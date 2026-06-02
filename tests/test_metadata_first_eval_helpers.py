@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from core.candidate_builder import MetadataRetrievalContext, apply_metadata_candidate_boosts
-from evals.v5.smoke_case_runner import doc_type_from_doc_id, expand_cases
+from evals.v5.smoke_case_runner import doc_type_from_doc_id, expand_cases, validate_smoke_case
 
 
 def test_doc_type_from_doc_id() -> None:
@@ -36,3 +36,45 @@ def test_comparison_fallback_telemetry_cesi() -> None:
     )
     assert tel["fallback_used"] is True
     assert tel["comparison_docs_for_topic"] is False
+
+
+def test_validate_expected_fallback_used_via_metadata_first_hook() -> None:
+    row = {
+        "id": "t_fallback",
+        "expected_fallback_used": True,
+    }
+    resp = {
+        "answer": "имплант или мост зависит от ситуации",
+        "meta": {
+            "file": "implantation__faq__cost.md",
+            "metadata_first": {"fallback_used": True, "selected_doc_type": "faq"},
+        },
+    }
+    result = validate_smoke_case(
+        row=row,
+        resp=resp,
+        answer=str(resp["answer"]),
+        route="retrieval_chunk",
+    )
+    assert result is None
+
+
+def test_validate_expected_doc_type_prefers_metadata_first_selected() -> None:
+    row = {
+        "id": "t_doc_type",
+        "expected_doc_type": "comparison",
+    }
+    resp = {
+        "answer": "сравнение",
+        "meta": {
+            "file": "implantation__faq__cost.md",
+            "metadata_first": {"selected_doc_type": "comparison"},
+        },
+    }
+    result = validate_smoke_case(
+        row=row,
+        resp=resp,
+        answer=str(resp["answer"]),
+        route="retrieval_chunk",
+    )
+    assert result is None

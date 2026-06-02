@@ -15,9 +15,9 @@ from config import (
 import alias_lexical
 from core.candidate_builder import (
     apply_metadata_candidate_boosts,
-    cap_alias_score_vs_semantic,
     effective_scope_topic_for_retrieval,
     metadata_context_from_decision,
+    resolve_alias_for_turn,
 )
 from core.client_config_loader import resolve_pack_client_id
 from core.routing_loader import THRESHOLDS
@@ -34,7 +34,6 @@ from policy import (
 from retriever import (
     broad_query_detect,
     chunk_info,
-    corpus_alias_leader,
     is_point_literal_query,
     llm_rerank,
     merge_retrieval_candidates,
@@ -123,7 +122,7 @@ def select_chunk_for_question(
         )
     widen_fb = bool(tel_p.get("scope_widen_fallback")) or bool(tel_s.get("scope_widen_fallback"))
 
-    # Defaults so early returns (e.g. no_candidates) can call _dm() before corpus_alias_leader runs.
+    # Defaults so early returns (e.g. no_candidates) can call _dm() before alias resolution runs.
     alias_leader: dict | None = None
     alias_score = 0.0
     alias_diag: dict[str, Any] = {}
@@ -152,6 +151,7 @@ def select_chunk_for_question(
         cands, boost_tel = apply_metadata_candidate_boosts(
             cands, ctx=meta_ctx, client_id=client_id
         )
+        boost_tel["top_semantic_raw"] = round(top_semantic_raw, 4)
     if not cands:
         return {
             "mode": "no_candidates",
@@ -160,15 +160,12 @@ def select_chunk_for_question(
 
     is_contacts = contacts_intent(q_policy)
     is_price = price_intent(q_policy)
-    alias_leader, alias_score, alias_diag = corpus_alias_leader(q_policy, client_id=client_id)
-    alias_score, alias_capped = cap_alias_score_vs_semantic(alias_score, top_semantic_raw)
-    alias_diag = {
-        **alias_diag,
-        "alias_hit": bool(alias_leader),
-        "alias_boost": round(float(alias_score or 0.0), 4),
-    }
-    if alias_capped:
-        alias_diag["alias_boost_capped"] = True
+    alias_leader, alias_score, alias_diag = resolve_alias_for_turn(
+        q_policy,
+        ctx=meta_ctx,
+        client_id=client_id,
+        top_semantic_score=top_semantic_raw,
+    )
     tier = str(alias_diag.get("alias_decision") or "")
     sim_raw = float(alias_diag.get("alias_similarity") or 0.0)
     ath = THRESHOLDS.alias
@@ -490,6 +487,7 @@ def compute_retrieval_scope_with_conflict_guard(
     scope_topic_candidate: str | None,
     q: str,
     client_id: str | None,
+    decision: Any | None = None,
 ) -> tuple[str | None, str]:
     """Вернуть эффективный topic scope для retrieval и причину гарда.
 
@@ -507,7 +505,13 @@ def compute_retrieval_scope_with_conflict_guard(
         return None, "catalog_match"
 
     q_pol = normalize_retrieval_query(q0) or q0
-    _leader, alias_sc, _alias_diag = corpus_alias_leader(q_pol, client_id=client_id)
+    meta_ctx = metadata_context_from_decision(decision)
+    _leader, alias_sc, _alias_diag = resolve_alias_for_turn(
+        q_pol,
+        ctx=meta_ctx,
+        client_id=client_id,
+        top_semantic_score=None,
+    )
     alias_val = float(alias_sc or 0.0)
     if alias_val >= float(THRESHOLDS.alias.scope_guard_min):
         return None, "alias_hit"

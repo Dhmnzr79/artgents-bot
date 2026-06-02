@@ -1,10 +1,10 @@
 {
-  "baseline": 27,
+  "baseline": 32,
   "description": "Metadata-first Phase 2 golden: route + doc_id (+ doc_type guards). Expand `clients` in runner.",
   "deferred": [
     {
       "id": "mf_comparison_fallback_telemetry",
-      "reason": "fallback_used only in candidate_builder telemetry; covered by unit test"
+      "reason": "fallback_used e2e unstable when alias picks wrong comparison doc; covered by unit test_finalize_ask_metadata_first_hook"
     }
   ],
   "cases": [
@@ -121,9 +121,51 @@
       "question": "Что лучше: имплант или мост?",
       "expected_route": "retrieval_chunk",
       "forbidden_doc_type": ["comparison"],
+      "expected_fallback_used": true,
       "answer_signals_any": ["имплант", "мост", "зуб"],
       "testability": "medium",
-      "comment": "no comparison md on cesi; must not select doc_type=comparison"
+      "comment": "cesi has all_on_4 comparison but not implant_vs_bridge; must not pick comparison doc for this pair"
+    },
+    {
+      "id": "mf_comparison_miss_nikadent",
+      "client_id": "nikadent",
+      "question": "Что лучше: имплант или мост?",
+      "expected_route": "retrieval_chunk",
+      "forbidden_doc_type": ["comparison"],
+      "expected_fallback_used": true,
+      "answer_signals_any": ["имплант", "мост", "зуб"],
+      "testability": "medium",
+      "comment": "nikadent has bugel comparison only; implant-vs-bridge miss → implantation RAG not prosthetics comparison"
+    },
+    {
+      "id": "mf_comparison_hit_cesi_all_on_4",
+      "client_id": "cesi",
+      "question": "Что лучше: All-on-4 или классическая имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__all_on_4_vs_classic_implantation",
+      "forbidden_doc_type": ["service", "pricing"],
+      "answer_signals_any": ["all-on-4", "all on 4", "классич", "имплант"],
+      "testability": "medium"
+    },
+    {
+      "id": "mf_comparison_bugel",
+      "clients": ["demo", "nikadent"],
+      "question": "Что лучше: бюгельный протез или мост?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__bugel_prosthesis_vs_fixed_bridge",
+      "forbidden_doc_type": ["service", "pricing"],
+      "answer_signals_any": ["бюгель", "мост"],
+      "testability": "medium"
+    },
+    {
+      "id": "mf_comparison_hit_nikadent_removable",
+      "client_id": "nikadent",
+      "question": "Что лучше: съемный протез или All-on-4?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__removable_denture_vs_all_on_4",
+      "forbidden_doc_type": ["service", "pricing"],
+      "answer_signals_any": ["съем", "протез", "all-on-4", "all on 4"],
+      "testability": "medium"
     },
     {
       "id": "mf_wrong_topic_aligners",

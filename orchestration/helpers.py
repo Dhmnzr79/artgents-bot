@@ -74,11 +74,13 @@ def apply_content_retrieval_scope_ctx(
     scope_topic_candidate: str | None,
     q: str,
     client_id: str,
+    decision: Any | None = None,
 ) -> str | None:
     eff, gr = compute_retrieval_scope_with_conflict_guard(
         scope_topic_candidate=scope_topic_candidate,
         q=q,
         client_id=client_id,
+        decision=decision,
     )
     if (
         bool(THRESHOLDS.metadata_first.soft_scope_enabled)

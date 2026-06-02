@@ -33,6 +33,28 @@ def test_soft_scope_disables_hard_topic_filter() -> None:
         assert request.ctx["retrieval_scope_topic_candidate"] == "implantation"
 
 
+def test_hard_scope_when_soft_scope_disabled() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        with patch("orchestration.helpers.THRESHOLDS") as thr:
+            thr.metadata_first.soft_scope_enabled = False
+            thr.catalog_match.containment_min = 0.88
+            thr.alias.scope_guard_min = 0.85
+            with patch(
+                "orchestration.helpers.compute_retrieval_scope_with_conflict_guard",
+                return_value=("implantation", "none"),
+            ):
+                eff = apply_content_retrieval_scope_ctx(
+                    "implantation", "тест", "demo"
+                )
+        assert eff == "implantation"
+        assert request.ctx["retrieval_scope_topic"] == "implantation"
+        assert request.ctx["retrieval_scope_guard_reason"] == "none"
+
+
 def test_comparison_wrong_topic_in_pool_gets_no_comparison_boost() -> None:
     corpus = [{"doc_type": "comparison", "topic": "implantation", "file": "c.md"}]
     cands = [
@@ -48,4 +70,5 @@ def test_comparison_wrong_topic_in_pool_gets_no_comparison_boost() -> None:
         cands, ctx=ctx, client_id="demo", corpus=corpus
     )
     assert tel["fallback_used"] is True
-    assert not any(ch.get("_metadata_boost") for ch in out if ch.get("doc_type") == "comparison")
+    assert tel.get("comparison_miss_excluded") is True
+    assert not any(ch.get("doc_type") == "comparison" for ch in out)

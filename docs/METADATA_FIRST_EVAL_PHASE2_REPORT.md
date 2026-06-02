@@ -13,7 +13,36 @@
 | `metadata_first_golden.json` | 27 (13 шаблонов × `clients`) | 27 | 0 | 0 | 27 |
 | `metadata_first_smoke.json` | 17 | 17 | 0 | 0 | 17 |
 
-**Итого:** 44/44 PASS.
+**Итого (Phase 2):** 44/44 PASS.
+
+### Phase 2b — comparison hit cesi/nikadent (2026-06-02)
+
+| Набор | Runs | PASS | Baseline |
+|-------|------|------|----------|
+| golden | 31 | 31 | 31 |
+| smoke | 19 | 19 | 19 |
+
+**Итого:** 50/50 PASS. Новые кейсы: `mf_comparison_hit_cesi_all_on_4`, `mf_comparison_bugel` (demo+nikadent), `mf_comparison_hit_nikadent_removable`; smoke: `mfs_comparison_cesi_all_on_4`, `mfs_comparison_nikadent_bugel`. `mf_comparison_miss_cesi` (implant vs bridge без doc) — без изменений.
+
+### Phase 3 — smoke expansion (2026-06-02)
+
+| Набор | Runs | PASS | Baseline |
+|-------|------|------|----------|
+| smoke | 33 | 33 | 33 |
+
+**+14 runs:** doctors (overview×3, Orlov, Moiseev, Kadiyev), multiclient cesi/nika (duration, safety, price_concern), faq/process (duration, safety, steps), cross-topic (extraction, braces ingress).
+
+**Итого eval:** golden 31 + smoke 33 = **64/64 PASS**.
+
+### Phase 3 — unit / CI (2026-06-02)
+
+| Область | Файл | Тестов |
+|---------|------|--------|
+| observability | `tests/test_metadata_first_observability.py` | 4 |
+| candidate_builder | `tests/test_candidate_builder.py` | +5 (всего 10) |
+| soft scope | `tests/test_metadata_first_scope.py` | +1 hard scope |
+| CI | `.github/workflows/ci.yml` | +observability pytest, alias report |
+| test hook | `finalize_turn.py` + `E2E_USE_TEST_CLIENT=1` | `meta.metadata_first` на `/ask` |
 
 ### Golden (шаблоны)
 
@@ -25,12 +54,15 @@
 | mf_faq_osseo, mf_faq_pain, mf_info_bone_graft | all 3 | content doc_id |
 | mf_service_classic_overview | all 3 | service overview |
 | mf_comparison_hit | demo | comparison doc |
-| mf_comparison_miss_cesi | cesi | forbidden_doc_type comparison |
+| mf_comparison_hit_cesi_all_on_4 | cesi | comparison all-on-4 vs classic |
+| mf_comparison_bugel | demo, nikadent | comparison bugel vs bridge |
+| mf_comparison_hit_nikadent_removable | nikadent | comparison removable vs all-on-4 |
+| mf_comparison_miss_cesi | cesi | implant vs bridge — нет comparison doc |
 | mf_wrong_topic_aligners | demo | aligners, forbidden comparison |
 
 ### Smoke
 
-Contacts (4), price (4), lead (2), pending (2), comparison (1), cross-topic veneers (1), content (3).
+Contacts (4), price (4), lead (2), pending (2), comparison (3), cross-topic veneers (1), content (3).
 
 ---
 
@@ -57,7 +89,7 @@ Contacts (4), price (4), lead (2), pending (2), comparison (1), cross-topic vene
 | `mf_comparison_fallback_telemetry` | `fallback_used` — telemetry `candidate_builder`, покрыт unit test |
 | `smoke_comparison_crown_vs_filling` | нет comparison md |
 | `smoke_comparison_missing_one_tooth` | weak, нет dedicated doc |
-| comparison hit cesi/nikadent | нет comparison md в pack |
+| comparison hit cesi/nikadent | ✅ Phase 2b: golden + smoke (2026-06-02) |
 | multi-turn smoke (6+ кейсов) | known v4 / #1.3 |
 | ingress / handoff / noise | вне scope metadata-first smoke |
 | `smoke_price_concern_general_no_service` | known v4 failure |

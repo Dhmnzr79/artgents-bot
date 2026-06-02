@@ -20,6 +20,7 @@
 
 | Задача | Направление | Phase |
 |--------|-------------|-------|
+| Metadata-First: unified alias scoring pool (alias as bonus in one ranked list, not parallel arbiter channel) | `docs/METADATA_FIRST_V1.md` §5 target | post-V1 |
 | Карта маршрутов | `docs/ROUTING_MAP.md` | **2 ✓** |
 | Smoke routing guards + `meta.service_route` | `evals/v5/e2e_smoke.json`, runner | **3 ✓** |
 | `orchestration/route_guards.py` | pre-Resolver guards | **3 ✓** |

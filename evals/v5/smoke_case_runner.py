@@ -258,11 +258,16 @@ def validate_smoke_case(
 
     if row.get("expected_doc_type") is not None:
         want_dt = str(row.get("expected_doc_type") or "").strip().lower()
-        if want_dt and norm(got_doc_type) != want_dt:
+        mf = meta.get("metadata_first")
+        if isinstance(mf, dict) and str(mf.get("selected_doc_type") or "").strip():
+            got_dt = str(mf.get("selected_doc_type") or "").strip().lower()
+        else:
+            got_dt = norm(got_doc_type)
+        if want_dt and got_dt != want_dt:
             return CaseResult(
                 case_id=case_id,
                 status="FAIL",
-                reason=f"doc_type: got={got_doc_type!r} want={want_dt!r}",
+                reason=f"doc_type: got={got_dt!r} want={want_dt!r}",
                 coverage_class=cov,
             )
 

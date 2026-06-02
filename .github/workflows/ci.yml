@@ -49,9 +49,14 @@ jobs:
           python -m pytest \
             tests/test_metadata_first_eval_helpers.py \
             tests/test_metadata_first_scope.py \
+            tests/test_metadata_first_observability.py \
+            tests/test_finalize_metadata_first_hook.py \
             tests/test_e2e_smoke_infer.py \
             tests/test_candidate_builder.py \
             -q --tb=short
+
+      - name: Alias collision report (non-blocking inventory)
+        run: python scripts/alias_collision_report.py --client all
 
   metadata-first-eval:
     name: Metadata-first eval (in-proc)

@@ -75,6 +75,7 @@ def run_content_arbiter_path(
         scope_topic_candidate,
         q,
         client_id,
+        decision=decision,
     )
     cands = collect_content_candidates(
         q=q,
@@ -383,6 +384,7 @@ def run_selection_fallback(
         scope_topic_candidate,
         q,
         client_id,
+        decision=decision_frame,
     )
     selection = select_chunk_for_question(
         q,

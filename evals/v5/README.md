@@ -52,7 +52,7 @@ python evals/v5/run_layer_eval.py --layer all
 - `answer_signals_any` — OR по подстрокам (предпочтительнее одного слова в `must_contain`)
 - `must_match_any_regex` — хотя бы один regex match
 - `clients` — дублировать кейс на несколько `client_id` (`id@demo`, …); только в `run_metadata_first_eval.py`
-- `expected_fallback_used` / `expected_doc_type` — Phase 2+ (нужен test hook `meta.metadata_first`)
+- `expected_fallback_used` / `expected_doc_type` — при `E2E_USE_TEST_CLIENT=1` через `meta.metadata_first`
 
 См. `docs/METADATA_FIRST_EVAL_PLAN.md`.
 

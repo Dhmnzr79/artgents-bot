@@ -5,7 +5,11 @@ from typing import Any
 
 from flask import request
 
-from core.metadata_first_observability import metadata_first_turn_details
+from core.metadata_first_observability import (
+    metadata_first_response_meta,
+    metadata_first_turn_details,
+    should_expose_metadata_first_in_response,
+)
 from logging_setup import emit_bot_event, get_logger, redact_text
 from session import get_topic_state, mem_get, record_last_bot_payload
 
@@ -60,6 +64,11 @@ def finalize_ask(
     else:
         meta["turn_count"] = session_turn_count
     meta["session_turn_count"] = session_turn_count
+
+    if should_expose_metadata_first_in_response():
+        mf = metadata_first_response_meta()
+        if mf:
+            meta["metadata_first"] = mf
 
     if turn_meta and turn_meta.get("interaction") == "user_message":
         emit_bot_event(logger, "user_turn_completed", status="ok", details=turn_meta)

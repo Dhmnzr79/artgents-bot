@@ -12,9 +12,10 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from core.candidate_builder import metadata_context_from_decision, resolve_alias_for_turn
 from core.routing_loader import THRESHOLDS
 from query_selector import select_catalog_content_route, select_chunk_for_question
-from retriever import broad_query_detect, corpus_alias_leader, normalize_retrieval_query
+from retriever import broad_query_detect, normalize_retrieval_query
 from session import mem_get
 
 
@@ -208,7 +209,21 @@ def collect_content_candidates(
     cat_anchor = _anchor_from_ref(md_ref) if md_ref else ""
     cat_is_overview = bool(md_ref and _is_overview_anchor(cat_anchor))
 
-    alias_leader, alias_score, alias_diag = corpus_alias_leader(q_norm, client_id=client_id)
+    sel_meta = selection.get("debug_meta") if isinstance(selection.get("debug_meta"), dict) else {}
+    top_sem_raw = sel_meta.get("top_semantic_raw")
+    if top_sem_raw is None and isinstance(retrieval_chunk, dict):
+        sc = retrieval_chunk.get("_score")
+        top_sem_raw = float(sc) if sc is not None else None
+    elif top_sem_raw is not None:
+        top_sem_raw = float(top_sem_raw)
+
+    meta_ctx = metadata_context_from_decision(decision)
+    alias_leader, alias_score, alias_diag = resolve_alias_for_turn(
+        q_norm,
+        ctx=meta_ctx,
+        client_id=client_id,
+        top_semantic_score=top_sem_raw,
+    )
     # `corpus_alias_leader` returns (chunk, score, diag). PR #1.10: diag carries alias_* telemetry.
     # For P0 we approximate "specificity" from the normalized user query token count.
     # This stays deterministic and avoids any per-phrase keyword exceptions.

@@ -1,6 +1,6 @@
 {
-  "baseline": 17,
-  "description": "Metadata-first Phase 2 critical smoke (subset of e2e_smoke + doc_id asserts)",
+  "baseline": 33,
+  "description": "Metadata-first smoke: Phase 2 critical + Phase 3 (doctors, multiclient, faq/process, cross-topic)",
   "cases": [
     {
       "id": "mfs_contacts_phone",
@@ -108,6 +108,24 @@
       "coverage_class": "STRONG"
     },
     {
+      "id": "mfs_comparison_cesi_all_on_4",
+      "client_id": "cesi",
+      "question": "Что лучше: All-on-4 или классическая имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__all_on_4_vs_classic_implantation",
+      "answer_signals_any": ["all-on-4", "классич", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_comparison_nikadent_bugel",
+      "client_id": "nikadent",
+      "question": "Что лучше: бюгельный протез или мост?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__bugel_prosthesis_vs_fixed_bridge",
+      "answer_signals_any": ["бюгель", "мост"],
+      "coverage_class": "STRONG"
+    },
+    {
       "id": "mfs_cross_topic_veneers",
       "question": "Сколько стоят виниры?",
       "expected_route_any": ["price_lookup", "catalog_facts", "catalog_md_first", "retrieval_chunk"],
@@ -138,6 +156,114 @@
       "expected_doc_id": "implantation__info__contraindications",
       "answer_signals_any": ["противопоказ"],
       "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_doctors_overview",
+      "clients": ["demo", "cesi", "nikadent"],
+      "question": "Какие врачи работают в клинике?",
+      "expected_route_any": ["doctors_list", "retrieval_chunk"],
+      "expected_doc_id": "doctors__doctor__overview",
+      "answer_signals_any": ["врач", "специалист", "имплант", "хирург"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_doctors_orlov",
+      "client_id": "demo",
+      "question": "Расскажите про врача Орлова",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "doctors__doctor__orlov",
+      "answer_signals_any": ["орлов", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_doctors_moiseev",
+      "client_id": "cesi",
+      "question": "Расскажите про врача Моисеева",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "doctors__doctor__moiseev",
+      "answer_signals_any": ["моисеев", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_doctors_kadiyev",
+      "client_id": "nikadent",
+      "question": "Расскажите про врача Кадиева",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "doctors__doctor__kadiyev",
+      "answer_signals_any": ["кадиев", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cesi_faq_duration",
+      "client_id": "cesi",
+      "question": "Сколько по времени длится имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__duration",
+      "answer_signals_any": ["месяц", "срок", "этап", "прижив"],
+      "must_not_contain": ["тверск", "495"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_nikadent_faq_safety",
+      "client_id": "nikadent",
+      "question": "Безопасна ли имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__safety",
+      "answer_signals_any": ["безопас", "стерил", "риск"],
+      "must_not_contain": ["тверск", "495"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cesi_price_concern",
+      "client_id": "cesi",
+      "question": "Почему импланты такие дорогие?",
+      "expected_route": "price_concern",
+      "expected_doc_id": "implantation__faq__cost",
+      "answer_signals_any": ["материал", "стоим", "цен"],
+      "must_not_contain": ["тверск", "495"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_faq_duration",
+      "question": "Сколько по времени длится имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__duration",
+      "answer_signals_any": ["месяц", "срок", "этап", "прижив"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_faq_safety",
+      "question": "Безопасна ли имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__safety",
+      "answer_signals_any": ["безопас", "стерил", "риск"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_info_impl_steps",
+      "question": "Как проходит имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__info__steps",
+      "answer_signals_any": ["этап", "консультац", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cross_topic_extraction",
+      "question": "Нужно удалить зуб, что делать?",
+      "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
+      "expected_doc_id": "extraction__service__tooth_extraction",
+      "answer_signals_any": ["удал", "зуб", "анестез"],
+      "must_not_contain": ["сделаем имплант", "поставим имплант", "запишем на имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cross_topic_braces",
+      "question": "А брекеты делаете?",
+      "expected_route": "ingress_service_not_offered",
+      "answer_signals_any": ["элайнер", "ортодонт", "выравн"],
+      "must_not_contain": ["да, делаем брекеты", "ставим брекеты"],
+      "coverage_class": "STRONG",
+      "comment": "брекеты не в каталоге — альтернатива элайнеры (clinic_policies)"
     }
   ]
 }

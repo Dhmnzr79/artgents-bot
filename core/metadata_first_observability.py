@@ -1,11 +1,26 @@
 """Metadata-First v1 telemetry helpers (request.ctx + bot_event details)."""
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from flask import request
 
 from retriever import chunk_doc_type
+
+
+def should_expose_metadata_first_in_response() -> bool:
+    """Test hook: attach telemetry to /ask meta only when E2E_USE_TEST_CLIENT=1."""
+    return (os.getenv("E2E_USE_TEST_CLIENT") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def metadata_first_response_meta() -> dict[str, Any]:
+    """Subset of ctx fields for eval runner (`meta.metadata_first`)."""
+    return metadata_first_turn_details()
 
 
 def record_decision_frame_ctx(decision: Any | None) -> None:
@@ -35,6 +50,10 @@ def merge_retrieval_debug_meta(debug_meta: dict[str, Any] | None) -> None:
         "comparison_prefer",
         "comparison_docs_for_topic",
         "fallback_used",
+        "comparison_miss_excluded",
+        "comparison_excluded_count",
+        "comparison_miss_alias_rejected",
+        "alias_topic_guard_rejected",
         "retrieval_scope_topic_effective",
         "alias_boost_capped",
         "alias_hit",
@@ -84,6 +103,9 @@ def metadata_first_turn_details() -> dict[str, Any]:
         "comparison_prefer",
         "comparison_docs_for_topic",
         "metadata_boost_applied",
+        "comparison_miss_excluded",
+        "comparison_excluded_count",
+        "alias_topic_guard_rejected",
         "retrieval_scope_guard_reason",
         "retrieval_scope_topic_candidate",
     )

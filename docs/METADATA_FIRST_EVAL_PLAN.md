@@ -4,7 +4,7 @@
 **Статус Phase 1:** ✅ inventory + design (этот документ)  
 **Статус Phase 2:** ✅ реализовано — отчёт **`docs/METADATA_FIRST_EVAL_PHASE2_REPORT.md`** (baseline golden=27, smoke=17)  
 **Статус Этап 3 (CI):** ✅ `.github/workflows/ci.yml`  
-**Статус Phase 3:** ⏸ после Phase 2  
+**Статус Phase 3 (smoke):** ✅ первая волна — baseline smoke=33 (2026-06-02)
 
 **Связанные документы:** `METADATA_FIRST_V1.md`, `METADATA_FIRST_V1_READINESS.md`, `evals/v5/README.md`, `evals/routing_smoke.md`.
 
@@ -424,12 +424,10 @@ python evals/v5/run_e2e_smoke.py --case-id smoke_cesi_contacts_address
 
 | Область | Где | Статус |
 |---------|-----|--------|
-| soft_scope | `tests/test_metadata_first_scope.py` | есть 1 тест — расширить |
-| comparison wrong-topic boost | `tests/test_metadata_first_scope.py` | есть 1 тест |
-| candidate_builder boosts | новый `tests/test_candidate_builder_metadata.py` | Phase 3 |
-| metadata observability | assert `turn_complete` / ctx fields | Phase 3 |
-| linter content | CI: `python scripts/lint_content.py --client all` | eval level 0 |
-| alias collision report | smoke script exit 0 / report artifact | Phase 3 |
+| candidate_builder boosts | `tests/test_candidate_builder.py` | ✅ расширено |
+| metadata observability | `tests/test_metadata_first_observability.py` | ✅ ctx / turn_details |
+| soft_scope hard path | `tests/test_metadata_first_scope.py` | ✅ + hard scope when soft off |
+| alias collision report | CI job `content-lint-and-unit` | ✅ non-blocking inventory |
 
 **Resolver golden:** 44 кейса — layer eval 1, не раздувать в Phase 3 без новых route_intent.
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from evals.v5.run_e2e_smoke import _infer_route_from_response
+from evals.v5.smoke_case_runner import infer_route_from_response as _infer_route_from_response
 
 
 def test_infer_route_service_route_wins() -> None:

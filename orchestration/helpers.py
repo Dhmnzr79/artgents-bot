@@ -8,6 +8,13 @@ from flask import request
 
 from core.client_config_loader import load_ui_bundle, ui_menu_to_payload
 from logging_setup import emit_bot_event, get_logger
+from core.metadata_first_observability import (
+    merge_retrieval_debug_meta,
+    metadata_first_turn_details,
+    record_decision_frame_ctx,
+    record_selection_metadata,
+)
+from core.routing_loader import THRESHOLDS
 from query_selector import compute_retrieval_scope_with_conflict_guard
 from retriever import chunk_info
 from ux_builder import format_price_answer_from_item
@@ -73,9 +80,45 @@ def apply_content_retrieval_scope_ctx(
         q=q,
         client_id=client_id,
     )
+    if (
+        bool(THRESHOLDS.metadata_first.soft_scope_enabled)
+        and gr == "none"
+        and eff is not None
+    ):
+        request.ctx["retrieval_scope_topic"] = None
+        request.ctx["retrieval_scope_guard_reason"] = "metadata_first_soft"
+        request.ctx["retrieval_scope_topic_candidate"] = eff
+        return None
     request.ctx["retrieval_scope_topic"] = eff
     request.ctx["retrieval_scope_guard_reason"] = gr
+    if eff is not None:
+        request.ctx["retrieval_scope_topic_candidate"] = eff
     return eff
+
+
+def apply_metadata_first_after_content_route(
+    *,
+    decision: Any,
+    retrieval_debug_meta: dict | None,
+    selected_doc_id: str | None,
+    selected_chunk: dict | None,
+    selected_route: str | None,
+    alias_candidate: dict | None,
+) -> None:
+    """Merge §7 telemetry into request.ctx after content arbiter / retrieval."""
+    record_decision_frame_ctx(decision)
+    merge_retrieval_debug_meta(retrieval_debug_meta)
+    if isinstance(alias_candidate, dict):
+        leader = alias_candidate.get("leader_chunk") or alias_candidate.get("leader")
+        score = alias_candidate.get("alias_score")
+        request.ctx["alias_hit"] = bool(leader)
+        if score is not None:
+            request.ctx["alias_boost"] = round(float(score), 4)
+    record_selection_metadata(
+        selected_doc_id=selected_doc_id,
+        selected_chunk=selected_chunk,
+        selected_route=selected_route,
+    )
 
 
 def guided_menu_payload(sid: str, client_id: str | None) -> dict:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -10,8 +11,10 @@ from content_arbiter import collect_content_candidates
 from contracts.ask_orchestration import AskOrchestrationResult
 from flow_handlers import resume_active_lead_flow
 from logging_setup import emit_bot_event, get_logger, log_json
+from core.metadata_first_observability import metadata_first_turn_details
 from orchestration.helpers import (
     apply_content_retrieval_scope_ctx,
+    apply_metadata_first_after_content_route,
     guided_menu_payload,
     log_selection,
     service_price_line_for_content,
@@ -86,18 +89,6 @@ def run_content_arbiter_path(
     rdbg_turn = (cands.retrieval or {}).get("debug_meta") or {}
     if rdbg_turn.get("scope_widen_fallback"):
         request.ctx["retrieval_scope_widen_fallback"] = True
-    for _mk in (
-        "candidate_pool_before",
-        "candidate_pool_after",
-        "metadata_boost_applied",
-        "comparison_prefer",
-        "comparison_docs_for_topic",
-        "fallback_used",
-        "retrieval_scope_topic_effective",
-        "alias_boost_capped",
-    ):
-        if _mk in rdbg_turn:
-            request.ctx[_mk] = rdbg_turn[_mk]
     sel = decide_content_route(
         q=q,
         sid=sid,
@@ -106,6 +97,20 @@ def run_content_arbiter_path(
         decision_frame=decision,
     )
     dm_sel = sel.debug_meta if isinstance(sel.debug_meta, dict) else {}
+    apply_metadata_first_after_content_route(
+        decision=decision,
+        retrieval_debug_meta=rdbg_turn,
+        selected_doc_id=sel.selected_doc_id,
+        selected_chunk=sel.selected_chunk,
+        selected_route=sel.selected_route,
+        alias_candidate=cands.alias,
+    )
+    emit_bot_event(
+        logger,
+        "retrieval_metadata",
+        status="ok",
+        details=metadata_first_turn_details(),
+    )
     request.ctx["arbiter_status"] = dm_sel.get("arbiter_status")
     request.ctx["arbiter_selected_ref"] = dm_sel.get("arbiter_selected_ref")
     request.ctx["arbiter_confidence"] = dm_sel.get("arbiter_confidence")
@@ -380,12 +385,35 @@ def run_selection_fallback(
         client_id,
     )
     selection = select_chunk_for_question(
-        q, client_id=client_id, sid=sid, scope_topic=effective_scope_topic
+        q,
+        client_id=client_id,
+        sid=sid,
+        scope_topic=effective_scope_topic,
+        decision=decision_frame,
     )
     mode = selection.get("mode")
     dmeta = selection.get("debug_meta") or {}
     if dmeta.get("scope_widen_fallback"):
         request.ctx["retrieval_scope_widen_fallback"] = True
+    _fb_chunk = selection.get("chunk") if mode == "chunk" else None
+    _fb_doc_id = None
+    if isinstance(_fb_chunk, dict):
+        _fb_file = os.path.basename(str(_fb_chunk.get("file") or ""))
+        _fb_doc_id = os.path.splitext(_fb_file)[0] if _fb_file else None
+    apply_metadata_first_after_content_route(
+        decision=decision_frame,
+        retrieval_debug_meta=dmeta,
+        selected_doc_id=_fb_doc_id,
+        selected_chunk=_fb_chunk if isinstance(_fb_chunk, dict) else None,
+        selected_route="retrieval_chunk" if mode == "chunk" else None,
+        alias_candidate=None,
+    )
+    emit_bot_event(
+        logger,
+        "retrieval_metadata",
+        status="ok",
+        details=metadata_first_turn_details(),
+    )
     if mode == "no_candidates":
         log_json(logger, "No candidates found", question=q[:50])
         emit_bot_event(

@@ -69,6 +69,7 @@ class MetadataFirstThresholds(BaseModel):
     comparison_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
     service_topic_match_boost: float = Field(..., ge=0.0, le=0.5)
     alias_boost_max_delta: float = Field(..., ge=0.0, le=0.5)
+    soft_scope_enabled: bool = True
 
 
 class CatalogMatchThresholds(BaseModel):

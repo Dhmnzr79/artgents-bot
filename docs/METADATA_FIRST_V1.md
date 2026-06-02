@@ -109,6 +109,8 @@ Comparison в v1:
 
 - система спокойно уходит в обычный retrieval/RAG
 
+Паттерн контента (эталон — `clients/demo/md/comparison__implant_vs_bridge.md`): короткий ответ в `#korotko`, уточняющие блоки — отдельные `h3` в том же файле; в frontmatter `suggest_h3` с id этих секций.
+
 ---
 
 ## План Работ V1
@@ -142,7 +144,7 @@ Comparison в v1:
 
 ### 3. Put metadata into corpus/index
 
-Каждый chunk в `corpus.jsonl` должен содержать минимум:
+**Реализовано в `build_index.py`** (нужен пересбор индекса). Каждый chunk в `corpus.jsonl` должен содержать минимум:
 
 - `client_id`
 - `doc_id`
@@ -153,6 +155,8 @@ Comparison в v1:
 Без этого metadata-first схема останется только внешней идеей.
 
 ### 4. Add candidate builder
+
+**Реализовано (частично):** `core/candidate_builder.py` — post-retrieve score boosts: только `comparison_doc_type_boost` (при `query_mode=comparison` и comparison-doc с тем же `topic`) и `service_topic_match_boost` (при совпадении chunk `topic` с `service_topic`). Общего prefer по `doc_type` для faq/service/info/pricing/doctor/contacts **нет**. Отдельного слоя до retriever нет — boosts после `merge_retrieval_candidates`. Soft-scope: при `metadata_first.soft_scope_enabled` и `guard_reason=none` candidate topic уходит в telemetry, hard filter не применяется (`apply_content_retrieval_scope_ctx`); при `catalog_match` / `alias_hit` hard scope по-прежнему может не включаться по другим правилам; иначе возможен прежний hard scope.
 
 Встроить слой:
 
@@ -172,6 +176,8 @@ Comparison в v1:
 В v1 не делать жёсткий hard filter.
 
 ### 5. Add capped alias boost
+
+**Реализовано:** `cap_alias_score_vs_semantic` в `core/candidate_builder.py`, вызов из `query_selector.py` (`metadata_first.alias_boost_max_delta`).
 
 Alias должен:
 
@@ -201,11 +207,13 @@ Alias не должен:
 
 - фронтматтер
 - `#korotko`
-- follow-up через `suggest_refs`
+- follow-up через `suggest_h3` → якоря `### ... {#h3_id}` **внутри того же** comparison-doc (не cross-doc `suggest_refs` в v1)
 - мягкий CTA
 - при необходимости эмпатичный тон
 
 ### 7. Add observability
+
+**Реализовано:** `core/metadata_first_observability.py` — поля в `request.ctx`, событие `retrieval_metadata`, блок в `turn_complete` (`finalize_turn.py`).
 
 Логировать минимум:
 
@@ -236,6 +244,8 @@ Alias не должен:
 - дубли alias
 
 ### 9. Add alias collision report
+
+**Реализовано:** `python scripts/alias_collision_report.py` (и `lint_content.py --collisions`).
 
 Отдельный отчёт:
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import request
 
+from core.metadata_first_observability import record_decision_frame_ctx
 from core.routing_loader import THRESHOLDS
 from llm import classify_intent
 from logging_setup import emit_bot_event, get_logger, log_json
@@ -89,6 +90,7 @@ def run_resolver_turn(
         else:
             intent = "content"
         request.ctx["effective_intent"] = str(intent)
+        record_decision_frame_ctx(decision)
 
     scope_topic_candidate: str | None = None
     if decision is not None:

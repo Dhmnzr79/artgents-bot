@@ -34,6 +34,8 @@ metadata_first:
   comparison_doc_type_boost: 0.08
   service_topic_match_boost: 0.05
   alias_boost_max_delta: 0.12
+  # v1: no hard corpus filter by service_topic (boosts in candidate_builder instead)
+  soft_scope_enabled: true
 
 catalog_match:
   containment_min: 0.88

@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+"""Metadata-first Phase 2 eval runner (golden + critical smoke)."""
+import argparse
+import os
+import sys
+
+_EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
+if _EVAL_DIR not in sys.path:
+    sys.path.insert(0, _EVAL_DIR)
+
+from smoke_case_runner import here, run_smoke_suite
+
+_SUITES = {
+    "golden": "metadata_first_golden.json",
+    "smoke": "metadata_first_smoke.json",
+    "all": "metadata_first_golden.json",
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(argv or [])
+    ap = argparse.ArgumentParser(description="Metadata-first v1 eval runner", allow_abbrev=False)
+    ap.add_argument(
+        "--suite",
+        choices=("golden", "smoke", "all"),
+        default=os.getenv("MF_EVAL_SUITE") or "golden",
+        help="golden | smoke | all (golden then smoke)",
+    )
+    ap.add_argument("--client", default=None, metavar="CLIENT_ID")
+    ap.add_argument("--case-id", action="append", default=None, metavar="ID")
+    ns, unknown = ap.parse_known_args(argv)
+    if unknown:
+        print(f"WARNING: ignored unknown args: {unknown!r}", file=sys.stderr, flush=True)
+
+    bot_url = (os.getenv("BOT_URL") or "http://localhost:5000/ask").strip()
+    timeout_sec = float(os.getenv("BOT_TIMEOUT_SEC") or "20")
+    custom_path = (os.getenv("MF_EVAL_PATH") or "").strip()
+
+    filter_ids: set[str] | None = None
+    raw_ids: list[str] = []
+    if ns.case_id:
+        raw_ids.extend(str(x).strip() for x in ns.case_id if str(x).strip())
+    if (os.getenv("MF_EVAL_CASE_ID") or "").strip():
+        raw_ids.extend(x.strip() for x in os.getenv("MF_EVAL_CASE_ID", "").split(",") if x.strip())
+    if raw_ids:
+        filter_ids = set(raw_ids)
+
+    client_filter: str | None = None
+    if ns.client and str(ns.client).strip():
+        client_filter = str(ns.client).strip().lower()
+    elif (os.getenv("MF_EVAL_CLIENT") or os.getenv("E2E_SMOKE_CLIENT") or "").strip():
+        client_filter = (
+            os.getenv("MF_EVAL_CLIENT") or os.getenv("E2E_SMOKE_CLIENT") or ""
+        ).strip().lower()
+
+    suites: list[str] = ["golden", "smoke"] if ns.suite == "all" else [ns.suite]
+    exit_code = 0
+    for suite in suites:
+        path = custom_path if custom_path and len(suites) == 1 else here(_SUITES[suite])
+        print(f"\n=== metadata-first eval: {suite} ({path}) ===\n", flush=True)
+        code = run_smoke_suite(
+            spec_path=path,
+            bot_url=bot_url,
+            timeout_sec=timeout_sec,
+            client_filter=client_filter,
+            filter_ids=filter_ids,
+            expand_multiclient=True,
+        )
+        if code != 0:
+            exit_code = code
+            if ns.suite == "all":
+                break
+    return exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

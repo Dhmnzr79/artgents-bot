@@ -162,8 +162,13 @@ def select_chunk_for_question(
     is_price = price_intent(q_policy)
     alias_leader, alias_score, alias_diag = corpus_alias_leader(q_policy, client_id=client_id)
     alias_score, alias_capped = cap_alias_score_vs_semantic(alias_score, top_semantic_raw)
+    alias_diag = {
+        **alias_diag,
+        "alias_hit": bool(alias_leader),
+        "alias_boost": round(float(alias_score or 0.0), 4),
+    }
     if alias_capped:
-        alias_diag = {**alias_diag, "alias_boost_capped": True, "alias_boost": round(alias_score, 4)}
+        alias_diag["alias_boost_capped"] = True
     tier = str(alias_diag.get("alias_decision") or "")
     sim_raw = float(alias_diag.get("alias_similarity") or 0.0)
     ath = THRESHOLDS.alias

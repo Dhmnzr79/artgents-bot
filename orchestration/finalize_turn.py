@@ -5,6 +5,7 @@ from typing import Any
 
 from flask import request
 
+from core.metadata_first_observability import metadata_first_turn_details
 from logging_setup import emit_bot_event, get_logger, redact_text
 from session import get_topic_state, mem_get, record_last_bot_payload
 
@@ -119,6 +120,7 @@ def finalize_ask(
                 "retrieval_scope_widen_fallback": bool(
                     request.ctx.get("retrieval_scope_widen_fallback")
                 ),
+                **metadata_first_turn_details(),
                 "legacy_intent": request.ctx.get("legacy_intent"),
                 "effective_intent": str(request.ctx.get("effective_intent") or ""),
                 "source_route_decision": request.ctx.get("source_route_decision"),

@@ -27,4 +27,5 @@
 ## Evals
 
 - Smoke: `evals/v5/run_e2e_smoke.py`
+- Metadata-first: `evals/v5/run_metadata_first_eval.py` (CI: `.github/workflows/ci.yml`)
 - Layer: `evals/v5/run_layer_eval.py`

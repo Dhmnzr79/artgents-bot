@@ -4,6 +4,10 @@
 
 ## Файлы
 
+- `smoke_case_runner.py` — общая валидация e2e / metadata-first кейсов
+- `metadata_first_golden.json` — Phase 2 golden (route + doc_id)
+- `metadata_first_smoke.json` — Phase 2 critical smoke
+- `run_metadata_first_eval.py` — runner metadata-first наборов
 - `resolver_golden.json` — кейсы для Resolver (`DecisionFrame`)
 - `arbiter_golden.json` — кейсы для Arbiter (`ArbiterDecision`)
 - `verifier_golden.json` — кейсы для Verifier (`VerifierVerdict`)
@@ -40,6 +44,31 @@ python evals/v5/run_layer_eval.py --layer all
 - `session_seed`: опционально, объект (напр. `{"pending_lead_offer": true}`) — только с `E2E_USE_TEST_CLIENT=1`; runner делает `mem_reset(sid)` перед кейсом, затем seed
 - `expected_route_any`: опционально, массив строк (ambiguous кейсы)
 - `must_contain` / `must_not_contain`: опционально, массив строк (case-insensitive substring)
+
+**Phase 2 (metadata-first, опционально в любом json):**
+
+- `expected_doc_id` / `expected_doc_id_any` / `forbidden_doc_id` — derive doc_id из `meta.file` (stem)
+- `forbidden_doc_type` — эвристика по doc_id (`__faq__`, `comparison__`, …)
+- `answer_signals_any` — OR по подстрокам (предпочтительнее одного слова в `must_contain`)
+- `must_match_any_regex` — хотя бы один regex match
+- `clients` — дублировать кейс на несколько `client_id` (`id@demo`, …); только в `run_metadata_first_eval.py`
+- `expected_fallback_used` / `expected_doc_type` — Phase 2+ (нужен test hook `meta.metadata_first`)
+
+См. `docs/METADATA_FIRST_EVAL_PLAN.md`.
+
+### Metadata-first eval (Phase 2)
+
+```bash
+# in-proc (рекомендуется для CI без поднятого сервера):
+set E2E_USE_TEST_CLIENT=1
+python evals/v5/run_metadata_first_eval.py --suite golden
+python evals/v5/run_metadata_first_eval.py --suite smoke
+python evals/v5/run_metadata_first_eval.py --suite all --client demo
+```
+
+Env: `MF_EVAL_SUITE`, `MF_EVAL_PATH`, `MF_EVAL_CLIENT`, `MF_EVAL_CASE_ID`.
+
+**CI:** `.github/workflows/ci.yml` — job `metadata-first-eval` (нужен repo secret `OPENAI_API_KEY`, `E2E_USE_TEST_CLIENT=1`).
 
 ### Как запустить
 

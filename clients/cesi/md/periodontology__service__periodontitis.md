@@ -1,5 +1,6 @@
 ---
 doc_id: periodontology__service__periodontitis
+doc_type: service
 topic: periodontology
 subtopic: periodontitis
 

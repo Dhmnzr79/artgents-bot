@@ -1,5 +1,6 @@
 ---
 doc_id: orthodontics__service__aligners
+doc_type: service
 topic: orthodontics
 subtopic: aligners
 

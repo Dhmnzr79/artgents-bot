@@ -1,5 +1,6 @@
 ---
 doc_id: clinic__info__technology
+doc_type: info
 topic: clinic
 subtopic: technology
 

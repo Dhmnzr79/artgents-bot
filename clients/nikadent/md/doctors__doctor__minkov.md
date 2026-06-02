@@ -1,5 +1,6 @@
 ---
 doc_id: doctors__doctor__minkov
+doc_type: doctor
 topic: doctors
 subtopic: minkov
 

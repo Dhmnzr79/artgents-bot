@@ -1,5 +1,6 @@
 ---
 doc_id: clinic__info__warranty
+doc_type: info
 topic: clinic
 subtopic: warranty
 

@@ -1,0 +1,173 @@
+"""Metadata-First v1: soft score boosts on retrieval candidates."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from core.routing_loader import THRESHOLDS
+from retriever import chunk_doc_type, load_corpus_if_needed
+
+
+@dataclass(frozen=True)
+class MetadataRetrievalContext:
+    query_mode: str | None
+    service_topic: str | None
+    service_topic_confidence: float = 0.0
+
+
+def metadata_context_from_decision(decision: Any | None) -> MetadataRetrievalContext | None:
+    if decision is None:
+        return None
+    if isinstance(decision, dict):
+        qm = decision.get("query_mode")
+        st = decision.get("service_topic")
+        conf = decision.get("confidence") or {}
+        topic_conf = (
+            float(conf.get("topic", 0.0))
+            if isinstance(conf, dict)
+            else float(getattr(conf, "topic", 0.0) or 0.0)
+        )
+    else:
+        qm = getattr(decision, "query_mode", None)
+        st = getattr(decision, "service_topic", None)
+        conf = getattr(decision, "confidence", None)
+        topic_conf = float(getattr(conf, "topic", 0.0) or 0.0) if conf is not None else 0.0
+    qm = str(qm or "").strip().lower() or None
+    st = str(st or "").strip().lower() or None
+    if st in ("", "unknown"):
+        st = None
+    if not qm and not st:
+        return None
+    return MetadataRetrievalContext(
+        query_mode=qm,
+        service_topic=st,
+        service_topic_confidence=topic_conf,
+    )
+
+
+def effective_scope_topic_for_retrieval(
+    scope_topic: str | None,
+    ctx: MetadataRetrievalContext | None,
+) -> str | None:
+    """Comparison queries: no hard topic scope (prefer doc_type via boosts)."""
+    if ctx and str(ctx.query_mode or "").strip().lower() == "comparison":
+        return None
+    return scope_topic
+
+
+def _chunk_topic(ch: dict) -> str | None:
+    t = ch.get("topic")
+    if t is not None and str(t).strip():
+        return str(t).strip().lower()
+    return None
+
+
+def _corpus_has_comparison_for_topic(
+    corpus: list[dict],
+    *,
+    client_id: str | None,
+    service_topic: str,
+) -> bool:
+    """True if pack has at least one comparison doc for this service_topic."""
+    want_topic = service_topic.strip().lower()
+    if not want_topic or want_topic == "unknown":
+        return False
+    for row in corpus:
+        if not isinstance(row, dict):
+            continue
+        row_cid = row.get("client_id")
+        if client_id and row_cid and row_cid != client_id:
+            continue
+        dt = chunk_doc_type(row)
+        if not dt or str(dt).strip().lower() != "comparison":
+            continue
+        topic_l = _chunk_topic(row)
+        if topic_l == want_topic:
+            return True
+    return False
+
+
+def apply_metadata_candidate_boosts(
+    candidates: list[dict],
+    *,
+    ctx: MetadataRetrievalContext | None,
+    client_id: str | None,
+    corpus: list[dict] | None = None,
+) -> tuple[list[dict], dict[str, Any]]:
+    """Re-rank retrieval candidates with soft metadata boosts; fail-open."""
+    tel: dict[str, Any] = {
+        "candidate_pool_before": len(candidates),
+        "metadata_boost_applied": False,
+        "comparison_prefer": False,
+        "fallback_used": False,
+    }
+    if not candidates or ctx is None:
+        tel["candidate_pool_after"] = len(candidates)
+        return candidates, tel
+
+    mf = THRESHOLDS.metadata_first
+    corpus_rows = corpus if corpus is not None else load_corpus_if_needed(client_id)
+    qm = str(ctx.query_mode or "").strip().lower()
+    st = ctx.service_topic
+    topic_conf_ok = float(ctx.service_topic_confidence or 0.0) >= float(
+        THRESHOLDS.retrieval.scope_topic_min_confidence
+    )
+
+    comparison_available = False
+    if qm == "comparison":
+        if st and topic_conf_ok:
+            comparison_available = _corpus_has_comparison_for_topic(
+                corpus_rows, client_id=client_id, service_topic=st
+            )
+        tel["comparison_docs_for_topic"] = comparison_available
+        if not comparison_available:
+            tel["fallback_used"] = True
+
+    boosted: list[dict] = []
+    for ch in candidates:
+        if not isinstance(ch, dict):
+            continue
+        row = dict(ch)
+        base = float(row.get("_score") or 0.0)
+        bonus = 0.0
+        dt = chunk_doc_type(row)
+        dt_l = str(dt or "").strip().lower()
+        topic_l = _chunk_topic(row)
+
+        if (
+            qm == "comparison"
+            and comparison_available
+            and dt_l == "comparison"
+            and st
+            and topic_conf_ok
+            and topic_l == st
+        ):
+            bonus += float(mf.comparison_doc_type_boost)
+            tel["comparison_prefer"] = True
+
+        if st and topic_conf_ok and topic_l == st:
+            bonus += float(mf.service_topic_match_boost)
+
+        if bonus > 0:
+            row["_score"] = base + bonus
+            row["_metadata_boost"] = round(bonus, 4)
+            tel["metadata_boost_applied"] = True
+        boosted.append(row)
+
+    boosted.sort(key=lambda c: float(c.get("_score") or 0.0), reverse=True)
+    tel["candidate_pool_after"] = len(boosted)
+    return boosted, tel
+
+
+def cap_alias_score_vs_semantic(
+    alias_score: float,
+    top_semantic_score: float | None,
+) -> tuple[float, bool]:
+    """Alias cannot exceed top semantic by more than metadata_first.alias_boost_max_delta."""
+    if top_semantic_score is None:
+        return alias_score, False
+    cap = float(THRESHOLDS.metadata_first.alias_boost_max_delta)
+    top = float(top_semantic_score)
+    if alias_score <= top + cap:
+        return alias_score, False
+    return top + cap, True

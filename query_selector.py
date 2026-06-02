@@ -13,6 +13,12 @@ from config import (
     PRICE_SERVICE_MATCH_STRONG,
 )
 import alias_lexical
+from core.candidate_builder import (
+    apply_metadata_candidate_boosts,
+    cap_alias_score_vs_semantic,
+    effective_scope_topic_for_retrieval,
+    metadata_context_from_decision,
+)
 from core.client_config_loader import resolve_pack_client_id
 from core.routing_loader import THRESHOLDS
 from llm import classify_price_intent, rewrite_query_for_retrieval
@@ -64,6 +70,7 @@ def select_chunk_for_question(
     client_id: str | None,
     sid: str | None = None,
     scope_topic: str | None = None,
+    decision: Any | None = None,
 ) -> dict:
     """Return selection result for /ask.
 
@@ -92,13 +99,16 @@ def select_chunk_for_question(
         "rewrite_applied": bool(q_rewrite_eff.strip().lower() != q_user.strip().lower()),
     }
 
+    meta_ctx = metadata_context_from_decision(decision)
+    eff_scope = effective_scope_topic_for_retrieval(scope_topic, meta_ctx)
+
     tel_p: dict[str, Any] = {}
     tel_s: dict[str, Any] = {}
     primary = retrieve(
         q_user,
         topk=8,
         client_id=client_id,
-        scope_topic=scope_topic,
+        scope_topic=eff_scope,
         telemetry=tel_p,
     )
     secondary: list = []
@@ -108,7 +118,7 @@ def select_chunk_for_question(
             topk=8,
             client_id=client_id,
             silent=True,
-            scope_topic=scope_topic,
+            scope_topic=eff_scope,
             telemetry=tel_s,
         )
     widen_fb = bool(tel_p.get("scope_widen_fallback")) or bool(tel_s.get("scope_widen_fallback"))
@@ -117,6 +127,7 @@ def select_chunk_for_question(
     alias_leader: dict | None = None
     alias_score = 0.0
     alias_diag: dict[str, Any] = {}
+    boost_tel: dict[str, Any] = {}
 
     def _dm(extra: dict) -> dict:
         tel = {
@@ -124,19 +135,35 @@ def select_chunk_for_question(
             for k, v in alias_diag.items()
             if k.startswith("alias_") or k.startswith("old_")
         }
-        return {**base_meta, **extra, **tel, "scope_widen_fallback": widen_fb}
+        return {
+            **base_meta,
+            **boost_tel,
+            **extra,
+            **tel,
+            "scope_widen_fallback": widen_fb,
+            "retrieval_scope_topic_effective": eff_scope,
+        }
 
     cands = merge_retrieval_candidates(primary, secondary)[:8]
     cands = prefer_overview_if_broad(cands, broad_query_detect(q_policy))
+    top_semantic_raw: float | None = None
+    if cands:
+        top_semantic_raw = float(cands[0].get("_score") or 0.0)
+        cands, boost_tel = apply_metadata_candidate_boosts(
+            cands, ctx=meta_ctx, client_id=client_id
+        )
     if not cands:
         return {
             "mode": "no_candidates",
-            "debug_meta": _dm({"top_score": None}),
+            "debug_meta": _dm({"top_score": None, **boost_tel}),
         }
 
     is_contacts = contacts_intent(q_policy)
     is_price = price_intent(q_policy)
     alias_leader, alias_score, alias_diag = corpus_alias_leader(q_policy, client_id=client_id)
+    alias_score, alias_capped = cap_alias_score_vs_semantic(alias_score, top_semantic_raw)
+    if alias_capped:
+        alias_diag = {**alias_diag, "alias_boost_capped": True, "alias_boost": round(alias_score, 4)}
     tier = str(alias_diag.get("alias_decision") or "")
     sim_raw = float(alias_diag.get("alias_similarity") or 0.0)
     ath = THRESHOLDS.alias

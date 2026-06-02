@@ -1,5 +1,6 @@
 ---
 doc_id: treatment__service__caries
+doc_type: service
 topic: treatment
 subtopic: caries
 

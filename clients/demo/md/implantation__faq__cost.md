@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__faq__cost
+doc_type: faq
 topic: implantation
 subtopic: cost
 

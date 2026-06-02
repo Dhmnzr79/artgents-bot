@@ -1,5 +1,6 @@
 ---
 doc_id: prosthetics__service__zirconia_crowns
+doc_type: service
 topic: prosthetics
 subtopic: zirconia_crowns
 

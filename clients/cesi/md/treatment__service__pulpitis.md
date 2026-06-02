@@ -1,5 +1,6 @@
 ---
 doc_id: treatment__service__pulpitis
+doc_type: service
 topic: treatment
 subtopic: pulpitis
 

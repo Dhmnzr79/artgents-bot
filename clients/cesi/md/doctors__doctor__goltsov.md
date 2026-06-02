@@ -1,5 +1,6 @@
 ---
 doc_id: doctors__doctor__goltsov
+doc_type: doctor
 topic: doctors
 subtopic: goltsov
 

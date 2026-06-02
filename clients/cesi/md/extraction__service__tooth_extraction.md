@@ -1,5 +1,6 @@
 ---
 doc_id: extraction__service__tooth_extraction
+doc_type: service
 topic: extraction
 subtopic: tooth_extraction
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__info__methods_overview
+doc_type: info
 topic: implantation
 subtopic: methods_overview
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__faq__tooth_one_day
+doc_type: faq
 topic: implantation
 subtopic: tooth_one_day
 

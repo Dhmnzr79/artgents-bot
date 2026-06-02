@@ -1,5 +1,6 @@
 ---
 doc_id: treatment__service__teeth_treatment
+doc_type: service
 topic: treatment
 subtopic: teeth_treatment
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__info__bone_graft
+doc_type: info
 topic: implantation
 subtopic: bone_graft
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__service__temporary_teeth
+doc_type: service
 topic: implantation
 subtopic: temporary_teeth
 

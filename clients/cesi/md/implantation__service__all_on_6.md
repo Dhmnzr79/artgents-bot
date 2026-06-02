@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__service__all_on_6
+doc_type: service
 topic: implantation
 subtopic: all_on_6
 

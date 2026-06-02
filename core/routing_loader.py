@@ -61,6 +61,16 @@ class RetrievalThresholds(BaseModel):
     alias_scope_guard_min: float = Field(..., ge=0.0, le=1.0)
 
 
+class MetadataFirstThresholds(BaseModel):
+    """Metadata-First v1 retrieval boosts (see docs/METADATA_FIRST_V1.md)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    comparison_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
+    service_topic_match_boost: float = Field(..., ge=0.0, le=0.5)
+    alias_boost_max_delta: float = Field(..., ge=0.0, le=0.5)
+
+
 class CatalogMatchThresholds(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -102,6 +112,7 @@ class Thresholds(BaseModel):
     retrieval: RetrievalThresholds
     catalog_match: CatalogMatchThresholds
     alias: AliasThresholds
+    metadata_first: MetadataFirstThresholds
 
 
 _LOCK = threading.Lock()

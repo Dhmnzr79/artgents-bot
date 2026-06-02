@@ -1,5 +1,6 @@
 ---
 doc_id: clinic__info__payment_terms
+doc_type: info
 topic: clinic
 subtopic: payment_terms
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__service__one_stage
+doc_type: service
 topic: implantation
 subtopic: one_stage
 

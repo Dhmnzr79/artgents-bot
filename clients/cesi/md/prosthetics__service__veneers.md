@@ -1,5 +1,6 @@
 ---
 doc_id: prosthetics__service__veneers
+doc_type: service
 topic: prosthetics
 subtopic: veneers
 

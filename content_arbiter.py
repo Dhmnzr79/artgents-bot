@@ -178,6 +178,7 @@ def collect_content_candidates(
     sid: str,
     client_id: str | None,
     scope_topic: str | None = None,
+    decision: Any | None = None,
     catalog_md_priority_ref: str | None = None,
     catalog_md_priority_service_id: str | None = None,
     catalog_md_priority_match_score: float | None = None,
@@ -186,7 +187,11 @@ def collect_content_candidates(
     q_norm = normalize_retrieval_query(q_user) or q_user
 
     selection = select_chunk_for_question(
-        q_user, client_id=client_id, sid=sid, scope_topic=scope_topic
+        q_user,
+        client_id=client_id,
+        sid=sid,
+        scope_topic=scope_topic,
+        decision=decision,
     )
     retrieval_mode = str(selection.get("mode") or "")
     retrieval_chunk = selection.get("chunk") if retrieval_mode == "chunk" else None

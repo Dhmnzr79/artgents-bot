@@ -1,5 +1,6 @@
 ---
 doc_id: prosthetics__service__removable_dentures
+doc_type: service
 topic: prosthetics
 subtopic: removable_dentures
 

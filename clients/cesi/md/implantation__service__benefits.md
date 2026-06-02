@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__service__benefits
+doc_type: service
 topic: implantation
 subtopic: benefits
 

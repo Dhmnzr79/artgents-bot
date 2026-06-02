@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__faq__tooth_loss
+doc_type: faq
 topic: implantation
 subtopic: tooth_loss
 

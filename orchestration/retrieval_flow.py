@@ -78,6 +78,7 @@ def run_content_arbiter_path(
         sid=sid,
         client_id=client_id,
         scope_topic=effective_scope_topic,
+        decision=decision,
         catalog_md_priority_ref=md_catalog_priority_ref,
         catalog_md_priority_service_id=md_catalog_priority_sid,
         catalog_md_priority_match_score=md_catalog_priority_score,
@@ -85,6 +86,18 @@ def run_content_arbiter_path(
     rdbg_turn = (cands.retrieval or {}).get("debug_meta") or {}
     if rdbg_turn.get("scope_widen_fallback"):
         request.ctx["retrieval_scope_widen_fallback"] = True
+    for _mk in (
+        "candidate_pool_before",
+        "candidate_pool_after",
+        "metadata_boost_applied",
+        "comparison_prefer",
+        "comparison_docs_for_topic",
+        "fallback_used",
+        "retrieval_scope_topic_effective",
+        "alias_boost_capped",
+    ):
+        if _mk in rdbg_turn:
+            request.ctx[_mk] = rdbg_turn[_mk]
     sel = decide_content_route(
         q=q,
         sid=sid,

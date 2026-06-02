@@ -1,5 +1,6 @@
 ---
 doc_id: prosthetics__service__clasp_dentures
+doc_type: service
 topic: prosthetics
 subtopic: clasp_dentures
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__service__classic
+doc_type: service
 topic: implantation
 subtopic: classic
 

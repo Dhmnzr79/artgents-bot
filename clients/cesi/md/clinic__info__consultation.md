@@ -1,5 +1,6 @@
 ---
 doc_id: clinic__info__consultation
+doc_type: info
 topic: clinic
 subtopic: consultation
 

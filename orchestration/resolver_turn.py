@@ -100,10 +100,6 @@ def run_resolver_turn(
             >= float(THRESHOLDS.retrieval.scope_topic_min_confidence)
         ):
             scope_topic_candidate = str(st_tp).strip().lower()
-        qm_rs = str(decision.query_mode or "").strip().lower()
-        if qm_rs in ("comparison", "process") and scope_topic_candidate is not None:
-            scope_topic_candidate = None
-
     return ResolverTurnOutcome(
         intent=intent,
         decision=decision,

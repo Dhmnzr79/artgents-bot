@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from core.client_runtime import client_md_dir, list_buildable_client_ids, per_client_data_dir
+from core.content_linter import format_lint_report, lint_all_clients
 
 # --- logging (устойчиво) ---
 try:
@@ -167,9 +168,11 @@ def build_client_index(client_id: str) -> None:
             local_aliases = extract_local_aliases(ch["text"])
             item = {
                 "doc": doc_id,
+                "doc_id": doc_id,
                 "file": os.path.basename(path),
                 "client_id": client_id,
                 "topic": meta.get("topic"),
+                "subtopic": meta.get("subtopic"),
                 "doc_type": meta.get("doc_type"),
                 "subtype": meta.get("subtype"),
                 "cta_action": meta.get("cta_action"),
@@ -265,11 +268,21 @@ def main():
         default="all",
         help="Client pack id (demo, cesi, nikadent) or 'all'",
     )
+    parser.add_argument(
+        "--skip-lint",
+        action="store_true",
+        help="Skip content linter (not recommended)",
+    )
     args = parser.parse_args()
     if args.client == "all":
         targets = list_buildable_client_ids()
     else:
         targets = [args.client.strip()]
+    if not args.skip_lint:
+        lint_results = lint_all_clients(targets)
+        if any(not r.ok for r in lint_results):
+            print(format_lint_report(lint_results), file=__import__("sys").stderr)
+            raise SystemExit("Content lint failed; fix md or use --skip-lint")
     log_json(logger, "Starting index build", clients=targets)
     for cid in targets:
         build_client_index(cid)

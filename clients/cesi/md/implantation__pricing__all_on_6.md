@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__pricing__all_on_6
+doc_type: pricing
 topic: implantation
 subtopic: all_on_6
 

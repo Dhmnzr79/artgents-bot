@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__info__implant_systems
+doc_type: info
 topic: implantation
 subtopic: implant_systems
 

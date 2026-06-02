@@ -1,5 +1,6 @@
 ---
 doc_id: doctors__doctor__kuznetsov
+doc_type: doctor
 topic: doctors
 subtopic: kuznetsov
 

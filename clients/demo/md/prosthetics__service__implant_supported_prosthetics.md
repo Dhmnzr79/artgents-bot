@@ -1,5 +1,6 @@
 ---
 doc_id: prosthetics__service__implant_supported_prosthetics
+doc_type: service
 topic: prosthetics
 subtopic: implant_supported_prosthetics
 

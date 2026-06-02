@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__info__aftercare
+doc_type: info
 topic: implantation
 subtopic: aftercare
 

@@ -1,5 +1,6 @@
 ---
 doc_id: implantation__pricing__implants
+doc_type: pricing
 topic: implantation
 subtopic: implants
 

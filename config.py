@@ -168,7 +168,11 @@ def estimate_llm_usage_usd(
 
 
 if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY is not set in .env")
+    # CI lint/unit import config without calling OpenAI; eval job checks the secret explicitly.
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        OPENAI_API_KEY = "github-actions-placeholder"
+    else:
+        raise RuntimeError("OPENAI_API_KEY is not set in .env")
 
 
 def resolve_client_id(raw: str | None) -> str | None:

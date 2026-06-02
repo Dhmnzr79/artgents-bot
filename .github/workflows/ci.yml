@@ -58,6 +58,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: content-lint-and-unit
     timeout-minutes: 45
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,17 +74,14 @@ jobs:
           pip install -r requirements.txt
 
       - name: Check OPENAI_API_KEY
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "::error::Add repository secret OPENAI_API_KEY for metadata-first e2e (in-proc /ask calls)."
+          if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
+            echo "::error::Add repository secret OPENAI_API_KEY (Settings → Secrets → Actions)."
             exit 1
           fi
 
       - name: Run metadata-first golden + smoke
         env:
           E2E_USE_TEST_CLIENT: "1"
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PYTHONUNBUFFERED: "1"
         run: python evals/v5/run_metadata_first_eval.py --suite all

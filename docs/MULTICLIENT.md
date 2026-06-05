@@ -25,7 +25,7 @@ Demo, ЦЭСИ, НикаДент и следующие клиники — **не
 5. **Индекс (corpus + embeddings + aliases) собирается отдельно** для каждого клиента.
 6. **Сессии (SQLite) — отдельный `bot.db`** на клиента в `data/{client_id}/` (через client-aware слой, §4.1).
 7. **Заявки, админка, guide-router, demo-режим** — через конфиг клиента (`features.yaml`, `lead_config.yaml`), не через `if client_id == ...` в коде.
-8. **Секреты** (OpenAI, SMTP, пароли админки) — только в `.env` на сервере, не в git.
+8. **Секреты** (`DASHSCOPE_API_KEY`, `OPENAI_API_KEY`, SMTP, пароли админки) — только в `.env` на сервере, не в git.
 
 Изоляция в коде: `core/client_runtime.py`, `core/client_data_loader.py`, client-aware `session.py` — см. `CURRENT_ARCHITECTURE.md`.
 
@@ -214,7 +214,9 @@ admin.bot.artgents.ru
 
 **Не использовать** `demo.artgents.ru` как API-host — в коде нет mapping без сегмента `.bot.`, на prod будет 403.
 
-**Embed и бюджет OpenAI:** список `allowed_origins` в `widget_config.json` — только конфиг. Защита работает, если **сервер на `/ask` и `/lead` проверяет `Origin` / `Referer` (и при необходимости согласованность с Host)** по этому списку и отклоняет запросы с чужих сайтов. Одного поля в JSON недостаточно.
+**Embed и бюджет LLM:** список `allowed_origins` в `widget_config.json` — только конфиг. Защита работает, если **сервер на `/ask` и `/lead` проверяет `Origin` / `Referer` (и при необходимости согласованность с Host)** по этому списку и отклоняет запросы с чужих сайтов. Одного поля в JSON недостаточно.
+
+**Провайдеры:** chat и классификаторы — **Qwen** (`DASHSCOPE_API_KEY`, `CHAT_BASE_URL`); embeddings и `build_index` — **OpenAI** (`OPENAI_API_KEY`, `MODEL_EMBED`). Стек — `CURRENT_ARCHITECTURE.md` §5.
 
 ---
 
@@ -230,7 +232,7 @@ admin.bot.artgents.ru
 | **1× bot (gunicorn)** | Один сервис на все поддомены; Host → `client_id`; см. workers ниже |
 | **PostgreSQL** | `bot_events`, `leads` — с колонкой `client_id` |
 | **admin_dashboard** | `:9100`, `ADMIN_DASHBOARD_TOKEN` |
-| **`.env` на сервере** | Секреты, `BOT_PG_DSN`, OpenAI |
+| **`.env` на сервере** | Секреты, `BOT_PG_DSN`, `DASHSCOPE_API_KEY`, `OPENAI_API_KEY` |
 
 **Workers (gunicorn):**
 
@@ -262,9 +264,9 @@ admin.bot.artgents.ru
 | Угроза | Мера |
 |--------|------|
 | Спам / DDoS на `/ask` | Caddy rate limit + лимиты в боте (`RATE_LIMIT_*`) |
-| Перегрузка VPS | Лимит длины вопроса; caps OpenAI; workers по нагрузке (§8) |
+| Перегрузка VPS | Лимит длины вопроса; rate limit; workers по нагрузке (§8) |
 | Подбор пароля админки | Сильный token; HTTPS; по желанию IP allowlist |
-| Чужой сайт жжёт OpenAI | **Сервер:** проверка `Origin`/`Referer` по `widget_config.allowed_origins` на `/ask` |
+| Чужой сайт жжёт LLM API | **Сервер:** проверка `Origin`/`Referer` по `widget_config.allowed_origins` на `/ask` |
 | Утечка контента клиники А в Б | Строгий `client_id` + нет fallback + отдельный индекс |
 | Утечка диалогов | PG и SQLite с `client_id`; телефоны redacted в логах |
 | Debug на prod | `APP_ENV=prod`, debug-роуты 404 |

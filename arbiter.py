@@ -16,6 +16,11 @@ from contracts.decision_frame import DecisionFrame
 from content_arbiter import ContentCandidates, ContentRouteResult
 from config import CHAT_MODEL
 from core.routing_loader import THRESHOLDS
+from core.service_followup import (
+    active_service_id_for_turn,
+    filter_compact_for_service_followup,
+    is_short_attribute_followup,
+)
 from llm import chat_completions_create
 from retriever import get_chunk_by_ref
 from logging_setup import get_logger, log_llm_error, log_llm_usage
@@ -324,13 +329,30 @@ def decide_content_route(
     decision_frame: DecisionFrame | dict[str, Any] | None = None,
 ) -> ContentRouteResult:
     """A5 ON: 0 compact → guided (или catalog_facts); 1 → shortcut; 2+ → LLM Arbiter."""
-    _ = sid
     compact = build_compact_content_candidates(candidates, client_id=client_id)
     bundle = _candidate_bundle(candidates)
     base_debug = dict(candidates.debug_meta) if isinstance(candidates.debug_meta, dict) else {}
     cat = candidates.catalog if isinstance(candidates.catalog, dict) else {}
     cat_mode = str(cat.get("mode") or "none")
     min_c = float(THRESHOLDS.arbiter.min_confidence)
+    rejected_followup: list[dict[str, Any]] = []
+    active_svc = active_service_id_for_turn(
+        sid=sid,
+        decision_frame=decision_frame,
+        catalog_matched_service_id=str(cat.get("matched_service_id") or "").strip() or None,
+    )
+    if is_short_attribute_followup(q) and active_svc:
+        compact, rejected_followup = filter_compact_for_service_followup(
+            compact,
+            service_id=active_svc,
+        )
+        if rejected_followup:
+            base_debug = {
+                **base_debug,
+                "service_followup_guard": True,
+                "service_followup_service_id": active_svc,
+                "service_followup_rejected_count": len(rejected_followup),
+            }
 
     def _refs_list() -> list[str]:
         return [str(x.get("ref") or "") for x in compact if isinstance(x, dict) and str(x.get("ref") or "").strip()]
@@ -392,6 +414,7 @@ def decide_content_route(
                 "arbiter_reason": None,
                 "arbiter_alternative": None,
             },
+            rejected=rejected_followup,
         )
 
     if n == 1:

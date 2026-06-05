@@ -2,7 +2,7 @@
 
 **Статус:** фактический runtime (multiclient M1–M4 локально).  
 **Целевое / ops:** `MULTICLIENT.md`.  
-**Обновлено:** 2026-05.
+**Обновлено:** 2026-06.
 
 ---
 
@@ -72,12 +72,13 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `core/origin_guard.py` | Origin/Referer vs `allowed_origins` |
 | `core/startup_check.py` | Старт: артефакты `data/{id}/` |
 | `ingress_gate.py` | Noise/offtopic до Resolver |
-| `flow_handlers.py` | Lead, situation, booking, «да» |
+| `flow_handlers.py` | Lead, situation, **explicit booking (regex)**, «да» по pending |
+| `policy.py` | CTA/UX; `booking_intent()` (regex + опц. LLM) **только для policy**, не lead gate |
 | `resolver.py` | `DecisionFrame` + safety-net |
 | `source_routing.py` | A3: doctor, catalog, price |
 | `doctors_lookup.py` | Врачи из `clients/{id}/md/` |
 | `query_selector.py` / `retriever.py` | RAG + rerank |
-| `arbiter.py` / `content_arbiter.py` | Выбор ref |
+| `arbiter.py` / `content_arbiter.py` | Выбор ref при 2+ кандидатах (LLM arbiter, без score-margin skip) |
 | `chunk_responder.py` | Chunk → LLM → policy |
 | `session.py` | SQLite `data/{id}/bot.db` |
 | `lead_service.py` | Email + PG |
@@ -92,12 +93,33 @@ Legacy (не расширять): `llm.classify_intent`, `query_selector.select_
 ## 4. Resolver
 
 - Основной путь: `resolver.resolve()` → `DecisionFrame`
+- Модель: **`qwen3.7-plus`** (`config.RESOLVER_MODEL`, override `MODEL_RESOLVER`)
 - Bypass: env **`RESOLVER_OFF=1`** → `classify_intent`
-- Contacts: regex overlay поверх Resolver
+- Contacts: regex overlay в `orchestration/ask_turn.py` (после Resolver, до A3)
+
+### Booking / lead (pre-Resolver)
+
+- **Lead сразу:** только `explicit_booking_intent()` — regex `BOOKING_INTENT_RE` в `flow_handlers` (кнопка `lead:booking`, pending «да» — отдельно).
+- **Не lead до Resolver:** контентные фразы с «хочу» без явной записи; мягкая запись («можете принять сегодня?») → Resolver / ingress / content.
+- **`booking_intent()`** в `policy.py` — подсказка CTA после ответа; может вызывать flash-LLM, **не** перехватывает ход.
 
 ---
 
-## 5. Контент и индекс
+## 5. LLM-стек (пилот Qwen)
+
+| Слой | Модель (default) | Env |
+|------|------------------|-----|
+| Generator | `qwen3.7-plus` | `MODEL_CHAT` |
+| Arbiter | `qwen3.7-plus` | `MODEL_ARBITER` |
+| Resolver | `qwen3.7-plus` | `MODEL_RESOLVER` |
+| Ingress, rerank, rewrite, classifiers | `qwen3.6-flash` | `MODEL_INGRESS_CLASSIFY`, `MODEL_RERANK`, … |
+| Embeddings | OpenAI `text-embedding-3-large` | `MODEL_EMBED`, `OPENAI_API_KEY` |
+
+Chat: `DASHSCOPE_API_KEY` + `CHAT_BASE_URL` (DashScope / MaaS). Дефолты — `config.py`, `.env.example`.
+
+---
+
+## 6. Контент и индекс
 
 | Что | Где |
 |-----|-----|
@@ -108,7 +130,7 @@ Legacy (не расширять): `llm.classify_intent`, `query_selector.select_
 
 ---
 
-## 6. Observability
+## 7. Observability
 
 - JSONL + `emit_bot_event` → optional PG (`BOT_PG_DSN`)
 - Боевая админка: `DASHBOARD.md`, `admin.bot.artgents.ru`
@@ -116,7 +138,7 @@ Legacy (не расширять): `llm.classify_intent`, `query_selector.select_
 
 ---
 
-## 7. Виджет
+## 8. Виджет
 
 Контракт ответа: `WIDGET_ANSWER_FORMAT.md`. Конфиг: `clients/{id}/widget_config.json`.
 

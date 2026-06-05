@@ -30,6 +30,7 @@
 | Legacy `classify_intent` только safety-net / `RESOLVER_OFF` | `resolver.resolve_with_fallback` | **3 ✓** |
 | Smoke multiclient (`client_id` per case) | cesi, nikadent contacts | **3 ✓** |
 | `pending_followup_ref` / guide_router | после стабильного routing | **4** |
+| **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
 
 ---
 
@@ -45,5 +46,11 @@
 ## Закрыто (не возвращать)
 
 Multiclient M1–M4 локально: client packs, `data/{id}/`, `client_data_loader`, per-client session/SQLite, Host+Origin, leads email, admin token, legacy `md/` + `clients/default/` удалены.
+
+Pre-Resolver **booking LLM** для lead gate убран: lead только `explicit_booking_intent()` (regex); `booking_intent()` LLM остаётся в `policy.py` для CTA.
+
+Arbiter **score-margin skip** убран: при 2+ кандидатах всегда LLM arbiter.
+
+Короткий **service follow-up** (rewrite validate + arbiter guard): `core/service_followup.py` — contextual rewrite overlap, generic FAQ отсекается при активной `last_catalog_service_id`.
 
 При закрытии новой задачи — удалить строку из таблицы в PR.

@@ -43,6 +43,7 @@ def chat_provider_is_qwen() -> bool:
         or "maas." in base
     )
 
+RESOLVER_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_PLUS_MODEL
 QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_FLASH_MODEL
 RERANK_MODEL = (os.getenv("MODEL_RERANK") or "").strip() or QWEN_FLASH_MODEL
 LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL

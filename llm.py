@@ -84,10 +84,20 @@ def _norm_rewrite_compare(s: str) -> str:
     return re.sub(r"\s+", " ", x).strip()
 
 
-def validated_retrieval_rewrite(q_user: str, model_out: str) -> tuple[str, str | None]:
+def validated_retrieval_rewrite(
+    q_user: str,
+    model_out: str,
+    *,
+    context_anchors: list[str] | None = None,
+) -> tuple[str, str | None]:
     """Вернуть (эффективная строка для доп. семантики, причина отказа или None).
 
     Эффективная строка никогда не бывает пустой при непустом q_user."""
+    from core.service_followup import (
+        rewrite_overlaps_attribute_synonyms,
+        rewrite_overlaps_context_anchors,
+    )
+
     u0 = (q_user or "").strip()
     w0 = (model_out or "").strip()
     if not u0:
@@ -100,7 +110,14 @@ def validated_retrieval_rewrite(q_user: str, model_out: str) -> tuple[str, str |
         if marker and marker in wl:
             return u0, "prompt_leak"
 
-    if QUERY_REWRITE_VALIDATE_OVERLAP and not _rewrite_overlaps_user_question(u0, w0):
+    if QUERY_REWRITE_VALIDATE_OVERLAP:
+        if _rewrite_overlaps_user_question(u0, w0):
+            return w0, None
+        if rewrite_overlaps_attribute_synonyms(u0, w0):
+            return w0, None
+        anchors = [a for a in (context_anchors or []) if str(a).strip()]
+        if anchors and rewrite_overlaps_context_anchors(w0, anchors):
+            return w0, None
         return u0, "no_overlap"
 
     return w0, None
@@ -229,7 +246,19 @@ def rewrite_query_for_retrieval(
         out = str(sq).strip() if sq is not None else ""
         if not out or len(out) > 600:
             raise ValueError("rewrite_empty_or_long")
-        effective, reject_reason = validated_retrieval_rewrite(q0, out)
+        context_anchors = []
+        if last_service_id:
+            context_anchors.append(last_service_id)
+        if last_service_id:
+            stitle_for_val = _service_title_from_catalog(last_service_id)
+            if stitle_for_val:
+                context_anchors.append(stitle_for_val)
+        context_anchors.extend(topic_bits[:2])
+        effective, reject_reason = validated_retrieval_rewrite(
+            q0,
+            out,
+            context_anchors=context_anchors,
+        )
         if reject_reason:
             log_json(
                 logger,

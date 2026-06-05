@@ -1,10 +1,10 @@
 # Карта маршрутизации
 
-**Статус:** Phase 2 — зафиксирована карта (2026-05).  
+**Статус:** Phase 3 — карта синхронизирована с runtime (2026-06).  
 **Парный документ:** `CURRENT_ARCHITECTURE.md`.  
 **Долг / следующие этапы:** `TECH_DEBT.md` → «Routing cleanup».
 
-Цель: один документ «куда уходит вопрос» без чтения всего `app.py`.
+Цель: один документ «куда уходит вопрос» без чтения всего `app.py` и `orchestration/`.
 
 ---
 
@@ -32,26 +32,28 @@
 |---|---------|---------------------|--------|
 | 0 | unknown `client_id` | HTTP 403 | `app.py` |
 | 0a | `/reset`, `/новая` | reset session | `session.mem_reset` |
-| 0b | rate limit | `rate_limited` | `app.py` |
-| 1 | obvious noise (без active lead) | `ingress_obvious_noise` | `app.py` → `ingress_gate` |
+| 0b | rate limit | `rate_limited` | `pre_resolver_turn` / `route_guards` |
+| 1 | obvious noise (без active lead) | `ingress_obvious_noise` | `pre_resolver_turn` → `ingress_gate` |
 | 2 | ingress gate (не skip) | `ingress_*` | `ingress_gate.classify_ingress` |
-| 3 | `cta_action`, situation, **explicit booking (regex)**, lead pending | `lead_flow` | `flow_handlers` |
+| 3 | `cta_action`, situation, **explicit booking (regex)**, lead pending | `lead_flow` | `flow_handlers` (`explicit_booking_intent`) |
 | 4 | active lead resume | `lead_flow` | `flow_handlers.resume_active_lead_flow` |
-| 5 | duplicate question | `duplicate_short_circuit` | `app.py` |
-| 6 | message burst / soft redirect | `booking_flow` | `app.py` |
-| 7 | `ref` в теле | `retrieval_chunk` | `retriever.get_chunk_by_ref` |
-| 8 | пустой вопрос | `error` | `app.py` |
-| 9 | короткое продолжение без контекста | `continuation_clarify` | `app.py` |
-| 10 | `continuation_only_phrase` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `app.py` |
-| 11 | `_is_short_contextual` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `app.py` |
-| 12 | Resolver (или legacy при `RESOLVER_OFF=1`) | задаёт `effective_intent` | `resolver` / `llm` |
-| 13 | contacts regex overlay | `contacts_chunk` | `app.py` + `retrieve` + `pick_contacts_chunk` |
+| 5 | duplicate question | `duplicate_short_circuit` | `pre_resolver_turn` |
+| 6 | message burst / soft redirect | `booking_flow` | `pre_resolver_turn` |
+| 7 | `ref` в теле | `retrieval_chunk` | `pre_resolver_turn` → `retriever.get_chunk_by_ref` |
+| 8 | пустой вопрос | `error` | `pre_resolver_turn` |
+| 9 | короткое продолжение без контекста | `continuation_clarify` | `pre_resolver_turn` |
+| 10 | `continuation_only_phrase` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `pre_resolver_turn` |
+| 11 | `_is_short_contextual` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `pre_resolver_turn` |
+| 12 | Resolver (или legacy при `RESOLVER_OFF=1`) | задаёт `effective_intent` | `resolver_turn` → `resolver` |
+| 13 | contacts regex overlay | `contacts_chunk` | `ask_turn` + `pick_contacts_chunk` |
 | 14 | A3 `route_source` | см. таблицу A3 ниже | `source_routing` |
-| 15 | fallback `price_lookup` (если intent) | `price_lookup` | `query_selector.select_price_service_route` |
-| 16 | content: Resolver `unknown` + clarify | `guided` | `app.py` |
-| 17 | content: candidates + arbiter | `retrieval_chunk` / `catalog_*` / `guided` / fallbacks | `query_selector`, `content_arbiter` |
+| 15 | fallback `price_lookup` (если intent) | `price_lookup` | `price_flow` / `select_price_service_route` |
+| 16 | content: Resolver `unknown` + clarify | `guided` | `retrieval_flow` |
+| 17 | content: candidates + arbiter | `retrieval_chunk` / `catalog_*` / `guided` / fallbacks | `retrieval_flow`, `content_arbiter` (2+ кандидата → LLM arbiter) |
 
-**Ingress skip:** есть `ref`, active lead, `situation_pending` или **`pending_lead_offer`** — ingress gate не вызывается (`app.py`).
+**Ingress skip:** есть `ref`, active lead, `situation_pending` или **`pending_lead_offer`** — ingress gate не вызывается (`pre_resolver_turn`).
+
+**Booking:** pre-Resolver lead только по regex (`BOOKING_INTENT_RE`). `booking_intent()` + LLM в `policy.py` — для CTA, не для lead gate.
 
 ---
 
@@ -64,9 +66,17 @@
 | `catalog_facts` | content + facts в catalog | `catalog_facts` | `service_id` из catalog |
 | `catalog_md` | content + `md_entry_ref` | приоритет в A4/A5 → часто `catalog_md_first` или `retrieval_chunk` | `*.md#korotko` |
 | `price_card` / `price_ref` | price match | `price_lookup` | `prices.json` / price ref |
-| `price_concern` | concern match | `price_concern` | `concern_ref` (default: `implantation__faq__cost.md#korotko`) |
+| `price_concern` | catalog `concern_ref` / session / **default** | `price_concern` | см. ниже |
 | `price_lookup_clarify` | услуга не найдена | `price_lookup` | clarify payload |
 | `none` | нет match | → ветка 15–17 | — |
+
+**`price_concern` — порядок ref (`source_routing.py`):**
+
+1. Каталог сматчился (containment) **и** у услуги есть `concern_ref` → этот ref.
+2. Иначе session context с `concern_ref`.
+3. Иначе **`concern_default`**: `implantation__faq__cost.md#korotko` (`DEFAULT_PRICE_CONCERN_REF`).
+
+**Известный пробел:** каталог сматчился, но `concern_ref` пуст (протезные услуги) → шаг 3 даёт имплантационный cost-FAQ. См. `TECH_DEBT.md`.
 
 ---
 
@@ -74,9 +84,9 @@
 
 | Intent / сигнал | Источник | Примечание |
 |-----------------|----------|------------|
-| contacts | regex overlay в `app.py` | не через Resolver; retrieve full corpus |
+| contacts | regex overlay в `ask_turn.py` | не через Resolver; retrieve full corpus |
 | price_lookup | A3 или `select_price_service_route` | цены только из `prices.json` |
-| price_concern | A3 concern_ref | |
+| price_concern | A3 `concern_ref` / `concern_default` | без матча услуги → default cost FAQ |
 | doctor | A3 `doctors_lookup` | cards / overview / doc ref |
 | catalog facts | A3 `catalog_facts` | facts card без MD |
 | catalog md | A3 → A4/A5 | приоритетный ref |
@@ -93,7 +103,7 @@
 | Topic scope | `DecisionFrame.service_topic` | safety-net: topic → `unknown` | `confidence.topic` < порога | оставить guard, не дублировать в app |
 | query_mode | `DecisionFrame.query_mode` | safety-net → `specific` | `confidence.query_mode` < порога | влияет на scope guard (comparison/process) |
 | Полный bypass | — | `classify_intent` only | `RESOLVER_OFF=1` (+ shadow resolver в логах) | только debug / A/B |
-| Contacts | regex `contacts_intent()` в `app.py` | Resolver не должен давать contacts | overlay **после** Resolver, **до** A3 | вынести в `route_guards` (Phase 3) |
+| Contacts | regex `contacts_intent()` в `ask_turn.py` | Resolver не должен давать contacts | overlay **после** Resolver, **до** A3 | оставить в `ask_turn` |
 | Catalog routing | `source_routing.route_source` (A3) | `query_selector.select_catalog_content_route` | **DEPRECATED**, не вызывается из `/ask` | не расширять |
 | Ingress / offtopic | `ingress_gate.classify_ingress` | `llm.classify_handoff_filter` | **DEPRECATED** | не расширять |
 | Price match | A3 + `select_price_service_route` | дублирующий fallback в app (ветка 15) | если A3 не вернул price, но `effective_intent=price_lookup` | вынести в `price_flow.py` (Phase 3) |
@@ -109,9 +119,12 @@
 | Вопрос | expected route (smoke) | ref / source | service_id (типично) |
 |--------|------------------------|--------------|----------------------|
 | Телефон клиники | `contacts_chunk` | `clinic__info__contacts.md` (retrieve pick) | — |
-| Хочу записаться | `lead_flow` | flow template | — |
+| Хочу записаться | `lead_flow` | flow template (regex) | — |
+| Я хочу удалить зуб и поставить имплант | `catalog_md_first` / `retrieval_chunk` | content, **не** lead | `smoke_cross_topic_extract_and_implant` |
+| Болит зуб, можете принять сегодня? | `expected_route_any` | не regex-lead; ingress/content | `smoke_booking_edge_pain_today` |
 | Сколько стоит имплантация? | `price_lookup` | `prices.json` key | `implantation_classic` (demo) |
-| Почему так дорого? | `price_concern` | `implantation__faq__cost.md#korotko` | concern fallback |
+| Почему так дорого? | `price_concern` | `implantation__faq__cost.md#korotko` | `concern_default` |
+| Почему протезирование такое дорогое? | `price_concern` | сейчас тот же default cost FAQ | баг: нет `concern_ref` у протезных услуг |
 | Какие врачи делают имплантацию? | `doctors_list` или `retrieval_chunk` | doctors cards / overview md | — |
 | Как проходит имплантация? | `retrieval_chunk` | `implantation__*.md` | — |
 | Чем имплантация лучше протезирования? | `retrieval_chunk` (сейчас) | RAG chunk | Resolver: `query_mode=comparison` |
@@ -205,6 +218,8 @@ Runner: `python evals/v5/run_e2e_smoke.py` (см. `evals/v5/README.md`).
 |---------|----------------|
 | `smoke_contacts_phone` | `contacts_chunk` |
 | `smoke_booking_want` | `lead_flow` |
+| `smoke_cross_topic_extract_and_implant` | `catalog_md_first` |
+| `smoke_booking_edge_pain_today` | `expected_route_any` (не обязательно lead) |
 | `smoke_price_classic` | `price_lookup` |
 | `smoke_price_concern_general_no_service` | `price_concern` |
 | `smoke_content_impl_process_with_doctor_word` | `retrieval_chunk` |
@@ -224,7 +239,7 @@ Per-case **`client_id`** в `e2e_smoke.json` (default `demo`); фильтр: `--
 
 **`session_seed`** в кейсе (только с `E2E_USE_TEST_CLIENT=1`): после `mem_reset(sid)` задаёт флаги (напр. `pending_lead_offer`). Каждый кейс — уникальный `sid` (`smoke_{case_id}_{ts}_{run_tag}`).
 
-Baseline smoke: **54** (42 demo + 2 multiclient contacts). Known failures — массив `known_v4_failures` в том же файле.
+Baseline smoke: **55** кейсов в `e2e_smoke.json`. Known failures — массив `known_v4_failures` в том же файле.
 
 ---
 
@@ -234,7 +249,12 @@ Baseline smoke: **54** (42 demo + 2 multiclient contacts). Known failures — м
 |------------|--------|
 | `RESOLVER_OFF=1` | Только `classify_intent`; Resolver в shadow (`V5_RESOLVER_SHADOW_ON`) |
 | `V5_RESOLVER_SHADOW_ON` | fire-and-forget shadow Resolver при bypass |
-| `MODEL_RESOLVER` | модель Resolver (default `gpt-5.4-nano`) |
+| `MODEL_CHAT` | Generator (default `qwen3.7-plus`) |
+| `MODEL_ARBITER` | Arbiter (default `qwen3.7-plus`) |
+| `MODEL_RESOLVER` | Resolver (default `qwen3.7-plus`) |
+| Остальные классификаторы | default `qwen3.6-flash` — см. `config.py` |
+| `DASHSCOPE_API_KEY` / `CHAT_BASE_URL` | Chat + классификаторы (Qwen) |
+| `OPENAI_API_KEY` / `MODEL_EMBED` | Embeddings (OpenAI) |
 | Пороги confidence | `core/routing.yaml` → `THRESHOLDS` |
 
 Per-client: `clients/{id}/features.yaml` — `guide_router.enabled` (Phase 4, сейчас `false` везде).

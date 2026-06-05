@@ -8,14 +8,14 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from contracts.decision_frame import DecisionFrame
-from config import QWEN_FLASH_MODEL
+from config import RESOLVER_MODEL
 from llm import chat_completions_create
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage, emit_bot_event
 
 
 logger = get_logger("bot")
 
-_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_FLASH_MODEL
+_MODEL = RESOLVER_MODEL
 _ON = (os.getenv("V5_RESOLVER_SHADOW_ON") or "1").strip().lower() in ("1", "true", "yes")
 _TIMEOUT_SEC = float(os.getenv("V5_RESOLVER_TIMEOUT_SEC", "8"))
 

@@ -9,6 +9,7 @@ import numpy as np
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from config import EMB_MODEL
 from core.client_runtime import client_md_dir, list_buildable_client_ids, per_client_data_dir
 from core.content_linter import format_lint_report, lint_all_clients
 
@@ -44,7 +45,6 @@ if not api_key:
     raise RuntimeError("OPENAI_API_KEY is not set in .env")
 
 client = OpenAI(api_key=api_key)
-EMB_MODEL = os.getenv("MODEL_EMBED", "text-embedding-3-small")
 
 ALIAS_RX = re.compile(r"<!--\s*aliases:\s*\[(.*?)\]\s*-->", re.I | re.S)
 

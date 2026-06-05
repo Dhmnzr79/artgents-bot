@@ -8,13 +8,14 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from contracts.decision_frame import DecisionFrame
-from llm import client
+from config import QWEN_FLASH_MODEL
+from llm import chat_completions_create
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage, emit_bot_event
 
 
 logger = get_logger("bot")
 
-_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or "gpt-5.4-nano"
+_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_FLASH_MODEL
 _ON = (os.getenv("V5_RESOLVER_SHADOW_ON") or "1").strip().lower() in ("1", "true", "yes")
 _TIMEOUT_SEC = float(os.getenv("V5_RESOLVER_TIMEOUT_SEC", "8"))
 
@@ -106,17 +107,20 @@ def _call_resolver_llm(
     user = _resolver_user_content(question=question, history=history)
     raw = ""
     try:
-        resp = client.chat.completions.create(
-            model=_MODEL,
-            temperature=0,
-            max_completion_tokens=250,
-            response_format={"type": "json_object"},
-            timeout=_TIMEOUT_SEC,
-            messages=[
-                {"role": "system", "content": RESOLVER_SYSTEM_PROMPT},
-                {"role": "user", "content": user},
-            ],
-        )
+        from core.turn_timing import timed_stage
+
+        with timed_stage("resolver_ms"):
+            resp = chat_completions_create(
+                model=_MODEL,
+                temperature=0,
+                max_completion_tokens=250,
+                response_format={"type": "json_object"},
+                timeout=_TIMEOUT_SEC,
+                messages=[
+                    {"role": "system", "content": RESOLVER_SYSTEM_PROMPT},
+                    {"role": "user", "content": user},
+                ],
+            )
         log_llm_usage(logger, resp, call_type=log_call_type, model=_MODEL)
         raw = (resp.choices[0].message.content or "").strip()
         obj = json.loads(raw)

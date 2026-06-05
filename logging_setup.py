@@ -182,6 +182,19 @@ def log_json(logger, message, **fields):
     logger.info(message, extra={"extra_data": _sanitize(fields)})
 
 
+def _cached_tokens_from_usage_obj(u: object) -> int | None:
+    details = getattr(u, "prompt_tokens_details", None)
+    if details is None:
+        return None
+    ct = getattr(details, "cached_tokens", None)
+    if ct is None and isinstance(details, dict):
+        ct = details.get("cached_tokens")
+    try:
+        return int(ct) if ct is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def usage_dict_from_completion(resp) -> dict | None:
     u = getattr(resp, "usage", None)
     if u is None:
@@ -194,6 +207,9 @@ def usage_dict_from_completion(resp) -> dict | None:
         "completion_tokens": ct,
         "total_tokens": tt,
     }
+    cached = _cached_tokens_from_usage_obj(u)
+    if cached is not None and int(cached) > 0:
+        out["cached_tokens"] = int(cached)
     est = estimate_llm_usage_usd(prompt_tokens=pt, completion_tokens=ct)
     if est is not None:
         out["estimated_usd"] = est
@@ -240,6 +256,9 @@ def log_llm_stream_usage(
         "completion_tokens": ct,
         "total_tokens": tt,
     }
+    cached = _cached_tokens_from_usage_obj(usage_obj)
+    if cached is not None and int(cached) > 0:
+        det["cached_tokens"] = int(cached)
     est = estimate_llm_usage_usd(prompt_tokens=pt, completion_tokens=ct)
     if est is not None:
         det["estimated_usd"] = est

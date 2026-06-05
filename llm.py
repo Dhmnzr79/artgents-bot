@@ -8,13 +8,17 @@ from openai import OpenAI
 from config import (
     BOOKING_INTENT_LLM_MODEL,
     BOOKING_INTENT_LLM_ON,
+    CHAT_API_KEY,
+    CHAT_BASE_URL,
     CHAT_JSON_MODE,
+    QWEN_ENABLE_THINKING,
+    chat_provider_is_qwen,
     CHAT_MODEL,
     COMPLAINT_CLASSIFY_MODEL,
+    EMBED_API_KEY,
     EMPATHY_ON,
     LEAD_NAME_CLASSIFY_MODEL,
     MEMORY_ON,
-    OPENAI_API_KEY,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
     QUERY_REWRITE_MAX_MESSAGES,
@@ -34,8 +38,30 @@ from session import (
     update_topic_empathy,
 )
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+_chat_client_kwargs: dict = {"api_key": CHAT_API_KEY}
+if CHAT_BASE_URL:
+    _chat_client_kwargs["base_url"] = CHAT_BASE_URL
+chat_client = OpenAI(**_chat_client_kwargs)
+embed_client = OpenAI(api_key=EMBED_API_KEY)
+client = chat_client
+
 logger = get_logger("bot")
+
+
+def _qwen_disable_thinking(*, model: str, kwargs: dict) -> dict:
+    """DashScope Qwen only: thinking adds latency; off by default (QWEN_ENABLE_THINKING=0)."""
+    extra_body = dict(kwargs.pop("extra_body", None) or {})
+    if not QWEN_ENABLE_THINKING and chat_provider_is_qwen():
+        extra_body.setdefault("enable_thinking", False)
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+    return kwargs
+
+
+def chat_completions_create(*, model: str, **kwargs):
+    """Chat completion via chat_client with Qwen-compatible extras."""
+    kwargs = _qwen_disable_thinking(model=model, kwargs=dict(kwargs))
+    return chat_client.chat.completions.create(model=model, **kwargs)
 LLM_REQUEST_TIMEOUT_SEC = float(os.getenv("LLM_REQUEST_TIMEOUT_SEC", "20"))
 LLM_FALLBACK_ANSWER = os.getenv(
     "LLM_FALLBACK_ANSWER",
@@ -111,6 +137,16 @@ def rewrite_query_for_retrieval(
     if not hist:
         return q0
 
+    from core.rewrite_policy import rewrite_skip_reason
+    from core.turn_timing import set_flag, timed_stage
+
+    skip_reason = rewrite_skip_reason(session_id, q0, client_id=client_id)
+    if skip_reason:
+        set_flag("rewrite_enabled", False)
+        set_flag("rewrite_skipped_reason", skip_reason)
+        return q0
+    set_flag("rewrite_enabled", True)
+
     def _h2_title_for_doc(doc_id: str) -> str | None:
         if not doc_id:
             return None
@@ -169,16 +205,17 @@ def rewrite_query_for_retrieval(
         f"{q0}"
     )
     try:
-        resp = client.chat.completions.create(
-            model=QUERY_REWRITE_MODEL,
-            max_completion_tokens=200,
-            response_format={"type": "json_object"},
-            timeout=LLM_REQUEST_TIMEOUT_SEC,
-            messages=[
-                {"role": "system", "content": _REWRITE_SYSTEM},
-                {"role": "user", "content": user_block},
-            ],
-        )
+        with timed_stage("rewrite_ms"):
+            resp = chat_completions_create(
+                model=QUERY_REWRITE_MODEL,
+                max_completion_tokens=200,
+                response_format={"type": "json_object"},
+                timeout=LLM_REQUEST_TIMEOUT_SEC,
+                messages=[
+                    {"role": "system", "content": _REWRITE_SYSTEM},
+                    {"role": "user", "content": user_block},
+                ],
+            )
         log_llm_usage(
             logger, resp, call_type="retrieval_query_rewrite", model=QUERY_REWRITE_MODEL
         )
@@ -271,7 +308,7 @@ def generate_facts_card_answer(
     q_line = f"Вопрос пациента: {user_question}\n\n" if user_question else ""
     user_msg = f"{q_line}Услуга: {title}\n\nФакты:\n{facts_block}"
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=CHAT_MODEL,
             temperature=0.2,
             max_completion_tokens=300,
@@ -560,7 +597,7 @@ def generate_answer_with_empathy(
         kwargs["response_format"] = {"type": "json_object"}
     kwargs["timeout"] = LLM_REQUEST_TIMEOUT_SEC
     try:
-        resp = client.chat.completions.create(**kwargs)
+        resp = chat_completions_create(**kwargs)
         log_llm_usage(logger, resp, call_type="chat_answer", model=CHAT_MODEL)
         raw = (resp.choices[0].message.content or "").strip()
         answer = raw
@@ -637,7 +674,7 @@ def generate_answer_stream(user_q: str, sources: list[dict], meta: dict, session
     stream_usage = None
     try:
         try:
-            stream = client.chat.completions.create(
+            stream = chat_completions_create(
                 model=CHAT_MODEL,
                 messages=messages,
                 stream=True,
@@ -645,16 +682,22 @@ def generate_answer_stream(user_q: str, sources: list[dict], meta: dict, session
                 stream_options={"include_usage": True},
             )
         except TypeError:
-            stream = client.chat.completions.create(
+            stream = chat_completions_create(
                 model=CHAT_MODEL,
                 messages=messages,
                 stream=True,
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
             )
+        first_delta_marked = False
         for chunk in stream:
             if chunk.choices:
                 delta = chunk.choices[0].delta.content or ""
                 if delta:
+                    if not first_delta_marked:
+                        first_delta_marked = True
+                        from core.turn_timing import mark
+
+                        mark("chat_first_delta")
                     full_text += delta
                     yield ("delta", delta)
             u = getattr(chunk, "usage", None)
@@ -720,7 +763,7 @@ def classify_lead_name_shape(
         return "invalid_name"
     payload = json.dumps({"candidate": c, "original": r}, ensure_ascii=False)
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=LEAD_NAME_CLASSIFY_MODEL,
             temperature=0,
             max_completion_tokens=60,
@@ -784,7 +827,7 @@ def classify_booking_wants_appointment(
     if len(msg) < 2:
         return False
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=BOOKING_INTENT_LLM_MODEL,
             temperature=0,
             max_completion_tokens=40,
@@ -850,7 +893,7 @@ def classify_price_intent(user_message: str, *, client_id: str | None, sid: str)
     if continuation_only_phrase(msg):
         return "other"
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=PRICE_INTENT_LLM_MODEL,
             temperature=0,
             max_completion_tokens=50,
@@ -913,7 +956,7 @@ def classify_safety(user_message: str, *, client_id: str | None, sid: str) -> di
     if len(msg) < 2:
         return {"label": "normal_sales_concern", "confidence": 0.0}
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=SAFETY_CLASSIFY_MODEL,
             temperature=0,
             max_completion_tokens=60,
@@ -979,7 +1022,7 @@ def classify_complaint_request(user_message: str, *, client_id: str | None, sid:
     if len(msg) < 2:
         return {"label": "normal", "confidence": 0.0}
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=COMPLAINT_CLASSIFY_MODEL,
             temperature=0,
             max_completion_tokens=60,
@@ -1116,7 +1159,7 @@ def classify_handoff_filter(user_message: str, *, client_id: str | None, sid: st
     return {"label": "sales_or_clinic_question", "reason": "default_allow", "confidence": 0.0}
 
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=CHAT_MODEL,
             temperature=0,
             max_completion_tokens=80,
@@ -1197,7 +1240,7 @@ def classify_intent(
     if len(msg) < 2:
         return "content"
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=CHAT_MODEL,
             temperature=0,
             max_completion_tokens=50,

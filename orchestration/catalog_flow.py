@@ -22,6 +22,7 @@ class CatalogMdPriority:
     ref: str | None = None
     service_id: str | None = None
     match_score: float | None = None
+    match_method: str | None = None
 
 
 def try_a3_doctor_route(
@@ -158,4 +159,5 @@ def catalog_md_priority_from_a3(sr: SourceRouteResult) -> CatalogMdPriority | No
         ref=sr.ref,
         service_id=sr.service_id,
         match_score=float(sr.match_score or 0.0),
+        match_method=str(sr.match_method or "") or None,
     )

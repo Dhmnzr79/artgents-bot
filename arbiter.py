@@ -16,7 +16,7 @@ from contracts.decision_frame import DecisionFrame
 from content_arbiter import ContentCandidates, ContentRouteResult
 from config import CHAT_MODEL
 from core.routing_loader import THRESHOLDS
-from llm import client
+from llm import chat_completions_create
 from retriever import get_chunk_by_ref
 from logging_setup import get_logger, log_llm_error, log_llm_usage
 
@@ -660,17 +660,25 @@ def arbitrate_among_candidates(
 
     raw = ""
     try:
-        resp = client.chat.completions.create(
-            model=_MODEL,
-            temperature=0,
-            max_completion_tokens=350,
-            response_format={"type": "json_object"},
-            timeout=_TIMEOUT_SEC,
-            messages=[
-                {"role": "system", "content": ARBITER_SYSTEM_PROMPT},
-                {"role": "user", "content": _arbiter_user_payload(question=q, candidates=cands, decision_frame=decision_frame)},
-            ],
-        )
+        from core.turn_timing import timed_stage
+
+        with timed_stage("arbiter_ms"):
+            resp = chat_completions_create(
+                model=_MODEL,
+                temperature=0,
+                max_completion_tokens=350,
+                response_format={"type": "json_object"},
+                timeout=_TIMEOUT_SEC,
+                messages=[
+                    {"role": "system", "content": ARBITER_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": _arbiter_user_payload(
+                            question=q, candidates=cands, decision_frame=decision_frame
+                        ),
+                    },
+                ],
+            )
         log_llm_usage(logger, resp, call_type=call_type, model=_MODEL)
         raw = (resp.choices[0].message.content or "").strip()
         try:

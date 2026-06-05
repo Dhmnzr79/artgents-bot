@@ -73,6 +73,7 @@ def orchestrate_routing_after_resolver(
     md_catalog_priority_ref = None
     md_catalog_priority_sid = None
     md_catalog_priority_score = None
+    md_catalog_priority_match_method = None
 
     if intent != "contacts":
         sr = route_source(q, sid=sid, client_id=client_id, decision=decision, app_intent=intent)
@@ -105,6 +106,7 @@ def orchestrate_routing_after_resolver(
             md_catalog_priority_ref = md_prio.ref
             md_catalog_priority_sid = md_prio.service_id
             md_catalog_priority_score = md_prio.match_score
+            md_catalog_priority_match_method = md_prio.match_method
 
         price_result = try_a3_price_route(
             q=q,
@@ -151,6 +153,7 @@ def orchestrate_routing_after_resolver(
             md_catalog_priority_ref=md_catalog_priority_ref,
             md_catalog_priority_sid=md_catalog_priority_sid,
             md_catalog_priority_score=md_catalog_priority_score,
+            md_catalog_priority_match_method=md_catalog_priority_match_method,
             data=data,
             client_txt=client_txt,
             service_payload=service_payload,

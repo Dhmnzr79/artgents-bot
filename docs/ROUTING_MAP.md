@@ -35,7 +35,7 @@
 | 0b | rate limit | `rate_limited` | `app.py` |
 | 1 | obvious noise (без active lead) | `ingress_obvious_noise` | `app.py` → `ingress_gate` |
 | 2 | ingress gate (не skip) | `ingress_*` | `ingress_gate.classify_ingress` |
-| 3 | `cta_action`, situation, booking, lead pending | `lead_flow` | `flow_handlers` |
+| 3 | `cta_action`, situation, **explicit booking (regex)**, lead pending | `lead_flow` | `flow_handlers` |
 | 4 | active lead resume | `lead_flow` | `flow_handlers.resume_active_lead_flow` |
 | 5 | duplicate question | `duplicate_short_circuit` | `app.py` |
 | 6 | message burst / soft redirect | `booking_flow` | `app.py` |

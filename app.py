@@ -376,6 +376,9 @@ def ask():
         if blocked:
             return blocked
         orch_r = _orchestrate_ask_turn(data)
+        from core.turn_timing import mark
+
+        mark("orchestrate_done")
         q = orch_r.q or ""
         return _dispatch_orchestration_json(orch_r)
     except Exception as e:
@@ -578,6 +581,9 @@ def ask_stream():
         if blocked:
             return blocked
         orch_r = _orchestrate_ask_turn(data)
+        from core.turn_timing import mark
+
+        mark("orchestrate_done")
         q = orch_r.q or ""
         return _dispatch_orchestration_sse(orch_r)
     except Exception as e:

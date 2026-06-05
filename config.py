@@ -6,13 +6,46 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- OpenAI ---
+# --- LLM providers (chat vs embeddings may use different APIs) ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+EMBED_API_KEY = (os.getenv("EMBED_API_KEY") or "").strip() or OPENAI_API_KEY
+CHAT_API_KEY = (
+    (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip()
+    or OPENAI_API_KEY
+)
+CHAT_BASE_URL = (
+    (os.getenv("CHAT_BASE_URL") or os.getenv("DASHSCOPE_BASE_URL") or "").strip()
+    or None
+)
+QWEN_ENABLE_THINKING = os.getenv("QWEN_ENABLE_THINKING", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+
+# --- Models (Qwen pilot defaults; override via .env to revert to OpenAI) ---
+QWEN_PLUS_MODEL = "qwen3.7-plus"
+QWEN_FLASH_MODEL = "qwen3.6-flash"
+
 EMB_MODEL = os.getenv("MODEL_EMBED", "text-embedding-3-large")
-CHAT_MODEL = os.getenv("MODEL_CHAT", "gpt-5.4-mini")
-QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or "gpt-5.4-nano"
-RERANK_MODEL = (os.getenv("MODEL_RERANK") or "").strip() or "gpt-5.4-mini"
-LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or CHAT_MODEL
+CHAT_MODEL = os.getenv("MODEL_CHAT", QWEN_PLUS_MODEL)
+
+
+def chat_provider_is_qwen() -> bool:
+    """True when chat client targets DashScope / MaaS Qwen (not OpenAI-native)."""
+    model = (os.getenv("MODEL_CHAT") or CHAT_MODEL or "").strip().lower()
+    base = (CHAT_BASE_URL or "").lower()
+    return (
+        "qwen" in model
+        or "dashscope" in base
+        or "aliyuncs" in base
+        or "maas." in base
+    )
+
+QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_FLASH_MODEL
+RERANK_MODEL = (os.getenv("MODEL_RERANK") or "").strip() or QWEN_FLASH_MODEL
+LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
 
 # --- Намерение «записаться» (regex + при необходимости LLM) ---
 BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
@@ -20,17 +53,17 @@ BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
     "true",
     "yes",
 )
-BOOKING_INTENT_LLM_MODEL = (os.getenv("BOOKING_INTENT_LLM_MODEL") or "").strip() or "gpt-5.4-nano"
+BOOKING_INTENT_LLM_MODEL = (os.getenv("BOOKING_INTENT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 PRICE_INTENT_LLM_ON = os.getenv("PRICE_INTENT_LLM_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
-PRICE_INTENT_LLM_MODEL = (os.getenv("PRICE_INTENT_LLM_MODEL") or "").strip() or CHAT_MODEL
-SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or "gpt-5.4-nano"
+PRICE_INTENT_LLM_MODEL = (os.getenv("PRICE_INTENT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
 SAFETY_RED_CONFIDENCE_THRESHOLD = float(os.getenv("SAFETY_RED_CONFIDENCE_THRESHOLD", "0.8"))
-COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or "gpt-5.4-nano"
-INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or "gpt-5.4-nano"
+COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
+INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
 QUERY_REWRITE_ON = os.getenv("QUERY_REWRITE_ON", "1").lower() in ("1", "true", "yes")
 QUERY_REWRITE_MAX_MESSAGES = int(os.getenv("QUERY_REWRITE_MAX_MESSAGES", "10"))
 # Подстроки в ответе rewrite → отбросить (утечка инструкции / мусор). Разделитель |
@@ -171,8 +204,14 @@ if not OPENAI_API_KEY:
     # CI lint/unit import config without calling OpenAI; eval job checks the secret explicitly.
     if os.getenv("GITHUB_ACTIONS") == "true":
         OPENAI_API_KEY = "github-actions-placeholder"
+        EMBED_API_KEY = EMBED_API_KEY or OPENAI_API_KEY
+        CHAT_API_KEY = CHAT_API_KEY or OPENAI_API_KEY
     else:
-        raise RuntimeError("OPENAI_API_KEY is not set in .env")
+        raise RuntimeError("OPENAI_API_KEY is not set in .env (required for embeddings)")
+elif not EMBED_API_KEY:
+    EMBED_API_KEY = OPENAI_API_KEY
+elif not CHAT_API_KEY:
+    CHAT_API_KEY = OPENAI_API_KEY
 
 
 def resolve_client_id(raw: str | None) -> str | None:

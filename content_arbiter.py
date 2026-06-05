@@ -183,6 +183,7 @@ def collect_content_candidates(
     catalog_md_priority_ref: str | None = None,
     catalog_md_priority_service_id: str | None = None,
     catalog_md_priority_match_score: float | None = None,
+    catalog_md_priority_match_method: str | None = None,
 ) -> ContentCandidates:
     q_user = (q or "").strip()
     q_norm = normalize_retrieval_query(q_user) or q_user
@@ -272,6 +273,7 @@ def collect_content_candidates(
             "mode": "md_first",
             "matched_service_id": catalog_md_priority_service_id or cat.get("matched_service_id"),
             "match_score": pri_score,
+            "match_method": (catalog_md_priority_match_method or "").strip() or None,
             "md_entry_ref": prref,
             "doc_id": cat_doc_id2,
             "is_overview": bool(prref and _is_overview_anchor(cat_anchor2)),

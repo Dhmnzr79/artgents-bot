@@ -18,7 +18,7 @@ from config import (
 from core.client_data_loader import get_client_index
 from core.client_runtime import effective_corpus_client_id
 from core.routing_loader import THRESHOLDS
-from llm import client
+from llm import chat_completions_create, embed_client
 from logging_setup import get_logger, log_json, log_llm_usage
 from meta_loader import get_doc_meta, get_doc_path
 
@@ -942,7 +942,7 @@ def is_point_literal_query(q: str) -> bool:
 
 
 def embed_q(q: str) -> np.ndarray:
-    v = client.embeddings.create(model=EMB_MODEL, input=q).data[0].embedding
+    v = embed_client.embeddings.create(model=EMB_MODEL, input=q).data[0].embedding
     v = np.array(v, dtype=np.float32)
     v = v / (np.linalg.norm(v) + 1e-9)
     return v
@@ -1114,7 +1114,11 @@ def retrieve(
             return out_cached
 
     corpus = load_corpus_if_needed(client_id)
+    from core.turn_timing import record_ms
+
+    t_emb = time.monotonic()
     v = embed_q(q_embed)
+    record_ms("embedding_ms", int((time.monotonic() - t_emb) * 1000), accumulate=True)
     widen_used = False
     prior_scope: str | None = str(scope_topic).strip() if scope_topic else None
 
@@ -1245,7 +1249,7 @@ def llm_rerank(q: str, cands: list) -> dict:
     ]
     fallback_reason = None
     try:
-        out = client.chat.completions.create(
+        out = chat_completions_create(
             model=RERANK_MODEL,
             messages=msgs,
             temperature=0,

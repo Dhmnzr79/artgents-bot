@@ -2,6 +2,7 @@
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from config import (
@@ -21,6 +22,7 @@ from core.candidate_builder import (
 )
 from core.client_config_loader import resolve_pack_client_id
 from core.routing_loader import THRESHOLDS
+from core.turn_timing import timed_stage
 from llm import classify_price_intent, rewrite_query_for_retrieval
 from session import mem_get
 from policy import (
@@ -79,13 +81,38 @@ def select_chunk_for_question(
       - chunk
     """
     q_user = (q or "").strip()
-    if sid and QUERY_REWRITE_ON:
-        q_rewrite_eff = rewrite_query_for_retrieval(sid, q_user, client_id=client_id)
-    else:
-        q_rewrite_eff = q_user
 
     # Интенты и алиасы — только по исходному вопросу пациента (не по rewrite).
     q_policy = normalize_retrieval_query(q_user) or q_user
+
+    meta_ctx = metadata_context_from_decision(decision)
+    eff_scope = effective_scope_topic_for_retrieval(scope_topic, meta_ctx)
+
+    tel_p: dict[str, Any] = {}
+    tel_s: dict[str, Any] = {}
+    with timed_stage("retrieval_block_ms"):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            primary_future = pool.submit(
+                retrieve,
+                q_user,
+                topk=8,
+                client_id=client_id,
+                scope_topic=eff_scope,
+                telemetry=tel_p,
+            )
+            rewrite_future = None
+            if sid and QUERY_REWRITE_ON:
+                rewrite_future = pool.submit(
+                    rewrite_query_for_retrieval,
+                    sid,
+                    q_user,
+                    client_id=client_id,
+                )
+            primary = primary_future.result()
+            q_rewrite_eff = (
+                rewrite_future.result() if rewrite_future is not None else q_user
+            )
+
     nu = (normalize_retrieval_query(q_user) or q_user).strip().lower()
     nr = (normalize_retrieval_query(q_rewrite_eff) or q_rewrite_eff).strip().lower()
 
@@ -97,19 +124,6 @@ def select_chunk_for_question(
         "query_normalized_rewrite": nr_meta[:200],
         "rewrite_applied": bool(q_rewrite_eff.strip().lower() != q_user.strip().lower()),
     }
-
-    meta_ctx = metadata_context_from_decision(decision)
-    eff_scope = effective_scope_topic_for_retrieval(scope_topic, meta_ctx)
-
-    tel_p: dict[str, Any] = {}
-    tel_s: dict[str, Any] = {}
-    primary = retrieve(
-        q_user,
-        topk=8,
-        client_id=client_id,
-        scope_topic=eff_scope,
-        telemetry=tel_p,
-    )
     secondary: list = []
     if nr != nu:
         secondary = retrieve(

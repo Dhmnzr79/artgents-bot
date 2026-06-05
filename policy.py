@@ -52,19 +52,60 @@ def continuation_without_context(q: str, st: dict | None) -> bool:
     return continuation_only_phrase(q) and not session_has_continuation_context(st)
 
 
+def _booking_intent_cache_key(q0: str, sid: str | None, client_id: str | None) -> str:
+    return f"{(client_id or '').strip()}|{(sid or '').strip()}|{q0[:600]}"
+
+
+def _booking_intent_cache() -> dict[str, bool] | None:
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context():
+            return None
+        ctx = getattr(request, "ctx", None)
+        if not isinstance(ctx, dict):
+            return None
+        raw = ctx.setdefault("booking_intent_cache", {})
+        return raw if isinstance(raw, dict) else None
+    except Exception:
+        return None
+
+
+def explicit_booking_intent(q: str) -> bool:
+    """Pre-Resolver lead gate: explicit booking phrases only (no LLM)."""
+    q0 = (q or "").strip()
+    return len(q0) >= 2 and bool(BOOKING_INTENT_RE.search(q0))
+
+
 def booking_intent(
     q: str, *, sid: str | None = None, client_id: str | None = None
 ) -> bool:
     q0 = (q or "").strip()
     if len(q0) < 2:
         return False
+
+    cache_key = _booking_intent_cache_key(q0, sid, client_id)
+    cache = _booking_intent_cache()
+    if cache is not None:
+        hit = cache.get(cache_key)
+        if hit is not None:
+            from core.turn_timing import set_flag
+
+            set_flag("booking_intent_cache_hit", True)
+            return bool(hit)
+
     if BOOKING_INTENT_RE.search(q0):
-        return True
-    if not BOOKING_INTENT_LLM_ON:
-        return False
-    return classify_booking_wants_appointment(
-        q0[:600], client_id=client_id, sid=sid or ""
-    )
+        out = True
+    elif not BOOKING_INTENT_LLM_ON:
+        out = False
+    else:
+        out = classify_booking_wants_appointment(
+            q0[:600], client_id=client_id, sid=sid or ""
+        )
+
+    if cache is not None:
+        cache[cache_key] = out
+    return out
 
 
 def pick_contacts_chunk(cands: list) -> dict | None:

@@ -18,12 +18,13 @@ from pydantic import ValidationError
 
 from contracts.verifier_verdict import VerifierVerdict
 from core.routing_loader import THRESHOLDS
-from llm import client
+from config import CHAT_API_KEY, QWEN_FLASH_MODEL
+from llm import chat_completions_create
 from logging_setup import emit_bot_event, get_logger, log_llm_error, log_llm_usage
 
 logger = get_logger("bot")
 
-_MODEL = (os.getenv("MODEL_VERIFIER") or "").strip() or "gpt-5.4-nano"
+_MODEL = (os.getenv("MODEL_VERIFIER") or "").strip() or QWEN_FLASH_MODEL
 
 _SHADOW_BOOT_LOCK = threading.Lock()
 _shadow_slot_sem: threading.Semaphore | None = None
@@ -170,14 +171,13 @@ def verify_answer_structured(
     call_type: str = "v5_verifier",
 ) -> tuple[VerifierVerdict | None, VerifierRunStatus, str | None]:
     """Синхронный LLM-вызов Verifier. Для runtime вызывайте из фонового потока."""
-    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
-    if not api_key:
-        return None, "skipped", "no_openai_api_key"
+    if not (CHAT_API_KEY or "").strip():
+        return None, "skipped", "no_chat_api_key"
 
     timeout_sec = float(THRESHOLDS.verifier.timeout_sec)
     raw = ""
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=_MODEL,
             temperature=0,
             max_completion_tokens=400,

@@ -1,5 +1,5 @@
 {
-  "baseline": 54,
+  "baseline": 55,
   "known_v4_failures": [
     {
       "case_id": "smoke_multi_turn_all_on_4_price",
@@ -358,12 +358,24 @@
       "comment": "demo: после имплант-контекста — contacts, адрес Москва (не cesi/Елизово)",
       "coverage_class": "STRONG"
     },
+    {
+      "id": "smoke_multi_turn_implant_catalog_then_parking",
+      "history": [
+        {"question": "классическая имплантация"}
+      ],
+      "question": "А парковка есть?",
+      "expected_route": "contacts_chunk",
+      "must_contain": ["парков"],
+      "must_not_contain": ["implantium", "классическая имплантация"],
+      "comment": "multi-turn: session_fallback catalog vs clinic topic — arbiter picks contacts",
+      "coverage_class": "STRONG"
+    },
 
     {
       "id": "smoke_booking_edge_pain_today",
       "question": "Болит зуб, можете принять сегодня?",
-      "expected_route": "lead_flow",
-      "comment": "booking edge-case: боль + сегодня → booking (не handoff)",
+      "expected_route_any": ["lead_flow", "ingress_manual_contact", "retrieval_chunk", "guided", "catalog_md_first"],
+      "comment": "мягкая запись без явного regex → resolver/ingress/content (A: lead только по BOOKING_INTENT_RE)",
       "coverage_class": "STRONG"
     },
     {

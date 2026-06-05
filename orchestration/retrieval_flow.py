@@ -45,6 +45,7 @@ def run_content_arbiter_path(
     md_catalog_priority_ref: str | None,
     md_catalog_priority_sid: str | None,
     md_catalog_priority_score: float | None,
+    md_catalog_priority_match_method: str | None,
     data: dict,
     client_txt: Callable[[str | None], dict[str, str]],
     service_payload: Callable[..., dict],
@@ -86,6 +87,7 @@ def run_content_arbiter_path(
         catalog_md_priority_ref=md_catalog_priority_ref,
         catalog_md_priority_service_id=md_catalog_priority_sid,
         catalog_md_priority_match_score=md_catalog_priority_score,
+        catalog_md_priority_match_method=md_catalog_priority_match_method,
     )
     rdbg_turn = (cands.retrieval or {}).get("debug_meta") or {}
     if rdbg_turn.get("scope_widen_fallback"):

@@ -5,6 +5,7 @@ from typing import Any
 
 from flask import request
 
+from core.turn_timing import summary_for_turn_complete
 from core.metadata_first_observability import (
     metadata_first_response_meta,
     metadata_first_turn_details,
@@ -134,6 +135,7 @@ def finalize_ask(
                 "effective_intent": str(request.ctx.get("effective_intent") or ""),
                 "source_route_decision": request.ctx.get("source_route_decision"),
                 **verifier_trace_flat(request.ctx.get("verifier_turn")),
+                **summary_for_turn_complete(),
             },
         )
     cta = payload.get("cta")

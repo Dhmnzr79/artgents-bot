@@ -5,7 +5,7 @@ import os
 from lead_service import handle_lead, resolve_lead_submit_message
 from llm import classify_lead_name_shape
 from name_gate import hard_reject_lead_name
-from policy import booking_intent
+from policy import explicit_booking_intent
 from session import (
     extract_name,
     extract_phone,
@@ -343,7 +343,7 @@ def handle_flows(
             service_payload=service_payload,
         )
 
-    if q and booking_intent(q, sid=sid, client_id=client_id) and not is_active_lead_flow(st):
+    if q and explicit_booking_intent(q) and not is_active_lead_flow(st):
         clear_pending_lead_offer(sid)
         mark_booking_intent_ever(sid)
         set_lead_intent(sid, "collecting_name")

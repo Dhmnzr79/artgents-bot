@@ -9,7 +9,7 @@ from core.answer_bold import normalize_answer_bold
 from core.answer_lead import ensure_lead_before_list, starts_with_list_marker
 
 # UX prebuffer (не routing thresholds — см. docs/WIDGET_ANSWER_FORMAT.md)
-PREBUFFER_MIN_CHARS = 120
+PREBUFFER_MIN_CHARS = 80
 PREBUFFER_MAX_CHARS = 250
 PREBUFFER_LIST_MIN_CHARS = 32
 

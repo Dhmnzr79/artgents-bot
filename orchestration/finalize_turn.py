@@ -11,7 +11,12 @@ from core.metadata_first_observability import (
     metadata_first_turn_details,
     should_expose_metadata_first_in_response,
 )
-from logging_setup import emit_bot_event, get_logger, redact_text
+from core.observability_pii import (
+    observability_bot_text,
+    observability_turn_preview,
+    observability_user_texts,
+)
+from logging_setup import emit_bot_event, get_logger
 from session import get_topic_state, mem_get, record_last_bot_payload
 
 logger = get_logger("bot")
@@ -31,6 +36,8 @@ def infer_route_from_payload(payload: dict) -> str:
         return "rate_limited"
     if bool(meta.get("low_score")):
         return "low_score_fallback"
+    if bool(meta.get("situation_collect")):
+        return "situation_collect"
     if bool(meta.get("lead_flow")):
         return "lead_flow"
     ingress_route = str(meta.get("ingress_route") or "").strip().lower()
@@ -71,15 +78,30 @@ def finalize_ask(
         if mf:
             meta["metadata_first"] = mf
 
-    if turn_meta and turn_meta.get("interaction") == "user_message":
-        emit_bot_event(logger, "user_turn_completed", status="ok", details=turn_meta)
     effective_route = str(route or request.ctx.get("route") or infer_route_from_payload(payload))
     request.ctx["route"] = effective_route
     pmeta = payload.get("meta") or {}
     answer_text = str(payload.get("answer") or "")
-    user_text_redacted = redact_text((q or ""), max_len=8000)
-    user_preview_redacted = redact_text((q or ""), max_len=200)
-    bot_text_redacted = redact_text(answer_text, max_len=8000)
+    user_text_redacted, user_preview_redacted, pii_withheld = observability_user_texts(
+        q or "",
+        route=effective_route,
+        meta=pmeta,
+    )
+    bot_text_redacted = observability_bot_text(
+        answer_text,
+        route=effective_route,
+        meta=pmeta,
+    )
+    if turn_meta and turn_meta.get("interaction") == "user_message":
+        safe_turn_meta = dict(turn_meta)
+        safe_turn_meta["preview"] = observability_turn_preview(
+            q or "",
+            route=effective_route,
+            meta=pmeta,
+        )
+        if pii_withheld:
+            safe_turn_meta["pii_withheld"] = True
+        emit_bot_event(logger, "user_turn_completed", status="ok", details=safe_turn_meta)
     emit_bot_event(
         logger,
         "bot_reply_completed",
@@ -117,7 +139,10 @@ def finalize_ask(
                 "route": effective_route,
                 "low_score": bool(pmeta.get("low_score")),
                 "lead_flow": bool(pmeta.get("lead_flow")),
+                "situation_collect": bool(pmeta.get("situation_collect")),
+                "lead_step": pmeta.get("lead_step"),
                 "handoff_filter": bool(pmeta.get("handoff_filter")),
+                "pii_withheld": pii_withheld,
                 "answer_chars": len(answer_text),
                 "latency_ms": lat_ms,
                 "fallback_reason": pmeta.get("fallback_reason"),

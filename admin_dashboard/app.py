@@ -56,6 +56,26 @@ def _utc_day_bounds(days_back: int = 0) -> tuple[datetime, datetime]:
     return d0, d1
 
 
+_OVERVIEW_PERIOD_DAYS = {"today": 1, "week": 7, "month": 30}
+_OVERVIEW_PERIOD_LABELS = {"today": "сегодня", "week": "7 дней", "month": "30 дней"}
+
+
+def _overview_period_bounds(raw: str | None = None) -> tuple[datetime, datetime, str, str]:
+    """UTC range [d0, d1) for overview/costs: calendar buckets ending tomorrow 00:00 UTC."""
+    key = (raw or "today").strip().lower()
+    if key not in _OVERVIEW_PERIOD_DAYS:
+        key = "today"
+    days = _OVERVIEW_PERIOD_DAYS[key]
+    now = datetime.now(timezone.utc)
+    d1 = datetime(now.year, now.month, now.day, tzinfo=timezone.utc) + timedelta(days=1)
+    d0 = d1 - timedelta(days=days)
+    return d0, d1, key, _OVERVIEW_PERIOD_LABELS[key]
+
+
+def _overview_period() -> tuple[datetime, datetime, str, str]:
+    return _overview_period_bounds(request.args.get("period"))
+
+
 def _guard():
     # Local mode: no token by default.
     if APP_ENV != "prod":
@@ -156,7 +176,8 @@ def _fetch_turn_rows(
           details->>'bot_text_redacted' AS bot_text,
           details->>'route' AS route,
           COALESCE(details->>'doc_id', details->>'chunk_id') AS doc_id,
-          COALESCE((details->>'latency_ms')::numeric, 0)::float AS latency_ms
+          COALESCE((details->>'latency_ms')::numeric, 0)::float AS latency_ms,
+          COALESCE((details->>'pii_withheld')::boolean, false) AS pii_withheld
         FROM bot_events
         WHERE {' AND '.join(where)}
         ORDER BY sid, occurred_at ASC
@@ -164,9 +185,19 @@ def _fetch_turn_rows(
         tuple(params),
     )
     by_sid: dict[str, list[TurnRow]] = {}
-    for sid_val, ts, status, turn_number, user_text, bot_text, route, doc_id, latency_ms in cur.fetchall():
+    for sid_val, ts, status, turn_number, user_text, bot_text, route, doc_id, latency_ms, pii_withheld in cur.fetchall():
         by_sid.setdefault(str(sid_val), []).append(
-            (ts, status, int(turn_number or 0), user_text, bot_text, route, doc_id, float(latency_ms or 0.0))
+            (
+                ts,
+                status,
+                int(turn_number or 0),
+                user_text,
+                bot_text,
+                route,
+                doc_id,
+                float(latency_ms or 0.0),
+                bool(pii_withheld),
+            )
         )
     return by_sid
 
@@ -268,7 +299,7 @@ def api_overview():
     if err:
         return err
     cid = _client_id()
-    d0, d1 = _utc_day_bounds(0)
+    d0, d1, period_key, period_label = _overview_period()
     with conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -313,6 +344,10 @@ def api_overview():
     return jsonify(
         {
             "client_id": cid,
+            "period": period_key,
+            "period_label": period_label,
+            "range_from": d0.date().isoformat(),
+            "range_to": (d1 - timedelta(days=1)).date().isoformat(),
             "today_utc": d0.date().isoformat(),
             "user_turns": int(row[0] or 0),
             "visits": visits,
@@ -390,6 +425,46 @@ def api_dialog_thread(sid: str):
             "turns_count": len(visit_turns),
             "has_lead": has_lead,
             "status": _dialog_status(has_lead=has_lead, last_status=last[1], last_route=last[5]),
+        }
+    )
+
+
+@app.post("/api/dialogs/<sid>/purge")
+@app.delete("/api/dialogs/<sid>")
+def api_dialog_delete(sid: str):
+    """Remove entire browser session from admin stats (keeps llm_usage / token costs)."""
+    denied = _guard()
+    if denied:
+        return denied
+    if not BOT_PG_DSN:
+        return jsonify({"error": "BOT_PG_DSN_not_set"}), 503
+    cid = _client_id()
+    sid_clean = (sid or "").strip()
+    if not sid_clean:
+        return jsonify({"error": "sid_required"}), 400
+    try:
+        from pg_retention import purge_session_observability
+
+        stats = purge_session_observability(
+            BOT_PG_DSN,
+            sid=sid_clean,
+            client_id=cid,
+            keep_llm_usage=True,
+        )
+    except Exception as e:
+        return jsonify({"error": "purge_failed", "details": str(e)[:200]}), 500
+    if not stats.get("found"):
+        return jsonify({"error": "not_found", "sid": sid_clean, "client_id": cid}), 404
+    return jsonify(
+        {
+            "ok": True,
+            "client_id": cid,
+            "sid": sid_clean,
+            "bot_events_deleted": int(stats.get("bot_events_deleted") or 0),
+            "traces_deleted": int(stats.get("traces_deleted") or 0),
+            "leads_deleted": int(stats.get("leads_deleted") or 0),
+            "sqlite_cleared": bool(stats.get("sqlite_cleared")),
+            "llm_usage_kept": True,
         }
     )
 
@@ -474,6 +549,18 @@ def api_problems():
     return jsonify({"client_id": cid, "items": items})
 
 
+def _json_bool(details_key: str) -> str:
+    """Safe JSONB → bool in SQL (legacy rows may store '' instead of bool)."""
+    return f"""
+    CASE lower(coalesce(details->>{details_key!r}, ''))
+      WHEN 'true' THEN true
+      WHEN 't' THEN true
+      WHEN '1' THEN true
+      ELSE false
+    END
+    """
+
+
 @app.get("/api/leads")
 def api_leads():
     denied = _guard()
@@ -484,32 +571,58 @@ def api_leads():
         return err
     cid = _client_id()
     limit = min(max(int(request.args.get("limit", 50)), 1), 300)
+    after_hours_sql = _json_bool("after_hours")
+    has_name_sql = _json_bool("has_name")
+    has_situation_sql = _json_bool("has_situation_note")
+    ok_sql = _json_bool("ok")
     with conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT captured_at, request_id, sid, name, phone, topic, cta_action, turns_to_lead, delivery_status
-                FROM leads
+                f"""
+                SELECT
+                  occurred_at,
+                  request_id,
+                  sid,
+                  COALESCE(details->>'delivery_status', details->>'delivery') AS delivery_status,
+                  details->>'delivery' AS delivery,
+                  details->>'intent' AS intent,
+                  {after_hours_sql} AS after_hours,
+                  {has_name_sql} AS has_name,
+                  {has_situation_sql} AS has_situation_note
+                FROM bot_events
                 WHERE client_id=%s
-                ORDER BY captured_at DESC
+                  AND event_type='lead_submitted'
+                  AND status='ok'
+                  AND ({ok_sql} OR details->>'ok' IS NULL)
+                ORDER BY occurred_at DESC
                 LIMIT %s
                 """,
                 (cid, limit),
             )
             rows = cur.fetchall()
     items = []
-    for ts, request_id, sid, name, phone, topic, cta_action, turns_to_lead, delivery_status in rows:
+    for (
+        ts,
+        request_id,
+        sid,
+        delivery_status,
+        delivery,
+        intent,
+        after_hours,
+        has_name,
+        has_situation_note,
+    ) in rows:
         items.append(
             {
                 "captured_at": ts.isoformat() if ts else None,
                 "request_id": request_id,
                 "sid": sid,
-                "name": name,
-                "phone": phone,
-                "topic": topic,
-                "cta_action": cta_action,
-                "turns_to_lead": turns_to_lead,
+                "topic": intent,
+                "delivery": delivery,
                 "delivery_status": delivery_status,
+                "after_hours": bool(after_hours),
+                "has_name": bool(has_name),
+                "has_situation_note": bool(has_situation_note),
                 "client_id": cid,
             }
         )
@@ -525,7 +638,7 @@ def api_costs():
     if err:
         return err
     cid = _client_id()
-    d0, d1 = _utc_day_bounds(0)
+    d0, d1, period_key, period_label = _overview_period()
     with conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -559,7 +672,18 @@ def api_costs():
                 "estimated_usd": round(val, 6),
             }
         )
-    return jsonify({"client_id": cid, "today_utc": d0.date().isoformat(), "estimated_usd_total": round(total, 6), "items": items})
+    return jsonify(
+        {
+            "client_id": cid,
+            "period": period_key,
+            "period_label": period_label,
+            "range_from": d0.date().isoformat(),
+            "range_to": (d1 - timedelta(days=1)).date().isoformat(),
+            "today_utc": d0.date().isoformat(),
+            "estimated_usd_total": round(total, 6),
+            "items": items,
+        }
+    )
 
 
 @app.get("/api/events")

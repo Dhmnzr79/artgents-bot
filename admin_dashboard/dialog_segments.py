@@ -13,6 +13,7 @@ TurnRow = tuple[
     str | None,
     str | None,
     float,
+    bool,
 ]
 
 
@@ -70,7 +71,7 @@ def visit_has_lead(visit_turns: list[TurnRow], lead_times: list[datetime]) -> bo
 
 
 def turn_row_to_dict(row: TurnRow) -> dict[str, Any]:
-    ts, status, turn_number, user_text, bot_text, route, doc_id, latency_ms = row
+    ts, status, turn_number, user_text, bot_text, route, doc_id, latency_ms, pii_withheld = row
     return {
         "ts": ts.isoformat() if ts else None,
         "turn_number": int(turn_number or 0),
@@ -80,6 +81,7 @@ def turn_row_to_dict(row: TurnRow) -> dict[str, Any]:
         "doc_id": doc_id,
         "status": status,
         "latency_ms": float(latency_ms or 0.0),
+        "pii_withheld": bool(pii_withheld),
     }
 
 

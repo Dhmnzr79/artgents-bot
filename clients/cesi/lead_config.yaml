@@ -3,4 +3,4 @@ delivery: email
 recipients:
   - gothica@mail.ru
 subject_template: "Заявка с бота ЦЭСИ"
-store_in_postgres: true
+store_in_postgres: false

@@ -169,6 +169,31 @@ button {
 }
 
 .card-overview { grid-area: overview; min-height: 0; }
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.period-field select {
+  min-width: 120px;
+}
+
+.card h2 {
+  margin: 0 0 12px;
+}
+
+.section-head + .kpi-grid {
+  margin-top: 0;
+}
 .card-costs { grid-area: costs; min-height: 160px; }
 .card-dialogs { grid-area: dialogs; min-height: 160px; }
 .card-problems { grid-area: problems; }
@@ -341,6 +366,14 @@ button {
   overflow-wrap: anywhere;
 }
 
+.dialog-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
 .dialog-toggle {
   flex-shrink: 0;
   border: 1px solid var(--lilac-border);
@@ -352,6 +385,22 @@ button {
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.dialog-delete {
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--line));
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 34px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dialog-delete:hover {
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface));
 }
 
 .dialog-toggle:hover {

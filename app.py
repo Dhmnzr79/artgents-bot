@@ -27,6 +27,7 @@ from core.origin_guard import validate_widget_origin
 from core.routing_loader import THRESHOLDS
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
+from core.observability_pii import observability_turn_preview, observability_user_texts
 from logging_setup import LOG_FILE, emit_bot_event, get_logger, make_request_context, log_json, redact_text
 from chunk_responder import respond_from_chunk, respond_from_chunk_stream
 from retriever import (
@@ -95,6 +96,11 @@ def _client_txt(client_id: str | None) -> dict[str, str]:
     return tone_to_txt_dict(client_id)
 
 
+def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
+    pmeta = payload.get("meta") or {}
+    return bool(pmeta.get("lead_flow") or pmeta.get("situation_collect"))
+
+
 def _service_reply(
     payload: dict,
     sid: str,
@@ -107,7 +113,7 @@ def _service_reply(
     from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
 
     reset_consult_nudge_on_route(route, sid)
-    if track_user and q:
+    if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
@@ -124,10 +130,11 @@ def _service_reply(
     turn_meta = None
     if track_user and (q or "").strip():
         qs = (q or "").strip()
+        pmeta = payload.get("meta") or {}
         turn_meta = {
             "interaction": "user_message",
             "question_len": len(qs),
-            "preview": qs[:120],
+            "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
     if answer:
@@ -461,7 +468,7 @@ def _sse_service_reply(
     from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
 
     reset_consult_nudge_on_route(route, sid)
-    if track_user and q:
+    if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
@@ -478,10 +485,11 @@ def _sse_service_reply(
     turn_meta = None
     if track_user and (q or "").strip():
         qs = (q or "").strip()
+        pmeta = payload.get("meta") or {}
         turn_meta = {
             "interaction": "user_message",
             "question_len": len(qs),
-            "preview": qs[:120],
+            "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
     if answer:

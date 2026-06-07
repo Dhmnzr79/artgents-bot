@@ -120,7 +120,7 @@ def test_send_lead_email_no_recipients() -> None:
 
 @patch("pg_sink.enqueue_lead")
 @patch("lead_service.send_lead_email", return_value=(True, "email"))
-def test_handle_lead_cesi_email_and_pg(mock_send, mock_pg_enqueue) -> None:
+def test_handle_lead_cesi_email_no_pii_in_pg(mock_send, mock_pg_enqueue) -> None:
     payload, status = handle_lead(
         {
             "client_id": "cesi",
@@ -135,10 +135,31 @@ def test_handle_lead_cesi_email_and_pg(mock_send, mock_pg_enqueue) -> None:
     assert payload["delivery"] == "email"
     assert payload["delivery_status"] == "email"
     mock_send.assert_called_once()
+    mock_pg_enqueue.assert_not_called()
+
+
+@patch("pg_sink.enqueue_lead")
+@patch("lead_service.send_lead_email", return_value=(True, "email"))
+@patch("lead_service.load_lead_config", return_value={"store_in_postgres": True})
+def test_handle_lead_pg_row_has_no_pii_when_store_enabled(
+    mock_cfg, mock_send, mock_pg_enqueue
+) -> None:
+    payload, status = handle_lead(
+        {
+            "client_id": "cesi",
+            "name": "Анна",
+            "phone": "+79007654321",
+            "intent": "lead",
+            "sid": "sid-1",
+            "request_id": "req-1",
+        }
+    )
+    assert status == 200
     mock_pg_enqueue.assert_called_once()
     row = mock_pg_enqueue.call_args[0][0]
     assert row["delivery_status"] == "email"
-    assert row["phone"] == "+79007654321"
+    assert row["name"] is None
+    assert row["phone"] is None
 
 
 def test_smtp_configured_requires_host_and_from() -> None:

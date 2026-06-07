@@ -44,13 +44,14 @@ function resolveClientId(raw) {
   return state.defaultClientId;
 }
 
-async function getJson(path, clientId) {
-  const sep = path.includes("?") ? "&" : "?";
+async function getJson(path, clientId, extraParams = {}) {
+  const params = new URLSearchParams({ client_id: clientId, ...extraParams });
+  const url = path.includes("?") ? `${path}&${params}` : `${path}?${params}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 6000);
   let r;
   try {
-    r = await fetch(`${path}${sep}client_id=${encodeURIComponent(clientId)}`, {
+    r = await fetch(url, {
       signal: ctrl.signal,
     });
   } finally {
@@ -61,6 +62,74 @@ async function getJson(path, clientId) {
     throw new Error(`${path} -> ${r.status} ${txt.slice(0, 200)}`);
   }
   return r.json();
+}
+
+const OVERVIEW_PERIODS = new Set(["today", "week", "month"]);
+
+function overviewPeriod() {
+  const raw = (q("overviewPeriod")?.value || "today").trim();
+  return OVERVIEW_PERIODS.has(raw) ? raw : "today";
+}
+
+function readUrlPeriod() {
+  return (new URLSearchParams(window.location.search).get("period") || "").trim();
+}
+
+function syncUrlPeriod(period) {
+  const url = new URL(window.location.href);
+  if (period && period !== "today") {
+    url.searchParams.set("period", period);
+  } else {
+    url.searchParams.delete("period");
+  }
+  window.history.replaceState({}, "", url);
+}
+
+function periodRangeLabel(data) {
+  const from = data?.range_from;
+  const to = data?.range_to;
+  if (from && to) {
+    if (from === to) {
+      return `${data.period_label || "сегодня"} · ${from} (UTC)`;
+    }
+    return `${data.period_label || "период"} · ${from} — ${to} (UTC)`;
+  }
+  return `${data?.period_label || "сегодня"} (UTC)`;
+}
+
+async function deleteSession(sid) {
+  const sidClean = String(sid || "").trim();
+  if (!sidClean) return;
+  const ok = window.confirm(
+    `Удалить всю сессию?\n\nДиалоги, заявки и ошибки этой сессии исчезнут из админки и статистики.\nРасход токенов (LLM) останется.\n\nsid: ${sidClean}`,
+  );
+  if (!ok) return;
+  const clientId = currentClientId();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 10000);
+  let r;
+  try {
+    r = await fetch(
+      `/api/dialogs/${encodeURIComponent(sidClean)}/purge?client_id=${encodeURIComponent(clientId)}`,
+      { method: "POST", signal: ctrl.signal },
+    );
+  } finally {
+    clearTimeout(t);
+  }
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`delete -> ${r.status} ${txt.slice(0, 200)}`);
+  }
+  if (state.expandedVisit && state.expandedVisit.sid === sidClean) {
+    state.expandedVisit = null;
+    closeDialogViewer();
+  }
+  Object.keys(state.threadCache).forEach((key) => {
+    if (key.startsWith(`${sidClean}:`)) {
+      delete state.threadCache[key];
+    }
+  });
+  await refreshAll();
 }
 
 function setError(id, e) {
@@ -107,11 +176,15 @@ function renderThreadTurns(turns) {
       const doc = t.doc_id ? `<span class="chat-doc">${esc(t.doc_id)}</span>` : "";
       const lat =
         t.latency_ms > 0 ? `<span class="chat-lat">${Math.round(t.latency_ms)} ms</span>` : "";
+      const piiNote =
+        t.route === "lead_flow" || t.route === "situation_collect" || t.pii_withheld
+          ? '<span class="chat-pii muted">без ПД</span>'
+          : "";
       return `
         <div class="chat-turn">
           <div class="chat-turn-meta">
             <span>Ход ${esc(turnNo)} · ${esc(formatTs(t.ts))}</span>
-            ${route}${doc}${lat}
+            ${route}${doc}${lat}${piiNote}
           </div>
           <div class="bubble bubble-user">${esc(t.user_text || "—")}</div>
           <div class="bubble bubble-bot">${esc(t.bot_text || "—")}</div>
@@ -221,6 +294,14 @@ function bindDialogCards() {
       openSidInExplorer(btn.dataset.sid || "");
     });
   });
+  q("dialogs").querySelectorAll(".dialog-delete").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteSession(btn.dataset.sid || "").catch((err) => {
+        window.alert(String(err));
+      });
+    });
+  });
 }
 
 function renderDialogs(data) {
@@ -270,13 +351,21 @@ function renderDialogs(data) {
               ${r.last_route ? ` · route: ${esc(r.last_route)}` : ""}
             </div>
           </div>
-          <button
-            type="button"
-            class="dialog-toggle"
-            data-sid="${esc(r.sid || "")}"
-            data-visit-index="${esc(visitIndex)}"
-            data-open-label="${esc(openLabel)}"
-          >${isSelected ? "Открыт" : esc(openLabel)}</button>
+          <div class="dialog-actions">
+            <button
+              type="button"
+              class="dialog-toggle"
+              data-sid="${esc(r.sid || "")}"
+              data-visit-index="${esc(visitIndex)}"
+              data-open-label="${esc(openLabel)}"
+            >${isSelected ? "Открыт" : esc(openLabel)}</button>
+            <button
+              type="button"
+              class="dialog-delete"
+              data-sid="${esc(r.sid || "")}"
+              title="Удалить всю сессию (sid)"
+            >Удалить</button>
+          </div>
         </div>
       </article>
     `;
@@ -332,6 +421,10 @@ function renderClientSelect(items, selectedId) {
 }
 
 function renderOverview(data) {
+  const title = q("overviewTitle");
+  if (title) {
+    title.textContent = `Обзор · ${periodRangeLabel(data)}`;
+  }
   const kpis = [
     ["Сообщений", data.user_turns ?? 0, ""],
     ["Диалогов", data.visits ?? data.conversations ?? 0, ""],
@@ -352,9 +445,13 @@ function renderOverview(data) {
 }
 
 function renderCosts(data) {
+  const title = q("costsTitle");
+  if (title) {
+    title.textContent = `Стоимость LLM · ${periodRangeLabel(data)}`;
+  }
   const rows = data.items || [];
   if (!rows.length) {
-    q("costs").innerHTML = `<div class="muted">Сегодня вызовов LLM пока нет.</div>`;
+    q("costs").innerHTML = `<div class="muted">За выбранный период вызовов LLM пока нет.</div>`;
     return;
   }
   const body = rows
@@ -428,19 +525,18 @@ function maskPhone(phone) {
 function renderLeads(data) {
   const rows = data.items || [];
   if (!rows.length) {
-    q("leads").innerHTML = `<div class="muted">Лидов пока нет.</div>`;
+    q("leads").innerHTML = `<div class="muted">Заявок пока нет.</div>`;
     return;
   }
   const body = rows
     .map(
       (r) => `
     <tr>
-      <td>${esc(r.captured_at || "-")}</td>
-      <td>${esc(r.name || "-")}</td>
-      <td>${esc(maskPhone(r.phone))}</td>
-      <td class="wrap">${esc(r.topic || "-")}</td>
-      <td>${r.sid ? `<button type="button" class="link-btn sid-link" data-sid="${esc(r.sid)}">${esc(r.sid)}</button>` : "-"}</td>
-      <td>${esc(r.delivery_status || "-")}</td>
+      <td>${esc(formatTs(r.captured_at))}</td>
+      <td>${esc(r.delivery_status || r.delivery || "-")}</td>
+      <td>${r.after_hours ? "вне часов" : "рабочие"}</td>
+      <td>${r.has_situation_note ? "да" : "—"}</td>
+      <td>${r.sid ? `<button type="button" class="link-btn sid-link" data-sid="${esc(r.sid)}">${esc(r.sid.slice(0, 8))}…</button>` : "-"}</td>
     </tr>
   `,
     )
@@ -448,10 +544,11 @@ function renderLeads(data) {
   q("leads").innerHTML = `
     <div class="table-scroll">
       <table class="simple-table">
-        <thead><tr><th>Время</th><th>Имя</th><th>Телефон</th><th>Тема</th><th>SID</th><th>Доставка</th></tr></thead>
+        <thead><tr><th>Время</th><th>Доставка</th><th>Часы</th><th>Ситуация</th><th>SID</th></tr></thead>
         <tbody>${body}</tbody>
       </table>
     </div>
+    <p class="section-hint muted">Имя, телефон и текст ситуации не хранятся — только на почте клиники.</p>
   `;
 
   q("leads").querySelectorAll(".sid-link").forEach((btn) => {
@@ -495,10 +592,14 @@ async function refreshAll() {
   }
   renderStatusBar(health, clientId);
 
+  const period = overviewPeriod();
+  syncUrlPeriod(period);
   const eventQuery = readDevFilters();
   await Promise.all([
-    getJson("/api/overview", clientId).then(renderOverview).catch((e) => setError("overview", e)),
-    getJson("/api/costs", clientId).then(renderCosts).catch((e) => setError("costs", e)),
+    getJson("/api/overview", clientId, { period })
+      .then(renderOverview)
+      .catch((e) => setError("overview", e)),
+    getJson("/api/costs", clientId, { period }).then(renderCosts).catch((e) => setError("costs", e)),
     getJson("/api/dialogs?limit=20", clientId).then(renderDialogs).catch((e) => setError("dialogs", e)),
     getJson("/api/problems?limit=40", clientId).then(renderProblems).catch((e) => setError("problems", e)),
     getJson("/api/leads?limit=40", clientId).then(renderLeads).catch((e) => setError("leads", e)),
@@ -535,6 +636,15 @@ async function initDashboard() {
   }
 
   syncUrlClientId(selectedId);
+
+  const periodSel = q("overviewPeriod");
+  const urlPeriod = readUrlPeriod();
+  if (periodSel && OVERVIEW_PERIODS.has(urlPeriod)) {
+    periodSel.value = urlPeriod;
+  }
+  periodSel?.addEventListener("change", () => {
+    refreshAll();
+  });
 
   q("refreshBtn").addEventListener("click", refreshAll);
   q("dialogViewerClose").addEventListener("click", closeDialogViewer);

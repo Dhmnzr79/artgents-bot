@@ -159,6 +159,12 @@ def emit_bot_event(
     if status is not None:
         row["status"] = status
     row["details"] = dict(details or {})
+    try:
+        from core.observability_pii import scrub_observability_details
+
+        row["details"] = scrub_observability_details(row["details"])
+    except Exception:
+        pass
     safe_row = _sanitize(row)
     try:
         from core.client_config_loader import postgres_events_enabled

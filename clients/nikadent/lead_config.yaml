@@ -3,4 +3,4 @@ delivery: email
 recipients:
   - denis.today@yandex.ru
 subject_template: "Заявка с бота НикаДент"
-store_in_postgres: true
+store_in_postgres: false

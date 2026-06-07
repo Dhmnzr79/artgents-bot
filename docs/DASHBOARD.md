@@ -63,8 +63,12 @@ Materialized views, `llm_calls`, ротация истории.
 
 Обязательные `details`: `turn_number`, `user_text_redacted`, `user_preview_redacted`, `bot_text_redacted`, `intent`, `doc_id`, `route`, `low_score`, `lead_flow`, `handoff_filter`, `answer_chars`, `latency_ms`.
 
+**PII (имя, телефон, текст «Расскажите о ситуации»):** на ходах `lead_flow` / `situation_collect` в PG/JSONL/Developer Mode **не хранятся** — placeholder + `pii_withheld: true` (`core/observability_pii.py`). Полные данные только email/CRM. Медицинские content-ходы — как раньше (redact только телефоны в тексте).
+
 Stream: событие **после** финала ответа, не по дельтам.  
 `route` задаётся в одном месте orchestration, не собирается постфактум.
+
+**Retention (variant A):** `BOT_OBSERVABILITY_RETENTION_HOURS=24` — удаление всей `sid`, когда последний `bot_events.occurred_at` старше окна; SQLite-сессия тоже (`pg_retention.py`, фоновый worker при `BOT_PG_DSN`).
 
 ---
 
@@ -73,6 +77,9 @@ Stream: событие **после** финала ответа, не по де�
 Сервис: `admin_dashboard/` (порт `9100`).
 
 - `GET /api/overview`, `/api/dialogs`, `/api/dialogs/<sid>/thread`, `/api/problems`, `/api/leads`, `/api/costs`, `/api/events`
+- `GET /api/overview?period=today|week|month` — обзор за сегодня / 7 / 30 календарных дней UTC (то же `period` для `/api/costs`)
+- `DELETE /api/dialogs/<sid>` — удалить **всю сессию** (sid): диалоги, заявки, ошибки; **`llm_usage` остаётся** (расход токенов)
+- `POST /api/dialogs/<sid>/purge` — то же (использует UI)
 - Фильтр **`?client_id=cesi`** на всех запросах
 - `BOT_PG_DSN` обязателен; `ADMIN_DASHBOARD_TOKEN` в prod
 
@@ -85,6 +92,8 @@ Stream: событие **после** финала ответа, не по де�
 | Переменная | Назначение |
 |------------|------------|
 | `BOT_PG_DSN` | Postgres для bot sink |
+| `BOT_OBSERVABILITY_RETENTION_HOURS` | Rolling purge PG+SQLite (default 24; 0 = off) |
+| `BOT_OBSERVABILITY_RETENTION_INTERVAL_SEC` | Интервал purge job (default 3600) |
 | `ADMIN_DASHBOARD_PORT` | default 9100 |
 | `ADMIN_DASHBOARD_TOKEN` | prod |
 
@@ -95,7 +104,7 @@ Stream: событие **после** финала ответа, не по де�
 1. `BOT_PG_DSN` задан, события в PG + JSONL.
 2. `turn_complete` с redacted текстами.
 3. Admin показывает метрики «сегодня» по `client_id`.
-4. Диалоги и проблемы видны; лиды после включения `lead_config` (не demo_stub).
+4. Диалоги и проблемы видны; **заявки** — события `lead_submitted` (без name/phone), не таблица `leads`.
 5. Demo не смешивается с боевыми в admin (фильтр или `features.admin: false`).
 
 ---

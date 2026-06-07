@@ -8,7 +8,7 @@ from admin_dashboard.dialog_segments import build_visit_item, group_turns_into_v
 
 def _turn(ts: str, user: str, route: str = "chunk") -> tuple:
     dt = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
-    return (dt, "ok", 1, user, "bot reply", route, None, 100.0)
+    return (dt, "ok", 1, user, "bot reply", route, None, 100.0, False)
 
 
 def test_split_visits_after_lead():

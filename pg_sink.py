@@ -404,6 +404,12 @@ def init_pg_sink(logger) -> bool:
         t.start()
         _WORKER_STARTED = True
         _log("info", "pg_sink_starting", queue_max=max(100, _QUEUE_MAX))
+        try:
+            from pg_retention import start_observability_retention_worker
+
+            start_observability_retention_worker(logger, dsn=_DSN)
+        except Exception as e:
+            _log("warning", "observability_retention_start_failed", err=str(e)[:200])
         return True
 
 

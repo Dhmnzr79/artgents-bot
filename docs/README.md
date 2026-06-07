@@ -4,6 +4,7 @@
 |----------|--------|
 | **`CURRENT_ARCHITECTURE.md`** | Как бот работает **сейчас** (runtime, модули, пайплайн) |
 | **`MULTICLIENT.md`** | Client pack, домены, VPS, локальный запуск, prod-критерии |
+| **`VPS_CHECKLIST.md`** | Чеклист деплоя M5 (новый чат / пошаговый prod) |
 | **`ROUTING_MAP.md`** | Куда уходит вопрос (маршруты до retrieval) |
 | **`WIDGET_ANSWER_FORMAT.md`** | Контракт текста ответа для виджета |
 | **`DASHBOARD.md`** | Admin, Postgres, события, cost |
@@ -19,8 +20,9 @@
 
 1. `README.md` → `CURRENT_ARCHITECTURE.md` → `MULTICLIENT.md` → `TECH_DEBT.md`
 2. Задача по UI: `WIDGET_ANSWER_FORMAT.md`
-3. Задача по admin/PG: `DASHBOARD.md`
-4. Задача по маршрутам: `ROUTING_MAP.md`
+3. Задача по VPS / prod: `VPS_CHECKLIST.md` + `MULTICLIENT.md` §8
+4. Задача по admin/PG: `DASHBOARD.md`
+5. Задача по маршрутам: `ROUTING_MAP.md`
 
 ---
 

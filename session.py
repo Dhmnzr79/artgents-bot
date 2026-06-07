@@ -657,3 +657,16 @@ def update_profile(session_id: str, **fields) -> None:
                 prof[k] = v
         st["profile"] = prof
         _persist_unlocked(session_id, st)
+
+
+def clear_lead_pii(session_id: str) -> None:
+    """Drop lead-flow PII from SQLite session after submit (name/phone/situation)."""
+    with _lock:
+        st = mem_get(session_id)
+        prof = dict(st.get("profile") or {})
+        prof.pop("name", None)
+        prof.pop("phone", None)
+        st["profile"] = prof
+        st["situation_note"] = ""
+        st["lead_pending_name"] = ""
+        _persist_unlocked(session_id, st)

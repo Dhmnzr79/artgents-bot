@@ -3,10 +3,10 @@
 import os
 
 from lead_service import handle_lead, resolve_lead_submit_message
-from llm import classify_lead_name_shape
 from name_gate import hard_reject_lead_name
 from policy import explicit_booking_intent
 from session import (
+    clear_lead_pii,
     extract_name,
     extract_phone,
     get_lead_pending_name,
@@ -62,26 +62,7 @@ def _collecting_name_reply(
             lead_flow=True,
             lead_step="name",
         )
-    label = classify_lead_name_shape(name, q, client_id=client_id, sid=sid)
-    if label == "invalid_name":
-        return service_payload(
-            txt["lead_name_invalid"],
-            sid,
-            client_id,
-            lead_flow=True,
-            lead_step="name",
-        )
-    if label == "unsure":
-        set_lead_pending_name(sid, name)
-        set_lead_intent(sid, "confirming_name")
-        return service_payload(
-            txt["lead_name_confirm_tpl"].format(name=name),
-            sid,
-            client_id,
-            lead_flow=True,
-            lead_step="confirm_name",
-            quick_replies=_name_confirm_quick_replies(),
-        )
+    # Deterministic path only (no LLM name classify — PII must not go to foreign LLM).
     update_profile(sid, name=name)
     set_lead_intent(sid, "collecting_phone")
     return service_payload(
@@ -219,7 +200,7 @@ def _lead_flow_payload(
             )
         set_lead_intent(sid, "submitted")
         set_situation_pending(sid, False)
-        set_situation_note(sid, "")
+        clear_lead_pii(sid)
         return service_payload(
             resolve_lead_submit_message(client_id, txt),
             sid,

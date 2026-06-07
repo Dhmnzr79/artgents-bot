@@ -88,7 +88,7 @@ def handle_lead(data: dict[str, Any]) -> tuple[dict[str, Any], int]:
         return {"ok": True, "error_code": None, "delivery": "demo_stub"}, 200
 
     lead_cfg = load_lead_config(client_id)
-    store_pg = bool(lead_cfg.get("store_in_postgres", True))
+    store_pg = bool(lead_cfg.get("store_in_postgres", False))
     captured_at = datetime.now(timezone.utc).isoformat()
     lead_fields = {
         "name": name,
@@ -106,14 +106,15 @@ def handle_lead(data: dict[str, Any]) -> tuple[dict[str, Any], int]:
         try:
             from pg_sink import enqueue_lead
 
+            # Metadata only — no name/phone (PII stays in email/CRM channel).
             enqueue_lead(
                 {
                     "captured_at": captured_at,
                     "request_id": request_id or None,
                     "sid": sid or None,
                     "client_id": client_id,
-                    "name": name or None,
-                    "phone": phone,
+                    "name": None,
+                    "phone": None,
                     "topic": intent or None,
                     "cta_action": "lead",
                     "turns_to_lead": None,

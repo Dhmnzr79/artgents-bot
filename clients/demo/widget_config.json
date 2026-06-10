@@ -19,16 +19,7 @@
   "launcherCtaLabel": "Запустить демо",
   "demoLauncher": true,
   "welcomeText": "Здравствуйте!\nЯ демо-версия ИИ-консультанта стоматологической клиники. Задайте вопрос по лечению или выберите тему ниже.",
-  "avatarUrl": "/static/avatar.png",
   "videoAspect": "horizontal",
-  "theme": {
-    "brand": "#6952e8",
-    "brandHover": "#5842d4",
-    "brandDeep": "#4f3bc4",
-    "brandLight": "#8f7ef0",
-    "brandSoft": "#b5a8f4",
-    "accent": "#bd35d8"
-  },
   "starterPrompts": [
     { "label": "Я боюсь боли", "q": "Я боюсь боли" },
     { "label": "Расскажите про all-on-4", "q": "Расскажите про all-on-4" },

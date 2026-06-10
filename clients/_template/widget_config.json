@@ -12,7 +12,6 @@
   "launcher_cta_label": "Задать вопрос",
   "demo_launcher": false,
   "welcome_text": null,
-  "avatar_url": null,
   "video_aspect": "horizontal",
   "starter_prompts": []
 }

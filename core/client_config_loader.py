@@ -136,6 +136,56 @@ def load_lead_config(client_id: str | None) -> dict[str, Any]:
     return _cached_load(_LEAD_CACHE, pack, "lead_config.yaml")
 
 
+_BRAND_COLOR_TO_THEME: tuple[tuple[str, str], ...] = (
+    ("brand", "brand"),
+    ("action", "action"),
+    ("button_1", "button_1"),
+    ("button_2", "button_2"),
+)
+
+
+def widget_theme_from_brand(client_id: str | None) -> dict[str, str]:
+    """Palette for embed: canonical source is clients/{id}/brand.yaml colors."""
+    colors = load_brand(client_id).get("colors")
+    if not isinstance(colors, dict):
+        return {}
+    out: dict[str, str] = {}
+    for yaml_key, theme_key in _BRAND_COLOR_TO_THEME:
+        val = colors.get(yaml_key)
+        if isinstance(val, str) and val.strip():
+            out[theme_key] = val.strip()
+    return out
+
+
+def widget_logo_from_brand(client_id: str | None) -> dict[str, Any]:
+    """Welcome-screen logo: url and display size from clients/{id}/brand.yaml."""
+    brand = load_brand(client_id)
+    if not isinstance(brand, dict):
+        return {}
+    out: dict[str, Any] = {}
+    logo_url = brand.get("logo_url")
+    if isinstance(logo_url, str) and logo_url.strip():
+        out["logoUrl"] = logo_url.strip()
+    for yaml_key, cfg_key in (("logo_width", "logoWidth"), ("logo_height", "logoHeight")):
+        val = brand.get(yaml_key)
+        if isinstance(val, bool):
+            continue
+        if isinstance(val, (int, float)) and val > 0:
+            out[cfg_key] = int(val)
+    return out
+
+
+def widget_avatar_from_brand(client_id: str | None) -> dict[str, str]:
+    """Bot avatar (launcher, header, message rows) from clients/{id}/brand.yaml."""
+    brand = load_brand(client_id)
+    if not isinstance(brand, dict):
+        return {}
+    avatar_url = brand.get("avatar_url")
+    if isinstance(avatar_url, str) and avatar_url.strip():
+        return {"avatarUrl": avatar_url.strip()}
+    return {}
+
+
 def load_widget_config(client_id: str | None) -> dict[str, Any]:
     path = _pack_path(client_id, "widget_config.json")
     if not os.path.isfile(path):
@@ -143,9 +193,25 @@ def load_widget_config(client_id: str | None) -> dict[str, Any]:
     try:
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        return raw if isinstance(raw, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+    if not isinstance(raw, dict):
+        return {}
+    theme_from_brand = widget_theme_from_brand(client_id)
+    if theme_from_brand:
+        existing = raw.get("theme") if isinstance(raw.get("theme"), dict) else {}
+        raw = {**raw, "theme": {**existing, **theme_from_brand}}
+    brand = load_brand(client_id)
+    clinic_name = brand.get("clinic_name") if isinstance(brand, dict) else None
+    if isinstance(clinic_name, str) and clinic_name.strip():
+        raw = {**raw, "clinicName": clinic_name.strip()}
+    logo = widget_logo_from_brand(client_id)
+    if logo:
+        raw = {**raw, **logo}
+    avatar = widget_avatar_from_brand(client_id)
+    if avatar:
+        raw = {**raw, **avatar}
+    return raw
 
 
 def _nested_get(data: dict[str, Any], path: tuple[str, ...]) -> Any:

@@ -1,10 +1,13 @@
 # clients/_template/brand.yaml
+# brand — glow, пузырь; action — ссылки и focus; button_1/button_2 — градиент кнопок
 clinic_name: "REPLACE_CLINIC_NAME"
 logo_url: null
+logo_width: null
+logo_height: null
+avatar_url: null
 
 colors:
   brand: null
-  brand_hover: null
-  brand_deep: null
-  brand_light: null
-  brand_soft: null
+  action: null
+  button_1: null
+  button_2: null

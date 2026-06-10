@@ -16,16 +16,7 @@
   "launcherCtaLabel": "Задать вопрос",
   "demoLauncher": false,
   "welcomeText": "Здравствуйте!\nЯ ИИ-консультант НикаДент. Помогу с услугами, ценами, врачами и записью — задайте вопрос или выберите тему ниже.",
-  "avatarUrl": "/static/avatar.png",
   "videoAspect": "horizontal",
-  "theme": {
-    "brand": "#7c3aed",
-    "brandHover": "#6d28d9",
-    "brandDeep": "#5b21b6",
-    "brandLight": "#a78bfa",
-    "brandSoft": "#ddd6fe",
-    "accent": "#f97316"
-  },
   "starterPrompts": [
     { "label": "Я боюсь боли", "q": "Я боюсь боли" },
     { "label": "Расскажите про all-on-4", "q": "Расскажите про all-on-4" },

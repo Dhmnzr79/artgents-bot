@@ -1,11 +1,12 @@
-# clients/cesi/brand.yaml — бирюзовая палитра
+# clients/cesi/brand.yaml
 clinic_name: "ЦЭСИ"
-logo_url: "/static/avatar.png"
+logo_url: "/static/clients/cesi/logo.svg"
+logo_width: 64
+logo_height: 65
+avatar_url: "/static/clients/cesi/avatar.png"
 
 colors:
-  brand: "#0d9488"
-  brand_hover: "#0f766e"
-  brand_deep: "#115e59"
-  brand_light: "#2dd4bf"
-  brand_soft: "#99f6e4"
-  accent: "#14b8a6"
+  brand: "#23BFCF"
+  action: "#0B7A86"
+  button_1: "#23BFCF"
+  button_2: "#1E6FD9"

@@ -1,11 +1,12 @@
 # clients/demo/brand.yaml
 clinic_name: "Демо-клиника"
-logo_url: "/static/avatar.png"
+logo_url: "/static/clients/demo/logo.svg"
+logo_width: 110
+logo_height: 28
+avatar_url: "/static/clients/demo/avatar.png"
 
 colors:
   brand: "#6952e8"
-  brand_hover: "#5842d4"
-  brand_deep: "#4f3bc4"
-  brand_light: "#8f7ef0"
-  brand_soft: "#b5a8f4"
-  accent: "#bd35d8"
+  action: "#4A3BA8"
+  button_1: "#6952e8"
+  button_2: "#BD35D8"

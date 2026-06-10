@@ -1,4 +1,27 @@
-﻿@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+﻿/* Inter — self-hosted (static/fonts/), кириллица + латиница, variable 100–900 */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src:
+    url("../fonts/inter-cyrillic-wght-normal.woff2") format("woff2 supports variations"),
+    url("../fonts/inter-cyrillic-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src:
+    url("../fonts/inter-latin-wght-normal.woff2") format("woff2 supports variations"),
+    url("../fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 /* Токены виджета (префикс .clinic-shell — не засоряем страницу-хост; палитра — drafts/widget_design.md) */
 .clinic-shell {
@@ -9,40 +32,43 @@
   --clinic-radius-lg: 16px;
   --clinic-radius-md: 12px;
   --clinic-radius-sm: 999px;
-  /* Фирменные: #6952e8, #BD35D8 */
+  /* Палитра: brand (заливки) + action (интерактив на белом); clients/{id}/brand.yaml */
   --clinic-brand: #6952e8;
-  --clinic-brand-hover: #5842d4;
-  --clinic-brand-deep: #4f3bc4;
-  --clinic-brand-light: #8f7ef0;
-  --clinic-brand-soft: #b5a8f4;
-  --clinic-accent: #bd35d8;
-  --clinic-shadow: 0 8px 32px rgba(105, 82, 232, 0.14);
-  --clinic-shadow-soft: 0 4px 16px rgba(105, 82, 232, 0.1);
-  --clinic-shadow-panel: 0 24px 60px rgba(105, 82, 232, 0.16), 0 8px 24px rgba(105, 82, 232, 0.08);
-  --clinic-surface-inset: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 10px 30px rgba(105, 82, 232, 0.08);
+  --clinic-button-1: #6952e8;
+  --clinic-button-2: #bd35d8;
+  --clinic-gradient-cta: linear-gradient(130deg, var(--clinic-button-1) 0%, var(--clinic-button-2) 100%);
+  --clinic-action: #4a3ba8;
+  --clinic-action-hover: #3f328f;
+  --clinic-brand-rgb: 105, 82, 232;
+  --clinic-action-rgb: 74, 59, 168;
+  --clinic-shadow: 0 8px 32px rgba(var(--clinic-brand-rgb), 0.14);
+  --clinic-shadow-soft: 0 4px 16px rgba(var(--clinic-brand-rgb), 0.1);
+  --clinic-shadow-panel: 0 24px 60px rgba(var(--clinic-brand-rgb), 0.16), 0 8px 24px rgba(var(--clinic-brand-rgb), 0.08);
+  --clinic-surface-inset: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 10px 30px rgba(var(--clinic-brand-rgb), 0.08);
   --clinic-bg: #ffffff;
-  --clinic-bg-subtle: rgba(105, 82, 232, 0.06);
+  --clinic-bg-subtle: rgba(var(--clinic-brand-rgb), 0.06);
   --clinic-bg-tint: #f8f6fe;
+  --clinic-bg-tint-deep: #f3effc;
+  --clinic-frame-bg:
+    radial-gradient(circle at 82% 8%, rgba(var(--clinic-brand-rgb), 0.14), transparent 38%),
+    radial-gradient(circle at 8% 72%, rgba(var(--clinic-brand-rgb), 0.09), transparent 40%),
+    linear-gradient(145deg, #ffffff 0%, var(--clinic-bg-tint) 52%, var(--clinic-bg-tint-deep) 100%);
   --clinic-border: rgba(43, 30, 78, 0.1);
   --clinic-text: #211632;
   --clinic-text-soft: #6b6280;
   --clinic-text-muted: #9a92ad;
-  --clinic-primary: var(--clinic-brand);
-  --clinic-primary-hover: var(--clinic-brand-hover);
-  --clinic-primary-light: var(--clinic-brand-light);
   --clinic-chip-bg: rgba(255, 255, 255, 0.72);
-  --clinic-chip-border: rgba(105, 82, 232, 0.14);
-  --clinic-focus: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(105, 82, 232, 0.32);
+  --clinic-chip-border: rgba(var(--clinic-brand-rgb), 0.14);
+  --clinic-focus: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(var(--clinic-action-rgb), 0.32);
   --clinic-gradient-online: linear-gradient(135deg, #8af447 0%, #32d33d 48%, #10b83a 100%);
-  --clinic-border-accent: rgba(105, 82, 232, 0.42);
   --clinic-bubble-bot: rgba(255, 255, 255, 0.88);
-  --clinic-bubble-user: rgba(105, 82, 232, 0.12);
+  --clinic-bubble-user: rgba(var(--clinic-brand-rgb), 0.12);
   --clinic-line: rgba(43, 30, 78, 0.09);
-  /* Кнопки — только оттенки #6952e8 */
-  --clinic-gradient-primary: linear-gradient(165deg, #8575ec 0%, #6952e8 52%, #5744d6 100%);
-  --clinic-gradient-send: linear-gradient(165deg, #7d6aeb 0%, #6952e8 58%, #5a48d8 100%);
+  --clinic-composer-bg: var(--clinic-bg-tint);
+  --clinic-composer-border: rgba(var(--clinic-brand-rgb), 0.18);
+  --clinic-composer-focus-border: rgba(var(--clinic-brand-rgb), 0.42);
+  --clinic-composer-focus-shadow: 0 10px 28px rgba(var(--clinic-brand-rgb), 0.12);
   --clinic-placeholder: #aaa0bb;
-  --clinic-radius-welcome-action: 14px;
   --clinic-panel-w: 440px;
   --clinic-panel-h: min(720px, calc(100vh - 48px));
   --clinic-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -67,14 +93,22 @@
 .clinic-shell *::before,
 .clinic-shell *::after {
   box-sizing: border-box;
+  font-family: inherit;
+}
+
+/* Кнопки/поля на сайте клиента часто не наследуют шрифт — фиксируем Inter явно */
+.clinic-shell input,
+.clinic-shell textarea,
+.clinic-shell button,
+.clinic-shell select {
+  font-family: var(--clinic-font);
 }
 
 .clinic-shell__launcher {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px 10px 10px;
-  min-height: 52px;
+  position: relative;
+  display: block;
+  padding: 14px 16px;
+  min-height: 0;
   background: var(--clinic-bg);
   border: 1px solid var(--clinic-border);
   border-radius: var(--clinic-radius-lg);
@@ -82,7 +116,7 @@
   cursor: pointer;
   text-align: left;
   width: auto;
-  max-width: min(320px, calc(100vw - 40px));
+  max-width: min(340px, calc(100vw - 40px));
 }
 
 .clinic-shell__launcher:not(.clinic-shell__launcher--demo):hover {
@@ -119,10 +153,14 @@
 }
 
 .clinic-shell__launcher-body {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   padding: 22px 22px 18px;
+}
+
+.clinic-shell__launcher-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
 }
 
 .clinic-shell__launcher-avatar {
@@ -131,9 +169,20 @@
   line-height: 0;
 }
 
-.clinic-shell__launcher-avatar .clinic-shell__header-online-dot {
+.clinic-shell__avatar-fallback--launcher {
+  width: 40px;
+  height: 40px;
+}
+
+.clinic-shell__header-online-dot--launcher {
+  width: 10px;
+  height: 10px;
   right: 0;
   bottom: 0;
+}
+
+.clinic-shell__launcher-avatar .clinic-shell__header-online-dot {
+  z-index: 1;
   box-shadow: 0 0 0 2px var(--clinic-bg);
 }
 
@@ -144,20 +193,46 @@
   white-space: normal;
 }
 
-.clinic-shell__launcher-subtitle {
+.clinic-shell__launcher-subtitle,
+.clinic-shell__launcher-tagline {
   display: block;
-  margin-top: 4px;
+  margin: 0;
   font-size: 13px;
   line-height: 1.35;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--clinic-text-soft);
 }
 
-.clinic-shell__unread--launcher {
+.clinic-shell__launcher .clinic-shell__unread {
   position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+}
+
+.clinic-shell__unread--launcher {
   top: 14px;
   right: 14px;
-  z-index: 2;
+}
+
+/* Свернутый виджет: белый центр + градиентная «рамка» как у .clinic-shell__frame */
+.clinic-shell:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
+  border: 3px solid transparent;
+  background-image:
+    linear-gradient(var(--clinic-bg), var(--clinic-bg)),
+    var(--clinic-frame-bg);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: var(--clinic-shadow-panel);
+}
+
+.clinic-shell:not(.is-open) .clinic-shell__launcher--demo .clinic-shell__launcher-card {
+  border: var(--clinic-frame-padding) solid transparent;
+  background-image:
+    linear-gradient(var(--clinic-bg), var(--clinic-bg)),
+    var(--clinic-frame-bg);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
 }
 
 .clinic-shell__launcher-cta {
@@ -166,7 +241,7 @@
   padding: 16px 22px;
   border: none;
   border-top: 1px solid var(--clinic-line);
-  background: var(--clinic-gradient-primary);
+  background: var(--clinic-gradient-cta, var(--clinic-brand));
   color: #fff;
   font-family: inherit;
   font-size: 16px;
@@ -181,7 +256,7 @@
 }
 
 .clinic-shell__launcher-cta:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
 }
 
 .clinic-shell__launcher-cta:active {
@@ -229,8 +304,9 @@
 .clinic-shell__launcher-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .clinic-shell__name {
@@ -248,7 +324,7 @@
 }
 
 .clinic-shell__launcher .clinic-shell__online {
-  color: var(--clinic-primary);
+  color: var(--clinic-action);
   font-weight: 600;
 }
 
@@ -264,6 +340,73 @@
 
 .clinic-shell__unread.is-visible {
   opacity: 1;
+}
+
+.clinic-shell__launcher-teaser {
+  display: none;
+  width: min(300px, calc(100vw - 40px));
+  margin: 0 0 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--clinic-border);
+  border-radius: var(--clinic-radius-lg);
+  background: var(--clinic-bg);
+  box-shadow: var(--clinic-shadow-soft);
+  color: var(--clinic-text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease,
+    box-shadow 0.2s ease;
+}
+
+.clinic-shell__launcher-teaser:hover {
+  box-shadow: var(--clinic-shadow);
+}
+
+.clinic-shell__launcher-teaser:focus-visible {
+  outline: none;
+  box-shadow: var(--clinic-shadow), var(--clinic-focus);
+}
+
+.clinic-shell__launcher-teaser-text {
+  display: block;
+}
+
+.clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher-teaser {
+  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
+  transform: scale(1.05);
+  box-shadow: var(--clinic-shadow);
+}
+
+.clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher--demo .clinic-shell__launcher-card {
+  transform: scale(1.03);
+  transition: transform 0.3s ease;
+}
+
+.clinic-shell__launcher--demo .clinic-shell__launcher-card {
+  transition: transform 0.3s ease;
+}
+
+.clinic-shell.is-open .clinic-shell__launcher-teaser {
+  display: none;
 }
 
 .clinic-shell__panel {
@@ -299,11 +442,7 @@
   padding: var(--clinic-frame-padding);
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 82% 5%, rgba(189, 53, 216, 0.12), transparent 34%),
-    radial-gradient(circle at 0% 62%, rgba(105, 82, 232, 0.11), transparent 36%),
-    radial-gradient(circle at 100% 88%, rgba(105, 82, 232, 0.08), transparent 34%),
-    linear-gradient(145deg, #ffffff 0%, var(--clinic-bg-tint) 48%, #f3effc 100%);
+  background: var(--clinic-frame-bg);
   box-shadow: var(--clinic-shadow-panel);
   display: flex;
   flex-direction: column;
@@ -330,7 +469,7 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: rgba(105, 82, 232, 0.22) transparent;
+  scrollbar-color: rgba(var(--clinic-brand-rgb), 0.22) transparent;
 }
 
 .clinic-shell__main::-webkit-scrollbar {
@@ -338,7 +477,7 @@
 }
 
 .clinic-shell__main::-webkit-scrollbar-thumb {
-  background: rgba(105, 82, 232, 0.22);
+  background: rgba(var(--clinic-brand-rgb), 0.22);
   border-radius: 999px;
 }
 
@@ -411,10 +550,27 @@
 }
 
 .clinic-shell__header-status {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 13px;
   line-height: 1.35;
   font-weight: 500;
   color: var(--clinic-text-soft);
+}
+
+.clinic-shell__header-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #22c55e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
 .clinic-shell__header-actions {
@@ -456,7 +612,7 @@
 
 .clinic-shell__header-close:hover {
   background: transparent;
-  color: var(--clinic-primary);
+  color: var(--clinic-action);
 }
 
 .clinic-shell__header-close:focus-visible {
@@ -498,7 +654,7 @@
   flex-direction: column;
   align-items: center;
   margin-top: 22px;
-  padding: 24px 24px 34px;
+  padding: 0 0 20px;
   overflow: visible;
 }
 
@@ -517,12 +673,14 @@
   line-height: 0;
 }
 
+.clinic-shell__welcome-logo-img,
 .clinic-shell__welcome-logo svg {
   display: block;
-  width: auto;
-  height: 32px;
+  width: var(--clinic-logo-w, auto);
+  height: var(--clinic-logo-h, 32px);
   max-width: 100%;
   margin: 0 auto;
+  object-fit: contain;
 }
 
 .clinic-shell__welcome-lead {
@@ -557,7 +715,7 @@
   margin-left: 6px;
   vertical-align: -0.12em;
   border-radius: 999px;
-  background: var(--clinic-primary);
+  background: var(--clinic-brand);
   animation: clinic-cursor-blink 0.9s steps(2, start) infinite;
 }
 
@@ -580,7 +738,7 @@
   left: -10%;
   right: -10%;
   height: 44px;
-  border-top: 1px solid rgba(105, 82, 232, 0.14);
+  border-top: 1px solid rgba(var(--clinic-brand-rgb), 0.14);
   border-radius: 50%;
 }
 
@@ -598,52 +756,16 @@
 .clinic-shell__welcome-actions {
   width: 100%;
   margin-top: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
-.clinic-shell__welcome-action {
-  width: 100%;
-  height: 52px;
-  margin: 0;
-  border-radius: var(--clinic-radius-welcome-action);
-  border: 1px solid var(--clinic-border-accent);
-  background: transparent;
-  color: var(--clinic-primary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
-  font-size: 15px;
-  line-height: 1;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  text-align: center;
-  box-shadow: none;
+.clinic-shell__welcome-actions .clinic-msg__links {
+  margin-top: 0;
 }
 
-.clinic-shell__welcome-action:hover,
-.clinic-shell__welcome-action:active {
-  background: transparent;
-  border-color: var(--clinic-border-accent);
-  color: var(--clinic-primary);
-  box-shadow: none;
-  transform: none;
-}
-
-.clinic-shell__welcome-action:focus-visible {
-  outline: none;
-  box-shadow: var(--clinic-focus);
-}
-
-.clinic-shell__welcome-action--soon,
-.clinic-shell__welcome-action--soon:hover,
-.clinic-shell__welcome-action--soon:active {
+.clinic-msg__link--soon,
+.clinic-msg__link--soon:hover {
   cursor: default;
   opacity: 0.45;
-  border-color: var(--clinic-border);
   color: var(--clinic-text-muted, #64748b);
 }
 
@@ -680,7 +802,7 @@
   flex-shrink: 0;
   border: none;
   background: var(--clinic-bg-subtle);
-  box-shadow: 0 6px 14px rgba(105, 82, 232, 0.1);
+  box-shadow: 0 6px 14px rgba(var(--clinic-brand-rgb), 0.1);
 }
 
 .clinic-row__avatar-online {
@@ -725,8 +847,8 @@
   border: 1px solid rgba(43, 30, 78, 0.07);
   border-radius: 0 18px 18px 18px;
   box-shadow:
-    0 18px 38px rgba(105, 82, 232, 0.06),
-    0 2px 8px rgba(105, 82, 232, 0.03);
+    0 18px 38px rgba(var(--clinic-brand-rgb), 0.06),
+    0 2px 8px rgba(var(--clinic-brand-rgb), 0.03);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
@@ -900,7 +1022,7 @@
   border: 0;
   border-bottom: 1px solid var(--clinic-line);
   background: transparent;
-  color: var(--clinic-primary);
+  color: var(--clinic-action);
   font: inherit;
   font-size: 14px;
   line-height: 1.35;
@@ -920,7 +1042,7 @@
 }
 
 .clinic-msg__link:hover {
-  color: var(--clinic-primary-hover);
+  color: var(--clinic-action-hover);
 }
 
 .clinic-msg__link:focus-visible {
@@ -1033,17 +1155,17 @@
 
 .clinic-turn__btn--cta-secondary {
   background: rgba(255, 255, 255, 0.62);
-  border: 1px solid var(--clinic-border-accent);
-  color: var(--clinic-primary);
-  box-shadow: 0 8px 18px rgba(105, 82, 232, 0.08);
+  border: 1px solid var(--clinic-action);
+  color: var(--clinic-action);
+  box-shadow: 0 8px 18px rgba(var(--clinic-brand-rgb), 0.08);
 }
 
 .clinic-turn__btn--cta-primary {
-  background: var(--clinic-gradient-primary);
+  background: var(--clinic-gradient-cta, var(--clinic-brand));
   color: #fff;
   box-shadow:
-    0 14px 28px rgba(105, 82, 232, 0.22),
-    0 4px 10px rgba(105, 82, 232, 0.12);
+    0 14px 28px rgba(var(--clinic-brand-rgb), 0.22),
+    0 4px 10px rgba(var(--clinic-brand-rgb), 0.12);
 }
 
 .clinic-turn__btn--cta-secondary:hover,
@@ -1104,7 +1226,51 @@
   background: var(--clinic-bubble-bot);
   border: 1px solid rgba(43, 30, 78, 0.07);
   border-radius: 0 18px 18px 18px;
-  box-shadow: 0 8px 20px rgba(105, 82, 232, 0.08);
+  box-shadow: 0 8px 20px rgba(var(--clinic-brand-rgb), 0.08);
+}
+
+.clinic-shell__typing-label {
+  position: relative;
+  display: inline-block;
+}
+
+.clinic-shell__typing-label-base {
+  color: inherit;
+}
+
+.clinic-shell__typing-label-shine {
+  display: none;
+}
+
+/* «Живой» перелив — серый текст всегда виден, бренд бежит маской сверху (без белых дыр) */
+.clinic-shell__typing--shimmer .clinic-shell__typing-label-shine {
+  display: inline;
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--clinic-brand);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 36%,
+    #000 50%,
+    rgba(0, 0, 0, 0.2) 64%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.2) 36%,
+    #000 50%,
+    rgba(0, 0, 0, 0.2) 64%,
+    transparent 100%
+  );
+  -webkit-mask-size: 200% 100%;
+  mask-size: 200% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: clinic-typing-shimmer-mask 2.4s linear infinite;
 }
 
 .clinic-shell__composer {
@@ -1115,46 +1281,54 @@
   flex-shrink: 0;
 }
 
+/* Compact messenger: общая «капсула» (без блока «+»), кнопка внизу при multiline */
 .clinic-shell__composer-inner {
   display: flex;
-  gap: 12px;
   align-items: flex-end;
+  gap: 8px;
+  min-height: 54px;
+  padding: 6px;
+  border: 1px solid var(--clinic-composer-border);
+  border-radius: 18px;
+  background: var(--clinic-composer-bg);
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.clinic-shell__composer-inner:focus-within {
+  background: var(--clinic-bg);
+  border-color: var(--clinic-composer-focus-border);
+  box-shadow: var(--clinic-composer-focus-shadow);
 }
 
 .clinic-shell__textarea {
   flex: 1;
-  min-height: 48px;
+  min-height: 40px;
   max-height: 112px;
-  padding: 14px 18px;
+  margin: 0;
+  padding: 8px 10px;
   font-family: inherit;
   font-size: 14px;
   line-height: 1.45;
   color: var(--clinic-text);
-  border: 1px solid rgba(43, 30, 78, 0.09);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 8px 18px rgba(105, 82, 232, 0.08);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   resize: none;
   outline: none;
   overflow-y: hidden;
-  transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    background-color 0.16s ease;
 }
 
 .clinic-shell__textarea::placeholder {
   color: var(--clinic-placeholder);
 }
 
+.clinic-shell__textarea:focus,
 .clinic-shell__textarea:focus-visible {
   outline: none;
-  border-color: rgba(105, 82, 232, 0.38);
-  box-shadow:
-    0 0 0 3px rgba(105, 82, 232, 0.1),
-    0 8px 18px rgba(105, 82, 232, 0.08);
 }
 
 .clinic-shell__textarea--phone {
@@ -1163,51 +1337,53 @@
 }
 
 .clinic-btn-send {
-  width: 52px;
-  height: 52px;
-  flex: 0 0 52px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  margin-bottom: 1px;
   border-radius: 50%;
-  border: 0;
-  background: var(--clinic-gradient-send);
+  border: none;
+  background: var(--clinic-gradient-cta, var(--clinic-brand));
   color: #fff;
   cursor: pointer;
   display: grid;
   place-items: center;
-  box-shadow:
-    0 12px 24px rgba(105, 82, 232, 0.24),
-    0 4px 10px rgba(109, 40, 217, 0.14);
+  align-self: flex-end;
+  box-shadow: 0 10px 22px rgba(var(--clinic-brand-rgb), 0.18);
   transition:
     transform 0.16s ease,
     opacity 0.16s ease,
-    box-shadow 0.16s ease;
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
 }
 
 .clinic-btn-send svg {
-  width: 23px;
-  height: 23px;
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
 .clinic-btn-send:disabled {
-  opacity: 0.42;
+  opacity: 0.55;
   cursor: default;
   transform: none;
   box-shadow: none;
+  filter: grayscale(0.15);
 }
 
 .clinic-btn-send:hover:not(:disabled) {
   transform: translateY(-1px);
+  box-shadow: 0 13px 28px rgba(var(--clinic-brand-rgb), 0.24);
+  filter: saturate(1.05);
 }
 
 .clinic-btn-send:active:not(:disabled) {
-  transform: translateY(0) scale(0.96);
+  transform: scale(0.96);
 }
 
 .clinic-btn-send:focus-visible {
   outline: none;
-  box-shadow:
-    var(--clinic-focus),
-    0 12px 24px rgba(105, 82, 232, 0.24);
+  box-shadow: none;
 }
 
 .clinic-shell__error {
@@ -1294,7 +1470,7 @@
 }
 
 .clinic-shell__video-player:focus-visible {
-  outline: 2px solid var(--clinic-primary);
+  outline: 2px solid var(--clinic-action);
   outline-offset: -2px;
 }
 
@@ -1331,7 +1507,7 @@
 
   .clinic-shell__welcome-card {
     margin-top: 16px;
-    padding: 20px 20px 28px;
+    padding: 0 0 20px;
   }
 
   .clinic-shell__welcome-logo-wrap {
@@ -1345,12 +1521,6 @@
 
   .clinic-shell__welcome-actions {
     margin-top: 16px;
-    gap: 8px;
-  }
-
-  .clinic-shell__welcome-action {
-    height: 48px;
-    font-size: 14px;
   }
 
 }
@@ -1360,9 +1530,38 @@
     transition: none;
   }
 
+  .clinic-shell__launcher-teaser,
+  .clinic-shell__launcher:not(.clinic-shell__launcher--demo),
+  .clinic-shell__launcher--demo .clinic-shell__launcher-card {
+    transition: none;
+    transform: none;
+  }
+
+  .clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher-teaser {
+    opacity: 1;
+    transform: none;
+  }
+
   .clinic-shell__stream-cursor {
     animation: none;
     opacity: 0.85;
+  }
+
+  .clinic-shell__typing--shimmer .clinic-shell__typing-label-shine {
+    animation: none;
+    display: none;
+  }
+}
+
+@keyframes clinic-typing-shimmer-mask {
+  0% {
+    -webkit-mask-position: 120% 0;
+    mask-position: 120% 0;
+  }
+
+  100% {
+    -webkit-mask-position: -20% 0;
+    mask-position: -20% 0;
   }
 }
 
@@ -1379,19 +1578,19 @@
   font-weight: 600;
   line-height: 1.2;
   color: #fff;
-  background: var(--clinic-primary);
+  background: var(--clinic-brand);
   border: none;
   border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(105, 82, 232, 0.32);
+  box-shadow: 0 6px 20px rgba(var(--clinic-brand-rgb), 0.32);
   cursor: pointer;
 }
 
 .clinic-dev-reset:hover {
-  background: var(--clinic-primary-hover);
+  filter: brightness(0.94);
 }
 
 .clinic-dev-reset:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(105, 82, 232, 0.38);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(var(--clinic-action-rgb), 0.38);
 }
 

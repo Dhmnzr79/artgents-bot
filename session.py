@@ -77,6 +77,10 @@ def _fresh_defaults() -> dict:
         "situation_pending": False,
         "situation_note": "",
         "lead_intent": "none",
+        "lead_resume_step": "",
+        "lead_return_doc_id": "",
+        "lead_interrupt_kind": "",
+        "lead_paused_answer_count": 0,
         "booking_intent_ever": False,
         "anti_spam_redirect_shown": False,
         "lead_pending_name": "",
@@ -161,12 +165,15 @@ def mem_get(session_id: str) -> dict:
 def mem_add_user(session_id: str, text: str) -> None:
     with _lock:
         st = mem_get(session_id)
-        st["hist"].append({"role": "user", "content": text})
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
         st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
         ts_list = list(st.get("user_turn_timestamps") or [])
         ts_list.append(time.time())
         st["user_turn_timestamps"] = ts_list[-50:]
+        if is_lead_context(st):
+            _persist_unlocked(session_id, st)
+            return
+        st["hist"].append({"role": "user", "content": text})
         m = PHONE_RX.search(text)
         if m:
             st["profile"]["phone"] = m.group().replace(" ", "")
@@ -303,6 +310,15 @@ def is_active_lead_flow(session_state: dict) -> bool:
         "collecting_phone",
         "confirming_name",
     }
+
+
+def is_lead_paused(session_state: dict) -> bool:
+    return (session_state or {}).get("lead_intent") == "paused"
+
+
+def is_lead_context(session_state: dict) -> bool:
+    """Active slot collection or paused booking — PII / side-effect guard zone."""
+    return is_active_lead_flow(session_state) or is_lead_paused(session_state)
 
 
 def _topic_state_container(st: dict) -> dict:
@@ -503,7 +519,79 @@ def set_lead_intent(session_id: str, intent: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["lead_intent"] = intent
+        if intent not in {"paused", "none"}:
+            st["lead_resume_step"] = ""
+            st["lead_return_doc_id"] = ""
+            st["lead_interrupt_kind"] = ""
+        if intent == "none":
+            st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)
+
+
+def pause_lead_flow(
+    session_id: str,
+    *,
+    resume_step: str,
+    return_doc_id: str | None = None,
+    interrupt_kind: str | None = None,
+) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        already_paused = st.get("lead_intent") == "paused"
+        if not already_paused:
+            st["lead_intent"] = "paused"
+            st["lead_resume_step"] = (resume_step or "").strip()
+            st["lead_return_doc_id"] = (return_doc_id or "").strip()
+        kind = (interrupt_kind or "").strip()
+        if kind:
+            st["lead_interrupt_kind"] = kind
+        _persist_unlocked(session_id, st)
+
+
+def resume_lead_from_pause(session_id: str) -> str:
+    """Restore slot step from pause; returns new lead_intent."""
+    with _lock:
+        st = mem_get(session_id)
+        step = (st.get("lead_resume_step") or "collecting_name").strip()
+        if step not in {"collecting_name", "collecting_phone", "confirming_name"}:
+            step = "collecting_name"
+        st["lead_intent"] = step
+        st["lead_resume_step"] = ""
+        st["lead_interrupt_kind"] = ""
+        st["lead_paused_answer_count"] = 0
+        _persist_unlocked(session_id, st)
+        return step
+
+
+def exit_lead_flow(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_intent"] = "none"
+        st["lead_resume_step"] = ""
+        st["lead_return_doc_id"] = ""
+        st["lead_interrupt_kind"] = ""
+        st["lead_paused_answer_count"] = 0
+        _persist_unlocked(session_id, st)
+    clear_lead_pii(session_id)
+
+
+def get_lead_paused_answer_count(session_id: str) -> int:
+    st = mem_get(session_id)
+    return int(st.get("lead_paused_answer_count") or 0)
+
+
+def increment_lead_paused_answer_count(session_id: str) -> int:
+    with _lock:
+        st = mem_get(session_id)
+        n = int(st.get("lead_paused_answer_count") or 0) + 1
+        st["lead_paused_answer_count"] = n
+        _persist_unlocked(session_id, st)
+        return n
+
+
+def get_lead_resume_step(session_id: str) -> str:
+    st = mem_get(session_id)
+    return (st.get("lead_resume_step") or "").strip()
 
 
 def mark_booking_intent_ever(session_id: str) -> None:
@@ -553,19 +641,6 @@ def get_lead_pending_name(session_id: str) -> str:
     return (st.get("lead_pending_name") or "").strip()
 
 
-# Токены, которые нельзя принимать за имя после «я …» / однословный ответ.
-_LEAD_NAME_REJECT = frozenset(
-    {
-        "боюсь", "хочу", "переживаю", "переживал", "переживала", "беспокоюсь",
-        "думаю", "знаю", "понимаю", "слышал", "слышала", "видел", "видела",
-        "устал", "устала", "устали", "надеюсь", "сомневаюсь",
-        "хотел", "хотела", "хотели", "хотелось", "узнать", "узнаю", "спрашиваю",
-        "бы", "же", "не", "тоже", "также", "просто", "очень", "уже", "ещё",
-        "еще", "пока", "только", "да", "нет", "ок", "ага", "угу",
-        "хорошо", "ладно", "спасибо", "привет", "здравствуйте", "понятно",
-        "ясно", "конечно", "извините", "простите",
-    }
-)
 
 _NAME_TOKEN_RX = re.compile(r"^[А-ЯЁA-Za-zа-яё\-]{2,40}$", re.U)
 
@@ -579,20 +654,26 @@ def _strip_lead_name_filler(s: str) -> str:
     ).strip()
 
 
+def _format_name_parts(parts: list[str]) -> str:
+    return " ".join(
+        (p[:1].upper() + p[1:].lower()) if len(p) > 1 else p.capitalize()
+        for p in parts
+    )
+
+
 def _token_ok_for_name(tok: str) -> bool:
-    t = (tok or "").strip()
-    if not t or not _NAME_TOKEN_RX.fullmatch(t):
-        return False
-    if t.lower() in _LEAD_NAME_REJECT:
-        return False
-    return True
+    from name_gate import is_plausible_name_token
+
+    return is_plausible_name_token(tok)
 
 
 def extract_name(text: str) -> str | None:
+    from name_gate import _normalize_lead_name_input, hard_reject_lead_name
+
     s0 = (text or "").strip()
-    if not s0:
+    if not s0 or hard_reject_lead_name(s0):
         return None
-    s = _strip_lead_name_filler(s0)
+    s = _strip_lead_name_filler(_normalize_lead_name_input(s0))
     if not s:
         return None
 
@@ -606,28 +687,18 @@ def extract_name(text: str) -> str | None:
         parts = m.group(1).split()
         if not parts or not all(_token_ok_for_name(p) for p in parts):
             return None
-        return " ".join(p[:1].upper() + p[1:].lower() if len(p) > 1 else p.capitalize() for p in parts)
+        return _format_name_parts(parts)
 
     m_ya = re.match(r"^я\s+([А-ЯЁA-Za-zа-яё\-]+)\s*$", s, re.I | re.U)
     if m_ya:
         tok = m_ya.group(1)
         if not _token_ok_for_name(tok):
             return None
-        t = tok
-        return (t[:1].upper() + t[1:].lower()) if len(t) > 1 else t.capitalize()
-
-    if re.fullmatch(r"[А-ЯЁA-Za-zа-яё\-]{2,40}", s, re.U):
-        if not _token_ok_for_name(s):
-            return None
-        t = s
-        return (t[:1].upper() + t[1:].lower()) if len(t) > 1 else t.capitalize()
+        return _format_name_parts([tok])
 
     parts = s.split()
-    if len(parts) == 2 and all(_token_ok_for_name(p) for p in parts):
-        return " ".join(
-            (p[:1].upper() + p[1:].lower()) if len(p) > 1 else p.capitalize()
-            for p in parts
-        )
+    if 1 <= len(parts) <= 3 and all(_token_ok_for_name(p) for p in parts):
+        return _format_name_parts(parts)
 
     return None
 
@@ -669,4 +740,8 @@ def clear_lead_pii(session_id: str) -> None:
         st["profile"] = prof
         st["situation_note"] = ""
         st["lead_pending_name"] = ""
+        st["lead_resume_step"] = ""
+        st["lead_return_doc_id"] = ""
+        st["lead_interrupt_kind"] = ""
+        st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)

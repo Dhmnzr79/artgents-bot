@@ -11,7 +11,7 @@ from config import (
     INPUT_MAX_CHARS,
 )
 from contracts.ask_orchestration import AskOrchestrationResult
-from flow_handlers import handle_flows, resume_active_lead_flow
+from flow_handlers import handle_flows
 from ingress_gate import build_ingress_payload, classify_ingress, ingress_service_route
 from logging_setup import get_logger, log_json
 from orchestration.context import AskTurnContext
@@ -36,6 +36,7 @@ from retriever import get_chunk_by_ref
 from session import (
     get_topic_state,
     is_active_lead_flow,
+    is_lead_context,
     mem_get,
     mem_reset,
     set_anti_spam_redirect_shown,
@@ -113,7 +114,7 @@ def run_pre_resolver_turn(
     st = mem_get(sid)
     decision_frame = decision_dump(decision)
 
-    if is_obvious_noise(q) and not is_active_lead_flow(st):
+    if is_obvious_noise(q) and not is_lead_context(st):
         noise_res = obvious_noise_ingress_result()
         log_json(logger, "obvious_noise_short_circuit", sid=sid, client_id=client_id)
         return AskOrchestrationResult(
@@ -132,7 +133,7 @@ def run_pre_resolver_turn(
 
     ingress_skip = (
         bool(ref)
-        or is_active_lead_flow(st)
+        or is_lead_context(st)
         or bool(st.get("situation_pending"))
         or bool(st.get("pending_lead_offer"))
     )
@@ -180,20 +181,6 @@ def run_pre_resolver_turn(
         )
 
     st = mem_get(sid)
-    if is_active_lead_flow(st) and (q or "").strip():
-        flow_result = resume_active_lead_flow(
-            data=data,
-            sid=sid,
-            q=q,
-            client_id=client_id,
-            txt=client_txt(client_id),
-            service_payload=service_payload,
-        )
-        if flow_result is not None:
-            log_json(logger, "lead_flow_resume", sid=sid, client_id=client_id)
-            return lead_flow_orchestration_result(
-                q=q, sid=sid, client_id=client_id, flow_result=flow_result, decision=decision
-            )
 
     if is_duplicate_question(st, q):
         snap = get_last_content_ui_payload(sid)
@@ -210,7 +197,7 @@ def run_pre_resolver_turn(
             decision_frame=decision_frame,
         )
 
-    if not is_active_lead_flow(st):
+    if not is_lead_context(st):
         if is_message_burst(st):
             set_anti_spam_redirect_shown(sid, True)
             log_json(

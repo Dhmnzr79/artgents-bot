@@ -100,6 +100,7 @@ Legacy (не расширять): `llm.classify_intent`, `query_selector.select_
 ### Booking / lead (pre-Resolver)
 
 - **Lead сразу:** только `explicit_booking_intent()` — regex `BOOKING_INTENT_RE` в `flow_handlers` (кнопка `lead:booking`, pending «да» — отдельно).
+- **Interrupt во время сбора:** contacts/price/`?`/префиксы → `paused`; QR **«Задать вопрос»** (`lead:pause`); resume явный; отмена — `lead:cancel` / «не сейчас».
 - **Не lead до Resolver:** контентные фразы с «хочу» без явной записи; мягкая запись («можете принять сегодня?») → Resolver / ingress / content.
 - **`booking_intent()`** в `policy.py` — подсказка CTA после ответа; может вызывать flash-LLM, **не** перехватывает ход.
 

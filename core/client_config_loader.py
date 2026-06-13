@@ -33,6 +33,10 @@ _TONE_KEY_MAP: tuple[tuple[str, str], ...] = (
     (("lead", "submit_ok"), "lead_submit_ok"),
     (("lead", "submit_ok_after_hours"), "lead_submit_ok_after_hours"),
     (("lead", "submit_error"), "lead_submit_error"),
+    (("lead", "paused_bridge_name"), "lead_paused_bridge_name"),
+    (("lead", "paused_bridge_phone"), "lead_paused_bridge_phone"),
+    (("lead", "ask_question_label"), "lead_ask_question_label"),
+    (("lead", "ask_question_prompt"), "lead_ask_question_prompt"),
     (("lead", "offer_declined"), "lead_offer_declined"),
     (("situation", "prompt"), "situation_prompt"),
     (("situation", "retry_short"), "situation_retry_short"),
@@ -76,6 +80,16 @@ _FALLBACK_TXT: dict[str, str] = {
     ),
     "situation_back_fallback": "Хорошо, продолжим. Задайте вопрос или выберите тему.",
     "lead_offer_declined": "Хорошо. Если появятся вопросы — спрашивайте.",
+    "lead_paused_bridge_name": (
+        "Если захотите продолжить запись — напишите, как к вам можно обращаться."
+    ),
+    "lead_paused_bridge_phone": (
+        "Если захотите продолжить запись — напишите номер телефона."
+    ),
+    "lead_ask_question_label": "Задать вопрос",
+    "lead_ask_question_prompt": (
+        "Хорошо, задайте вопрос — после ответа сможете продолжить запись."
+    ),
     "bare_affirmative_fallback": "Напишите, пожалуйста, ваш вопрос — так будет проще подсказать.",
     "followup_choose_topic": "Могу рассказать про этапы или про сроки — что выбрать?",
     "guided_menu_answer": "Могу коротко подсказать и помочь выбрать направление — что для вас важнее?",

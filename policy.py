@@ -8,7 +8,7 @@ from config import BOOKING_INTENT_LLM_ON, BOOKING_INTENT_RE, CONTACTS_RE, PRICES
 from core.video_catalog_loader import resolve_video_payload
 from llm import classify_booking_wants_appointment
 from retriever import chunk_doc_type
-from session import is_active_lead_flow
+from session import is_lead_context
 from dialog_offer import sanitize_ungrounded_continuation_invites
 
 
@@ -150,7 +150,7 @@ def build_policy_decision(
 ) -> dict:
     meta = payload.get("meta") or {}
     low_score = bool(meta.get("low_score"))
-    lead_flow_active = is_active_lead_flow(session_state)
+    lead_flow_active = is_lead_context(session_state)
     booking = booking_intent(q, sid=session_id, client_id=client_id)
     exhausted = _is_topic_exhausted(doc_meta, topic_state)
     doc_turn_after = int(topic_state.get("doc_turn_count") or 0)

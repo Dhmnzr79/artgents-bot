@@ -23,6 +23,10 @@ const TYPING_WRITING_MIN_MS = 200;
 const BOOKING_INTENT_RE =
   /(?:запишите\s+меня|хочу\s+запис(?:аться|ать)\b|запись\s+на\s+(?:консультац|приём|прием)|остав(?:ить|лю)\s+заявку|(?<!\bкак\s)(?<!\bгде\s)(?<!\bкуда\s)\bзапис(?:аться|ать)\b(?:\s+на\s+(?:консультац|приём|прием))?)/iu;
 
+/** Скрытый сброс сессии: «::reset <token>» (только demoLauncher / dev-хост). */
+const SECRET_SESSION_RESET_RE = /^::reset\s+(\S+)\s*$/i;
+const SECRET_SESSION_RESET_TOKEN = "x7k9m2p4";
+
 const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const LINK_CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -431,6 +435,17 @@ function isDevHost() {
   if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return true;
   if (new URLSearchParams(location.search).get("dev") === "1") return true;
   return false;
+}
+
+/**
+ * @param {string} text
+ * @param {WidgetConfig} config
+ */
+function isSecretSessionResetCommand(text, config) {
+  if (!config.demoLauncher && !isDevHost()) return false;
+  const m = (text || "").trim().match(SECRET_SESSION_RESET_RE);
+  if (!m) return false;
+  return m[1] === SECRET_SESSION_RESET_TOKEN;
 }
 
 /**
@@ -1004,6 +1019,22 @@ export function mountWidget(root, config) {
     renderFeed();
   }
 
+  async function runSecretSessionReset() {
+    if (state.pending) return;
+    const sid = getSid();
+    input.value = "";
+    autoResizeTextarea(input);
+    syncSendState();
+    if (sid) {
+      try {
+        await postAsk(apiBase, { client_id: clientId, sid, q: "/reset" });
+      } catch {
+        /* best-effort server cleanup */
+      }
+    }
+    resetSession();
+  }
+
   function openChatFromLauncher() {
     if (state.isOpen) return;
     setOpen(true);
@@ -1561,7 +1592,13 @@ export function mountWidget(root, config) {
   async function sendFromComposer() {
     if (state.pending) return;
 
-    let q = input.value.trim();
+    const raw = input.value.trim();
+    if (isSecretSessionResetCommand(raw, config)) {
+      await runSecretSessionReset();
+      return;
+    }
+
+    let q = raw;
     let userBubbleText = q;
 
     if (isLeadPhoneStep()) {

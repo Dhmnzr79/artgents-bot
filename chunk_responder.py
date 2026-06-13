@@ -25,7 +25,8 @@ from session import (
     defer_refs,
     get_topic_state,
     increment_doc_turn_if_contentful,
-    is_active_lead_flow,
+    is_lead_context,
+    is_lead_paused,
     mark_h3_covered,
     mark_situation_offered,
     mark_video_pending,
@@ -37,6 +38,9 @@ from session import (
     set_cta_shown,
     set_current_doc,
 )
+from core.client_config_loader import tone_to_txt_dict
+from core.lead_context import lead_interrupt_no_topic
+from flow_handlers import finish_lead_paused_payload
 from ux_builder import build_ask_response, normalize_policy_payload
 
 _APPLY_POLICY_PARAMS = inspect.signature(apply_response_policy).parameters
@@ -51,7 +55,7 @@ def _planned_consult_nudge_for_chunk(
     topic_state: dict,
     client_id: str | None = None,
 ) -> str | None:
-    if is_active_lead_flow(mem_get(sid)):
+    if is_lead_context(mem_get(sid)):
         return None
     exhausted = topic_exhausted_after_this_chunk(
         meta,
@@ -262,11 +266,12 @@ def respond_from_chunk(
 ):
     if (q or "").strip():
         mem_add_user(sid, q)
+    skip_topic = lead_interrupt_no_topic()
     meta = meta_for_chunk(chunk, client_id=client_id)
     if client_id is not None:
         meta["client_id"] = client_id
     doc_id = meta.get("doc_id")
-    if doc_id:
+    if doc_id and not skip_topic:
         set_current_doc(sid, doc_id)
 
     sources = [build_generator_source_from_chunk(chunk, meta)]
@@ -302,24 +307,26 @@ def respond_from_chunk(
     answer = _append_generator_append_text(answer, generator_append_text)
 
     st = mem_get(sid)
-    lead_flow_active = is_active_lead_flow(st)
+    lead_context = is_lead_context(st)
     pre_turn = _increment_doc_turn_with_pre(
         sid,
         doc_id,
         contentful=bool(answer.strip()),
         is_low_score=False,
         is_error=False,
-        lead_flow_active=lead_flow_active,
+        lead_flow_active=lead_context,
     )
     tstate = get_topic_state(sid, doc_id) if doc_id else {}
     suggest_h3 = set(meta.get("suggest_h3") or [])
     h3_id = chunk.get("h3_id")
-    if h3_id and h3_id in suggest_h3:
+    if h3_id and h3_id in suggest_h3 and not skip_topic:
         mark_h3_covered(sid, doc_id, h3_id)
         tstate = get_topic_state(sid, doc_id)
 
-    consult_meta = record_consult_nudge_after_answer(
-        sid, route, planned_nudge, answer
+    consult_meta = (
+        {}
+        if lead_context
+        else record_consult_nudge_after_answer(sid, route, planned_nudge, answer)
     )
 
     payload = build_ask_response(
@@ -352,7 +359,7 @@ def respond_from_chunk(
     payload.setdefault("meta", {})["generator_input"] = generator_input
     pdec = (payload.get("meta") or {}).get("policy_decision") or {}
     ui_dropped = set((payload.get("meta") or {}).get("ui_dropped") or [])
-    if doc_id:
+    if doc_id and not skip_topic:
         if bool(pdec.get("show_video")):
             mark_video_shown(sid, doc_id)
         elif meta.get("video_key") and not bool(get_topic_state(sid, doc_id).get("video_shown")):
@@ -372,8 +379,13 @@ def respond_from_chunk(
             if tstate_after.get("refs_deferred"):
                 pop_deferred_ref(sid, doc_id)
 
-    if payload.get("cta") and doc_id:
+    if payload.get("cta") and doc_id and not skip_topic:
         set_cta_shown(sid, doc_id, shown=True)
+
+    if is_lead_paused(st):
+        payload = finish_lead_paused_payload(
+            payload, sid, client_id, tone_to_txt_dict(client_id)
+        )
 
     verifier_src = verifier_effective_source_body(
         chunk_md_body=str(s0.get("content") or ""),
@@ -448,11 +460,12 @@ def respond_from_chunk_stream(
     yield 'event: typing\ndata: {"phase": "searching"}\n\n'
     if (q or "").strip():
         mem_add_user(sid, q)
+    skip_topic = lead_interrupt_no_topic()
     meta = meta_for_chunk(chunk, client_id=client_id)
     if client_id is not None:
         meta["client_id"] = client_id
     doc_id = meta.get("doc_id")
-    if doc_id:
+    if doc_id and not skip_topic:
         set_current_doc(sid, doc_id)
 
     sources = [build_generator_source_from_chunk(chunk, meta)]
@@ -529,24 +542,26 @@ def respond_from_chunk_stream(
 
     # Все session side-effects — идентично respond_from_chunk
     st = mem_get(sid)
-    lead_flow_active = is_active_lead_flow(st)
+    lead_context = is_lead_context(st)
     pre_turn = _increment_doc_turn_with_pre(
         sid,
         doc_id,
         contentful=bool(answer.strip()),
         is_low_score=False,
         is_error=False,
-        lead_flow_active=lead_flow_active,
+        lead_flow_active=lead_context,
     )
     tstate = get_topic_state(sid, doc_id) if doc_id else {}
     suggest_h3 = set(meta.get("suggest_h3") or [])
     h3_id = chunk.get("h3_id")
-    if h3_id and h3_id in suggest_h3:
+    if h3_id and h3_id in suggest_h3 and not skip_topic:
         mark_h3_covered(sid, doc_id, h3_id)
         tstate = get_topic_state(sid, doc_id)
 
-    consult_meta = record_consult_nudge_after_answer(
-        sid, route, planned_nudge, answer
+    consult_meta = (
+        {}
+        if lead_context
+        else record_consult_nudge_after_answer(sid, route, planned_nudge, answer)
     )
 
     payload = build_ask_response(
@@ -580,7 +595,7 @@ def respond_from_chunk_stream(
     pdec = (payload.get("meta") or {}).get("policy_decision") or {}
     ui_dropped = set((payload.get("meta") or {}).get("ui_dropped") or [])
 
-    if doc_id:
+    if doc_id and not skip_topic:
         if bool(pdec.get("show_video")):
             mark_video_shown(sid, doc_id)
         elif meta.get("video_key") and not bool(get_topic_state(sid, doc_id).get("video_shown")):
@@ -598,8 +613,13 @@ def respond_from_chunk_stream(
             if tstate_after.get("refs_deferred"):
                 pop_deferred_ref(sid, doc_id)
 
-    if payload.get("cta") and doc_id:
+    if payload.get("cta") and doc_id and not skip_topic:
         set_cta_shown(sid, doc_id, shown=True)
+
+    if is_lead_paused(st):
+        payload = finish_lead_paused_payload(
+            payload, sid, client_id, tone_to_txt_dict(client_id)
+        )
 
     verifier_src = verifier_effective_source_body(
         chunk_md_body=str(s0.get("content") or ""),

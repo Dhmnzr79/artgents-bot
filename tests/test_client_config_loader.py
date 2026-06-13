@@ -88,8 +88,8 @@ def test_widget_logo_from_brand_cesi():
 def test_widget_logo_from_brand_demo():
     logo = widget_logo_from_brand("demo")
     assert logo["logoUrl"] == "/static/clients/demo/logo.svg"
-    assert logo["logoWidth"] == 124
-    assert logo["logoHeight"] == 32
+    assert logo["logoWidth"] == 110
+    assert logo["logoHeight"] == 28
 
 
 def test_widget_avatar_from_brand_cesi():
@@ -113,6 +113,6 @@ def test_load_widget_config_merges_brand_theme():
 def test_load_widget_config_merges_demo_logo():
     cfg = load_widget_config("demo")
     assert cfg["logoUrl"] == "/static/clients/demo/logo.svg"
-    assert cfg["logoWidth"] == 124
-    assert cfg["logoHeight"] == 32
+    assert cfg["logoWidth"] == 110
+    assert cfg["logoHeight"] == 28
     assert cfg["avatarUrl"] == "/static/clients/demo/avatar.png"

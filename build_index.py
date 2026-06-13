@@ -177,6 +177,7 @@ def build_client_index(client_id: str) -> None:
                 "subtype": meta.get("subtype"),
                 "cta_action": meta.get("cta_action"),
                 "cta_text": meta.get("cta_text"),
+                "cta_key": meta.get("cta_key"),
                 "empathy_enabled": bool(meta.get("empathy_enabled", False)),
                 "empathy_tag": meta.get("empathy_tag"),
                 "followups": meta.get("followups", []),

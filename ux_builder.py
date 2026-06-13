@@ -87,10 +87,10 @@ def build_followups(
     return out
 
 
-def build_cta(meta: dict):
-    if meta.get("cta_text") and meta.get("cta_action"):
-        return {"text": meta["cta_text"], "action": meta["cta_action"]}
-    return None
+def build_cta(meta: dict, client_id: str | None = None):
+    from core.client_config_loader import lead_cta_dict_from_meta
+
+    return lead_cta_dict_from_meta(client_id, meta)
 
 
 def pick_relevant_offer(meta: dict):
@@ -150,7 +150,7 @@ def build_ask_response(
     )
     followups = fups_full
 
-    cta_btn = build_cta(meta)
+    cta_btn = build_cta(meta, client_id=client_id)
     quick_refs = dedup_refs_vs_cta(quick_refs, cta_btn)
 
     score = float(round(float(top.get("_score", 0.0)), 3))

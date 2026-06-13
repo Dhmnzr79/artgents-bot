@@ -136,6 +136,119 @@ def load_lead_config(client_id: str | None) -> dict[str, Any]:
     return _cached_load(_LEAD_CACHE, pack, "lead_config.yaml")
 
 
+@dataclass(frozen=True)
+class LeadCtaVariant:
+    key: str
+    label: str
+    name_prompt: str
+
+
+_LEAD_CTA_VARIANTS_CACHE: dict[str, tuple[LeadCtaVariant, ...]] = {}
+
+
+def load_lead_cta_variants(client_id: str | None) -> tuple[LeadCtaVariant, ...]:
+    """Marketing pairs CTA label + first lead phrase from clients/{id}/tone.yaml."""
+    pack = resolve_pack_client_id(client_id)
+    with _LOCK:
+        if pack in _LEAD_CTA_VARIANTS_CACHE:
+            return _LEAD_CTA_VARIANTS_CACHE[pack]
+    lead = load_tone_raw(client_id).get("lead")
+    raw = lead.get("cta_variants") if isinstance(lead, dict) else None
+    out: list[LeadCtaVariant] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key") or "").strip()
+            label = str(item.get("label") or "").strip()
+            prompt = str(item.get("name_prompt") or "").strip()
+            if key and label and prompt:
+                out.append(LeadCtaVariant(key=key, label=label, name_prompt=prompt))
+    variants = tuple(out)
+    with _LOCK:
+        _LEAD_CTA_VARIANTS_CACHE[pack] = variants
+    return variants
+
+
+def _lead_cta_index(client_id: str | None) -> tuple[dict[str, LeadCtaVariant], dict[str, LeadCtaVariant]]:
+    by_key: dict[str, LeadCtaVariant] = {}
+    by_label: dict[str, LeadCtaVariant] = {}
+    for variant in load_lead_cta_variants(client_id):
+        by_key[variant.key] = variant
+        by_label[variant.label.lower()] = variant
+    return by_key, by_label
+
+
+def resolve_lead_name_prompt(
+    client_id: str | None,
+    *,
+    cta_key: str | None = None,
+    cta_label: str | None = None,
+    txt: dict[str, str] | None = None,
+) -> str:
+    """First lead-flow phrase: by cta_key, then cta_label, else lead.name_prompt."""
+    by_key, by_label = _lead_cta_index(client_id)
+    key = (cta_key or "").strip()
+    if key and key in by_key:
+        return by_key[key].name_prompt
+    label = (cta_label or "").strip()
+    if label:
+        matched = by_label.get(label.lower())
+        if matched:
+            return matched.name_prompt
+    if txt is None:
+        txt = tone_to_txt_dict(client_id)
+    return txt.get("lead_name_prompt") or _FALLBACK_TXT["lead_name_prompt"]
+
+
+def lead_cta_dict_from_meta(client_id: str | None, meta: dict[str, Any]) -> dict[str, str] | None:
+    """Build widget CTA payload {text, action, key} from doc frontmatter or defaults."""
+    action = str(meta.get("cta_action") or "").strip()
+    if not action:
+        return None
+    by_key, by_label = _lead_cta_index(client_id)
+    if action == "lead":
+        key = str(meta.get("cta_key") or "").strip()
+        if key and key in by_key:
+            variant = by_key[key]
+            return {"text": variant.label, "action": "lead", "key": variant.key}
+        cta_text = str(meta.get("cta_text") or "").strip()
+        if cta_text:
+            matched = by_label.get(cta_text.lower())
+            if matched:
+                return {"text": matched.label, "action": "lead", "key": matched.key}
+            return {"text": cta_text, "action": "lead", "key": ""}
+        from config import default_cta_dict
+
+        default = default_cta_dict()
+        matched = by_label.get(str(default.get("text") or "").strip().lower())
+        if matched:
+            return {"text": matched.label, "action": "lead", "key": matched.key}
+        return {
+            "text": str(default.get("text") or "Записаться на консультацию"),
+            "action": "lead",
+            "key": "booking",
+        }
+    cta_text = str(meta.get("cta_text") or "").strip()
+    if cta_text:
+        return {"text": cta_text, "action": action, "key": ""}
+    return None
+
+
+def lead_cta_dict_for_menu(
+    client_id: str | None,
+    cta_text: str | None,
+    cta_action: str | None,
+) -> dict[str, str] | None:
+    return lead_cta_dict_from_meta(
+        client_id,
+        {
+            "cta_text": cta_text,
+            "cta_action": cta_action,
+        },
+    )
+
+
 _BRAND_COLOR_TO_THEME: tuple[tuple[str, str], ...] = (
     ("brand", "brand"),
     ("action", "action"),
@@ -497,8 +610,6 @@ def load_ui_bundle(client_id: str | None) -> UiBundle:
 
 
 def ui_menu_to_payload(menu: UiMenu, *, sid: str, client_id: str | None, extra_meta: dict | None = None) -> dict:
-    from config import default_cta_dict
-
     meta: dict[str, Any] = {"sid": sid}
     if client_id is not None:
         meta["client_id"] = client_id
@@ -506,9 +617,9 @@ def ui_menu_to_payload(menu: UiMenu, *, sid: str, client_id: str | None, extra_m
         meta.update(extra_meta)
     cta = None
     if menu.cta_text and menu.cta_action:
-        cta = {"text": menu.cta_text, "action": menu.cta_action}
+        cta = lead_cta_dict_for_menu(client_id, menu.cta_text, menu.cta_action)
     elif menu.cta_action == "lead":
-        cta = default_cta_dict()
+        cta = lead_cta_dict_for_menu(client_id, None, "lead")
     quick = [{"label": q["label"], "ref": q.get("ref") or q.get("action") or ""} for q in menu.quick_replies]
     return {
         "answer": menu.answer,

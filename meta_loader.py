@@ -47,6 +47,7 @@ def _meta_item(pack_id: str, name: str, fm: dict) -> dict:
         "topic": fm.get("topic"),
         "subtopic": fm.get("subtopic"),
         "cta_text": fm.get("cta_text"),
+        "cta_key": fm.get("cta_key"),
         "cta_action": fm.get("cta_action"),
         "cta_from_turn": _safe_int(fm.get("cta_from_turn", 0), 0),
         "verbatim_ids": fm.get("verbatim_ids") or [],

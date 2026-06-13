@@ -22,12 +22,33 @@ from session import (
     set_situation_pending,
     update_profile,
 )
-from core.client_config_loader import situation_enabled
+from core.client_config_loader import (
+    lead_cta_dict_for_menu,
+    resolve_lead_name_prompt,
+    situation_enabled,
+)
 from dialog_offer import parse_lead_offer_no, parse_lead_offer_yes
 
 _LEAD_NAME_CONFIRM_YES = "lead:name_confirm:yes"
 _LEAD_NAME_CONFIRM_NO = "lead:name_confirm:no"
 LEAD_BOOKING_REF = "lead:booking"
+LEAD_BOOKING_CTA_KEY = "booking"
+
+
+def _lead_entry_name_prompt(
+    client_id: str | None,
+    txt: dict,
+    data: dict | None = None,
+    *,
+    cta_key: str | None = None,
+) -> str:
+    payload = data or {}
+    return resolve_lead_name_prompt(
+        client_id,
+        cta_key=cta_key or (str(payload.get("cta_key") or "").strip() or None),
+        cta_label=str(payload.get("cta_label") or "").strip() or None,
+        txt=txt,
+    )
 
 
 def _name_confirm_quick_replies() -> list[dict]:
@@ -305,7 +326,9 @@ def handle_flows(
         set_lead_intent(sid, "collecting_name")
         return {
             "payload": service_payload(
-                txt["lead_name_prompt"],
+                _lead_entry_name_prompt(
+                    client_id, txt, cta_key=LEAD_BOOKING_CTA_KEY
+                ),
                 sid,
                 client_id,
                 lead_flow=True,
@@ -330,7 +353,9 @@ def handle_flows(
         set_lead_intent(sid, "collecting_name")
         return {
             "payload": service_payload(
-                txt["lead_name_prompt"],
+                _lead_entry_name_prompt(
+                    client_id, txt, cta_key=LEAD_BOOKING_CTA_KEY
+                ),
                 sid,
                 client_id,
                 lead_flow=True,
@@ -348,7 +373,9 @@ def handle_flows(
             set_lead_intent(sid, "collecting_name")
             return {
                 "payload": service_payload(
-                    txt["lead_name_prompt"],
+                    _lead_entry_name_prompt(
+                        client_id, txt, cta_key=LEAD_BOOKING_CTA_KEY
+                    ),
                     sid,
                     client_id,
                     lead_flow=True,
@@ -436,7 +463,7 @@ def handle_flows(
         set_lead_intent(sid, "collecting_name")
         return {
             "payload": service_payload(
-                txt["lead_name_prompt"],
+                _lead_entry_name_prompt(client_id, txt, data),
                 sid,
                 client_id,
                 lead_flow=True,

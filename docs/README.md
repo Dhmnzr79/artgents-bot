@@ -6,6 +6,7 @@
 | **`MULTICLIENT.md`** | Client pack, домены, VPS, локальный запуск, prod-критерии |
 | **`VPS_CHECKLIST.md`** | Чеклист деплоя M5 (новый чат / пошаговый prod) |
 | **`ROUTING_MAP.md`** | Куда уходит вопрос (маршруты до retrieval) |
+| **`CLIENT_FILLING_SERVICES_PRICES.md`** | Шпаргалка: каталог, цены, md, маршруты при заполнении клиента |
 | **`WIDGET_ANSWER_FORMAT.md`** | Контракт текста ответа для виджета |
 | **`DASHBOARD.md`** | Admin, Postgres, события, cost |
 | **`TECH_DEBT.md`** | Открытый долг и следующие шаги |

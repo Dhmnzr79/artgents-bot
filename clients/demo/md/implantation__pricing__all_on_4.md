@@ -17,7 +17,7 @@ suggest_h3:
   - oplata-po-etapam
   - rassrochka-i-skidka
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 situation_allowed: true

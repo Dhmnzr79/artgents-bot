@@ -274,7 +274,11 @@ function botTurnFromPayload(data) {
   const ctaRaw = data.cta;
   const cta =
     ctaRaw && typeof ctaRaw === "object" && ctaRaw.text
-      ? { text: String(ctaRaw.text), action: String(ctaRaw.action || "lead") }
+      ? {
+          text: String(ctaRaw.text),
+          action: String(ctaRaw.action || "lead"),
+          key: ctaRaw.key ? String(ctaRaw.key) : "",
+        }
       : null;
   const vp = data.video && typeof data.video === "object" ? data.video : null;
   const vk = vp?.key ? String(vp.key).trim() : "";
@@ -1303,7 +1307,13 @@ export function mountWidget(root, config) {
         dismissTrailingsAll(state.messages);
         dismissLinksAll(state.messages);
         const echo = (m.cta.text || "Запись").trim();
-        void sendAsk({ cta_action: "lead", q: "", userEcho: echo });
+        void sendAsk({
+          cta_action: "lead",
+          cta_key: m.cta.key || "",
+          cta_label: ctaLabel,
+          q: "",
+          userEcho: echo,
+        });
       });
       trail.appendChild(c);
     }

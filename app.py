@@ -24,6 +24,10 @@ from core.client_host import resolve_request_client_id
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import load_widget_config, tone_to_txt_dict
 from core.origin_guard import validate_widget_origin
+from core.widget_cors import (
+    apply_widget_cors_headers,
+    widget_cors_preflight_response,
+)
 from core.routing_loader import THRESHOLDS
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
@@ -207,6 +211,11 @@ def _before():
     request.ctx["t0"] = time.time()
 
 
+@app.before_request
+def _widget_cors_preflight():
+    return widget_cors_preflight_response()
+
+
 @app.after_request
 def _after(resp):
     if request.path.startswith("/dashboard"):
@@ -222,7 +231,7 @@ def _after(resp):
             "ip": request.remote_addr,
         },
     )
-    return resp
+    return apply_widget_cors_headers(resp)
 
 
 @app.get("/_debug/ping")
@@ -678,6 +687,9 @@ def api_video_catalog():
     client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
     if client_id is None:
         return jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
     return jsonify({"client_id": client_id, "videos": catalog_for_widget(client_id)}), 200
 
 
@@ -690,6 +702,10 @@ def api_media_proxy(video_key: str):
     client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
     if client_id is None:
         return jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        body, status = blocked
+        return body, status
     external = get_external_video_src(client_id=client_id, video_key=video_key)
     if not external:
         return jsonify({"error": "not_found"}), 404
@@ -736,6 +752,9 @@ def api_widget_config():
     client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
     if client_id is None:
         return jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
     cfg = load_widget_config(client_id)
     if not cfg:
         return jsonify({"error": "widget_config_not_found"}), 404

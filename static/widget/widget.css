@@ -23,6 +23,15 @@
     U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Shadow DOM host — block inherited typography/color from the clinic site */
+:host {
+  all: initial;
+  display: block;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #1f1528;
+}
+
 /* Токены виджета (префикс .clinic-shell — не засоряем страницу-хост; палитра — drafts/widget_design.md) */
 .clinic-shell {
   --clinic-radius-widget: 30px;

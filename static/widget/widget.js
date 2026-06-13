@@ -470,7 +470,10 @@ function attachDevResetControl(onReset) {
 export function mountWidget(root, config) {
   const apiBase = config.apiBase ?? "";
   const clientId = config.clientId || "default";
-  const resolvedAvatarUrl = (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL;
+  const resolvedAvatarUrl = resolvePackAssetUrl(
+    apiBase,
+    (config.avatarUrl || "").trim() || DEFAULT_AVATAR_URL
+  );
 
   const state = {
     isOpen: false,

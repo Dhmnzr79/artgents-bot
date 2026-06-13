@@ -59,18 +59,47 @@ def _origin_is_allowed(candidate: str, allowed: set[str], local_dev_hosts: set[s
     return False
 
 
-def validate_widget_origin(client_id: str | None) -> str | None:
-    """Return error code if Origin/Referer is present but not allowed; else None."""
+def allowed_origins_for_client(client_id: str | None) -> set[str]:
+    """Normalized allowed_origins from widget_config.json."""
     cfg = load_widget_config(client_id)
     allowed_raw = cfg.get("allowed_origins") or []
     allowed = {_normalize_origin(str(x)) for x in allowed_raw if str(x).strip()}
     allowed.discard("")
+    return allowed
+
+
+def _request_origin_candidates() -> tuple[str, str]:
+    origin = _normalize_origin(request.headers.get("Origin") or "")
+    referer_origin = _origin_from_referer(request.headers.get("Referer") or "")
+    return origin, referer_origin
+
+
+def matching_widget_origin(client_id: str | None) -> str | None:
+    """Return Origin/Referer value to echo in Access-Control-Allow-Origin, else None."""
+    allowed = allowed_origins_for_client(client_id)
     if not allowed:
         return None
 
     local_dev_hosts = _local_dev_hosts_from_allowed(allowed)
-    origin = _normalize_origin(request.headers.get("Origin") or "")
-    referer_origin = _origin_from_referer(request.headers.get("Referer") or "")
+    origin, referer_origin = _request_origin_candidates()
+    if not origin and not referer_origin:
+        return None
+
+    if _origin_is_allowed(origin, allowed, local_dev_hosts):
+        return origin
+    if _origin_is_allowed(referer_origin, allowed, local_dev_hosts):
+        return referer_origin
+    return None
+
+
+def validate_widget_origin(client_id: str | None) -> str | None:
+    """Return error code if Origin/Referer is present but not allowed; else None."""
+    allowed = allowed_origins_for_client(client_id)
+    if not allowed:
+        return None
+
+    local_dev_hosts = _local_dev_hosts_from_allowed(allowed)
+    origin, referer_origin = _request_origin_candidates()
     if APP_ENV == "prod" and allowed and not origin and not referer_origin:
         return "origin_required"
     if not origin and not referer_origin:

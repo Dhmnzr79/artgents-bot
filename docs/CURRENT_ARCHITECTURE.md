@@ -140,7 +140,46 @@ Chat: `DASHSCOPE_API_KEY` + `CHAT_BASE_URL` (DashScope / MaaS). Дефолты �
 
 ## 8. Виджет
 
-Контракт ответа: `WIDGET_ANSWER_FORMAT.md`. Конфиг: `clients/{id}/widget_config.json`.
+Контракт ответа: `WIDGET_ANSWER_FORMAT.md`. Конфиг: `clients/{id}/widget_config.json` + `brand.yaml` (мерж в `load_widget_config`).
+
+### Embed на сайте клиники (prod)
+
+Одна строка на внешнем сайте:
+
+```html
+<script src="https://{client_id}.bot.artgents.ru/static/widget/embed.js" defer></script>
+```
+
+`embed.js` (classic script):
+
+1. `apiBase` ← `origin` URL скрипта (не из JSON конфига).
+2. `clientId` ← `data-client-id` на `<script>` или поддомен до `.bot.` в host скрипта.
+3. Shadow DOM (`#clinic-widget-root` → `attachShadow`) + `widget.css` внутрь shadow.
+4. `GET {apiBase}/api/widget-config?client_id=…` → после ответа **перезаписать** `config.apiBase` и `config.clientId`.
+5. `import({apiBase}/static/widget/widget.js)` → `mountWidget(mountRoot, config)`.
+
+Повторная вставка `embed.js` на странице игнорируется (global guard).
+
+### Ассеты (лого, аватар)
+
+Сервер отдаёт **относительные** пути (`/static/clients/{id}/…` из `brand.yaml`). Runtime резолвит их через `config.apiBase` в `widget.js` (`resolvePackAssetUrl`) — не через домен сайта клиники.
+
+### Изоляция стилей
+
+| Слой | Механизм |
+|------|----------|
+| Сайт клиники → виджет | Shadow DOM + `:host { all: initial }` в `widget.css` |
+| Клиент → клиент | Один `widget.css`, палитра через `config.theme` (`applyWidgetTheme`) |
+
+### Безопасность embed
+
+| Мера | Где |
+|------|-----|
+| `allowed_origins` per client | `clients/{id}/widget_config.json` |
+| Origin/Referer guard | `/ask`, `/ask/stream`, `/lead`, `/api/widget-config`, `/api/video-catalog`, `/api/media/*` — `core/origin_guard.py` |
+| CORS (браузер) | Те же пути + `/static/widget/*` — `core/widget_cors.py` |
+
+`apiBase` в `widget_config.json` — справочное; для embed источник правды — URL `embed.js`.
 
 ---
 

@@ -14,7 +14,7 @@ aliases:
 suggest_h3:
   - pochemu-lechenie-zubov-bez-boli
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 situation_allowed: true

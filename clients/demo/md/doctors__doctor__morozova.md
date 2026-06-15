@@ -20,7 +20,7 @@ position: "Врач-ортодонт"
 
 experience_years: 11
 
-cta_text: "Обсудить на консультации"
+cta_key: doctor
 cta_action: lead
 ---
 

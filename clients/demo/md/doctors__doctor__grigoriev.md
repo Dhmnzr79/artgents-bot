@@ -20,7 +20,7 @@ position: "Врач-пародонтолог"
 
 experience_years: 12
 
-cta_text: "Обсудить на консультации"
+cta_key: doctor
 cta_action: lead
 ---
 

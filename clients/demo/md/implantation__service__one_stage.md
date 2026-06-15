@@ -14,7 +14,7 @@ suggest_h3:
   - kogda-ne-podhodit-odnomomentnaya
   - v-chem-osobennost-metoda
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 situation_allowed: true
 ---

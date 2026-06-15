@@ -16,7 +16,7 @@ suggest_h3:
   - chto-ispravlyayut-elaynery
   - etapy-lecheniya-na-elaynerah
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 ---
 

@@ -140,22 +140,18 @@
   box-shadow: var(--clinic-shadow), var(--clinic-focus);
 }
 
-/* Демо-CTA: цвета только через --clinic-demo-cta-* (clients/demo/widget_config.json) */
+/* Демо-CTA: белая кнопка, розовый текст (--clinic-demo-cta-from из widget_config) */
 .clinic-shell__launcher.clinic-shell__launcher--demo {
   display: inline-block;
   width: auto;
   max-width: none;
   margin: 0;
   padding: 14px 24px;
-  border: none;
+  border: 1px solid rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.22);
   border-radius: 3px;
-  background-color: var(--clinic-demo-cta-from, #d92879);
-  background-image: linear-gradient(
-    90deg,
-    var(--clinic-demo-cta-from, #d92879) 0%,
-    var(--clinic-demo-cta-to, #e42a7d) 100%
-  );
-  color: #fff;
+  background-color: #fff;
+  background-image: none;
+  color: var(--clinic-demo-cta-from, #d92879);
   font-family: inherit;
   font-size: 14px;
   font-weight: 400;
@@ -165,35 +161,38 @@
   white-space: nowrap;
   cursor: pointer;
   box-shadow:
-    0 14px 32px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.38),
-    0 6px 16px rgba(var(--clinic-demo-cta-to-rgb, 228, 42, 125), 0.32);
+    0 10px 28px rgba(15, 23, 42, 0.1),
+    0 4px 12px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.14);
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease,
-    filter 0.16s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease;
   appearance: none;
   -webkit-appearance: none;
   outline: none;
 }
 
 .clinic-shell__launcher--demo:hover {
-  filter: brightness(1.06);
   transform: translateY(-1px);
+  background-color: #fff;
+  border-color: rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.35);
   box-shadow:
-    0 18px 40px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.44),
-    0 8px 20px rgba(var(--clinic-demo-cta-to-rgb, 228, 42, 125), 0.38);
+    0 14px 32px rgba(15, 23, 42, 0.12),
+    0 6px 16px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.2);
 }
 
 .clinic-shell__launcher--demo:active {
   transform: translateY(0);
-  filter: brightness(0.98);
+  background-color: #fafafa;
 }
 
 .clinic-shell__launcher--demo:focus-visible {
   outline: none;
+  border-color: rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.45);
   box-shadow:
-    0 14px 32px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.38),
-    0 6px 16px rgba(var(--clinic-demo-cta-to-rgb, 228, 42, 125), 0.32),
+    0 10px 28px rgba(15, 23, 42, 0.1),
+    0 4px 12px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.14),
     var(--clinic-focus);
 }
 

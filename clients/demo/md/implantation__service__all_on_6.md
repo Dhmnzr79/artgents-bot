@@ -16,7 +16,7 @@ suggest_h3:
   - kak-rabotaet-metod-all-on-6
   - sroki-i-osobennosti
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 situation_allowed: true

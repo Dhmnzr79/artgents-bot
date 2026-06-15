@@ -22,7 +22,7 @@ suggest_h3:
   - mozhno-li-sdelat-udobno-i-estestvenno
   - chto-delat-esli-protez-natiraet
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 empathy_enabled: true

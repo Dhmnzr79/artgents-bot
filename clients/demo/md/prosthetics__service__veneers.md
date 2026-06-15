@@ -14,7 +14,7 @@ aliases:
 suggest_h3:
   - etapy-ustanovki-vinirov
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 ---
 

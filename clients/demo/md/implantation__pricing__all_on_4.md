@@ -17,7 +17,7 @@ suggest_h3:
   - oplata-po-etapam
   - rassrochka-i-skidka
 
-cta_key: consult
+cta_key: price
 cta_action: lead
 
 situation_allowed: true

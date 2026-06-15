@@ -15,7 +15,7 @@ suggest_h3:
   - kogda-stavyat-vremennye-zuby
   - ogranicheniya-do-postoyannoy-koronki
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 situation_allowed: true

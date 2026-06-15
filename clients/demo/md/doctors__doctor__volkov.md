@@ -26,7 +26,7 @@ position: "Главный врач, стоматолог-хирург, импл�
 
 experience_years: 13
 
-cta_text: "Обсудить на консультации"
+cta_key: doctor
 cta_action: lead
 ---
 

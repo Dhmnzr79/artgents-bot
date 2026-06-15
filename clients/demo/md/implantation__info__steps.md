@@ -14,7 +14,7 @@ aliases:
 suggest_refs:
   - { label: "Цены на импланты", ref: "implantation__pricing__implants.md#korotko" }
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 situation_allowed: true

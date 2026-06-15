@@ -17,7 +17,7 @@ suggest_h3:
   - chto-proishodit-posle-udaleniya
   - kogda-nuzhno-stavit-implant
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 ---
 

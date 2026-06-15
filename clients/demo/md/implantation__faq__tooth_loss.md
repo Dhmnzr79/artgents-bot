@@ -11,7 +11,7 @@ aliases:
   - "выпал зуб что делать"
   - "остался без зуба"
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

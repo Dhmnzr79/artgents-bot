@@ -16,7 +16,7 @@ suggest_h3:
   - kogda-chashche-vybirayut-implant
   - kogda-most-mozhet-byt-razumnym-variantom
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

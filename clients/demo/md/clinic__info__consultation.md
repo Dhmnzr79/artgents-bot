@@ -11,7 +11,7 @@ aliases:
   - "план лечения"
   - "запись к врачу"
 
-cta_text: "Обсудить на консультации"
+cta_key: booking
 cta_action: lead
 ---
 

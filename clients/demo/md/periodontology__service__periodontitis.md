@@ -20,7 +20,7 @@ suggest_h3:
   - chto-proishodit-s-desnami
   - mozhno-li-sohranit-zuby
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 empathy_enabled: true

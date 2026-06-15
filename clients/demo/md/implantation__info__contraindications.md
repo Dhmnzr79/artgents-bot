@@ -14,7 +14,7 @@ aliases:
 suggest_h3:
   - nuzhna-li-podgotovka-pered-implantatsiey
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 situation_allowed: true

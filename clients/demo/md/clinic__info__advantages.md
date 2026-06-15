@@ -11,7 +11,7 @@ aliases:
   - "рейтинг клиники"
   - "почему выбрать клинику"
 
-cta_text: "Обсудить на консультации"
+cta_key: booking
 cta_action: lead
 ---
 

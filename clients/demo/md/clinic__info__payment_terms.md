@@ -12,7 +12,7 @@ aliases:
   - "скрытые доплаты"
   - "договор на лечение"
 
-cta_text: "Обсудить на консультации"
+cta_key: callback
 cta_action: lead
 ---
 

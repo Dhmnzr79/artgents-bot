@@ -18,7 +18,7 @@ aliases:
 suggest_h3:
   - bolno-li-lechit-kanaly
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 empathy_enabled: true

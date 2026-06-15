@@ -28,7 +28,7 @@ position: "Врач-имплантолог"
 
 experience_years: 16
 
-cta_text: "Обсудить на консультации"
+cta_key: doctor
 cta_action: lead
 ---
 

@@ -14,7 +14,7 @@ aliases:
   - "как доехать"
   - "метро"
 
-cta_text: "Обсудить на консультации"
+cta_key: callback
 cta_action: lead
 ---
 

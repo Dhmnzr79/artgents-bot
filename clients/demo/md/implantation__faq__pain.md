@@ -15,7 +15,7 @@ suggest_h3:
   - kakuyu-anesteziyu-ispolzuyut
   - chto-chuvstvuetsya-posle-ustanovki
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

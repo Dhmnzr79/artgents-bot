@@ -13,7 +13,7 @@ aliases:
 suggest_h3:
   - kak-sdelat-implantatsiyu-dostupnee
 
-cta_text: "Обсудить на консультации"
+cta_key: price
 cta_action: lead
 
 empathy_enabled: true

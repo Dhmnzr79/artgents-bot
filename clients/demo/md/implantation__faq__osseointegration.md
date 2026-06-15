@@ -16,7 +16,7 @@ suggest_h3:
   - ot-chego-zavisit-prizhivlenie
   - chto-budet-esli-nichego-ne-delat
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

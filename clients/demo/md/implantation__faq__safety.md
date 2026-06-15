@@ -14,7 +14,7 @@ aliases:
   - "страх заражения"
   - "можно ли заразиться у стоматолога"
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

@@ -11,7 +11,7 @@ aliases:
   - "кто помогает во время лечения"
   - "помощник в клинике"
 
-cta_text: "Обсудить на консультации"
+cta_key: booking
 cta_action: lead
 
 situation_allowed: true

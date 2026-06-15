@@ -10,7 +10,7 @@ aliases:
   - "плюсы имплантации"
   - "зачем ставить имплант"
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 situation_allowed: true

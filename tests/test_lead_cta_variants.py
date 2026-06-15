@@ -9,15 +9,15 @@ from core.client_config_loader import (
 )
 
 
-def test_load_lead_cta_variants_demo_has_four():
+def test_load_lead_cta_variants_demo_has_six():
     variants = load_lead_cta_variants("demo")
     keys = {v.key for v in variants}
-    assert keys == {"booking", "consult", "callback", "plan"}
+    assert keys == {"booking", "consult", "callback", "plan", "price", "doctor"}
 
 
 def test_resolve_lead_name_prompt_by_key():
     prompt = resolve_lead_name_prompt("demo", cta_key="consult")
-    assert "обсудим ваш вопрос на консультации" in prompt.lower()
+    assert "обсудим ваш вопрос с врачом" in prompt.lower()
 
 
 def test_resolve_lead_name_prompt_by_label_backward_compat():

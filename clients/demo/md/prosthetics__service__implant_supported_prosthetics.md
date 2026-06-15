@@ -17,7 +17,7 @@ suggest_h3:
   - kakoy-variant-podoydet
   - budu-li-hodit-bez-zubov
 
-cta_text: "Обсудить на консультации"
+cta_key: plan
 cta_action: lead
 
 situation_allowed: true

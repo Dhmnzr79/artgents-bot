@@ -16,7 +16,7 @@ suggest_h3:
   - kak-platit-po-chastyam
   - garantii-i-skidka
 
-cta_text: "Обсудить на консультации"
+cta_key: price
 cta_action: lead
 
 situation_allowed: true

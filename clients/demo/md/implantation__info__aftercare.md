@@ -15,7 +15,7 @@ suggest_h3:
   - chto-proishodit-v-pervye-dni
   - kak-prohodit-vosstanovlenie-do-koronki
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

@@ -16,7 +16,7 @@ suggest_h3:
   - kogda-chashche-vybirayut-byugelnyy-protez
   - kogda-mozhno-rassmotret-nesemnyy-most
 
-cta_text: "Обсудить на консультации"
+cta_key: consult
 cta_action: lead
 
 empathy_enabled: true

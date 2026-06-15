@@ -12,6 +12,7 @@ const WELCOME_CHAR_MS = 32;
 const WELCOME_STREAM_START_MS = 280;
 const WELCOME_LEAVE_MS = 240;
 const TEXTAREA_MAX_HEIGHT = 112;
+const MOBILE_MAX_WIDTH_PX = 520;
 const SCROLL_NEAR_BOTTOM_PX = 80;
 const TURN_SCROLL_TOP_GAP_PX = 12;
 const VIDEO_REVEAL_LABEL = "Посмотреть видео с врачом";
@@ -31,10 +32,8 @@ const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xm
 
 const LINK_CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-/** Уникальный id градиента — иначе при нескольких кнопках в ленте ломается fill="url(#…)" */
-function videoPlayIconSvg(gradientId) {
-  const gid = String(gradientId || "").replace(/[^a-zA-Z0-9_-]/g, "") || "clinicVideoPlay";
-  return `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 26C16.4478 26 19.7544 24.6304 22.1924 22.1924C24.6304 19.7544 26 16.4478 26 13C26 9.55219 24.6304 6.24558 22.1924 3.80761C19.7544 1.36964 16.4478 0 13 0C9.55219 0 6.24558 1.36964 3.80761 3.80761C1.36964 6.24558 0 9.55219 0 13C0 16.4478 1.36964 19.7544 3.80761 22.1924C6.24558 24.6304 9.55219 26 13 26ZM12.2769 8.398C12.0321 8.23472 11.7477 8.14094 11.4538 8.12667C11.16 8.1124 10.8678 8.17816 10.6084 8.31695C10.349 8.45575 10.1321 8.66235 9.98095 8.91474C9.82978 9.16712 9.74996 9.45581 9.75 9.75V16.25C9.74996 16.5442 9.82978 16.8329 9.98095 17.0853C10.1321 17.3376 10.349 17.5443 10.6084 17.683C10.8678 17.8218 11.16 17.8876 11.4538 17.8733C11.7477 17.8591 12.0321 17.7653 12.2769 17.602L17.1519 14.352C17.3744 14.2036 17.5569 14.0026 17.6831 13.7667C17.8093 13.5309 17.8754 13.2675 17.8754 13C17.8754 12.7325 17.8093 12.4691 17.6831 12.2333C17.5569 11.9974 17.3744 11.7964 17.1519 11.648L12.2769 8.398Z" fill="url(#${gid})"/><defs><linearGradient id="${gid}" x1="-0.443182" y1="9.55303" x2="24.8274" y2="15.429" gradientUnits="userSpaceOnUse"><stop stop-color="#662482"/><stop offset="1" stop-color="#F351DD"/></linearGradient></defs></svg>`;
+function videoPlayIconSvg() {
+  return `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 26C16.4478 26 19.7544 24.6304 22.1924 22.1924C24.6304 19.7544 26 16.4478 26 13C26 9.55219 24.6304 6.24558 22.1924 3.80761C19.7544 1.36964 16.4478 0 13 0C9.55219 0 6.24558 1.36964 3.80761 3.80761C1.36964 6.24558 0 9.55219 0 13C0 16.4478 1.36964 19.7544 3.80761 22.1924C6.24558 24.6304 9.55219 26 13 26ZM12.2769 8.398C12.0321 8.23472 11.7477 8.14094 11.4538 8.12667C11.16 8.1124 10.8678 8.17816 10.6084 8.31695C10.349 8.45575 10.1321 8.66235 9.98095 8.91474C9.82978 9.16712 9.74996 9.45581 9.75 9.75V16.25C9.74996 16.5442 9.82978 16.8329 9.98095 17.0853C10.1321 17.3376 10.349 17.5443 10.6084 17.683C10.8678 17.8218 11.16 17.8876 11.4538 17.8733C11.7477 17.8591 12.0321 17.7653 12.2769 17.602L17.1519 14.352C17.3744 14.2036 17.5569 14.0026 17.6831 13.7667C17.8093 13.5309 17.8754 13.2675 17.8754 13C17.8754 12.7325 17.8093 12.4691 17.6831 12.2333C17.5569 11.9974 17.3744 11.7964 17.1519 11.648L12.2769 8.398Z" fill="currentColor"/></svg>`;
 }
 
 const CTA_CHAT_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>`;
@@ -97,6 +96,14 @@ function applyWidgetTheme(shellEl, theme) {
   shellEl.style.setProperty("--clinic-action-hover", actionHover);
   shellEl.style.setProperty("--clinic-button-1", button1);
   shellEl.style.setProperty("--clinic-button-2", button2);
+  const button1Rgb = _hexToRgb(button1);
+  const button2Rgb = _hexToRgb(button2);
+  if (button1Rgb) {
+    shellEl.style.setProperty("--clinic-button-1-rgb", _rgbCss(button1Rgb));
+  }
+  if (button2Rgb) {
+    shellEl.style.setProperty("--clinic-button-2-rgb", _rgbCss(button2Rgb));
+  }
   shellEl.style.setProperty(
     "--clinic-gradient-cta",
     `linear-gradient(130deg, ${button1} 0%, ${button2} 100%)`
@@ -138,6 +145,38 @@ function applyWidgetTheme(shellEl, theme) {
       `0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(${argb}, 0.32)`
     );
   }
+}
+
+/**
+ * Демо-CTA: отдельные CSS-переменные на shell (не inline на кнопке, не button_1/2 чата).
+ * @param {HTMLElement | null} shell
+ * @param {Record<string, unknown>} config
+ */
+function applyDemoLauncherTheme(shell, config) {
+  if (!shell || !config || typeof config !== "object") return;
+  const pack =
+    config.demoLauncherColors && typeof config.demoLauncherColors === "object"
+      ? config.demoLauncherColors
+      : null;
+  const theme =
+    config.theme && typeof config.theme === "object" ? config.theme : null;
+  const from = String(
+    /** @type {{ from?: unknown }} */ (pack)?.from ||
+      /** @type {{ button_1?: unknown }} */ (theme)?.button_1 ||
+      ""
+  ).trim();
+  const to = String(
+    /** @type {{ to?: unknown }} */ (pack)?.to ||
+      /** @type {{ button_2?: unknown }} */ (theme)?.button_2 ||
+      ""
+  ).trim();
+  if (!from || !to) return;
+  shell.style.setProperty("--clinic-demo-cta-from", from);
+  shell.style.setProperty("--clinic-demo-cta-to", to);
+  const rgb1 = _hexToRgb(from);
+  const rgb2 = _hexToRgb(to);
+  if (rgb1) shell.style.setProperty("--clinic-demo-cta-from-rgb", _rgbCss(rgb1));
+  if (rgb2) shell.style.setProperty("--clinic-demo-cta-to-rgb", _rgbCss(rgb2));
 }
 
 /** @param {string | undefined} apiBase @param {string | undefined} path */
@@ -339,6 +378,14 @@ function createBotAvatarEl(avatarUrl) {
   return wrap;
 }
 
+/** @returns {boolean} */
+function isMobileViewport() {
+  return (
+    typeof matchMedia !== "undefined" &&
+    matchMedia(`(max-width: ${MOBILE_MAX_WIDTH_PX}px)`).matches
+  );
+}
+
 function autoResizeTextarea(textarea) {
   textarea.style.height = "auto";
   const next = Math.min(textarea.scrollHeight, TEXTAREA_MAX_HEIGHT);
@@ -379,10 +426,26 @@ function _createLiveBubble(feed, resolvedAvatarUrl) {
  */
 /**
  * @param {HTMLElement} feedEl
+ * @returns {HTMLElement | null}
+ */
+function getChatScroller(feedEl) {
+  const feed = feedEl.closest(".clinic-shell__feed");
+  if (!feed) return feedEl.closest(".clinic-shell__main");
+  let node = feed;
+  while (node) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") return node;
+    node = node.parentElement;
+  }
+  return feed.closest(".clinic-shell__main");
+}
+
+/**
+ * @param {HTMLElement} feedEl
  * @param {{ force?: boolean }} [opts]
  */
 function scrollChatPaneToEnd(feedEl, opts = {}) {
-  const scroller = feedEl.closest(".clinic-shell__main");
+  const scroller = getChatScroller(feedEl);
   if (!scroller) return;
   if (!opts.force) {
     const dist =
@@ -398,7 +461,7 @@ function scrollChatPaneToEnd(feedEl, opts = {}) {
  * @param {HTMLElement} feedEl
  */
 function scrollToLastTurnStart(feedEl) {
-  const scroller = feedEl.closest(".clinic-shell__main");
+  const scroller = getChatScroller(feedEl);
   if (!scroller) return;
   const turns = feedEl.querySelectorAll(".clinic-turn");
   const last = turns[turns.length - 1];
@@ -406,17 +469,20 @@ function scrollToLastTurnStart(feedEl) {
     scroller.scrollTop = scroller.scrollHeight;
     return;
   }
-  const header = scroller.querySelector(".clinic-shell__header--glass");
+  const main = feedEl.closest(".clinic-shell__main");
+  const header =
+    scroller.querySelector(".clinic-shell__header--glass") ||
+    main?.querySelector(".clinic-shell__header--glass");
   const headerH = header ? header.getBoundingClientRect().height : 0;
   const turnRect = last.getBoundingClientRect();
   const scrollerRect = scroller.getBoundingClientRect();
-  const effectiveViewH = scroller.clientHeight - headerH;
+  const effectiveViewH = scroller.clientHeight - (scroller === main ? headerH : 0);
 
   if (turnRect.height + TURN_SCROLL_TOP_GAP_PX > effectiveViewH) {
     const target =
       scroller.scrollTop +
       (turnRect.top - scrollerRect.top) -
-      headerH -
+      (scroller === main ? headerH : 0) -
       TURN_SCROLL_TOP_GAP_PX;
     scroller.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   } else {
@@ -651,6 +717,9 @@ export function mountWidget(root, config) {
 
   const useDemoLauncher = config.demoLauncher !== false;
   const launcherCtaLabel = String(config.launcherCtaLabel || "Запустить демо").trim();
+  const launcherMobileCtaLabel = String(
+    config.launcherMobileCtaLabel || launcherCtaLabel
+  ).trim();
   const clinicName = String(config.clinicName || "").trim();
   const launcherSubtitle = clinicName
     ? `ИИ-консультант «${clinicName}»`
@@ -658,34 +727,20 @@ export function mountWidget(root, config) {
   const launcherTagline = String(
     config.launcherTagline || "Подскажу по лечению, ценам и записи."
   ).trim();
-  const launcherTeaserEnabled = config.launcherTeaser !== false;
+  const launcherTeaserEnabled = !useDemoLauncher && config.launcherTeaser !== false;
   const launcherTeaserText = String(
     config.launcherTeaserText || DEFAULT_LAUNCHER_TEASER_TEXT
   ).trim();
 
   const launcherHtml = useDemoLauncher
     ? `
-      <div class="clinic-shell__launcher clinic-shell__launcher--demo" data-clinic-launcher>
-        <div class="clinic-shell__launcher-card">
-          <span class="clinic-shell__unread clinic-shell__unread--launcher" data-clinic-unread aria-hidden="true"></span>
-          <div class="clinic-shell__launcher-body">
-            <div class="clinic-shell__launcher-row">
-              <div class="clinic-shell__launcher-avatar">
-                <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--launcher" data-clinic-avatar-fb>
-                  <img class="clinic-shell__avatar-fallback-img" alt="" width="40" height="40" data-clinic-avatar />
-                </span>
-                <span class="clinic-shell__header-online-dot clinic-shell__header-online-dot--launcher" aria-hidden="true"></span>
-              </div>
-              <div class="clinic-shell__launcher-text">
-                <span class="clinic-shell__name clinic-shell__name--launcher" data-clinic-launcher-name></span>
-                <span class="clinic-shell__launcher-subtitle" data-clinic-launcher-subtitle></span>
-                <span class="clinic-shell__launcher-tagline" data-clinic-launcher-tagline></span>
-              </div>
-            </div>
-          </div>
-          <button type="button" class="clinic-shell__launcher-cta" data-clinic-launcher-open aria-controls="clinic-panel"></button>
-        </div>
-      </div>`
+      <button
+        type="button"
+        class="clinic-shell__launcher clinic-shell__launcher--demo"
+        data-clinic-launcher-open
+        aria-expanded="false"
+        aria-controls="clinic-panel"
+      ></button>`
     : `
       <button type="button" class="clinic-shell__launcher" data-clinic-launcher aria-expanded="false" aria-controls="clinic-panel">
         <span class="clinic-shell__unread" data-clinic-unread aria-hidden="true"></span>
@@ -700,6 +755,8 @@ export function mountWidget(root, config) {
             <span class="clinic-shell__name" data-clinic-name></span>
             <span class="clinic-shell__launcher-subtitle" data-clinic-launcher-subtitle></span>
             <span class="clinic-shell__launcher-tagline" data-clinic-launcher-tagline></span>
+            <span class="clinic-shell__launcher-mobile-headline" data-clinic-launcher-mobile-headline></span>
+            <span class="clinic-shell__launcher-mobile-online">Онлайн 24/7</span>
           </div>
         </div>
       </button>`;
@@ -754,9 +811,22 @@ export function mountWidget(root, config) {
 
   const shell = root.querySelector("[data-clinic-root]");
   applyWidgetTheme(shell, config.theme);
+  if (useDemoLauncher) {
+    applyDemoLauncherTheme(shell, config);
+  }
   const launcher = root.querySelector("[data-clinic-launcher]");
   const launcherOpenBtn = root.querySelector("[data-clinic-launcher-open]");
-  if (launcherOpenBtn) launcherOpenBtn.textContent = launcherCtaLabel;
+  const launcherControl = launcherOpenBtn || launcher;
+  const launcherLinkEl = root.querySelector(".clinic-shell__launcher-link");
+  if (launcherLinkEl) launcherLinkEl.textContent = launcherCtaLabel;
+  if (launcherOpenBtn && useDemoLauncher) {
+    launcherOpenBtn.textContent = launcherCtaLabel;
+    launcherOpenBtn.setAttribute("aria-label", launcherCtaLabel);
+  }
+  for (const el of root.querySelectorAll("[data-clinic-launcher-mobile-headline]")) {
+    el.textContent = launcherMobileCtaLabel;
+  }
+  if (launcher) launcher.setAttribute("aria-label", launcherMobileCtaLabel);
   const panel = root.querySelector("[data-clinic-panel]");
   const feed = root.querySelector("[data-clinic-feed]");
   const input = root.querySelector("[data-clinic-input]");
@@ -785,9 +855,11 @@ export function mountWidget(root, config) {
   fillHeaderStatus(root.querySelector("[data-clinic-header-online]"), config);
 
   const alt = (config.botName || "Бот").trim();
-  avatarImg.alt = alt;
+  if (avatarImg) {
+    avatarImg.alt = alt;
+    avatarImg.src = resolvedAvatarUrl;
+  }
   hAvatar.alt = alt;
-  avatarImg.src = resolvedAvatarUrl;
   hAvatar.src = resolvedAvatarUrl;
 
   const videoAspectMode =
@@ -880,7 +952,7 @@ export function mountWidget(root, config) {
     const play = document.createElement("span");
     play.className = "clinic-msg__video-play";
     play.setAttribute("aria-hidden", "true");
-    play.innerHTML = videoPlayIconSvg(`clinicVp_${msgIndex}`);
+    play.innerHTML = videoPlayIconSvg();
     btn.appendChild(lab);
     btn.appendChild(play);
     btn.setAttribute("aria-label", VIDEO_REVEAL_LABEL);
@@ -905,11 +977,11 @@ export function mountWidget(root, config) {
     state.messages.push({ role: "user", text: userLabel });
     state.messages.push({
       role: "bot",
-      text: "Короткий комментарий врача:",
+      text: "",
       videoKey: vk,
       videoSrc: cat?.src || mediaPlayUrl(vk),
       videoTitleText: cat?.title || "",
-      videoRevealed: false,
+      videoRevealed: true,
       followups: [],
       quickReplies: [],
       linksDismissed: false,
@@ -920,7 +992,6 @@ export function mountWidget(root, config) {
     renderFeed();
   }
 
-  setOpen(false);
   autoResizeTextarea(input);
 
   let launcherTeaserTimer = 0;
@@ -1012,7 +1083,7 @@ export function mountWidget(root, config) {
     state.welcomeAnimActive = false;
     state.welcomeStreamDone = false;
     state.unread = false;
-    unreadDot.classList.remove("is-visible");
+    unreadDot?.classList.remove("is-visible");
     setError("");
     pauseOtherInlineVideos(/** @type {HTMLVideoElement} */ (null));
     input.value = "";
@@ -1042,24 +1113,90 @@ export function mountWidget(root, config) {
     maybeStartWelcomeStream();
   }
 
+  /** @type {number} */
+  let bodyScrollLockY = 0;
+  /** @type {(() => void) | null} */
+  let mobileViewportHandler = null;
+
+  function updateMobileViewportHeight() {
+    const h = window.visualViewport?.height ?? window.innerHeight;
+    shell.style.setProperty("--clinic-vvh", `${Math.round(h)}px`);
+  }
+
+  function lockHostPageScroll() {
+    bodyScrollLockY = window.scrollY;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${bodyScrollLockY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+  }
+
+  function unlockHostPageScroll() {
+    document.documentElement.style.overflow = "";
+    document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    document.body.style.width = "";
+    window.scrollTo(0, bodyScrollLockY);
+  }
+
+  function bindMobileViewportListeners() {
+    if (mobileViewportHandler) return;
+    shell.classList.add("is-mobile-fullscreen");
+    updateMobileViewportHeight();
+    mobileViewportHandler = () => updateMobileViewportHeight();
+    window.visualViewport?.addEventListener("resize", mobileViewportHandler);
+    window.visualViewport?.addEventListener("scroll", mobileViewportHandler);
+    window.addEventListener("resize", mobileViewportHandler);
+  }
+
+  function unbindMobileViewportListeners() {
+    if (!mobileViewportHandler) return;
+    window.visualViewport?.removeEventListener("resize", mobileViewportHandler);
+    window.visualViewport?.removeEventListener("scroll", mobileViewportHandler);
+    window.removeEventListener("resize", mobileViewportHandler);
+    mobileViewportHandler = null;
+    shell.classList.remove("is-mobile-fullscreen");
+    shell.style.removeProperty("--clinic-vvh");
+  }
+
+  function syncMobileShellClass() {
+    shell.classList.toggle("is-mobile", isMobileViewport());
+  }
+
   function setOpen(open) {
     state.isOpen = open;
+    syncMobileShellClass();
     shell.classList.toggle("is-open", open);
-    if (launcher) {
-      launcher.setAttribute("aria-expanded", open ? "true" : "false");
+    if (launcherControl) {
+      launcherControl.setAttribute("aria-expanded", open ? "true" : "false");
     }
     panel.setAttribute("aria-hidden", open ? "false" : "true");
     if (open) {
       cancelLauncherTeaser();
       state.unread = false;
-      unreadDot.classList.remove("is-visible");
-      input.focus();
+      unreadDot?.classList.remove("is-visible");
+      if (isMobileViewport()) {
+        lockHostPageScroll();
+        bindMobileViewportListeners();
+      } else {
+        input.focus();
+      }
     } else {
+      if (isMobileViewport()) {
+        unlockHostPageScroll();
+        unbindMobileViewportListeners();
+      }
       if (state.welcomeAnimActive) {
         clearWelcomeStream();
         state.welcomeAnimActive = false;
       }
-      launcher.focus();
+      launcherControl?.focus();
     }
   }
 
@@ -1220,7 +1357,7 @@ export function mountWidget(root, config) {
           });
         }
         endPendingRequest();
-        if (state.unread && !state.isOpen) unreadDot.classList.add("is-visible");
+        if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
         renderFeed();
         syncSendState();
       },
@@ -1699,6 +1836,11 @@ export function mountWidget(root, config) {
 
   input.addEventListener("input", onComposerInput);
 
+  input.addEventListener("focus", () => {
+    if (!isMobileViewport()) return;
+    requestAnimationFrame(() => scrollChatPaneToEnd(feed, { force: true }));
+  });
+
   input.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && !ev.shiftKey) {
       ev.preventDefault();
@@ -1717,12 +1859,29 @@ export function mountWidget(root, config) {
     }
   });
 
+  syncMobileShellClass();
+  if (typeof matchMedia !== "undefined") {
+    matchMedia(`(max-width: ${MOBILE_MAX_WIDTH_PX}px)`).addEventListener("change", () => {
+      syncMobileShellClass();
+      if (!state.isOpen) return;
+      if (isMobileViewport()) {
+        lockHostPageScroll();
+        bindMobileViewportListeners();
+      } else {
+        unlockHostPageScroll();
+        unbindMobileViewportListeners();
+      }
+    });
+  }
+
   renderFeed();
-  scheduleLauncherTeaser();
+  if (launcherTeaserEnabled) scheduleLauncherTeaser();
 
   void fetchVideoCatalog().then(() => renderFeed());
 
   attachDevResetControl(resetSession);
+
+  setOpen(false);
 
   return { resetSession };
 }

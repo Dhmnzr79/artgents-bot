@@ -2,12 +2,18 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Виджет — локальный тест</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="widget/widget.css">
   <style>
+    body {
+      margin: 0;
+      background: #10142b;
+      color: #e8eaf0;
+    }
+
     .page-host {
       min-height: 120vh;
       padding: 24px;
@@ -17,8 +23,13 @@
       line-height: 1.5;
     }
 
+    .page-host a {
+      color: #c4c9e8;
+    }
+
     .page-host code {
       font-size: 0.9em;
+      color: #f0f2ff;
     }
   </style>
 </head>
@@ -51,8 +62,13 @@
     "botName": "Надежда",
     "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
     "launcherSubtitle": "Демо ИИ-консультанта клиники",
-    "launcherCtaLabel": "Запустить демо",
+    "launcherCtaLabel": "Посмотреть демо",
+    "launcherTeaser": false,
     "demoLauncher": true,
+    "demoLauncherColors": {
+      "from": "#D92879",
+      "to": "#E42A7D"
+    },
     "welcomeText": "Здравствуйте!\nЯ демо-версия ИИ-консультанта стоматологической клиники. Задайте вопрос по лечению или выберите тему ниже.",
     "videoAspect": "horizontal",
     "videoCatalog": {

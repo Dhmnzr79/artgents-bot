@@ -1,5 +1,5 @@
 # clients/demo/brand.yaml
-clinic_name: "Демо-клиника"
+clinic_name: "Artgents"
 logo_url: "/static/clients/demo/logo.svg"
 logo_width: 110
 logo_height: 28
@@ -8,5 +8,5 @@ avatar_url: "/static/clients/demo/avatar.png"
 colors:
   brand: "#6952e8"
   action: "#4A3BA8"
-  button_1: "#6952e8"
-  button_2: "#BD35D8"
+  button_1: "#D92879"
+  button_2: "#E42A7D"

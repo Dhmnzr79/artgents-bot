@@ -16,8 +16,13 @@
   "botName": "Надежда",
   "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
   "launcherSubtitle": "Демо ИИ-консультанта клиники",
-  "launcherCtaLabel": "Запустить демо",
+  "launcherCtaLabel": "Посмотреть демо",
+  "launcherTeaser": false,
   "demoLauncher": true,
+  "demoLauncherColors": {
+    "from": "#D92879",
+    "to": "#E42A7D"
+  },
   "welcomeText": "Здравствуйте!\nЯ демо-версия ИИ-консультанта стоматологической клиники. Задайте вопрос по лечению или выберите тему ниже.",
   "videoAspect": "horizontal",
   "starterPrompts": [

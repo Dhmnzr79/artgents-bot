@@ -45,7 +45,9 @@
   --clinic-brand: #6952e8;
   --clinic-button-1: #6952e8;
   --clinic-button-2: #bd35d8;
+  --clinic-button-2-rgb: 189, 53, 216;
   --clinic-gradient-cta: linear-gradient(130deg, var(--clinic-button-1) 0%, var(--clinic-button-2) 100%);
+  --clinic-video-play: #e02424;
   --clinic-action: #4a3ba8;
   --clinic-action-hover: #3f328f;
   --clinic-brand-rgb: 105, 82, 232;
@@ -70,6 +72,7 @@
   --clinic-chip-border: rgba(var(--clinic-brand-rgb), 0.14);
   --clinic-focus: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(var(--clinic-action-rgb), 0.32);
   --clinic-gradient-online: linear-gradient(135deg, #8af447 0%, #32d33d 48%, #10b83a 100%);
+  --clinic-online: #32d33d;
   --clinic-bubble-bot: rgba(255, 255, 255, 0.88);
   --clinic-bubble-user: rgba(var(--clinic-brand-rgb), 0.12);
   --clinic-line: rgba(43, 30, 78, 0.09);
@@ -137,16 +140,61 @@
   box-shadow: var(--clinic-shadow), var(--clinic-focus);
 }
 
-/* Демо-превью: крупная карточка + кнопка запуска */
-.clinic-shell__launcher--demo {
-  display: block;
-  width: min(380px, calc(100vw - 32px));
+/* Демо-CTA: цвета только через --clinic-demo-cta-* (clients/demo/widget_config.json) */
+.clinic-shell__launcher.clinic-shell__launcher--demo {
+  display: inline-block;
+  width: auto;
   max-width: none;
-  padding: 0;
+  margin: 0;
+  padding: 14px 24px;
   border: none;
-  background: transparent;
-  box-shadow: none;
-  cursor: default;
+  border-radius: 3px;
+  background-color: var(--clinic-demo-cta-from, #d92879);
+  background-image: linear-gradient(
+    90deg,
+    var(--clinic-demo-cta-from, #d92879) 0%,
+    var(--clinic-demo-cta-to, #e42a7d) 100%
+  );
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow:
+    0 14px 32px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.38),
+    0 6px 16px rgba(var(--clinic-demo-cta-to-rgb, 228, 42, 125), 0.32);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.clinic-shell__launcher--demo:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow:
+    0 18px 40px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.44),
+    0 8px 20px rgba(var(--clinic-demo-cta-to-rgb, 228, 42, 125), 0.38);
+}
+
+.clinic-shell__launcher--demo:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+
+.clinic-shell__launcher--demo:focus-visible {
+  outline: none;
+  box-shadow:
+    0 14px 32px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.38),
+    0 6px 16px rgba(var(--clinic-demo-cta-to-rgb, 228, 42, 125), 0.32),
+    var(--clinic-focus);
 }
 
 .clinic-shell__launcher-card {
@@ -156,8 +204,8 @@
   align-items: stretch;
   background: var(--clinic-bg);
   border: 1px solid var(--clinic-border);
-  border-radius: 20px;
-  box-shadow: var(--clinic-shadow-panel);
+  border-radius: var(--clinic-radius-lg);
+  box-shadow: var(--clinic-shadow-soft);
   overflow: hidden;
 }
 
@@ -227,6 +275,7 @@
 /* Свернутый виджет: белый центр + градиентная «рамка» как у .clinic-shell__frame */
 .clinic-shell:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
   border: 3px solid transparent;
+  border-radius: var(--clinic-radius-lg);
   background-image:
     linear-gradient(var(--clinic-bg), var(--clinic-bg)),
     var(--clinic-frame-bg);
@@ -235,46 +284,18 @@
   box-shadow: var(--clinic-shadow-panel);
 }
 
-.clinic-shell:not(.is-open) .clinic-shell__launcher--demo .clinic-shell__launcher-card {
-  border: var(--clinic-frame-padding) solid transparent;
-  background-image:
-    linear-gradient(var(--clinic-bg), var(--clinic-bg)),
-    var(--clinic-frame-bg);
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-}
-
-.clinic-shell__launcher-cta {
-  width: 100%;
-  margin: 0;
-  padding: 16px 22px;
-  border: none;
-  border-top: 1px solid var(--clinic-line);
-  background: var(--clinic-gradient-cta, var(--clinic-brand));
-  color: #fff;
-  font-family: inherit;
-  font-size: 16px;
+.clinic-shell__launcher-link {
+  display: inline-block;
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  text-align: center;
-  cursor: pointer;
-  transition:
-    filter 0.16s ease,
-    transform 0.12s ease;
+  color: #d52a7d;
 }
 
-.clinic-shell__launcher-cta:hover {
-  filter: brightness(1.06);
-}
-
-.clinic-shell__launcher-cta:active {
-  transform: scale(0.99);
-}
-
-.clinic-shell__launcher-cta:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+.clinic-shell__launcher-mobile-headline,
+.clinic-shell__launcher-mobile-online {
+  display: none;
 }
 
 /* Рамка-круг: внутри только img (аватар), без отдельного img снаружи */
@@ -403,15 +424,6 @@
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
-}
-
-.clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher--demo .clinic-shell__launcher-card {
-  transform: scale(1.03);
-  transition: transform 0.3s ease;
-}
-
-.clinic-shell__launcher--demo .clinic-shell__launcher-card {
-  transition: transform 0.3s ease;
 }
 
 .clinic-shell.is-open .clinic-shell__launcher-teaser {
@@ -961,6 +973,7 @@
   justify-content: center;
   border-radius: 0;
   background: transparent;
+  color: var(--clinic-video-play);
 }
 
 .clinic-msg__video-play svg {
@@ -1497,14 +1510,170 @@
 
 @media (max-width: 520px) {
   .clinic-shell {
-    right: 12px;
-    bottom: 12px;
+    transition: none;
   }
 
-  .clinic-shell__panel {
-    width: calc(100vw - 24px);
+  .clinic-shell:not(.is-open) {
+    right: 12px;
+    bottom: 12px;
+    align-items: flex-end;
+    --clinic-mobile-launcher-shadow:
+      0 8px 26px rgba(var(--clinic-brand-rgb), 0.2),
+      0 3px 10px rgba(var(--clinic-brand-rgb), 0.12);
+    --clinic-mobile-launcher-shadow-demo:
+      0 8px 26px rgba(var(--clinic-button-2-rgb), 0.28),
+      0 3px 10px rgba(var(--clinic-button-2-rgb), 0.16);
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-teaser {
+    width: 200px;
+    max-width: 200px;
+    border-radius: 10px;
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
+    width: 200px;
+    max-width: 200px;
+    padding: 10px;
+    border: 1px solid rgba(var(--clinic-brand-rgb), 0.12);
+    border-radius: 10px;
+    background: var(--clinic-bg);
+    background-image: none;
+    box-shadow: var(--clinic-mobile-launcher-shadow);
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-row {
+    align-items: center;
+    gap: 0;
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-text {
+    gap: 2px;
+    padding-left: 10px;
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__name,
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-subtitle,
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-tagline,
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-link {
+    display: none;
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-mobile-headline {
+    display: block;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.25;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--clinic-text);
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-avatar .clinic-shell__avatar-fallback--launcher {
+    width: 36px;
+    height: 36px;
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-avatar .clinic-shell__header-online-dot--launcher {
+    width: 10px;
+    height: 10px;
+  }
+
+  .clinic-shell:not(.is-open) .clinic-shell__launcher-mobile-online {
+    display: block;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: #0e9f17;
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen {
+    --clinic-frame-padding: 0;
+    --clinic-radius-widget: 0;
+    --clinic-radius-surface: 0;
+    inset: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
     max-width: none;
-    height: min(72vh, calc(100vh - 120px));
+    height: var(--clinic-vvh, 100dvh);
+    max-height: var(--clinic-vvh, 100dvh);
+    align-items: stretch;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__panel {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__frame {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0;
+    background: var(--clinic-bg);
+    box-shadow: none;
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__surface {
+    flex: 1;
+    min-height: 0;
+    border-radius: 0;
+    background: var(--clinic-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__header--glass {
+    position: relative;
+    top: auto;
+    flex-shrink: 0;
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__feed {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-left: calc(15px + env(safe-area-inset-left, 0px));
+    padding-right: calc(15px + env(safe-area-inset-right, 0px));
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__header {
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+    padding-left: calc(15px + env(safe-area-inset-left, 0px));
+    padding-right: calc(15px + env(safe-area-inset-right, 0px));
+  }
+
+  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__composer {
+    padding-left: calc(15px + env(safe-area-inset-left, 0px));
+    padding-right: calc(15px + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .clinic-row__avatar-wrap,
+  .clinic-row__avatar {
+    width: 30px;
+    height: 30px;
   }
 }
 
@@ -1541,7 +1710,7 @@
 
   .clinic-shell__launcher-teaser,
   .clinic-shell__launcher:not(.clinic-shell__launcher--demo),
-  .clinic-shell__launcher--demo .clinic-shell__launcher-card {
+  .clinic-shell__launcher--demo {
     transition: none;
     transform: none;
   }

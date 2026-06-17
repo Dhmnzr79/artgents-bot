@@ -140,20 +140,24 @@
   box-shadow: var(--clinic-shadow), var(--clinic-focus);
 }
 
-/* Демо-CTA: белая кнопка, розовый текст (--clinic-demo-cta-from из widget_config) */
+/* Демо-CTA: сиренево-фиолетовая кнопка (--clinic-demo-cta-from/to из widget_config) */
 .clinic-shell__launcher.clinic-shell__launcher--demo {
   display: inline-block;
   width: auto;
   max-width: none;
   margin: 0;
-  padding: 14px 24px;
-  border: 1px solid rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.22);
-  border-radius: 3px;
-  background-color: #fff;
-  background-image: none;
-  color: var(--clinic-demo-cta-from, #d92879);
+  padding: 14px 26px;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--clinic-demo-cta-from, #6952e8);
+  background-image: linear-gradient(
+    130deg,
+    var(--clinic-demo-cta-from, #6952e8) 0%,
+    var(--clinic-demo-cta-to, #9b4dff) 100%
+  );
+  color: #fff;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -161,38 +165,36 @@
   white-space: nowrap;
   cursor: pointer;
   box-shadow:
-    0 10px 28px rgba(15, 23, 42, 0.1),
-    0 4px 12px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.14);
+    0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
+    0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22);
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease,
-    background-color 0.16s ease,
-    border-color 0.16s ease;
+    filter 0.16s ease;
   appearance: none;
   -webkit-appearance: none;
   outline: none;
+  animation: clinic-demo-launcher-pulse 9s ease-in-out infinite;
 }
 
 .clinic-shell__launcher--demo:hover {
   transform: translateY(-1px);
-  background-color: #fff;
-  border-color: rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.35);
+  filter: brightness(1.05);
   box-shadow:
-    0 14px 32px rgba(15, 23, 42, 0.12),
-    0 6px 16px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.2);
+    0 14px 32px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.44),
+    0 6px 16px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.28);
 }
 
 .clinic-shell__launcher--demo:active {
   transform: translateY(0);
-  background-color: #fafafa;
+  filter: brightness(0.98);
 }
 
 .clinic-shell__launcher--demo:focus-visible {
   outline: none;
-  border-color: rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.45);
   box-shadow:
-    0 10px 28px rgba(15, 23, 42, 0.1),
-    0 4px 12px rgba(var(--clinic-demo-cta-from-rgb, 217, 40, 121), 0.14),
+    0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
+    0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22),
     var(--clinic-focus);
 }
 
@@ -1712,6 +1714,7 @@
   .clinic-shell__launcher--demo {
     transition: none;
     transform: none;
+    animation: none;
   }
 
   .clinic-shell.is-launcher-teaser:not(.is-open) .clinic-shell__launcher-teaser {
@@ -1727,6 +1730,31 @@
   .clinic-shell__typing--shimmer .clinic-shell__typing-label-shine {
     animation: none;
     display: none;
+  }
+}
+
+@keyframes clinic-demo-launcher-pulse {
+  0%,
+  82%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
+      0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22);
+  }
+
+  88% {
+    transform: scale(1.04);
+    box-shadow:
+      0 16px 36px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.52),
+      0 8px 20px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.36);
+  }
+
+  94% {
+    transform: scale(1);
+    box-shadow:
+      0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
+      0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22);
   }
 }
 

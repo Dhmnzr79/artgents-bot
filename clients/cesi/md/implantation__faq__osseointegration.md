@@ -21,7 +21,6 @@ cta_action: lead
 
 empathy_enabled: true
 situation_allowed: true
-video_key: pain-doctor-explains
 ---
 
 ## Приживаемость имплантов
@@ -52,5 +51,3 @@ video_key: pain-doctor-explains
 Процесс нарастает: чем дольше ждать, тем сложнее и дороже восстановление.
 
 *Точный план лечения определяется после осмотра и КТ.*
-
-<!-- UX-тест: видео для subtopic osseointegration — правило в config/video_map.json -->

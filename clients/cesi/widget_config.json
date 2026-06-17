@@ -2,6 +2,8 @@
   "pack_id": "cesi",
   "clientId": "cesi",
   "allowed_origins": [
+    "https://dental41.ru",
+    "https://www.dental41.ru",
     "https://cesi.bot.artgents.ru",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
@@ -16,10 +18,9 @@
   "launcherCtaLabel": "Задать вопрос",
   "demoLauncher": false,
   "welcomeText": "Здравствуйте!\nЯ ИИ-консультант ЦЭСИ. Помогу с услугами, ценами, врачами и записью — задайте вопрос или выберите тему ниже.",
-  "videoAspect": "horizontal",
   "starterPrompts": [
     { "label": "Я боюсь боли", "q": "Я боюсь боли" },
     { "label": "Расскажите про all-on-4", "q": "Расскажите про all-on-4" },
-    { "label": "Посмотреть видео с врачом", "videoKey": "pain-doctor-explains" }
+    { "label": "Какая приживаемость имплантов?", "q": "Какая приживаемость имплантов?" }
   ]
 }

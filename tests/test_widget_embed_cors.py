@@ -13,6 +13,33 @@ def test_allowed_origins_for_client_demo():
     assert "https://demo.bot.artgents.ru" in allowed
 
 
+def test_allowed_origins_for_client_cesi_dental41():
+    allowed = allowed_origins_for_client("cesi")
+    assert "https://dental41.ru" in allowed
+
+
+def test_matching_widget_origin_cesi_dental41(monkeypatch):
+    class _Req:
+        headers = {"Origin": "https://dental41.ru"}
+
+    monkeypatch.setattr("core.origin_guard.request", _Req())
+    assert matching_widget_origin("cesi") == "https://dental41.ru"
+
+
+def test_resolve_widget_cors_client_id_from_host(monkeypatch):
+    class _Req:
+        method = "GET"
+        args = {}
+        host = "cesi.bot.artgents.ru"
+
+        @staticmethod
+        def get_json(silent=True):
+            return None
+
+    monkeypatch.setattr("core.widget_cors.request", _Req())
+    assert widget_cors.resolve_widget_cors_client_id() == "cesi"
+
+
 def test_is_widget_embed_cors_path():
     assert widget_cors.is_widget_embed_cors_path("/api/widget-config")
     assert widget_cors.is_widget_embed_cors_path("/api/media/pain-doctor-explains")

@@ -22,7 +22,7 @@ from orchestration.helpers import (
     with_default_anchor,
 )
 from query_selector import select_chunk_for_question
-from session import is_lead_context, mem_get, set_last_catalog_service
+from session import is_active_lead_flow, is_lead_context, mem_get, set_last_catalog_service
 from ux_builder import (
     build_service_facts_card_payload,
     low_score_response,

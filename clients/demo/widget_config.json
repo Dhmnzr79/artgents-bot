@@ -20,8 +20,8 @@
   "launcherTeaser": false,
   "demoLauncher": true,
   "demoLauncherColors": {
-    "from": "#D92879",
-    "to": "#E42A7D"
+    "from": "#6952E8",
+    "to": "#9B4DFF"
   },
   "welcomeText": "Здравствуйте!\nЯ демо-версия ИИ-консультанта стоматологической клиники. Задайте вопрос по лечению или выберите тему ниже.",
   "videoAspect": "horizontal",

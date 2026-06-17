@@ -18,7 +18,6 @@ services:
   - zirconia_crowns
   - veneers
   - implant_supported_prosthetics
-  - clasp_dentures
   - removable_dentures
 
 position: "Стоматолог-ортопед"

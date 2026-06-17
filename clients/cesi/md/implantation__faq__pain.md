@@ -20,8 +20,6 @@ cta_action: lead
 
 empathy_enabled: true
 situation_allowed: true
-
-video_key: pain-doctor-explains
 ---
 
 ## Имплантация: боль и анестезия

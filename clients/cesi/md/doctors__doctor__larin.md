@@ -20,7 +20,6 @@ services:
   - all_on_4
   - all_on_6
   - implant_supported_prosthetics
-  - clasp_dentures
   - removable_dentures
 
 position: "Стоматолог-ортопед"

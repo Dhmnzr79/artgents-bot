@@ -10,6 +10,8 @@
 | **`WIDGET_ANSWER_FORMAT.md`** | Контракт текста ответа для виджета |
 | **`DASHBOARD.md`** | Admin, Postgres, события, cost |
 | **`TECH_DEBT.md`** | Открытый долг и следующие шаги |
+| **`IMPLANT_QUESTIONS_COVERAGE.md`** | 101 вопрос по имплантации → контент / логика |
+| **`PRODUCT_WORK_PLAN.md`** | План работ: eval, slots, price offers, planner, verifier |
 
 Корень репо: `DEPRECATED.md`, `contracts/`, `core/routing.yaml`.
 

@@ -4,7 +4,15 @@ from __future__ import annotations
 import os
 import re
 
-from config import BOOKING_INTENT_LLM_ON, BOOKING_INTENT_RE, CONTACTS_RE, PRICES_RE
+from config import (
+    BOOKING_INTENT_LLM_ON,
+    BOOKING_INTENT_RE,
+    CONTACTS_RE,
+    IMPLANT_PAIN_FAQ_FEAR_RE,
+    IMPLANT_PAIN_FAQ_IMPLANT_RE,
+    PRICE_CONCERN_RE,
+    PRICES_RE,
+)
 from core.video_catalog_loader import resolve_video_payload
 from llm import classify_booking_wants_appointment
 from retriever import chunk_doc_type
@@ -18,6 +26,18 @@ def contacts_intent(q: str) -> bool:
 
 def price_intent(q: str) -> bool:
     return bool(PRICES_RE.search(q or ""))
+
+
+def implant_pain_faq_intent(q: str) -> bool:
+    """Страх/боль/анестезия при имплантации → faq pain (overlay до catalog_md, как contacts)."""
+    q0 = (q or "").strip()
+    if len(q0) < 4:
+        return False
+    if price_intent(q0) or PRICE_CONCERN_RE.search(q0):
+        return False
+    return bool(
+        IMPLANT_PAIN_FAQ_IMPLANT_RE.search(q0) and IMPLANT_PAIN_FAQ_FEAR_RE.search(q0)
+    )
 
 
 _CONTINUATION_ONLY_RE = re.compile(
@@ -116,6 +136,17 @@ def pick_contacts_chunk(cands: list) -> dict | None:
         # Fallback: filename contains "contacts" (если doc_type не прописан во front-matter)
         file_base = os.path.basename((ch.get("file") or "") if isinstance(ch, dict) else "").lower()
         if "contacts" in file_base:
+            return ch
+    return None
+
+
+def pick_implant_pain_faq_chunk(cands: list) -> dict | None:
+    for ch in cands:
+        if not isinstance(ch, dict):
+            continue
+        file_base = os.path.basename(str(ch.get("file") or "")).lower()
+        doc_id = os.path.splitext(file_base)[0] if file_base else ""
+        if doc_id == "implantation__faq__pain":
             return ch
     return None
 

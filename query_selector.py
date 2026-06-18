@@ -653,7 +653,7 @@ def select_price_service_route(
                     "fallback_reason": fb_final,
                 }
             return {
-                "mode": "clarify",
+                "mode": "unavailable",
                 "intent": intent,
                 "fallback_reason": fb_final or "price_not_in_catalog",
                 "matched_service_id": ctx.get("service_id"),
@@ -702,7 +702,7 @@ def select_price_service_route(
                     "fallback_reason": fb_final,
                 }
             return {
-                "mode": "clarify",
+                "mode": "unavailable",
                 "intent": intent,
                 "fallback_reason": fb_final or "price_not_in_catalog",
                 "matched_service_id": ctx.get("service_id"),
@@ -752,7 +752,7 @@ def select_price_service_route(
             }
         if fallback_reason == "price_not_in_catalog":
             return {
-                "mode": "clarify",
+                "mode": "unavailable",
                 "intent": intent,
                 "fallback_reason": fallback_reason,
                 **match,

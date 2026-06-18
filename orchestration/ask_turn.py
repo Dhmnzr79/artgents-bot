@@ -15,7 +15,13 @@ from orchestration.catalog_flow import (
 from orchestration.helpers import decision_dump
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
-from policy import contacts_intent, pick_contacts_chunk
+from config import IMPLANT_PAIN_FAQ_REF
+from policy import (
+    contacts_intent,
+    implant_pain_faq_intent,
+    pick_contacts_chunk,
+    pick_implant_pain_faq_chunk,
+)
 from query_selector import select_price_service_route
 from retriever import get_chunk_by_ref, normalize_retrieval_query, retrieve
 from source_routing import route_source, slim_source_route_payload
@@ -67,6 +73,29 @@ def orchestrate_routing_after_resolver(
                 llm_question=q,
                 log_event="Answer generated from contacts intent",
                 chunk_route="contacts_chunk",
+                decision_frame=decision_frame,
+            )
+
+    q_raw = (q or "").strip()
+    if intent not in ("contacts", "price_lookup", "price_concern") and (
+        implant_pain_faq_intent(qp_loc.strip()) or implant_pain_faq_intent(q_raw)
+    ):
+        scope = scope_topic_candidate if scope_topic_candidate else "implantation"
+        cands = retrieve(q, topk=24, client_id=client_id, scope_topic=scope)
+        picked = pick_implant_pain_faq_chunk(cands)
+        if picked is None:
+            picked = get_chunk_by_ref(IMPLANT_PAIN_FAQ_REF, client_id=client_id)
+        if picked:
+            request.ctx["effective_intent"] = intent or "content"
+            return AskOrchestrationResult(
+                kind="chunk",
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                chosen_chunk=picked,
+                llm_question=q,
+                log_event="Answer generated from implant pain FAQ overlay",
+                chunk_route="retrieval_chunk",
                 decision_frame=decision_frame,
             )
 

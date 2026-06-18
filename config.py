@@ -157,6 +157,17 @@ PRICE_CONCERN_RE = re.compile(
     r"(дорог|почему\s+так\s+дорого|слишком\s+дорого|высокая\s+цена|не\s+потяну|не\s+по\s+карману|дешевле|снизить\s+стоимост)",
     re.I,
 )
+# Implant pain/fear FAQ overlay (ask_turn, до A3 catalog_md) — см. ROUTING_MAP.md
+IMPLANT_PAIN_FAQ_IMPLANT_RE = re.compile(
+    r"(имплант|implant|all[\s-]?on|все\s+на\s+(?:четыр|4|шест|6))",
+    re.I | re.U,
+)
+IMPLANT_PAIN_FAQ_FEAR_RE = re.compile(
+    r"(больно|боюсь|страш|страх|анестез|наркоз|обезбол|седац|"
+    r"не\s+больно|во\s+сне|дискомфорт\s+при\s+имплант)",
+    re.I | re.U,
+)
+IMPLANT_PAIN_FAQ_REF = "implantation__faq__pain.md#korotko"
 
 PRICE_SERVICE_MATCH_STRONG = float(os.getenv("PRICE_SERVICE_MATCH_STRONG", "0.62"))
 

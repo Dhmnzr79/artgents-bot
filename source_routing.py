@@ -214,14 +214,25 @@ def route_source(
         pr = select_price_service_route(q0, client_id=client_id, sid=sid, intent_override="price_lookup")
         if pr.get("mode") == "matched":
             return _price_route_to_source_result(pr)
+        if pr.get("mode") == "unavailable":
+            mid_u = str(pr.get("matched_service_id") or "") or None
+            return SourceRouteResult(
+                source="price_unavailable",
+                service_id=mid_u,
+                ref=None,
+                concern_ref=None,
+                payload={"price_route": pr},
+                match_score=float(pr.get("match_score") or 0.0),
+                match_method="catalog_containment",
+            )
         return SourceRouteResult(
             source="price_lookup_clarify",
-            service_id=None,
+            service_id=str(pr.get("matched_service_id") or "") or None,
             ref=None,
             concern_ref=None,
             payload={"price_route": pr},
-            match_score=0.0,
-            match_method="none",
+            match_score=float(pr.get("match_score") or 0.0),
+            match_method="none" if not pr.get("matched_service_id") else "catalog_containment",
         )
 
     return SourceRouteResult(

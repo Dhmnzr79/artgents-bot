@@ -472,35 +472,97 @@ def build_price_concern_payload(
     }
 
 
-def build_price_clarify_payload(
+def build_price_resolution_payload(
     *,
     sid: str,
     client_id: str | None,
     intent: str,
-    fallback_reason: str,
+    resolution_reason: str,
+    service_id: str | None = None,
+    service: dict | None = None,
+    match_score: float = 0.0,
     question: str = "",
+    route_source: str = "catalog",
+    price_key: str | None = None,
+    price_ref: str | None = None,
 ) -> dict:
+    from core.catalog_resolution import fallback_reason_to_resolution, service_content_snippet
     from core.clinic_policies_loader import (
         build_service_not_offered_answer,
         find_service_alternative_note,
         service_alternative_quick_replies,
     )
 
+    reason = fallback_reason_to_resolution(resolution_reason)
+    svc = service if isinstance(service, dict) else {}
+    sid_svc = str(service_id or "").strip()
+    title = str(svc.get("title") or sid_svc).strip()
+    score = round(float(match_score or 0.0), 4)
     cid = (client_id or "").strip() or "default"
+    consult_tail = (
+        "Точную стоимость лучше уточнить на консультации — "
+        "после осмотра назовут сумму по вашей ситуации."
+    )
+
     if find_service_alternative_note(question, cid):
         answer = build_service_not_offered_answer(cid, question=question)
         quick_replies = service_alternative_quick_replies(question, cid)
-    else:
+        service_status = "not_offered"
+        price_status = "not_requested"
+        snippet_source = None
+        cta = None
+    elif reason == "matched_service_but_no_price" and sid_svc:
+        snippet, snippet_source = service_content_snippet(svc, client_id=client_id)
+        if snippet and snippet_source and snippet_source != "title_only":
+            answer = f"{snippet}\n\n{consult_tail}"
+        elif title:
+            answer = (
+                f"По услуге «{title}» точную стоимость назовут на консультации — "
+                "после осмотра посчитают сумму по вашей ситуации."
+            )
+            snippet_source = snippet_source or "title_only"
+        else:
+            answer = consult_tail
+            snippet_source = None
+        quick_replies = _suggest_refs_at_most_one(svc)
+        service_status = "found"
+        price_status = "not_available"
+        cta = default_cta_dict()
+    elif reason == "low_match_score" and title:
         answer = (
-            "Не могу определить услугу для расчёта цены. "
-            "Напишите, пожалуйста, что именно вас интересует — "
+            f"Похоже, речь о «{title}». Уточните, пожалуйста, что именно вас интересует — "
             "или запишитесь на консультацию, там всё посчитают."
         )
         quick_replies = []
+        service_status = "ambiguous"
+        price_status = "not_available"
+        snippet_source = None
+        cta = None
+    elif reason == "continuation_no_context":
+        answer = (
+            "О какой услуге стоимость? Напишите название или тему — "
+            "тогда смогу подсказать или направлю на консультацию."
+        )
+        quick_replies = []
+        service_status = "not_found"
+        price_status = "not_available"
+        snippet_source = None
+        cta = None
+    else:
+        answer = (
+            "Не вижу такую услугу в нашей базе. Напишите, пожалуйста, что именно вас интересует — "
+            "или запишитесь на консультацию, там всё посчитают."
+        )
+        quick_replies = []
+        service_status = "not_found"
+        price_status = "not_available"
+        snippet_source = None
+        cta = None
+
     return {
         "answer": answer,
         "quick_replies": quick_replies,
-        "cta": None,
+        "cta": cta,
         "video": None,
         "situation": {"show": False, "mode": "normal"},
         "offer": None,
@@ -508,12 +570,39 @@ def build_price_clarify_payload(
             "sid": sid,
             "client_id": client_id,
             "intent": intent,
-            "matched_service_id": None,
-            "match_score": 0.0,
-            "route_source": "catalog",
-            "price_key": None,
-            "price_ref": None,
-            "fallback_reason": fallback_reason,
+            "matched_service_id": sid_svc or None,
+            "match_score": score,
+            "route_source": route_source,
+            "price_key": price_key,
+            "price_ref": price_ref,
+            "fallback_reason": reason,
+            "resolution_reason": reason,
+            "service_status": service_status,
+            "price_status": price_status,
+            "content_snippet_source": snippet_source,
             "followups": [],
         },
     }
+
+
+def build_price_clarify_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    intent: str,
+    fallback_reason: str,
+    question: str = "",
+    service_id: str | None = None,
+    service: dict | None = None,
+    match_score: float = 0.0,
+) -> dict:
+    return build_price_resolution_payload(
+        sid=sid,
+        client_id=client_id,
+        intent=intent,
+        resolution_reason=fallback_reason,
+        service_id=service_id,
+        service=service,
+        match_score=match_score,
+        question=question,
+    )

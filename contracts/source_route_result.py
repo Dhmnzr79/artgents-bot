@@ -11,6 +11,7 @@ SourceType = Literal[
     "price_card",
     "price_ref",
     "price_lookup_clarify",
+    "price_unavailable",
     "price_concern",
     "doctor",
     "contacts",

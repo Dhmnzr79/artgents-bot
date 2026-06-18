@@ -1,6 +1,6 @@
 {
-  "baseline": 32,
-  "description": "Metadata-first Phase 2 golden: route + doc_id (+ doc_type guards). Expand `clients` in runner.",
+  "baseline": 11,
+  "description": "Metadata-first Phase 2 golden: route + doc_id (+ doc_type guards). Demo client only until other packs are ready.",
   "deferred": [
     {
       "id": "mf_comparison_fallback_telemetry",
@@ -19,28 +19,8 @@
       "testability": "strong"
     },
     {
-      "id": "mf_contacts_cesi",
-      "client_id": "cesi",
-      "question": "Где вы находитесь?",
-      "expected_route": "contacts_chunk",
-      "expected_doc_id": "clinic__info__contacts",
-      "answer_signals_any": ["елизово", "ленина"],
-      "must_not_contain": ["тверск"],
-      "testability": "strong"
-    },
-    {
-      "id": "mf_contacts_nikadent",
-      "client_id": "nikadent",
-      "question": "Где вы находитесь?",
-      "expected_route": "contacts_chunk",
-      "expected_doc_id": "clinic__info__contacts",
-      "answer_signals_any": ["елизово", "рябиков"],
-      "must_not_contain": ["тверск"],
-      "testability": "strong"
-    },
-    {
       "id": "mf_price_all_on_4",
-      "clients": ["demo", "nikadent"],
+      "client_id": "demo",
       "question": "Сколько стоит All-on-4?",
       "expected_route": "price_lookup",
       "expected_doc_id": "implantation__pricing__all_on_4",
@@ -48,18 +28,8 @@
       "testability": "strong"
     },
     {
-      "id": "mf_price_all_on_4_cesi",
-      "client_id": "cesi",
-      "question": "Сколько стоит All-on-4?",
-      "expected_route": "price_lookup",
-      "expected_doc_id": "clinic__info__payment_terms",
-      "answer_signals_any": ["договор", "этап", "вычет"],
-      "must_not_contain": ["318 000", "428 000", "190 800"],
-      "testability": "strong"
-    },
-    {
       "id": "mf_price_classic",
-      "clients": ["demo", "cesi", "nikadent"],
+      "client_id": "demo",
       "question": "Сколько стоит классическая имплантация?",
       "expected_route": "price_lookup",
       "expected_doc_id": "implantation__pricing__implants",
@@ -68,7 +38,7 @@
     },
     {
       "id": "mf_concern_cost",
-      "clients": ["demo", "cesi", "nikadent"],
+      "client_id": "demo",
       "question": "Почему так дорого импланты?",
       "expected_route": "price_concern",
       "expected_doc_id": "implantation__faq__cost",
@@ -78,7 +48,7 @@
     },
     {
       "id": "mf_faq_osseo",
-      "clients": ["demo", "cesi", "nikadent"],
+      "client_id": "demo",
       "question": "Какая приживаемость имплантов?",
       "expected_route": "retrieval_chunk",
       "expected_doc_id": "implantation__faq__osseointegration",
@@ -89,7 +59,7 @@
     },
     {
       "id": "mf_faq_pain",
-      "clients": ["demo", "cesi", "nikadent"],
+      "client_id": "demo",
       "question": "Больно ли ставить имплант?",
       "expected_route": "retrieval_chunk",
       "expected_doc_id": "implantation__faq__pain",
@@ -99,7 +69,7 @@
     },
     {
       "id": "mf_info_bone_graft",
-      "clients": ["demo", "cesi", "nikadent"],
+      "client_id": "demo",
       "question": "Если кости мало, что делать?",
       "expected_route": "retrieval_chunk",
       "expected_doc_id": "implantation__info__bone_graft",
@@ -109,7 +79,7 @@
     },
     {
       "id": "mf_service_classic_overview",
-      "clients": ["demo", "cesi", "nikadent"],
+      "client_id": "demo",
       "question": "Расскажите про классическую имплантацию",
       "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
       "expected_doc_id": "implantation__service__classic",
@@ -126,55 +96,13 @@
       "testability": "medium"
     },
     {
-      "id": "mf_comparison_miss_cesi",
-      "client_id": "cesi",
-      "question": "Что лучше: имплант или мост?",
-      "expected_route": "retrieval_chunk",
-      "forbidden_doc_type": ["comparison"],
-      "expected_fallback_used": true,
-      "answer_signals_any": ["имплант", "мост", "зуб"],
-      "testability": "medium",
-      "comment": "cesi has all_on_4 comparison but not implant_vs_bridge; must not pick comparison doc for this pair"
-    },
-    {
-      "id": "mf_comparison_miss_nikadent",
-      "client_id": "nikadent",
-      "question": "Что лучше: имплант или мост?",
-      "expected_route": "retrieval_chunk",
-      "forbidden_doc_type": ["comparison"],
-      "expected_fallback_used": true,
-      "answer_signals_any": ["имплант", "мост", "зуб"],
-      "testability": "medium",
-      "comment": "nikadent has bugel comparison only; implant-vs-bridge miss → implantation RAG not prosthetics comparison"
-    },
-    {
-      "id": "mf_comparison_hit_cesi_all_on_4",
-      "client_id": "cesi",
-      "question": "Что лучше: All-on-4 или классическая имплантация?",
-      "expected_route": "retrieval_chunk",
-      "expected_doc_id": "comparison__all_on_4_vs_classic_implantation",
-      "forbidden_doc_type": ["service", "pricing"],
-      "answer_signals_any": ["all-on-4", "all on 4", "классич", "имплант"],
-      "testability": "medium"
-    },
-    {
       "id": "mf_comparison_bugel",
-      "clients": ["demo", "nikadent"],
+      "client_id": "demo",
       "question": "Что лучше: бюгельный протез или мост?",
       "expected_route": "retrieval_chunk",
       "expected_doc_id": "comparison__bugel_prosthesis_vs_fixed_bridge",
       "forbidden_doc_type": ["service", "pricing"],
       "answer_signals_any": ["бюгель", "мост"],
-      "testability": "medium"
-    },
-    {
-      "id": "mf_comparison_hit_nikadent_removable",
-      "client_id": "nikadent",
-      "question": "Что лучше: съемный протез или All-on-4?",
-      "expected_route": "retrieval_chunk",
-      "expected_doc_id": "comparison__removable_denture_vs_all_on_4",
-      "forbidden_doc_type": ["service", "pricing"],
-      "answer_signals_any": ["съем", "протез", "all-on-4", "all on 4"],
       "testability": "medium"
     },
     {

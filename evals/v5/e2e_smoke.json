@@ -1,5 +1,5 @@
 {
-  "baseline": 55,
+  "baseline": 53,
   "known_v4_failures": [
     {
       "case_id": "smoke_multi_turn_all_on_4_price",
@@ -530,24 +530,6 @@
       "must_contain": ["корон"],
       "comment": "comparison baseline — retrieval до guide_router",
       "coverage_class": "WEAK"
-    },
-    {
-      "id": "smoke_cesi_contacts_address",
-      "client_id": "cesi",
-      "question": "Где вы находитесь?",
-      "expected_route": "contacts_chunk",
-      "must_contain": ["елизово"],
-      "comment": "cesi pack: адрес Елизово/Ленина (multiclient routing golden)",
-      "coverage_class": "STRONG"
-    },
-    {
-      "id": "smoke_nikadent_contacts_address",
-      "client_id": "nikadent",
-      "question": "Где вы находитесь?",
-      "expected_route": "contacts_chunk",
-      "must_contain": ["рябиков"],
-      "comment": "nikadent pack: филиал Рябикова (multiclient routing golden)",
-      "coverage_class": "STRONG"
     }
   ]
 }

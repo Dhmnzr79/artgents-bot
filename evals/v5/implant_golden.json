@@ -1,18 +1,7 @@
 {
-  "baseline": 18,
+  "baseline": 28,
   "description": "Implantation golden set (PRODUCT_WORK_PLAN stage 0): 28 patient questions from IMPLANT_QUESTIONS_COVERAGE #1–28. Demo client only.",
-  "known_failures": [
-    {
-      "case_id": "implant_q16_all_on_4_vs_6",
-      "reason": "catalog_facts vs comparison routing — stage 2 arbiter",
-      "expected_fix_in": "stage-2"
-    },
-    {
-      "case_id": "implant_q08_installment",
-      "reason": "«не потяну» → price_concern по PRICE_CONCERN_RE; рассрочка — payment_terms (stage 2 routing)",
-      "expected_fix_in": "stage-2"
-    }
-  ],
+  "known_failures": [],
   "cases": [
     {
       "id": "implant_q01_one_tooth_turnkey",

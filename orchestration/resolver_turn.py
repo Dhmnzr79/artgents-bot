@@ -7,7 +7,9 @@ from typing import Any
 
 from flask import request
 
+from config import COMPARISON_QUERY_RE
 from core.metadata_first_observability import record_decision_frame_ctx
+from query_selector import commercial_info_query, consultation_info_query
 from core.routing_loader import THRESHOLDS
 from llm import classify_intent
 from logging_setup import emit_bot_event, get_logger, log_json
@@ -85,10 +87,15 @@ def run_resolver_turn(
             resolver_bypassed_env=False,
         )
         ri = str(decision.route_intent or "").strip().lower()
-        if ri in ("price_lookup", "price_concern"):
+        if consultation_info_query(q) or commercial_info_query(q):
+            intent = "content"
+            decision = decision.model_copy(update={"route_intent": "content"})
+        elif ri in ("price_lookup", "price_concern"):
             intent = ri
         else:
             intent = "content"
+        if COMPARISON_QUERY_RE.search(q or ""):
+            decision = decision.model_copy(update={"query_mode": "comparison"})
         request.ctx["effective_intent"] = str(intent)
         record_decision_frame_ctx(decision)
 

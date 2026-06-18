@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from config import COMPARISON_QUERY_RE, STEPS_VISITS_QUERY_RE, TEMPORARY_TEETH_QUERY_RE
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
 
@@ -11,6 +12,8 @@ from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctor_intent_probe, doctor_name_probe, doctors_lookup
 from query_selector import (
     catalog_service_session_context,
+    commercial_info_query,
+    consultation_info_query,
     match_service_from_catalog,
     price_rules_hint,
     price_lookup_allows_session_context,
@@ -42,13 +45,26 @@ def _facts_nonempty(service: dict[str, Any]) -> list[str]:
     return [str(x).strip() for x in (service.get("facts") or []) if str(x).strip()]
 
 
+def _comparison_query(q: str, decision: DecisionFrame | None) -> bool:
+    if decision is not None and str(decision.query_mode or "").strip().lower() == "comparison":
+        return True
+    return bool(COMPARISON_QUERY_RE.search(q or ""))
+
+
 def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent: str) -> str:
     hint = price_rules_hint(q)
     if hint:
         return hint
+    ri = "unknown"
     if decision is not None:
-        return str(decision.route_intent or "unknown").strip().lower()
-    return str(app_intent or "content").strip().lower()
+        ri = str(decision.route_intent or "unknown").strip().lower()
+    else:
+        ri = str(app_intent or "content").strip().lower()
+    if ri in ("price_lookup", "price_concern") and (
+        commercial_info_query(q) or consultation_info_query(q)
+    ):
+        return "content"
+    return ri
 
 
 def _source_type_from_price_route(pr: dict[str, Any]) -> SourceType:
@@ -89,6 +105,40 @@ def route_source(
     """Run A3 routing. Caller handles `source == none` via legacy branches."""
     ri = _resolve_route_intent(q=q, decision=decision, app_intent=app_intent)
     q0 = (q or "").strip()
+    is_comparison = _comparison_query(q0, decision)
+
+    if consultation_info_query(q0):
+        return SourceRouteResult(
+            source="catalog_md",
+            service_id=None,
+            ref=_with_korotko_anchor("clinic__info__consultation"),
+            concern_ref=None,
+            payload=None,
+            match_score=1.0,
+            match_method="catalog_containment",
+        )
+
+    if STEPS_VISITS_QUERY_RE.search(q0) and ri == "content":
+        return SourceRouteResult(
+            source="catalog_md",
+            service_id=None,
+            ref=_with_korotko_anchor("implantation__info__steps"),
+            concern_ref=None,
+            payload=None,
+            match_score=1.0,
+            match_method="catalog_containment",
+        )
+
+    if TEMPORARY_TEETH_QUERY_RE.search(q0) and ri == "content":
+        return SourceRouteResult(
+            source="catalog_md",
+            service_id="temporary_teeth",
+            ref=_with_korotko_anchor("implantation__service__temporary_teeth"),
+            concern_ref=None,
+            payload=None,
+            match_score=1.0,
+            match_method="catalog_containment",
+        )
 
     doctors_gate = doctor_name_probe(q0, client_id=client_id) or doctor_intent_probe(q0)
     if doctors_gate and ri not in ("price_lookup", "price_concern"):
@@ -124,7 +174,7 @@ def route_source(
     svc = match.get("service") if isinstance(match.get("service"), dict) else {}
     svc = dict(svc)
 
-    if contain and ri == "content":
+    if contain and ri == "content" and not is_comparison:
         facts = _facts_nonempty(svc)
         if facts:
             return SourceRouteResult(

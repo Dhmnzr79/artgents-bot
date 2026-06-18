@@ -17,6 +17,8 @@ data/embeddings.npy
 data/sessions/
 data/bot.db
 data/bot.db-*
+data/*/bot.db
+data/*/bot.db-*
 
 # Локальные логи (вся папка, включая ротацию *.jsonl.*)
 logs/

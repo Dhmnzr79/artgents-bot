@@ -83,6 +83,7 @@
 ```
 вопрос
 → guards / Resolver / A3 (как сейчас)
+→ aspect + subject (topic, service_id) — metadata, не hard route
 → planner-lite (детерминированный, без LLM на MVP)
 → evidence: 1 md-чанк + structured facts (price_offers, policy)
 → Generator (суть, single source)
@@ -90,6 +91,37 @@
 → verifier gate (tiered)
 → policy → JSON /ask
 ```
+
+### 3.1 Aspect (question facets)
+
+Помимо **`topic`** и **`service_id`**, у чанков и документов в metadata — **`aspect`**: *тип вопроса* (facets), а не отдельная услуга.
+
+**Примеры aspect (MVP — 8–12, позже 15–25, без раздувания под каждый fail):**
+
+`price`, `duration`, `pain`, `stages`, `included`, `payment`, `warranty`, `contraindications`, `comparison`, `aftercare`, `doctors`, `consultation`, …
+
+**Принципы (важно):**
+
+| Правило | Смысл |
+|---------|--------|
+| **Не hard route** | `aspect` **не** означает «aspect → один конкретный файл». Это soft signal для retrieval / planner / session, не замена A3 и arbiter |
+| **Boost / filter** | При ranking кандидатов: бонус, если `chunk.aspect` совпадает с aspect запроса; при конфликте topic — subject из session |
+| **Subject vs aspect в session** | Хранить отдельно: **`last_subject`** `{ topic, service_id, label }` и **`last_aspect`**. Subject — *о чём говорим*; aspect — *какой тип вопроса сейчас* |
+| **Follow-up без потери темы** | «Сколько длится протезирование?» → «А это больно?»: subject остаётся `prosthetics` + тот же service, aspect меняется `duration` → `pain` |
+| **Не плодить под eval** | Новый aspect — только если повторяется в живых диалогах / матрице 101, а не под один golden-кейс |
+
+**Откуда берётся aspect (MVP):**
+
+1. **Авто из имени / doc_type** при индексации: `faq__pain` → `pain`, `faq__duration` → `duration`, `comparison__*` → `comparison`, `__pricing__` → `price`, …
+2. **Ручной override** во frontmatter: `aspect: payment` (если filename неоднозначен).
+
+**Где используется:**
+
+- **Retrieval 2.0** — metadata filter + soft boost вместо regex «вопрос → doc_id»
+- **Planner-lite** — выбор append-слотов (`payment_terms` при `payment`, warranty-md при `warranty`) по subject + aspect
+- **Dialog context** — Resolver / follow-up: короткая реплика наследует `last_subject`, aspect определяется заново
+
+**Связь с текущим кодом:** pre-stage-2 routing hints (`COMMERCIAL_*`, `CONSULTATION_*`, …) — временный слой; целевой путь — вынести смысл в `aspect` + session, hints сузить (см. `TECH_DEBT.md`).
 
 **Разделение данных:**
 
@@ -100,6 +132,7 @@
 | Пакет / под ключ | `price_offers.json` (новое) | Имплантация, All-on, unit, stages, includes |
 | Объяснение | md (`service`, `faq`, `pricing`, `comparison`) | Смысл, этапы, страхи |
 | Слоты ответа | frontmatter service md | clinic_note, consult_value, promo_note, h3_overrides |
+| Aspect (facets) | frontmatter + build_index | question facet: price, pain, duration, …; override в md |
 | Ограничения | `clinic_policies.yaml` | Не делаем, альтернатива |
 
 ---
@@ -155,9 +188,26 @@
 
 - [x] `concern_ref` для `implant_supported_prosthetics` и `removable_dentures` (TECH_DEBT price_concern)
 
-**Критерий готовности:** ≥70% из 25 golden — зелёные или осознанный known-fail с причиной.
+**Критерий готовности:** ≥70% текущего golden (20/28) — зелёные или осознанный known-fail с причиной.
+
+**Факт (demo):** **28/28** implant golden — baseline зафиксирован. Достижение через **этап 1.5** (hint layer), не через чистый Resolver + arbiter. Детали и план снятия shims — **`TECH_DEBT.md` → Stage 1.5**.
 
 **Не трогаем:** planner, verifier gate, retrieval 2.0.
+
+---
+
+#### Этап 1.5 — routing hints (промежуточный, зафиксирован)
+
+Между этапами 1 и 2: deterministic routing для зелёного golden на demo. **Не откатывать**; считать **временным shim** до planner-lite + aspect (этапы 4–6).
+
+| Тип | Оценка |
+|-----|--------|
+| Commercial vs `price_concern` | продуктовая логика |
+| Comparison → `query_mode` | терпимый query-mode signal |
+| Client pack aliases | норма, если не единственный путь |
+| `catalog_md_direct`, regex → md | **debt** — см. `TECH_DEBT.md` |
+
+**Правило с этапа 2:** новые **regex → doc** — только при блокере; иначе aspect / planner flag. Regex не сужать под один golden-кейс.
 
 ---
 
@@ -191,6 +241,8 @@
 **От чего избавляемся:** prompt-driven «не забудь про клинику»; реклама в embeddings.
 
 **Не трогаем:** multi-source LLM; `pick_relevant_offer` можно перевести на `promo_note` в этом же PR или сразу после.
+
+**Правило (наследие 1.5):** не добавлять direct **regex → doc** маршруты; словесные сигналы — в planner/aspect, не в `source_routing` ref. Shims из 1.5 не расширять — готовить замену в этапе 4.
 
 ---
 
@@ -231,6 +283,9 @@
 **Сделать:**
 
 - [ ] `core/answer_planner.py` — **без LLM**: вход DecisionFrame, catalog match, regex (`под ключ`, `рассрочка`, `акция`, `vs`, `боюсь`)
+- [ ] **Aspect + session:** резолв `aspect` запроса (MVP: rules + `last_aspect` / `last_subject`); subject carry-over на коротких follow-up («А это больно?»)
+- [ ] Session: `last_subject` `{ topic, service_id, label }` и `last_aspect` — отдельные поля (не смешивать с `last_catalog_service_id`)
+- [ ] Planner: append по **subject + aspect** (`payment` → payment_terms, `warranty` → warranty md), не «aspect → один файл»
 - [ ] Выход: `{ primary_chunk_ref, append: [price_offer, payment_terms, boundary], slots: [...], risk: [price] }`
 - [ ] Интеграция в `orchestration/` после A3, до `chunk_responder`
 - [ ] Golden: 10 составных вопросов из `IMPLANT_QUESTIONS_COVERAGE` (напр. 1+7+8, 3+7, 16+6)
@@ -276,9 +331,12 @@
 
 **Retrieval:**
 
+- [ ] **`aspect` в corpus/chunk metadata** — авто из path/doc_type (`faq__pain` → `pain`, `comparison__*` → `comparison`) + frontmatter override; канон 8–12 aspect на MVP
+- [ ] metadata filter / soft boost по **`topic` + `service_id` + `aspect`** (не hard route «aspect → файл»)
 - [ ] metadata filter по `doc_type` (pricing vs service при `price_lookup`)
 - [ ] hybrid / rerank (не удалять alias pipeline — только снизить зависимость)
-- [ ] arbiter: приоритет `comparison` при `query_mode=comparison`
+- [ ] arbiter: приоритет `comparison` при `query_mode=comparison`; согласовать с `aspect=comparison`
+- [ ] Свести routing regex-hints к aspect/session там, где дублируют смысл (post-MVP cleanup)
 
 **Content compiler (расширение линтера):**
 
@@ -341,7 +399,8 @@
 | LLM-planner на старте | Rule-based planner-lite |
 | LLM смешивает 3 чанка | 1 чанк + append |
 | Реклама в body md | frontmatter slots |
-| 20 алиасов на тему | service entry + comparison + h3 |
+| 20 алиасов на тему | service entry + comparison + h3 + **aspect** metadata |
+| Aspect под каждый golden-fail | 8–12 канонических facet; расширять по матрице 101, не по eval |
 | Ослаблять golden ради зелёного | known-fail + задача в TECH_DEBT |
 | Абстрактная «рыба» (lorem, нереальные цены) | Правдоподобный стомат. контент + рыночные вилки; demo ≠ prod-клиника |
 | `if client_id ==` | `clients/{id}/` + policies |
@@ -356,9 +415,9 @@
 | 1 | `clients/*/md/comparison__*.md`, правки catalog/prices |
 | 2 | `contracts/answer_slots.py`, `core/answer_slots.py`, `meta_loader.py`, `chunk_responder.py` |
 | 3 | `contracts/price_offer.py`, `clients/*/price_offers.json`, `price_flow.py`, `ux_builder.py` |
-| 4 | `core/answer_planner.py`, `orchestration/*` |
+| 4 | `core/answer_planner.py`, `orchestration/*`, session `last_subject` / `last_aspect` |
 | 5 | verifier gate в `chunk_responder` / отдельный модуль |
-| 6 | `scripts/audit_client_readiness.py`, retriever/rerank |
+| 6 | `scripts/audit_client_readiness.py`, retriever/rerank, `aspect` в build_index / corpus |
 
 ---
 
@@ -366,8 +425,8 @@
 
 | Уровень | Критерий |
 |---------|----------|
-| **MVP** | 25 golden зелёные; answer slots на service; цены импланта из structure или md+append |
-| **Хороший бот** | 70%+ из 101; planner-lite на составные; verifier hard на цены |
+| **MVP** | golden ≥70% (20/28); answer slots на service; цены импланта из structure или md+append |
+| **Хороший бот** | 70%+ implant golden; planner-lite на составные; verifier hard на цены |
 | **Продукт** | readiness audit; второй клиент за &lt;2 недель контента; CI eval |
 
 ---
@@ -379,6 +438,7 @@
 - `price_concern` + пустой `concern_ref` у протезов
 - `offer` / promo (после этапа 2)
 - implant `prices.json` vs каталог (после этапа 1 или 3)
+- **Stage 1.5 routing shims** — закрывать по мере этапов 4–6 (planner-lite + aspect)
 
 ---
 

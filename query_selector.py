@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from config import (
+    COMMERCIAL_INFO_RE,
+    CONSULTATION_QUERY_RE,
     LOW_SCORE_THRESHOLD,
     QUERY_REWRITE_ON,
     DEFAULT_CLIENT_ID,
@@ -427,11 +429,21 @@ def _match_score_catalog_typo(query: str, phrase: str) -> float:
     return round(float(best), 4)
 
 
+def commercial_info_query(q: str) -> bool:
+    return bool(COMMERCIAL_INFO_RE.search(q or ""))
+
+
+def consultation_info_query(q: str) -> bool:
+    return bool(CONSULTATION_QUERY_RE.search(q or ""))
+
+
 def _lookup_intent_by_rules(q: str) -> str:
     q0 = (q or "").strip()
     if not q0:
         return "other"
     if continuation_only_phrase(q0):
+        return "other"
+    if consultation_info_query(q0) or commercial_info_query(q0):
         return "other"
     if PRICE_CONCERN_RE.search(q0):
         return "price_concern"

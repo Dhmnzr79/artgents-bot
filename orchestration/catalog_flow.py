@@ -150,6 +150,70 @@ def try_a3_catalog_facts(
     )
 
 
+_DIRECT_CATALOG_MD_DOC_IDS = frozenset(
+    {
+        "clinic__info__consultation",
+        "implantation__info__steps",
+    }
+)
+
+
+def _doc_id_from_md_ref(ref: str) -> str:
+    r = (ref or "").strip()
+    if "#" in r:
+        r = r.split("#", 1)[0]
+    if r.lower().endswith(".md"):
+        return r[:-3]
+    return r
+
+
+def try_a3_catalog_md_direct(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    sr: SourceRouteResult,
+    decision_frame: dict[str, Any] | None,
+) -> AskOrchestrationResult | None:
+    """Deterministic info pages (consultation, steps, temporary_teeth hint) — без arbiter."""
+    if sr.source != "catalog_md" or not sr.ref:
+        return None
+    doc_id = _doc_id_from_md_ref(sr.ref)
+    direct = doc_id in _DIRECT_CATALOG_MD_DOC_IDS or (
+        doc_id == "implantation__service__temporary_teeth"
+        and str(sr.service_id or "") == "temporary_teeth"
+        and float(sr.match_score or 0.0) >= 1.0
+    )
+    if not direct:
+        return None
+    ch = get_chunk_by_ref(sr.ref, client_id=client_id)
+    if not ch:
+        return None
+    sid_svc = str(sr.service_id or "").strip()
+    if sid_svc:
+        set_last_catalog_service(sid, sid_svc)
+    log_json(
+        logger,
+        "catalog_route",
+        route="md_direct",
+        matched_service_id=sid_svc or None,
+        match_score=sr.match_score,
+        md_entry_ref=sr.ref,
+    )
+    return AskOrchestrationResult(
+        kind="chunk",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        chosen_chunk=ch,
+        llm_question=q,
+        log_event="Answer generated from catalog_md direct",
+        chunk_route="retrieval_chunk",
+        matched_service_id=sid_svc or None,
+        decision_frame=decision_frame,
+    )
+
+
 def catalog_md_priority_from_a3(sr: SourceRouteResult) -> CatalogMdPriority | None:
     if sr.source != "catalog_md" or not sr.ref:
         return None

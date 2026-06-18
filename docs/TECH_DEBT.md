@@ -20,6 +20,7 @@
 
 | Задача | Направление | Phase |
 |--------|-------------|-------|
+| **Stage 1.5 routing shims** (см. блок ниже) | planner-lite + aspect metadata; удалить после этапов 2–4 | **1.5 → 4** |
 | Metadata-First: unified alias scoring pool (alias as bonus in one ranked list, not parallel arbiter channel) | `docs/METADATA_FIRST_V1.md` §5 target | post-V1 |
 | Карта маршрутов | `docs/ROUTING_MAP.md` | **2 ✓** |
 | Smoke routing guards + `meta.service_route` | `evals/v5/e2e_smoke.json`, runner | **3 ✓** |
@@ -54,3 +55,32 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 Короткий **service follow-up** (rewrite validate + arbiter guard): `core/service_followup.py` — contextual rewrite overlap, generic FAQ отсекается при активной `last_catalog_service_id`.
 
 При закрытии новой задачи — удалить строку из таблицы в PR.
+
+---
+
+## Stage 1.5 — routing shims (временный слой, не финальная архитектура)
+
+**Контекст:** implant golden **28/28** на demo достигнуты, но **не** «чистой» целевой схемой (Resolver → metadata-first → arbiter). Между этапами 1 и 2 добавлен **deterministic hint layer**: regex-сигналы, прямые маршруты на md, обход arbiter для части типов вопросов. Для цели «быстро сделать бота отвечающим» — нормальный **этап 1.5**; для продукта — **временный shim**, не финал.
+
+### Что считать продуктовой логикой (оставить, позже обобщить)
+
+| Правка | Где | Замена в целевой архитектуре |
+|--------|-----|------------------------------|
+| Commercial vs `price_concern` | `COMMERCIAL_INFO_RE`, `_lookup_intent_by_rules`, `resolver_turn` | `aspect` + `route_intent`; рассрочка / «что входит» / «под ключ» / оценка по снимку — content/commercial facet, не concern |
+| Comparison signal | `COMPARISON_QUERY_RE` → `query_mode=comparison` | aspect/query-mode signal; не «фраза → файл» |
+| Алиасы в client pack | `clients/{id}/md`, `service_catalog.json` | основной путь doc selection; не единственный |
+
+### Временные shims (удалить после этапов 2–4)
+
+| Shim | Где | Риск |
+|------|-----|------|
+| `try_a3_catalog_md_direct` | `orchestration/catalog_flow.py` | жёсткий список `consultation` / `steps` / `temporary_teeth`; **обход arbiter** |
+| Regex → конкретный md | `STEPS_VISITS_QUERY_RE`, `TEMPORARY_TEETH_QUERY_RE`, `CONSULTATION_QUERY_RE` в `source_routing.py` | «если фраза похожа на X → файл Y» |
+| Comparison `query_mode` override | `resolver_turn.py` + skip A3 catalog при comparison | дублирует resolver, если golden не доведён |
+| Сужение regex под golden | напр. `TEMPORARY_TEETH_QUERY_RE` после ложного q23 | **опасно:** словесные подборы под eval, не под живой диалог |
+
+**Цель замены:** `core/answer_planner.py` + **`aspect`** / subject metadata (boost/filter, не hard route) + session `last_subject` / `last_aspect`. См. `PRODUCT_WORK_PLAN.md` §3.1.
+
+**Правило на этапы 2–4:** не добавлять новые **direct regex → doc** маршруты без крайней необходимости; новые словесные сигналы — **флаг плана / aspect**, не `ref` на md. Этап 4 planner-lite должен **поглотить** эти shims.
+
+**Файлы:** `config.py`, `source_routing.py`, `orchestration/resolver_turn.py`, `orchestration/catalog_flow.py`, `orchestration/ask_turn.py`, `query_selector.py`.

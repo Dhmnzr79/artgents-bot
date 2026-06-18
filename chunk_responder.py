@@ -263,6 +263,7 @@ def respond_from_chunk(
     log_event: str = "Answer generated",
     route: str = "retrieval_chunk",
     generator_append_text: str | None = None,
+    matched_service_id: str | None = None,
 ):
     if (q or "").strip():
         mem_add_user(sid, q)
@@ -270,6 +271,9 @@ def respond_from_chunk(
     meta = meta_for_chunk(chunk, client_id=client_id)
     if client_id is not None:
         meta["client_id"] = client_id
+    sid_svc = str(matched_service_id or "").strip()
+    if sid_svc:
+        meta["matched_service_id"] = sid_svc
     doc_id = meta.get("doc_id")
     if doc_id and not skip_topic:
         set_current_doc(sid, doc_id)

@@ -174,6 +174,10 @@ def build_ask_response(
     }
     if client_id is not None:
         meta_out["client_id"] = client_id
+    if meta.get("doc_id"):
+        meta_out["doc_id"] = meta.get("doc_id")
+    if meta.get("matched_service_id"):
+        meta_out["matched_service_id"] = meta.get("matched_service_id")
 
     return {
         "answer": answer,

@@ -36,3 +36,4 @@ class AskOrchestrationResult(BaseModel):
     chunk_route: str = "retrieval_chunk"
     # Детерминированный хвост ответа (например цена из каталога), не через инструкции к LLM.
     generator_append_text: str | None = None
+    matched_service_id: str | None = None

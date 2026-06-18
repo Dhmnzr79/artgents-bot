@@ -101,6 +101,7 @@ def price_matched_from_route(
                     llm_question=q,
                     log_event="Answer generated from concern_ref",
                     chunk_route="price_concern",
+                    matched_service_id=service_id or None,
                     decision_frame=decision_frame,
                 )
         payload = build_price_concern_payload(
@@ -163,6 +164,7 @@ def price_matched_from_route(
                 llm_question=llmq,
                 log_event="Answer generated from price_ref",
                 chunk_route="price_lookup",
+                matched_service_id=service_id or None,
                 decision_frame=decision_frame,
             )
     payload = build_price_lookup_payload(
@@ -232,6 +234,7 @@ def try_a3_price_route(
                 llm_question=q,
                 log_event="Answer generated from concern_ref",
                 chunk_route="price_concern",
+                matched_service_id=sr.service_id,
                 decision_frame=decision_frame,
             )
     if sr.source == "price_unavailable" and isinstance(sr.payload, dict):

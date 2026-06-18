@@ -43,6 +43,43 @@ service_alternatives:
       Брекеты мы не устанавливаем; для выравнивания зубов у нас есть элайнеры — прозрачные капы.
       Могу кратко рассказать про элайнеры или записать на консультацию.
 
+  - match_keywords:
+      - "скулов"
+      - "zygoma"
+    mention: "костная пластика и All-on-4/6"
+    suggest_ref: "implantation__info__bone_graft.md#skulovye-implanty-i-alternativy"
+    note: >-
+      Скуловую имплантацию в клинике не выполняем. После КТ обсуждаем классические протоколы,
+      костную пластику, синус-лифтинг или All-on-4/6 — что подходит по снимку.
+
+  - match_keywords:
+      - "базальн"
+      - "basal"
+    mention: "классическая имплантация"
+    suggest_ref: "implantation__service__classic.md#korotko"
+    note: >-
+      Базальную имплантацию мы не проводим. Работаем с проверенными протоколами классической
+      и одномоментной имплантации, All-on-4/6 и костной пластикой — по показаниям после диагностики.
+
+  - match_keywords:
+      - "мини-имплант"
+      - "мини имплант"
+    mention: "классическая имплантация"
+    suggest_ref: "implantation__service__classic.md#korotko"
+    note: >-
+      Мини-импланты не используем как основной протокол. Для постоянного результата обычно
+      подбираем стандартные системы имплантов после осмотра и КТ.
+
+  - match_keywords:
+      - "osstem"
+      - "ossstem"
+      - "остем"
+    mention: "Implantium, Impro, Nobel Biocare"
+    suggest_ref: "implantation__info__implant_systems.md#korotko"
+    note: >-
+      Osstem в ассортименте нет. Работаем с Implantium, Impro и Nobel Biocare — могу рассказать
+      про отличия систем и ориентиры по стоимости «под ключ».
+
 service_not_offered_template: >-
   К сожалению, услугу «{requested_service}» в нашей клинике не оказываем.
   Могу подсказать по направлениям, которые у нас есть, или записать на консультацию.

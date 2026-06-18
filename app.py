@@ -376,6 +376,7 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
             log_event=orch_r.log_event,
             route=orch_r.chunk_route,
             generator_append_text=orch_r.generator_append_text,
+            matched_service_id=orch_r.matched_service_id,
         )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 

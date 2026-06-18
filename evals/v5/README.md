@@ -13,6 +13,8 @@
 - `verifier_golden.json` — кейсы для Verifier (`VerifierVerdict`)
 - `generator_golden.json` — кейсы для Generator (faithfulness)
 - `run_layer_eval.py` — запуск eval по слоям
+- `implant_golden.json` — golden по имплантации (28 вопросов, `IMPLANT_QUESTIONS_COVERAGE` #1–28)
+- `run_implant_eval.py` — runner implant golden (demo)
 
 ## Запуск
 
@@ -67,6 +69,18 @@ python evals/v5/run_metadata_first_eval.py --suite all --client demo
 ```
 
 Env: `MF_EVAL_SUITE`, `MF_EVAL_PATH`, `MF_EVAL_CLIENT`, `MF_EVAL_CASE_ID`.
+
+### Implant golden eval (PRODUCT_WORK_PLAN stage 0)
+
+```bash
+set E2E_USE_TEST_CLIENT=1
+python evals/v5/run_implant_eval.py --client demo
+python evals/v5/run_implant_eval.py --case-id implant_q16_all_on_4_vs_6
+```
+
+Env: `IMPLANT_EVAL_PATH`, `IMPLANT_EVAL_CLIENT`, `IMPLANT_EVAL_CASE_ID`.
+
+Кейсы поддерживают `expected_route`, `expected_doc_id` / `expected_doc_id_any`, `expected_service_id` / `expected_service_id_any` (из `meta.matched_service_id`).
 
 **CI:** `.github/workflows/ci.yml` — job `metadata-first-eval` (нужен repo secret `OPENAI_API_KEY`, `E2E_USE_TEST_CLIENT=1`).
 

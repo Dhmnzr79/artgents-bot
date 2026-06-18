@@ -120,8 +120,7 @@
 - [x] `IMPLANT_QUESTIONS_COVERAGE.md` — матрица 101 вопроса
 - [x] `PRODUCT_WORK_PLAN.md` — этот документ
 - [x] Пилот первой батареи: **`demo`** (presentation-рыба, пишет AI); prod-клиенты — после зелёного demo
-- [ ] `evals/v5/implant_golden.json` — первые **25–30** вопросов (цена, all-on, боль, contraindications, comparison)
-- [ ] Скрипт или секция в smoke: `expected_route`, `expected_doc_id` / `service_id`
+- [x] Eval 0: `implant_golden.json` (28 кейсов) + `run_implant_eval.py`
 
 **От чего избавляемся:** проверка «на глаз» без эталона.
 
@@ -141,20 +140,20 @@
 - [ ] Тон и факты: как у реальной имплантологической клиники; без «lorem» и вымышленных протоколов
 - [ ] Цены: вилки «от … ₽» в рынке; единый источник правды между json и md; этапы оплаты правдоподобны
 
-- [ ] Comparison: `comparison__all_on_4_vs_all_on_6.md`, `comparison__classic_vs_one_stage.md`, `comparison__bone_graft_vs_all_on_4.md`
-- [ ] Расширить: `bone_graft`, `contraindications`, `pain` (наркоз/седация), faq второе мнение / рынок цен
-- [ ] `clinic_policies` — бренды не в ассортименте, скуловые/базальная/мини (если не делаете)
+- [x] Comparison: `comparison__all_on_4_vs_all_on_6.md`, `comparison__classic_vs_one_stage.md`, `comparison__bone_graft_vs_all_on_4.md`
+- [x] Расширить: `bone_graft`, `contraindications`, `pain` (наркоз/седация), faq второе мнение / рынок цен
+- [x] `clinic_policies` — бренды не в ассортименте, скуловые/базальная/мини (если не делаете)
 - [ ] Проставить `clinic_note` / `consult_value` в **боевых** service md (не только `classic_test`)
 
 **Сделать (данные):**
 
-- [ ] `service_catalog.json` — все имплантационные услуги: `md_entry_ref`, `price_key`, `concern_ref`, `price_ref`
-- [ ] `prices.json` — минимум ключи под каталог **или** явный переход на этап 2 (`price_offers`)
-- [ ] Пересборка индекса: `data/{client_id}/`
+- [x] `service_catalog.json` — все имплантационные услуги: `md_entry_ref`, `price_key`, `concern_ref`, `price_ref`
+- [x] `prices.json` — минимум ключи под каталог **или** явный переход на этап 2 (`price_offers`)
+- [x] Пересборка индекса: `data/{client_id}/`
 
 **Сделать (код, мелочь):**
 
-- [ ] Исправить `price_concern` default для услуг без `concern_ref` (см. `TECH_DEBT.md`, `ROUTING_MAP.md`)
+- [x] `concern_ref` для `implant_supported_prosthetics` и `removable_dentures` (TECH_DEBT price_concern)
 
 **Критерий готовности:** ≥70% из 25 golden — зелёные или осознанный known-fail с причиной.
 

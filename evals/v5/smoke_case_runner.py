@@ -218,6 +218,27 @@ def validate_smoke_case(
             coverage_class=cov,
         )
 
+    got_service_id = str(meta.get("matched_service_id") or meta.get("service_id") or "").strip()
+    expected_service_id = row.get("expected_service_id")
+    if expected_service_id is not None:
+        want_svc = str(expected_service_id).strip()
+        if want_svc and norm(got_service_id) != norm(want_svc):
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"service_id: got={got_service_id!r} want={want_svc!r}",
+                coverage_class=cov,
+            )
+
+    expected_service_id_any = str_list_field(row, "expected_service_id_any")
+    if expected_service_id_any and norm(got_service_id) not in {norm(x) for x in expected_service_id_any}:
+        return CaseResult(
+            case_id=case_id,
+            status="FAIL",
+            reason=f"service_id: got={got_service_id!r} want_any={expected_service_id_any!r}",
+            coverage_class=cov,
+        )
+
     forbidden_doc_id = str_list_field(row, "forbidden_doc_id")
     if forbidden_doc_id and norm(got_doc_id) in {norm(x) for x in forbidden_doc_id}:
         return CaseResult(

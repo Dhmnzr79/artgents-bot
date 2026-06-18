@@ -1,0 +1,376 @@
+{
+  "baseline": 18,
+  "description": "Implantation golden set (PRODUCT_WORK_PLAN stage 0): 28 patient questions from IMPLANT_QUESTIONS_COVERAGE #1–28. Demo client only.",
+  "known_failures": [
+    {
+      "case_id": "implant_q16_all_on_4_vs_6",
+      "reason": "catalog_facts vs comparison routing — stage 2 arbiter",
+      "expected_fix_in": "stage-2"
+    },
+    {
+      "case_id": "implant_q08_installment",
+      "reason": "«не потяну» → price_concern по PRICE_CONCERN_RE; рассрочка — payment_terms (stage 2 routing)",
+      "expected_fix_in": "stage-2"
+    }
+  ],
+  "cases": [
+    {
+      "id": "implant_q01_one_tooth_turnkey",
+      "client_id": "demo",
+      "implant_ref": 1,
+      "question": "Сколько будет стоить поставить один имплант полностью с коронкой, не просто сам винт?",
+      "expected_route": "price_lookup",
+      "expected_doc_id": "implantation__pricing__implants",
+      "expected_service_id": "classic",
+      "answer_signals_any": ["₽", "руб", "implantium", "76"],
+      "testability": "strong"
+    },
+    {
+      "id": "implant_q02_turnkey_included",
+      "client_id": "demo",
+      "implant_ref": 2,
+      "question": "У вас цена на имплантацию указана под ключ или потом ещё отдельно абатмент, коронка, снимок и т.д.?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__pricing__implants",
+        "implantation__service__classic"
+      ],
+      "answer_signals_any": ["ключ", "входит", "коронк", "абатмент"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q03_one_stage_price",
+      "client_id": "demo",
+      "implant_ref": 3,
+      "question": "Сколько примерно выйдет один зуб, если удалять корень и сразу ставить имплант?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
+      "expected_service_id_any": ["one_stage", "classic"],
+      "expected_doc_id_any": [
+        "implantation__pricing__implants",
+        "implantation__service__one_stage"
+      ],
+      "answer_signals_any": ["₽", "руб", "одномомент", "удален"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q04_price_spread_why",
+      "client_id": "demo",
+      "implant_ref": 4,
+      "question": "Почему у одних клиник имплант 25 тысяч, а у других 80, это реально такая разница или маркетинг?",
+      "expected_route_any": ["price_concern", "retrieval_chunk"],
+      "expected_doc_id": "implantation__faq__cost",
+      "answer_signals_any": ["материал", "стоим", "цен", "систем"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q05_three_teeth_bridge",
+      "client_id": "demo",
+      "implant_ref": 5,
+      "question": "Мне надо восстановить 3 зуба подряд, это считается как 3 импланта или можно меньше?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__info__methods_overview",
+        "implantation__service__classic",
+        "comparison__implant_vs_bridge"
+      ],
+      "answer_signals_any": ["имплант", "мост", "три", "3"],
+      "testability": "weak"
+    },
+    {
+      "id": "implant_q06_upper_jaw_price",
+      "client_id": "demo",
+      "implant_ref": 6,
+      "question": "Сколько стоит имплантация всей верхней челюсти, хотя бы примерно от и до?",
+      "expected_route": "price_lookup",
+      "expected_service_id_any": ["all_on_4", "all_on_6"],
+      "expected_doc_id_any": [
+        "implantation__pricing__all_on_4",
+        "implantation__pricing__all_on_6"
+      ],
+      "answer_signals_any": ["₽", "руб", "all-on", "челюст"],
+      "testability": "strong"
+    },
+    {
+      "id": "implant_q07_pay_crowns_later",
+      "client_id": "demo",
+      "implant_ref": 7,
+      "question": "Можно ли сначала поставить импланты, а коронки оплатить потом, когда приживутся?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk"],
+      "expected_doc_id_any": [
+        "implantation__pricing__implants",
+        "clinic__info__payment_terms"
+      ],
+      "answer_signals_any": ["этап", "коронк", "прижив", "оплат"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q08_installment",
+      "client_id": "demo",
+      "implant_ref": 8,
+      "question": "У вас есть рассрочка на имплантацию, потому что сразу 300–500 тысяч я не потяну?",
+      "expected_route_any": ["price_concern", "retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__faq__cost",
+        "clinic__info__payment_terms"
+      ],
+      "answer_signals_any": ["рассроч", "оплат", "этап"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q09_promo_included",
+      "client_id": "demo",
+      "implant_ref": 9,
+      "question": "Что входит в акцию на импланты, там точно коронка включена?",
+      "expected_route_any": ["retrieval_chunk", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__pricing__implants",
+        "implantation__faq__cost"
+      ],
+      "answer_signals_any": ["входит", "коронк", "акци", "ключ"],
+      "testability": "weak"
+    },
+    {
+      "id": "implant_q10_foreign_clinic_price",
+      "client_id": "demo",
+      "implant_ref": 10,
+      "question": "Мне сказали в другой клинике 180 тысяч за All-on-4, это нормальная цена или там что-то не включено?",
+      "expected_route_any": ["retrieval_chunk", "price_concern", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__faq__cost",
+        "implantation__pricing__all_on_4",
+        "implantation__service__all_on_4"
+      ],
+      "answer_signals_any": ["входит", "этап", "стоим", "all-on"],
+      "must_not_contain": ["180 тысяч нормальн", "дешевле чем у нас"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q11_consultation_price",
+      "client_id": "demo",
+      "implant_ref": 11,
+      "question": "Сколько стоит консультация имплантолога и план лечения, если я потом не буду лечиться у вас?",
+      "expected_route_any": ["retrieval_chunk", "price_lookup"],
+      "expected_doc_id": "clinic__info__consultation",
+      "answer_signals_any": ["консультац", "план", "₽", "руб", "бесплат"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q12_price_by_xray",
+      "client_id": "demo",
+      "implant_ref": 12,
+      "question": "Можно ли по снимку хотя бы примерно посчитать цену, чтобы я зря не ехал?",
+      "expected_route_any": ["retrieval_chunk", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__faq__cost",
+        "clinic__info__consultation"
+      ],
+      "answer_signals_any": ["осмотр", "кт", "консультац", "точн"],
+      "must_not_contain": ["точно будет стоить"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q13_brand_osstem",
+      "client_id": "demo",
+      "implant_ref": 13,
+      "question": "Сколько будет стоить имплант Osstem под ключ с металлокерамикой и с цирконием отдельно?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk"],
+      "expected_doc_id_any": [
+        "implantation__pricing__implants",
+        "implantation__info__implant_systems"
+      ],
+      "answer_signals_any": ["implantium", "impro", "nobel", "систем", "₽", "руб"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q14_sinus_not_included",
+      "client_id": "demo",
+      "implant_ref": 14,
+      "question": "Почему синус-лифтинг не входит в цену имплантации, если без него имплант не поставить?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__info__bone_graft",
+        "implantation__pricing__implants"
+      ],
+      "answer_signals_any": ["синус", "лифтинг", "отдельн", "кост"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q15_warranty_replacement",
+      "client_id": "demo",
+      "implant_ref": 15,
+      "question": "Если имплант не приживётся, повторная установка платная или по гарантии?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "clinic__info__warranty",
+        "implantation__faq__osseointegration"
+      ],
+      "answer_signals_any": ["гарант", "прижив", "повтор"],
+      "testability": "strong"
+    },
+    {
+      "id": "implant_q16_all_on_4_vs_6",
+      "client_id": "demo",
+      "implant_ref": 16,
+      "question": "У меня почти нет зубов сверху, что лучше все на 4 или все на 6?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__all_on_4_vs_all_on_6",
+      "forbidden_doc_type": ["pricing"],
+      "answer_signals_any": ["all-on", "4", "6", "имплант"],
+      "testability": "strong"
+    },
+    {
+      "id": "implant_q17_all_on_one_day",
+      "client_id": "demo",
+      "implant_ref": 17,
+      "question": "All-on-4 это реально за один день или это просто реклама?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__service__all_on_4",
+        "implantation__faq__tooth_one_day"
+      ],
+      "answer_signals_any": ["день", "времен", "all-on", "этап"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q18_bone_loss_all_on",
+      "client_id": "demo",
+      "implant_ref": 18,
+      "question": "Можно ли сделать все зубы на 4 имплантах, если кость уже сильно ушла?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__info__bone_graft",
+        "implantation__service__all_on_4",
+        "comparison__bone_graft_vs_all_on_4",
+        "comparison__all_on_4_vs_all_on_6"
+      ],
+      "answer_signals_any": ["кост", "all-on", "наращ", "показан"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q19_removable_to_fixed",
+      "client_id": "demo",
+      "implant_ref": 19,
+      "question": "У меня снизу съёмный протез, можно заменить на несъёмный на имплантах?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "prosthetics__service__removable_dentures",
+        "prosthetics__service__implant_supported_prosthetics",
+        "implantation__service__all_on_4"
+      ],
+      "answer_signals_any": ["съём", "несъём", "имплант", "протез"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q20_all_on_6_vs_4_diff",
+      "client_id": "demo",
+      "implant_ref": 20,
+      "question": "Чем отличается All-on-6 от All-on-4, кроме количества имплантов и цены?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__all_on_4_vs_all_on_6",
+      "forbidden_doc_type": ["pricing"],
+      "answer_signals_any": ["all-on", "4", "6", "имплант"],
+      "testability": "strong"
+    },
+    {
+      "id": "implant_q21_temp_teeth_material",
+      "client_id": "demo",
+      "implant_ref": 21,
+      "question": "Если ставить всю челюсть, зубы будут временные пластиковые или сразу нормальные?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__service__temporary_teeth",
+        "implantation__service__all_on_4"
+      ],
+      "answer_signals_any": ["времен", "постоян", "протез", "пластик"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q22_temp_duration",
+      "client_id": "demo",
+      "implant_ref": 22,
+      "question": "Сколько ходят временные зубы после All-on-4, их потом обязательно менять?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__service__temporary_teeth",
+        "implantation__service__all_on_4"
+      ],
+      "answer_signals_any": ["времен", "месяц", "меня", "постоян"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q23_chewing_all_on",
+      "client_id": "demo",
+      "implant_ref": 23,
+      "question": "Можно ли на All-on-4 нормально жевать мясо или всё равно надо осторожно?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__service__all_on_4",
+        "implantation__info__aftercare"
+      ],
+      "answer_signals_any": ["жев", "нагруз", "all-on", "питан"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q24_age_67",
+      "client_id": "demo",
+      "implant_ref": 24,
+      "question": "Мне 67 лет, есть смысл делать всё на 4 или уже поздно?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id_any": [
+        "implantation__info__contraindications",
+        "implantation__service__all_on_4"
+      ],
+      "answer_signals_any": ["возраст", "показан", "all-on", "консультац"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q25_no_bone_zygomatic",
+      "client_id": "demo",
+      "implant_ref": 25,
+      "question": "У меня сверху вообще нет зубов и кость тонкая, это только скуловые импланты?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__info__bone_graft",
+      "answer_signals_any": ["кост", "скул", "наращ", "all-on"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q26_periodontitis_all_on",
+      "client_id": "demo",
+      "implant_ref": 26,
+      "question": "Если зубы шатаются из-за пародонтита, можно удалить и сразу поставить All-on-4?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "periodontology__service__periodontitis",
+        "implantation__service__all_on_4",
+        "implantation__info__contraindications"
+      ],
+      "answer_signals_any": ["пародонт", "all-on", "удален", "имплант"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q27_visits_full_jaw",
+      "client_id": "demo",
+      "implant_ref": 27,
+      "question": "Сколько визитов нужно для полного протезирования челюсти на имплантах?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__info__steps",
+        "implantation__faq__duration",
+        "implantation__service__all_on_4"
+      ],
+      "answer_signals_any": ["визит", "этап", "месяц", "приём"],
+      "testability": "medium"
+    },
+    {
+      "id": "implant_q28_upper_4_vs_6",
+      "client_id": "demo",
+      "implant_ref": 28,
+      "question": "На верхнюю челюсть лучше 4 или 6 имплантов, потому что читал что сверху хуже держится?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__all_on_4_vs_all_on_6",
+      "forbidden_doc_type": ["pricing"],
+      "answer_signals_any": ["верхн", "4", "6", "all-on"],
+      "testability": "strong"
+    }
+  ]
+}

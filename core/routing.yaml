@@ -64,3 +64,10 @@ alias:
   scope_guard_min: 0.85
   embed_matrix_top_chunks: 48
 
+# Answer slots (PRODUCT_WORK_PLAN stage 2) — repeat control per doc_id in session
+answer_slots:
+  cooldown_turns: 3
+  clinic_note_max_chars: 400
+  consult_value_max_chars: 400
+  promo_note_max_chars: 200
+

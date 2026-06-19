@@ -38,6 +38,47 @@ def _parse_front_matter(text: str) -> dict:
         return {}
 
 
+def _parse_promo_note(raw) -> dict | None:
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        return {"text": text, "active_until": None}
+    if isinstance(raw, dict):
+        text = str(raw.get("text") or "").strip()
+        if not text:
+            return None
+        active_until = raw.get("active_until")
+        return {
+            "text": text,
+            "active_until": str(active_until).strip() if active_until else None,
+        }
+    return None
+
+
+def _parse_h3_overrides(raw) -> dict:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict = {}
+    for h3_key, entry in raw.items():
+        key = str(h3_key or "").strip().lower()
+        if not key or not isinstance(entry, dict):
+            continue
+        parsed: dict = {}
+        cn = str(entry.get("clinic_note") or "").strip()
+        if cn:
+            parsed["clinic_note"] = cn
+        cv = str(entry.get("consult_value") or "").strip()
+        if cv:
+            parsed["consult_value"] = cv
+        promo = _parse_promo_note(entry.get("promo_note"))
+        if promo:
+            parsed["promo_note"] = promo
+        if parsed:
+            out[key] = parsed
+    return out
+
+
 def _meta_item(pack_id: str, name: str, fm: dict) -> dict:
     return {
         "client_id": pack_id,
@@ -58,6 +99,10 @@ def _meta_item(pack_id: str, name: str, fm: dict) -> dict:
         "video_key": fm.get("video_key"),
         "empathy_enabled": bool(fm.get("empathy_enabled", False)),
         "empathy_tag": fm.get("empathy_tag"),
+        "clinic_note": str(fm.get("clinic_note") or "").strip() or None,
+        "consult_value": str(fm.get("consult_value") or "").strip() or None,
+        "promo_note": _parse_promo_note(fm.get("promo_note")),
+        "h3_overrides": _parse_h3_overrides(fm.get("h3_overrides")),
     }
 
 

@@ -103,6 +103,17 @@ class AliasThresholds(BaseModel):
     embed_matrix_top_chunks: int = Field(..., ge=8, le=512)
 
 
+class AnswerSlotsThresholds(BaseModel):
+    """Answer slot assembly (see docs/CURRENT_ARCHITECTURE.md, PRODUCT_WORK_PLAN stage 2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cooldown_turns: int = Field(..., ge=1, le=32)
+    clinic_note_max_chars: int = Field(..., ge=40, le=2000)
+    consult_value_max_chars: int = Field(..., ge=40, le=2000)
+    promo_note_max_chars: int = Field(..., ge=20, le=1000)
+
+
 class Thresholds(BaseModel):
     """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
@@ -116,6 +127,7 @@ class Thresholds(BaseModel):
     catalog_match: CatalogMatchThresholds
     alias: AliasThresholds
     metadata_first: MetadataFirstThresholds
+    answer_slots: AnswerSlotsThresholds
 
 
 _LOCK = threading.Lock()

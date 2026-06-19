@@ -333,6 +333,60 @@ def lint_md_file(
             )
         seen_alias.add(nk)
 
+    if doc_type == "service":
+        from core.routing_loader import load_thresholds
+
+        slot_cfg = load_thresholds().answer_slots
+        slot_limits = {
+            "clinic_note": slot_cfg.clinic_note_max_chars,
+            "consult_value": slot_cfg.consult_value_max_chars,
+        }
+        for field_name, max_len in slot_limits.items():
+            raw = fm.get(field_name)
+            if raw is None:
+                continue
+            text = str(raw).strip()
+            if text and len(text) > max_len:
+                issues.append(
+                    LintIssue(
+                        "warning",
+                        "answer_slot_too_long",
+                        f"{field_name} length {len(text)} exceeds {max_len}",
+                        path,
+                        field_name,
+                    )
+                )
+        promo = fm.get("promo_note")
+        promo_text = ""
+        if isinstance(promo, dict):
+            promo_text = str(promo.get("text") or "").strip()
+        elif isinstance(promo, str):
+            promo_text = promo.strip()
+        if promo_text and len(promo_text) > slot_cfg.promo_note_max_chars:
+            issues.append(
+                LintIssue(
+                    "warning",
+                    "answer_slot_too_long",
+                    f"promo_note length {len(promo_text)} exceeds {slot_cfg.promo_note_max_chars}",
+                    path,
+                    "promo_note",
+                )
+            )
+        overrides = fm.get("h3_overrides") or {}
+        if isinstance(overrides, dict):
+            for h3_key in overrides:
+                aid = str(h3_key or "").strip().lower()
+                if aid and aid not in anchors:
+                    issues.append(
+                        LintIssue(
+                            "error",
+                            "broken_ref",
+                            f"h3_overrides anchor #{aid} not found in document",
+                            path,
+                            "h3_overrides",
+                        )
+                    )
+
     return issues
 
 

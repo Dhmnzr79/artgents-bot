@@ -79,7 +79,7 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `doctors_lookup.py` | Врачи из `clients/{id}/md/` |
 | `query_selector.py` / `retriever.py` | RAG + rerank |
 | `arbiter.py` / `content_arbiter.py` | Выбор ref при 2+ кандидатах (LLM arbiter, без score-margin skip) |
-| `chunk_responder.py` | Chunk → LLM → policy |
+| `chunk_responder.py` | Chunk → LLM → **answer slots** → policy |
 | `session.py` | SQLite `data/{id}/bot.db` |
 | `lead_service.py` | Email + PG |
 | `pg_sink.py` | Async PG events |
@@ -128,6 +128,18 @@ Chat: `DASHSCOPE_API_KEY` + `CHAT_BASE_URL` (DashScope / MaaS). Дефолты �
 | Catalog, prices, policies | `clients/{id}/` |
 | Индекс | `data/{id}/corpus.jsonl`, `embeddings.npy`, `alias_*` |
 | Пересборка | `python build_index.py --client {id\|all}` |
+
+### Answer slots (stage 2)
+
+После Generator, до policy, `chunk_responder` дописывает **абзацы** из frontmatter service-md:
+
+1. Суть (LLM по одному чанку)
+2. `clinic_note` (0–1)
+3. `consult_value` (0–1) — при наличии поля **отключается** `consult_nudge` в промпте
+4. `promo_note` (0–1) — только commercial intent (`price_lookup` или `COMMERCIAL_INFO_RE`); не на pain / contraindications / `price_concern` / safety-query / lead
+5. CTA / follow-ups (policy)
+
+Поля: `clinic_note`, `consult_value`, `promo_note`, `h3_overrides` в frontmatter; читает `meta_loader.py`, логика — `core/answer_slots.py`. Повтор одного слота на doc — cooldown (`answer_slots.cooldown_turns` в `core/routing.yaml`, per `doc_id` в session). Telemetry: `meta.answer_slots`. Eval: `evals/v5/answer_slots_golden.json`.
 
 ---
 

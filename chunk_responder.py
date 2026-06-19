@@ -12,6 +12,7 @@ from core.consult_nudge import (
     record_consult_nudge_after_answer,
     topic_exhausted_after_this_chunk,
 )
+from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
 from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, format_answer_for_display
 
@@ -35,6 +36,7 @@ from session import (
     mem_add_user,
     mem_get,
     pop_deferred_ref,
+    record_answer_slots_shown,
     set_cta_shown,
     set_current_doc,
 )
@@ -56,6 +58,8 @@ def _planned_consult_nudge_for_chunk(
     client_id: str | None = None,
 ) -> str | None:
     if is_lead_context(mem_get(sid)):
+        return None
+    if doc_meta_has_consult_value(meta, h3_id=chunk.get("h3_id")):
         return None
     exhausted = topic_exhausted_after_this_chunk(
         meta,
@@ -186,6 +190,45 @@ def _append_generator_append_text(answer: str, append_text: str | None) -> str:
     return f"{base}\n\n{at}" if base else at
 
 
+def _apply_answer_slots_and_price_append(
+    *,
+    answer: str,
+    meta: dict,
+    chunk: dict,
+    q: str,
+    route: str,
+    sid: str,
+    doc_id: str | None,
+    generator_append_text: str | None,
+    lead_context: bool,
+) -> tuple[str, dict | None, str]:
+    """Append clinic/consult/promo slots, then price append; return telemetry + combined append."""
+    tstate = get_topic_state(sid, doc_id) if doc_id else {}
+    slots_text, telemetry = assemble_answer_slots(
+        meta=meta,
+        h3_id=chunk.get("h3_id"),
+        q=q,
+        route=route,
+        topic_state=tstate,
+        lead_context=lead_context,
+    )
+    combined_append = merge_deterministic_appends(
+        slots_text=slots_text,
+        generator_append_text=generator_append_text,
+    )
+    answer = _append_generator_append_text(answer, combined_append or None)
+    if doc_id and telemetry.appended:
+        next_turn = int(tstate.get("doc_turn_count") or 0) + 1
+        record_answer_slots_shown(
+            sid,
+            doc_id,
+            slot_keys=list(telemetry.appended),
+            turn=next_turn,
+        )
+    slot_meta = telemetry.model_dump() if telemetry.appended or telemetry.suppressed else None
+    return answer, slot_meta, combined_append
+
+
 def verifier_effective_source_body(*, chunk_md_body: str, generator_append_text: str | None) -> str:
     """Текст «разрешённых фактов» для A7: чанк + детерминированный хвост (цены и т.д.), если был."""
     base = (chunk_md_body or "").strip()
@@ -308,10 +351,21 @@ def respond_from_chunk(
     answer = format_generator_answer(
         answer, user_question=llm_question or q, chunk=chunk, meta=meta
     )
-    answer = _append_generator_append_text(answer, generator_append_text)
+    st_pre = mem_get(sid)
+    lead_context = is_lead_context(st_pre)
+    answer, slot_meta, deterministic_append = _apply_answer_slots_and_price_append(
+        answer=answer,
+        meta=meta,
+        chunk=chunk,
+        q=q,
+        route=route,
+        sid=sid,
+        doc_id=doc_id,
+        generator_append_text=generator_append_text,
+        lead_context=lead_context,
+    )
 
     st = mem_get(sid)
-    lead_context = is_lead_context(st)
     pre_turn = _increment_doc_turn_with_pre(
         sid,
         doc_id,
@@ -346,6 +400,8 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["orch_route"] = route
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
+    if slot_meta:
+        payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
     payload = _apply_response_policy_compat(
@@ -393,14 +449,14 @@ def respond_from_chunk(
 
     verifier_src = verifier_effective_source_body(
         chunk_md_body=str(s0.get("content") or ""),
-        generator_append_text=generator_append_text,
+        generator_append_text=deterministic_append or None,
     )
     v_trace = build_turn_trace_prefix(
         answer=str(payload.get("answer") or answer),
         source_ref=str(generator_input.get("source_ref") or ""),
         source_text=verifier_src,
     )
-    v_trace["verifier_source_has_deterministic_append"] = bool((generator_append_text or "").strip())
+    v_trace["verifier_source_has_deterministic_append"] = bool((deterministic_append or "").strip())
     try:
         from flask import has_request_context, request
 
@@ -538,7 +594,19 @@ def respond_from_chunk_stream(
         yield _yield_delta(tail)
 
     answer_base = format_answer_for_display(raw_final, fmt_ctx)
-    answer = _append_generator_append_text(answer_base, generator_append_text)
+    st_pre = mem_get(sid)
+    lead_context = is_lead_context(st_pre)
+    answer, slot_meta, deterministic_append = _apply_answer_slots_and_price_append(
+        answer=answer_base,
+        meta=meta,
+        chunk=chunk,
+        q=q,
+        route=route,
+        sid=sid,
+        doc_id=doc_id,
+        generator_append_text=generator_append_text,
+        lead_context=lead_context,
+    )
     append_delta = answer[stream_acc.display_sent_len :]
     if append_delta:
         yield _yield_delta(append_delta)
@@ -546,7 +614,6 @@ def respond_from_chunk_stream(
 
     # Все session side-effects — идентично respond_from_chunk
     st = mem_get(sid)
-    lead_context = is_lead_context(st)
     pre_turn = _increment_doc_turn_with_pre(
         sid,
         doc_id,
@@ -581,6 +648,8 @@ def respond_from_chunk_stream(
         payload.setdefault("meta", {})["orch_route"] = route
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
+    if slot_meta:
+        payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
     payload = _apply_response_policy_compat(
@@ -627,14 +696,14 @@ def respond_from_chunk_stream(
 
     verifier_src = verifier_effective_source_body(
         chunk_md_body=str(s0.get("content") or ""),
-        generator_append_text=generator_append_text,
+        generator_append_text=deterministic_append or None,
     )
     v_trace = build_turn_trace_prefix(
         answer=str(payload.get("answer") or answer),
         source_ref=str(generator_input.get("source_ref") or ""),
         source_text=verifier_src,
     )
-    v_trace["verifier_source_has_deterministic_append"] = bool((generator_append_text or "").strip())
+    v_trace["verifier_source_has_deterministic_append"] = bool((deterministic_append or "").strip())
     try:
         from flask import has_request_context, request
 

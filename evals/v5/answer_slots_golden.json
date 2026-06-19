@@ -1,0 +1,101 @@
+{
+  "baseline": 8,
+  "description": "Answer slots golden (PRODUCT_WORK_PLAN stage 2): clinic_note / consult_value / promo / cooldown / consult_nudge suppression. Demo client, E2E_USE_TEST_CLIENT=1.",
+  "known_failures": [],
+  "cases": [
+    {
+      "id": "slots_classic_service_consult",
+      "client_id": "demo",
+      "question": "Расскажите про классическую имплантацию одного зуба",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "implantation__service__classic",
+      "expected_answer_slots": ["clinic_note", "consult_value"],
+      "must_contain": ["консультации врач", "КТ"],
+      "testability": "strong"
+    },
+    {
+      "id": "slots_classic_commercial_promo",
+      "client_id": "demo",
+      "question": "Есть ли рассрочка на классическую имплантацию одного зуба?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__service__classic",
+        "implantation__info__payment_terms"
+      ],
+      "expected_answer_slots": ["promo_note"],
+      "must_contain": ["бесплатная консультация"],
+      "testability": "medium"
+    },
+    {
+      "id": "slots_pain_no_promo",
+      "client_id": "demo",
+      "question": "Боюсь, что имплантация будет очень больной",
+      "expected_route_any": ["retrieval_chunk"],
+      "expected_doc_id": "implantation__faq__pain",
+      "forbidden_answer_slots": ["promo_note"],
+      "must_not_contain": ["бесплатная консультация по имплантации", "При записи на All-on-4"],
+      "testability": "strong"
+    },
+    {
+      "id": "slots_price_concern_no_promo",
+      "client_id": "demo",
+      "question": "Почему у одних клиник имплант 25 тысяч, а у других 80?",
+      "expected_route_any": ["price_concern", "retrieval_chunk"],
+      "expected_doc_id": "implantation__faq__cost",
+      "forbidden_answer_slots": ["promo_note"],
+      "must_not_contain": ["До конца месяца"],
+      "testability": "medium"
+    },
+    {
+      "id": "slots_all_on_4_commercial_promo",
+      "client_id": "demo",
+      "question": "Что входит в стоимость All-on-4 под ключ?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__service__all_on_4",
+        "implantation__pricing__all_on_4"
+      ],
+      "expected_answer_slots": ["promo_note"],
+      "must_contain": ["бесплатная КТ"],
+      "testability": "medium"
+    },
+    {
+      "id": "slots_one_stage_consult_only",
+      "client_id": "demo",
+      "question": "Можно ли удалить зуб и сразу поставить имплант?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__service__one_stage",
+        "implantation__pricing__implants"
+      ],
+      "expected_answer_slots": ["consult_value"],
+      "must_contain": ["консультации"],
+      "testability": "medium"
+    },
+    {
+      "id": "slots_cooldown_second_turn",
+      "client_id": "demo",
+      "history": [
+        {"question": "Расскажите про классическую имплантацию одного зуба"}
+      ],
+      "question": "А сколько по времени занимает классическая имплантация?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "implantation__service__classic",
+      "forbidden_answer_slots": ["clinic_note", "consult_value"],
+      "testability": "strong"
+    },
+    {
+      "id": "slots_safety_query_no_promo_on_service",
+      "client_id": "demo",
+      "question": "Насколько безопасна классическая имплантация?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__service__classic",
+        "implantation__faq__contraindications"
+      ],
+      "forbidden_answer_slots": ["promo_note"],
+      "must_not_contain": ["До конца месяца"],
+      "testability": "medium"
+    }
+  ]
+}

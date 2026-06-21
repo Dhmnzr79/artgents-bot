@@ -22,6 +22,7 @@ from orchestration.helpers import (
     with_default_anchor,
 )
 from query_selector import select_chunk_for_question
+from core.follow_up_rewrite import get_follow_up_turn_ctx
 from session import is_active_lead_flow, is_lead_context, mem_get, set_last_catalog_service
 from ux_builder import (
     build_service_facts_card_payload,
@@ -72,12 +73,18 @@ def run_content_arbiter_path(
             service_route="guided",
             decision_frame=decision_frame,
         )
+    get_follow_up_turn_ctx(q, sid=sid, client_id=client_id)
     effective_scope_topic = apply_content_retrieval_scope_ctx(
         scope_topic_candidate,
         q,
         client_id,
         decision=decision,
     )
+    fu = request.ctx.get("follow_up") if isinstance(getattr(request, "ctx", None), dict) else None
+    if isinstance(fu, dict) and fu.get("follow_up_mode"):
+        effective_scope_topic = None
+        request.ctx["retrieval_scope_topic"] = None
+        request.ctx["retrieval_scope_guard_reason"] = "follow_up_mode"
     cands = collect_content_candidates(
         q=q,
         sid=sid,

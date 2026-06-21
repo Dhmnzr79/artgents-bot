@@ -312,6 +312,49 @@ def format_generator_answer(
     return format_answer_for_display(answer, ctx)
 
 
+def _persist_subject_focus(
+    *,
+    sid: str,
+    client_id: str | None,
+    doc_id: str | None,
+    matched_service_id: str | None,
+    route: str,
+    meta: dict,
+    skip_topic: bool,
+    answer: str,
+) -> None:
+    if skip_topic or not (answer or "").strip():
+        return
+    if route in (
+        "guided",
+        "lead_cancelled",
+        "retrieval_no_candidates",
+        "low_score_fallback",
+        "error",
+    ):
+        return
+    from core.follow_up_rewrite import resolve_focus_from_turn
+    from session import set_last_catalog_service, set_last_subject
+
+    focus = resolve_focus_from_turn(
+        client_id=client_id,
+        doc_id=doc_id,
+        matched_service_id=matched_service_id,
+        route=route,
+        meta=meta,
+    )
+    if not focus:
+        return
+    set_last_subject(
+        sid,
+        service_id=focus["service_id"],
+        topic=focus["topic"],
+        label=focus["label"],
+        last_route=str(focus.get("last_route") or route),
+    )
+    set_last_catalog_service(sid, focus["service_id"])
+
+
 def meta_for_chunk(chunk: dict, client_id: str | None = None) -> dict:
     meta = get_doc_meta(
         os.path.basename(chunk.get("file", "") or ""),
@@ -381,6 +424,16 @@ def respond_from_chunk(
     answer = ensure_answer(answer, chunk)
     answer = format_generator_answer(
         answer, user_question=llm_question or q, chunk=chunk, meta=meta
+    )
+    _persist_subject_focus(
+        sid=sid,
+        client_id=client_id,
+        doc_id=doc_id,
+        matched_service_id=sid_svc or None,
+        route=route,
+        meta=meta,
+        skip_topic=skip_topic,
+        answer=answer,
     )
     st_pre = mem_get(sid)
     lead_context = is_lead_context(st_pre)
@@ -627,6 +680,16 @@ def respond_from_chunk_stream(
         yield _yield_delta(tail)
 
     answer_base = format_answer_for_display(raw_final, fmt_ctx)
+    _persist_subject_focus(
+        sid=sid,
+        client_id=client_id,
+        doc_id=doc_id,
+        matched_service_id=sid_svc or None,
+        route=route,
+        meta=meta,
+        skip_topic=skip_topic,
+        answer=answer_base,
+    )
     st_pre = mem_get(sid)
     lead_context = is_lead_context(st_pre)
     answer, slot_meta, deterministic_append = _apply_answer_slots_and_price_append(

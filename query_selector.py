@@ -23,6 +23,7 @@ from core.candidate_builder import (
     resolve_alias_for_turn,
 )
 from core.client_config_loader import resolve_pack_client_id
+from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
 from core.routing_loader import THRESHOLDS
 from core.price_offers import (
     is_generic_implant_price_query,
@@ -89,36 +90,51 @@ def select_chunk_for_question(
     """
     q_user = (q or "").strip()
 
+    fu_ctx = get_follow_up_turn_ctx(q_user, sid=sid, client_id=client_id)
+    follow_up_mode = bool(fu_ctx and fu_ctx.follow_up_mode)
+
     # Интенты и алиасы — только по исходному вопросу пациента (не по rewrite).
     q_policy = normalize_retrieval_query(q_user) or q_user
 
     meta_ctx = metadata_context_from_decision(decision)
-    eff_scope = effective_scope_topic_for_retrieval(scope_topic, meta_ctx)
+    eff_scope = effective_scope_topic_for_retrieval(
+        scope_topic, meta_ctx, follow_up_mode=follow_up_mode
+    )
 
     tel_p: dict[str, Any] = {}
     tel_s: dict[str, Any] = {}
     with timed_stage("retrieval_block_ms"):
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            primary_future = pool.submit(
-                retrieve,
-                q_user,
+        if follow_up_mode and fu_ctx is not None:
+            q_rewrite_eff = fu_ctx.rewritten_query
+            primary = retrieve(
+                q_rewrite_eff,
                 topk=8,
                 client_id=client_id,
                 scope_topic=eff_scope,
                 telemetry=tel_p,
             )
-            rewrite_future = None
-            if sid and QUERY_REWRITE_ON:
-                rewrite_future = pool.submit(
-                    rewrite_query_for_retrieval,
-                    sid,
+        else:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                primary_future = pool.submit(
+                    retrieve,
                     q_user,
+                    topk=8,
                     client_id=client_id,
+                    scope_topic=eff_scope,
+                    telemetry=tel_p,
                 )
-            primary = primary_future.result()
-            q_rewrite_eff = (
-                rewrite_future.result() if rewrite_future is not None else q_user
-            )
+                rewrite_future = None
+                if sid and QUERY_REWRITE_ON:
+                    rewrite_future = pool.submit(
+                        rewrite_query_for_retrieval,
+                        sid,
+                        q_user,
+                        client_id=client_id,
+                    )
+                primary = primary_future.result()
+                q_rewrite_eff = (
+                    rewrite_future.result() if rewrite_future is not None else q_user
+                )
 
     nu = (normalize_retrieval_query(q_user) or q_user).strip().lower()
     nr = (normalize_retrieval_query(q_rewrite_eff) or q_rewrite_eff).strip().lower()
@@ -130,6 +146,7 @@ def select_chunk_for_question(
         "query_normalized_user": q_policy[:200],
         "query_normalized_rewrite": nr_meta[:200],
         "rewrite_applied": bool(q_rewrite_eff.strip().lower() != q_user.strip().lower()),
+        **follow_up_turn_meta(fu_ctx),
     }
     secondary: list = []
     if nr != nu:
@@ -186,6 +203,7 @@ def select_chunk_for_question(
         ctx=meta_ctx,
         client_id=client_id,
         top_semantic_score=top_semantic_raw,
+        follow_up_mode=follow_up_mode,
     )
     tier = str(alias_diag.get("alias_decision") or "")
     sim_raw = float(alias_diag.get("alias_similarity") or 0.0)

@@ -74,3 +74,9 @@ answer_slots:
 lead_turn:
   min_confidence: 0.65
 
+# Follow-up compatibility (PRODUCT_WORK_PLAN stage 4a)
+follow_up:
+  max_subject_turn_age: 4
+  min_compat_score: 0.15
+  doc_type_boost: 0.04
+

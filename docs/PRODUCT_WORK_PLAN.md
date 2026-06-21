@@ -514,7 +514,7 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 |--|--|
 | **Срок** | 1–3 недели / **1–2 дня** |
 | **Eval** | уровень 3 |
-| **Статус** | ⏳ **4a** и **4b** не начаты |
+| **Статус** | ⏳ **4a** ✅ MVP; **4b** не начат |
 
 #### 4a — Follow-up & compatibility guard (§3.3)
 
@@ -522,13 +522,13 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 
 **Сделать:**
 
-- [ ] Session **focus** / `last_subject` `{ service_id, topic, label }`, `turn_age`, сброс на смене темы
-- [ ] `core/follow_up_rewrite.py` — короткая реплика + focus → rewritten query (шаблон → flash structured)
-- [ ] `core/compatibility_guard.py` — pass если **relevance(rewritten query)** и **нет conflict**; `doc_type`/aspect — boost only, не gate
-- [ ] `follow_up_mode` в retrieval/guard: ослабить `scope_topic` / `alias_topic_guard` на follow-up (`core/candidate_builder.py`)
-- [ ] Conflict check: явно другая услуга → reject; **не** reject только `topic=clinic`
-- [ ] Telemetry: `meta.follow_up_rewritten`, `meta.focus_used`, `meta.guard_pass_reason`
-- [ ] `evals/v5/follow_up_golden.json` — classic → warranty / pain / payment / contacts; negative: «сколько брекеты?»
+- [x] Session **focus** / `last_subject` `{ service_id, topic, label }`, `turn_age`, сброс на смене темы
+- [x] `core/follow_up_rewrite.py` — короткая реплика + focus → rewritten query (шаблон → flash structured)
+- [x] `core/compatibility_guard.py` — pass если **relevance(rewritten query)** и **нет conflict**; `doc_type`/aspect — boost only, не gate
+- [x] `follow_up_mode` в retrieval/guard: ослабить `scope_topic` / `alias_topic_guard` на follow-up (`core/candidate_builder.py`)
+- [x] Conflict check: явно другая услуга → reject; **не** reject только `topic=clinic`
+- [x] Telemetry: `meta.follow_up_rewritten`, `meta.focus_used`, `meta.guard_pass_reason`
+- [x] `evals/v5/follow_up_golden.json` — classic → warranty / pain / payment / contacts; negative: «сколько брекеты?»
 - [ ] Optional позже: `clients/{id}/aspect_routing.yaml` — только если golden 4a не зелёный
 
 **От чего избавляемся:** «гарантия на classic» → rewrite ok, warranty отброшен guard'ом → «в материале не указано».

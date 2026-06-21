@@ -48,8 +48,12 @@ def metadata_context_from_decision(decision: Any | None) -> MetadataRetrievalCon
 def effective_scope_topic_for_retrieval(
     scope_topic: str | None,
     ctx: MetadataRetrievalContext | None,
+    *,
+    follow_up_mode: bool = False,
 ) -> str | None:
     """Comparison queries: no hard topic scope (prefer doc_type via boosts)."""
+    if follow_up_mode:
+        return None
     if ctx and str(ctx.query_mode or "").strip().lower() == "comparison":
         return None
     return scope_topic
@@ -223,8 +227,11 @@ def filter_alias_leader_on_topic_mismatch(
     *,
     ctx: MetadataRetrievalContext | None,
     alias_diag: dict[str, Any] | None,
+    follow_up_mode: bool = False,
 ) -> tuple[dict | None, bool]:
     """Drop non-exact alias when chunk topic conflicts with confident resolver service_topic."""
+    if follow_up_mode:
+        return alias_leader, False
     if not bool(THRESHOLDS.metadata_first.alias_topic_guard_enabled):
         return alias_leader, False
     if not isinstance(alias_leader, dict) or ctx is None:
@@ -248,6 +255,7 @@ def resolve_alias_for_turn(
     client_id: str | None,
     top_semantic_score: float | None = None,
     corpus: list[dict] | None = None,
+    follow_up_mode: bool = False,
 ) -> tuple[dict | None, float, dict[str, Any]]:
     """Single runtime alias entry: corpus leader → metadata guards → cap vs semantic top.
 
@@ -267,7 +275,7 @@ def resolve_alias_for_turn(
 
     topic_got: str | None = _chunk_topic(alias_leader) if isinstance(alias_leader, dict) else None
     alias_leader, topic_rej = filter_alias_leader_on_topic_mismatch(
-        alias_leader, ctx=ctx, alias_diag=tel
+        alias_leader, ctx=ctx, alias_diag=tel, follow_up_mode=follow_up_mode
     )
     if topic_rej:
         alias_score = 0.0

@@ -189,20 +189,20 @@ LeadTurnDecision.content_hint ∈ price | contacts | pain | generic | None  # п
 
 Eval (целевое): `evals/v5/lead_turn_golden.json` — кейсы cancel/pause/content/defer/unclear + smoke из реальных застреваний (имя vs «боюсь боли» vs «не хочу записываться»).
 
-### Follow-up & compatibility guard (целевое)
+### Follow-up & compatibility guard (этап 4a)
 
-Спека: `PRODUCT_WORK_PLAN.md` § **3.3**; обсуждение — `drafts/2.md`. Runtime gap — `TECH_DEBT.md` → Follow-up compatibility.
+Спека: `PRODUCT_WORK_PLAN.md` § **3.3**; обсуждение — `drafts/2.md`.
 
-**Диагноз:** rewrite часто склеивает focus + короткий вопрос; retrieval находит cross-topic chunk (напр. `clinic__info__warranty`); **guard** (`alias_topic_guard`, `scope_topic`) отбрасывает по `topic != service_topic`.
+**Runtime (demo):**
 
-**Целевое поведение:**
+- **Session focus:** `last_subject` `{ service_id, topic, label, last_route }`, `subject_turn_age`; пишется после content-ответа (`chunk_responder._persist_subject_focus`); сброс в `exit_lead_flow` / `clear_last_subject`.
+- **Rewrite:** `core/follow_up_rewrite.py` — шаблон «а гарантия?» + focus → «гарантия на {label}»; используется в retrieval (`query_selector`) и arbiter guard.
+- **Compatibility guard:** `core/compatibility_guard.py` — relevance(rewritten) + conflict (другая услуга); clinic/warranty/contacts **не** conflict; `doc_type` — boost only (`routing.yaml` → `follow_up.doc_type_boost`).
+- **`follow_up_mode`:** `effective_scope_topic=None`, skip `alias_topic_guard` (`candidate_builder`); telemetry в `debug_meta`: `follow_up_rewritten`, `focus_used`, `guard_pass_reason`, `compat_score`.
 
-- **Session focus** (`last_subject`: service_id, topic, label) после ответа по услуге.
-- **Follow-up rewrite:** «а гарантия?» → «гарантия на {label}» для retrieval и guard.
-- **Compatibility guard:** pass если кандидат **отвечает на rewritten query** в focus и **нет явного конфликта** услуги; `doc_type` / aspect — **boost only**, не gate.
-- **`follow_up_mode`:** на коротком follow-up ослабить topic-only reject; не отключать conflict check.
+Eval: unit — `tests/test_follow_up_*.py`, `tests/test_compatibility_guard.py`; E2E — `evals/v5/follow_up_golden.json` + `run_follow_up_eval.py`.
 
-Optional позже: `clients/{id}/aspect_routing.yaml` — точечный override, не обязателен для MVP.
+Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`.
 
 ---
 

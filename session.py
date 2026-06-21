@@ -88,6 +88,8 @@ def _fresh_defaults() -> dict:
         "topic_state": {},
         "last_content_ui_payload": None,
         "last_catalog_service_id": None,
+        "last_subject": None,
+        "subject_turn_age": 0,
         "pending_lead_offer": False,
         "user_turn_timestamps": [],
         "consult_streak": 0,
@@ -166,6 +168,8 @@ def mem_get(session_id: str) -> dict:
 def mem_add_user(session_id: str, text: str) -> None:
     with _lock:
         st = mem_get(session_id)
+        if isinstance(st.get("last_subject"), dict) and st["last_subject"].get("service_id"):
+            st["subject_turn_age"] = int(st.get("subject_turn_age") or 0) + 1
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
         st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
         ts_list = list(st.get("user_turn_timestamps") or [])
@@ -368,6 +372,47 @@ def set_last_catalog_service(session_id: str, service_id: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["last_catalog_service_id"] = (service_id or "").strip() or None
+        _persist_unlocked(session_id, st)
+
+
+def get_last_subject(session_id: str) -> dict | None:
+    st = mem_get(session_id)
+    sub = st.get("last_subject")
+    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
+        return sub
+    return None
+
+
+def set_last_subject(
+    session_id: str,
+    *,
+    service_id: str,
+    topic: str,
+    label: str,
+    last_route: str = "",
+) -> None:
+    sid = (service_id or "").strip()
+    if not sid:
+        return
+    with _lock:
+        st = mem_get(session_id)
+        st["last_subject"] = {
+            "service_id": sid,
+            "topic": (topic or "").strip() or "unknown",
+            "label": (label or sid).strip(),
+            "last_route": (last_route or "").strip(),
+        }
+        st["subject_turn_age"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def clear_last_subject(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("last_subject") is None and int(st.get("subject_turn_age") or 0) == 0:
+            return
+        st["last_subject"] = None
+        st["subject_turn_age"] = 0
         _persist_unlocked(session_id, st)
 
 
@@ -617,6 +662,7 @@ def exit_lead_flow(session_id: str) -> None:
         st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)
     clear_lead_pii(session_id)
+    clear_last_subject(session_id)
 
 
 def get_lead_paused_answer_count(session_id: str) -> int:

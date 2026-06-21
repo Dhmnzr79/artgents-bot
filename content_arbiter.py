@@ -211,6 +211,7 @@ def collect_content_candidates(
     cat_is_overview = bool(md_ref and _is_overview_anchor(cat_anchor))
 
     sel_meta = selection.get("debug_meta") if isinstance(selection.get("debug_meta"), dict) else {}
+    follow_up_mode = bool(sel_meta.get("follow_up_mode"))
     top_sem_raw = sel_meta.get("top_semantic_raw")
     if top_sem_raw is None and isinstance(retrieval_chunk, dict):
         sc = retrieval_chunk.get("_score")
@@ -224,6 +225,7 @@ def collect_content_candidates(
         ctx=meta_ctx,
         client_id=client_id,
         top_semantic_score=top_sem_raw,
+        follow_up_mode=follow_up_mode,
     )
     # `corpus_alias_leader` returns (chunk, score, diag). PR #1.10: diag carries alias_* telemetry.
     # For P0 we approximate "specificity" from the normalized user query token count.

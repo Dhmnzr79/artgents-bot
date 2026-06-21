@@ -16,6 +16,8 @@ from contracts.decision_frame import DecisionFrame
 from content_arbiter import ContentCandidates, ContentRouteResult
 from config import CHAT_MODEL
 from core.routing_loader import THRESHOLDS
+from core.compatibility_guard import filter_compact_by_compatibility_guard
+from core.follow_up_rewrite import follow_up_ctx_from_dict, get_follow_up_turn_ctx
 from core.service_followup import (
     active_service_id_for_turn,
     filter_compact_for_service_followup,
@@ -336,23 +338,55 @@ def decide_content_route(
     cat_mode = str(cat.get("mode") or "none")
     min_c = float(THRESHOLDS.arbiter.min_confidence)
     rejected_followup: list[dict[str, Any]] = []
-    active_svc = active_service_id_for_turn(
-        sid=sid,
-        decision_frame=decision_frame,
-        catalog_matched_service_id=str(cat.get("matched_service_id") or "").strip() or None,
-    )
-    if is_short_attribute_followup(q) and active_svc:
-        compact, rejected_followup = filter_compact_for_service_followup(
+    rejected_compat: list[dict[str, Any]] = []
+
+    fu_ctx = None
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
+            fu_ctx = follow_up_ctx_from_dict(request.ctx.get("follow_up"))
+    except Exception:
+        fu_ctx = None
+    if fu_ctx is None:
+        fu_ctx = get_follow_up_turn_ctx(q, sid=sid, client_id=client_id)
+
+    if fu_ctx and fu_ctx.follow_up_mode:
+        compact, rejected_compat, guard_tel = filter_compact_by_compatibility_guard(
             compact,
-            service_id=active_svc,
+            rewritten_query=fu_ctx.rewritten_query,
+            focus=fu_ctx.focus,
+            client_id=client_id,
         )
-        if rejected_followup:
-            base_debug = {
-                **base_debug,
-                "service_followup_guard": True,
-                "service_followup_service_id": active_svc,
-                "service_followup_rejected_count": len(rejected_followup),
-            }
+        base_debug = {
+            **base_debug,
+            **guard_tel,
+            "follow_up_rewritten": fu_ctx.rewritten_query[:200],
+            "focus_used": {
+                "service_id": fu_ctx.focus.get("service_id"),
+                "topic": fu_ctx.focus.get("topic"),
+                "label": fu_ctx.focus.get("label"),
+            },
+        }
+        rejected_followup.extend(rejected_compat)
+    else:
+        active_svc = active_service_id_for_turn(
+            sid=sid,
+            decision_frame=decision_frame,
+            catalog_matched_service_id=str(cat.get("matched_service_id") or "").strip() or None,
+        )
+        if is_short_attribute_followup(q) and active_svc:
+            compact, rejected_followup = filter_compact_for_service_followup(
+                compact,
+                service_id=active_svc,
+            )
+            if rejected_followup:
+                base_debug = {
+                    **base_debug,
+                    "service_followup_guard": True,
+                    "service_followup_service_id": active_svc,
+                    "service_followup_rejected_count": len(rejected_followup),
+                }
 
     def _refs_list() -> list[str]:
         return [str(x.get("ref") or "") for x in compact if isinstance(x, dict) and str(x.get("ref") or "").strip()]

@@ -122,6 +122,16 @@ class LeadTurnThresholds(BaseModel):
     min_confidence: float = Field(..., ge=0.0, le=1.0)
 
 
+class FollowUpThresholds(BaseModel):
+    """Short follow-up rewrite + compatibility guard (PRODUCT_WORK_PLAN stage 4a)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_subject_turn_age: int = Field(..., ge=1, le=16)
+    min_compat_score: float = Field(..., ge=0.0, le=1.0)
+    doc_type_boost: float = Field(..., ge=0.0, le=0.25)
+
+
 class Thresholds(BaseModel):
     """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
@@ -137,6 +147,7 @@ class Thresholds(BaseModel):
     metadata_first: MetadataFirstThresholds
     answer_slots: AnswerSlotsThresholds
     lead_turn: LeadTurnThresholds
+    follow_up: FollowUpThresholds
 
 
 _LOCK = threading.Lock()

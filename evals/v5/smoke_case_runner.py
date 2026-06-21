@@ -359,6 +359,80 @@ def validate_smoke_case(
                 coverage_class=cov,
             )
 
+    expected_fb = row.get("expected_fallback_reason")
+    if expected_fb is not None:
+        got_fb = str(meta.get("fallback_reason") or "").strip()
+        if norm(got_fb) != norm(str(expected_fb)):
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"fallback_reason: got={got_fb!r} want={expected_fb!r}",
+                coverage_class=cov,
+            )
+
+    expected_price_unit = row.get("expected_price_unit")
+    if expected_price_unit is not None:
+        got_unit = str(meta.get("price_offer_unit") or "").strip().lower()
+        want_unit = str(expected_price_unit).strip().lower()
+        if want_unit and got_unit != want_unit:
+            jaw_hint = "318 000" in answer or "368 000" in answer
+            tooth_hint = "76 200" in answer or "85 200" in answer
+            unit_ok = (want_unit == "jaw" and jaw_hint and "76 200" not in answer) or (
+                want_unit == "one_tooth" and tooth_hint and "318 000" not in answer
+            )
+            if not unit_ok:
+                return CaseResult(
+                    case_id=case_id,
+                    status="FAIL",
+                    reason=f"price_offer_unit: meta={got_unit!r} want={want_unit!r}",
+                    coverage_class=cov,
+                )
+
+    expected_brands = str_list_field(row, "expected_price_offer_brands")
+    if expected_brands:
+        missing_brands = [b for b in expected_brands if b and not contains_ci(answer, b.split()[0])]
+        if missing_brands:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"expected_price_offer_brands missing: {missing_brands[:3]!r}",
+                coverage_class=cov,
+            )
+
+    forbidden_brands = str_list_field(row, "forbidden_price_offer_brands")
+    if forbidden_brands:
+        hit_br = [b for b in forbidden_brands if b and contains_ci(answer, b.split()[0])]
+        if hit_br:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"forbidden_price_offer_brands hit: {hit_br!r}",
+                coverage_class=cov,
+            )
+
+    if row.get("expected_price_offers_applied") is True:
+        if not meta.get("price_offers_applied"):
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason="expected price_offers_applied in meta but missing",
+                coverage_class=cov,
+            )
+
+    expected_offer_ids = str_list_field(row, "expected_price_offer_ids")
+    if expected_offer_ids:
+        got_ids_raw = meta.get("price_offer_ids")
+        got_ids = got_ids_raw if isinstance(got_ids_raw, list) else []
+        got_norm = {norm(str(x)) for x in got_ids if str(x).strip()}
+        missing_ids = [x for x in expected_offer_ids if norm(x) not in got_norm]
+        if missing_ids:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"expected_price_offer_ids missing: {missing_ids!r} got={got_ids!r}",
+                coverage_class=cov,
+            )
+
     return None
 
 

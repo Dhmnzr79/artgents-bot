@@ -43,12 +43,7 @@
     "price_key": "professional_whitening",
     "price_ref": null,
     "price_display": "on_request",
-    "suggest_refs": [
-      {
-        "label": "Условия оплаты",
-        "ref": "clinic__info__payment_terms.md#korotko"
-      }
-    ]
+    "suggest_refs": []
   },
   "classic": {
     "title": "Классическая имплантация",
@@ -193,12 +188,7 @@
     "price_key": "caries",
     "price_ref": null,
     "price_display": "always",
-    "suggest_refs": [
-      {
-        "label": "Условия оплаты",
-        "ref": "clinic__info__payment_terms.md#korotko"
-      }
-    ]
+    "suggest_refs": []
   },
   "pulpitis": {
     "title": "Лечение пульпита",
@@ -220,12 +210,7 @@
     "price_key": "pulpitis",
     "price_ref": null,
     "price_display": "always",
-    "suggest_refs": [
-      {
-        "label": "Условия оплаты",
-        "ref": "clinic__info__payment_terms.md#korotko"
-      }
-    ]
+    "suggest_refs": []
   },
   "teeth_treatment": {
     "title": "Лечение зубов",
@@ -243,12 +228,7 @@
     "price_key": "teeth_treatment",
     "price_ref": null,
     "price_display": "always",
-    "suggest_refs": [
-      {
-        "label": "Условия оплаты",
-        "ref": "clinic__info__payment_terms.md#korotko"
-      }
-    ]
+    "suggest_refs": []
   },
   "tooth_extraction": {
     "title": "Удаление зубов любой сложности",
@@ -348,12 +328,7 @@
     "price_key": "zirconia_crowns",
     "price_ref": null,
     "price_display": "on_request",
-    "suggest_refs": [
-      {
-        "label": "Условия оплаты",
-        "ref": "clinic__info__payment_terms.md#korotko"
-      }
-    ]
+    "suggest_refs": []
   },
   "clasp_dentures": {
     "title": "Бюгельные протезы",

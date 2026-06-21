@@ -1,0 +1,120 @@
+{
+  "baseline": 9,
+  "description": "Price offers golden (PRODUCT_WORK_PLAN stage 3): deterministic sums from price_offers.json. Demo client, E2E_USE_TEST_CLIENT=1.",
+  "known_failures": [],
+  "cases": [
+    {
+      "id": "offers_classic_three_brands",
+      "client_id": "demo",
+      "question": "Сколько стоит один имплант под ключ с коронкой?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
+      "expected_service_id_any": ["classic", "one_stage"],
+      "expected_price_offer_brands": ["Implantium", "Impro", "Nobel Biocare"],
+      "must_contain": ["76 200", "85 200", "101 200", "Точные цены"],
+      "expected_price_unit": "one_tooth",
+      "expected_price_offers_applied": true,
+      "expected_price_offer_ids": [
+        "classic.one_tooth.implantium",
+        "classic.one_tooth.impro",
+        "classic.one_tooth.nobel"
+      ],
+      "testability": "strong"
+    },
+    {
+      "id": "offers_classic_nobel_only",
+      "client_id": "demo",
+      "question": "Сколько стоит имплант Nobel Biocare под ключ на один зуб?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "classic",
+      "expected_price_offer_brands": ["Nobel Biocare"],
+      "must_contain": ["101 200", "Входит"],
+      "must_not_contain": ["76 200"],
+      "expected_price_offers_applied": true,
+      "expected_price_offer_ids": ["classic.one_tooth.nobel"],
+      "testability": "strong"
+    },
+    {
+      "id": "offers_all_on_4_jaw",
+      "client_id": "demo",
+      "question": "Сколько стоит All-on-4 на одну челюсть под ключ?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
+      "expected_service_id": "all_on_4",
+      "expected_price_offer_brands": ["Implantium", "Impro", "Nobel Biocare"],
+      "must_contain": ["318 000", "368 000", "428 000"],
+      "expected_price_unit": "jaw",
+      "expected_price_offers_applied": true,
+      "expected_price_offer_ids": [
+        "all_on_4.jaw.implantium",
+        "all_on_4.jaw.impro",
+        "all_on_4.jaw.nobel"
+      ],
+      "testability": "strong"
+    },
+    {
+      "id": "offers_generic_implant_unit_clarify",
+      "client_id": "demo",
+      "question": "Сколько стоит имплантация?",
+      "expected_route": "price_lookup",
+      "expected_fallback_reason": "price_implant_overview",
+      "must_contain": ["76 200", "318 000", "398 000", "протокол", "Классическая"],
+      "testability": "medium"
+    },
+    {
+      "id": "offers_payment_stages_classic",
+      "client_id": "demo",
+      "question": "Сколько будет стоить классическая имплантация одного зуба Implantium?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk"],
+      "expected_service_id_any": ["classic"],
+      "must_contain": ["45 200", "31 000", "Оплата по этапам"],
+      "testability": "medium"
+    },
+    {
+      "id": "offers_all_on_4_payment_stages",
+      "client_id": "demo",
+      "question": "All-on-4 Impro — какая цена и как платить по этапам?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
+      "expected_service_id": "all_on_4",
+      "must_contain": ["368 000", "220 800", "147 200"],
+      "testability": "medium"
+    },
+    {
+      "id": "offers_no_jaw_price_on_one_tooth",
+      "client_id": "demo",
+      "question": "Сколько стоит поставить один имплант Impro полностью с коронкой?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk"],
+      "expected_service_id_any": ["classic", "one_stage"],
+      "must_contain": ["85 200"],
+      "must_not_contain": ["318 000", "428 000"],
+      "testability": "strong"
+    },
+    {
+      "id": "offers_all_on_6_jaw",
+      "client_id": "demo",
+      "question": "Сколько стоит All-on-6 на одну челюсть под ключ?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
+      "expected_service_id": "all_on_6",
+      "expected_price_offer_brands": ["Implantium", "Impro", "Nobel Biocare"],
+      "must_contain": ["398 000", "458 000", "528 000", "Входит"],
+      "expected_price_unit": "jaw",
+      "expected_price_offers_applied": true,
+      "expected_price_offer_ids": [
+        "all_on_6.jaw.implantium",
+        "all_on_6.jaw.impro",
+        "all_on_6.jaw.nobel"
+      ],
+      "testability": "strong"
+    },
+    {
+      "id": "offers_one_stage_impro",
+      "client_id": "demo",
+      "question": "Сколько стоит одномоментная имплантация Impro под ключ на один зуб?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk"],
+      "expected_service_id_any": ["one_stage"],
+      "expected_price_offer_brands": ["Impro"],
+      "must_contain": ["96 500", "Входит", "удаление"],
+      "expected_price_offers_applied": true,
+      "expected_price_offer_ids": ["one_stage.one_tooth.impro"],
+      "testability": "strong"
+    }
+  ]
+}

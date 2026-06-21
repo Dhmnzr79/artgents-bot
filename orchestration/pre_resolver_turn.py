@@ -31,12 +31,14 @@ from orchestration.route_guards import (
     should_soft_redirect_no_intent,
     soft_redirect_payload,
 )
+from core.price_ref_routing import orchestrate_price_widget_ref
 from policy import continuation_only_phrase, continuation_without_context
 from retriever import get_chunk_by_ref
 from session import (
     get_topic_state,
     is_active_lead_flow,
     is_lead_context,
+    mark_nav_ref_used,
     mem_get,
     mem_reset,
     set_anti_spam_redirect_shown,
@@ -241,6 +243,22 @@ def run_pre_resolver_turn(
             )
 
     if ref:
+        ref_eff = str(ref).strip()
+        if ref_eff:
+            try:
+                request.ctx["nav_ref"] = ref_eff
+            except Exception:
+                pass
+            mark_nav_ref_used(sid, ref_eff)
+        price_from_ref = orchestrate_price_widget_ref(
+            ref,
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            decision_frame=decision_frame,
+        )
+        if price_from_ref is not None:
+            return price_from_ref
         ch = get_chunk_by_ref(ref, client_id=client_id)
         if ch:
             return AskOrchestrationResult(

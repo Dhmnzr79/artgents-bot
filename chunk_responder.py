@@ -80,6 +80,19 @@ def _mark_suggest_ref_used_compat(sid: str, doc_id: str, used: bool = True) -> N
         fn(sid, doc_id, used)
 
 
+def _nav_ref_suppress_list() -> list[str]:
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context():
+            return []
+        ctx = getattr(request, "ctx", None)
+        ref = str((ctx or {}).get("nav_ref") or "").strip()
+        return [ref] if ref else []
+    except Exception:
+        return []
+
+
 def _increment_doc_turn_with_pre(
     sid: str,
     doc_id: str | None,
@@ -188,6 +201,26 @@ def _append_generator_append_text(answer: str, append_text: str | None) -> str:
     if at in base:
         return answer
     return f"{base}\n\n{at}" if base else at
+
+
+def _merge_price_offer_meta_into_payload(
+    payload: dict,
+    *,
+    price_offer_meta: dict | None = None,
+) -> None:
+    pom = price_offer_meta if isinstance(price_offer_meta, dict) and price_offer_meta else None
+    if pom is None:
+        try:
+            from flask import has_request_context, request
+
+            if has_request_context():
+                ctx_pom = request.ctx.get("price_offer_meta")
+                if isinstance(ctx_pom, dict) and ctx_pom:
+                    pom = ctx_pom
+        except Exception:
+            pass
+    if isinstance(pom, dict) and pom:
+        payload.setdefault("meta", {}).update(pom)
 
 
 def _apply_answer_slots_and_price_append(
@@ -306,6 +339,7 @@ def respond_from_chunk(
     log_event: str = "Answer generated",
     route: str = "retrieval_chunk",
     generator_append_text: str | None = None,
+    price_offer_meta: dict | None = None,
     matched_service_id: str | None = None,
 ):
     if (q or "").strip():
@@ -395,6 +429,7 @@ def respond_from_chunk(
         profile=profile,
         client_id=client_id,
         topic_state=tstate,
+        suppress_refs=_nav_ref_suppress_list(),
     )
     if route:
         payload.setdefault("meta", {})["orch_route"] = route
@@ -402,6 +437,7 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["intent"] = "price_concern"
     if slot_meta:
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
+    _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
     payload = _apply_response_policy_compat(
@@ -511,6 +547,8 @@ def respond_from_chunk_stream(
     log_event: str = "Answer generated",
     route: str = "retrieval_chunk",
     generator_append_text: str | None = None,
+    price_offer_meta: dict | None = None,
+    matched_service_id: str | None = None,
 ):
     """Generator yielding SSE strings: typing → text_delta → ui → done.
 
@@ -524,6 +562,9 @@ def respond_from_chunk_stream(
     meta = meta_for_chunk(chunk, client_id=client_id)
     if client_id is not None:
         meta["client_id"] = client_id
+    sid_svc = str(matched_service_id or "").strip()
+    if sid_svc:
+        meta["matched_service_id"] = sid_svc
     doc_id = meta.get("doc_id")
     if doc_id and not skip_topic:
         set_current_doc(sid, doc_id)
@@ -643,6 +684,7 @@ def respond_from_chunk_stream(
         profile=profile,
         client_id=client_id,
         topic_state=tstate,
+        suppress_refs=_nav_ref_suppress_list(),
     )
     if route:
         payload.setdefault("meta", {})["orch_route"] = route
@@ -650,6 +692,7 @@ def respond_from_chunk_stream(
         payload.setdefault("meta", {})["intent"] = "price_concern"
     if slot_meta:
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
+    _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
     payload = _apply_response_policy_compat(

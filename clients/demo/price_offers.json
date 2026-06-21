@@ -1,0 +1,266 @@
+{
+  "version": 1,
+  "offers": [
+    {
+      "offer_id": "classic.one_tooth.implantium",
+      "service_id": "classic",
+      "unit": "one_tooth",
+      "brand": "Implantium",
+      "brand_label": "Implantium (Южная Корея)",
+      "recommended": false,
+      "total": 76200,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Хирургический этап", "amount": 45200},
+        {"name": "Ортопедический этап (коронка)", "amount": 31000}
+      ],
+      "includes": [
+        "имплант с документами",
+        "хирургия и анестезия",
+        "коронка на импланте",
+        "контрольные осмотры и куратор"
+      ],
+      "excludes": ["КТ при необходимости — отдельно"]
+    },
+    {
+      "offer_id": "classic.one_tooth.impro",
+      "service_id": "classic",
+      "unit": "one_tooth",
+      "brand": "Impro",
+      "brand_label": "Impro (Германия)",
+      "recommended": true,
+      "total": 85200,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Хирургический этап", "amount": 54200},
+        {"name": "Ортопедический этап (коронка)", "amount": 31000}
+      ],
+      "includes": [
+        "имплант с документами",
+        "хирургия и анестезия",
+        "коронка на импланте",
+        "контрольные осмотры и куратор"
+      ],
+      "excludes": ["КТ при необходимости — отдельно"]
+    },
+    {
+      "offer_id": "classic.one_tooth.nobel",
+      "service_id": "classic",
+      "unit": "one_tooth",
+      "brand": "Nobel Biocare",
+      "brand_label": "Nobel Biocare (Швейцария)",
+      "recommended": false,
+      "total": 101200,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Хирургический этап", "amount": 70200},
+        {"name": "Ортопедический этап (коронка)", "amount": 31000}
+      ],
+      "includes": [
+        "имплант с документами",
+        "хирургия и анестезия",
+        "коронка на импланте",
+        "контрольные осмотры и куратор"
+      ],
+      "excludes": ["КТ при необходимости — отдельно"]
+    },
+    {
+      "offer_id": "all_on_4.jaw.implantium",
+      "service_id": "all_on_4",
+      "unit": "jaw",
+      "brand": "Implantium",
+      "brand_label": "Implantium (Южная Корея)",
+      "recommended": false,
+      "total": 318000,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Этап 1 — хирургия и временный протез (60%)", "amount": 190800},
+        {"name": "Этап 2 — постоянный протез (40%)", "amount": 127200}
+      ],
+      "includes": [
+        "4 импланта с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": ["КТ и костная пластика по показаниям — отдельно"]
+    },
+    {
+      "offer_id": "all_on_4.jaw.impro",
+      "service_id": "all_on_4",
+      "unit": "jaw",
+      "brand": "Impro",
+      "brand_label": "Impro (Германия)",
+      "recommended": true,
+      "total": 368000,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Этап 1 — хирургия и временный протез (60%)", "amount": 220800},
+        {"name": "Этап 2 — постоянный протез (40%)", "amount": 147200}
+      ],
+      "includes": [
+        "4 импланта с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": ["КТ и костная пластика по показаниям — отдельно"]
+    },
+    {
+      "offer_id": "all_on_4.jaw.nobel",
+      "service_id": "all_on_4",
+      "unit": "jaw",
+      "brand": "Nobel Biocare",
+      "brand_label": "Nobel Biocare (Швейцария)",
+      "recommended": false,
+      "total": 428000,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Этап 1 — хирургия и временный протез (60%)", "amount": 256800},
+        {"name": "Этап 2 — постоянный протез (40%)", "amount": 171200}
+      ],
+      "includes": [
+        "4 импланта с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": ["КТ и костная пластика по показаниям — отдельно"]
+    },
+    {
+      "offer_id": "one_stage.one_tooth.implantium",
+      "service_id": "one_stage",
+      "unit": "one_tooth",
+      "brand": "Implantium",
+      "brand_label": "Implantium (Южная Корея)",
+      "recommended": false,
+      "total": 86500,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Удаление и хирургический этап", "amount": 52000},
+        {"name": "Ортопедический этап (коронка)", "amount": 34500}
+      ],
+      "includes": [
+        "удаление зуба при показаниях",
+        "имплант с документами в день удаления",
+        "хирургия и анестезия",
+        "коронка на импланте",
+        "контрольные осмотры и куратор"
+      ],
+      "excludes": ["КТ и лечение воспаления до операции — по показаниям, отдельно"]
+    },
+    {
+      "offer_id": "one_stage.one_tooth.impro",
+      "service_id": "one_stage",
+      "unit": "one_tooth",
+      "brand": "Impro",
+      "brand_label": "Impro (Германия)",
+      "recommended": true,
+      "total": 96500,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Удаление и хирургический этап", "amount": 58000},
+        {"name": "Ортопедический этап (коронка)", "amount": 38500}
+      ],
+      "includes": [
+        "удаление зуба при показаниях",
+        "имплант с документами в день удаления",
+        "хирургия и анестезия",
+        "коронка на импланте",
+        "контрольные осмотры и куратор"
+      ],
+      "excludes": ["КТ и лечение воспаления до операции — по показаниям, отдельно"]
+    },
+    {
+      "offer_id": "one_stage.one_tooth.nobel",
+      "service_id": "one_stage",
+      "unit": "one_tooth",
+      "brand": "Nobel Biocare",
+      "brand_label": "Nobel Biocare (Швейцария)",
+      "recommended": false,
+      "total": 114500,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Удаление и хирургический этап", "amount": 70000},
+        {"name": "Ортопедический этап (коронка)", "amount": 44500}
+      ],
+      "includes": [
+        "удаление зуба при показаниях",
+        "имплант с документами в день удаления",
+        "хирургия и анестезия",
+        "коронка на импланте",
+        "контрольные осмотры и куратор"
+      ],
+      "excludes": ["КТ и лечение воспаления до операции — по показаниям, отдельно"]
+    },
+    {
+      "offer_id": "all_on_6.jaw.implantium",
+      "service_id": "all_on_6",
+      "unit": "jaw",
+      "brand": "Implantium",
+      "brand_label": "Implantium (Южная Корея)",
+      "recommended": false,
+      "total": 398000,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Этап 1 — хирургия и временный протез (60%)", "amount": 238800},
+        {"name": "Этап 2 — постоянный протез (40%)", "amount": 159200}
+      ],
+      "includes": [
+        "6 имплантов с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": ["КТ и костная пластика по показаниям — отдельно"]
+    },
+    {
+      "offer_id": "all_on_6.jaw.impro",
+      "service_id": "all_on_6",
+      "unit": "jaw",
+      "brand": "Impro",
+      "brand_label": "Impro (Германия)",
+      "recommended": true,
+      "total": 458000,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Этап 1 — хирургия и временный протез (60%)", "amount": 274800},
+        {"name": "Этап 2 — постоянный протез (40%)", "amount": 183200}
+      ],
+      "includes": [
+        "6 имплантов с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": ["КТ и костная пластика по показаниям — отдельно"]
+    },
+    {
+      "offer_id": "all_on_6.jaw.nobel",
+      "service_id": "all_on_6",
+      "unit": "jaw",
+      "brand": "Nobel Biocare",
+      "brand_label": "Nobel Biocare (Швейцария)",
+      "recommended": false,
+      "total": 528000,
+      "currency": "RUB",
+      "payment_stages": [
+        {"name": "Этап 1 — хирургия и временный протез (60%)", "amount": 316800},
+        {"name": "Этап 2 — постоянный протез (40%)", "amount": 211200}
+      ],
+      "includes": [
+        "6 имплантов с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": ["КТ и костная пластика по показаниям — отдельно"]
+    }
+  ]
+}

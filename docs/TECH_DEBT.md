@@ -8,6 +8,7 @@
 
 | Задача | Примечание |
 |--------|------------|
+| **Freeze pack cesi / nikadent** | до отмашки владельца; вся продуктовая работа — **только `clients/demo/`** |
 | VPS + Caddy + wildcard `*.bot.artgents.ru` | один bot-сервис |
 | Smoke 10–20 вопросов на клиента | цена, врач, контакты, lead |
 | `allowed_origins` — реальные домены сайтов клиник | не только bot-поддомены |
@@ -31,7 +32,62 @@
 | Legacy `classify_intent` только safety-net / `RESOLVER_OFF` | `resolver.resolve_with_fallback` | **3 ✓** |
 | Smoke multiclient (`client_id` per case) | cesi, nikadent contacts | **3 ✓** |
 | `pending_followup_ref` / guide_router | после стабильного routing | **4** |
+| **`pick_relevant_offer` / `offer` в ответе** | заглушка; promo через `promo_note` в answer slots | **2 частично** |
+| **PriceBook v2 — остаток** | MVP 3.5a–3.5d ✅; детали — § PriceBook v2 ниже | **3.5 → 4** — см. `PRICEBOOK_V2.md` |
 | **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
+| **Lead flow v2** | Спека: §3.2. Сейчас: slot-first, узкий interrupt, overlay paused только chunk-path | **3.6** |
+| **Follow-up compatibility** | Спека: §3.3, `drafts/2.md`. Сейчас: rewrite частично; `alias_topic_guard` / scope режут cross-topic (warranty при focus=implantation); нет единого focus | **4** |
+
+---
+
+## PriceBook v2 — остаток (3.5)
+
+**Статус (2026-06-21):** MVP runtime на demo — loader + assembler + `price:*` refs. Шаги 3.5a–3.5d ✅; 3.5e ⚠️; 3.5f ❌. Спека: `PRICEBOOK_V2.md`.
+
+### Блокеры UX
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 1 | **S2 пульпит — «Что входит»** | `pulpitis.json` → followup `price_aspect/includes` + `detail_ref`. Клик не работает: assembler требует `offers` (complex), у simple их нет. Нужен путь: aspect + `detail_ref` → retrieval/md **без новой цены**. |
+| 2 | **S6 brand_group** | «Корейские импланты» — фильтра `brand_group` в маршруте нет (поле в данных есть, routing/planner — нет). |
+
+### Данные / миграция
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 3 | **Тройной источник цен** | pricebook + `price_offers.json` + `prices.json` + md-fallback при miss. Принцип P1 («суммы только в PriceBook») не закрыт. |
+| 4 | **`service_catalog.json`** | Ещё `price_ref` → pricing-md; целевой `pricebook_id` не внедрён. |
+| 5 | **Promo `active_until`** | Для `service.promo` runtime не проверяет дату (для facts в `facts.json` — проверяет). |
+| 6 | **Lint §9** | Нет проверки resolvable followup refs (`scripts/lint_pricebook.py`). |
+
+### Eval / тесты
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 7 | **`price_offers_golden.json`** | Ждёт legacy-формат («Точные цены», «Входит» в одном ответе). Конфликт с compact S4 (stages/includes — по кнопкам). |
+
+### Документация
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 8 | **`CURRENT_ARCHITECTURE.md` / `ROUTING_MAP.md`** | Не описывают PriceBook v2; `price_offers.json` ещё указан как источник истины. |
+
+### Конфликты с будущими этапами
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 9 | **Этап 4 planner-lite** | Риск дубля `installment_12`: fact_refs в price-ответе + append payment_terms md. |
+| 10 | **Этап 5 verifier** | `natural` facts без LLM-paraphrase; gate «любая ₽ ∈ PriceBook» не стоит. |
+| 11 | **S5 policy** | «1 member в group → сразу S4» не реализовано. |
+
+### Demo-контент (не код)
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 12 | Цифры spec vs demo | Отбеливание 15k→18k, пульпит 15k→12k — осознанная «рыба». |
+| 13 | Скуловая в `full_jaw` | Не решено (`PRICEBOOK_V2.md` §13). |
+
+**При закрытии пункта** — удалить строку из таблицы в PR.
 
 ---
 
@@ -50,6 +106,8 @@ Multiclient M1–M4 локально: client packs, `data/{id}/`, `client_data_l
 
 Pre-Resolver **booking LLM** для lead gate убран: lead только `explicit_booking_intent()` (regex); `booking_intent()` LLM остаётся в `policy.py` для CTA.
 
+**Answer slots + price offers (этапы 2–3, demo):** `core/answer_slots.py`, `core/price_offers.py` — см. `CURRENT_ARCHITECTURE.md` §6.
+
 Arbiter **score-margin skip** убран: при 2+ кандидатах всегда LLM arbiter.
 
 Короткий **service follow-up** (rewrite validate + arbiter guard): `core/service_followup.py` — contextual rewrite overlap, generic FAQ отсекается при активной `last_catalog_service_id`.
@@ -60,7 +118,7 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 
 ## Stage 1.5 — routing shims (временный слой, не финальная архитектура)
 
-**Контекст:** implant golden **28/28** на demo достигнуты, но **не** «чистой» целевой схемой (Resolver → metadata-first → arbiter). Между этапами 1 и 2 добавлен **deterministic hint layer**: regex-сигналы, прямые маршруты на md, обход arbiter для части типов вопросов. Для цели «быстро сделать бота отвечающим» — нормальный **этап 1.5**; для продукта — **временный shim**, не финал.
+**Контекст:** implant golden **28/28** на demo достигнуты, но **не** «чистой» целевой схемой (Resolver → metadata-first → arbiter). Между этапами 1 и 2 добавлен **deterministic hint layer**: regex-сигналы, прямые маршруты на md, обход arbiter для части типов вопросов. Этапы **2–3** (answer slots, price offers) сделаны на demo; shims **ещё в коде** — замена в этапе 4 (planner-lite + aspect).
 
 ### Что считать продуктовой логикой (оставить, позже обобщить)
 

@@ -4,7 +4,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from config import COMPARISON_QUERY_RE, STEPS_VISITS_QUERY_RE, TEMPORARY_TEETH_QUERY_RE
+from config import (
+    COMPARISON_QUERY_RE,
+    PRICE_LOOKUP_RE,
+    STEPS_VISITS_QUERY_RE,
+    TEMPORARY_TEETH_QUERY_RE,
+)
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
 
@@ -62,7 +67,7 @@ def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent:
         ri = str(app_intent or "content").strip().lower()
     if ri in ("price_lookup", "price_concern") and (
         commercial_info_query(q) or consultation_info_query(q)
-    ):
+    ) and not PRICE_LOOKUP_RE.search(q or ""):
         return "content"
     return ri
 

@@ -376,6 +376,7 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
             log_event=orch_r.log_event,
             route=orch_r.chunk_route,
             generator_append_text=orch_r.generator_append_text,
+            price_offer_meta=orch_r.price_offer_meta,
             matched_service_id=orch_r.matched_service_id,
         )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
@@ -525,6 +526,8 @@ def _sse_chunk_response(
     log_event: str = "Answer generated",
     route: str = "retrieval_chunk",
     generator_append_text: str | None = None,
+    price_offer_meta: dict | None = None,
+    matched_service_id: str | None = None,
 ):
     """Стриминговый ответ из чанка через SSE."""
     return app.response_class(
@@ -540,6 +543,8 @@ def _sse_chunk_response(
                 log_event=log_event,
                 route=route,
                 generator_append_text=generator_append_text,
+                price_offer_meta=price_offer_meta,
+                matched_service_id=matched_service_id,
             ),
         ),
         mimetype="text/event-stream",
@@ -575,6 +580,8 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
             log_event=orch_r.log_event,
             route=orch_r.chunk_route,
             generator_append_text=orch_r.generator_append_text,
+            price_offer_meta=orch_r.price_offer_meta,
+            matched_service_id=orch_r.matched_service_id,
         )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 

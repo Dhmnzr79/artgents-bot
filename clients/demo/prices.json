@@ -102,27 +102,27 @@
     "price_type": "from",
     "value": 76200,
     "currency": "RUB",
-    "note": "Implantium под ключ с коронкой; Impro от 85 200 ₽, Nobel от 101 200 ₽ — после диагностики"
+    "note": "Implantium под ключ; подробные варианты Impro и Nobel — в price_offers"
   },
   "one_stage": {
     "name": "Одномоментная имплантация (1 зуб под ключ)",
     "price_type": "from",
-    "value": 82000,
+    "value": 86500,
     "currency": "RUB",
-    "note": "Удаление и имплант за один визит; точная сумма после КТ"
+    "note": "Implantium под ключ с удалением; подробные варианты Impro и Nobel — в price_offers"
   },
   "all_on_4": {
     "name": "Имплантация All-on-4 (1 челюсть под ключ)",
     "price_type": "from",
     "value": 318000,
     "currency": "RUB",
-    "note": "Implantium; Impro от 368 000 ₽, Nobel от 428 000 ₽ — фиксируется в договоре"
+    "note": "Implantium на челюсть; подробные варианты Impro и Nobel — в price_offers"
   },
   "all_on_6": {
     "name": "Имплантация All-on-6 (1 челюсть под ключ)",
     "price_type": "from",
     "value": 398000,
     "currency": "RUB",
-    "note": "Implantium; Impro от 458 000 ₽, Nobel от 528 000 ₽ — фиксируется в договоре"
+    "note": "Implantium на челюсть; подробные варианты Impro и Nobel — в price_offers"
   }
 }

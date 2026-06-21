@@ -42,6 +42,14 @@
 
 Порядок в `answer`: суть → слоты → (опционально) price append → policy/CTA не меняют уже записанный текст.
 
+## Price append (детерминированный хвост, stage 3)
+
+На `price_lookup` с `price_ref` (или `price_key` + offers) бэкенд дописывает блок **«Точные цены»** / **«Оплата по этапам»** из `price_offers.json`. Суммы **не** из LLM.
+
+- Источник: `core/price_offers.py` → `generator_append_text` в `chunk_responder`.
+- Может содержать маркированный список с `**суммами**` — это разрешённый поднабор markdown (как у Generator).
+- Telemetry в `meta`: `price_offers_applied`, `price_offer_ids`, `price_offer_unit` (см. `CURRENT_ARCHITECTURE.md` §6).
+
 ---
 
 - Промпт: `RESPONSE_FORMAT` в `llm.py` (все ветки Generator, включая стрим).

@@ -24,6 +24,11 @@ from core.candidate_builder import (
 )
 from core.client_config_loader import resolve_pack_client_id
 from core.routing_loader import THRESHOLDS
+from core.price_offers import (
+    is_generic_implant_price_query,
+    resolve_implant_group_overview,
+    should_offer_unit_clarify,
+)
 from core.turn_timing import timed_stage
 from llm import classify_price_intent, rewrite_query_for_retrieval
 from session import mem_get
@@ -443,12 +448,12 @@ def _lookup_intent_by_rules(q: str) -> str:
         return "other"
     if continuation_only_phrase(q0):
         return "other"
-    if consultation_info_query(q0) or commercial_info_query(q0):
-        return "other"
     if PRICE_CONCERN_RE.search(q0):
         return "price_concern"
     if PRICE_LOOKUP_RE.search(q0):
         return "price_lookup"
+    if consultation_info_query(q0) or commercial_info_query(q0):
+        return "other"
     return "other"
 
 
@@ -639,7 +644,22 @@ def select_price_service_route(
     if intent == "other":
         return {"mode": "other", "intent": intent}
     match = match_service_from_catalog(q, client_id=client_id)
+    group_id = resolve_implant_group_overview(q) if intent == "price_lookup" else None
+    if intent == "price_lookup" and group_id:
+        return {
+            "mode": "group_overview",
+            "group_id": group_id,
+            "intent": intent,
+            **match,
+        }
     if not match.get("matched_service_id"):
+        if intent == "price_lookup" and is_generic_implant_price_query(q):
+            return {
+                "mode": "group_overview",
+                "group_id": "implantation",
+                "intent": intent,
+                **match,
+            }
         ctx = _service_from_session_context(sid, client_id)
         if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
             pi = ctx.get("price_item")
@@ -778,6 +798,52 @@ def select_price_service_route(
         "price_item": price_item if isinstance(price_item, dict) else None,
         "fallback_reason": fallback_reason,
         **match,
+    }
+
+
+def build_price_route_for_service_id(
+    service_id: str,
+    *,
+    client_id: str | None,
+    sid: str | None = None,
+    q: str = "",
+) -> dict | None:
+    """Deterministic price route for widget ref `price:{service_id}` (catalog match score = 1)."""
+    sid_clean = (service_id or "").strip()
+    if not sid_clean:
+        return None
+    catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
+    if not isinstance(catalog, dict):
+        return None
+    entry = catalog.get(sid_clean)
+    if not isinstance(entry, dict) or not bool(entry.get("active", True)):
+        return None
+    prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
+    price_key = entry.get("price_key")
+    price_ref = entry.get("price_ref")
+    price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+    q_eff = (q or "").strip() or f"Сколько стоит {entry.get('title') or sid_clean}?"
+    route_source = "catalog"
+    route_source, price_ref, fallback_reason = _resolve_price_lookup_route(
+        route_source=route_source,
+        price_ref=price_ref,
+        price_item=price_item if isinstance(price_item, dict) else None,
+        q=q_eff,
+        sid=sid,
+        client_id=client_id,
+    )
+    return {
+        "mode": "matched",
+        "intent": "price_lookup",
+        "route_source": route_source,
+        "matched_service_id": sid_clean,
+        "service": entry,
+        "match_score": 1.0,
+        "is_confident": True,
+        "price_key": price_key,
+        "price_ref": price_ref,
+        "price_item": price_item if isinstance(price_item, dict) else None,
+        "fallback_reason": fallback_reason or "price_ref_click",
     }
 
 

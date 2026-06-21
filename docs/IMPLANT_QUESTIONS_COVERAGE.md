@@ -11,7 +11,7 @@
 |-------|----------|
 | **C** | Достаточно md + алиасы (+ при необходимости chunk `<!-- aliases -->`) |
 | **K** | + `service_catalog.json` (запись услуги, `md_entry_ref`, `price_key`, `concern_ref`) |
-| **P** | + `prices.json` и/или `implantation__pricing__*.md` |
+| **P** | + `prices.json`, `price_offers.json` и/или `implantation__pricing__*.md` |
 | **CMP** | Отдельный `comparison__*.md` |
 | **POL** | `clinic_policies.yaml` («не делаем» / альтернатива) |
 | **L** | Доработка логики (price matrix, promo, comparison routing, answer slots…) |
@@ -61,7 +61,7 @@
 
 ### Verifier и цены
 - Цены только в md → риск округления/опущения пунктов LLM.
-- Надёжнее: детерминированный append из `prices.json` / price flow (как уже частично в runtime).
+- **Сейчас (demo):** детерминированный append из `price_offers.json` на `price_lookup` + `price_ref`; `prices.json` — fallback «от N ₽». Verifier gate на цифры — ещё в shadow (этап 5).
 
 ---
 
@@ -78,13 +78,13 @@
 ### Уровень 2 — структура (+20–25%)
 - 3–5 `comparison__*.md` (all-on-4 vs 6, кость vs all-on, classic vs one-stage, коронки).
 - Education-faq: цены в разных клиниках, импланты без названия, второе мнение.
-- Продающие слоты в frontmatter (`clinic_note`, `consult_value`) — после реализации в коде.
+- Продающие слоты в frontmatter (`clinic_note`, `consult_value`) — **в runtime** (`core/answer_slots.py`, demo service md).
 
 ### Уровень 3 — логика (остаток)
-- `promo_note` / активные акции.
-- Price matrix или диапазоны (челюсть, N зубов).
+- `promo_note` / активные акции — частично в slots; `pick_relevant_offer` ещё заглушка.
+- Price matrix (челюсть, N зубов, бренды) — **частично:** `price_offers.json` (demo: classic + all_on_4).
 - Усиление comparison routing в resolver/arbiter.
-- Eval: golden/smoke по этому списку.
+- Eval: golden/smoke по этому списку (`implant_golden`, `price_offers_golden`, `answer_slots_golden`).
 
 ### Уровень 4 — не обещать боту
 - Сравнение с конкретной чужой ценой.
@@ -257,16 +257,16 @@
 
 ## Связь с продающими слотами (frontmatter)
 
-Для вопросов блока «услуга / протокол» (не чистая цена) после реализации `clinic_note` / `consult_value`:
+**В runtime** (`core/answer_slots.py`): для вопросов блока «услуга / протокол» (не чистая цена):
 
-- **service** md — общие вставки по услуге.
+- **service** md — `clinic_note`, `consult_value` (cooldown per doc).
 - **h3_overrides** — для «сроки», «кому подходит», «этапы».
-- **promo_note** — для 8, 9 (акции/рассрочка), без смешения с мед. faq.
+- **promo_note** — для акций/рассрочки (commercial intent only), без смешения с мед. faq.
 
-См. тестовый образец: `clients/demo/md/implantation__service__classic_test.md`.
+Образец полей: `clients/demo/md/implantation__service__classic.md` (боевой demo); тестовый черновик — `classic_test.md`.
 
 ---
 
 ## Eval
 
-Перед merge крупного контент-пакета — выборка 20–30 вопросов из таблицы в `evals/v5/` (smoke): ожидаемый route + ref/doc_id, без ослабления golden.
+Перед merge крупного контент-пакета — выборка из таблицы в `evals/v5/`: `implant_golden.json`, `price_offers_golden.json`, `answer_slots_golden.json`, smoke — без ослабления golden.

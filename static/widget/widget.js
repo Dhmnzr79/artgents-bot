@@ -1688,13 +1688,11 @@ export function mountWidget(root, config) {
 
     if (userEcho) {
       const applyUserEcho = () => {
-        if (linkOnly) {
-          dismissTrailingsAll(state.messages);
-        } else {
-          dismissTrailingsAll(state.messages);
-          dismissLinksAll(state.messages);
+        dismissTrailingsAll(state.messages);
+        dismissLinksAll(state.messages);
+        if (userEcho) {
+          state.messages.push({ role: "user", text: userEcho });
         }
-        state.messages.push({ role: "user", text: userEcho });
       };
       if (!state.started && feed.querySelector(".clinic-shell__welcome-screen")) {
         await new Promise((resolve) => {

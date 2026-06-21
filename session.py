@@ -91,6 +91,7 @@ def _fresh_defaults() -> dict:
         "pending_lead_offer": False,
         "user_turn_timestamps": [],
         "consult_streak": 0,
+        "nav_refs_used": [],
     }
 
 
@@ -461,6 +462,26 @@ def mark_situation_offered(session_id: str, doc_id: str) -> None:
         st = mem_get(session_id)
         _upsert_topic_state(st, doc_id, {"situation_offered": True})
         _persist_unlocked(session_id, st)
+
+
+def mark_nav_ref_used(session_id: str, ref: str) -> None:
+    """Track widget ref clicks so price/chunk UIs can hide already-used buttons."""
+    r = (ref or "").strip()
+    if not r:
+        return
+    with _lock:
+        st = mem_get(session_id)
+        used = [x for x in list(st.get("nav_refs_used") or []) if str(x).strip()]
+        if r in used:
+            used.remove(r)
+        used.append(r)
+        st["nav_refs_used"] = used[-12:]
+        _persist_unlocked(session_id, st)
+
+
+def get_nav_refs_used(session_id: str) -> list[str]:
+    st = mem_get(session_id)
+    return [str(x).strip() for x in list(st.get("nav_refs_used") or []) if str(x).strip()]
 
 
 def mark_suggest_ref_used(session_id: str, doc_id: str, used: bool = True) -> None:

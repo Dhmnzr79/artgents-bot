@@ -1,0 +1,23 @@
+{
+  "service_id": "professional_whitening",
+  "price_model": "simple",
+  "display_name": "Профессиональное отбеливание",
+  "tags": [],
+  "default_unit": null,
+  "price": {
+    "price_type": "from",
+    "value": 18000,
+    "currency": "RUB",
+    "note": "Точная стоимость зависит от выбранного протокола"
+  },
+  "variants": [],
+  "promo": {
+    "text": "Сейчас на эту процедуру скидка 10% до 15 июля.",
+    "active_until": "2026-07-15"
+  },
+  "fact_refs": [
+    "installment_12"
+  ],
+  "followups": [],
+  "cta_key": "price"
+}

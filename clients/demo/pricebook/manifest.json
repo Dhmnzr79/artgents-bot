@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "groups": {
+    "implantation": {
+      "label": "Имплантация",
+      "overview_prompt": "Стоимость имплантации зависит от выбранного протокола.",
+      "members": [
+        { "service_id": "classic", "label": "Классическая", "unit_hint": "one_tooth", "from_total": 76200 },
+        { "service_id": "one_stage", "label": "Одномоментная", "unit_hint": "one_tooth", "from_total": 86500 },
+        { "service_id": "all_on_4", "label": "All-on-4", "unit_hint": "jaw", "from_total": 318000 },
+        { "service_id": "all_on_6", "label": "All-on-6", "unit_hint": "jaw", "from_total": 398000 }
+      ]
+    },
+    "full_jaw": {
+      "label": "Имплантация целой челюсти",
+      "overview_prompt": "Стоимость восстановления челюсти зависит от протокола — All-on-4 или All-on-6.",
+      "unit_filter": "jaw",
+      "members": [
+        { "service_id": "all_on_4", "label": "All-on-4", "from_total": 318000 },
+        { "service_id": "all_on_6", "label": "All-on-6", "from_total": 398000 }
+      ]
+    }
+  }
+}

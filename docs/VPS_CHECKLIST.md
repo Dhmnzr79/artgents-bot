@@ -118,7 +118,7 @@ SMTP_PASSWORD=...
 
 Для **каждого** `client_id`:
 
-- [ ] `clients/{id}/` — md, `service_catalog.json`, `prices.json`, `widget_config.json` (`allowed_origins`)
+- [ ] `clients/{id}/` — md, `service_catalog.json`, `prices.json`, `price_offers.json` (если сложный прайс), `widget_config.json` (`allowed_origins`)
 - [ ] `data/{id}/` — `corpus.jsonl`, `embeddings.npy`, `alias_*`, `bot.db`
 - [ ] `features.yaml` — demo: leads/admin/pg **off**; cesi/nikadent: **on**
 - [ ] `lead_config.yaml` + SMTP для email-лидов (боевые)

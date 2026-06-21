@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sys
+import time
 import uuid
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
@@ -12,6 +13,9 @@ from config import estimate_llm_usage_usd
 
 LOG_DIR = os.getenv("BOT_LOG_DIR", "logs")
 LOG_FILE = os.path.join(LOG_DIR, os.getenv("BOT_LOG_FILE", "app.jsonl"))
+_LOG_RETENTION_DAYS = int(os.getenv("BOT_LOG_RETENTION_DAYS", "7"))
+_LOG_PURGE_DONE = False
+_LOG_NAME_RX = re.compile(r"\.(?:jsonl|log)(?:\.\d+)?$", re.IGNORECASE)
 
 SENSITIVE_KEYS = ("api_key", "apikey", "token", "secret", "authorization", "password")
 _USAGE_TOKEN_KEYS = frozenset({"prompt_tokens", "completion_tokens", "total_tokens"})
@@ -87,11 +91,48 @@ class JsonLineFormatter(logging.Formatter):
         return json.dumps(base, ensure_ascii=False)
 
 
+def log_retention_days() -> int:
+    """File log retention window; 0 disables time-based purge."""
+    return max(0, _LOG_RETENTION_DAYS)
+
+
+def _is_log_file_name(name: str) -> bool:
+    return bool(_LOG_NAME_RX.search(name or ""))
+
+
+def purge_old_log_files(*, logger: logging.Logger | None = None) -> list[str]:
+    """Delete rotated/local log files older than BOT_LOG_RETENTION_DAYS (by mtime)."""
+    days = log_retention_days()
+    if days <= 0 or not os.path.isdir(LOG_DIR):
+        return []
+    cutoff = time.time() - days * 86400
+    removed: list[str] = []
+    for name in os.listdir(LOG_DIR):
+        if not _is_log_file_name(name):
+            continue
+        path = os.path.join(LOG_DIR, name)
+        if not os.path.isfile(path):
+            continue
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                removed.append(name)
+        except OSError:
+            continue
+    if removed and logger is not None:
+        log_json(logger, "log_retention_purge", retention_days=days, removed=removed)
+    return removed
+
+
 def get_logger(name="bot"):
+    global _LOG_PURGE_DONE
     os.makedirs(LOG_DIR, exist_ok=True)
     logger = logging.getLogger(name)
     if logger.handlers:
         return logger
+    if not _LOG_PURGE_DONE:
+        _LOG_PURGE_DONE = True
+        purge_old_log_files()
     logger.setLevel(logging.INFO)
     fh = RotatingFileHandler(LOG_FILE, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
     ch = logging.StreamHandler(sys.stdout)

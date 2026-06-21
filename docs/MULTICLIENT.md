@@ -26,6 +26,7 @@ Demo, ЦЭСИ, НикаДент и следующие клиники — **не
 6. **Сессии (SQLite) — отдельный `bot.db`** на клиента в `data/{client_id}/` (через client-aware слой, §4.1).
 7. **Заявки, админка, guide-router, demo-режим** — через конфиг клиента (`features.yaml`, `lead_config.yaml`), не через `if client_id == ...` в коде.
 8. **Секреты** (`DASHSCOPE_API_KEY`, `OPENAI_API_KEY`, SMTP, пароли админки) — только в `.env` на сервере, не в git.
+9. **Активная разработка (2026-06):** правки pack, цен, контента, product eval — **только `demo`**, пока владелец явно не разрешит трогать **`cesi`** / **`nikadent`**. Smoke multiclient на cesi/nikadent — регрессия без изменения их файлов.
 
 Изоляция в коде: `core/client_runtime.py`, `core/client_data_loader.py`, client-aware `session.py` — см. `CURRENT_ARCHITECTURE.md`.
 
@@ -52,6 +53,7 @@ clients/
     md/                      # вся база знаний demo
     service_catalog.json
     prices.json
+    price_offers.json        # сложный прайс (бренды, unit, этапы) — demo pilot
     clinic_policies.yaml
     video_catalog.yaml
     widget_config.json       # embed, allowed_origins, тексты виджета
@@ -96,7 +98,8 @@ data/
 |------|------------|
 | `md/` | FAQ, услуги, врачи (`doctors__*.md`), контакты, цены-объяснения |
 | `service_catalog.json` | Услуги, aliases, `md_entry_ref`, `price_key` |
-| `prices.json` | Цифры для price_lookup |
+| `prices.json` | Простые «от N ₽» (КТ, кариес); fallback |
+| `price_offers.json` | Structured offers: бренды, unit, payment_stages (если есть у клиента) |
 | `clinic_policies.yaml` | «Нет детской», «нет ОМС», альтернативы услуг |
 | `video_catalog.yaml` | Ключи видео для виджета |
 | `widget_config.json` | Приветствие, teaser, **`allowed_origins`** (whitelist для проверки на сервере) |

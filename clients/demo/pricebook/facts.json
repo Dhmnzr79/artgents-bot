@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "facts": {
+    "tax_deduction": {
+      "id": "tax_deduction",
+      "kind": "benefit",
+      "text_fact": "Можно оформить налоговый вычет 13% от оплаченного лечения.",
+      "render_mode": "strict",
+      "detail_ref": "clinic__info__payment_terms.md#korotko",
+      "followup_label": "Налоговый вычет",
+      "usable_in": ["price_answer", "payment_question", "retrieval"]
+    },
+    "installment_12": {
+      "id": "installment_12",
+      "kind": "payment",
+      "text_fact": "Доступна рассрочка от клиники до 12 месяцев.",
+      "render_mode": "strict",
+      "detail_ref": "clinic__info__payment_terms.md#korotko",
+      "followup_label": "Условия оплаты",
+      "usable_in": ["price_answer", "commercial_answer"]
+    },
+    "free_implant_consult": {
+      "id": "free_implant_consult",
+      "kind": "promo",
+      "text_fact": "Сейчас по этому протоколу можно пройти бесплатную консультацию имплантолога. На ней врач по КТ проверит, подойдёт ли выбранный протокол или лучше рассмотреть другой вариант.",
+      "render_mode": "natural",
+      "detail_ref": "clinic__info__consultation.md#korotko",
+      "followup_label": "Что будет на консультации",
+      "usable_in": ["price_answer"],
+      "active_until": "2026-12-31"
+    }
+  }
+}

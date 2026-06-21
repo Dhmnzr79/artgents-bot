@@ -2,6 +2,8 @@
 
 Кратко: что смотрит бот, в каком порядке, что отдаёт. Парные документы: `ROUTING_MAP.md`, `MULTICLIENT.md`.
 
+**Scope (2026-06):** примеры и пилоты цен/каталога в этом документе ориентированы на **`clients/demo/`**. **`cesi`** / **`nikadent`** не редактировать до отмашки владельца.
+
 ---
 
 ## Три файла на клиента
@@ -9,7 +11,9 @@
 | Файл | Роль |
 |------|------|
 | `service_catalog.json` | Реестр услуг: матч по aliases, маршрут, связи с ценой |
-| `prices.json` | Цифры для прямого ответа «сколько стоит» |
+| `prices.json` | Простые «от N ₽» (КТ, кариес); fallback для implant |
+| `price_offers.json` | Сложный прайс: бренды, unit, этапы оплаты, includes/excludes (**demo pilot**) |
+| `price_brand_aliases.json` | Синонимы брендов в запросе (опционально, demo) |
 | `md/` | Тексты: `*__service__*.md`, `*__pricing__*.md`, `*__faq__*.md` |
 
 **Связка:** `service_id` (ключ в каталоге) → `price_key` (тот же ключ в `prices.json`, если есть цена).
@@ -55,7 +59,7 @@
 → lead / situation / ref-кнопка / «да» (если pending)
 → короткое продолжение + current_doc_id → тот же md#korotko
 → Resolver (intent: content | price_lookup | price_concern | unknown)
-→ regex цены ПЕРЕБИВАЕТ Resolver (price_rules_hint)
+→ regex цены ПЕРЕБИВАЕТ Resolver (`price_rules_hint`; `PRICE_LOOKUP_RE` раньше commercial-downgrade)
 → A3 source_routing:
      1) врачи (если не ценовой intent)
      2) каталог + content → catalog_md / catalog_facts
@@ -119,10 +123,13 @@
 ### Приоритет источника цены (`price_lookup`)
 
 ```
-1. price_ref в каталоге  →  ответ из md-чанка (LLM по тексту pricing/faq)
-2. иначе price_key       →  prices.json («Название — от N ₽.»)
-3. иначе                 →  clarify или заглушка
+1. price_ref в каталоге  →  md-чанк (объяснение) + deterministic append из price_offers.json (если есть)
+2. иначе price_key       →  price_offers.json (если есть) иначе prices.json («Название — от N ₽.»)
+3. общий «сколько имплантация» без zub/челюсть → unit clarify (mini-summary + quick_replies)
+4. иначе                 →  clarify или заглушка
 ```
+
+**price_offers.json** (отдельный файл в `clients/{id}/`, не в каталоге): массив offers по `service_id` + `unit` + `brand`. Источник истины для сумм на price_lookup; md только объясняет состав и этапы.
 
 Для `price_concern` (не «сколько», а «дорого»):
 
@@ -152,8 +159,9 @@
 
 | Ситуация | Что отдаёт бот |
 |----------|----------------|
-| Услуга + `price_ref` | Текст из pricing/faq md |
-| Услуга + `price_key` в prices.json | «Название — цена.» + note |
+| Услуга + `price_ref` | Текст из pricing md + **точные цифры** из `price_offers.json` (append) |
+| Услуга + `price_key` + offers | Deterministic блок из `price_offers.json` |
+| Услуга + `price_key` только | «Название — цена.» + note из `prices.json` |
 | Услуга есть, цены нет | Clarify: «Не могу определить…» или заглушка про консультацию |
 | Услуга не найдена | Clarify + при `clinic_policies.yaml` — альтернатива («у нас нет детской…») |
 | Короткое «сколько?» без контекста | Clarify `continuation_no_context` |
@@ -200,7 +208,7 @@
 - [ ] Каждая **продающая** услуга: запись в `service_catalog.json`
 - [ ] `md_entry_ref` = `doc_id` в md (или осознанно только `facts`)
 - [ ] `price_key` совпадает с ключом в `prices.json` (если цена нужна)
-- [ ] Для имплантации/сложных: `price_ref` на `*__pricing__*.md#korotko`
+- [ ] Для имплантации/сложных: `price_ref` на `*__pricing__*.md#korotko` + offers в `price_offers.json` (если нужны точные суммы)
 - [ ] Для «дорого»: `concern_ref` на тематический FAQ (не полагаться на default)
 - [ ] `aliases` в каталоге покрывают разговорные формулировки
 - [ ] В md: `suggest_h3` указывает на реальные `{#anchor}` в файле
@@ -214,7 +222,9 @@
 |--------|---------|----------------|
 | Классическая имплантация | `catalog_md_first` | `implantation__service__classic.md` |
 | КТ | `catalog_facts` | facts в каталоге + цена (`price_display`) |
-| Сколько стоит all-on-4? | `price_lookup` | `price_ref` → `implantation__pricing__all_on_4.md` |
+| Сколько стоит all-on-4? | `price_lookup` | `price_ref` + append `price_offers.json` |
+| Сколько стоит один имплант под ключ? | `price_lookup` | `price_ref` + append (3 бренда × one_tooth) |
+| Сколько стоит имплантация? | `price_lookup` | unit clarify (зуб / челюсть) |
 | Сколько стоит кариес? | `price_lookup` | `prices.json` → `caries` |
 | Почему так дорого? (после all-on-4) | `price_concern` | `concern_ref` услуги |
 | Преимущества имплантации | `retrieval_chunk` | md есть, в каталоге нет |

@@ -10,7 +10,7 @@
 
 | Реализовано | Ещё не prod |
 |-------------|-------------|
-| `clients/{id}/` — md, catalog, prices, policies, tone, features | Контент nikadent / финализация cesi |
+| `clients/{id}/` — md, catalog, prices, **price_offers**, policies, tone, features | Контент nikadent / финализация cesi |
 | `data/{id}/` — corpus, embeddings, aliases, `bot.db` | VPS deploy (Caddy, wildcard TLS) |
 | `core/client_runtime.py`, `client_data_loader.py` | `allowed_origins` — домены сайтов клиник |
 | `meta_loader`, `doctors_lookup` → только pack md | Golden evals per `client_id` |
@@ -44,9 +44,11 @@ Debug: `/_debug/ping`, `/__debug/retrieval` — prod: 404 или token.
 ```
 ingress / rate limit → flow_handlers → ref / continuation
 → Resolver (или classify_intent при RESOLVER_OFF=1)
-→ contacts overlay → route_source (A3) → retrieval + arbiter
-→ chunk_responder → policy → session → JSON
+→ contacts overlay → route_source (A3) → price_flow / retrieval + arbiter
+→ chunk_responder: LLM → answer slots + price append → policy → session → JSON
 ```
+
+На chunk-пути **детерминированная сборка** (без второго LLM): сначала слоты из frontmatter, затем `generator_append_text` (цены из `price_offers`), потом policy/CTA.
 
 Детали маршрутов: `ROUTING_MAP.md`.
 
@@ -64,7 +66,7 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `orchestration/policy_compat.py` | `apply_response_policy` signature shim |
 | `orchestration/route_guards.py` | pre-Resolver guards (noise, duplicate, anti-spam, continuation clarify payload) |
 | `orchestration/ask_turn.py` | post-Resolver: contacts → A3 → price fallback → content arbiter → selection |
-| `orchestration/price_flow.py` | A3 price route + `price_lookup` intent fallback |
+| `orchestration/price_flow.py` | A3 `price_ref` / concern / unit clarify; `build_price_append_for_lookup` → `AskOrchestrationResult` |
 | `orchestration/catalog_flow.py` | A3 doctor list + catalog facts + md priority |
 | `orchestration/retrieval_flow.py` | content arbiter path + legacy selection fallback |
 | `orchestration/helpers.py` | decision_dump, scope ctx, price line, guided menu, selection log |
@@ -75,11 +77,15 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `flow_handlers.py` | Lead, situation, **explicit booking (regex)**, «да» по pending |
 | `policy.py` | CTA/UX; `booking_intent()` (regex + опц. LLM) **только для policy**, не lead gate |
 | `resolver.py` | `DecisionFrame` + safety-net |
-| `source_routing.py` | A3: doctor, catalog, price |
+| `source_routing.py` | A3: doctor, catalog, price; commercial→content downgrade (см. §6) |
 | `doctors_lookup.py` | Врачи из `clients/{id}/md/` |
-| `query_selector.py` / `retriever.py` | RAG + rerank |
+| `query_selector.py` | Catalog/price match, regex price hints (`PRICE_LOOKUP_RE`, `COMMERCIAL_INFO_RE`) |
+| `retriever.py` | RAG + rerank |
+| `core/answer_slots.py` | Слоты ответа из frontmatter service-md |
+| `core/price_offers.py` | `price_offers.json`: loader, render append, unit/brand detect |
 | `arbiter.py` / `content_arbiter.py` | Выбор ref при 2+ кандидатах (LLM arbiter, без score-margin skip) |
-| `chunk_responder.py` | Chunk → LLM → **answer slots** → policy |
+| `chunk_responder.py` | Chunk → LLM → slots + price append → policy; merge `price_offer_meta` в `meta` |
+| `contracts/ask_orchestration.py` | `AskOrchestrationResult` (+ `generator_append_text`, `price_offer_meta`) |
 | `session.py` | SQLite `data/{id}/bot.db` |
 | `lead_service.py` | Email + PG |
 | `pg_sink.py` | Async PG events |
@@ -99,10 +105,104 @@ Legacy (не расширять): `llm.classify_intent`, `query_selector.select_
 
 ### Booking / lead (pre-Resolver)
 
-- **Lead сразу:** только `explicit_booking_intent()` — regex `BOOKING_INTENT_RE` в `flow_handlers` (кнопка `lead:booking`, pending «да» — отдельно).
-- **Interrupt во время сбора:** contacts/price/`?`/префиксы → `paused`; QR **«Задать вопрос»** (`lead:pause`); resume явный; отмена — `lead:cancel` / «не сейчас».
+- **Lead сразу:** только `explicit_booking_intent()` — regex `BOOKING_INTENT_RE` в `flow_handlers` (кнопка `lead:booking`, pending «да» — отдельно). Pre-Resolver **booking LLM** для lead gate **убран** (см. `TECH_DEBT.md` «Закрыто»).
 - **Не lead до Resolver:** контентные фразы с «хочу» без явной записи; мягкая запись («можете принять сегодня?») → Resolver / ingress / content.
-- **`booking_intent()`** в `policy.py` — подсказка CTA после ответа; может вызывать flash-LLM, **не** перехватывает ход.
+- **`booking_intent()`** в `policy.py` — подсказка CTA после ответа; может вызывать flash-LLM, **не** перехватывает ход и **не** классифицирует слоты (имя/телефон).
+
+Целевое поведение lead-flow — § **Lead flow v2** ниже. Текущий runtime частично расходится (slot-first, overlay только на chunk-path) — см. `TECH_DEBT.md` → **Lead flow v2**.
+
+### Lead flow v2 — состояния
+
+Три режима (не только `lead_flow: true/false`):
+
+| Режим | Сессия | Поведение бота |
+|-------|--------|----------------|
+| **CONSULT** | нет active lead | Обычный диалог: Resolver → content / price / contacts |
+| **LEAD_ACTIVE** | `lead_intent` ∈ collecting_name / collecting_phone / confirming_name | Сбор слотов; turn классифицируется **до** slot retry |
+| **LEAD_PAUSED** | `lead_paused` + `lead_resume_step` | Ответ как в CONSULT + bridge и кнопки «Продолжить / Отменить» |
+
+Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel` (`lead_interrupt.py`, `flow_handlers.py`).
+
+### Lead flow v2 — UX (exit: доступен vs предложен)
+
+**Принцип:** отмена **всегда доступна текстом** на любом шаге; кнопки exit **не обязаны** быть на каждом экране.
+
+| Экран / момент | Что показываем | Что бэкенд понимает текстом |
+|----------------|----------------|----------------------------|
+| **Первый экран** после «хочу записаться» / `lead:booking` | Только вопрос про имя. **Без** «Отменить» / «Не сейчас» | «не хочу», «передумал», «не сейчас», «отменить» → выход в CONSULT |
+| **LEAD_ACTIVE**, сбор имени/телефона** | По умолчанию без exit-кнопок; «Задать вопрос» — **не** на первом экране (добавлять по метрикам застревания) | cancel-синонимы; content-фразы (цена, адрес, страх); опционально «задать вопрос» / «сначала вопрос» → pause |
+| **После сопротивления, retry, content** | Опционально QR «Задать вопрос» | то же |
+| **LEAD_PAUSED**, после content-ответа | Bridge + **«Продолжить запись»** + **«Отменить запись»** (обязательно) | `lead:resume` / `lead:cancel` + текстовые синонимы |
+
+**Не смешивать** в одной реплике бота: content-ответ и повтор «как вас зовут». Имя — только после `resume` или на шаге slot.
+
+**Класс `defer`** («надо подумать», «подумаю»): мягкий выход в CONSULT без агрессивного slot retry («Хорошо, без спешки…»).
+
+### Lead flow v2 — порядок обработки turn (LEAD_ACTIVE)
+
+**Главное правило:** любое сообщение в lead-flow — **сначала намерение пользователя**, **потом** кандидат в слот. Slot retry — **последний** resort, не default.
+
+```
+LEAD_ACTIVE turn
+  1. ref / meta command     (lead:pause | lead:cancel | lead:resume)
+  2. explicit cancel        (regex + синонимы; всегда, без кнопки)
+  3. explicit meta_pause    («задать вопрос», «сначала вопрос» — текст и ref)
+  4. high-confidence slot   (accept_lead_name / extract_phone)
+  5. content interrupt      → pause + обычный пайплайн (price / contacts / retrieval)
+  6. defer                  → мягкий выход
+  7. unclear                → мягкий retry: «Напишите имя или задайте вопрос» (+ опц. QR pause)
+```
+
+**Content interrupt** (детерминированно, до gray-zone LLM): `contacts_intent`, `price_intent`, явный вопрос (`?`, префиксы «подскажите…», «а больно/сколько/где…»), страх/боль (расширить beyond текущего `lead_interrupt`).
+
+После content-ответа: **единый lead overlay** (bridge + resume/cancel QR) на **всех** маршрутах ответа (chunk, price, contacts) — не только `chunk_responder`.
+
+### Lead flow v2 — классификация: LLM vs deterministic
+
+| Класс | Примеры | Слой |
+|-------|---------|------|
+| Meta cancel | «не хочу», «передумал», «отменить запись» | regex / ref |
+| Meta pause | `lead:pause`, «задать вопрос» | ref + короткие синонимы |
+| Slot | «Мария», «+7…», «меня зовут Олег» | `name_gate.accept_lead_name`, `extract_phone` |
+| Content (явный) | «сколько стоит», «адрес», «а больно?» | `lead_interrupt` + policy intents → pause |
+| Content (gray) | «я переживаю», «дорого наверное», «надо подумать» | **structured mini-classifier** (Pydantic, temperature 0) — только если шаги 1–5 не сработали |
+| Unclear | шум, «не знаю», низкий confidence classifier | мягкий retry, **не** «напишите имя» |
+
+**Не использовать LLM для:** ref-кнопок, телефона, очевидного имени, явного cancel/pause, pre-Resolver lead gate (`explicit_booking_intent`).
+
+**Fail-loud:** не «чинить» вывод classifier пост-hoc regex по тексту запроса; при `confidence` ниже порога из `routing.yaml` → `unclear`.
+
+Целевой контракт turn (новый слой, `contracts/`):
+
+```python
+LeadTurnDecision.kind ∈ slot | meta_pause | meta_cancel | meta_resume | content | defer | unclear
+LeadTurnDecision.content_hint ∈ price | contacts | pain | generic | None  # при kind=content
+```
+
+Модули (целевое разделение): state machine — `session` + `flow_handlers`; classifier — `lead_interrupt` → `core/lead_turn_classifier.py`; overlay — после `finalize_turn`, не только в `chunk_responder`.
+
+### Lead flow v2 — связь с остальным пайплайном
+
+- **Pause + content:** `bind_lead_context_turn(interrupt_kind=…)` → тот же Resolver / A3 / price_flow / retrieval, что и в CONSULT.
+- **Planner-lite (этап 4):** subject/aspect для follow-up **в PAUSED**, не заменяет lead turn classifier.
+- **Policy CTA:** `booking_intent()` после ответа — отдельно от lead-flow; не дублировать payment/promo в bridge paused lead.
+
+Eval (целевое): `evals/v5/lead_turn_golden.json` — кейсы cancel/pause/content/defer/unclear + smoke из реальных застреваний (имя vs «боюсь боли» vs «не хочу записываться»).
+
+### Follow-up & compatibility guard (целевое)
+
+Спека: `PRODUCT_WORK_PLAN.md` § **3.3**; обсуждение — `drafts/2.md`. Runtime gap — `TECH_DEBT.md` → Follow-up compatibility.
+
+**Диагноз:** rewrite часто склеивает focus + короткий вопрос; retrieval находит cross-topic chunk (напр. `clinic__info__warranty`); **guard** (`alias_topic_guard`, `scope_topic`) отбрасывает по `topic != service_topic`.
+
+**Целевое поведение:**
+
+- **Session focus** (`last_subject`: service_id, topic, label) после ответа по услуге.
+- **Follow-up rewrite:** «а гарантия?» → «гарантия на {label}» для retrieval и guard.
+- **Compatibility guard:** pass если кандидат **отвечает на rewritten query** в focus и **нет явного конфликта** услуги; `doc_type` / aspect — **boost only**, не gate.
+- **`follow_up_mode`:** на коротком follow-up ослабить topic-only reject; не отключать conflict check.
+
+Optional позже: `clients/{id}/aspect_routing.yaml` — точечный override, не обязателен для MVP.
 
 ---
 
@@ -125,21 +225,44 @@ Chat: `DASHSCOPE_API_KEY` + `CHAT_BASE_URL` (DashScope / MaaS). Дефолты �
 | Что | Где |
 |-----|-----|
 | MD | `clients/{id}/md/` |
-| Catalog, prices, policies | `clients/{id}/` |
+| Catalog, prices, policies, **price_offers** | `clients/{id}/` |
 | Индекс | `data/{id}/corpus.jsonl`, `embeddings.npy`, `alias_*` |
 | Пересборка | `python build_index.py --client {id\|all}` |
 
+**price_offers.json** (отдельный файл в `clients/{id}/`, не в каталоге): массив offers по `service_id` + `unit` + `brand`. Опционально **`price_brand_aliases.json`** — нормализация брендов в запросе (без хардкода в коде). Источник истины для сумм на price_lookup; md только объясняет состав и этапы.
+
 ### Answer slots (stage 2)
 
-После Generator, до policy, `chunk_responder` дописывает **абзацы** из frontmatter service-md:
+После Generator, до policy, `chunk_responder._apply_answer_slots_and_price_append` дописывает **абзацы** (порядок merge — `core/answer_slots.merge_deterministic_appends`):
 
 1. Суть (LLM по одному чанку)
 2. `clinic_note` (0–1)
 3. `consult_value` (0–1) — при наличии поля **отключается** `consult_nudge` в промпте
 4. `promo_note` (0–1) — только commercial intent (`price_lookup` или `COMMERCIAL_INFO_RE`); не на pain / contraindications / `price_concern` / safety-query / lead
-5. CTA / follow-ups (policy)
+5. **Price append** (0–1) — если оркестратор передал `generator_append_text` (этап 3)
+6. CTA / follow-ups (policy)
 
 Поля: `clinic_note`, `consult_value`, `promo_note`, `h3_overrides` в frontmatter; читает `meta_loader.py`, логика — `core/answer_slots.py`. Повтор одного слота на doc — cooldown (`answer_slots.cooldown_turns` в `core/routing.yaml`, per `doc_id` в session). Telemetry: `meta.answer_slots`. Eval: `evals/v5/answer_slots_golden.json`.
+
+### Price offers (stage 3)
+
+`clients/{id}/price_offers.json` — structured offers (`service_id`, `unit`, `brand`, `total`, `payment_stages`, …). Контракт: `contracts/price_offer.py`. Loader/render: `core/price_offers.py`.
+
+**Маршрут `price_lookup` + `price_ref`** (`orchestration/price_flow.py`):
+
+1. Chunk из pricing-md (`price_ref` в каталоге) → LLM объясняет состав/этапы.
+2. `build_price_append_for_lookup` → детерминированный блок «Точные цены» / «Оплата по этапам» в `generator_append_text`.
+3. Суммы **только** из json; LLM получает hint не дублировать цифры.
+
+**Неоднозначный unit** («сколько имплантация» без зуб/челюсть, без протез/коронк) → `price_lookup_clarify` / `build_price_unit_clarify_payload` (mini-summary + quick_replies).
+
+**Intent vs commercial:** вопрос с явной ценой (`PRICE_LOOKUP_RE`, напр. «сколько стоит … под ключ») остаётся `price_lookup`, даже если фраза попадает в `COMMERCIAL_INFO_RE` (`под ключ`, «что входит»). Порядок в `query_selector._lookup_intent_by_rules`: сначала `PRICE_LOOKUP_RE`, затем commercial; в `source_routing._resolve_route_intent` downgrade в `content` не применяется при `PRICE_LOOKUP_RE`.
+
+**Telemetry в ответе** (`meta`, после policy): `price_offers_applied`, `price_offer_ids`, `price_offer_unit`, `price_offer_service_id`, `price_offer_brand_filter`. Источник: `AskOrchestrationResult.price_offer_meta` из `price_flow` (дубль в `request.ctx["price_offer_meta"]` для совместимости); merge в `chunk_responder._merge_price_offer_meta_into_payload`.
+
+**Append (demo):** `classic`, `one_stage`, `all_on_4`, `all_on_6` × 3 бренда; блок «Точные цены» + **Входит / Не входит / Оплата по этапам** (полная карточка при одном бренде, у recommended при нескольких).
+
+Eval: `evals/v5/price_offers_golden.json` (в т.ч. проверка meta, не только сумм в тексте).
 
 ---
 

@@ -131,6 +131,7 @@ def build_ask_response(
     profile: dict,
     client_id: str | None = None,
     topic_state: dict | None = None,
+    suppress_refs: list[str] | None = None,
 ) -> dict:
     """Единая структура успешного ответа /ask."""
     md_file = top.get("file")
@@ -152,6 +153,20 @@ def build_ask_response(
 
     cta_btn = build_cta(meta, client_id=client_id)
     quick_refs = dedup_refs_vs_cta(quick_refs, cta_btn)
+
+    if suppress_refs:
+        from core.price_answer_assembler import hide_navigated_quick_replies
+
+        suppress = {str(r).strip().lower() for r in suppress_refs if str(r).strip()}
+        if suppress:
+            quick_refs = hide_navigated_quick_replies(
+                quick_refs,
+                exclude_refs=suppress,
+            )
+            followups = hide_navigated_quick_replies(
+                followups,
+                exclude_refs=suppress,
+            )
 
     score = float(round(float(top.get("_score", 0.0)), 3))
 
@@ -404,24 +419,194 @@ def build_price_lookup_payload(
     price_key: str | None,
     price_ref: str | None,
     price_item: dict | None,
+    question: str = "",
 ) -> dict:
+    from core.price_offers import build_price_answer_for_lookup
+    from core.price_answer_assembler import merge_price_quick_replies
+    from core.pricebook_loader import load_pricebook_service
+    from session import get_nav_refs_used
+
     title = str((service or {}).get("title") or service_id).strip()
+    answer, offer_meta = build_price_answer_for_lookup(
+        client_id=client_id,
+        service_id=service_id,
+        q=question,
+    )
     price_line = (
         format_price_answer_from_item(price_item, title_fallback=title)
         if isinstance(price_item, dict)
         else None
     )
-    if price_line:
-        answer = price_line
-    else:
-        answer = (
+    pb_entry = load_pricebook_service(client_id, service_id)
+    if not answer:
+        if price_line:
+            answer = price_line
+        else:
+            answer = (
+                "Точную стоимость лучше уточнить на консультации — "
+                "после осмотра назовут сумму по вашей ситуации."
+            )
+    used_refs = set(get_nav_refs_used(sid))
+    quick = (
+        merge_price_quick_replies(
+            pb_entry,
+            client_id,
+            exclude_refs=used_refs,
+        )
+        if pb_entry
+        else []
+    )
+    meta = {
+        "sid": sid,
+        "client_id": client_id,
+        "intent": "price_lookup",
+        "matched_service_id": service_id,
+        "match_score": round(float(match_score or 0.0), 4),
+        "route_source": route_source,
+        "price_key": price_key,
+        "price_ref": price_ref,
+        "fallback_reason": None if (answer and answer != (
             "Точную стоимость лучше уточнить на консультации — "
             "после осмотра назовут сумму по вашей ситуации."
-        )
-    quick = _suggest_refs_at_most_one(service)
+        )) else "price_not_found",
+        "followups": [],
+    }
+    meta.update(offer_meta)
     return {
         "answer": answer,
         "quick_replies": quick,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }
+
+
+def build_price_aspect_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    service_id: str,
+    aspect: str,
+    match_score: float = 1.0,
+) -> dict | None:
+    from core.price_offers import build_price_answer_for_lookup
+    from core.price_answer_assembler import merge_price_quick_replies
+    from core.pricebook_loader import load_pricebook_service
+    from query_selector import match_service_from_catalog
+    from session import get_nav_refs_used
+
+    sid_eff = (service_id or "").strip()
+    aspect_eff = (aspect or "").strip().lower()
+    if not sid_eff or not aspect_eff:
+        return None
+
+    match = match_service_from_catalog(sid_eff.replace("_", " "), client_id=client_id)
+    service = match.get("service") if isinstance(match.get("service"), dict) else {}
+    if not service:
+        pb_entry = load_pricebook_service(client_id, sid_eff)
+        service = {"title": pb_entry.display_name if pb_entry else sid_eff}
+
+    answer, offer_meta = build_price_answer_for_lookup(
+        client_id=client_id,
+        service_id=sid_eff,
+        q="",
+        aspect=aspect_eff,
+    )
+    if not answer:
+        return None
+
+    pb_entry = load_pricebook_service(client_id, sid_eff)
+    active_ref = f"price:{sid_eff}/{aspect_eff}"
+    used_refs = set(get_nav_refs_used(sid))
+    quick = (
+        merge_price_quick_replies(
+            pb_entry,
+            client_id,
+            active_aspect=aspect_eff,
+            active_ref=active_ref,
+            exclude_refs=used_refs,
+        )
+        if pb_entry
+        else []
+    )
+    meta = {
+        "sid": sid,
+        "client_id": client_id,
+        "intent": "price_lookup",
+        "matched_service_id": sid_eff,
+        "match_score": round(float(match_score or 0.0), 4),
+        "route_source": "price_aspect",
+        "pricebook_aspect": aspect_eff,
+        "fallback_reason": None,
+        "followups": [],
+    }
+    meta.update(offer_meta)
+    return {
+        "answer": answer,
+        "quick_replies": quick,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }
+
+
+def build_price_group_overview_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    group_id: str = "implantation",
+    match_score: float = 0.0,
+) -> dict | None:
+    from core.price_group_overview import build_group_overview_answer
+
+    answer, quick, overview_meta = build_group_overview_answer(client_id, group_id=group_id)
+    if not answer:
+        return None
+    meta = {
+        "sid": sid,
+        "client_id": client_id,
+        "intent": "price_lookup",
+        "matched_service_id": None,
+        "match_score": round(float(match_score or 0.0), 4),
+        "route_source": "pricebook_manifest",
+        "fallback_reason": "price_implant_overview",
+        "price_status": "group_overview",
+        "followups": [],
+    }
+    meta.update(overview_meta)
+    return {
+        "answer": answer,
+        "quick_replies": quick,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }
+
+
+def build_price_unit_clarify_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    match_score: float = 0.0,
+    group_id: str = "implantation",
+) -> dict:
+    payload = build_price_group_overview_payload(
+        sid=sid,
+        client_id=client_id,
+        group_id=group_id,
+        match_score=match_score,
+    )
+    if payload:
+        return payload
+    return {
+        "answer": "Уточните, пожалуйста: какой протокол имплантации вас интересует?",
+        "quick_replies": [],
         "cta": None,
         "video": None,
         "situation": {"show": False, "mode": "normal"},
@@ -430,12 +615,11 @@ def build_price_lookup_payload(
             "sid": sid,
             "client_id": client_id,
             "intent": "price_lookup",
-            "matched_service_id": service_id,
+            "matched_service_id": None,
             "match_score": round(float(match_score or 0.0), 4),
-            "route_source": route_source,
-            "price_key": price_key,
-            "price_ref": price_ref,
-            "fallback_reason": None if price_line else "price_not_found",
+            "route_source": "price_offers",
+            "fallback_reason": "price_implant_overview",
+            "price_status": "group_overview",
             "followups": [],
         },
     }

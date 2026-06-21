@@ -9,10 +9,16 @@ from contracts.source_route_result import SourceRouteResult
 from logging_setup import get_logger, log_json
 from retriever import get_chunk_by_ref
 from session import set_last_catalog_service
+from core.price_offers import (
+    build_price_answer_for_lookup,
+    build_price_append_for_lookup,
+    price_append_llm_hint,
+)
 from ux_builder import (
     build_price_concern_payload,
     build_price_lookup_payload,
     build_price_resolution_payload,
+    build_price_unit_clarify_payload,
 )
 
 logger = get_logger("bot")
@@ -125,25 +131,63 @@ def price_matched_from_route(
         )
     if route_source == "price_ref" and price_route.get("price_ref"):
         ref_px = str(price_route.get("price_ref") or "").strip()
-        ch = get_chunk_by_ref(ref_px, client_id=client_id)
-        if ch:
+        price_append, offer_meta = build_price_answer_for_lookup(
+            client_id=client_id,
+            service_id=service_id,
+            q=q,
+        )
+        ctx_offer_meta: dict[str, Any] | None = offer_meta if offer_meta else None
+        if price_append:
+            if ctx_offer_meta:
+                try:
+                    request.ctx["price_offer_meta"] = ctx_offer_meta
+                except Exception:
+                    pass
             log_json(
                 logger,
                 "price_route",
                 intent="price_lookup",
                 matched_service_id=service_id,
                 match_score=round(match_score, 4),
-                route_source="price_ref",
+                route_source="price_offers",
                 price_key=price_route.get("price_key"),
                 price_ref=ref_px,
                 fallback_reason=price_route.get("fallback_reason"),
+                price_answer_mode="offers_only",
+                **offer_meta,
             )
+            payload = build_price_lookup_payload(
+                sid=sid,
+                client_id=client_id,
+                service_id=service_id,
+                service=service if isinstance(service, dict) else {},
+                match_score=match_score,
+                route_source="price_offers",
+                price_key=price_route.get("price_key"),
+                price_ref=ref_px,
+                price_item=price_route.get("price_item"),
+                question=q,
+            )
+            return AskOrchestrationResult(
+                kind="service_reply",
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                service_payload=payload,
+                service_doc_id=None,
+                service_track_user=True,
+                service_route="price_lookup",
+                price_offer_meta=ctx_offer_meta,
+                decision_frame=decision_frame,
+            )
+        ch = get_chunk_by_ref(ref_px, client_id=client_id)
+        if ch:
             q0 = (q or "").strip()
             llmq = (
                 f"{q0}\n\n"
-                "Ответь по ценам только из материала ниже. "
+                "Ответь по смыслу цены из материала ниже: что входит, этапы, от чего зависит. "
                 "Без вступлений вроде «такая услуга есть», «стоимость составляет». "
-                "Сразу по сути, цифры только из текста."
+                "Сразу по сути; если ниже будет блок «Точные цены» — итоговые суммы не дублируй в своём тексте."
             )
             if str(price_route.get("fallback_reason") or "") == "context_session":
                 svc_ctx = price_route.get("service") if isinstance(price_route.get("service"), dict) else {}
@@ -155,6 +199,31 @@ def price_matched_from_route(
                         "Упомяни в ответе это название или короткий синоним из каталога "
                         "(например all-on-4), чтобы было ясно, о какой услуге речь."
                     )
+            price_append, offer_meta = build_price_append_for_lookup(
+                client_id=client_id,
+                service_id=service_id,
+                q=q,
+            )
+            ctx_offer_meta = offer_meta if offer_meta else None
+            if price_append:
+                llmq += price_append_llm_hint()
+                if ctx_offer_meta:
+                    try:
+                        request.ctx["price_offer_meta"] = ctx_offer_meta
+                    except Exception:
+                        pass
+            log_json(
+                logger,
+                "price_route",
+                intent="price_lookup",
+                matched_service_id=service_id,
+                match_score=round(match_score, 4),
+                route_source="price_ref",
+                price_key=price_route.get("price_key"),
+                price_ref=ref_px,
+                fallback_reason=price_route.get("fallback_reason"),
+                **offer_meta,
+            )
             return AskOrchestrationResult(
                 kind="chunk",
                 q=q,
@@ -165,6 +234,8 @@ def price_matched_from_route(
                 log_event="Answer generated from price_ref",
                 chunk_route="price_lookup",
                 matched_service_id=service_id or None,
+                generator_append_text=price_append,
+                price_offer_meta=ctx_offer_meta,
                 decision_frame=decision_frame,
             )
     payload = build_price_lookup_payload(
@@ -177,6 +248,7 @@ def price_matched_from_route(
         price_key=price_route.get("price_key"),
         price_ref=price_route.get("price_ref"),
         price_item=price_route.get("price_item"),
+        question=q,
     )
     log_json(logger, "price_route", **payload.get("meta") or {})
     return AskOrchestrationResult(
@@ -251,6 +323,25 @@ def try_a3_price_route(
     if sr.source == "price_lookup_clarify" and isinstance(sr.payload, dict):
         pr_cl = sr.payload.get("price_route")
         if isinstance(pr_cl, dict):
+            if pr_cl.get("mode") in ("unit_clarify", "group_overview"):
+                payload = build_price_unit_clarify_payload(
+                    sid=sid,
+                    client_id=client_id,
+                    match_score=float(pr_cl.get("match_score") or 0.0),
+                    group_id=str(pr_cl.get("group_id") or "implantation"),
+                )
+                log_json(logger, "price_route", **payload.get("meta") or {})
+                return AskOrchestrationResult(
+                    kind="service_reply",
+                    q=q,
+                    sid=sid,
+                    client_id=client_id,
+                    service_payload=payload,
+                    service_doc_id=None,
+                    service_track_user=True,
+                    service_route="price_lookup",
+                    decision_frame=decision_frame,
+                )
             return _service_reply_from_price_route(
                 q=q,
                 sid=sid,
@@ -274,6 +365,25 @@ def price_lookup_intent_fallback(
     price_route = select_price_service_route(
         q, client_id=client_id, sid=sid, intent_override="price_lookup"
     )
+    if price_route.get("mode") in ("unit_clarify", "group_overview"):
+        payload = build_price_unit_clarify_payload(
+            sid=sid,
+            client_id=client_id,
+            match_score=float(price_route.get("match_score") or 0.0),
+            group_id=str(price_route.get("group_id") or "implantation"),
+        )
+        log_json(logger, "price_route", **payload.get("meta") or {})
+        return AskOrchestrationResult(
+            kind="service_reply",
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            service_payload=payload,
+            service_doc_id=None,
+            service_track_user=True,
+            service_route="price_lookup",
+            decision_frame=decision_frame,
+        )
     if price_route.get("mode") == "clarify":
         return _service_reply_from_price_route(
             q=q,

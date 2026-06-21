@@ -553,29 +553,51 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 
 ---
 
-### Этап 5 — Verifier gate (tiered)
+### Этап 5 — Numeric fact safety (5a) + LLM verifier shadow
 
 | | |
 |--|--|
-| **Срок** | 1–2 недели / **1 день** MVP |
-| **Eval** | уровень 2–3 |
+| **Срок** | **5a MVP:** 1 день · **5b:** позже |
+| **Eval** | уровень 2 (unit + price smoke) |
 
-**Hard gate** (блок / перегенерация / safe fallback):
+**Принцип:** gate — **не** второй арбитр качества ответа, а предохранитель от **опасных чисел** (₽, %, рассрочка). LLM A7 (`verifier.py`) **остаётся shadow-only** (метрики, калибровка).
 
-- цены, этапы оплаты, акции, гарантии, сроки с цифрами, «входит / не входит»
+#### 5a — Numeric fact gate (MVP, demo)
 
-**Soft guard** (добавить boundary-фразу, не блокировать):
+**Scope (узко):**
 
-- противопоказания, боль, «можно ли мне»
+- только **`clients/demo`** (`features.yaml`);
+- только **финальный `answer` после сборки** (slots + planner append + price tail);
+- только **`price_lookup`**, deterministic append или answer_slots **с цифрами**;
+- только **₽**, явные **%** и **числовые рассрочки** (N месяцев).
 
-**Сделать:**
+**Whitelist turn'а** (не перечитывать PriceBook): суммы из `price_offer_ids` / `pricebook_simple_value`, deterministic append, appended slots с цифрами.
 
-- [ ] Режим gate для price append и answer_slots с цифрами
-- [ ] Сверка с `price_offers` / `prices.json` / разрешённым md-хвостом
-- [ ] Лог `verifier_blocked` / `verifier_softened` в meta
-- [ ] Флаг в `features.yaml` per client: `verifier_gate.enabled`
+**Actions (лестница, fail-open):**
 
-**От чего избавляемся:** выдуманные 85 200 ₽ и «пожизненная гарантия клиники».
+1. `pass` — все числа ∈ whitelist или gate не применим;
+2. `remove_fact` — вырезать предложение/фразу со спорной цифрой, остальной ответ сохранить;
+3. `blocked` — только если после `remove_fact` ответ пустой или целиком держится на конфликтной цифре → safe fallback.
+
+**Не в 5a:** блок content-ответов про боль/гарантию; LLM hard gate; перегенерация; soft boundary для pain.
+
+**Сделать (5a):**
+
+- [x] `core/numeric_fact_gate.py` — детерминированная сверка ₽ / % / месяцев рассрочки
+- [x] Интеграция: `chunk_responder` (после `_apply_answer_slots_and_price_append`), `ux_builder.build_price_lookup_payload`
+- [x] Meta: `numeric_fact_gate` (`action`, `reason`, `removed`)
+- [x] Флаг `clients/demo/features.yaml`: `verifier_gate.numeric_fact.enabled`
+- [x] Порог `min_answer_chars_after_remove` в `core/routing.yaml`
+- [x] Unit-тесты `tests/test_numeric_fact_gate.py`
+
+#### 5b — позже (по метрикам shadow)
+
+- [ ] гарантии и сроки без ₽ (детерминированно, по whitelist md/facts);
+- [ ] soft boundary для pain / противопоказаний (не блок);
+- [ ] включение других client pack после прогонов;
+- [ ] eval golden «выдуманная цена» / «цена из pricebook ok».
+
+**От чего избавляемся (5a):** выдуманные 85 200 ₽ в price-ответе при корректном append из PriceBook.
 
 ---
 

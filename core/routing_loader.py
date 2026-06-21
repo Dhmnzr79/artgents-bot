@@ -132,6 +132,14 @@ class FollowUpThresholds(BaseModel):
     doc_type_boost: float = Field(..., ge=0.0, le=0.25)
 
 
+class NumericFactGateThresholds(BaseModel):
+    """Deterministic ₽ / % / installment gate (PRODUCT_WORK_PLAN stage 5a)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_answer_chars_after_remove: int = Field(..., ge=0, le=2000)
+
+
 class Thresholds(BaseModel):
     """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
@@ -148,6 +156,7 @@ class Thresholds(BaseModel):
     answer_slots: AnswerSlotsThresholds
     lead_turn: LeadTurnThresholds
     follow_up: FollowUpThresholds
+    numeric_fact_gate: NumericFactGateThresholds
 
 
 _LOCK = threading.Lock()

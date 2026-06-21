@@ -16,6 +16,7 @@ from core.answer_plan_apply import apply_answer_plan_append, payment_terms_suppr
 from core.answer_planner import answer_plan_from_ctx
 from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
+from core.numeric_fact_gate import apply_numeric_fact_gate
 from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, format_answer_for_display
 
 import session as session_mod
@@ -297,6 +298,31 @@ def _apply_answer_slots_and_price_append(
     return answer, slot_meta, combined_append, plan_meta
 
 
+def _apply_numeric_fact_gate(
+    *,
+    answer: str,
+    route: str,
+    meta: dict,
+    client_id: str | None,
+    deterministic_append: str,
+    price_offer_meta: dict | None,
+) -> tuple[str, dict | None]:
+    gate_meta = dict(meta)
+    if isinstance(price_offer_meta, dict):
+        gate_meta.update(price_offer_meta)
+    result = apply_numeric_fact_gate(
+        answer=answer,
+        route=route,
+        meta=gate_meta,
+        client_id=client_id,
+        allowed_source_text=(deterministic_append or "").strip() or None,
+    )
+    gate_payload = result.meta_dict()
+    if not gate_payload:
+        return answer, None
+    return result.answer, gate_payload
+
+
 def verifier_effective_source_body(*, chunk_md_body: str, generator_append_text: str | None) -> str:
     """Текст «разрешённых фактов» для A7: чанк + детерминированный хвост (цены и т.д.), если был."""
     base = (chunk_md_body or "").strip()
@@ -488,6 +514,14 @@ def respond_from_chunk(
         price_offer_meta=price_offer_meta,
         matched_service_id=sid_svc or None,
     )
+    answer, numeric_gate_meta = _apply_numeric_fact_gate(
+        answer=answer,
+        route=route,
+        meta=meta,
+        client_id=client_id,
+        deterministic_append=deterministic_append,
+        price_offer_meta=price_offer_meta,
+    )
 
     st = mem_get(sid)
     pre_turn = _increment_doc_turn_with_pre(
@@ -534,6 +568,8 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if plan_meta:
         payload.setdefault("meta", {}).update(plan_meta)
+    if numeric_gate_meta:
+        payload.setdefault("meta", {}).update(numeric_gate_meta)
     _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
@@ -752,6 +788,14 @@ def respond_from_chunk_stream(
         price_offer_meta=price_offer_meta,
         matched_service_id=sid_svc or None,
     )
+    answer, numeric_gate_meta = _apply_numeric_fact_gate(
+        answer=answer,
+        route=route,
+        meta=meta,
+        client_id=client_id,
+        deterministic_append=deterministic_append,
+        price_offer_meta=price_offer_meta,
+    )
     append_delta = answer[stream_acc.display_sent_len :]
     if append_delta:
         yield _yield_delta(append_delta)
@@ -803,6 +847,8 @@ def respond_from_chunk_stream(
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if plan_meta:
         payload.setdefault("meta", {}).update(plan_meta)
+    if numeric_gate_meta:
+        payload.setdefault("meta", {}).update(numeric_gate_meta)
     _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)

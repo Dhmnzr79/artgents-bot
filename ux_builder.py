@@ -3,6 +3,7 @@ import os
 import re
 
 from config import default_cta_dict
+from core.numeric_fact_gate import apply_numeric_fact_gate
 from llm import generate_facts_card_answer
 from meta_loader import get_doc_path
 
@@ -472,6 +473,17 @@ def build_price_lookup_payload(
         "followups": [],
     }
     meta.update(offer_meta)
+    gate_result = apply_numeric_fact_gate(
+        answer=answer or "",
+        route="price_lookup",
+        meta=meta,
+        client_id=client_id,
+        allowed_source_text=None,
+    )
+    answer = gate_result.answer
+    gate_meta = gate_result.meta_dict()
+    if gate_meta:
+        meta.update(gate_meta)
     return {
         "answer": answer,
         "quick_replies": quick,
@@ -543,6 +555,17 @@ def build_price_aspect_payload(
         "followups": [],
     }
     meta.update(offer_meta)
+    gate_result = apply_numeric_fact_gate(
+        answer=answer or "",
+        route="price_lookup",
+        meta=meta,
+        client_id=client_id,
+        allowed_source_text=None,
+    )
+    answer = gate_result.answer
+    gate_meta = gate_result.meta_dict()
+    if gate_meta:
+        meta.update(gate_meta)
     return {
         "answer": answer,
         "quick_replies": quick,

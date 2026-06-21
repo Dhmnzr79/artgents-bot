@@ -23,3 +23,8 @@ messaging:
 
 ingress:
   strict: true
+
+# Stage 5a: deterministic numeric fact safety (demo only until eval green)
+verifier_gate:
+  numeric_fact:
+    enabled: true

@@ -77,7 +77,7 @@
 | # | Проблема | Суть |
 |---|----------|------|
 | 9 | **Этап 4 planner-lite** | Риск дубля `installment_12`: fact_refs в price-ответе + append payment_terms md. |
-| 10 | **Этап 5 verifier** | `natural` facts без LLM-paraphrase; gate «любая ₽ ∈ PriceBook» не стоит. |
+| 10 | **Этап 5 verifier** | 5a numeric gate (demo) — done; 5b: `natural` facts, гарантии без ₽, другие client pack. |
 | 11 | **S5 policy** | «1 member в group → сразу S4» не реализовано. |
 
 ### Demo-контент (не код)

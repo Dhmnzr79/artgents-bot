@@ -435,6 +435,10 @@ def admin_client_options() -> list[dict[str, str]]:
     ]
 
 
+def numeric_fact_gate_enabled(client_id: str | None) -> bool:
+    return feature_flag(client_id, "verifier_gate", "numeric_fact", "enabled", default=False)
+
+
 def consult_nudge_enabled(client_id: str | None) -> bool:
     return feature_flag(client_id, "consult_nudge", "enabled", default=True)
 

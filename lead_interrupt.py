@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from name_gate import accept_lead_name
-from policy import contacts_intent, price_intent
+from policy import PRICE_CONCERN_RE, contacts_intent, implant_pain_faq_intent, price_intent
 from session import extract_phone, normalize_phone
 
 LEAD_RESUME_REF = "lead:resume"
@@ -20,9 +20,44 @@ _LEAD_CANCEL_RX = re.compile(
     r"|no"
     r"|пока\s+не\s+хочу"
     r"|не\s+сейчас"
+    r"|не\s+хочу(?:\s+запис\w*)?"
     r"|отмен(?:ить|а|ить\s+запись|я)?"
     r"|передумал(?:а)?"
     r")\W*$",
+    re.I | re.U,
+)
+
+_LEAD_META_PAUSE_RX = re.compile(
+    r"^(?:"
+    r"задать\s+вопрос"
+    r"|сначала\s+вопрос"
+    r"|хочу\s+задать\s+вопрос"
+    r")\W*$",
+    re.I | re.U,
+)
+
+_LEAD_DEFER_RX = re.compile(
+    r"^(?:"
+    r"надо\s+подумать"
+    r"|нужно\s+подумать"
+    r"|подумаю"
+    r"|не\s+спешу"
+    r"|пока\s+не\s+готов"
+    r"|пока\s+не\s+готова"
+    r")\W*$",
+    re.I | re.U,
+)
+
+_PAIN_FEAR_RX = re.compile(
+    r"(?:"
+    r"боюсь"
+    r"|страшн"
+    r"|пережива"
+    r"|волну"
+    r"|больно"
+    r"|болит"
+    r"|болят"
+    r")",
     re.I | re.U,
 )
 
@@ -74,6 +109,29 @@ _A_STRONG_QUESTION_RX = re.compile(
 def parse_lead_cancel(text: str) -> bool:
     """Explicit cancel / change-of-mind during active or paused lead."""
     return bool(_LEAD_CANCEL_RX.fullmatch((text or "").strip()))
+
+
+def parse_lead_meta_pause(text: str) -> bool:
+    return bool(_LEAD_META_PAUSE_RX.fullmatch((text or "").strip()))
+
+
+def parse_lead_defer(text: str) -> bool:
+    return bool(_LEAD_DEFER_RX.fullmatch((text or "").strip()))
+
+
+def looks_like_pain_fear_concern(q: str) -> bool:
+    s = (q or "").strip()
+    if len(s) < 4:
+        return False
+    if price_intent(s) or contacts_intent(s):
+        return False
+    if implant_pain_faq_intent(s):
+        return True
+    if not _PAIN_FEAR_RX.search(s):
+        return False
+    if PRICE_CONCERN_RE.search(s):
+        return False
+    return True
 
 
 def is_ambiguous_short_reply(text: str) -> bool:
@@ -129,6 +187,8 @@ def detect_lead_interrupt(q: str, *, resume_step: str) -> str | None:
         return "contacts"
     if price_intent(s):
         return "price"
+    if looks_like_pain_fear_concern(s):
+        return "pain"
     if looks_like_generic_question(s):
         return "generic"
     return None

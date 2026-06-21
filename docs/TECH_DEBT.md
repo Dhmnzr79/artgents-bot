@@ -35,7 +35,7 @@
 | **`pick_relevant_offer` / `offer` в ответе** | заглушка; promo через `promo_note` в answer slots | **2 частично** |
 | **PriceBook v2 — остаток** | MVP 3.5a–3.5d ✅; детали — § PriceBook v2 ниже | **3.5 → 4** — см. `PRICEBOOK_V2.md` |
 | **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
-| **Lead flow v2** | Спека: §3.2. Сейчас: slot-first, узкий interrupt, overlay paused только chunk-path | **3.6** |
+| **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
 | **Follow-up compatibility** | Спека: §3.3, `drafts/2.md`. Сейчас: rewrite частично; `alias_topic_guard` / scope режут cross-topic (warranty при focus=implantation); нет единого focus | **4** |
 
 ---

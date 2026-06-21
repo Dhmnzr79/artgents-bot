@@ -114,6 +114,14 @@ class AnswerSlotsThresholds(BaseModel):
     promo_note_max_chars: int = Field(..., ge=20, le=1000)
 
 
+class LeadTurnThresholds(BaseModel):
+    """Gray-zone lead turn LLM classifier (see docs/CURRENT_ARCHITECTURE.md § Lead flow v2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_confidence: float = Field(..., ge=0.0, le=1.0)
+
+
 class Thresholds(BaseModel):
     """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
@@ -128,6 +136,7 @@ class Thresholds(BaseModel):
     alias: AliasThresholds
     metadata_first: MetadataFirstThresholds
     answer_slots: AnswerSlotsThresholds
+    lead_turn: LeadTurnThresholds
 
 
 _LOCK = threading.Lock()

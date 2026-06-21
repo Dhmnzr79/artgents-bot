@@ -49,6 +49,17 @@ def test_slot_vs_interrupt_name_step() -> None:
     assert looks_like_slot_answer("Мария", "collecting_name")
     assert looks_like_slot_answer("Мария?", "collecting_name")
     assert not looks_like_slot_answer("болит зуб", "collecting_name")
+    assert not looks_like_slot_answer("Я передумал", "collecting_name")
     assert detect_lead_interrupt("А какой адрес?", resume_step="collecting_name") == "contacts"
-    assert detect_lead_interrupt("болит зуб", resume_step="collecting_name") is None
+    assert detect_lead_interrupt("болит зуб", resume_step="collecting_name") == "pain"
     assert detect_lead_interrupt("бирбылыблы", resume_step="collecting_name") is None
+
+
+def test_accept_lead_name_rejects_refusal_phrases() -> None:
+    from name_gate import accept_lead_name
+
+    assert accept_lead_name("Я передумал") is None
+    assert accept_lead_name("Не хочу") is None
+    assert accept_lead_name("я не буду") is None
+    assert accept_lead_name("я Анна") == "Анна"
+    assert accept_lead_name("Мария") == "Мария"

@@ -48,6 +48,14 @@ QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_F
 RERANK_MODEL = (os.getenv("MODEL_RERANK") or "").strip() or QWEN_FLASH_MODEL
 LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
 
+# --- Lead active-turn gray-zone classifier ---
+LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+LEAD_TURN_LLM_MODEL = (os.getenv("LEAD_TURN_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+
 # --- Намерение «записаться» (regex + при необходимости LLM) ---
 BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
     "1",

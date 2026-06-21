@@ -71,3 +71,6 @@ answer_slots:
   consult_value_max_chars: 400
   promo_note_max_chars: 200
 
+lead_turn:
+  min_confidence: 0.65
+

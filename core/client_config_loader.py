@@ -37,6 +37,8 @@ _TONE_KEY_MAP: tuple[tuple[str, str], ...] = (
     (("lead", "paused_bridge_phone"), "lead_paused_bridge_phone"),
     (("lead", "ask_question_label"), "lead_ask_question_label"),
     (("lead", "ask_question_prompt"), "lead_ask_question_prompt"),
+    (("lead", "unclear_retry"), "lead_unclear_retry"),
+    (("lead", "defer_exit"), "lead_defer_exit"),
     (("lead", "offer_declined"), "lead_offer_declined"),
     (("situation", "prompt"), "situation_prompt"),
     (("situation", "retry_short"), "situation_retry_short"),
@@ -89,6 +91,12 @@ _FALLBACK_TXT: dict[str, str] = {
     "lead_ask_question_label": "Задать вопрос",
     "lead_ask_question_prompt": (
         "Хорошо, задайте вопрос — после ответа сможете продолжить запись."
+    ),
+    "lead_unclear_retry": (
+        "Напишите, пожалуйста, имя — или задайте вопрос, и я отвечу."
+    ),
+    "lead_defer_exit": (
+        "Хорошо, без спешки. Когда будете готовы — нажмите «Записаться» или напишите."
     ),
     "bare_affirmative_fallback": "Напишите, пожалуйста, ваш вопрос — так будет проще подсказать.",
     "followup_choose_topic": "Могу рассказать про этапы или про сроки — что выбрать?",

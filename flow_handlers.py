@@ -3,14 +3,8 @@
 import os
 
 from core.lead_context import bind_lead_context_turn
-from lead_interrupt import (
-    LEAD_CANCEL_REF,
-    LEAD_PAUSE_REF,
-    LEAD_RESUME_REF,
-    detect_lead_interrupt,
-    is_ambiguous_short_reply,
-    parse_lead_cancel,
-)
+from core.lead_turn_classifier import classify_lead_active_turn, interrupt_kind_for_content_hint
+from lead_interrupt import LEAD_CANCEL_REF, LEAD_PAUSE_REF, LEAD_RESUME_REF, parse_lead_cancel
 from lead_service import handle_lead, resolve_lead_submit_message
 from name_gate import accept_lead_name
 from policy import explicit_booking_intent
@@ -178,6 +172,67 @@ def _lead_pause_prompt_result(
     }
 
 
+def _lead_defer_result(
+    *,
+    sid: str,
+    client_id: str | None,
+    txt: dict,
+    service_payload,
+) -> dict:
+    exit_lead_flow(sid)
+    return {
+        "payload": service_payload(
+            txt.get(
+                "lead_defer_exit",
+                "Хорошо, без спешки. Когда будете готовы — нажмите «Записаться» или напишите.",
+            ),
+            sid,
+            client_id,
+        ),
+        "doc_id": None,
+        "service_route": "lead_deferred",
+    }
+
+
+def _lead_unclear_reply(
+    sid: str,
+    client_id: str | None,
+    *,
+    txt: dict,
+    service_payload,
+    lead_step: str,
+) -> dict:
+    return service_payload(
+        txt.get(
+            "lead_unclear_retry",
+            "Напишите, пожалуйста, имя — или задайте вопрос, и я отвечу.",
+        ),
+        sid,
+        client_id,
+        lead_flow=True,
+        lead_step=lead_step,
+        quick_replies=_merge_lead_slot_qrs([], txt),
+    )
+
+
+def _pause_for_content(
+    *,
+    sid: str,
+    st: dict,
+    decision,
+) -> None:
+    resume_step = (st.get("lead_intent") or "collecting_name").strip()
+    hint = decision.content_hint
+    interrupt_kind = interrupt_kind_for_content_hint(hint)
+    pause_lead_flow(
+        sid,
+        resume_step=resume_step,
+        return_doc_id=(st.get("current_doc_id") or "").strip() or None,
+        interrupt_kind=interrupt_kind,
+    )
+    bind_lead_context_turn(interrupt_no_topic=True, interrupt_kind=interrupt_kind)
+
+
 def _try_lead_step_controls(
     *,
     ref: str,
@@ -190,13 +245,14 @@ def _try_lead_step_controls(
 ) -> tuple[str, dict | None]:
     """
     Returns (action, flow_result).
-    action: proceed | cancelled | paused_pipeline | paused_prompt
+    action: proceed | cancelled | paused_pipeline | paused_prompt | defer | unclear
     """
-    if ref == LEAD_CANCEL_REF or parse_lead_cancel(q):
+    decision = classify_lead_active_turn(q, ref=ref, st=st, sid=sid, client_id=client_id)
+    if decision.kind == "meta_cancel":
         return "cancelled", _exit_lead_flow_result(
             sid=sid, client_id=client_id, txt=txt, service_payload=service_payload
         )
-    if ref == LEAD_PAUSE_REF:
+    if decision.kind == "meta_pause":
         resume_step = (st.get("lead_intent") or "collecting_name").strip()
         pause_lead_flow(
             sid,
@@ -207,17 +263,26 @@ def _try_lead_step_controls(
         return "paused_prompt", _lead_pause_prompt_result(
             sid=sid, client_id=client_id, txt=txt, service_payload=service_payload
         )
-    resume_step = (st.get("lead_intent") or "collecting_name").strip()
-    kind = detect_lead_interrupt(q, resume_step=resume_step)
-    if kind:
-        pause_lead_flow(
-            sid,
-            resume_step=resume_step,
-            return_doc_id=(st.get("current_doc_id") or "").strip() or None,
-            interrupt_kind=kind,
-        )
-        bind_lead_context_turn(interrupt_no_topic=True, interrupt_kind=kind)
+    if decision.kind == "content":
+        _pause_for_content(sid=sid, st=st, decision=decision)
         return "paused_pipeline", None
+    if decision.kind == "defer":
+        return "defer", _lead_defer_result(
+            sid=sid, client_id=client_id, txt=txt, service_payload=service_payload
+        )
+    if decision.kind == "unclear":
+        step = (st.get("lead_intent") or "collecting_name").strip()
+        lead_step = "phone" if step == "collecting_phone" else "name"
+        return "unclear", {
+            "payload": _lead_unclear_reply(
+                sid,
+                client_id,
+                txt=txt,
+                service_payload=service_payload,
+                lead_step=lead_step,
+            ),
+            "doc_id": None,
+        }
     return "proceed", None
 
 
@@ -352,7 +417,7 @@ def _handle_active_lead_turn(
         txt=txt,
         service_payload=service_payload,
     )
-    if action in {"cancelled", "paused_prompt"}:
+    if action in {"cancelled", "paused_prompt", "defer", "unclear"}:
         return result
     if action == "paused_pipeline":
         return None
@@ -383,24 +448,14 @@ def _collecting_name_reply(
     txt: dict,
     service_payload,
 ) -> dict | None:
-    if is_ambiguous_short_reply(q):
-        return service_payload(
-            txt["lead_name_retry"],
-            sid,
-            client_id,
-            lead_flow=True,
-            lead_step="name",
-            quick_replies=_merge_lead_slot_qrs([], txt),
-        )
     name = accept_lead_name(q)
     if not name:
-        return service_payload(
-            txt["lead_name_retry"],
+        return _lead_unclear_reply(
             sid,
             client_id,
-            lead_flow=True,
+            txt=txt,
+            service_payload=service_payload,
             lead_step="name",
-            quick_replies=_merge_lead_slot_qrs([], txt),
         )
     update_profile(sid, name=name)
     set_lead_intent(sid, "collecting_phone")
@@ -435,7 +490,7 @@ def _handle_lead_name_confirm(
         txt=txt,
         service_payload=service_payload,
     )
-    if action in {"cancelled", "paused_prompt"}:
+    if action in {"cancelled", "paused_prompt", "defer", "unclear"}:
         return result
     if action == "paused_pipeline":
         return None
@@ -566,42 +621,6 @@ def _lead_flow_payload(
             lead_step="done",
         )
     return None
-
-
-def finish_lead_paused_payload(
-    payload: dict,
-    sid: str,
-    client_id: str | None,
-    txt: dict,
-) -> dict:
-    """After a content answer during lead pause: PII meta, bridge, resume QR."""
-    st = mem_get(sid)
-    if not is_lead_paused(st):
-        return payload
-    pmeta = payload.setdefault("meta", {})
-    pmeta["lead_flow"] = True
-    pmeta["lead_paused"] = True
-    pmeta["lead_step"] = "paused"
-    kind = (st.get("lead_interrupt_kind") or "").strip()
-    if kind:
-        pmeta["lead_interrupt_kind"] = kind
-    resume_step = get_lead_resume_step(sid) or "collecting_name"
-    bridge_key = (
-        "lead_paused_bridge_phone"
-        if resume_step == "collecting_phone"
-        else "lead_paused_bridge_name"
-    )
-    bridge = (txt.get(bridge_key) or "").strip()
-    answer = str(payload.get("answer") or "").strip()
-    if get_lead_paused_answer_count(sid) == 0 and bridge and bridge not in answer:
-        payload["answer"] = f"{answer}\n\n{bridge}".strip() if answer else bridge
-    increment_lead_paused_answer_count(sid)
-    payload["quick_replies"] = _lead_pause_quick_replies()
-    payload["cta"] = None
-    payload["video"] = None
-    payload["situation"] = {"show": False, "mode": "normal"}
-    pmeta["followups"] = []
-    return payload
 
 
 def resume_active_lead_flow(

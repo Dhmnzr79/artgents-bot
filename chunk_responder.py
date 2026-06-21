@@ -27,7 +27,6 @@ from session import (
     get_topic_state,
     increment_doc_turn_if_contentful,
     is_lead_context,
-    is_lead_paused,
     mark_h3_covered,
     mark_situation_offered,
     mark_video_pending,
@@ -40,9 +39,7 @@ from session import (
     set_cta_shown,
     set_current_doc,
 )
-from core.client_config_loader import tone_to_txt_dict
 from core.lead_context import lead_interrupt_no_topic
-from flow_handlers import finish_lead_paused_payload
 from ux_builder import build_ask_response, normalize_policy_payload
 
 _APPLY_POLICY_PARAMS = inspect.signature(apply_response_policy).parameters
@@ -478,11 +475,6 @@ def respond_from_chunk(
     if payload.get("cta") and doc_id and not skip_topic:
         set_cta_shown(sid, doc_id, shown=True)
 
-    if is_lead_paused(st):
-        payload = finish_lead_paused_payload(
-            payload, sid, client_id, tone_to_txt_dict(client_id)
-        )
-
     verifier_src = verifier_effective_source_body(
         chunk_md_body=str(s0.get("content") or ""),
         generator_append_text=deterministic_append or None,
@@ -731,11 +723,6 @@ def respond_from_chunk_stream(
 
     if payload.get("cta") and doc_id and not skip_topic:
         set_cta_shown(sid, doc_id, shown=True)
-
-    if is_lead_paused(st):
-        payload = finish_lead_paused_payload(
-            payload, sid, client_id, tone_to_txt_dict(client_id)
-        )
 
     verifier_src = verifier_effective_source_body(
         chunk_md_body=str(s0.get("content") or ""),

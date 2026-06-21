@@ -18,6 +18,8 @@ from config import (
     EMBED_API_KEY,
     EMPATHY_ON,
     LEAD_NAME_CLASSIFY_MODEL,
+    LEAD_TURN_LLM_CLASSIFY_ON,
+    LEAD_TURN_LLM_MODEL,
     MEMORY_ON,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
@@ -897,6 +899,122 @@ def classify_booking_wants_appointment(
             err=str(e)[:300],
         )
         return False
+
+
+_LEAD_TURN_GRAY_SYSTEM = (
+    "Ты классификатор реплики пациента на шаге записи в чате стоматологии "
+    "(бот спрашивает имя или телефон для записи).\n"
+    "Определи намерение реплики. НЕ извлекай имя и телефон — только класс намерения.\n"
+    "kind:\n"
+    "- meta_cancel — отказ от записи, передумал, не хочу (в т.ч. с разговорными вставками: "
+    "«Не, я передумал», «ну ладно, не буду»).\n"
+    "- meta_pause — хочет сначала задать вопрос, не заполняя слот.\n"
+    "- defer — нужно время подумать, не спешит, но не явный отказ.\n"
+    "- content — вопрос по лечению, боли, цене, адресу, услуге (не имя).\n"
+    "- unclear — непонятно / мусор / похоже на попытку имени, но сомнительно.\n"
+    "content_hint (только при kind=content): price | contacts | pain | generic.\n"
+    "confidence: 0.0–1.0.\n"
+    'Ответь одним JSON: {"kind":"...", "content_hint": null или "price|contacts|pain|generic", '
+    '"confidence": число}. Без markdown.'
+)
+
+
+def classify_lead_turn_gray_zone(
+    user_message: str,
+    *,
+    lead_step: str,
+    client_id: str | None,
+    sid: str | None,
+) -> dict | None:
+    """
+    Gray-zone LLM for LEAD_ACTIVE when deterministic rules did not match.
+    Returns parsed dict with kind/content_hint/confidence, or None on skip/failure.
+    """
+    from core.routing_loader import THRESHOLDS
+
+    if not LEAD_TURN_LLM_CLASSIFY_ON:
+        return None
+    msg = (user_message or "").strip()
+    if len(msg) < 2:
+        return None
+    step = (lead_step or "collecting_name").strip()
+    payload = json.dumps(
+        {"message": msg[:600], "lead_step": step},
+        ensure_ascii=False,
+    )
+    try:
+        resp = chat_completions_create(
+            model=LEAD_TURN_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=80,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _LEAD_TURN_GRAY_SYSTEM},
+                {"role": "user", "content": payload},
+            ],
+        )
+        log_llm_usage(
+            logger, resp, call_type="lead_turn_gray", model=LEAD_TURN_LLM_MODEL
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("lead_turn_gray_not_object")
+        kind = str(obj.get("kind") or "").strip().lower()
+        allowed = {"meta_cancel", "meta_pause", "defer", "content", "unclear"}
+        if kind not in allowed:
+            raise ValueError(f"lead_turn_gray_bad_kind:{kind!r}")
+        hint_raw = obj.get("content_hint")
+        hint = None
+        if hint_raw is not None and str(hint_raw).strip():
+            hint = str(hint_raw).strip().lower()
+            if hint not in {"price", "contacts", "pain", "generic"}:
+                hint = "generic"
+        conf_raw = obj.get("confidence")
+        try:
+            confidence = float(conf_raw)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        min_conf = float(THRESHOLDS.lead_turn.min_confidence)
+        if confidence < min_conf:
+            log_json(
+                logger,
+                "lead_turn_gray_low_confidence",
+                client_id=client_id,
+                sid=sid,
+                kind=kind,
+                confidence=confidence,
+                min_confidence=min_conf,
+            )
+            return None
+        log_json(
+            logger,
+            "lead_turn_gray",
+            client_id=client_id,
+            sid=sid,
+            kind=kind,
+            content_hint=hint,
+            confidence=confidence,
+            lead_step=step,
+        )
+        return {"kind": kind, "content_hint": hint, "confidence": confidence}
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="lead_turn_gray",
+            err=str(e),
+            model=LEAD_TURN_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "lead_turn_gray_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
 
 
 _PRICE_INTENT_SYSTEM = (

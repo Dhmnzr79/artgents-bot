@@ -16,8 +16,9 @@ from core.observability_pii import (
     observability_turn_preview,
     observability_user_texts,
 )
+from core.lead_paused_overlay import apply_lead_paused_overlay
 from logging_setup import emit_bot_event, get_logger
-from session import get_topic_state, mem_get, record_last_bot_payload
+from session import get_topic_state, is_lead_paused, mem_get, record_last_bot_payload
 
 logger = get_logger("bot")
 
@@ -61,10 +62,21 @@ def finalize_ask(
     doc_id: str | None = None,
     turn_meta: dict | None = None,
     route: str | None = None,
+    client_id: str | None = None,
 ) -> dict:
-    record_last_bot_payload(sid, payload)
     st = mem_get(sid)
     meta = payload.setdefault("meta", {})
+    cid = (
+        (client_id or "").strip()
+        or str(meta.get("client_id") or "").strip()
+        or str(getattr(request, "ctx", {}).get("client_id") or "").strip()
+        or None
+    )
+    if is_lead_paused(st):
+        payload = apply_lead_paused_overlay(payload, sid, cid)
+        meta = payload.setdefault("meta", {})
+    record_last_bot_payload(sid, payload)
+    st = mem_get(sid)
     session_turn_count = int(st.get("session_turn_count") or 0)
     if doc_id:
         tstate = get_topic_state(sid, doc_id)

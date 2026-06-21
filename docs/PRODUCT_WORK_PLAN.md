@@ -490,19 +490,19 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 |--|--|
 | **Срок** | 3–7 дней / **1–2 дня** кода |
 | **Eval** | уровень 2–3; `lead_turn_golden.json` |
-| **Статус** | 📋 **спека согласована**; код — см. `TECH_DEBT.md` |
+| **Статус** | ✅ **MVP готов** (deterministic classifier; gray LLM — TECH_DEBT) |
 
 **Спека:** § **3.2 Lead flow v2** (этот документ), runtime — `CURRENT_ARCHITECTURE.md` § Lead flow v2.
 
 **Сделать:**
 
-- [ ] `LeadTurnDecision` в `contracts/` + `core/lead_turn_classifier.py` (regex/meta/slot → gray LLM)
-- [ ] Перестроить `flow_handlers`: intent before slot; расширить cancel/pause текстом; класс `defer`
-- [ ] Первый экран записи: только имя, без exit-кнопок; текстовый cancel всегда
-- [ ] Единый **lead overlay** после `finalize_turn` (chunk + price + contacts)
-- [ ] Price interrupt в lead → pause → PriceAnswerAssembler; followups `price:*` в PAUSED
-- [ ] `evals/v5/lead_turn_golden.json` + smoke-кейсы из реальных застреваний
-- [ ] Обновить `tests/test_lead_interrupt.py` под новый контракт (не slot-first)
+- [x] `LeadTurnDecision` в `contracts/` + `core/lead_turn_classifier.py` (deterministic + gray LLM hook)
+- [x] Перестроить `flow_handlers`: intent before slot; расширить cancel/pause текстом; класс `defer`
+- [x] Первый экран записи: только имя, без exit-кнопок; текстовый cancel всегда
+- [x] Единый **lead overlay** после `finalize_turn` (chunk + price + contacts)
+- [x] Price interrupt в lead → pause → PriceAnswerAssembler; followups `price:*` в PAUSED (overlay)
+- [x] `evals/v5/lead_turn_golden.json` + smoke-кейсы из реальных застреваний
+- [x] Обновить `tests/test_lead_interrupt.py` под новый контракт (не slot-first)
 
 **Не трогаем:** pre-Resolver lead gate (regex-only); cesi/nikadent.
 

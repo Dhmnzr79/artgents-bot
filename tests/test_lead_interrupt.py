@@ -4,11 +4,11 @@ from __future__ import annotations
 import uuid
 
 from core.observability_pii import observability_user_texts
+from core.lead_paused_overlay import finish_lead_paused_payload
 from flow_handlers import (
     LEAD_BOOKING_REF,
     _collecting_name_reply,
     _try_lead_step_controls,
-    finish_lead_paused_payload,
     handle_flows,
 )
 from lead_interrupt import (
@@ -17,6 +17,8 @@ from lead_interrupt import (
     is_ambiguous_short_reply,
     looks_like_slot_answer,
     parse_lead_cancel,
+    parse_lead_defer,
+    parse_lead_meta_pause,
 )
 from session import (
     is_lead_context,
@@ -33,7 +35,7 @@ from session import (
 def test_detect_lead_interrupt_contacts_price_generic() -> None:
     assert detect_lead_interrupt("А какой адрес?", resume_step="collecting_name") == "contacts"
     assert detect_lead_interrupt("Сколько стоит имплант?", resume_step="collecting_name") == "price"
-    assert detect_lead_interrupt("А больно ли?", resume_step="collecting_name") == "generic"
+    assert detect_lead_interrupt("А больно ли?", resume_step="collecting_name") == "pain"
     assert detect_lead_interrupt("расскажите про all-on-4", resume_step="collecting_name") == "generic"
 
 
@@ -54,7 +56,26 @@ def test_parse_lead_cancel_includes_ne_seychas() -> None:
     assert parse_lead_cancel("не надо")
     assert parse_lead_cancel("отменить запись")
     assert parse_lead_cancel("не сейчас")
+    assert parse_lead_cancel("не хочу")
+    assert parse_lead_cancel("Не хочу")
+    assert parse_lead_cancel("не хочу записываться")
+    assert parse_lead_cancel("передумал")
+    assert not parse_lead_cancel("Я передумал")
+    assert not parse_lead_cancel("Не, я передумал")
+    assert not parse_lead_cancel("я не буду")
     assert not parse_lead_cancel("Мария")
+
+
+def test_parse_lead_meta_pause_and_defer() -> None:
+    assert parse_lead_meta_pause("задать вопрос")
+    assert parse_lead_meta_pause("хочу задать вопрос")
+    assert parse_lead_defer("надо подумать")
+    assert not parse_lead_meta_pause("Я боюсь боли")
+
+
+def test_detect_lead_interrupt_pain() -> None:
+    assert detect_lead_interrupt("Я боюсь боли", resume_step="collecting_name") == "pain"
+    assert detect_lead_interrupt("А больно ли?", resume_step="collecting_name") == "pain"
 
 
 def test_pause_and_resume_session_fields() -> None:
@@ -171,13 +192,13 @@ def test_first_lead_prompt_has_no_ask_question_qr() -> None:
     assert not any((qr.get("ref") or "") == LEAD_PAUSE_REF for qr in qrs)
 
 
-def test_lead_name_retry_has_ask_question_qr() -> None:
+def test_lead_invalid_name_gets_unclear_with_ask_question_qr() -> None:
     sid = uuid.uuid4().hex
     mem_reset(sid)
     set_lead_intent(sid, "collecting_name")
     txt = {
         "lead_ask_question_label": "Задать вопрос",
-        "lead_name_retry": "Напишите просто имя.",
+        "lead_unclear_retry": "Напишите имя или задайте вопрос.",
     }
 
     def _sp(answer, sid, client_id, **kwargs):

@@ -12,6 +12,8 @@ from core.consult_nudge import (
     record_consult_nudge_after_answer,
     topic_exhausted_after_this_chunk,
 )
+from core.answer_plan_apply import apply_answer_plan_append, payment_terms_suppress_refs
+from core.answer_planner import answer_plan_from_ctx
 from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
 from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, format_answer_for_display
@@ -38,6 +40,7 @@ from session import (
     record_answer_slots_shown,
     set_cta_shown,
     set_current_doc,
+    set_last_aspect,
 )
 from core.lead_context import lead_interrupt_no_topic
 from ux_builder import build_ask_response, normalize_policy_payload
@@ -88,6 +91,19 @@ def _nav_ref_suppress_list() -> list[str]:
         return [ref] if ref else []
     except Exception:
         return []
+
+
+def _plan_append_suppress_refs(
+    plan_meta: dict[str, Any] | None,
+    *,
+    doc_id: str | None = None,
+    answer_body: str | None = None,
+) -> list[str]:
+    return payment_terms_suppress_refs(
+        plan_meta=plan_meta,
+        doc_id=doc_id,
+        answer_body=answer_body,
+    )
 
 
 def _increment_doc_turn_with_pre(
@@ -231,9 +247,22 @@ def _apply_answer_slots_and_price_append(
     doc_id: str | None,
     generator_append_text: str | None,
     lead_context: bool,
-) -> tuple[str, dict | None, str]:
-    """Append clinic/consult/promo slots, then price append; return telemetry + combined append."""
+    price_offer_meta: dict | None = None,
+    matched_service_id: str | None = None,
+) -> tuple[str, dict | None, str, dict | None]:
+    """Append clinic/consult/promo slots, planner append, then price tail."""
     tstate = get_topic_state(sid, doc_id) if doc_id else {}
+    plan = answer_plan_from_ctx()
+    svc_id = str(matched_service_id or meta.get("matched_service_id") or "").strip() or None
+    plan_append, plan_apply_meta = apply_answer_plan_append(
+        plan,
+        client_id=meta.get("client_id"),
+        service_id=svc_id,
+        q=q,
+        existing_append=generator_append_text,
+        price_offer_meta=price_offer_meta,
+        answer_body=answer,
+    )
     slots_text, telemetry = assemble_answer_slots(
         meta=meta,
         h3_id=chunk.get("h3_id"),
@@ -244,7 +273,7 @@ def _apply_answer_slots_and_price_append(
     )
     combined_append = merge_deterministic_appends(
         slots_text=slots_text,
-        generator_append_text=generator_append_text,
+        generator_append_text=plan_append,
     )
     answer = _append_generator_append_text(answer, combined_append or None)
     if doc_id and telemetry.appended:
@@ -256,7 +285,16 @@ def _apply_answer_slots_and_price_append(
             turn=next_turn,
         )
     slot_meta = telemetry.model_dump() if telemetry.appended or telemetry.suppressed else None
-    return answer, slot_meta, combined_append
+    plan_meta: dict[str, Any] | None = None
+    if plan is not None:
+        if plan.primary_aspect:
+            set_last_aspect(sid, plan.primary_aspect)
+        plan_meta = {
+            "answer_plan": plan.model_dump(),
+        }
+        if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
+            plan_meta["answer_plan_apply"] = plan_apply_meta
+    return answer, slot_meta, combined_append, plan_meta
 
 
 def verifier_effective_source_body(*, chunk_md_body: str, generator_append_text: str | None) -> str:
@@ -437,7 +475,7 @@ def respond_from_chunk(
     )
     st_pre = mem_get(sid)
     lead_context = is_lead_context(st_pre)
-    answer, slot_meta, deterministic_append = _apply_answer_slots_and_price_append(
+    answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
         answer=answer,
         meta=meta,
         chunk=chunk,
@@ -447,6 +485,8 @@ def respond_from_chunk(
         doc_id=doc_id,
         generator_append_text=generator_append_text,
         lead_context=lead_context,
+        price_offer_meta=price_offer_meta,
+        matched_service_id=sid_svc or None,
     )
 
     st = mem_get(sid)
@@ -471,6 +511,11 @@ def respond_from_chunk(
         else record_consult_nudge_after_answer(sid, route, planned_nudge, answer)
     )
 
+    suppress_refs = _nav_ref_suppress_list() + _plan_append_suppress_refs(
+        plan_meta,
+        doc_id=doc_id,
+        answer_body=answer,
+    )
     payload = build_ask_response(
         answer=answer,
         top=chunk,
@@ -479,7 +524,7 @@ def respond_from_chunk(
         profile=profile,
         client_id=client_id,
         topic_state=tstate,
-        suppress_refs=_nav_ref_suppress_list(),
+        suppress_refs=suppress_refs,
     )
     if route:
         payload.setdefault("meta", {})["orch_route"] = route
@@ -487,6 +532,8 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["intent"] = "price_concern"
     if slot_meta:
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
+    if plan_meta:
+        payload.setdefault("meta", {}).update(plan_meta)
     _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
@@ -692,7 +739,7 @@ def respond_from_chunk_stream(
     )
     st_pre = mem_get(sid)
     lead_context = is_lead_context(st_pre)
-    answer, slot_meta, deterministic_append = _apply_answer_slots_and_price_append(
+    answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
         answer=answer_base,
         meta=meta,
         chunk=chunk,
@@ -702,6 +749,8 @@ def respond_from_chunk_stream(
         doc_id=doc_id,
         generator_append_text=generator_append_text,
         lead_context=lead_context,
+        price_offer_meta=price_offer_meta,
+        matched_service_id=sid_svc or None,
     )
     append_delta = answer[stream_acc.display_sent_len :]
     if append_delta:
@@ -731,6 +780,11 @@ def respond_from_chunk_stream(
         else record_consult_nudge_after_answer(sid, route, planned_nudge, answer)
     )
 
+    suppress_refs = _nav_ref_suppress_list() + _plan_append_suppress_refs(
+        plan_meta,
+        doc_id=doc_id,
+        answer_body=answer,
+    )
     payload = build_ask_response(
         answer=answer,
         top=chunk,
@@ -739,7 +793,7 @@ def respond_from_chunk_stream(
         profile=profile,
         client_id=client_id,
         topic_state=tstate,
-        suppress_refs=_nav_ref_suppress_list(),
+        suppress_refs=suppress_refs,
     )
     if route:
         payload.setdefault("meta", {})["orch_route"] = route
@@ -747,6 +801,8 @@ def respond_from_chunk_stream(
         payload.setdefault("meta", {})["intent"] = "price_concern"
     if slot_meta:
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
+    if plan_meta:
+        payload.setdefault("meta", {}).update(plan_meta)
     _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)

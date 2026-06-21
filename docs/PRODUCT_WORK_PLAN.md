@@ -514,7 +514,7 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 |--|--|
 | **Срок** | 1–3 недели / **1–2 дня** |
 | **Eval** | уровень 3 |
-| **Статус** | ⏳ **4a** ✅ MVP; **4b** не начат |
+| **Статус** | ⏳ **4a** ✅ MVP; **4b** ⏳ MVP partial (append-only; golden 9/12 + 3 known) |
 
 #### 4a — Follow-up & compatibility guard (§3.3)
 
@@ -537,13 +537,15 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 
 **Сделать:**
 
-- [ ] `core/answer_planner.py` — **без LLM**: вход DecisionFrame, catalog match, regex (`под ключ`, `рассрочка`, `акция`, `vs`, `боюсь`)
-- [ ] **Aspect + session:** резолв `aspect` (MVP: rules + `last_aspect`); subject carry-over («А это больно?»)
-- [ ] Session: `last_aspect` — отдельно от `last_subject` (не смешивать с `last_catalog_service_id`)
-- [ ] Planner: append по **subject + aspect** (`payment` → payment_terms), не «aspect → один файл»
-- [ ] Выход: `{ primary_chunk_ref, append: [price_offer, payment_terms, boundary], slots: [...], risk: [price] }`
-- [ ] Интеграция в `orchestration/` после A3, до `chunk_responder`
-- [ ] Golden: 10 составных вопросов из `IMPLANT_QUESTIONS_COVERAGE` (напр. 1+7+8, 3+7, 16+6)
+- [x] `core/answer_planner.py` — **без LLM**: вход DecisionFrame, catalog match, regex (`под ключ`, `рассрочка`, `акция`, `vs`, `боюсь`)
+- [x] **Aspect + session:** резолв `aspect` (MVP: rules + `last_aspect`); subject carry-over («А это больно?»)
+- [x] Session: `last_aspect` — отдельно от `last_subject` (не смешивать с `last_catalog_service_id`)
+- [x] Planner: append по **subject + aspect** (`payment` → payment_terms), не «aspect → один файл»
+- [x] Выход: `{ primary_chunk_ref, append: [price_offer, payment_terms, boundary], slots: [...], risk: [price] }`
+- [x] Интеграция в `orchestration/` после A3, до `chunk_responder`
+- [x] Golden: 10 составных + 2 negative (`planner_golden.json`); **baseline 9/12**, 3 known out-of-scope (warranty/turnkey/comparison routing)
+- [x] `clear_focus_context()` — `last_subject` + `last_aspect` + `subject_turn_age`; price-turn → `last_subject`
+- [x] `last_aspect` — telemetry текущего хода only; append только от явных aspects в вопросе
 
 **От чего избавляемся:** «ответил только про протокол, забыл рассрочку».
 

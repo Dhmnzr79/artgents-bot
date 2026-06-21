@@ -23,6 +23,7 @@ from policy import (
     pick_contacts_chunk,
     pick_implant_pain_faq_chunk,
 )
+from core.answer_planner import build_answer_plan, publish_answer_plan
 from query_selector import select_price_service_route
 from retriever import get_chunk_by_ref, normalize_retrieval_query, retrieve
 from source_routing import route_source, slim_source_route_payload
@@ -110,6 +111,16 @@ def orchestrate_routing_after_resolver(
         srd = slim_source_route_payload(sr)
         request.ctx["source_route_decision"] = srd
         emit_bot_event(logger, "source_route_decision", status="ok", details=srd)
+
+        plan = build_answer_plan(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            intent=intent,
+            decision=decision,
+            source_route=sr,
+        )
+        publish_answer_plan(plan)
 
         doc_result = try_a3_doctor_route(
             q=q,

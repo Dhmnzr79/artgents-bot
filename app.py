@@ -105,6 +105,34 @@ def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
     return bool(pmeta.get("lead_flow") or pmeta.get("situation_collect"))
 
 
+def _suppress_plan_append_quick_replies(payload: dict, plan_apply_meta: dict[str, Any]) -> None:
+    from core.answer_plan_apply import payment_terms_suppress_refs
+    from core.price_answer_assembler import hide_navigated_quick_replies
+
+    meta = payload.get("meta") or {}
+    suppress_list = payment_terms_suppress_refs(
+        plan_meta={
+            "answer_plan": meta.get("answer_plan"),
+            "answer_plan_apply": plan_apply_meta,
+        },
+        doc_id=meta.get("doc_id"),
+        answer_body=str(payload.get("answer") or ""),
+    )
+    if not suppress_list:
+        return
+    suppress = {str(r).strip().lower() for r in suppress_list if str(r).strip()}
+    payload["quick_replies"] = hide_navigated_quick_replies(
+        list(payload.get("quick_replies") or []),
+        exclude_refs=suppress,
+    )
+    meta = payload.setdefault("meta", {})
+    if isinstance(meta.get("followups"), list):
+        meta["followups"] = hide_navigated_quick_replies(
+            list(meta.get("followups") or []),
+            exclude_refs=suppress,
+        )
+
+
 def _service_reply(
     payload: dict,
     sid: str,
@@ -114,7 +142,10 @@ def _service_reply(
     track_user: bool = True,
     route: str | None = None,
 ):
+    from core.answer_plan_apply import apply_answer_plan_append
+    from core.answer_planner import answer_plan_from_ctx
     from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
+    from session import set_last_aspect
 
     reset_consult_nudge_on_route(route, sid)
     if track_user and q and not _skip_lead_pii_in_session_hist(payload):
@@ -122,6 +153,46 @@ def _service_reply(
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
     r = (route or "").strip().lower()
+    plan = answer_plan_from_ctx()
+    pmeta = payload.get("meta") or {}
+    if plan is not None and r in {"price_lookup", "price_concern", "catalog_facts"}:
+        svc_id = str(pmeta.get("matched_service_id") or plan.service_id or "").strip() or None
+        plan_tail, plan_apply_meta = apply_answer_plan_append(
+            plan,
+            client_id=pmeta.get("client_id"),
+            service_id=svc_id,
+            q=q,
+            existing_append=None,
+            price_offer_meta=pmeta if isinstance(pmeta, dict) else None,
+            answer_body=str(payload.get("answer") or ""),
+        )
+        if plan_tail:
+            base = str(payload.get("answer") or "").strip()
+            if plan_tail not in base:
+                payload["answer"] = f"{base}\n\n{plan_tail}" if base else plan_tail
+        if plan.primary_aspect:
+            set_last_aspect(sid, plan.primary_aspect)
+        payload.setdefault("meta", {})["answer_plan"] = plan.model_dump()
+        if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
+            _suppress_plan_append_quick_replies(payload, plan_apply_meta)
+            payload.setdefault("meta", {})["answer_plan_apply"] = plan_apply_meta
+    if (
+        r in {"price_lookup", "price_concern", "catalog_facts"}
+        and not _skip_lead_pii_in_session_hist(payload)
+    ):
+        from core.follow_up_rewrite import persist_focus_from_service_turn
+
+        pmeta = payload.get("meta") or {}
+        svc_id = str(pmeta.get("matched_service_id") or "").strip() or None
+        topic = (plan.topic if plan else None) or str(pmeta.get("service_topic") or "").strip() or None
+        persist_focus_from_service_turn(
+            sid,
+            client_id=pmeta.get("client_id"),
+            matched_service_id=svc_id,
+            route=r,
+            answer=str(payload.get("answer") or ""),
+            topic=topic,
+        )
     if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
         pmeta = payload.get("meta") or {}
         record_consult_nudge_after_answer(

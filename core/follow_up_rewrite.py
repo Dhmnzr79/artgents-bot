@@ -180,6 +180,44 @@ def rewrite_follow_up_query(q: str, focus: dict[str, str]) -> str:
     return label
 
 
+def persist_focus_from_service_turn(
+    session_id: str,
+    *,
+    client_id: str | None,
+    matched_service_id: str | None,
+    route: str | None,
+    answer: str,
+    topic: str | None = None,
+) -> None:
+    """Write last_subject after price/catalog service_reply (4a focus for follow-up)."""
+    if not (answer or "").strip():
+        return
+    if route in ("guided", "lead_cancelled", "error"):
+        return
+    from session import set_last_catalog_service, set_last_subject
+
+    meta: dict[str, Any] = {}
+    if topic:
+        meta["topic"] = topic.strip().lower()
+    focus = resolve_focus_from_turn(
+        client_id=client_id,
+        doc_id=None,
+        matched_service_id=matched_service_id,
+        route=route,
+        meta=meta,
+    )
+    if not focus:
+        return
+    set_last_subject(
+        session_id,
+        service_id=focus["service_id"],
+        topic=focus["topic"],
+        label=focus["label"],
+        last_route=str(focus.get("last_route") or route or ""),
+    )
+    set_last_catalog_service(session_id, focus["service_id"])
+
+
 def prepare_follow_up_turn(
     q: str,
     st: dict[str, Any],
@@ -237,9 +275,26 @@ def get_follow_up_turn_ctx(
 
     if not sid:
         return None
-    from session import mem_get
+    from session import clear_focus_context, mem_get
 
     st = mem_get(sid)
+    q0 = (q or "").strip()
+    focus: dict[str, str] | None = None
+    sub = st.get("last_subject")
+    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
+        focus = {
+            "service_id": str(sub.get("service_id") or "").strip(),
+            "topic": str(sub.get("topic") or "").strip(),
+            "label": str(sub.get("label") or sub.get("service_id") or "").strip(),
+            "last_route": str(sub.get("last_route") or "").strip(),
+        }
+    else:
+        focus = focus_from_legacy_session(st, client_id=client_id)
+
+    if focus and is_explicit_topic_change(q0, focus, client_id=client_id):
+        clear_focus_context(sid)
+        return None
+
     ctx = prepare_follow_up_turn(q, st, client_id=client_id)
     if ctx is None:
         return None

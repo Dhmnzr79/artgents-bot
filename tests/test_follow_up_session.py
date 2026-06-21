@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from session import (
     clear_last_subject,
+    get_last_aspect,
     get_last_subject,
     mem_add_user,
     mem_get,
+    set_last_aspect,
     set_last_subject,
 )
 
@@ -40,6 +42,21 @@ def test_mem_add_user_increments_subject_turn_age():
     )
     mem_add_user(sid, "а гарантия?")
     assert int(mem_get(sid).get("subject_turn_age") or 0) == 1
+
+
+def test_clear_last_subject_clears_aspect_too():
+    sid = "test-clear-aspect"
+    set_last_subject(
+        sid,
+        service_id="classic",
+        topic="implantation",
+        label="classic",
+        last_route="retrieval_chunk",
+    )
+    set_last_aspect(sid, "payment")
+    clear_last_subject(sid)
+    assert get_last_subject(sid) is None
+    assert get_last_aspect(sid) is None
 
 
 def test_clear_last_subject_resets_age():

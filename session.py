@@ -89,6 +89,7 @@ def _fresh_defaults() -> dict:
         "last_content_ui_payload": None,
         "last_catalog_service_id": None,
         "last_subject": None,
+        "last_aspect": None,
         "subject_turn_age": 0,
         "pending_lead_offer": False,
         "user_turn_timestamps": [],
@@ -406,13 +407,50 @@ def set_last_subject(
         _persist_unlocked(session_id, st)
 
 
-def clear_last_subject(session_id: str) -> None:
+def clear_focus_context(session_id: str) -> None:
+    """Reset dialog focus: subject, aspect, turn age (4a/4b)."""
     with _lock:
         st = mem_get(session_id)
-        if st.get("last_subject") is None and int(st.get("subject_turn_age") or 0) == 0:
+        if (
+            st.get("last_subject") is None
+            and st.get("last_aspect") is None
+            and int(st.get("subject_turn_age") or 0) == 0
+        ):
             return
         st["last_subject"] = None
+        st["last_aspect"] = None
         st["subject_turn_age"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def clear_last_subject(session_id: str) -> None:
+    clear_focus_context(session_id)
+
+
+def get_last_aspect(session_id: str) -> str | None:
+    st = mem_get(session_id)
+    raw = st.get("last_aspect")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    return None
+
+
+def set_last_aspect(session_id: str, aspect: str | None) -> None:
+    val = (aspect or "").strip().lower() or None
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("last_aspect") == val:
+            return
+        st["last_aspect"] = val
+        _persist_unlocked(session_id, st)
+
+
+def clear_last_aspect(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("last_aspect") is None:
+            return
+        st["last_aspect"] = None
         _persist_unlocked(session_id, st)
 
 
@@ -662,7 +700,7 @@ def exit_lead_flow(session_id: str) -> None:
         st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)
     clear_lead_pii(session_id)
-    clear_last_subject(session_id)
+    clear_focus_context(session_id)
 
 
 def get_lead_paused_answer_count(session_id: str) -> int:

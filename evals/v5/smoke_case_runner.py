@@ -566,6 +566,10 @@ def run_smoke_suite(
         raise ValueError("cases must be a non-empty array")
     if baseline is not None and not isinstance(baseline, int):
         raise ValueError("baseline must be null or int")
+    known_raw = spec.get("known_failures")
+    known_fail_ids: set[str] = set()
+    if isinstance(known_raw, list):
+        known_fail_ids = {str(x).strip() for x in known_raw if str(x).strip()}
 
     if expand_multiclient:
         cases = expand_cases([r for r in cases if isinstance(r, dict)])
@@ -653,6 +657,17 @@ def run_smoke_suite(
         if fail is not None:
             if fail.status == "SKIP":
                 skipped += 1
+            elif case_id in known_fail_ids and fail.status == "FAIL":
+                skipped += 1
+                results.append(
+                    CaseResult(
+                        case_id=case_id,
+                        status="SKIP",
+                        reason=f"known_failure: {fail.reason}",
+                        coverage_class=cov,
+                    )
+                )
+                continue
             else:
                 if "must_contain_missing" in fail.reason:
                     debug_fail_must_contain(

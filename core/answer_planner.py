@@ -1,0 +1,228 @@
+"""Deterministic answer planner (stage 4b): aspect + subject → append plan, no LLM."""
+
+from __future__ import annotations
+
+import re
+
+from config import (
+    COMMERCIAL_INFO_RE,
+    COMPARISON_QUERY_RE,
+    PRICE_LOOKUP_RE,
+    STEPS_VISITS_QUERY_RE,
+)
+from contracts.answer_plan import AnswerPlan, AspectKind, PlanAppendKind, PlanRiskKind
+from contracts.decision_frame import DecisionFrame
+from contracts.source_route_result import SourceRouteResult
+from core.service_followup import is_short_attribute_followup, normalize_service_id
+from query_selector import match_service_from_catalog
+from session import get_last_subject
+
+_PAYMENT_ASPECT_RE = re.compile(
+    r"(?:рассроч|оплат\w*\s+по\s+(?:част|этап)|оплат\w*\s+потом|кредит)",
+    re.I | re.U,
+)
+_WARRANTY_ASPECT_RE = re.compile(r"гарант\w*", re.I | re.U)
+_PAIN_ASPECT_RE = re.compile(
+    r"(?:больно|боюсь|страш|страх|анестез|обезбол|безболезнен)",
+    re.I | re.U,
+)
+_INCLUDED_ASPECT_RE = re.compile(
+    r"(?:под\s+ключ|что\s+входит|входит\s+в\s+(?:акци|стоим|цен)|не\s+входит)",
+    re.I | re.U,
+)
+_DURATION_ASPECT_RE = re.compile(
+    r"(?:сколько\s+(?:длит|времени|по\s+времени)|длительн|срок\w*|месяц\w*|недел\w*)",
+    re.I | re.U,
+)
+
+_ASPECT_PRIORITY: tuple[AspectKind, ...] = (
+    "price",
+    "payment",
+    "included",
+    "warranty",
+    "pain",
+    "duration",
+    "comparison",
+    "stages",
+    "overview",
+)
+
+_PAYMENT_TERMS_REF = "clinic__info__payment_terms.md#korotko"
+
+
+def payment_terms_ref() -> str:
+    return _PAYMENT_TERMS_REF
+
+
+def detect_aspects(q: str, *, decision: DecisionFrame | None = None) -> list[AspectKind]:
+    text = (q or "").strip()
+    if not text:
+        return []
+    low = text.lower()
+    found: list[AspectKind] = []
+    if PRICE_LOOKUP_RE.search(text) or re.search(
+        r"сколько\s+(?:стоит|будет|обойд)", low
+    ):
+        found.append("price")
+    if _PAYMENT_ASPECT_RE.search(low) or (
+        COMMERCIAL_INFO_RE.search(text) and re.search(r"рассроч|оплат", low)
+    ):
+        found.append("payment")
+    if _INCLUDED_ASPECT_RE.search(low):
+        found.append("included")
+    if _WARRANTY_ASPECT_RE.search(low):
+        found.append("warranty")
+    if _PAIN_ASPECT_RE.search(low):
+        found.append("pain")
+    if _DURATION_ASPECT_RE.search(low) or STEPS_VISITS_QUERY_RE.search(text):
+        found.append("duration")
+    if COMPARISON_QUERY_RE.search(text) or (
+        decision is not None
+        and str(decision.query_mode or "").strip().lower() == "comparison"
+    ):
+        found.append("comparison")
+    if "этап" in low and "payment" not in found and "duration" not in found:
+        found.append("stages")
+    if not found:
+        found.append("overview")
+    # Stable unique order by priority
+    order = {a: i for i, a in enumerate(_ASPECT_PRIORITY)}
+    uniq: list[AspectKind] = []
+    for a in _ASPECT_PRIORITY:
+        if a in found and a not in uniq:
+            uniq.append(a)
+    for a in found:
+        if a not in uniq:
+            uniq.append(a)
+    return uniq
+
+
+def _pick_primary_aspect(aspects: list[AspectKind]) -> AspectKind | None:
+    """Primary aspect from the current turn only (telemetry; not used for append carry-over)."""
+    if not aspects or aspects == ["overview"]:
+        return None
+    for a in _ASPECT_PRIORITY:
+        if a in aspects:
+            return a
+    return aspects[0]
+
+
+def _resolve_service_id(
+    *,
+    q: str,
+    client_id: str | None,
+    decision: DecisionFrame | None,
+    source_route: SourceRouteResult | None,
+    sid: str,
+) -> tuple[str | None, str | None]:
+    svc = normalize_service_id(str(getattr(source_route, "service_id", None) or ""))
+    topic: str | None = None
+    if decision is not None:
+        if not svc:
+            svc = normalize_service_id(str(decision.service_id or ""))
+        topic = str(decision.service_topic or "").strip().lower() or None
+    if not svc:
+        match = match_service_from_catalog(q, client_id=client_id)
+        if match.get("is_confident"):
+            svc = normalize_service_id(str(match.get("matched_service_id") or ""))
+    subject = get_last_subject(sid)
+    if not svc and subject and (
+        is_short_attribute_followup(q) or len((q or "").split()) <= 12
+    ):
+        svc = normalize_service_id(str(subject.get("service_id") or ""))
+        topic = str(subject.get("topic") or topic or "").strip().lower() or topic
+    if subject and not topic:
+        topic = str(subject.get("topic") or "").strip().lower() or None
+    return svc or None, topic
+
+
+def _append_for_aspects(
+    aspects: list[AspectKind],
+    *,
+    service_id: str | None,
+    route_intent: str,
+) -> list[PlanAppendKind]:
+    append: list[PlanAppendKind] = []
+    ri = (route_intent or "content").strip().lower()
+    if "price" in aspects and service_id and ri in ("content", "price_lookup", "unknown"):
+        append.append("price_offer")
+    if "payment" in aspects:
+        append.append("payment_terms")
+    if "included" in aspects and service_id and "price_offer" not in append:
+        append.append("price_offer")
+    return append
+
+
+def _risk_for_aspects(aspects: list[AspectKind]) -> list[PlanRiskKind]:
+    risk: list[PlanRiskKind] = []
+    if "price" in aspects or "included" in aspects:
+        risk.append("price")
+    if "warranty" in aspects:
+        risk.append("warranty")
+    if "pain" in aspects:
+        risk.append("pain")
+    if "included" in aspects:
+        risk.append("included")
+    return risk
+
+
+def build_answer_plan(
+    *,
+    q: str,
+    sid: str,
+    client_id: str | None,
+    intent: str,
+    decision: DecisionFrame | None,
+    source_route: SourceRouteResult | None,
+) -> AnswerPlan:
+    aspects = detect_aspects(q, decision=decision)
+    primary = _pick_primary_aspect(aspects)
+    service_id, topic = _resolve_service_id(
+        q=q,
+        client_id=client_id,
+        decision=decision,
+        source_route=source_route,
+        sid=sid,
+    )
+    route_intent = str(getattr(decision, "route_intent", None) or intent or "content")
+    append = _append_for_aspects(aspects, service_id=service_id, route_intent=route_intent)
+    risk = _risk_for_aspects(aspects)
+    reason_bits: list[str] = []
+    if len(aspects) > 1:
+        reason_bits.append("composite")
+    if service_id and get_last_subject(sid):
+        reason_bits.append("subject_carry")
+    return AnswerPlan(
+        aspects=aspects,
+        primary_aspect=primary,
+        service_id=service_id,
+        topic=topic,
+        primary_chunk_ref=None,
+        append=append,
+        risk=risk,
+        plan_reason="|".join(reason_bits) if reason_bits else "single",
+    )
+
+
+def publish_answer_plan(plan: AnswerPlan) -> None:
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context():
+            request.ctx["answer_plan"] = plan.model_dump()
+    except Exception:
+        pass
+
+
+def answer_plan_from_ctx() -> AnswerPlan | None:
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context():
+            return None
+        raw = request.ctx.get("answer_plan")
+        if not isinstance(raw, dict):
+            return None
+        return AnswerPlan.model_validate(raw)
+    except Exception:
+        return None

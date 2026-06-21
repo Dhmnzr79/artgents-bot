@@ -204,6 +204,23 @@ Eval: unit — `tests/test_follow_up_*.py`, `tests/test_compatibility_guard.py`;
 
 Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`.
 
+### Planner-lite (этап 4b)
+
+Спека: `PRODUCT_WORK_PLAN.md` § **3.1** / этап **4b**.
+
+**Runtime (demo):**
+
+- **План:** `core/answer_planner.py` — без LLM; вход: `DecisionFrame`, A3 `SourceRouteResult`, session `last_subject` / `last_aspect`; regex → `aspects` + append kinds.
+- **Hook:** сразу после `route_source` в `orchestration/ask_turn.py` → `request.ctx["answer_plan"]` (до ранних return catalog/price).
+- **Append:** `core/answer_plan_apply.py` — `price_offer` (catalog), `payment_terms` (`clinic__info__payment_terms.md#korotko`); `boundary` в контракте, не в MVP append.
+- **Dedup:** если price append / `price_offers_applied` уже содержит этапы оплаты — `payment_terms` suppress.
+- **Session:** `last_aspect` отдельно от `last_subject` (telemetry текущего хода); **`clear_focus_context()`** сбрасывает subject+aspect+age (`exit_lead_flow`, смена темы в follow-up).
+- **Focus после price:** `persist_focus_from_service_turn` в `_service_reply` → `last_subject` для follow-up «а гарантия?».
+- **Lead PAUSED:** planner на обычном content-path после classifier; lead overlay — по-прежнему в `finalize_turn`.
+- **Принцип:** append только при явном aspect в **текущем** вопросе; при сомнении — молчать. Follow-up (4a) важнее одноходового composite.
+
+Eval: unit — `tests/test_answer_planner.py`; E2E — `evals/v5/planner_golden.json` + `run_planner_eval.py`.
+
 ---
 
 ## 5. LLM-стек (пилот Qwen)

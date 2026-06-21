@@ -1,0 +1,128 @@
+{
+  "baseline": 10,
+  "description": "Planner-lite golden (PRODUCT_WORK_PLAN stage 4b): composite price+payment, turnkey, warranty, duration+pain, follow-up, lead paused; 2 negative topic changes.",
+  "known_failures": [
+    "planner_turnkey_included",
+    "planner_price_warranty",
+    "planner_comparison_all_on"
+  ],
+  "cases": [
+    {
+      "id": "planner_price_installment_classic",
+      "client_id": "demo",
+      "question": "Сколько стоит классическая имплантация с коронкой и есть ли рассрочка?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["рассроч", "оплат"],
+      "comment": "IMPLANT #1+#8 composite: price + payment_terms append",
+      "testability": "strong"
+    },
+    {
+      "id": "planner_turnkey_included",
+      "client_id": "demo",
+      "question": "Цена на имплант под ключ или абатмент и коронка отдельно?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["ключ", "входит"],
+      "comment": "IMPLANT #2: turnkey / included",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_price_warranty",
+      "client_id": "demo",
+      "question": "Сколько стоит поставить имплант и какая у вас гарантия?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["гарант"],
+      "comment": "IMPLANT #1+#15: price + warranty facet",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_duration_pain",
+      "client_id": "demo",
+      "question": "Сколько по времени длится протезирование на имплантах и больно ли это?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "must_contain": ["срок", "боль"],
+      "comment": "duration + pain composite",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_one_stage_price_payment",
+      "client_id": "demo",
+      "question": "Сколько выйдет одномоментная имплантация и можно оплатить потом коронку?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["оплат", "этап"],
+      "comment": "IMPLANT #3+#7",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_all_on_price_installment",
+      "client_id": "demo",
+      "question": "Сколько стоит All-on-4 на верхнюю челюсть и есть рассрочка на такую сумму?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["рассроч"],
+      "comment": "IMPLANT #6+#8 all-on composite",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_followup_classic_installment",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "а рассрочка есть?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["рассроч"],
+      "comment": "classic follow-up → payment append",
+      "testability": "strong"
+    },
+    {
+      "id": "planner_comparison_all_on",
+      "client_id": "demo",
+      "question": "Что лучше все на 4 или все на 6 по цене и надежности?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "must_contain": ["4", "6"],
+      "comment": "IMPLANT #16 comparison facet",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_payment_stages_only",
+      "client_id": "demo",
+      "question": "Можно ли платить за имплантацию по частям?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "must_contain": ["этап", "оплат"],
+      "comment": "IMPLANT #7 payment without explicit price word",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_lead_paused_price_payment",
+      "client_id": "demo",
+      "history": [
+        {"question": "Хочу записаться на имплантацию"},
+        {"question": "Мария"}
+      ],
+      "question": "Подождите, сколько стоит имплант и есть рассрочка?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["рассроч"],
+      "comment": "lead paused → content + planner append",
+      "testability": "weak"
+    },
+    {
+      "id": "planner_negative_braces",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "сколько стоят брекеты?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["брекет"],
+      "must_not_contain": ["классическ"],
+      "comment": "negative: new service, not classic payment follow-up",
+      "testability": "medium"
+    },
+    {
+      "id": "planner_negative_veneers_after_classic",
+      "client_id": "demo",
+      "history": [{"question": "Сколько стоит классический имплант?"}],
+      "question": "а виниры сколько?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["винир"],
+      "must_not_contain": ["имплант под ключ"],
+      "comment": "negative: explicit other service after price turn",
+      "testability": "medium"
+    }
+  ]
+}

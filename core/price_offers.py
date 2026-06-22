@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from config import PRICE_LOOKUP_RE
 from contracts.price_brand_aliases import PriceBrandAliasesFile
 from contracts.price_offer import PriceOffer, PriceOfferUnit, PriceOffersFile
+from contracts.pricebook import PricebookServiceEntry
 from core.client_runtime import client_pack_dir
 from core.pricebook_loader import (
     load_pricebook_service,
@@ -209,8 +210,8 @@ def get_price_offers(
         return []
     unit_eff = unit or default_unit_for_service(sid)
     entry = load_pricebook_service(client_id, sid)
-    if entry and entry.variants:
-        pool = offers_from_service_entry(entry)
+    if entry is not None:
+        pool = offers_from_service_entry(entry) if entry.variants else []
     else:
         pool = [o for o in load_price_offers(client_id) if o.service_id == sid]
     out: list[PriceOffer] = []
@@ -243,8 +244,14 @@ def min_offer_total(
 def _unit_heading(unit: PriceOfferUnit) -> str:
     if unit == "one_tooth":
         return "под ключ, один зуб"
+    if unit == "one_implant":
+        return "один имплант"
+    if unit == "one_site":
+        return "одна зона"
     if unit == "jaw":
         return "под ключ, одна челюсть"
+    if unit == "full_mouth":
+        return "обе челюсти"
     return "под ключ"
 
 
@@ -259,10 +266,26 @@ def _append_bullet_section(lines: list[str], heading: str, items: list[str]) -> 
             lines.append(f"- {t}")
 
 
-def _render_offer_detail_lines(offer: PriceOffer, *, compact: bool) -> list[str]:
-    suffix = ""
-    if offer.recommended:
-        suffix = " — часто рекомендуем как баланс цены и надёжности"
+def variants_are_brand_based(entry: PricebookServiceEntry) -> bool:
+    """True when variant rows represent implant brands (not procedure options)."""
+    if not entry.variants:
+        return False
+    return any(v.brand_group for v in entry.variants)
+
+
+def _recommended_offer_suffix(*, brand_based: bool) -> str:
+    if brand_based:
+        return " — часто рекомендуем как баланс цены и надёжности"
+    return " — рекомендуемый вариант"
+
+
+def _render_offer_detail_lines(
+    offer: PriceOffer,
+    *,
+    compact: bool,
+    brand_based: bool = True,
+) -> list[str]:
+    suffix = _recommended_offer_suffix(brand_based=brand_based) if offer.recommended else ""
     lines = [f"- **{offer.brand_label}** — **{format_rub(offer.total)}**{suffix}"]
     if compact:
         return lines
@@ -281,6 +304,7 @@ def render_price_offers_append(
     *,
     compact: bool = False,
     heading: str | None = None,
+    brand_based: bool = True,
 ) -> str | None:
     if not offers:
         return None
@@ -292,13 +316,13 @@ def render_price_offers_append(
         lines.append(f"**Точные цены** ({_unit_heading(unit)}):")
 
     if len(offers) == 1 and not compact:
-        lines.extend(_render_offer_detail_lines(offers[0], compact=False))
+        lines.extend(_render_offer_detail_lines(offers[0], compact=False, brand_based=brand_based))
         return "\n".join(lines)
 
     for offer in offers:
         line = f"- {offer.brand_label} — **{format_rub(offer.total)}**"
         if offer.recommended:
-            line += " — часто рекомендуем как баланс цены и надёжности"
+            line += _recommended_offer_suffix(brand_based=brand_based)
         lines.append(line)
 
     if compact:

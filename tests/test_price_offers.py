@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from core.price_offers import (
+    build_price_answer_for_lookup,
     build_price_append_for_lookup,
     build_unit_clarify_answer,
     detect_brand_in_query,
@@ -12,6 +13,26 @@ from core.price_offers import (
     resolve_implant_group_overview,
     should_offer_unit_clarify,
 )
+
+
+def test_get_price_offers_sinus_lift_from_pricebook():
+    offers = get_price_offers("demo", "sinus_lift", unit="one_site")
+    assert len(offers) == 2
+    assert min(o.total for o in offers) == 42000
+    assert max(o.total for o in offers) == 68000
+
+
+def test_build_price_lookup_sinus_lift_uses_pricebook():
+    text, meta = build_price_answer_for_lookup(
+        client_id="demo",
+        service_id="sinus_lift",
+        q="сколько стоит синус-лифтинг",
+    )
+    assert text
+    assert "42 000" in text
+    assert "По брендам" not in text
+    assert "Варианты" in text
+    assert meta.get("pricebook_applied") is True
 
 
 def test_get_price_offers_three_brands_one_tooth():
@@ -62,7 +83,7 @@ def test_group_overview_four_protocol_buttons():
     from core.price_group_overview import group_overview_quick_replies
 
     replies = group_overview_quick_replies("demo")
-    assert len(replies) == 4
+    assert len(replies) == 5
     labels = [r["label"] for r in replies]
     refs = [r["ref"] for r in replies]
     assert "Классическая" in labels

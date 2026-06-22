@@ -2,6 +2,7 @@
   "service_id": "classic",
   "price_model": "complex",
   "display_name": "Классическая имплантация",
+  "intro_text": "Стоимость имплантации зависит от выбранной системы. В цену под ключ входит имплант, хирургия, анестезия, коронка, контрольные осмотры и куратор.",
   "tags": [
     "implantation"
   ],
@@ -98,7 +99,9 @@
   ],
   "promo": null,
   "fact_refs": [
-    "free_implant_consult"
+    "free_implant_consult",
+    "implant_warranty",
+    "implant_same_day_discount"
   ],
   "followups": [
     {

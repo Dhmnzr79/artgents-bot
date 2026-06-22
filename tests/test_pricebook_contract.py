@@ -16,6 +16,19 @@ ROOT = Path(__file__).resolve().parents[1]
 DEMO_PB = ROOT / "clients" / "demo" / "pricebook"
 
 
+def test_demo_manifest_validates():
+    raw = json.loads((DEMO_PB / "manifest.json").read_text(encoding="utf-8"))
+    m = PricebookManifest.model_validate(raw)
+    assert "implantation" in m.groups
+    sinus = next(
+        (x for x in m.groups["implantation"].members if x.service_id == "sinus_lift"),
+        None,
+    )
+    assert sinus is not None
+    assert sinus.unit_hint == "one_site"
+    assert sinus.from_total == 42000
+
+
 def test_demo_pricebook_manifest_validates():
     raw = json.loads((DEMO_PB / "manifest.json").read_text(encoding="utf-8"))
     m = PricebookManifest.model_validate(raw)

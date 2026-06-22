@@ -39,6 +39,9 @@ from contracts.pricebook import (
 )
 
 from core.client_runtime import client_pack_dir
+from logging_setup import get_logger
+
+logger = get_logger("bot")
 
 
 
@@ -310,8 +313,14 @@ def _load_all_service_files(client_id: str | None, *, force_reload: bool = False
 
                 out[entry.service_id] = entry
 
-            except ValidationError:
+            except ValidationError as exc:
 
+                logger.warning(
+                    "pricebook_service_skip client=%s file=%s errors=%s",
+                    client_id,
+                    name,
+                    exc.error_count(),
+                )
                 continue
 
     with _CACHE_LOCK:

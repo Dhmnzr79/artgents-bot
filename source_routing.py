@@ -76,7 +76,7 @@ def _source_type_from_price_route(pr: dict[str, Any]) -> SourceType:
     if str(pr.get("intent") or "") == "price_concern":
         return "price_concern"
     rs = str(pr.get("route_source") or "")
-    if rs == "prices_json":
+    if rs in ("prices_json", "pricebook"):
         return "price_card"
     return "price_ref"
 

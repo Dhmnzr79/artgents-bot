@@ -120,9 +120,9 @@ def lint_manifest_vs_services(manifest_path: Path, services_dir: Path) -> list[s
 
         manifest = PricebookManifest.model_validate(raw)
 
-    except ValidationError:
+    except ValidationError as exc:
 
-        return errors
+        return [f"{manifest_path}: schema {exc}"]
 
     service_mins: dict[str, int] = {}
 
@@ -147,6 +147,10 @@ def lint_manifest_vs_services(manifest_path: Path, services_dir: Path) -> list[s
             if entry.variants:
 
                 service_mins[entry.service_id] = min(v.total for v in entry.variants)
+
+            elif entry.price is not None:
+
+                service_mins[entry.service_id] = entry.price.value
 
     for gid, group in manifest.groups.items():
 
@@ -240,6 +244,35 @@ def lint_pricing_md(md_dir: Path) -> list[str]:
 
 
 
+def lint_catalog_coverage(catalog_path: Path, services_dir: Path) -> list[str]:
+    errors: list[str] = []
+    raw = _load_json(catalog_path)
+    if not raw:
+        return errors
+    service_ids: set[str] = set()
+    if services_dir.is_dir():
+        for path in services_dir.glob("*.json"):
+            raw_s = _load_json(path)
+            if not raw_s:
+                continue
+            try:
+                entry = PricebookServiceEntry.model_validate(raw_s)
+            except ValidationError:
+                continue
+            service_ids.add(entry.service_id)
+    for sid, entry in raw.items():
+        if not isinstance(entry, dict) or not bool(entry.get("active", True)):
+            continue
+        price_key = str(entry.get("price_key") or "").strip()
+        if not price_key:
+            continue
+        if price_key not in service_ids:
+            errors.append(
+                f"service_catalog: {sid} price_key={price_key!r} missing in pricebook/services"
+            )
+    return errors
+
+
 def lint_client(client_dir: Path) -> tuple[list[str], list[str]]:
 
     pb = client_dir / "pricebook"
@@ -251,6 +284,8 @@ def lint_client(client_dir: Path) -> tuple[list[str], list[str]]:
     errors.extend(lint_services(pb / "services"))
 
     errors.extend(lint_manifest_vs_services(pb / "manifest.json", pb / "services"))
+
+    errors.extend(lint_catalog_coverage(client_dir / "service_catalog.json", pb / "services"))
 
     warnings.extend(lint_facts_active(pb / "facts.json"))
 

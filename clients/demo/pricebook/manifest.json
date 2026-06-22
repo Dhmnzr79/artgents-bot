@@ -8,7 +8,8 @@
         { "service_id": "classic", "label": "Классическая", "unit_hint": "one_tooth", "from_total": 76200 },
         { "service_id": "one_stage", "label": "Одномоментная", "unit_hint": "one_tooth", "from_total": 86500 },
         { "service_id": "all_on_4", "label": "All-on-4", "unit_hint": "jaw", "from_total": 318000 },
-        { "service_id": "all_on_6", "label": "All-on-6", "unit_hint": "jaw", "from_total": 398000 }
+        { "service_id": "all_on_6", "label": "All-on-6", "unit_hint": "jaw", "from_total": 398000 },
+        { "service_id": "sinus_lift", "label": "Синус-лифтинг", "unit_hint": "one_site", "from_total": 42000 }
       ]
     },
     "full_jaw": {

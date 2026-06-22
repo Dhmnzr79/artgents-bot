@@ -1,0 +1,18 @@
+{
+  "service_id": "veneers",
+  "price_model": "simple",
+  "display_name": "Виниры E-max",
+  "tags": [],
+  "default_unit": "one_tooth",
+  "price": {
+    "price_type": "from",
+    "value": 35000,
+    "currency": "RUB",
+    "note": "За один зуб; полная реставрация улыбки рассчитывается на консультации"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": ["installment_12"],
+  "followups": [],
+  "cta_key": "price"
+}

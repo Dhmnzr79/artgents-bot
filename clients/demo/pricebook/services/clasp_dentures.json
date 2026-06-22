@@ -1,0 +1,18 @@
+{
+  "service_id": "clasp_dentures",
+  "price_model": "simple",
+  "display_name": "Бюгельные протезы",
+  "tags": [],
+  "default_unit": null,
+  "price": {
+    "price_type": "from",
+    "value": 85000,
+    "currency": "RUB",
+    "note": "Частичное восстановление; вариант на кламмерах или замках"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": ["installment_12"],
+  "followups": [],
+  "cta_key": "price"
+}

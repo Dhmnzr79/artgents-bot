@@ -9,6 +9,7 @@ from typing import Any, Literal
 import yaml
 
 from core.client_runtime import client_md_dir, list_buildable_client_ids
+from core.price_ref_routing import parse_price_widget_ref
 
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.S)
 _H2_RX = re.compile(r"^##\s+.+?(?:\s*\{#([a-z0-9\-_]+)\})?\s*$", re.I | re.M)
@@ -268,6 +269,8 @@ def lint_md_file(
             )
 
     for field_name, ref in _collect_ref_targets(fm):
+        if parse_price_widget_ref(ref):
+            continue
         fb, anchor = _parse_ref(ref)
         if not fb:
             issues.append(

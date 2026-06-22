@@ -101,7 +101,9 @@
   ],
   "promo": null,
   "fact_refs": [
-    "free_implant_consult"
+    "free_implant_consult",
+    "implant_warranty",
+    "implant_same_day_discount"
   ],
   "followups": [
     {

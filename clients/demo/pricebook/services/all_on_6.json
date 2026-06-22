@@ -2,6 +2,7 @@
   "service_id": "all_on_6",
   "price_model": "complex",
   "display_name": "All-on-6",
+  "intro_text": "All-on-6 — восстановление зубного ряда на одной челюсти на 6 имплантах: несъёмный протез в день операции, постоянная конструкция через 3–6 месяцев.",
   "tags": [
     "implantation"
   ],
@@ -101,7 +102,11 @@
   ],
   "promo": null,
   "fact_refs": [
-    "free_implant_consult"
+    "free_implant_consult",
+    "implant_warranty",
+    "all_on_6_installment",
+    "all_on_same_day_discount",
+    "tax_deduction"
   ],
   "followups": [
     {

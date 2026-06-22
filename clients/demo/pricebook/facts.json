@@ -28,6 +28,51 @@
       "followup_label": "Что будет на консультации",
       "usable_in": ["price_answer"],
       "active_until": "2026-12-31"
+    },
+    "implant_warranty": {
+      "id": "implant_warranty",
+      "kind": "warranty",
+      "text_fact": "Гарантия на работу врача — 1 год. На импланты Impro и Nobel — пожизненная, на Implantium — 5 лет.",
+      "render_mode": "strict",
+      "detail_ref": "clinic__info__warranty.md#korotko",
+      "followup_label": "Гарантия",
+      "usable_in": ["price_answer", "commercial_answer"]
+    },
+    "implant_same_day_discount": {
+      "id": "implant_same_day_discount",
+      "kind": "promo",
+      "text_fact": "При оплате в день обращения — скидка до 15% на имплантацию.",
+      "render_mode": "strict",
+      "detail_ref": null,
+      "followup_label": null,
+      "usable_in": ["price_answer", "commercial_answer"]
+    },
+    "all_on_installment": {
+      "id": "all_on_installment",
+      "kind": "payment",
+      "text_fact": "Рассрочка от клиники до 12 месяцев, первый взнос от 30% после подписания договора.",
+      "render_mode": "strict",
+      "detail_ref": "clinic__info__payment_terms.md#korotko",
+      "followup_label": "Условия оплаты",
+      "usable_in": ["price_answer", "commercial_answer"]
+    },
+    "all_on_same_day_discount": {
+      "id": "all_on_same_day_discount",
+      "kind": "promo",
+      "text_fact": "При полной оплате в день консультации — скидка до 10% на пакет All-on.",
+      "render_mode": "strict",
+      "detail_ref": null,
+      "followup_label": null,
+      "usable_in": ["price_answer", "commercial_answer"]
+    },
+    "all_on_6_installment": {
+      "id": "all_on_6_installment",
+      "kind": "payment",
+      "text_fact": "Рассрочка в клинике до 18 месяцев, первый взнос от 25%.",
+      "render_mode": "strict",
+      "detail_ref": "clinic__info__payment_terms.md#korotko",
+      "followup_label": "Условия оплаты",
+      "usable_in": ["price_answer", "commercial_answer"]
     }
   }
 }

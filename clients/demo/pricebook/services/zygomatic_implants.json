@@ -1,0 +1,25 @@
+{
+  "service_id": "zygomatic_implants",
+  "price_model": "simple",
+  "display_name": "Скуловая имплантация",
+  "intro_text": "Сложный протокол для выраженной атрофии верхней челюсти. Точная смета — после КТ и планирования.",
+  "tags": [
+    "implantation"
+  ],
+  "default_unit": "jaw",
+  "price": {
+    "price_type": "from",
+    "value": 420000,
+    "currency": "RUB",
+    "note": "На одну челюсть; временный и постоянный протез — по плану лечения"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12"
+  ],
+  "followups": [],
+  "cta_key": "price"
+}

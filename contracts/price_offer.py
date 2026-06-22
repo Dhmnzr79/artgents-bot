@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-PriceOfferUnit = Literal["one_tooth", "jaw", "full_mouth"]
+PriceOfferUnit = Literal["one_tooth", "one_implant", "one_site", "jaw", "full_mouth"]
 
 
 class PaymentStage(BaseModel):

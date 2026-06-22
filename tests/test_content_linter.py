@@ -49,6 +49,22 @@ def test_lint_missing_doc_type(tmp_path) -> None:
     assert "missing_field" in codes
 
 
+def test_lint_price_widget_suggest_ref_allowed(tmp_path) -> None:
+    md = tmp_path / "implantation__info__steps.md"
+    md.write_text(
+        "---\n"
+        "doc_id: implantation__info__steps\n"
+        "doc_type: info\n"
+        "topic: implantation\n"
+        "subtopic: steps\n"
+        'suggest_refs:\n  - { label: "Цены", ref: "price:classic" }\n'
+        "---\n### Коротко {#korotko}\n",
+        encoding="utf-8",
+    )
+    issues = lint_md_file(str(md), client_id="demo", known_basenames={md.name})
+    assert not any(i.code == "broken_ref" for i in issues)
+
+
 def test_lint_broken_suggest_ref(tmp_path) -> None:
     md = tmp_path / "implantation__faq__cost.md"
     md.write_text(

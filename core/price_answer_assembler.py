@@ -16,6 +16,7 @@ from core.price_offers import (
     render_offer_includes_only,
     render_offer_stages_only,
     render_price_offers_append,
+    variants_are_brand_based,
 )
 from core.pricebook_loader import load_pricebook_service, resolve_fact_refs
 
@@ -189,10 +190,15 @@ def assemble_price_answer(
 
     if "price_table" in plan.blocks and offers:
         compact = entry.price_model == "complex"
+        brand_based = variants_are_brand_based(entry)
+        table_heading = (
+            ("**По брендам:**" if brand_based else "**Варианты:**") if compact else None
+        )
         append = render_price_offers_append(
             offers,
             compact=compact,
-            heading="**По брендам:**" if compact else None,
+            heading=table_heading,
+            brand_based=brand_based,
         )
         if append:
             parts.append(append)

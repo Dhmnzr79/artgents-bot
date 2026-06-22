@@ -534,7 +534,7 @@ _DEFAULT_ANTI_SPAM_NEUTRAL = (
 
 
 _DEFAULT_GUIDED_REPLIES: tuple[dict[str, str], ...] = (
-    {"label": "Стоимость имплантации", "ref": "implantation__pricing__implants.md#korotko"},
+    {"label": "Стоимость имплантации", "ref": "price:classic"},
     {"label": "Больно ли ставить имплант?", "ref": "implantation__faq__pain.md#korotko"},
     {"label": "Что будет на консультации?", "ref": "clinic__info__consultation.md#korotko"},
     {"label": "Хочу записаться", "ref": "lead:booking"},

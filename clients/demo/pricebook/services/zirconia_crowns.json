@@ -1,0 +1,18 @@
+{
+  "service_id": "zirconia_crowns",
+  "price_model": "simple",
+  "display_name": "Коронки из диоксида циркония",
+  "tags": [],
+  "default_unit": "one_tooth",
+  "price": {
+    "price_type": "from",
+    "value": 25000,
+    "currency": "RUB",
+    "note": "Стоимость зависит от сложности работы и типа конструкции (одиночная коронка или мост)"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": ["installment_12"],
+  "followups": [],
+  "cta_key": "price"
+}

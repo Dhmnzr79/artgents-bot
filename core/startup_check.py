@@ -9,7 +9,21 @@ import sys
 import numpy as np
 
 from core.client_runtime import client_pack_dir, corpus_paths, list_buildable_client_ids
+from core.pricebook_loader import pricebook_services_dir
 from logging_setup import log_json
+
+
+def _client_has_price_source(cid: str) -> bool:
+    prices_path = os.path.join(client_pack_dir(cid), "prices.json")
+    if os.path.isfile(prices_path):
+        return True
+    svc_dir = pricebook_services_dir(cid)
+    if not os.path.isdir(svc_dir):
+        return False
+    try:
+        return any(name.endswith(".json") for name in os.listdir(svc_dir))
+    except OSError:
+        return False
 
 
 def run_startup_check(logger: logging.Logger) -> None:
@@ -25,6 +39,38 @@ def run_startup_check(logger: logging.Logger) -> None:
         corpus_path = paths["corpus"]
         catalog_path = os.path.join(client_pack_dir(cid), "service_catalog.json")
         prices_path = os.path.join(client_pack_dir(cid), "prices.json")
+
+        if not os.path.isfile(catalog_path):
+            logger.error("startup_check_failed: service_catalog missing for %s: %s", cid, catalog_path)
+            sys.exit(1)
+        try:
+            with open(catalog_path, "r", encoding="utf-8") as f:
+                catalog_obj = json.load(f)
+            if not isinstance(catalog_obj, dict):
+                logger.error("startup_check_failed: service_catalog must be object for %s", cid)
+                sys.exit(1)
+        except Exception as e:
+            logger.error("startup_check_failed: invalid service_catalog for %s: %s", cid, e)
+            sys.exit(1)
+
+        if not _client_has_price_source(cid):
+            logger.error(
+                "startup_check_failed: price source missing for %s "
+                "(need prices.json or pricebook/services/*.json)",
+                cid,
+            )
+            sys.exit(1)
+
+        if os.path.isfile(prices_path):
+            try:
+                with open(prices_path, "r", encoding="utf-8") as f:
+                    prices_obj = json.load(f)
+                if not isinstance(prices_obj, dict):
+                    logger.error("startup_check_failed: prices must be object for %s", cid)
+                    sys.exit(1)
+            except Exception as e:
+                logger.error("startup_check_failed: invalid prices for %s: %s", cid, e)
+                sys.exit(1)
 
         if not os.path.isfile(emb_path):
             logger.error("startup_check_failed: embeddings missing for %s: %s", cid, emb_path)
@@ -51,19 +97,5 @@ def run_startup_check(logger: logging.Logger) -> None:
             logger.error("startup_check_failed: empty corpus for %s: %s", cid, corpus_path)
             sys.exit(1)
         total_chunks += chunks
-
-        for label, path in (("service_catalog", catalog_path), ("prices", prices_path)):
-            if not os.path.isfile(path):
-                logger.error("startup_check_failed: %s missing for %s: %s", label, cid, path)
-                sys.exit(1)
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    obj = json.load(f)
-                if not isinstance(obj, dict):
-                    logger.error("startup_check_failed: %s must be object for %s", label, cid)
-                    sys.exit(1)
-            except Exception as e:
-                logger.error("startup_check_failed: invalid %s for %s: %s", label, cid, e)
-                sys.exit(1)
 
     log_json(logger, "startup_check_ok", clients=client_ids, chunks=total_chunks)

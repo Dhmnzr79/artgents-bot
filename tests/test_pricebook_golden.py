@@ -136,7 +136,7 @@ def test_s3_group_overview_from_manifest(demo_client):
     assert "76 200" in answer
     assert "318 000" in answer
     assert meta.get("pricebook_scenario") == "overview"
-    assert len(quick) == 4
+    assert len(quick) == 5
     assert quick[0]["label"] == "Классическая"
 
 

@@ -25,6 +25,29 @@ def demo_client():
     return "demo"
 
 
+def test_demo_has_all_catalog_price_keys(demo_client):
+    catalog = json.loads((ROOT / "clients" / "demo" / "service_catalog.json").read_text(encoding="utf-8"))
+    ids = set(list_pricebook_service_ids(demo_client))
+    missing = []
+    for sid, entry in catalog.items():
+        if not isinstance(entry, dict) or not bool(entry.get("active", True)):
+            continue
+        price_key = str(entry.get("price_key") or "").strip()
+        if price_key and price_key not in ids:
+            missing.append(price_key)
+    assert not missing, f"missing pricebook entries: {missing}"
+
+
+def test_load_sinus_lift_and_pterygoid(demo_client):
+    sinus = load_pricebook_service(demo_client, "sinus_lift")
+    assert sinus is not None
+    assert sinus.default_unit == "one_site"
+    assert len(sinus.variants) == 2
+    pterygoid = load_pricebook_service(demo_client, "pterygoid_implants")
+    assert pterygoid is not None
+    assert pterygoid.default_unit == "one_implant"
+
+
 def test_demo_has_pricebook_services(demo_client):
     ids = list_pricebook_service_ids(demo_client)
     assert "classic" in ids

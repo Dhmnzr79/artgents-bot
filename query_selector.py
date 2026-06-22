@@ -30,6 +30,7 @@ from core.price_offers import (
     resolve_implant_group_overview,
     should_offer_unit_clarify,
 )
+from core.pricebook_loader import load_pricebook_service
 from core.turn_timing import timed_stage
 from llm import classify_price_intent, rewrite_query_for_retrieval
 from session import mem_get
@@ -52,16 +53,34 @@ from retriever import (
     retrieve,
 )
 
+def _service_in_pricebook(
+    client_id: str | None,
+    service_id: str | None,
+    price_key: str | None,
+) -> bool:
+    sid = (service_id or price_key or "").strip()
+    if not sid:
+        return False
+    return load_pricebook_service(client_id, sid) is not None
+
+
+def _price_route_is_matched(route_source: str, price_ref: str | None) -> bool:
+    if price_ref and route_source == "price_ref":
+        return True
+    return route_source in {"prices_json", "pricebook"}
+
+
 def _resolve_price_lookup_route(
     *,
     route_source: str,
     price_ref: Any,
     price_item: dict | None,
+    pricebook_available: bool = False,
     q: str = "",
     sid: str | None = None,
     client_id: str | None = None,
 ) -> tuple[str, str | None, str | None]:
-    """price_ref → md; иначе prices.json; без авто-подстановки payment_terms."""
+    """price_ref → md; pricebook or prices.json; без авто-подстановки payment_terms."""
     if continuation_only_phrase(q) and not _service_from_session_context(sid, client_id):
         return route_source, None, None
     pref = str(price_ref or "").strip()
@@ -70,6 +89,8 @@ def _resolve_price_lookup_route(
         return rs, pref, None
     if price_item is not None:
         return "prices_json", None, None
+    if pricebook_available:
+        return "pricebook", None, None
     return route_source, None, "price_not_in_catalog"
 
 
@@ -583,16 +604,20 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
         return None
 
     def _make_result(service_id: str, entry: dict, context_doc_id: str | None) -> dict:
-        prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
         price_key = entry.get("price_key")
         price_ref = entry.get("price_ref")
-        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+        pb_avail = _service_in_pricebook(client_id, service_id, price_key)
+        price_item = None
+        if not pb_avail:
+            prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
+            price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
         return {
             "service_id": str(service_id),
             "service": entry,
             "price_key": price_key,
             "price_ref": price_ref,
             "price_item": price_item if isinstance(price_item, dict) else None,
+            "pricebook_available": pb_avail,
             "context_doc_id": context_doc_id,
         }
 
@@ -684,10 +709,16 @@ def select_price_service_route(
             pr = ctx.get("price_ref")
             rs = "catalog"
             rs, pr2, fb = _resolve_price_lookup_route(
-                route_source=rs, price_ref=pr, price_item=pi, q=q, sid=sid, client_id=client_id
+                route_source=rs,
+                price_ref=pr,
+                price_item=pi,
+                pricebook_available=bool(ctx.get("pricebook_available")),
+                q=q,
+                sid=sid,
+                client_id=client_id,
             )
             fb_final = fb or "context_session"
-            if rs == "prices_json" or (pr2 and rs == "price_ref"):
+            if _price_route_is_matched(rs, pr2):
                 return {
                     "mode": "matched",
                     "intent": intent,
@@ -733,10 +764,16 @@ def select_price_service_route(
             pr = ctx.get("price_ref")
             rs = "catalog"
             rs, pr2, fb = _resolve_price_lookup_route(
-                route_source=rs, price_ref=pr, price_item=pi, q=q, sid=sid, client_id=client_id
+                route_source=rs,
+                price_ref=pr,
+                price_item=pi,
+                pricebook_available=bool(ctx.get("pricebook_available")),
+                q=q,
+                sid=sid,
+                client_id=client_id,
             )
             fb_final = fb or "context_session"
-            if rs == "prices_json" or (pr2 and rs == "price_ref"):
+            if _price_route_is_matched(rs, pr2):
                 return {
                     "mode": "matched",
                     "intent": intent,
@@ -779,7 +816,11 @@ def select_price_service_route(
     service = match.get("service") or {}
     price_ref = service.get("price_ref")
     price_key = service.get("price_key")
-    price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+    matched_sid = str(match.get("matched_service_id") or "")
+    pb_avail = _service_in_pricebook(client_id, matched_sid, price_key)
+    price_item = None
+    if not pb_avail:
+        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
     route_source = "catalog"
     if intent == "price_concern":
         route_source = "catalog"
@@ -789,11 +830,12 @@ def select_price_service_route(
             route_source=route_source,
             price_ref=price_ref,
             price_item=price_item if isinstance(price_item, dict) else None,
+            pricebook_available=pb_avail,
             q=q,
             sid=sid,
             client_id=client_id,
         )
-        if continuation_only_phrase(q) and not price_ref and price_item is None:
+        if continuation_only_phrase(q) and not price_ref and price_item is None and not pb_avail:
             return {
                 "mode": "clarify",
                 "intent": intent,
@@ -839,13 +881,17 @@ def build_price_route_for_service_id(
     prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
     price_key = entry.get("price_key")
     price_ref = entry.get("price_ref")
-    price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+    pb_avail = _service_in_pricebook(client_id, sid_clean, price_key)
+    price_item = None
+    if not pb_avail:
+        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
     q_eff = (q or "").strip() or f"Сколько стоит {entry.get('title') or sid_clean}?"
     route_source = "catalog"
     route_source, price_ref, fallback_reason = _resolve_price_lookup_route(
         route_source=route_source,
         price_ref=price_ref,
         price_item=price_item if isinstance(price_item, dict) else None,
+        pricebook_available=pb_avail,
         q=q_eff,
         sid=sid,
         client_id=client_id,

@@ -62,11 +62,33 @@ def service_price_line_for_content(service: dict, client_id: str | None) -> str 
     price_key = str(service.get("price_key") or "").strip()
     if not price_key:
         return None
+    title = str(service.get("title") or price_key).strip()
+
+    from core.pricebook_loader import load_pricebook_service
+    from core.price_offers import format_rub
+
+    entry = load_pricebook_service(client_id, price_key)
+    if entry is not None:
+        if entry.price_model == "simple" and entry.price is not None:
+            return format_price_answer_from_item(
+                {
+                    "name": entry.display_name,
+                    "price_type": entry.price.price_type,
+                    "value": entry.price.value,
+                    "currency": entry.price.currency,
+                    "note": entry.price.note,
+                },
+                title_fallback=title,
+            )
+        if entry.variants:
+            min_total = min(v.total for v in entry.variants)
+            label = str(entry.display_name or title).strip()
+            return f"{label} — от {format_rub(min_total)}."
+
     prices = load_prices_for_client(client_id)
     price_item = prices.get(price_key) if isinstance(prices, dict) else None
     if not isinstance(price_item, dict):
         return None
-    title = str(service.get("title") or price_key).strip()
     return format_price_answer_from_item(price_item, title_fallback=title)
 
 

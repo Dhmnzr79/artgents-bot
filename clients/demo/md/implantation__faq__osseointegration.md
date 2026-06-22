@@ -54,3 +54,4 @@ video_key: pain-doctor-explains
 *Точный план лечения определяется после осмотра и КТ.*
 
 <!-- UX-тест: видео для subtopic osseointegration — правило в config/video_map.json -->
+

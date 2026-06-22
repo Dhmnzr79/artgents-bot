@@ -1,6 +1,8 @@
 # PriceBook v2 (demo)
 
-Runtime читает `pricebook/services/*.json` **в первую очередь**; при отсутствии файла — fallback на `price_offers.json` / `prices.json`.
+**Demo:** единственный источник сумм — `pricebook/services/*.json`. Legacy `prices.json` / `price_offers.json` для demo удалены.
+
+Runtime: PriceBook → при отсутствии entry fallback на `price_offers.json` / `prices.json` (другие клиенты).
 
 | Файл | Назначение |
 |------|------------|

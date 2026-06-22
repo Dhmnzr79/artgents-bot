@@ -39,5 +39,5 @@
 - Implant battery: `evals/v5/run_implant_eval.py` (`implant_golden.json`)
 - Answer slots: `evals/v5/run_answer_slots_eval.py`
 - Price offers: `evals/v5/run_price_offers_eval.py` (`E2E_USE_TEST_CLIENT=1`)
-- Metadata-first: `evals/v5/run_metadata_first_eval.py` (CI: `.github/workflows/ci.yml`)
+- CI eval (demo): `run_implant_eval.py`, `run_e2e_smoke.py` — `.github/workflows/ci.yml`; metadata-first — опционально на `multiclient`
 - Layer: `evals/v5/run_layer_eval.py`

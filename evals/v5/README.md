@@ -82,7 +82,7 @@ Env: `IMPLANT_EVAL_PATH`, `IMPLANT_EVAL_CLIENT`, `IMPLANT_EVAL_CASE_ID`.
 
 Кейсы поддерживают `expected_route`, `expected_doc_id` / `expected_doc_id_any`, `expected_service_id` / `expected_service_id_any` (из `meta.matched_service_id`).
 
-**CI:** `.github/workflows/ci.yml` — job `metadata-first-eval` (нужен repo secret `OPENAI_API_KEY`, `E2E_USE_TEST_CLIENT=1`).
+**CI:** `.github/workflows/ci.yml` — обязательные jobs: `implant-golden-eval`, `e2e-smoke-eval` (`demo`, `E2E_USE_TEST_CLIENT=1`, secret `OPENAI_API_KEY`). Job `metadata-first-eval` — только ветка/PR `multiclient`, `continue-on-error` (инфраструктурный routing pack, не блокирует merge).
 
 ### Как запустить
 

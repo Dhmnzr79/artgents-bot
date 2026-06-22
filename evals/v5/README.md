@@ -29,8 +29,12 @@ python evals/v5/run_layer_eval.py --layer all
 
 Цель: минимальный end-to-end smoke runner, который дёргает `/ask` целиком и проверяет:
 - **inferred smoke route** — `_infer_route_from_response()` по `meta.orch_route`, `meta.ingress_route`, флагам и `meta.file` (см. `docs/ROUTING_MAP.md`; **не** `meta.route`)
-- `must_contain` — подстроки, которые **обязаны** быть в `answer` (case-insensitive)
-- `must_not_contain` — подстроки, которых **не должно** быть в `answer` (case-insensitive)
+- **`expected_route` / `expected_route_any`** — куда ушёл вопрос (главный сигнал)
+- **`answer_signals_any`** — хотя бы одна подстрока из списка (предпочтительно для LLM-текста и цен)
+- `must_contain` — все подстроки обязаны быть (жёстко; для шаблонов lead)
+- `must_not_contain` — запрещённые подстроки
+
+**Правила ожиданий (demo):** цены в ответе — с пробелами (`18 000`, не `18000`); контакты — `+7` / `тверск` / `москв`; при `E2E_USE_TEST_CLIENT=1` rate limit отключён для полного прогона.
 
 ### Файлы
 

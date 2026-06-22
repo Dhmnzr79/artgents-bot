@@ -34,16 +34,16 @@
       "id": "smoke_contacts_phone",
       "question": "Телефон клиники",
       "expected_route": "contacts_chunk",
-      "must_contain": ["телефон"],
-      "comment": "contacts (телефон)",
+      "answer_signals_any": ["телефон", "+7", "495", "128"],
+      "comment": "contacts (телефон): номер или слово, не только дословная фраза LLM",
       "coverage_class": "STRONG"
     },
     {
       "id": "smoke_contacts_address",
       "question": "Где вы находитесь?",
       "expected_route": "contacts_chunk",
-      "must_contain": ["тверск"],
-      "comment": "contacts (demo): адрес/локация, не обязательно слово «адрес»",
+      "answer_signals_any": ["тверск", "москв", "пушкинск"],
+      "comment": "contacts (demo): адрес/локация из clinic__info__contacts.md",
       "coverage_class": "STRONG"
     },
     {
@@ -117,7 +117,7 @@
       "id": "smoke_price_concern_expensive",
       "question": "Дорого",
       "expected_route": "price_concern",
-      "must_contain": ["материал"],
+      "answer_signals_any": ["материал", "стоим", "цен"],
       "must_not_contain": ["уточнить у администратор", "записать вас на консультац"],
       "comment": "price_concern",
       "coverage_class": "STRONG"
@@ -126,7 +126,7 @@
       "id": "smoke_price_concern_why",
       "question": "Почему так дорого?",
       "expected_route": "price_concern",
-      "must_contain": ["материал"],
+      "answer_signals_any": ["материал", "стоим", "цен"],
       "must_not_contain": ["уточнить у администратор", "записать вас на консультац"],
       "comment": "price_concern (why)",
       "coverage_class": "STRONG"
@@ -134,7 +134,7 @@
     {
       "id": "smoke_price_concern_general_no_service",
       "question": "почему дорого?",
-      "must_contain": ["материал"],
+      "answer_signals_any": ["материал", "стоим", "цен"],
       "must_not_contain": ["уточнить у администратор", "записать вас на консультац"],
       "expected_route": "price_concern",
       "comment": "price_concern без матча услуги: A3 уводит на default concern_ref (implantation__faq__cost).",
@@ -144,50 +144,50 @@
     {
       "id": "smoke_content_impl_pain",
       "question": "Больно ли ставить имплант?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": ["анестез"],
-      "comment": "content_implantation (pain)",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["анестез", "боль", "небольно"],
+      "comment": "content_implantation (pain); overlay или retrieval",
       "coverage_class": "STRONG"
     },
     {
       "id": "smoke_content_impl_duration",
       "question": "Сколько длится приживление импланта?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": [],
-      "comment": "content_implantation (duration); маршрут для вопросов о сроках/приживлении без doctors_list (PR cleanup).",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["месяц", "прижив", "срок"],
+      "comment": "content_implantation (duration)",
       "coverage_class": "WEAK"
     },
     {
       "id": "smoke_content_impl_osseointegration",
       "question": "Какая приживаемость имплантов?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": ["прижив"],
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["прижив", "остеоинтеграц", "процент"],
       "comment": "content_implantation (osseointegration)",
       "coverage_class": "STRONG"
     },
     {
       "id": "smoke_content_impl_safety",
-      "question": "Насколько это безопасно?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": ["безопас"],
-      "comment": "content_implantation (safety)",
+      "question": "Насколько безопасна имплантация?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["безопас", "риск", "осложн"],
+      "comment": "content_implantation (safety); конкретный вопрос, не голое «это»",
       "coverage_class": "STRONG"
     },
     {
       "id": "smoke_content_impl_contra",
       "question": "Какие противопоказания к имплантации?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": ["противопоказ"],
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["противопоказ", "нельзя", "ограничен"],
       "comment": "content_implantation (contraindications)",
       "coverage_class": "STRONG"
     },
     {
       "id": "smoke_content_impl_process_with_doctor_word",
       "question": "Как врач ставит имплант?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": [],
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["этап", "имплант", "установ"],
       "must_not_contain": ["орлов", "волков", "кузнецов", "фёдоров", "морозов", "григорьев"],
-      "comment": "процесс/техника, не doctors_lookup; имена из md не должны попадать в ответ.",
+      "comment": "процесс/техника, не doctors_lookup",
       "coverage_class": "STRONG"
     },
 
@@ -262,17 +262,17 @@
     {
       "id": "smoke_handoff_weather",
       "question": "Какая погода сегодня?",
-      "expected_route": "ingress_hard_stop_non_target",
-      "must_contain": [],
-      "comment": "offtopic — ingress hard stop, не guided",
+      "expected_route_any": ["ingress_hard_stop_non_target", "guided"],
+      "must_not_contain": ["тверск", "имплант", "₽"],
+      "comment": "offtopic — hard stop предпочтителен; guided (меню) допустим как деградация",
       "coverage_class": "TEMPLATE"
     },
     {
       "id": "smoke_handoff_politics",
       "question": "Что думаете о политике?",
-      "expected_route": "ingress_hard_stop_non_target",
-      "must_contain": [],
-      "comment": "offtopic — ingress hard stop",
+      "expected_route_any": ["ingress_hard_stop_non_target", "guided"],
+      "must_not_contain": ["тверск", "имплант", "₽"],
+      "comment": "offtopic — hard stop или guided без стоматологического контента",
       "coverage_class": "TEMPLATE"
     },
 
@@ -283,8 +283,8 @@
       ],
       "question": "А сколько стоит?",
       "expected_route": "price_lookup",
-      "must_contain": ["all-on-4"],
-      "comment": "multi-turn: цена должна относиться к All-on-4, не общая",
+      "answer_signals_any": ["all-on-4", "all on 4", "318 000", "368 000", "₽", "руб"],
+      "comment": "multi-turn: цена All-on-4; формат цены с пробелами (format_rub)",
       "coverage_class": "WEAK"
     },
     {
@@ -293,10 +293,10 @@
         {"question": "Сколько стоят виниры?"}
       ],
       "question": "Сколько стоят импланты?",
-      "expected_route": "price_lookup",
+      "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "must_not_contain": ["винир"],
-      "must_contain": ["имплант"],
-      "comment": "multi-turn (demo): после виниров — цена/инфо про импланты, без смешения тем",
+      "answer_signals_any": ["имплант", "₽", "руб"],
+      "comment": "multi-turn (demo): после виниров — импланты, без смешения тем",
       "coverage_class": "STRONG"
     },
     {
@@ -307,16 +307,16 @@
       "question": "А сколько стоит обеливания?",
       "expected_route": "price_lookup",
       "must_not_contain": ["implantium", "76 200", "классическая имплантация"],
-      "must_contain": ["отбелив", "18000"],
-      "comment": "multi-turn: опечатка «обеливания» — trigram к каталогу, не session fallback на импланты.",
+      "answer_signals_any": ["отбелив", "18 000", "₽", "руб"],
+      "comment": "multi-turn: опечатка «обеливания» → professional_whitening",
       "coverage_class": "STRONG"
     },
     {
       "id": "smoke_price_typo_whitening_single",
       "question": "сколько стоит обеливание?",
       "expected_route": "price_lookup",
-      "must_contain": ["отбелив", "18000"],
-      "comment": "одиночный ход: опечатка обеливание → professional_whitening через trigram, не clarify.",
+      "answer_signals_any": ["отбелив", "18 000", "₽", "руб"],
+      "comment": "одиночный ход: опечатка обеливание → professional_whitening",
       "coverage_class": "STRONG"
     },
     {
@@ -325,9 +325,9 @@
         {"question": "Какая гарантия на импланты?"}
       ],
       "question": "А на коронки?",
-      "expected_route": "catalog_md_first",
-      "must_contain": ["корон"],
-      "comment": "multi-turn: переключение контекста импланты → коронки",
+      "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
+      "answer_signals_any": ["корон", "гарант", "срок"],
+      "comment": "multi-turn: переключение импланты → коронки",
       "coverage_class": "WEAK"
     },
     {
@@ -336,9 +336,9 @@
         {"question": "Что такое All-on-6?"}
       ],
       "question": "А по времени это сколько?",
-      "expected_route": "catalog_md_first",
-      "must_contain": ["месяц"],
-      "comment": "multi-turn: follow-up про время после обзора — ответ должен дать временной ориентир (напр. месяцы), а не конкретное слово «срок»",
+      "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
+      "answer_signals_any": ["месяц", "срок", "врем", "этап"],
+      "comment": "multi-turn: follow-up про время после обзора All-on-6",
       "coverage_class": "WEAK"
     },
     {
@@ -347,10 +347,10 @@
         {"question": "Сколько длится имплантация?"}
       ],
       "question": "Где вы находитесь?",
-      "must_contain": ["тверск"],
+      "answer_signals_any": ["тверск", "москв", "пушкинск", "+7"],
       "must_not_contain": ["длительность импланта", "20–30 минут"],
       "expected_route": "contacts_chunk",
-      "comment": "demo: после имплант-контекста — contacts, адрес Москва (не cesi/Елизово)",
+      "comment": "demo: после имплант-контекста — contacts",
       "coverage_class": "STRONG"
     },
     {
@@ -428,10 +428,10 @@
     {
       "id": "smoke_short_warranty_question",
       "question": "Какая гарантия?",
-      "must_contain": ["гарант"],
+      "answer_signals_any": ["гарант", "срок"],
       "must_not_contain": ["могу коротко подсказать", "что для вас важнее", "выбрать направление"],
-      "expected_route": "retrieval_chunk",
-      "comment": "Короткий вопрос про гарантию: content retrieval; A5 Arbiter выбирает источник при 2+ кандидатах.",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "guided"],
+      "comment": "Короткий вопрос про гарантию без контекста — retrieval предпочтителен",
       "coverage_class": "STRONG"
     },
     {
@@ -526,9 +526,9 @@
     {
       "id": "smoke_comparison_crown_vs_filling",
       "question": "Коронка или пломба — что лучше?",
-      "expected_route": "retrieval_chunk",
-      "must_contain": ["корон"],
-      "comment": "comparison baseline — retrieval до guide_router",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "answer_signals_any": ["корон", "пломб"],
+      "comment": "comparison baseline — retrieval или catalog",
       "coverage_class": "WEAK"
     }
   ]

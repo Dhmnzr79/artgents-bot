@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import time
 import threading
@@ -46,7 +47,13 @@ def resolve_client_ip(*, x_forwarded_for: str | None, remote_addr: str | None) -
     return remote_addr or "unknown"
 
 
+def _rate_limit_disabled_for_eval() -> bool:
+    return (os.getenv("E2E_USE_TEST_CLIENT") or "").strip().lower() in {"1", "true", "yes"}
+
+
 def check_rate_limit(ip: str) -> bool:
+    if _rate_limit_disabled_for_eval():
+        return True
     now = time.time()
     with _IP_RATE_LOCK:
         q = _IP_RATE_BUCKETS.get(ip)

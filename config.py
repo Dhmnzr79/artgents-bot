@@ -220,13 +220,6 @@ STEPS_VISITS_QUERY_RE = re.compile(
     re.I,
 )
 KT_EXPLICIT_RE = re.compile(r"\bкт\b|томограф|компьютерн", re.I | re.U)
-TEMPORARY_TEETH_QUERY_RE = re.compile(
-    r"(?:"
-    r"(?:временн\w+|постоянн\w+|пластик\w*).*(?:или|сразу)|"
-    r"вся\s+челюсть.*(?:временн|постоянн|пластик)"
-    r")",
-    re.I,
-)
 # Implant pain/fear FAQ overlay (ask_turn, до A3 catalog_md) — см. ROUTING_MAP.md
 IMPLANT_PAIN_FAQ_IMPLANT_RE = re.compile(
     r"(имплант|implant|all[\s-]?on|все\s+на\s+(?:четыр|4|шест|6))",

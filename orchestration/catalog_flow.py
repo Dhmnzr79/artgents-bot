@@ -153,7 +153,6 @@ def try_a3_catalog_facts(
 _DIRECT_CATALOG_MD_DOC_IDS = frozenset(
     {
         "clinic__info__consultation",
-        "implantation__info__steps",
     }
 )
 
@@ -175,15 +174,11 @@ def try_a3_catalog_md_direct(
     sr: SourceRouteResult,
     decision_frame: dict[str, Any] | None,
 ) -> AskOrchestrationResult | None:
-    """Deterministic info pages (consultation, steps, temporary_teeth hint) — без arbiter."""
+    """Deterministic info pages (consultation) — без arbiter."""
     if sr.source != "catalog_md" or not sr.ref:
         return None
     doc_id = _doc_id_from_md_ref(sr.ref)
-    direct = doc_id in _DIRECT_CATALOG_MD_DOC_IDS or (
-        doc_id == "implantation__service__temporary_teeth"
-        and str(sr.service_id or "") == "temporary_teeth"
-        and float(sr.match_score or 0.0) >= 1.0
-    )
+    direct = doc_id in _DIRECT_CATALOG_MD_DOC_IDS
     if not direct:
         return None
     ch = get_chunk_by_ref(sr.ref, client_id=client_id)

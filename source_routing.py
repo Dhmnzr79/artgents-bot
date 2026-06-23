@@ -8,8 +8,6 @@ from config import (
     COMPARISON_QUERY_RE,
     KT_EXPLICIT_RE,
     PRICE_LOOKUP_RE,
-    STEPS_VISITS_QUERY_RE,
-    TEMPORARY_TEETH_QUERY_RE,
 )
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
@@ -132,28 +130,6 @@ def route_source(
             source="catalog_md",
             service_id=None,
             ref=_with_korotko_anchor("clinic__info__consultation"),
-            concern_ref=None,
-            payload=None,
-            match_score=1.0,
-            match_method="catalog_containment",
-        )
-
-    if STEPS_VISITS_QUERY_RE.search(q0) and ri == "content":
-        return SourceRouteResult(
-            source="catalog_md",
-            service_id=None,
-            ref=_with_korotko_anchor("implantation__info__steps"),
-            concern_ref=None,
-            payload=None,
-            match_score=1.0,
-            match_method="catalog_containment",
-        )
-
-    if TEMPORARY_TEETH_QUERY_RE.search(q0) and ri == "content":
-        return SourceRouteResult(
-            source="catalog_md",
-            service_id="temporary_teeth",
-            ref=_with_korotko_anchor("implantation__service__temporary_teeth"),
             concern_ref=None,
             payload=None,
             match_score=1.0,

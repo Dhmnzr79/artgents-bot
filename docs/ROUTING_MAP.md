@@ -18,7 +18,7 @@
 → Resolver (+ legacy safety-net)
 → contacts overlay (regex, до A3)
 → A3 source_routing (doctor / catalog / price)
-→ price_flow (price_ref + price_offers append) / content retrieval + arbiter (facet_arbitration: pain/duration → faq or service-section over catalog service overview)
+→ price_flow (price_ref + price_offers append) / content retrieval + arbiter (facet_arbitration: pain/duration/comparison over catalog service overview)
 → chunk_responder: LLM → answer slots + price append → policy → session → JSON
 ```
 

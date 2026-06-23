@@ -75,6 +75,39 @@ def _duration_service_overview_row(*, alias_decision: str = "exact", score: floa
     }
 
 
+def _catalog_all_on_4_row() -> dict:
+    return {
+        "ref": "implantation__service__all_on_4.md#korotko",
+        "source_kind": "catalog",
+        "score": 1.0,
+        "doc_type": "catalog_md",
+        "doc_id": "implantation__service__all_on_4",
+        "anchor": "korotko",
+        "aspect": "overview",
+    }
+
+
+def _comparison_alias_row(*, alias_decision: str = "exact", score: float = 1.0) -> dict:
+    return {
+        "ref": "comparison__all_on_4_vs_all_on_6.md#korotko",
+        "source_kind": "alias",
+        "score": score,
+        "doc_type": "comparison",
+        "doc_id": "comparison__all_on_4_vs_all_on_6",
+        "anchor": "korotko",
+        "aspect": "comparison",
+        "alias_decision": alias_decision,
+    }
+
+
+def _comparison_service_overview_alias_row() -> dict:
+    row = _catalog_overview_row()
+    row["source_kind"] = "alias"
+    row["aspect"] = "comparison"
+    row["alias_decision"] = "exact"
+    return row
+
+
 def test_is_catalog_service_overview_positive() -> None:
     assert is_catalog_service_overview(_catalog_overview_row()) is True
 
@@ -126,6 +159,46 @@ def test_strong_facet_pain_service_section_not_strong() -> None:
         facet_aspect="pain",
         min_facet_score=0.72,
     )
+
+
+def test_strong_facet_comparison_doc_alias() -> None:
+    assert is_strong_facet_candidate(
+        _comparison_alias_row(),
+        facet_aspect="comparison",
+        min_facet_score=0.72,
+    )
+
+
+def test_strong_facet_comparison_service_overview_not_strong() -> None:
+    assert not is_strong_facet_candidate(
+        _comparison_service_overview_alias_row(),
+        facet_aspect="comparison",
+        min_facet_score=0.72,
+    )
+
+
+def test_filter_suppresses_catalog_when_comparison_alias() -> None:
+    compact = [_catalog_all_on_4_row(), _comparison_alias_row()]
+    kept, rejected, tel = filter_compact_for_facet_arbitration(
+        compact,
+        primary_aspect="comparison",
+        q="All-on-4 или All-on-6 что выбрать?",
+    )
+    assert tel["facet_arbitration_applied"] is True
+    assert len(rejected) == 1
+    assert kept[0]["doc_id"] == "comparison__all_on_4_vs_all_on_6"
+
+
+def test_filter_keeps_catalog_when_only_service_overview_as_comparison_aspect() -> None:
+    compact = [_catalog_all_on_4_row(), _comparison_service_overview_alias_row()]
+    kept, rejected, tel = filter_compact_for_facet_arbitration(
+        compact,
+        primary_aspect="comparison",
+        q="классическая имплантация",
+    )
+    assert tel["facet_arbitration_skipped"] == "no_strong_facet_candidate"
+    assert len(rejected) == 0
+    assert len(kept) == 2
 
 
 def test_strong_facet_alias_exact() -> None:
@@ -303,3 +376,37 @@ def test_decide_content_route_pain_still_works_with_duration_enabled() -> None:
     )
     assert result.selected_doc_id == "implantation__faq__pain"
     assert result.debug_meta.get("facet_arbitration_applied") is True
+
+
+def test_decide_content_route_comparison_suppresses_catalog() -> None:
+    """All-on-4 vs All-on-6: comparison doc must win over catalog service overview."""
+    q = "All-on-4 или All-on-6 что выбрать?"
+    cands = collect_content_candidates(q=q, sid="unit_cmp_arb", client_id="demo")
+    compact = build_compact_content_candidates(cands, client_id="demo")
+    assert any(r.get("source_kind") == "catalog" for r in compact)
+    result = decide_content_route(
+        q=q,
+        sid="unit_cmp_arb",
+        client_id="demo",
+        candidates=cands,
+    )
+    assert result.debug_meta.get("facet_arbitration_applied") is True
+    assert result.selected_doc_id == "comparison__all_on_4_vs_all_on_6"
+
+
+def test_decide_content_route_r14_not_comparison_facet() -> None:
+    """Risk r14: bone graft question must not misfire comparison facet."""
+    q = "Можно поставить импланты без костной пластики?"
+    result = decide_content_route(
+        q=q,
+        sid="unit_r14_cmp",
+        client_id="demo",
+        candidates=collect_content_candidates(q=q, sid="unit_r14_cmp", client_id="demo"),
+    )
+    assert result.debug_meta.get("facet_arbitration_primary_aspect") != "comparison"
+    assert result.selected_doc_id in (
+        "implantation__info__bone_graft",
+        "comparison__bone_graft_vs_all_on_4",
+        "implantation__service__zygomatic_implants",
+        "implantation__service__pterygoid_implants",
+    )

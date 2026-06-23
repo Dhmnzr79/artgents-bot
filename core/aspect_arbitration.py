@@ -6,6 +6,8 @@ service-overview catalog matches must not win via score / shortcut_single_candid
 Duration slice: strong candidates include faq/info and service *sections* (non-overview), not
 another service overview (e.g. temporary_teeth#korotko must not trigger suppression).
 
+Comparison slice: strong candidates are doc_type=comparison only (not service overview).
+
 Canon: PRODUCT_WORK_PLAN.md stage 6; no regex→md routes.
 """
 from __future__ import annotations
@@ -58,6 +60,8 @@ def _facet_row_doc_kind_allowed(row: dict[str, Any], facet_aspect: str) -> bool:
         return True
     if facet_aspect == "duration" and dt == "service":
         return not is_compact_service_overview(row)
+    if facet_aspect == "comparison" and dt == "comparison":
+        return True
     return False
 
 
@@ -67,7 +71,7 @@ def is_strong_facet_candidate(
     facet_aspect: str,
     min_facet_score: float,
 ) -> bool:
-    """Strong faq/info (and duration service-section) row matching the query facet."""
+    """Strong facet row matching the query aspect (faq/info; duration service-section; comparison doc)."""
     if str(row.get("aspect") or "").strip().lower() != facet_aspect:
         return False
     sk = str(row.get("source_kind") or "").strip().lower()

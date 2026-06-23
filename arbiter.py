@@ -15,6 +15,9 @@ from contracts.arbiter_decision import ArbiterDecision
 from contracts.decision_frame import DecisionFrame
 from content_arbiter import ContentCandidates, ContentRouteResult
 from config import CHAT_MODEL
+from core.aspect_arbitration import filter_compact_for_facet_arbitration
+from core.aspect_metadata import infer_chunk_aspect
+from core.answer_planner import detect_aspects, pick_primary_aspect
 from core.routing_loader import THRESHOLDS
 from core.compatibility_guard import filter_compact_by_compatibility_guard
 from core.follow_up_rewrite import follow_up_ctx_from_dict, get_follow_up_turn_ctx
@@ -91,6 +94,57 @@ def _source_priority(source_kind: str) -> int:
         return len(order)
 
 
+def _doc_id_anchor_from_ref(ref: str) -> tuple[str | None, str]:
+    r = (ref or "").strip()
+    if not r:
+        return None, ""
+    left, _, right = r.partition("#")
+    base = os.path.basename(left.strip())
+    if base.lower().endswith(".md"):
+        base = base[:-3]
+    return (base.strip() or None), (right or "").strip().lower()
+
+
+def _infer_compact_aspect(
+    *,
+    doc_id: str | None,
+    doc_type: str | None,
+    subtype: str | None,
+) -> str | None:
+    subtopic = subtype
+    did = str(doc_id or "").strip().lower()
+    if not subtopic and did and "__faq__" in did:
+        subtopic = did.split("__faq__", 1)[-1].split("__")[0]
+    inferred = infer_chunk_aspect(
+        doc_id=did,
+        doc_type=doc_type,
+        subtopic=subtopic,
+    )
+    return str(inferred) if inferred else None
+
+
+def _enrich_compact_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Ensure doc_id, anchor, aspect on compact rows for facet arbitration."""
+    out = dict(row)
+    ref = str(out.get("ref") or "").strip()
+    doc_id = out.get("doc_id")
+    anchor = out.get("anchor")
+    if not doc_id or anchor is None:
+        parsed_id, parsed_anchor = _doc_id_anchor_from_ref(ref)
+        doc_id = doc_id or parsed_id
+        if anchor is None or anchor == "":
+            anchor = parsed_anchor
+    out["doc_id"] = doc_id
+    out["anchor"] = str(anchor or "").strip().lower()
+    if not out.get("aspect"):
+        out["aspect"] = _infer_compact_aspect(
+            doc_id=str(doc_id or "") or None,
+            doc_type=str(out.get("doc_type") or "") or None,
+            subtype=str(out.get("subtype") or "") or None,
+        )
+    return out
+
+
 def build_compact_content_candidates(
     cands: ContentCandidates,
     *,
@@ -110,42 +164,49 @@ def build_compact_content_candidates(
         service_id: str | None,
         snippet: str | None,
         why: str | None,
+        doc_id: str | None = None,
+        anchor: str | None = None,
+        aspect: str | None = None,
+        alias_decision: str | None = None,
     ) -> None:
         r = (ref or "").strip()
         if not r or "#" not in r:
             return
         key = canonical_ref(r)
+        parsed_id, parsed_anchor = _doc_id_anchor_from_ref(r)
+        doc_id_eff = (doc_id or parsed_id) or None
+        anchor_eff = (anchor if anchor is not None else parsed_anchor) or ""
+        aspect_eff = aspect or _infer_compact_aspect(
+            doc_id=doc_id_eff,
+            doc_type=doc_type,
+            subtype=subtype,
+        )
         prev = out_map.get(key)
         sc = float(score) if score is not None else 0.0
+        payload = {
+            "ref": r,
+            "source_kind": source_kind,
+            "score": score,
+            "doc_type": doc_type,
+            "subtype": subtype,
+            "topic": topic,
+            "service_id": service_id,
+            "snippet": (snippet or "")[:220] or None,
+            "why": why,
+            "doc_id": doc_id_eff,
+            "anchor": anchor_eff.strip().lower(),
+            "aspect": aspect_eff,
+            "alias_decision": alias_decision,
+        }
         if prev is None:
-            out_map[key] = {
-                "ref": r,
-                "source_kind": source_kind,
-                "score": score,
-                "doc_type": doc_type,
-                "subtype": subtype,
-                "topic": topic,
-                "service_id": service_id,
-                "snippet": (snippet or "")[:220] or None,
-                "why": why,
-            }
+            out_map[key] = payload
             return
         prev_sc = _score_float(prev.get("score"))
         prev_sc_f = float(prev_sc) if prev_sc is not None else 0.0
         if sc > prev_sc_f or (
             sc == prev_sc_f and _source_priority(source_kind) < _source_priority(str(prev.get("source_kind") or ""))
         ):
-            out_map[key] = {
-                "ref": r,
-                "source_kind": source_kind,
-                "score": score,
-                "doc_type": doc_type,
-                "subtype": subtype,
-                "topic": topic,
-                "service_id": service_id,
-                "snippet": (snippet or "")[:220] or None,
-                "why": why,
-            }
+            out_map[key] = payload
 
     ret = cands.retrieval or {}
     if str(ret.get("mode") or "") == "chunk":
@@ -181,6 +242,8 @@ def build_compact_content_candidates(
         if md_ref:
             svc = cat.get("service") if isinstance(cat.get("service"), dict) else {}
             title = str((svc or {}).get("title") or (svc or {}).get("name") or "")[:120] or None
+            cat_doc_id = str(cat.get("doc_id") or "").strip() or None
+            _, cat_anchor = _doc_id_anchor_from_ref(md_ref)
             put(
                 ref=md_ref,
                 source_kind="catalog",
@@ -191,9 +254,12 @@ def build_compact_content_candidates(
                 service_id=str(cat.get("matched_service_id") or "") or None,
                 snippet=title,
                 why="catalog_md_first",
+                doc_id=cat_doc_id,
+                anchor=cat_anchor,
             )
 
     alias = cands.alias or {}
+    alias_decision = str(alias.get("alias_decision") or "").strip() or None
     ach = alias.get("leader_chunk") if isinstance(alias.get("leader_chunk"), dict) else None
     if isinstance(ach, dict):
         rr = ref_from_chunk(ach)
@@ -213,6 +279,7 @@ def build_compact_content_candidates(
                 service_id=None,
                 snippet=snip,
                 why="corpus_alias_leader",
+                alias_decision=alias_decision,
             )
 
     sess = cands.session or {}
@@ -233,7 +300,7 @@ def build_compact_content_candidates(
                 why="session_current_doc_id",
             )
 
-    merged = list(out_map.values())
+    merged = [_enrich_compact_row(x) for x in out_map.values()]
     merged.sort(key=lambda x: (-float(_score_float(x.get("score")) or 0.0), _source_priority(str(x.get("source_kind") or ""))))
     return merged
 
@@ -339,6 +406,24 @@ def decide_content_route(
     min_c = float(THRESHOLDS.arbiter.min_confidence)
     rejected_followup: list[dict[str, Any]] = []
     rejected_compat: list[dict[str, Any]] = []
+    rejected_facet: list[dict[str, Any]] = []
+
+    decision_obj: DecisionFrame | None = None
+    if isinstance(decision_frame, DecisionFrame):
+        decision_obj = decision_frame
+    aspects = detect_aspects(q, decision=decision_obj)
+    primary_aspect = pick_primary_aspect(aspects)
+
+    compact, rejected_facet, facet_tel = filter_compact_for_facet_arbitration(
+        compact,
+        primary_aspect=primary_aspect,
+        q=q,
+    )
+    if rejected_facet:
+        rejected_followup.extend(rejected_facet)
+        base_debug = {**base_debug, **facet_tel}
+    elif facet_tel.get("facet_arbitration_skipped"):
+        base_debug = {**base_debug, **facet_tel}
 
     fu_ctx = None
     try:

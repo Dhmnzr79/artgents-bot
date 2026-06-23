@@ -141,6 +141,16 @@ class NumericFactGateThresholds(BaseModel):
     min_answer_chars_after_remove: int = Field(..., ge=0, le=2000)
 
 
+class FacetArbitrationThresholds(BaseModel):
+    """Aspect-aware catalog suppression in A5 arbiter (Retrieval 2.0)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    aspects: list[str] = Field(default_factory=lambda: ["pain"])
+    min_facet_score: float = Field(..., ge=0.0, le=1.0)
+
+
 class Thresholds(BaseModel):
     """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
@@ -158,6 +168,7 @@ class Thresholds(BaseModel):
     lead_turn: LeadTurnThresholds
     follow_up: FollowUpThresholds
     numeric_fact_gate: NumericFactGateThresholds
+    facet_arbitration: FacetArbitrationThresholds
 
 
 _LOCK = threading.Lock()

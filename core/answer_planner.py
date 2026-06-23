@@ -97,14 +97,18 @@ def detect_aspects(q: str, *, decision: DecisionFrame | None = None) -> list[Asp
     return uniq
 
 
-def _pick_primary_aspect(aspects: list[AspectKind]) -> AspectKind | None:
-    """Primary aspect from the current turn only (telemetry; not used for append carry-over)."""
+def pick_primary_aspect(aspects: list[AspectKind]) -> AspectKind | None:
+    """Primary aspect from the current turn only (telemetry / facet arbitration)."""
     if not aspects or aspects == ["overview"]:
         return None
     for a in _ASPECT_PRIORITY:
         if a in aspects:
             return a
     return aspects[0]
+
+
+def _pick_primary_aspect(aspects: list[AspectKind]) -> AspectKind | None:
+    return pick_primary_aspect(aspects)
 
 
 def _resolve_service_id(

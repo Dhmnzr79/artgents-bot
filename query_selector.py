@@ -23,6 +23,7 @@ from core.candidate_builder import (
     metadata_context_from_decision,
     resolve_alias_for_turn,
 )
+from core.catalog_match import resolve_catalog_match
 from core.client_config_loader import resolve_pack_client_id
 from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
 from core.routing_loader import THRESHOLDS
@@ -528,54 +529,34 @@ def match_service_from_catalog(
     *,
     client_id: str | None,
     exclude_service_ids: frozenset[str] | None = None,
+    service_topic: str | None = None,
+    topic_confidence: float = 0.0,
 ) -> dict:
     catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
-    best_id = None
-    best_obj = None
-    best_score = 0.0
-    skip = {str(x).strip().lower() for x in (exclude_service_ids or frozenset()) if str(x).strip()}
-    for service_id, entry in catalog.items():
-        if not isinstance(entry, dict) or not bool(entry.get("active", True)):
-            continue
-        sid = str(service_id).strip().lower()
-        if sid in skip:
-            continue
-        phrases = []
-        title = str(entry.get("title") or "").strip()
-        if title:
-            phrases.append(title)
-        aliases = list(entry.get("aliases") or [])
-        phrases.extend(str(x).strip() for x in aliases if str(x).strip())
-        local_best = 0.0
-        for ph in phrases:
-            local_best = max(
-                local_best,
-                _match_score(q, ph),
-                _match_score_lemma(q, ph),
-                _match_score_catalog_typo(q, ph),
-            )
-        if local_best > best_score:
-            best_id = str(service_id)
-            best_obj = entry
-            best_score = local_best
-    return {
-        "matched_service_id": best_id,
-        "service": best_obj,
-        "match_score": round(float(best_score), 4),
-        "is_confident": bool(best_obj is not None and best_score >= PRICE_SERVICE_MATCH_STRONG),
-    }
+    return resolve_catalog_match(
+        q,
+        catalog,
+        exclude_service_ids=exclude_service_ids,
+        service_topic=service_topic,
+        topic_confidence=topic_confidence,
+        strong_match_min=float(PRICE_SERVICE_MATCH_STRONG),
+    )
 
 
 def match_catalog_for_implant_group_overview(q: str, *, client_id: str | None) -> dict:
-    """Generic implant price overview: КТ не перебивает classic без явного КТ в вопросе."""
+    """Generic implant price overview: prefer implant services; no typo-only containment."""
     q0 = (q or "").strip()
-    if KT_EXPLICIT_RE.search(q0):
-        return match_service_from_catalog(q0, client_id=client_id)
-    return match_service_from_catalog(
+    exclude: frozenset[str] = frozenset()
+    if not KT_EXPLICIT_RE.search(q0):
+        exclude = frozenset({"tomography"})
+    m = match_service_from_catalog(
         q0,
         client_id=client_id,
-        exclude_service_ids=frozenset({"tomography"}),
+        exclude_service_ids=exclude,
+        service_topic="implantation",
+        topic_confidence=0.9,
     )
+    return {**m, "containment_eligible": False}
 
 
 def compute_retrieval_scope_with_conflict_guard(
@@ -596,8 +577,7 @@ def compute_retrieval_scope_with_conflict_guard(
 
     q0 = (q or "").strip()
     match = match_service_from_catalog(q0, client_id=client_id)
-    cat_score = float(match.get("match_score") or 0.0)
-    if cat_score >= float(THRESHOLDS.catalog_match.containment_min):
+    if match.get("containment_eligible"):
         return None, "catalog_match"
 
     q_pol = normalize_retrieval_query(q0) or q0

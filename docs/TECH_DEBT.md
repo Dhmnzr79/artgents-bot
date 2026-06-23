@@ -153,7 +153,7 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 |------|-----|------|
 | `try_a3_catalog_md_direct` | `orchestration/catalog_flow.py` | жёсткий список `consultation` / `steps` / `temporary_teeth` / `methods_overview` / `tooth_one_day`; **обход arbiter** |
 | Regex → конкретный md | `STEPS_VISITS`, `TEMPORARY_TEETH`, `CONSULTATION`, `IMPLANTATION_WHAT_IS`, `TREATMENT_SEQUENCE`, `PERMANENT_CROWN_WHY_WAIT` в `source_routing.py` | «если фраза похожа на X → файл Y» |
-| Tomography topic guard | `source_routing._catalog_match_blocked_for_topic` | **не снят** (2026-06): naive `exclude_service_ids={tomography}` → ложный catalog winner (`professional_whitening` при tie 0.88). Снять после **catalog containment fix** (lemma-subset / tie-break по `service_topic`) или hybrid/rerank; price path — `match_catalog_for_implant_group_overview` ✅ |
+| Tomography topic guard | ~~`source_routing._catalog_match_blocked_for_topic`~~ | **снят** `571f717+`: `core/catalog_match.py` — channel-aware containment + topic tie-break; tomography только при exact/strong match (КТ в вопросе) |
 | Comparison `query_mode` override | `resolver_turn.py` + skip A3 catalog при comparison | дублирует resolver, если golden не доведён |
 | Сужение regex под golden | напр. `TEMPORARY_TEETH_QUERY_RE` после ложного q23 | **опасно:** словесные подборы под eval, не под живой диалог |
 

@@ -84,6 +84,11 @@ class CatalogMatchThresholds(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     containment_min: float = Field(..., ge=0.0, le=1.0)
+    tie_score_margin: float = Field(..., ge=0.0, le=0.25)
+    typo_support_min: float = Field(..., ge=0.0, le=1.0)
+    lemma_weak_phrase_recall_min: float = Field(..., ge=0.0, le=1.0)
+    topic_tiebreak_boost: float = Field(..., ge=0.0, le=0.25)
+    topic_tiebreak_min_confidence: float = Field(..., ge=0.0, le=1.0)
 
 
 class AliasThresholds(BaseModel):

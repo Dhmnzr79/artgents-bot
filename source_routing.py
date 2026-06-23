@@ -6,7 +6,6 @@ from typing import Any
 
 from config import (
     COMPARISON_QUERY_RE,
-    KT_EXPLICIT_RE,
     PRICE_LOOKUP_RE,
 )
 from contracts.decision_frame import DecisionFrame
@@ -69,20 +68,6 @@ def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent:
     ) and not PRICE_LOOKUP_RE.search(q or ""):
         return "content"
     return ri
-
-
-def _catalog_match_blocked_for_topic(
-    q: str,
-    matched_id: str | None,
-    decision: DecisionFrame | None,
-) -> bool:
-    """Block unrelated catalog cards when resolver/query context is implantation."""
-    mid = str(matched_id or "").strip().lower()
-    topic = str(decision.service_topic or "").strip().lower() if decision else ""
-    implant_ctx = topic == "implantation"
-    if implant_ctx and mid == "tomography" and not KT_EXPLICIT_RE.search(q or ""):
-        return True
-    return False
 
 
 def _source_type_from_price_route(pr: dict[str, Any]) -> SourceType:
@@ -152,16 +137,23 @@ def route_source(
                 match_method="doctors_lookup",
             )
 
-    match = match_service_from_catalog(q0, client_id=client_id)
+    match = match_service_from_catalog(
+        q0,
+        client_id=client_id,
+        service_topic=str(decision.service_topic or "").strip().lower() if decision else None,
+        topic_confidence=(
+            float(decision.confidence.topic or 0.0)
+            if decision is not None and decision.confidence is not None
+            else 0.0
+        ),
+    )
     score = float(match.get("match_score") or 0.0)
-    contain = score >= float(THRESHOLDS.catalog_match.containment_min)
+    contain = bool(match.get("containment_eligible"))
     mid = match.get("matched_service_id")
     svc = match.get("service") if isinstance(match.get("service"), dict) else {}
     svc = dict(svc)
 
-    if contain and ri == "content" and not is_comparison and not _catalog_match_blocked_for_topic(
-        q0, mid, decision
-    ):
+    if contain and ri == "content" and not is_comparison:
         facts = _facts_nonempty(svc)
         if facts:
             return SourceRouteResult(

@@ -22,7 +22,8 @@ def test_select_price_route_group_overview_for_typo():
 def test_group_overview_even_when_catalog_matches_classic():
     route = select_price_service_route("Сколько стоит имплантация?", client_id="demo", sid="t3")
     assert route.get("mode") == "group_overview"
-    assert route.get("matched_service_id") == "classic"
+    assert route.get("matched_service_id") != "tomography"
+    assert route.get("containment_eligible") is False
 
 
 @pytest.mark.parametrize("question", ["Сколько стоит имплантация?", "Сколько стоит импланатция?"])

@@ -50,6 +50,11 @@ metadata_first:
 
 catalog_match:
   containment_min: 0.88
+  tie_score_margin: 0.01
+  typo_support_min: 0.65
+  lemma_weak_phrase_recall_min: 0.75
+  topic_tiebreak_boost: 0.04
+  topic_tiebreak_min_confidence: 0.75
 
 # PR #1.10 — corpus alias (exact + build-time alias embeddings + controlled rescue).
 # Runtime source of truth for alias behavior; do not duplicate as 0.x literals in *.py.

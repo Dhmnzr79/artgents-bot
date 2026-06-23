@@ -239,6 +239,30 @@ def validate_smoke_case(
             coverage_class=cov,
         )
 
+    expected_pricebook_group_id = row.get("expected_pricebook_group_id")
+    if expected_pricebook_group_id is not None:
+        want_gid = str(expected_pricebook_group_id).strip()
+        got_gid = str(meta.get("pricebook_group_id") or "").strip()
+        if want_gid and norm(got_gid) != norm(want_gid):
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"pricebook_group_id: got={got_gid!r} want={want_gid!r}",
+                coverage_class=cov,
+            )
+
+    expected_price_status = row.get("expected_price_status")
+    if expected_price_status is not None:
+        want_ps = str(expected_price_status).strip()
+        got_ps = str(meta.get("price_status") or "").strip()
+        if want_ps and norm(got_ps) != norm(want_ps):
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"price_status: got={got_ps!r} want={want_ps!r}",
+                coverage_class=cov,
+            )
+
     forbidden_doc_id = str_list_field(row, "forbidden_doc_id")
     if forbidden_doc_id and norm(got_doc_id) in {norm(x) for x in forbidden_doc_id}:
         return CaseResult(
@@ -321,7 +345,7 @@ def validate_smoke_case(
                 coverage_class=cov,
             )
 
-    must_not_contain = str_list_field(row, "must_not_contain")
+    must_not_contain = str_list_field(row, "must_not_contain") + str_list_field(row, "forbidden_signals")
     forbidden_hit = [x for x in must_not_contain if x and contains_ci(answer, x)]
     if forbidden_hit:
         return CaseResult(

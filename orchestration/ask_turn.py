@@ -14,6 +14,7 @@ from orchestration.catalog_flow import (
     try_a3_doctor_route,
 )
 from orchestration.helpers import decision_dump
+from core.price_offers import is_crown_inclusion_content_query
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
 from config import IMPLANT_PAIN_FAQ_REF
@@ -106,6 +107,11 @@ def orchestrate_routing_after_resolver(
     md_catalog_priority_score = None
     md_catalog_priority_match_method = None
 
+    q_raw = (q or "").strip()
+    if is_crown_inclusion_content_query(q_raw):
+        intent = "content"
+        request.ctx["effective_intent"] = "content"
+
     if intent != "contacts":
         sr = route_source(q, sid=sid, client_id=client_id, decision=decision, app_intent=intent)
         srd = slim_source_route_payload(sr)
@@ -159,16 +165,17 @@ def orchestrate_routing_after_resolver(
             md_catalog_priority_score = md_prio.match_score
             md_catalog_priority_match_method = md_prio.match_method
 
-        price_result = try_a3_price_route(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            sr=sr,
-            decision=decision,
-            decision_frame=decision_frame,
-        )
-        if price_result is not None:
-            return price_result
+        if not is_crown_inclusion_content_query(q_raw):
+            price_result = try_a3_price_route(
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                sr=sr,
+                decision=decision,
+                decision_frame=decision_frame,
+            )
+            if price_result is not None:
+                return price_result
     else:
         request.ctx["source_route_decision"] = {
             "source": "contacts",

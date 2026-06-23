@@ -49,19 +49,25 @@ def build_group_overview_answer(
         if total is None:
             total = min_offer_total(client_id, sid, unit=member.unit_hint)
         if total is not None:
-            price_lines.append(f"- {label} — от **{format_rub(total)}**")
+            suffix = " за челюсть" if member.unit_hint == "jaw" else ""
+            price_lines.append(f"- {label} — от **{format_rub(total)}**{suffix}")
         else:
             price_lines.append(f"- {label}")
 
     if price_lines:
-        section = "**По протоколам:**" if group_id == "implantation" else "**Варианты:**"
+        section = "**По протоколам:**" if group_id == "implantation" else "**All-on-4 и All-on-6:**"
         parts.append(section)
         parts.extend(price_lines)
-    parts.append(
-        "Выберите протокол ниже или уточните вопрос."
-        if group_id == "implantation"
-        else "Выберите вариант ниже или уточните вопрос."
-    )
+    if group_id == "upper_jaw":
+        parts.append("Выберите протокол ниже или уточните вопрос — на консультации покажут оба варианта по снимку.")
+    elif group_id == "implantation":
+        parts.append(
+            "Выберите протокол ниже или уточните вопрос."
+        )
+    else:
+        parts.append(
+            "Выберите вариант ниже или уточните вопрос."
+        )
 
     quick = group_overview_quick_replies(client_id, group_id=group_id)
     meta = {

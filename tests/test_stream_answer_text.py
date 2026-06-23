@@ -21,7 +21,8 @@ def test_prebuffer_blocks_until_enough_for_paragraph() -> None:
 def test_stream_accumulator_prepends_lead_before_first_emit() -> None:
     ctx = AnswerFormatContext(
         user_question="Сколько стоят импланты?",
-        doc_id="implantation__pricing__implants",
+        doc_id="implantation__service__classic",
+        h2="Цены на импланты",
         h3="Коротко",
     )
     acc = StreamTextAccumulator(ctx=ctx)
@@ -36,7 +37,7 @@ def test_stream_accumulator_prepends_lead_before_first_emit() -> None:
 
 
 def test_stream_prefix_stable_when_more_tokens_arrive() -> None:
-    ctx = AnswerFormatContext(user_question="цены", doc_id="implantation__pricing__implants")
+    ctx = AnswerFormatContext(user_question="цены", doc_id="implantation__service__classic", h2="Цены")
     acc = StreamTextAccumulator(ctx=ctx)
     first = acc.ingest_llm_delta("- a\n- b\n- c\n")
     second = acc.ingest_llm_delta("")

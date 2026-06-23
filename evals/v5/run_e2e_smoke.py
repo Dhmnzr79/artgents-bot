@@ -3,51 +3,37 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import warnings
 
 _EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 if _EVAL_DIR not in sys.path:
     sys.path.insert(0, _EVAL_DIR)
 
-from smoke_case_runner import here, run_smoke_suite
-
 
 def main(argv: list[str] | None = None) -> int:
-    argv = list(argv or [])
-    ap = argparse.ArgumentParser(description="v5 e2e smoke runner", allow_abbrev=False)
-    ap.add_argument("--client", default=None, metavar="CLIENT_ID")
-    ap.add_argument("--case-id", action="append", default=None, metavar="ID")
-    ns, unknown = ap.parse_known_args(argv)
-    if unknown:
-        print(f"WARNING: ignored unknown args: {unknown!r}", file=sys.stderr, flush=True)
-
-    path = os.getenv("E2E_SMOKE_PATH") or here("e2e_smoke.json")
-    bot_url = (os.getenv("BOT_URL") or "http://localhost:5000/ask").strip()
-    timeout_sec = float(os.getenv("BOT_TIMEOUT_SEC") or "20")
-
-    filter_ids: set[str] | None = None
-    raw_ids: list[str] = []
-    if ns.case_id:
-        raw_ids.extend(str(x).strip() for x in ns.case_id if str(x).strip())
-    env_csv = (os.getenv("E2E_SMOKE_CASE_ID") or "").strip()
-    if env_csv:
-        raw_ids.extend(x.strip() for x in env_csv.split(",") if x.strip())
-    if raw_ids:
-        filter_ids = set(raw_ids)
-
-    client_filter: str | None = None
-    if ns.client and str(ns.client).strip():
-        client_filter = str(ns.client).strip().lower()
-    elif (os.getenv("E2E_SMOKE_CLIENT") or "").strip():
-        client_filter = str(os.getenv("E2E_SMOKE_CLIENT")).strip().lower()
-
-    return run_smoke_suite(
-        spec_path=path,
-        bot_url=bot_url,
-        timeout_sec=timeout_sec,
-        client_filter=client_filter,
-        filter_ids=filter_ids,
-        expand_multiclient=False,
+    warnings.warn(
+        "run_e2e_smoke.py is deprecated; use: python evals/v5/run_demo_eval.py --suite smoke",
+        DeprecationWarning,
+        stacklevel=1,
     )
+    from run_demo_eval import main as demo_main
+
+    argv = list(argv or [])
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--client", default=None)
+    ap.add_argument("--case-id", action="append", default=None)
+    ns, rest = ap.parse_known_args(argv)
+    forwarded = ["--suite", "smoke"]
+    if ns.client:
+        forwarded.extend(["--client", ns.client])
+    if ns.case_id:
+        for cid in ns.case_id:
+            forwarded.extend(["--case-id", cid])
+    forwarded.extend(rest)
+    path = os.getenv("E2E_SMOKE_PATH") or ""
+    if path and os.path.isfile(path):
+        os.environ["DEMO_EVAL_SMOKE_PATH"] = path
+    return demo_main(forwarded)
 
 
 if __name__ == "__main__":

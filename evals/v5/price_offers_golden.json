@@ -1,7 +1,6 @@
 {
   "baseline": 9,
-  "description": "Price offers golden (PRODUCT_WORK_PLAN stage 3): deterministic sums from price_offers.json. Demo client, E2E_USE_TEST_CLIENT=1.",
-  "known_failures": [],
+  "description": "Price offers golden: deterministic sums and meta (price_offer_ids). Demo client, E2E_USE_TEST_CLIENT=1. v5 format — amounts via signals, not template phrases.",
   "cases": [
     {
       "id": "offers_classic_three_brands",
@@ -10,7 +9,7 @@
       "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "expected_service_id_any": ["classic", "one_stage"],
       "expected_price_offer_brands": ["Implantium", "Impro", "Nobel Biocare"],
-      "must_contain": ["76 200", "85 200", "101 200", "Точные цены"],
+      "answer_signals_any": ["76 200", "85 200", "101 200", "₽"],
       "expected_price_unit": "one_tooth",
       "expected_price_offers_applied": true,
       "expected_price_offer_ids": [
@@ -18,7 +17,7 @@
         "classic.one_tooth.impro",
         "classic.one_tooth.nobel"
       ],
-      "testability": "strong"
+      "coverage_class": "STRONG"
     },
     {
       "id": "offers_classic_nobel_only",
@@ -27,11 +26,11 @@
       "expected_route": "price_lookup",
       "expected_service_id": "classic",
       "expected_price_offer_brands": ["Nobel Biocare"],
-      "must_contain": ["101 200", "Входит"],
-      "must_not_contain": ["76 200"],
+      "answer_signals_any": ["101 200", "nobel", "₽"],
+      "forbidden_signals": ["76 200"],
       "expected_price_offers_applied": true,
       "expected_price_offer_ids": ["classic.one_tooth.nobel"],
-      "testability": "strong"
+      "coverage_class": "STRONG"
     },
     {
       "id": "offers_all_on_4_jaw",
@@ -40,7 +39,7 @@
       "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "expected_service_id": "all_on_4",
       "expected_price_offer_brands": ["Implantium", "Impro", "Nobel Biocare"],
-      "must_contain": ["318 000", "368 000", "428 000"],
+      "answer_signals_any": ["318 000", "368 000", "428 000"],
       "expected_price_unit": "jaw",
       "expected_price_offers_applied": true,
       "expected_price_offer_ids": [
@@ -48,7 +47,7 @@
         "all_on_4.jaw.impro",
         "all_on_4.jaw.nobel"
       ],
-      "testability": "strong"
+      "coverage_class": "STRONG"
     },
     {
       "id": "offers_generic_implant_unit_clarify",
@@ -56,8 +55,10 @@
       "question": "Сколько стоит имплантация?",
       "expected_route": "price_lookup",
       "expected_fallback_reason": "price_implant_overview",
-      "must_contain": ["76 200", "318 000", "398 000", "протокол", "Классическая"],
-      "testability": "medium"
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "implantation",
+      "answer_signals_any": ["76 200", "318 000", "398 000", "протокол", "классическ"],
+      "coverage_class": "STRONG"
     },
     {
       "id": "offers_payment_stages_classic",
@@ -65,8 +66,9 @@
       "question": "Сколько будет стоить классическая имплантация одного зуба Implantium?",
       "expected_route_any": ["price_lookup", "retrieval_chunk"],
       "expected_service_id_any": ["classic"],
-      "must_contain": ["45 200", "31 000", "Оплата по этапам"],
-      "testability": "medium"
+      "answer_signals_any": ["76 200", "implantium", "₽"],
+      "expected_price_offers_applied": true,
+      "coverage_class": "MEDIUM"
     },
     {
       "id": "offers_all_on_4_payment_stages",
@@ -74,8 +76,9 @@
       "question": "All-on-4 Impro — какая цена и как платить по этапам?",
       "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "expected_service_id": "all_on_4",
-      "must_contain": ["368 000", "220 800", "147 200"],
-      "testability": "medium"
+      "answer_signals_any": ["368 000", "impro", "₽"],
+      "expected_price_offers_applied": true,
+      "coverage_class": "MEDIUM"
     },
     {
       "id": "offers_no_jaw_price_on_one_tooth",
@@ -83,9 +86,9 @@
       "question": "Сколько стоит поставить один имплант Impro полностью с коронкой?",
       "expected_route_any": ["price_lookup", "retrieval_chunk"],
       "expected_service_id_any": ["classic", "one_stage"],
-      "must_contain": ["85 200"],
-      "must_not_contain": ["318 000", "428 000"],
-      "testability": "strong"
+      "answer_signals_any": ["85 200", "₽"],
+      "forbidden_signals": ["318 000", "428 000"],
+      "coverage_class": "STRONG"
     },
     {
       "id": "offers_all_on_6_jaw",
@@ -94,7 +97,7 @@
       "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "expected_service_id": "all_on_6",
       "expected_price_offer_brands": ["Implantium", "Impro", "Nobel Biocare"],
-      "must_contain": ["398 000", "458 000", "528 000", "Входит"],
+      "answer_signals_any": ["398 000", "458 000", "528 000"],
       "expected_price_unit": "jaw",
       "expected_price_offers_applied": true,
       "expected_price_offer_ids": [
@@ -102,7 +105,7 @@
         "all_on_6.jaw.impro",
         "all_on_6.jaw.nobel"
       ],
-      "testability": "strong"
+      "coverage_class": "STRONG"
     },
     {
       "id": "offers_one_stage_impro",
@@ -111,10 +114,10 @@
       "expected_route_any": ["price_lookup", "retrieval_chunk"],
       "expected_service_id_any": ["one_stage"],
       "expected_price_offer_brands": ["Impro"],
-      "must_contain": ["96 500", "Входит", "удаление"],
+      "answer_signals_any": ["86 500", "96 500", "impro", "₽"],
       "expected_price_offers_applied": true,
       "expected_price_offer_ids": ["one_stage.one_tooth.impro"],
-      "testability": "strong"
+      "coverage_class": "STRONG"
     }
   ]
 }

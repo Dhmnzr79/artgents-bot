@@ -17,8 +17,17 @@
       "overview_prompt": "Стоимость восстановления челюсти зависит от протокола — All-on-4 или All-on-6.",
       "unit_filter": "jaw",
       "members": [
-        { "service_id": "all_on_4", "label": "All-on-4", "from_total": 318000 },
-        { "service_id": "all_on_6", "label": "All-on-6", "from_total": 398000 }
+        { "service_id": "all_on_4", "label": "All-on-4", "unit_hint": "jaw", "from_total": 318000 },
+        { "service_id": "all_on_6", "label": "All-on-6", "unit_hint": "jaw", "from_total": 398000 }
+      ]
+    },
+    "upper_jaw": {
+      "label": "Восстановление верхней челюсти",
+      "overview_prompt": "Для всей верхней челюсти чаще сравнивают All-on-4 и All-on-6. Что подойдёт именно сверху, решают по КТ: на верхней челюсти кость часто тоньше, поэтому иногда врач предлагает 6 опор.",
+      "unit_filter": "jaw",
+      "members": [
+        { "service_id": "all_on_4", "label": "All-on-4", "unit_hint": "jaw", "from_total": 318000 },
+        { "service_id": "all_on_6", "label": "All-on-6", "unit_hint": "jaw", "from_total": 398000 }
       ]
     }
   }

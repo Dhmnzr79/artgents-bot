@@ -52,8 +52,7 @@
       "question": "Что входит в стоимость All-on-4 под ключ?",
       "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
       "expected_doc_id_any": [
-        "implantation__service__all_on_4",
-        "implantation__pricing__all_on_4"
+        "implantation__service__all_on_4"
       ],
       "expected_answer_slots": ["promo_note"],
       "must_contain": ["бесплатная КТ"],
@@ -65,8 +64,7 @@
       "question": "Можно ли удалить зуб и сразу поставить имплант?",
       "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
       "expected_doc_id_any": [
-        "implantation__service__one_stage",
-        "implantation__pricing__implants"
+        "implantation__service__one_stage"
       ],
       "expected_answer_slots": ["consult_value"],
       "must_contain": ["консультации"],

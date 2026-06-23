@@ -446,7 +446,7 @@ def eval_ingress() -> EvalResult:
     total = 0
     ok = 0
     bad: list[dict[str, Any]] = []
-    client_id = "default"
+    client_id = os.getenv("INGRESS_EVAL_CLIENT") or "demo"
     for row in cases:
         cid = str(row.get("id") or "")
         q = str(row.get("question") or "")

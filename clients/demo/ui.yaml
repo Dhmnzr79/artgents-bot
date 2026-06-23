@@ -3,7 +3,7 @@ guided_menu:
   answer: "Могу коротко подсказать и помочь выбрать направление — что для вас важнее?"
   quick_replies:
     - label: "Стоимость имплантации"
-      ref: "price:classic"
+      ref: "price:implantation/overview"
     - label: "Больно ли ставить имплант?"
       ref: "implantation__faq__pain.md#korotko"
     - label: "Что будет на консультации?"

@@ -25,7 +25,13 @@ def test_unit_clarify_quick_replies_use_price_ref():
     from core.price_group_overview import group_overview_quick_replies
 
     refs = [r["ref"] for r in group_overview_quick_replies("demo")]
-    assert refs == ["price:classic", "price:one_stage", "price:all_on_4", "price:all_on_6"]
+    assert refs == [
+        "price:classic",
+        "price:one_stage",
+        "price:all_on_4",
+        "price:all_on_6",
+        "price:sinus_lift",
+    ]
 
 
 def test_price_ref_click_classic_offers(monkeypatch):
@@ -44,7 +50,7 @@ def test_price_ref_click_classic_offers(monkeypatch):
     assert meta.get("price_offers_applied") is True
     assert meta.get("matched_service_id") == "classic"
     assert "76 200" in (body.get("answer") or "")
-    assert "классическ" in (body.get("answer") or "").lower()
+    assert "под ключ" in (body.get("answer") or "").lower()
 
 
 def test_parse_price_widget_ref_aspect_stages():

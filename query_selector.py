@@ -26,7 +26,9 @@ from core.client_config_loader import resolve_pack_client_id
 from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
 from core.routing_loader import THRESHOLDS
 from core.price_offers import (
+    is_crown_inclusion_content_query,
     is_generic_implant_price_query,
+    is_one_stage_price_query,
     resolve_implant_group_overview,
     should_offer_unit_clarify,
 )
@@ -487,6 +489,8 @@ def _lookup_intent_by_rules(q: str) -> str:
         return "other"
     if continuation_only_phrase(q0):
         return "other"
+    if is_crown_inclusion_content_query(q0):
+        return "other"
     if PRICE_CONCERN_RE.search(q0):
         return "price_concern"
     if PRICE_LOOKUP_RE.search(q0):
@@ -686,7 +690,19 @@ def select_price_service_route(
         intent = classify_price_route_intent(q, client_id=client_id, sid=sid)
     if intent == "other":
         return {"mode": "other", "intent": intent}
+    if is_crown_inclusion_content_query(q):
+        return {"mode": "other", "intent": "other"}
     match = match_service_from_catalog(q, client_id=client_id)
+    if intent == "price_lookup" and is_one_stage_price_query(q):
+        catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
+        one_stage_svc = catalog.get("one_stage") if isinstance(catalog.get("one_stage"), dict) else None
+        if one_stage_svc:
+            match = {
+                "matched_service_id": "one_stage",
+                "service": one_stage_svc,
+                "match_score": 1.0,
+                "is_confident": True,
+            }
     group_id = resolve_implant_group_overview(q) if intent == "price_lookup" else None
     if intent == "price_lookup" and group_id:
         return {

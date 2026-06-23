@@ -7,8 +7,11 @@ from core.price_offers import (
     build_unit_clarify_answer,
     detect_brand_in_query,
     get_price_offers,
+    is_crown_inclusion_content_query,
     is_full_jaw_implant_price_query,
     is_generic_implant_price_query,
+    is_one_stage_price_query,
+    is_upper_jaw_restoration_price_query,
     render_price_offers_append,
     resolve_implant_group_overview,
     should_offer_unit_clarify,
@@ -152,7 +155,42 @@ def test_full_jaw_implant_price_query():
 def test_all_on_4_only_not_full_jaw_overview():
     q = "Сколько стоит All-on-4 на челюсть?"
     assert not is_full_jaw_implant_price_query(q)
+    assert not is_upper_jaw_restoration_price_query(q)
     assert resolve_implant_group_overview(q) is None
+
+
+def test_upper_jaw_price_routes_to_upper_jaw_group():
+    for question in (
+        "сколько стоит вся верхняя челюсть",
+        "имплантация верхней челюсти цена",
+        "сколько стоит восстановить верхнюю челюсть",
+        "сколько стоит если нет зубов на верхней челюсти",
+    ):
+        assert is_upper_jaw_restoration_price_query(question)
+        assert resolve_implant_group_overview(question) == "upper_jaw"
+        assert not is_full_jaw_implant_price_query(question)
+
+
+def test_full_arch_turnkey_price_query():
+    q = "Сколько стоит вставить все зубы под ключ?"
+    assert is_full_jaw_implant_price_query(q)
+    assert resolve_implant_group_overview(q) == "full_jaw"
+
+
+def test_one_stage_price_not_group_overview():
+    q = "Удалить зуб и сразу поставить имплант — сколько стоит?"
+    assert is_one_stage_price_query(q)
+    assert resolve_implant_group_overview(q) is None
+
+
+def test_crown_inclusion_is_content_not_price_lookup():
+    from query_selector import price_rules_hint, select_price_service_route
+
+    q = "Коронка отдельно оплачивается?"
+    assert is_crown_inclusion_content_query(q)
+    assert price_rules_hint(q) is None
+    route = select_price_service_route(q, client_id="demo", intent_override="price_lookup")
+    assert route.get("mode") == "other"
 
 
 def test_price_offer_meta_in_ask_response_meta(monkeypatch):

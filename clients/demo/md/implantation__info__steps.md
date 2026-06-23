@@ -15,7 +15,7 @@ aliases:
   - "из чего состоит имплантация"
 
 suggest_refs:
-  - { label: "Цены на импланты", ref: "price:classic" }
+  - { label: "Варианты и цены", ref: "price:implantation/overview" }
 
 cta_key: plan
 cta_action: lead

@@ -31,8 +31,29 @@ _JAW_EXPLICIT_RX = re.compile(
     r"all[\s-]?on|все\s+на|челюст|весь\s+зубной|полный\s+протез|all-on",
     re.I | re.U,
 )
+_UPPER_JAW_RX = re.compile(
+    r"верхн\w*\s+челюст|на\s+верхн\w*\s+челюст|сверху",
+    re.I | re.U,
+)
+_JAW_RESTORATION_RX = re.compile(
+    r"в(?:ся|есь)\s+(?:верхн\w*\s+)?челюст|нет\s+зуб|восстанов|все\s+зуб",
+    re.I | re.U,
+)
 _ONE_TOOTH_EXPLICIT_RX = re.compile(
-    r"один\s+зуб|1\s+зуб|one\s+tooth|одного\s+зуба|одним\s+зубом",
+    r"один\s+(?:зуб|имплант)|1\s+зуб|one\s+tooth|одного\s+зуба|одним\s+зубом|одного\s+импланта",
+    re.I | re.U,
+)
+_FULL_ARCH_RX = re.compile(
+    r"все\s+зуб|вставить\s+все|восстановить\s+все\s+зуб|полностью\s+зуб|весь\s+зубной",
+    re.I | re.U,
+)
+_CROWN_INCLUSION_RX = re.compile(
+    r"коронк\w*.*(?:отдельн|входит|входят)|(?:отдельн|входит|входят).*коронк",
+    re.I | re.U,
+)
+_ONE_STAGE_PRICE_RX = re.compile(
+    r"(?:удал\w*|удален\w*).{0,48}(?:сразу|одномомент|в\s+день).{0,48}имплант|"
+    r"имплант.{0,48}(?:сразу|одномомент).{0,48}удал",
     re.I | re.U,
 )
 _ALL_ON_6_RX = re.compile(r"all[\s-]?on[\s-]?6|все\s+на\s+6|all-on-6", re.I | re.U)
@@ -146,16 +167,10 @@ _ALL_ON_4_ONLY_RX = re.compile(r"all[\s-]?on[\s-]?4|все\s+на\s+4", re.I | r
 _ALL_ON_6_ONLY_RX = re.compile(r"all[\s-]?on[\s-]?6|все\s+на\s+6", re.I | re.U)
 
 
-def is_full_jaw_implant_price_query(q: str) -> bool:
-    """Jaw-scope implant price without a single protocol — → manifest group full_jaw."""
-    text = (q or "").strip()
+def _jaw_scope_price_query_common(text: str) -> bool:
     if not text or not PRICE_LOOKUP_RE.search(text):
         return False
-    if not _JAW_EXPLICIT_RX.search(text):
-        return False
     if _ONE_TOOTH_EXPLICIT_RX.search(text):
-        return False
-    if not _IMPLANT_PRICE_RX.search(text):
         return False
     if re.search(r"протез|протезирован|коронк|абатмент", text, re.I | re.U):
         return False
@@ -163,10 +178,61 @@ def is_full_jaw_implant_price_query(q: str) -> bool:
         return False
     if _ALL_ON_6_ONLY_RX.search(text) and not _ALL_ON_4_ONLY_RX.search(text):
         return False
+    has_jaw = bool(
+        _JAW_EXPLICIT_RX.search(text) or _UPPER_JAW_RX.search(text) or _FULL_ARCH_RX.search(text)
+    )
+    has_signal = bool(
+        _IMPLANT_PRICE_RX.search(text)
+        or _JAW_RESTORATION_RX.search(text)
+        or _UPPER_JAW_RX.search(text)
+        or _FULL_ARCH_RX.search(text)
+    )
+    return has_jaw and has_signal
+
+
+def is_full_jaw_implant_price_query(q: str) -> bool:
+    """Jaw-scope implant price without a single protocol — → manifest group full_jaw."""
+    text = (q or "").strip()
+    if not _jaw_scope_price_query_common(text):
+        return False
+    return not _UPPER_JAW_RX.search(text)
+
+
+def is_upper_jaw_restoration_price_query(q: str) -> bool:
+    """Upper jaw full-arch price — compare All-on-4 vs All-on-6 (manifest group upper_jaw)."""
+    text = (q or "").strip()
+    if not _jaw_scope_price_query_common(text):
+        return False
+    return bool(_UPPER_JAW_RX.search(text))
+
+
+def is_crown_inclusion_content_query(q: str) -> bool:
+    """Crown in/out of turnkey price — FAQ content, not zirconia price lookup."""
+    text = (q or "").strip()
+    if not text or not _CROWN_INCLUSION_RX.search(text):
+        return False
+    if PRICE_LOOKUP_RE.search(text) and re.search(r"сколько|цена|стоим|стоит", text, re.I | re.U):
+        if re.search(r"уже\s+стоит\s+имплант|коронк\w*\s+на\s+имплант", text, re.I | re.U):
+            return False
+        if re.search(r"обычн\w*|на\s+зуб\b|сво[ийё]\w*\s+зуб", text, re.I | re.U):
+            return False
     return True
 
 
+def is_one_stage_price_query(q: str) -> bool:
+    text = (q or "").strip()
+    if not text:
+        return False
+    if not (PRICE_LOOKUP_RE.search(text) or re.search(r"сколько|цена|стоим|стоит", text, re.I | re.U)):
+        return False
+    return bool(_ONE_STAGE_PRICE_RX.search(text))
+
+
 def resolve_implant_group_overview(q: str) -> str | None:
+    if is_one_stage_price_query(q):
+        return None
+    if is_upper_jaw_restoration_price_query(q):
+        return "upper_jaw"
     if is_full_jaw_implant_price_query(q):
         return "full_jaw"
     if is_generic_implant_price_query(q):

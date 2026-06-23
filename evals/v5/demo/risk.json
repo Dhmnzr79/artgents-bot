@@ -1,0 +1,250 @@
+{
+  "baseline": 20,
+  "description": "Demo risk regression (drafts/test.md §3, cases 1–20): routing traps — group price overview, what_included, crown vs implant, policies. No known_failures skips.",
+  "cases": [
+    {
+      "id": "risk_r01_generic_implant_price",
+      "client_id": "demo",
+      "risk_ref": 1,
+      "question": "Сколько стоит имплантация?",
+      "expected_route": "price_lookup",
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "implantation",
+      "answer_signals_any": ["протокол", "318 000", "76 200", "all-on"],
+      "forbidden_signals": ["только 76 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r02_implant_tooth_price",
+      "client_id": "demo",
+      "risk_ref": 2,
+      "question": "Сколько стоит имплантация зуба?",
+      "expected_route": "price_lookup",
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "implantation",
+      "answer_signals_any": ["протокол", "318 000", "76 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r03_upper_jaw_price",
+      "client_id": "demo",
+      "risk_ref": 3,
+      "question": "Сколько стоит вся верхняя челюсть?",
+      "expected_route": "price_lookup",
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "upper_jaw",
+      "answer_signals_any": ["верхн", "318 000", "398 000", "all-on"],
+      "forbidden_signals": ["76 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r04_upper_jaw_full_phrase",
+      "client_id": "demo",
+      "risk_ref": 4,
+      "question": "Сколько стоит имплантация всей верхней челюсти?",
+      "expected_route": "price_lookup",
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "upper_jaw",
+      "answer_signals_any": ["верхн", "318 000", "398 000"],
+      "forbidden_signals": ["76 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r05_all_teeth_turnkey_price",
+      "client_id": "demo",
+      "risk_ref": 5,
+      "question": "Сколько стоит вставить все зубы под ключ?",
+      "expected_route": "price_lookup",
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "full_jaw",
+      "answer_signals_any": ["318 000", "398 000", "all-on", "челюст"],
+      "forbidden_signals": ["76 200", "85 200", "implantium"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r06_crown_in_implant_price",
+      "client_id": "demo",
+      "risk_ref": 6,
+      "question": "Коронка входит в цену импланта?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "implantation__faq__what_included",
+      "answer_signals_any": ["входит", "коронк", "ключ", "отдельно"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r07_turnkey_what_included",
+      "client_id": "demo",
+      "risk_ref": 7,
+      "question": "Что входит в имплантацию под ключ?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "implantation__faq__what_included",
+      "answer_signals_any": ["входит", "коронк", "имплант", "ключ"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r08_crown_paid_separately",
+      "client_id": "demo",
+      "risk_ref": 8,
+      "question": "Коронка отдельно оплачивается?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "implantation__faq__what_included",
+      "answer_signals_any": ["отдельно", "коронк", "входит", "этап"],
+      "forbidden_signals": ["25 000"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r09_crown_on_existing_implant",
+      "client_id": "demo",
+      "risk_ref": 9,
+      "question": "У меня уже стоит имплант, сколько стоит коронка?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "implant_supported_prosthetics",
+      "answer_signals_any": ["31 000", "протезирован", "имплант", "₽"],
+      "forbidden_signals": ["76 200", "85 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r10_regular_crown_price",
+      "client_id": "demo",
+      "risk_ref": 10,
+      "question": "Сколько стоит обычная коронка на зуб?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "zirconia_crowns",
+      "answer_signals_any": ["25 000", "циркон", "коронк", "₽"],
+      "forbidden_signals": ["31 000", "имплант под ключ"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r11_zirconia_vs_implant",
+      "client_id": "demo",
+      "risk_ref": 11,
+      "question": "Циркониевая коронка — это имплант?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "prosthetics__service__zirconia_crowns",
+        "implantation__faq__what_included"
+      ],
+      "answer_signals_any": ["не", "разн", "коронк", "имплант", "корень"],
+      "forbidden_signals": ["это одно и то же", "коронка — это имплант"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_r12_extraction_one_stage_price",
+      "client_id": "demo",
+      "risk_ref": 12,
+      "question": "Удалить зуб и сразу поставить имплант — сколько стоит?",
+      "expected_route": "price_lookup",
+      "expected_service_id_any": ["one_stage"],
+      "answer_signals_any": ["одномомент", "86 500", "86500", "удален"],
+      "forbidden_signals": ["318 000"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r13_sinus_in_implant_price",
+      "client_id": "demo",
+      "risk_ref": 13,
+      "question": "Синус-лифтинг входит в цену импланта?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_doc_id_any": [
+        "implantation__service__sinus_lift",
+        "implantation__info__bone_graft"
+      ],
+      "answer_signals_any": ["отдельно", "не входит", "синус", "дополн"],
+      "forbidden_signals": ["входит в цену импланта", "бесплатно"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r14_implant_without_bone_graft",
+      "client_id": "demo",
+      "risk_ref": 14,
+      "question": "Можно поставить импланты без костной пластики?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__info__bone_graft",
+        "comparison__bone_graft_vs_all_on_4"
+      ],
+      "answer_signals_any": ["кт", "завис", "случа", "кост"],
+      "forbidden_signals": ["всегда можно без", "точно без наращивания", "гарантированно без"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_r15_no_bone_only_zygomatic",
+      "client_id": "demo",
+      "risk_ref": 15,
+      "question": "Если сверху совсем нет кости, это только скуловые импланты?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__service__zygomatic_implants",
+        "implantation__service__pterygoid_implants",
+        "implantation__info__bone_graft",
+        "comparison__bone_graft_vs_all_on_4"
+      ],
+      "answer_signals_any": ["не единствен", "вариант", "альтернат", "кт"],
+      "forbidden_signals": ["только скулов", "единственный способ"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_r16_pterygoid_vs_sinus",
+      "client_id": "demo",
+      "risk_ref": 16,
+      "question": "Птеригоидные импланты — это вместо синус-лифтинга?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": [
+        "implantation__service__pterygoid_implants",
+        "implantation__service__sinus_lift"
+      ],
+      "answer_signals_any": ["альтернат", "синус", "птеригоид", "завис", "кт"],
+      "forbidden_signals": ["всегда вместо", "всегда лучше"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_r17_sedation_sleep",
+      "client_id": "demo",
+      "risk_ref": 17,
+      "question": "Можно имплантацию во сне?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id_any": ["implantation__faq__pain"],
+      "answer_signals_any": ["седац", "анестез", "местн", "наркоз"],
+      "forbidden_signals": ["общий наркоз всем", "полный наркоз по умолчанию", "без противопоказаний всем"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_r18_osstem_policy",
+      "client_id": "demo",
+      "risk_ref": 18,
+      "question": "Ставите Osstem?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "ingress_service_not_offered"],
+      "expected_doc_id_any": [
+        "implantation__info__implant_systems",
+        "implantation__service__classic"
+      ],
+      "answer_signals_any": ["implantium", "impro", "nobel"],
+      "forbidden_signals": ["ставим osstem", "да, osstem", "osstem —"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_r19_straumann_brands",
+      "client_id": "demo",
+      "risk_ref": 19,
+      "question": "Ставите Straumann?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "ingress_service_not_offered"],
+      "expected_doc_id_any": [
+        "implantation__info__implant_systems",
+        "implantation__service__classic"
+      ],
+      "answer_signals_any": ["straumann", "нет", "консультац", "систем"],
+      "forbidden_signals": ["ставим straumann", "да, straumann", "работаем со straumann"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_r20_braces_policy",
+      "client_id": "demo",
+      "risk_ref": 20,
+      "question": "Ставите брекеты?",
+      "expected_route": "ingress_service_not_offered",
+      "answer_signals_any": ["элайнер", "брекет"],
+      "forbidden_signals": ["ставим брекеты", "да, делаем брекеты"],
+      "coverage_class": "STRONG"
+    }
+  ]
+}

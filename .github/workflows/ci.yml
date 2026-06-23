@@ -1,6 +1,5 @@
-# CI — content lint, unit tests, demo product evals (implant + e2e smoke).
-# Optional on multiclient only: metadata-first eval (continue-on-error until routing pack is green).
-# Secrets: OPENAI_API_KEY (required for in-proc eval jobs).
+# CI — content lint, unit tests, demo product evals (v5 architecture).
+# Secrets (Settings → Actions): OPENAI_API_KEY (embeddings), DASHSCOPE_API_KEY (Qwen chat).
 
 name: CI
 
@@ -23,7 +22,6 @@ jobs:
     name: Content lint + unit
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # lint imports config.py, which requires OPENAI_API_KEY at import time
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
@@ -49,7 +47,7 @@ jobs:
       - name: Lint client md (all packs)
         run: python scripts/lint_content.py --client all
 
-      - name: Unit tests (smoke helpers + routing)
+      - name: Unit tests (routing, pricebook, metadata-first helpers)
         run: |
           python -m pytest \
             tests/test_metadata_first_eval_helpers.py \
@@ -58,18 +56,23 @@ jobs:
             tests/test_finalize_metadata_first_hook.py \
             tests/test_e2e_smoke_infer.py \
             tests/test_candidate_builder.py \
+            tests/test_price_offers.py \
+            tests/test_price_group_overview.py \
+            tests/test_price_ref_routing.py \
             -q --tb=short
 
       - name: Alias collision report (non-blocking inventory)
         run: python scripts/alias_collision_report.py --client all
 
-  implant-golden-eval:
-    name: Implant golden (demo, in-proc)
+  demo-deterministic-eval:
+    name: Demo deterministic (ingress + price offers)
     runs-on: ubuntu-latest
     needs: content-lint-and-unit
-    timeout-minutes: 60
+    timeout-minutes: 10
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      CHAT_BASE_URL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
     steps:
       - uses: actions/checkout@v4
 
@@ -83,27 +86,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Check OPENAI_API_KEY
+      - name: Ingress + policy layer eval
+        run: python evals/v5/run_layer_eval.py --layer ingress
+
+      - name: Check LLM secrets (price offers hits /ask + retrieval)
         run: |
           if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
-            echo "::error::Add repository secret OPENAI_API_KEY (Settings → Secrets → Actions)."
+            echo "::error::Add OPENAI_API_KEY — embeddings for retrieval in /ask evals."
+            exit 1
+          fi
+          if [ -z "$DASHSCOPE_API_KEY" ]; then
+            echo "::error::Add DASHSCOPE_API_KEY — Qwen chat (qwen3.7-plus). Without it: model_not_found in CI."
             exit 1
           fi
 
-      - name: Run implant golden (28 cases)
+      - name: Price offers golden (in-proc)
         env:
           E2E_USE_TEST_CLIENT: "1"
-          IMPLANT_EVAL_CLIENT: "demo"
-          PYTHONUNBUFFERED: "1"
-        run: python evals/v5/run_implant_eval.py --client demo
+          PRICE_OFFERS_EVAL_CLIENT: "demo"
+        run: python evals/v5/run_price_offers_eval.py --client demo
 
-  e2e-smoke-eval:
-    name: E2E smoke (demo, in-proc)
+  demo-product-eval:
+    name: Demo product eval (smoke + risk)
     runs-on: ubuntu-latest
     needs: content-lint-and-unit
     timeout-minutes: 60
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      CHAT_BASE_URL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
     steps:
       - uses: actions/checkout@v4
 
@@ -117,19 +128,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Check OPENAI_API_KEY
+      - name: Check LLM secrets (OpenAI embed + Qwen chat)
         run: |
           if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
-            echo "::error::Add repository secret OPENAI_API_KEY (Settings → Secrets → Actions)."
+            echo "::error::Add OPENAI_API_KEY — embeddings for retrieval in /ask evals."
+            exit 1
+          fi
+          if [ -z "$DASHSCOPE_API_KEY" ]; then
+            echo "::error::Add DASHSCOPE_API_KEY — Qwen chat (qwen3.7-plus). Without it: model_not_found in CI."
             exit 1
           fi
 
-      - name: Run e2e smoke
+      - name: Run demo smoke + risk regression
         env:
           E2E_USE_TEST_CLIENT: "1"
-          E2E_SMOKE_CLIENT: "demo"
+          DEMO_EVAL_CLIENT: "demo"
           PYTHONUNBUFFERED: "1"
-        run: python evals/v5/run_e2e_smoke.py --client demo
+        run: python evals/v5/run_demo_eval.py --client demo --suite all
 
   metadata-first-eval:
     name: Metadata-first eval (multiclient, optional)
@@ -140,6 +155,8 @@ jobs:
     timeout-minutes: 45
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      CHAT_BASE_URL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
     steps:
       - uses: actions/checkout@v4
 
@@ -153,10 +170,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Check OPENAI_API_KEY
+      - name: Check LLM secrets (OpenAI embed + Qwen chat)
         run: |
           if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
-            echo "::error::Add repository secret OPENAI_API_KEY (Settings → Secrets → Actions)."
+            echo "::error::Add OPENAI_API_KEY — embeddings for retrieval in /ask evals."
+            exit 1
+          fi
+          if [ -z "$DASHSCOPE_API_KEY" ]; then
+            echo "::error::Add DASHSCOPE_API_KEY — Qwen chat (qwen3.7-plus). Without it: model_not_found in CI."
             exit 1
           fi
 

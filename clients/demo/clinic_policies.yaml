@@ -44,15 +44,6 @@ service_alternatives:
       Могу кратко рассказать про элайнеры или записать на консультацию.
 
   - match_keywords:
-      - "скулов"
-      - "zygoma"
-    mention: "костная пластика и All-on-4/6"
-    suggest_ref: "implantation__info__bone_graft.md#skulovye-implanty-i-alternativy"
-    note: >-
-      Скуловую имплантацию в клинике не выполняем. После КТ обсуждаем классические протоколы,
-      костную пластику, синус-лифтинг или All-on-4/6 — что подходит по снимку.
-
-  - match_keywords:
       - "базальн"
       - "basal"
     mention: "классическая имплантация"

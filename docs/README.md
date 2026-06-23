@@ -6,6 +6,7 @@
 | **`MULTICLIENT.md`** | Client pack, домены, VPS, локальный запуск, prod-критерии |
 | **`VPS_CHECKLIST.md`** | Чеклист деплоя M5 (новый чат / пошаговый prod) |
 | **`ROUTING_MAP.md`** | Куда уходит вопрос (маршруты до retrieval) |
+| **`DEMO_KNOWLEDGE_BASE_GUIDE.md`** | **Гайд для ИИ/редактора:** как устроен demo-пак, цены, md, слоты, тесты |
 | **`CLIENT_FILLING_SERVICES_PRICES.md`** | Шпаргалка: каталог, цены, md, маршруты при заполнении клиента |
 | **`WIDGET_ANSWER_FORMAT.md`** | Контракт текста ответа для виджета |
 | **`CESI_WIDGET_PRESENTATION.md`** | Текстовая презентация виджета на примере ЦЭСИ (UX, CTA, меню) |
@@ -33,11 +34,24 @@
 
 ---
 
-## Evals
+## Evals (demo product — v5)
 
-- Smoke: `evals/v5/run_e2e_smoke.py`
-- Implant battery: `evals/v5/run_implant_eval.py` (`implant_golden.json`)
-- Answer slots: `evals/v5/run_answer_slots_eval.py`
-- Price offers: `evals/v5/run_price_offers_eval.py` (`E2E_USE_TEST_CLIENT=1`)
-- CI eval (demo): `run_implant_eval.py`, `run_e2e_smoke.py` — `.github/workflows/ci.yml`; metadata-first — опционально на `multiclient`
-- Layer: `evals/v5/run_layer_eval.py`
+**CI (обязательно):** `run_demo_eval.py` (smoke + risk), `run_price_offers_eval.py`, `run_layer_eval.py --layer ingress`, unit routing/pricebook tests.
+
+**GitHub Actions secrets:** `OPENAI_API_KEY` (embeddings / retrieval) + `DASHSCOPE_API_KEY` (Qwen chat). Без второго в CI будет `model_not_found` для `qwen3.7-plus`.
+
+| Набор | Файл | Runner |
+|-------|------|--------|
+| Smoke (24) | `evals/v5/demo/smoke.json` | `python evals/v5/run_demo_eval.py --suite smoke --client demo` |
+| Risk regression (20) | `evals/v5/demo/risk.json` | `python evals/v5/run_demo_eval.py --suite risk --client demo` |
+| Оба | | `python evals/v5/run_demo_eval.py --suite all --client demo` |
+
+Формат кейса: `expected_route`, `expected_doc_id` / `expected_service_id`, `answer_signals_any`, `forbidden_signals` — без дословных `must_contain` на текст LLM (кроме шаблонов lead).
+
+Архив v4: `evals/v5/archive/` (`e2e_smoke.v4.json`, `implant_golden.v4.json`).
+
+**Детерминированные слои:** `run_layer_eval.py`, `run_price_offers_eval.py`, `run_answer_slots_eval.py`.
+
+**Опционально (ветка multiclient):** `run_metadata_first_eval.py` — `continue-on-error` в CI.
+
+План расширения golden: `drafts/test.md` §2 → будущий `demo/golden.json`.

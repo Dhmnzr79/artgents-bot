@@ -22,7 +22,7 @@
       "id": "mfs_price_all_on_4",
       "question": "Сколько стоит All-on-4?",
       "expected_route": "price_lookup",
-      "expected_doc_id": "implantation__pricing__all_on_4",
+      "expected_service_id": "all_on_4",
       "answer_signals_any": ["₽", "руб"],
       "coverage_class": "STRONG"
     },
@@ -30,7 +30,7 @@
       "id": "mfs_price_classic",
       "question": "Сколько стоит классическая имплантация?",
       "expected_route": "price_lookup",
-      "expected_doc_id": "implantation__pricing__implants",
+      "expected_service_id": "classic",
       "answer_signals_any": ["₽", "руб"],
       "coverage_class": "STRONG"
     },

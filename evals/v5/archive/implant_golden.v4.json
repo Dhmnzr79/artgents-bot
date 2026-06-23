@@ -9,7 +9,6 @@
       "implant_ref": 1,
       "question": "Сколько будет стоить поставить один имплант полностью с коронкой, не просто сам винт?",
       "expected_route": "price_lookup",
-      "expected_doc_id": "implantation__pricing__implants",
       "expected_service_id": "classic",
       "answer_signals_any": ["₽", "руб", "implantium", "76"],
       "testability": "strong"
@@ -21,7 +20,6 @@
       "question": "У вас цена на имплантацию указана под ключ или потом ещё отдельно абатмент, коронка, снимок и т.д.?",
       "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "expected_doc_id_any": [
-        "implantation__pricing__implants",
         "implantation__service__classic"
       ],
       "answer_signals_any": ["ключ", "входит", "коронк", "абатмент"],
@@ -35,7 +33,6 @@
       "expected_route_any": ["price_lookup", "retrieval_chunk", "catalog_md_first"],
       "expected_service_id_any": ["one_stage", "classic"],
       "expected_doc_id_any": [
-        "implantation__pricing__implants",
         "implantation__service__one_stage"
       ],
       "answer_signals_any": ["₽", "руб", "одномомент", "удален"],
@@ -72,10 +69,6 @@
       "question": "Сколько стоит имплантация всей верхней челюсти, хотя бы примерно от и до?",
       "expected_route": "price_lookup",
       "expected_service_id_any": ["all_on_4", "all_on_6"],
-      "expected_doc_id_any": [
-        "implantation__pricing__all_on_4",
-        "implantation__pricing__all_on_6"
-      ],
       "answer_signals_any": ["₽", "руб", "all-on", "челюст"],
       "testability": "strong"
     },
@@ -86,7 +79,6 @@
       "question": "Можно ли сначала поставить импланты, а коронки оплатить потом, когда приживутся?",
       "expected_route_any": ["price_lookup", "retrieval_chunk"],
       "expected_doc_id_any": [
-        "implantation__pricing__implants",
         "clinic__info__payment_terms"
       ],
       "answer_signals_any": ["этап", "коронк", "прижив", "оплат"],
@@ -112,7 +104,6 @@
       "question": "Что входит в акцию на импланты, там точно коронка включена?",
       "expected_route_any": ["retrieval_chunk", "price_lookup"],
       "expected_doc_id_any": [
-        "implantation__pricing__implants",
         "implantation__faq__cost"
       ],
       "answer_signals_any": ["входит", "коронк", "акци", "ключ"],
@@ -126,7 +117,6 @@
       "expected_route_any": ["retrieval_chunk", "price_concern", "price_lookup"],
       "expected_doc_id_any": [
         "implantation__faq__cost",
-        "implantation__pricing__all_on_4",
         "implantation__service__all_on_4"
       ],
       "answer_signals_any": ["входит", "этап", "стоим", "all-on"],
@@ -164,7 +154,6 @@
       "question": "Сколько будет стоить имплант Osstem под ключ с металлокерамикой и с цирконием отдельно?",
       "expected_route_any": ["price_lookup", "retrieval_chunk"],
       "expected_doc_id_any": [
-        "implantation__pricing__implants",
         "implantation__info__implant_systems"
       ],
       "answer_signals_any": ["implantium", "impro", "nobel", "систем", "₽", "руб"],
@@ -177,8 +166,7 @@
       "question": "Почему синус-лифтинг не входит в цену имплантации, если без него имплант не поставить?",
       "expected_route": "retrieval_chunk",
       "expected_doc_id_any": [
-        "implantation__info__bone_graft",
-        "implantation__pricing__implants"
+        "implantation__info__bone_graft"
       ],
       "answer_signals_any": ["синус", "лифтинг", "отдельн", "кост"],
       "testability": "medium"

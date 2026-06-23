@@ -154,8 +154,6 @@ _DIRECT_CATALOG_MD_DOC_IDS = frozenset(
     {
         "clinic__info__consultation",
         "implantation__info__steps",
-        "implantation__info__methods_overview",
-        "implantation__faq__tooth_one_day",
     }
 )
 

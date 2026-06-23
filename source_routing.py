@@ -125,17 +125,6 @@ def route_source(
     q0 = (q or "").strip()
     is_comparison = _comparison_query(q0, decision)
 
-    if consultation_info_query(q0):
-        return SourceRouteResult(
-            source="catalog_md",
-            service_id=None,
-            ref=_with_korotko_anchor("clinic__info__consultation"),
-            concern_ref=None,
-            payload=None,
-            match_score=1.0,
-            match_method="catalog_containment",
-        )
-
     doctors_gate = doctor_name_probe(q0, client_id=client_id) or doctor_intent_probe(q0)
     if doctors_gate and ri not in ("price_lookup", "price_concern"):
         hit = doctors_lookup(q0, client_id=client_id)

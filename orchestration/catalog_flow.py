@@ -150,11 +150,7 @@ def try_a3_catalog_facts(
     )
 
 
-_DIRECT_CATALOG_MD_DOC_IDS = frozenset(
-    {
-        "clinic__info__consultation",
-    }
-)
+_DIRECT_CATALOG_MD_DOC_IDS: frozenset[str] = frozenset()
 
 
 def _doc_id_from_md_ref(ref: str) -> str:
@@ -174,7 +170,7 @@ def try_a3_catalog_md_direct(
     sr: SourceRouteResult,
     decision_frame: dict[str, Any] | None,
 ) -> AskOrchestrationResult | None:
-    """Deterministic info pages (consultation) — без arbiter."""
+    """Deterministic info pages — без arbiter (E3: direct list empty; pack + arbiter only)."""
     if sr.source != "catalog_md" or not sr.ref:
         return None
     doc_id = _doc_id_from_md_ref(sr.ref)

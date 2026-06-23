@@ -10,7 +10,6 @@ from logging_setup import emit_bot_event, get_logger
 from orchestration.catalog_flow import (
     catalog_md_priority_from_a3,
     try_a3_catalog_facts,
-    try_a3_catalog_md_direct,
     try_a3_doctor_route,
 )
 from orchestration.helpers import decision_dump
@@ -137,16 +136,6 @@ def orchestrate_routing_after_resolver(
         )
         if doc_result is not None:
             return doc_result
-
-        md_direct = try_a3_catalog_md_direct(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            sr=sr,
-            decision_frame=decision_frame,
-        )
-        if md_direct is not None:
-            return md_direct
 
         facts_result = try_a3_catalog_facts(
             q=q,

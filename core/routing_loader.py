@@ -67,10 +67,12 @@ class MetadataFirstThresholds(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     comparison_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
+    pricing_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
     service_topic_match_boost: float = Field(..., ge=0.0, le=0.5)
     aspect_match_boost: float = Field(..., ge=0.0, le=0.5)
     alias_boost_max_delta: float = Field(..., ge=0.0, le=0.5)
     comparison_miss_exclude_comparison: bool = True
+    price_lookup_exclude_service_when_pricing_present: bool = True
     alias_topic_guard_enabled: bool = True
     soft_scope_enabled: bool = True
 

@@ -32,11 +32,14 @@ retrieval:
 # Metadata-First v1 — candidate score boosts (see docs/METADATA_FIRST_V1.md)
 metadata_first:
   comparison_doc_type_boost: 0.08
+  pricing_doc_type_boost: 0.08
   service_topic_match_boost: 0.05
   aspect_match_boost: 0.05
   alias_boost_max_delta: 0.12
   # comparison miss: drop foreign comparison docs from pool → RAG on service_topic
   comparison_miss_exclude_comparison: true
+  # price_lookup: drop service chunks when pricing doc is already in candidate pool
+  price_lookup_exclude_service_when_pricing_present: true
   # reject embed alias on wrong topic when resolver topic confidence is high (exact/near_exact exempt)
   alias_topic_guard_enabled: true
   # v1: no hard corpus filter by service_topic (boosts in candidate_builder instead)

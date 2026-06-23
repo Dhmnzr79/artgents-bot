@@ -14,6 +14,7 @@ class MetadataRetrievalContext:
     service_topic: str | None
     service_topic_confidence: float = 0.0
     query_aspects: tuple[str, ...] = ()
+    route_intent: str | None = None
 
 
 def metadata_context_from_decision(
@@ -27,6 +28,7 @@ def metadata_context_from_decision(
         qm = decision.get("query_mode")
         st = decision.get("service_topic")
         conf = decision.get("confidence") or {}
+        ri = decision.get("route_intent")
         topic_conf = (
             float(conf.get("topic", 0.0))
             if isinstance(conf, dict)
@@ -35,10 +37,12 @@ def metadata_context_from_decision(
     else:
         qm = getattr(decision, "query_mode", None)
         st = getattr(decision, "service_topic", None)
+        ri = getattr(decision, "route_intent", None)
         conf = getattr(decision, "confidence", None)
         topic_conf = float(getattr(conf, "topic", 0.0) or 0.0) if conf is not None else 0.0
     qm = str(qm or "").strip().lower() or None
     st = str(st or "").strip().lower() or None
+    ri = str(ri or "").strip().lower() or None
     if st in ("", "unknown"):
         st = None
     if not qm and not st and not (q or "").strip():
@@ -56,6 +60,7 @@ def metadata_context_from_decision(
         service_topic=st,
         service_topic_confidence=topic_conf,
         query_aspects=aspects,
+        route_intent=ri,
     )
 
 
@@ -142,6 +147,26 @@ def _chunk_aspect(ch: dict) -> str | None:
     return None
 
 
+def _is_pricing_chunk(ch: dict) -> bool:
+    dt = str(chunk_doc_type(ch) or "").strip().lower()
+    if dt in ("pricing", "pricing_specific"):
+        return True
+    file_ref = str(ch.get("file") or ch.get("doc") or "").strip().lower()
+    doc_id = str(ch.get("doc_id") or "").strip().lower()
+    return "__pricing__" in file_ref or "__pricing__" in doc_id
+
+
+def _is_service_chunk(ch: dict) -> bool:
+    return str(chunk_doc_type(ch) or "").strip().lower() == "service"
+
+
+def _price_lookup_filter_active(ctx: MetadataRetrievalContext | None) -> bool:
+    return (
+        ctx is not None
+        and str(ctx.route_intent or "").strip().lower() == "price_lookup"
+    )
+
+
 def apply_metadata_candidate_boosts(
     candidates: list[dict],
     *,
@@ -154,6 +179,7 @@ def apply_metadata_candidate_boosts(
         "candidate_pool_before": len(candidates),
         "metadata_boost_applied": False,
         "comparison_prefer": False,
+        "price_lookup_prefer": False,
         "fallback_used": False,
     }
     if not candidates or ctx is None:
@@ -165,6 +191,7 @@ def apply_metadata_candidate_boosts(
     qm = str(ctx.query_mode or "").strip().lower()
     st = ctx.service_topic
     topic_conf_ok = _topic_confidence_ok(ctx)
+    price_lookup = _price_lookup_filter_active(ctx)
 
     comparison_available, exclude_comparison = _comparison_retrieval_state(
         ctx, client_id=client_id, corpus=corpus_rows
@@ -196,6 +223,16 @@ def apply_metadata_candidate_boosts(
             bonus += float(mf.comparison_doc_type_boost)
             tel["comparison_prefer"] = True
 
+        if (
+            price_lookup
+            and _is_pricing_chunk(row)
+            and st
+            and topic_conf_ok
+            and topic_l == st
+        ):
+            bonus += float(mf.pricing_doc_type_boost)
+            tel["price_lookup_prefer"] = True
+
         if st and topic_conf_ok and topic_l == st:
             bonus += float(mf.service_topic_match_boost)
 
@@ -222,6 +259,18 @@ def apply_metadata_candidate_boosts(
         if excluded:
             tel["comparison_miss_excluded"] = True
             tel["comparison_excluded_count"] = excluded
+
+    if (
+        price_lookup
+        and bool(mf.price_lookup_exclude_service_when_pricing_present)
+        and any(_is_pricing_chunk(ch) for ch in boosted)
+    ):
+        before = len(boosted)
+        boosted = [ch for ch in boosted if not _is_service_chunk(ch)]
+        excluded = before - len(boosted)
+        if excluded:
+            tel["price_service_excluded"] = True
+            tel["price_service_excluded_count"] = excluded
 
     tel["candidate_pool_after"] = len(boosted)
     return boosted, tel

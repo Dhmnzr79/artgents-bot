@@ -320,3 +320,125 @@ def test_corpus_comparison_filtered_by_client_id() -> None:
     )
     assert tel["comparison_docs_for_topic"] is False
     assert tel["fallback_used"] is True
+
+
+def test_price_lookup_pricing_boost_ranks_pricing_over_service() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "_score": 0.80,
+            "file": "implantation__service__classic.md",
+        },
+        {
+            "doc_type": "pricing",
+            "topic": "implantation",
+            "_score": 0.72,
+            "file": "implantation__pricing__implants.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        route_intent="price_lookup",
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="cesi", corpus=cands
+    )
+    assert tel["price_lookup_prefer"] is True
+    assert out[0]["doc_type"] == "pricing"
+
+
+def test_price_lookup_excludes_service_when_pricing_present() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "_score": 0.80,
+            "file": "implantation__service__classic.md",
+        },
+        {
+            "doc_type": "pricing",
+            "topic": "implantation",
+            "_score": 0.72,
+            "file": "implantation__pricing__implants.md",
+        },
+        {
+            "doc_type": "faq",
+            "topic": "implantation",
+            "_score": 0.70,
+            "file": "implantation__faq__cost.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        route_intent="price_lookup",
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="cesi", corpus=cands
+    )
+    assert tel.get("price_service_excluded") is True
+    assert tel.get("price_service_excluded_count") == 1
+    assert not any(ch.get("doc_type") == "service" for ch in out)
+    assert any(ch.get("doc_type") == "faq" for ch in out)
+
+
+def test_price_lookup_keeps_service_when_no_pricing_in_pool() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "_score": 0.80,
+            "file": "implantation__service__classic.md",
+        },
+        {
+            "doc_type": "faq",
+            "topic": "implantation",
+            "_score": 0.70,
+            "file": "implantation__faq__cost.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        route_intent="price_lookup",
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel.get("price_service_excluded") is not True
+    assert any(ch.get("doc_type") == "service" for ch in out)
+
+
+def test_content_route_intent_skips_price_lookup_filter() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "_score": 0.80,
+            "file": "implantation__service__classic.md",
+        },
+        {
+            "doc_type": "pricing",
+            "topic": "implantation",
+            "_score": 0.72,
+            "file": "implantation__pricing__implants.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        route_intent="content",
+        query_aspects=("price",),
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="cesi", corpus=cands
+    )
+    assert tel.get("price_lookup_prefer") is not True
+    assert tel.get("price_service_excluded") is not True
+    assert any(ch.get("doc_type") == "service" for ch in out)

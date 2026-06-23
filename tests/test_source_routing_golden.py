@@ -49,3 +49,16 @@ def test_treatment_order_must_not_route_tomography_catalog_facts() -> None:
         app_intent="content",
     )
     assert not (sr.source == "catalog_facts" and sr.service_id == "tomography")
+
+
+def test_implant_doctors_question_routes_doctor_not_catalog_facts() -> None:
+    """Smoke #10: staff intent must win over tomography catalog false-positive."""
+    sr = route_source(
+        "Кто у вас занимается имплантацией?",
+        sid="t10",
+        client_id="demo",
+        decision=_frame(topic="doctors", mode="specific"),
+        app_intent="content",
+    )
+    assert sr.source == "doctor"
+    assert sr.match_method == "doctors_lookup"

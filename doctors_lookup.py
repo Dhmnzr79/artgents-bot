@@ -11,6 +11,7 @@ from typing import Any, TypedDict
 import alias_lexical
 import yaml
 
+from config import KT_EXPLICIT_RE
 from core.client_config_loader import resolve_pack_client_id
 from core.client_runtime import client_md_dir
 from query_selector import match_service_from_catalog
@@ -592,7 +593,7 @@ def doctor_intent_probe(q: str) -> bool:
         return True
 
     if re.search(
-        r"\b(?:кто|какой|какая|какие)\s+"
+        r"\b(?:кто|какой|какая|какие)\s+(?:у\s+вас\s+)?"
         r"(?:делает|делают|ставит|ставят|ведёт|ведет|ведут|принимает|принимают|"
         r"занимается|занимаются|лечит|лечают|работает|работают)\b",
         x,
@@ -606,7 +607,7 @@ def doctor_intent_probe(q: str) -> bool:
         return True
 
     if re.search(
-        r"\bкто\s+(?:занимается|делает|ведет|ведёт|ставит|лечит|принимает|работает)\s+",
+        r"\bкто\s+(?:у\s+вас\s+)?(?:занимается|занимаются|делает|делают|ведет|ведёт|ставит|ставят|лечит|лечают|принимает|принимают|работает|работают)\s+",
         x,
     ) and re.search(
         r"\b(?:имплант|протез|ортодонт|удален|коронк|винир|протезирован)",
@@ -704,38 +705,41 @@ def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
     cat_match = match_service_from_catalog(q0, client_id=client_id)
     if cat_match.get("matched_service_id") and bool(cat_match.get("is_confident")):
         sid = str(cat_match.get("matched_service_id") or "")
-        by_svc = find_doctors_by_service(sid, client_id=client_id)
-        by_svc = _dedupe_doctor_facts(by_svc)
-        n = len(by_svc)
-        if n == 1:
-            d0 = by_svc[0]
-            did = str(d0.get("doc_id") or "")
-            return {
-                "routing": "doc",
-                "doc_id": did,
-                "doctor_name": d0.get("name_full") or did,
-                "specialty": None,
-                "matched_service_id": sid,
-                "cards": [d0],
-            }
-        if 2 <= n <= 3:
-            return {
-                "routing": "cards",
-                "doc_id": None,
-                "doctor_name": "Несколько врачей",
-                "specialty": None,
-                "matched_service_id": sid,
-                "cards": by_svc,
-            }
-        if n >= 4:
-            return {
-                "routing": "overview",
-                "doc_id": _OVERVIEW_ID,
-                "doctor_name": "Наши врачи",
-                "specialty": None,
-                "matched_service_id": sid,
-                "matching_doctors_total": n,
-            }
+        if sid == "tomography" and not KT_EXPLICIT_RE.search(q0):
+            sid = ""
+        if sid:
+            by_svc = find_doctors_by_service(sid, client_id=client_id)
+            by_svc = _dedupe_doctor_facts(by_svc)
+            n = len(by_svc)
+            if n == 1:
+                d0 = by_svc[0]
+                did = str(d0.get("doc_id") or "")
+                return {
+                    "routing": "doc",
+                    "doc_id": did,
+                    "doctor_name": d0.get("name_full") or did,
+                    "specialty": None,
+                    "matched_service_id": sid,
+                    "cards": [d0],
+                }
+            if 2 <= n <= 3:
+                return {
+                    "routing": "cards",
+                    "doc_id": None,
+                    "doctor_name": "Несколько врачей",
+                    "specialty": None,
+                    "matched_service_id": sid,
+                    "cards": by_svc,
+                }
+            if n >= 4:
+                return {
+                    "routing": "overview",
+                    "doc_id": _OVERVIEW_ID,
+                    "doctor_name": "Наши врачи",
+                    "specialty": None,
+                    "matched_service_id": sid,
+                    "matching_doctors_total": n,
+                }
 
     # --- 3) Ключевые слова специализации
     st = _specialty_topic_from_query(q0)
@@ -831,9 +835,15 @@ def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
 
 def _is_staff_implant_question(q_raw: str, q_lem: set[str]) -> bool:
     low = q_raw.lower()
-    if "врач" not in low and "доктор" not in low:
-        return False
     if not (q_lem & frozenset({"имплант", "имплантация", "имплантолог"})):
+        return False
+    norm = _norm_query(q_raw)
+    if re.search(
+        r"\bкто\s+(?:у\s+вас\s+)?(?:занимается|занимаются|делает|делают|ведет|ведёт|ставит|лечит)\b",
+        norm,
+    ):
+        return True
+    if "врач" not in low and "доктор" not in low and "специалист" not in low:
         return False
     return bool(re.search(r"\b(кто|какой|какие|чей)\b", low, flags=re.I))
 

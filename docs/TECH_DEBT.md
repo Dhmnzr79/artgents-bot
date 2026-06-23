@@ -132,8 +132,9 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 
 | Shim | Где | Риск |
 |------|-----|------|
-| `try_a3_catalog_md_direct` | `orchestration/catalog_flow.py` | жёсткий список `consultation` / `steps` / `temporary_teeth`; **обход arbiter** |
-| Regex → конкретный md | `STEPS_VISITS_QUERY_RE`, `TEMPORARY_TEETH_QUERY_RE`, `CONSULTATION_QUERY_RE` в `source_routing.py` | «если фраза похожа на X → файл Y» |
+| `try_a3_catalog_md_direct` | `orchestration/catalog_flow.py` | жёсткий список `consultation` / `steps` / `temporary_teeth` / `methods_overview` / `tooth_one_day`; **обход arbiter** |
+| Regex → конкретный md | `STEPS_VISITS`, `TEMPORARY_TEETH`, `CONSULTATION`, `IMPLANTATION_WHAT_IS`, `TREATMENT_SEQUENCE`, `PERMANENT_CROWN_WHY_WAIT` в `source_routing.py` | «если фраза похожа на X → файл Y» |
+| Tomography topic guard | `source_routing._catalog_match_blocked_for_topic` | общий guard; снять после catalog/aspect boost |
 | Comparison `query_mode` override | `resolver_turn.py` + skip A3 catalog при comparison | дублирует resolver, если golden не доведён |
 | Сужение regex под golden | напр. `TEMPORARY_TEETH_QUERY_RE` после ложного q23 | **опасно:** словесные подборы под eval, не под живой диалог |
 
@@ -142,3 +143,41 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 **Правило на этапы 2–4:** не добавлять новые **direct regex → doc** маршруты без крайней необходимости; новые словесные сигналы — **флаг плана / aspect**, не `ref` на md. Этап 4 planner-lite должен **поглотить** эти shims.
 
 **Файлы:** `config.py`, `source_routing.py`, `orchestration/resolver_turn.py`, `orchestration/catalog_flow.py`, `orchestration/ask_turn.py`, `query_selector.py`.
+
+**Freeze (2026-06):** новые **regex → конкретный md** в общем коде **запрещены** до снятия shims (замена: aliases + aspect boost + catalog). Исключение — явная задача в PR с записью в таблицу снятия ниже.
+
+### Golden §2.1 → shim → aspect → pack (demo)
+
+План снятия Stage 1.5 для `evals/v5/demo/golden.json` §2.1 (14 кейсов). Связка с **этапом 6** (`PRODUCT_WORK_PLAN.md` §604): `aspect` в corpus + soft boost в `candidate_builder`, без hard route.
+
+| golden_ref | Вопрос (кратко) | Временный shim (код) | Aspect (planner) | Целевой doc / route | Pack (aliases / catalog) |
+|------------|-----------------|---------------------|------------------|---------------------|--------------------------|
+| 1 | Что такое имплантация | `IMPLANTATION_WHAT_IS_RE` → methods_overview; `_DIRECT_CATALOG` | `overview` | `implantation__info__methods_overview` | alias «что такое имплантация зубов» ✅ |
+| 2 | Как проходит | `STEPS_VISITS` (частично) | `stages` | `implantation__info__steps` | aliases на steps ✅ |
+| 3–4 | Сроки / время в кресле | — | `duration` | `implantation__faq__duration` | aliases duration ✅ |
+| 5 | Когда коронка | `TEMPORARY_TEETH` (частично) | `duration` | `temporary_teeth` / duration / aftercare | alias на temporary_teeth ✅ |
+| 6 | Почему не постоянная коронка сразу | `PERMANENT_CROWN_WHY_WAIT_RE` | `duration` | `tooth_one_day` | aliases tooth_one_day ✅ |
+| 7 | Зуб за один день | — | `duration` | `tooth_one_day` / `one_stage` | existing aliases |
+| 8–9 | Удаление + имплант / сроки | — | `stages` / `duration` | one_stage / extraction / comparison | h3 aliases extraction |
+| 10 | Нет зуба 8 лет | — | `overview` | `bone_graft` / classic | aliases bone_graft ✅ |
+| 11 | Не ставить имплант | — | `overview` | `osseointegration` h3 | alias в md ✅ |
+| 12 | КТ перед имплантацией | tomography topic guard | `overview` | `catalog_facts` + `tomography` | facts OK при явном КТ |
+| 13 | Зачем 3D | — | `overview` | `clinic__info__technology` | aliases technology ✅ |
+| 14 | Что сначала (КТ, удаление…) | `TREATMENT_SEQUENCE_RE` | `stages` | `implantation__info__steps` | aliases steps ✅ |
+
+**Spike этапа 6 (код, без снятия shims):** `core/aspect_metadata.py`, поле `aspect` в `build_index`, `aspect_match_boost` в `routing.yaml`, boost в `apply_metadata_candidate_boosts` при `detect_aspects(q)`.
+
+**Порядок снятия shims (E1–E8):** см. `PRODUCT_WORK_PLAN.md` этап 6 + таблица «Временные shims» выше. После каждого шага: `run_demo_eval.py --suite product` + `--suite golden`.
+
+### Критерий «готово к multiclient» (routing)
+
+| # | Критерий |
+|---|----------|
+| M1 | Нет новых direct regex→md после freeze |
+| M2 | Таблица «Временные shims» — все строки закрыты или перенесены в pack-driven hints |
+| M3 | `aspect` в corpus + `aspect_match_boost` включены; индекс пересобран per client |
+| M4 | `run_demo_eval.py --suite product` и `--suite golden` green **без** shims E1–E7 |
+| M5 | `audit_client_readiness` (этап 6) для 2-й клиники — пробелы задокументированы |
+| M6 | `CURRENT_ARCHITECTURE.md` / `ROUTING_MAP.md` описывают retrieval 2.0, не regex→md |
+
+**Не путать с M5 prod (VPS):** таблица «До prod» выше — деплой; M1–M6 — чистота routing перед onboarding нового client pack.

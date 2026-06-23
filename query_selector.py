@@ -119,7 +119,7 @@ def select_chunk_for_question(
     # Интенты и алиасы — только по исходному вопросу пациента (не по rewrite).
     q_policy = normalize_retrieval_query(q_user) or q_user
 
-    meta_ctx = metadata_context_from_decision(decision)
+    meta_ctx = metadata_context_from_decision(decision, q=q_policy)
     eff_scope = effective_scope_topic_for_retrieval(
         scope_topic, meta_ctx, follow_up_mode=follow_up_mode
     )
@@ -579,7 +579,7 @@ def compute_retrieval_scope_with_conflict_guard(
         return None, "catalog_match"
 
     q_pol = normalize_retrieval_query(q0) or q0
-    meta_ctx = metadata_context_from_decision(decision)
+    meta_ctx = metadata_context_from_decision(decision, q=q_pol)
     _leader, alias_sc, _alias_diag = resolve_alias_for_turn(
         q_pol,
         ctx=meta_ctx,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Demo product eval — smoke + risk regression (v5 architecture)."""
+"""Demo product eval — smoke + risk + core golden (v5 architecture)."""
 import argparse
 import os
 import sys
@@ -14,17 +14,24 @@ from smoke_case_runner import here, run_smoke_suite
 _SUITES: dict[str, str] = {
     "smoke": "demo/smoke.json",
     "risk": "demo/risk.json",
+    "golden": "demo/golden.json",
 }
+
+# Product CI runs smoke+risk only; golden grows incrementally (run --suite golden locally).
+_CI_SUITES = ("smoke", "risk")
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv or [])
-    ap = argparse.ArgumentParser(description="Demo product eval (smoke + risk)", allow_abbrev=False)
+    ap = argparse.ArgumentParser(
+        description="Demo product eval (smoke + risk + golden)",
+        allow_abbrev=False,
+    )
     ap.add_argument(
         "--suite",
-        choices=[*sorted(_SUITES.keys()), "all"],
+        choices=[*_SUITES.keys(), "all", "product"],
         default="all",
-        help="smoke | risk | all (default: all)",
+        help="smoke | risk | golden | product (smoke+risk) | all (default: all suites in file)",
     )
     ap.add_argument("--client", default=None, metavar="CLIENT_ID")
     ap.add_argument("--case-id", action="append", default=None, metavar="ID")
@@ -53,7 +60,12 @@ def main(argv: list[str] | None = None) -> int:
             os.getenv("DEMO_EVAL_CLIENT") or os.getenv("E2E_SMOKE_CLIENT") or ""
         ).strip().lower()
 
-    suites = list(_SUITES.keys()) if ns.suite == "all" else [ns.suite]
+    if ns.suite == "product":
+        suites = list(_CI_SUITES)
+    elif ns.suite == "all":
+        suites = list(_SUITES.keys())
+    else:
+        suites = [ns.suite]
     exit_code = 0
     for name in suites:
         rel = _SUITES[name]

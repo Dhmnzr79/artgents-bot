@@ -56,9 +56,11 @@ jobs:
             tests/test_finalize_metadata_first_hook.py \
             tests/test_e2e_smoke_infer.py \
             tests/test_candidate_builder.py \
+            tests/test_aspect_metadata.py \
             tests/test_price_offers.py \
             tests/test_price_group_overview.py \
             tests/test_price_ref_routing.py \
+            tests/test_source_routing_golden.py \
             -q --tb=short
 
       - name: Alias collision report (non-blocking inventory)
@@ -144,7 +146,7 @@ jobs:
           E2E_USE_TEST_CLIENT: "1"
           DEMO_EVAL_CLIENT: "demo"
           PYTHONUNBUFFERED: "1"
-        run: python evals/v5/run_demo_eval.py --client demo --suite all
+        run: python evals/v5/run_demo_eval.py --client demo --suite product
 
   metadata-first-eval:
     name: Metadata-first eval (multiclient, optional)

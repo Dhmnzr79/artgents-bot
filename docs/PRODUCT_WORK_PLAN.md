@@ -610,8 +610,8 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 
 **Retrieval:**
 
-- [ ] **`aspect` в corpus/chunk metadata** — авто из path/doc_type (`faq__pain` → `pain`, `comparison__*` → `comparison`) + frontmatter override; канон 8–12 aspect на MVP
-- [ ] metadata filter / soft boost по **`topic` + `service_id` + `aspect`** (не hard route «aspect → файл»)
+- [x] **`aspect` в corpus** — spike: `core/aspect_metadata.py` + `build_index` + soft boost (`aspect_match_boost` в `routing.yaml`); пересборка индекса: `python build_index.py --client demo`
+- [ ] metadata filter / soft boost по **`topic` + `service_id` + `aspect`** (не hard route «aspect → файл») — boost MVP ✅; filter опционально
 - [ ] metadata filter по `doc_type` (pricing vs service при `price_lookup`)
 - [ ] hybrid / rerank (не удалять alias pipeline — только снизить зависимость)
 - [ ] arbiter: приоритет `comparison` при `query_mode=comparison`; согласовать с `aspect=comparison`
@@ -699,7 +699,7 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 | 4a | `core/follow_up_rewrite.py`, `core/compatibility_guard.py`, `evals/v5/follow_up_golden.json` |
 | 4b | `core/answer_planner.py`, session `last_subject` / `last_aspect`, orchestration |
 | 5 | verifier gate в `chunk_responder` / отдельный модуль |
-| 6 | `scripts/audit_client_readiness.py`, retriever/rerank, `aspect` в build_index / corpus |
+| 6 | `scripts/audit_client_readiness.py`, retriever/rerank, `aspect` в build_index / corpus (`core/aspect_metadata.py`) |
 
 ---
 
@@ -720,7 +720,7 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 - `price_concern` + пустой `concern_ref` у протезов
 - `offer` / promo (после этапа 2) — частично: `promo_note` в slots; `pick_relevant_offer` ещё заглушка
 - implant `prices.json` vs каталог (после этапа 1 или 3) — ✅ demo
-- **Stage 1.5 routing shims** — закрывать по мере этапов 4–6 (planner-lite + aspect)
+- **Stage 1.5 routing shims** — закрывать по мере этапов 4–6 (planner-lite + aspect); таблица golden §2.1 и критерий M1–M6 — **`TECH_DEBT.md`**
 - **Lead flow v2** — закрывать в этапе 3.6 (см. §3.2)
 - **Follow-up compatibility** — этап 4, §3.3 (до optional aspect_routing.yaml)
 

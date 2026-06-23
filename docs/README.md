@@ -44,7 +44,8 @@
 |-------|------|--------|
 | Smoke (24) | `evals/v5/demo/smoke.json` | `python evals/v5/run_demo_eval.py --suite smoke --client demo` |
 | Risk regression (20) | `evals/v5/demo/risk.json` | `python evals/v5/run_demo_eval.py --suite risk --client demo` |
-| Оба | | `python evals/v5/run_demo_eval.py --suite all --client demo` |
+| Core golden (§2.1, 14) | `evals/v5/demo/golden.json` | `python evals/v5/run_demo_eval.py --suite golden --client demo` |
+| CI product | smoke+risk | `python evals/v5/run_demo_eval.py --suite product --client demo` |
 
 Формат кейса: `expected_route`, `expected_doc_id` / `expected_service_id`, `answer_signals_any`, `forbidden_signals` — без дословных `must_contain` на текст LLM (кроме шаблонов lead).
 

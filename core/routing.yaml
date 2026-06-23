@@ -33,6 +33,7 @@ retrieval:
 metadata_first:
   comparison_doc_type_boost: 0.08
   service_topic_match_boost: 0.05
+  aspect_match_boost: 0.05
   alias_boost_max_delta: 0.12
   # comparison miss: drop foreign comparison docs from pool → RAG on service_topic
   comparison_miss_exclude_comparison: true

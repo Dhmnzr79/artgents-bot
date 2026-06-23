@@ -8,10 +8,13 @@
 |-------|-------|------|
 | smoke | 24 | `demo/smoke.json` |
 | risk | 20 | `demo/risk.json` |
+| golden | 14 (§2.1, растёт) | `demo/golden.json` |
 
 ```bash
 set E2E_USE_TEST_CLIENT=1
-python evals/v5/run_demo_eval.py --client demo --suite all
+python evals/v5/run_demo_eval.py --client demo --suite product   # CI: smoke+risk
+python evals/v5/run_demo_eval.py --client demo --suite golden   # core golden batch
+python evals/v5/run_demo_eval.py --client demo --suite all      # всё
 python evals/v5/run_demo_eval.py --suite smoke --case-id demo_smoke_05_phone
 ```
 

@@ -219,6 +219,16 @@ STEPS_VISITS_QUERY_RE = re.compile(
     r")",
     re.I,
 )
+IMPLANTATION_WHAT_IS_RE = re.compile(r"что\s+такое\s+имплант", re.I | re.U)
+TREATMENT_SEQUENCE_RE = re.compile(
+    r"что\s+сначала.*(?:кт|имплант|удален|дёсн|десн|лечен)",
+    re.I | re.U,
+)
+PERMANENT_CROWN_WHY_WAIT_RE = re.compile(
+    r"(?:почему|зачем).*(?:нельзя|нельзя ли).*(?:сразу|сразу же).*(?:постоянн\w*|постоянную)\s+коронк",
+    re.I | re.U,
+)
+KT_EXPLICIT_RE = re.compile(r"\bкт\b|томограф|компьютерн", re.I | re.U)
 TEMPORARY_TEETH_QUERY_RE = re.compile(
     r"(?:"
     r"(?:временн\w+|постоянн\w+|пластик\w*).*(?:или|сразу)|"

@@ -13,9 +13,14 @@ class MetadataRetrievalContext:
     query_mode: str | None
     service_topic: str | None
     service_topic_confidence: float = 0.0
+    query_aspects: tuple[str, ...] = ()
 
 
-def metadata_context_from_decision(decision: Any | None) -> MetadataRetrievalContext | None:
+def metadata_context_from_decision(
+    decision: Any | None,
+    *,
+    q: str | None = None,
+) -> MetadataRetrievalContext | None:
     if decision is None:
         return None
     if isinstance(decision, dict):
@@ -36,12 +41,21 @@ def metadata_context_from_decision(decision: Any | None) -> MetadataRetrievalCon
     st = str(st or "").strip().lower() or None
     if st in ("", "unknown"):
         st = None
-    if not qm and not st:
+    if not qm and not st and not (q or "").strip():
         return None
+
+    aspects: tuple[str, ...] = ()
+    if (q or "").strip():
+        from core.answer_planner import detect_aspects
+
+        detected = detect_aspects(q or "", decision=decision)
+        aspects = tuple(a for a in detected if a)
+
     return MetadataRetrievalContext(
         query_mode=qm,
         service_topic=st,
         service_topic_confidence=topic_conf,
+        query_aspects=aspects,
     )
 
 
@@ -121,6 +135,13 @@ def _corpus_has_comparison_for_topic(
     return False
 
 
+def _chunk_aspect(ch: dict) -> str | None:
+    a = ch.get("aspect")
+    if a is not None and str(a).strip():
+        return str(a).strip().lower()
+    return None
+
+
 def apply_metadata_candidate_boosts(
     candidates: list[dict],
     *,
@@ -177,6 +198,10 @@ def apply_metadata_candidate_boosts(
 
         if st and topic_conf_ok and topic_l == st:
             bonus += float(mf.service_topic_match_boost)
+
+        chunk_aspect = _chunk_aspect(row)
+        if chunk_aspect and ctx.query_aspects and chunk_aspect in ctx.query_aspects:
+            bonus += float(mf.aspect_match_boost)
 
         if bonus > 0:
             row["_score"] = base + bonus

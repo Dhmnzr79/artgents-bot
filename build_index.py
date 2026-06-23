@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from config import EMB_MODEL
+from core.aspect_metadata import infer_chunk_aspect
 from core.client_runtime import client_md_dir, list_buildable_client_ids, per_client_data_dir
 from core.content_linter import format_lint_report, lint_all_clients
 
@@ -166,6 +167,12 @@ def build_client_index(client_id: str) -> None:
         doc_aliases = meta.get("aliases") or []
         for ch in split_md_to_chunks(fm.content):
             local_aliases = extract_local_aliases(ch["text"])
+            aspect = infer_chunk_aspect(
+                doc_id=str(doc_id),
+                doc_type=meta.get("doc_type"),
+                subtopic=meta.get("subtopic"),
+                frontmatter_aspect=meta.get("aspect"),
+            )
             item = {
                 "doc": doc_id,
                 "doc_id": doc_id,
@@ -174,6 +181,7 @@ def build_client_index(client_id: str) -> None:
                 "topic": meta.get("topic"),
                 "subtopic": meta.get("subtopic"),
                 "doc_type": meta.get("doc_type"),
+                "aspect": aspect,
                 "subtype": meta.get("subtype"),
                 "cta_action": meta.get("cta_action"),
                 "cta_text": meta.get("cta_text"),

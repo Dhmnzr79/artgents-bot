@@ -249,6 +249,36 @@ def test_service_topic_match_boost_ranks_same_topic() -> None:
     assert out[0]["topic"] == "implantation"
 
 
+def test_aspect_match_boost_ranks_matching_facet() -> None:
+    cands = [
+        {
+            "doc_type": "faq",
+            "topic": "implantation",
+            "aspect": "overview",
+            "_score": 0.70,
+            "file": "methods.md",
+        },
+        {
+            "doc_type": "info",
+            "topic": "implantation",
+            "aspect": "stages",
+            "_score": 0.72,
+            "file": "steps.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="overview",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        query_aspects=("overview",),
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel["metadata_boost_applied"] is True
+    assert out[0]["aspect"] == "overview"
+
+
 def test_low_topic_confidence_skips_comparison_boost() -> None:
     corpus = [
         {"doc_type": "comparison", "topic": "implantation", "file": "cmp.md"},

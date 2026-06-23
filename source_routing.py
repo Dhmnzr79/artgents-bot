@@ -6,9 +6,13 @@ from typing import Any
 
 from config import (
     COMPARISON_QUERY_RE,
+    IMPLANTATION_WHAT_IS_RE,
+    KT_EXPLICIT_RE,
+    PERMANENT_CROWN_WHY_WAIT_RE,
     PRICE_LOOKUP_RE,
     STEPS_VISITS_QUERY_RE,
     TEMPORARY_TEETH_QUERY_RE,
+    TREATMENT_SEQUENCE_RE,
 )
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
@@ -70,6 +74,20 @@ def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent:
     ) and not PRICE_LOOKUP_RE.search(q or ""):
         return "content"
     return ri
+
+
+def _catalog_match_blocked_for_topic(
+    q: str,
+    matched_id: str | None,
+    decision: DecisionFrame | None,
+) -> bool:
+    """Block unrelated catalog cards when resolver/query context is implantation."""
+    mid = str(matched_id or "").strip().lower()
+    topic = str(decision.service_topic or "").strip().lower() if decision else ""
+    implant_ctx = topic == "implantation" or bool(IMPLANTATION_WHAT_IS_RE.search(q or ""))
+    if implant_ctx and mid == "tomography" and not KT_EXPLICIT_RE.search(q or ""):
+        return True
+    return False
 
 
 def _source_type_from_price_route(pr: dict[str, Any]) -> SourceType:
@@ -145,6 +163,39 @@ def route_source(
             match_method="catalog_containment",
         )
 
+    if IMPLANTATION_WHAT_IS_RE.search(q0) and ri == "content":
+        return SourceRouteResult(
+            source="catalog_md",
+            service_id=None,
+            ref=_with_korotko_anchor("implantation__info__methods_overview"),
+            concern_ref=None,
+            payload=None,
+            match_score=1.0,
+            match_method="catalog_containment",
+        )
+
+    if TREATMENT_SEQUENCE_RE.search(q0) and ri == "content":
+        return SourceRouteResult(
+            source="catalog_md",
+            service_id=None,
+            ref=_with_korotko_anchor("implantation__info__steps"),
+            concern_ref=None,
+            payload=None,
+            match_score=1.0,
+            match_method="catalog_containment",
+        )
+
+    if PERMANENT_CROWN_WHY_WAIT_RE.search(q0) and ri == "content":
+        return SourceRouteResult(
+            source="catalog_md",
+            service_id=None,
+            ref=_with_korotko_anchor("implantation__faq__tooth_one_day"),
+            concern_ref=None,
+            payload=None,
+            match_score=1.0,
+            match_method="catalog_containment",
+        )
+
     doctors_gate = doctor_name_probe(q0, client_id=client_id) or doctor_intent_probe(q0)
     if doctors_gate and ri not in ("price_lookup", "price_concern"):
         hit = doctors_lookup(q0, client_id=client_id)
@@ -179,7 +230,9 @@ def route_source(
     svc = match.get("service") if isinstance(match.get("service"), dict) else {}
     svc = dict(svc)
 
-    if contain and ri == "content" and not is_comparison:
+    if contain and ri == "content" and not is_comparison and not _catalog_match_blocked_for_topic(
+        q0, mid, decision
+    ):
         facts = _facts_nonempty(svc)
         if facts:
             return SourceRouteResult(

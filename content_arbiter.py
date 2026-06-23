@@ -219,7 +219,7 @@ def collect_content_candidates(
     elif top_sem_raw is not None:
         top_sem_raw = float(top_sem_raw)
 
-    meta_ctx = metadata_context_from_decision(decision)
+    meta_ctx = metadata_context_from_decision(decision, q=q_norm)
     alias_leader, alias_score, alias_diag = resolve_alias_for_turn(
         q_norm,
         ctx=meta_ctx,

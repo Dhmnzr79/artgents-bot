@@ -8,6 +8,7 @@ from typing import Any
 from config import (
     COMMERCIAL_INFO_RE,
     CONSULTATION_QUERY_RE,
+    KT_EXPLICIT_RE,
     LOW_SCORE_THRESHOLD,
     QUERY_REWRITE_ON,
     DEFAULT_CLIENT_ID,
@@ -522,13 +523,22 @@ def classify_price_route_intent(q: str, *, client_id: str | None, sid: str | Non
     return classify_price_intent(q, client_id=client_id, sid=sid or "")
 
 
-def match_service_from_catalog(q: str, *, client_id: str | None) -> dict:
+def match_service_from_catalog(
+    q: str,
+    *,
+    client_id: str | None,
+    exclude_service_ids: frozenset[str] | None = None,
+) -> dict:
     catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
     best_id = None
     best_obj = None
     best_score = 0.0
+    skip = {str(x).strip().lower() for x in (exclude_service_ids or frozenset()) if str(x).strip()}
     for service_id, entry in catalog.items():
         if not isinstance(entry, dict) or not bool(entry.get("active", True)):
+            continue
+        sid = str(service_id).strip().lower()
+        if sid in skip:
             continue
         phrases = []
         title = str(entry.get("title") or "").strip()
@@ -554,6 +564,18 @@ def match_service_from_catalog(q: str, *, client_id: str | None) -> dict:
         "match_score": round(float(best_score), 4),
         "is_confident": bool(best_obj is not None and best_score >= PRICE_SERVICE_MATCH_STRONG),
     }
+
+
+def match_catalog_for_implant_group_overview(q: str, *, client_id: str | None) -> dict:
+    """Generic implant price overview: КТ не перебивает classic без явного КТ в вопросе."""
+    q0 = (q or "").strip()
+    if KT_EXPLICIT_RE.search(q0):
+        return match_service_from_catalog(q0, client_id=client_id)
+    return match_service_from_catalog(
+        q0,
+        client_id=client_id,
+        exclude_service_ids=frozenset({"tomography"}),
+    )
 
 
 def compute_retrieval_scope_with_conflict_guard(
@@ -705,11 +727,16 @@ def select_price_service_route(
             }
     group_id = resolve_implant_group_overview(q) if intent == "price_lookup" else None
     if intent == "price_lookup" and group_id:
+        overview_match = (
+            match_catalog_for_implant_group_overview(q, client_id=client_id)
+            if group_id == "implantation"
+            else match
+        )
         return {
             "mode": "group_overview",
             "group_id": group_id,
             "intent": intent,
-            **match,
+            **overview_match,
         }
     if not match.get("matched_service_id"):
         if intent == "price_lookup" and is_generic_implant_price_query(q):
@@ -717,7 +744,7 @@ def select_price_service_route(
                 "mode": "group_overview",
                 "group_id": "implantation",
                 "intent": intent,
-                **match,
+                **match_catalog_for_implant_group_overview(q, client_id=client_id),
             }
         ctx = _service_from_session_context(sid, client_id)
         if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):

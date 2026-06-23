@@ -17,9 +17,8 @@
 → continuation guards (короткое без контекста / #korotko)
 → Resolver (+ legacy safety-net)
 → contacts overlay (regex, до A3)
-→ implant pain/fear FAQ overlay (regex, до A3; faq__pain вместо catalog_md)
 → A3 source_routing (doctor / catalog / price)
-→ price_flow (price_ref + price_offers append) / content retrieval + arbiter
+→ price_flow (price_ref + price_offers append) / content retrieval + arbiter (facet_arbitration: pain → faq over catalog service overview)
 → chunk_responder: LLM → answer slots + price append → policy → session → JSON
 ```
 
@@ -47,7 +46,6 @@
 | 11 | `_is_short_contextual` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `pre_resolver_turn` |
 | 12 | Resolver (или legacy при `RESOLVER_OFF=1`) | задаёт `effective_intent` | `resolver_turn` → `resolver` |
 | 13 | contacts regex overlay | `contacts_chunk` | `ask_turn` + `pick_contacts_chunk` |
-| 13a | implant pain/fear FAQ overlay | `retrieval_chunk` | `ask_turn` + `implant_pain_faq_intent` → `implantation__faq__pain#korotko` |
 | 14 | A3 `route_source` | см. таблицу A3 ниже | `source_routing` |
 | 15 | fallback `price_lookup` (если intent) | `price_lookup` | `price_flow` / `select_price_service_route` |
 | 16 | content: Resolver `unknown` + clarify | `guided` | `retrieval_flow` |

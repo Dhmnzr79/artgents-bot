@@ -29,7 +29,7 @@ def price_intent(q: str) -> bool:
 
 
 def implant_pain_faq_intent(q: str) -> bool:
-    """Страх/боль/анестезия при имплантации → faq pain (overlay до catalog_md, как contacts)."""
+    """Страх/боль/анестезия при имплантации (lead_interrupt; routing — facet_arbitration)."""
     q0 = (q or "").strip()
     if len(q0) < 4:
         return False
@@ -136,17 +136,6 @@ def pick_contacts_chunk(cands: list) -> dict | None:
         # Fallback: filename contains "contacts" (если doc_type не прописан во front-matter)
         file_base = os.path.basename((ch.get("file") or "") if isinstance(ch, dict) else "").lower()
         if "contacts" in file_base:
-            return ch
-    return None
-
-
-def pick_implant_pain_faq_chunk(cands: list) -> dict | None:
-    for ch in cands:
-        if not isinstance(ch, dict):
-            continue
-        file_base = os.path.basename(str(ch.get("file") or "")).lower()
-        doc_id = os.path.splitext(file_base)[0] if file_base else ""
-        if doc_id == "implantation__faq__pain":
             return ch
     return None
 

@@ -1,7 +1,7 @@
-"""Implant pain/fear FAQ overlay (pre-A3, like contacts)."""
+"""Implant pain/fear intent helpers (policy / lead_interrupt). Overlay removed in E5 — routing via facet_arbitration."""
 from __future__ import annotations
 
-from policy import implant_pain_faq_intent, pick_implant_pain_faq_chunk
+from policy import implant_pain_faq_intent
 
 
 def test_implant_pain_faq_intent_positive() -> None:
@@ -16,13 +16,3 @@ def test_implant_pain_faq_intent_negative() -> None:
     assert not implant_pain_faq_intent("Сколько стоит имплант?")
     assert not implant_pain_faq_intent("Почему импланты такие дорогие?")
     assert not implant_pain_faq_intent("Больно ли лечить кариес?")
-
-
-def test_pick_implant_pain_faq_chunk() -> None:
-    cands = [
-        {"file": "implantation__service__classic.md", "h3_id": "korotko"},
-        {"file": "implantation__faq__pain.md", "h3_id": "korotko"},
-    ]
-    picked = pick_implant_pain_faq_chunk(cands)
-    assert picked is not None
-    assert picked["file"] == "implantation__faq__pain.md"

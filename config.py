@@ -220,7 +220,7 @@ STEPS_VISITS_QUERY_RE = re.compile(
     re.I,
 )
 KT_EXPLICIT_RE = re.compile(r"\bкт\b|томограф|компьютерн", re.I | re.U)
-# Implant pain/fear FAQ overlay (ask_turn, до A3 catalog_md) — см. ROUTING_MAP.md
+# Implant pain/fear intent (lead_interrupt, policy; ask_turn overlay removed E5) — см. ROUTING_MAP.md
 IMPLANT_PAIN_FAQ_IMPLANT_RE = re.compile(
     r"(имплант|implant|all[\s-]?on|все\s+на\s+(?:четыр|4|шест|6))",
     re.I | re.U,
@@ -230,7 +230,6 @@ IMPLANT_PAIN_FAQ_FEAR_RE = re.compile(
     r"не\s+больно|во\s+сне|дискомфорт\s+при\s+имплант)",
     re.I | re.U,
 )
-IMPLANT_PAIN_FAQ_REF = "implantation__faq__pain.md#korotko"
 
 PRICE_SERVICE_MATCH_STRONG = float(os.getenv("PRICE_SERVICE_MATCH_STRONG", "0.62"))
 

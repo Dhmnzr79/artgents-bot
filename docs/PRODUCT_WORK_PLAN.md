@@ -611,8 +611,8 @@ Refs: `lead:booking`, `lead:pause`, `lead:resume`, `lead:cancel`.
 **Retrieval:**
 
 - [x] **`aspect` в corpus** — spike: `core/aspect_metadata.py` + `build_index` + soft boost (`aspect_match_boost` в `routing.yaml`); пересборка индекса: `python build_index.py --client demo`
-- [ ] metadata filter / soft boost по **`topic` + `service_id` + `aspect`** (не hard route «aspect → файл») — boost MVP ✅; filter опционально
-- [ ] metadata filter по `doc_type` (pricing vs service при `price_lookup`)
+- [x] metadata filter / soft boost по **`topic` + `service_id` + `aspect`** — `09bbc2e`: unified boosts в `candidate_builder`; soft filter только `doc_type=service` (fail-open); aspect-exempt v2 → `TECH_DEBT.md`
+- [x] metadata filter по `doc_type` (pricing vs service при `price_lookup`) — `1a30ae2` + boosts в `candidate_builder`
 - [ ] hybrid / rerank (не удалять alias pipeline — только снизить зависимость)
 - [ ] arbiter: приоритет `comparison` при `query_mode=comparison`; согласовать с `aspect=comparison`
 - [ ] Свести routing regex-hints к aspect/session там, где дублируют смысл (post-MVP cleanup)

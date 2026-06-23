@@ -53,7 +53,9 @@
 | **Единое правило** | Одна функция в `candidate_builder` (расширение `_apply_metadata_topic_soft_filter`), пороги в `routing.yaml` — не размазывать по `source_routing` / `ask_turn` |
 | **Eval** | Кейс `demo_smoke_17_warranty` + golden с cross-topic clinic info; не ослаблять ожидания ради зелёного прогона |
 
-**Связано:** `facet_arbitration` (arbiter), `aspect_match_boost`, снятие tomography topic guard (Stage 1.5).
+**Следующий slice (после checkpoint):** tomography guard — только с catalog tie-break; затем hybrid/rerank (`PRODUCT_WORK_PLAN.md` §611).
+
+**Связано:** `facet_arbitration` (arbiter), `aspect_match_boost`, tomography topic guard (Stage 1.5, см. таблицу shims).
 
 ---
 
@@ -151,7 +153,7 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 |------|-----|------|
 | `try_a3_catalog_md_direct` | `orchestration/catalog_flow.py` | жёсткий список `consultation` / `steps` / `temporary_teeth` / `methods_overview` / `tooth_one_day`; **обход arbiter** |
 | Regex → конкретный md | `STEPS_VISITS`, `TEMPORARY_TEETH`, `CONSULTATION`, `IMPLANTATION_WHAT_IS`, `TREATMENT_SEQUENCE`, `PERMANENT_CROWN_WHY_WAIT` в `source_routing.py` | «если фраза похожа на X → файл Y» |
-| Tomography topic guard | `source_routing._catalog_match_blocked_for_topic` | общий guard; снять после catalog/aspect boost |
+| Tomography topic guard | `source_routing._catalog_match_blocked_for_topic` | **не снят** (2026-06): naive `exclude_service_ids={tomography}` → ложный catalog winner (`professional_whitening` при tie 0.88). Снять после **catalog containment fix** (lemma-subset / tie-break по `service_topic`) или hybrid/rerank; price path — `match_catalog_for_implant_group_overview` ✅ |
 | Comparison `query_mode` override | `resolver_turn.py` + skip A3 catalog при comparison | дублирует resolver, если golden не доведён |
 | Сужение regex под golden | напр. `TEMPORARY_TEETH_QUERY_RE` после ложного q23 | **опасно:** словесные подборы под eval, не под живой диалог |
 

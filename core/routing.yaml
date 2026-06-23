@@ -90,5 +90,6 @@ facet_arbitration:
   enabled: true
   aspects:
     - pain
+    - duration
   min_facet_score: 0.72
 

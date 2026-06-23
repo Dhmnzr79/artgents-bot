@@ -70,6 +70,9 @@ class MetadataFirstThresholds(BaseModel):
     pricing_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
     service_topic_match_boost: float = Field(..., ge=0.0, le=0.5)
     aspect_match_boost: float = Field(..., ge=0.0, le=0.5)
+    service_id_match_boost: float = Field(..., ge=0.0, le=0.5)
+    service_id_min_confidence: float = Field(..., ge=0.0, le=1.0)
+    metadata_soft_filter_enabled: bool = True
     alias_boost_max_delta: float = Field(..., ge=0.0, le=0.5)
     comparison_miss_exclude_comparison: bool = True
     price_lookup_exclude_service_when_pricing_present: bool = True

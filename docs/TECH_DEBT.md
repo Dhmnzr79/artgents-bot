@@ -37,6 +37,23 @@
 | **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
 | **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
 | **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml` | **4** — optional |
+| **Metadata soft filter v2 (aspect-aware exempt)** | см. § Metadata soft filter ниже | **retrieval 2.0** |
+
+---
+
+## Metadata soft filter v2 (retrieval 2.0)
+
+**Контекст (2026-06):** в `core/candidate_builder.py` soft filter по `service_topic` режет только **`doc_type=service`** с чужим `topic` (при высокой confidence resolver'а, fail-open). Info/faq не трогаем — иначе ломаются кросс-topic ответы (напр. «гарантия на импланты» → `clinic__info__warranty` при `service_topic=implantation`).
+
+**Долг:** сделать фильтр **умнее**, без возврата к точечным guards (`if warranty → …`):
+
+| Направление | Суть |
+|-------------|------|
+| **Aspect-exempt** | Не вырезать info/faq/comparison, если `chunk.aspect` (или subtopic/aspect metadata) **совпадает** с `query_aspects` из planner/resolver — напр. aspect `warranty` → оставить `clinic__info__warranty` даже при topic mismatch |
+| **Единое правило** | Одна функция в `candidate_builder` (расширение `_apply_metadata_topic_soft_filter`), пороги в `routing.yaml` — не размазывать по `source_routing` / `ask_turn` |
+| **Eval** | Кейс `demo_smoke_17_warranty` + golden с cross-topic clinic info; не ослаблять ожидания ради зелёного прогона |
+
+**Связано:** `facet_arbitration` (arbiter), `aspect_match_boost`, снятие tomography topic guard (Stage 1.5).
 
 ---
 

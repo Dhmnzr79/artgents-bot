@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from core.routing_loader import THRESHOLDS
+from core.service_followup import normalize_service_id
 from retriever import chunk_doc_type, load_corpus_if_needed
 
 
@@ -13,6 +14,8 @@ class MetadataRetrievalContext:
     query_mode: str | None
     service_topic: str | None
     service_topic_confidence: float = 0.0
+    service_id: str | None = None
+    service_id_confidence: float = 0.0
     query_aspects: tuple[str, ...] = ()
     route_intent: str | None = None
 
@@ -29,20 +32,29 @@ def metadata_context_from_decision(
         st = decision.get("service_topic")
         conf = decision.get("confidence") or {}
         ri = decision.get("route_intent")
+        svc = decision.get("service_id")
         topic_conf = (
             float(conf.get("topic", 0.0))
             if isinstance(conf, dict)
             else float(getattr(conf, "topic", 0.0) or 0.0)
         )
+        svc_conf = (
+            float(conf.get("service", 0.0))
+            if isinstance(conf, dict)
+            else float(getattr(conf, "service", 0.0) or 0.0)
+        )
     else:
         qm = getattr(decision, "query_mode", None)
         st = getattr(decision, "service_topic", None)
         ri = getattr(decision, "route_intent", None)
+        svc = getattr(decision, "service_id", None)
         conf = getattr(decision, "confidence", None)
         topic_conf = float(getattr(conf, "topic", 0.0) or 0.0) if conf is not None else 0.0
+        svc_conf = float(getattr(conf, "service", 0.0) or 0.0) if conf is not None else 0.0
     qm = str(qm or "").strip().lower() or None
     st = str(st or "").strip().lower() or None
     ri = str(ri or "").strip().lower() or None
+    svc_id = normalize_service_id(str(svc or "")) or None
     if st in ("", "unknown"):
         st = None
     if not qm and not st and not (q or "").strip():
@@ -59,6 +71,8 @@ def metadata_context_from_decision(
         query_mode=qm,
         service_topic=st,
         service_topic_confidence=topic_conf,
+        service_id=svc_id,
+        service_id_confidence=svc_conf,
         query_aspects=aspects,
         route_intent=ri,
     )
@@ -147,6 +161,123 @@ def _chunk_aspect(ch: dict) -> str | None:
     return None
 
 
+def _chunk_service_id(ch: dict) -> str | None:
+    raw = ch.get("subtopic")
+    if raw is not None and str(raw).strip():
+        return normalize_service_id(str(raw)) or None
+    doc_id = str(ch.get("doc_id") or ch.get("doc") or "").strip().lower().removesuffix(".md")
+    if "__service__" in doc_id:
+        tail = doc_id.split("__service__", 1)[1]
+        return normalize_service_id(tail.split("__")[0] if tail else "") or None
+    return None
+
+
+def _service_id_confidence_ok(ctx: MetadataRetrievalContext) -> bool:
+    return float(ctx.service_id_confidence or 0.0) >= float(
+        THRESHOLDS.metadata_first.service_id_min_confidence
+    )
+
+
+def _metadata_boost_bonus(
+    row: dict,
+    *,
+    ctx: MetadataRetrievalContext,
+    mf: Any,
+    qm: str,
+    comparison_available: bool,
+    topic_conf_ok: bool,
+    price_lookup: bool,
+    tel: dict[str, Any],
+) -> float:
+    """Unified soft boosts: topic + service_id + aspect (+ doc_type lanes)."""
+    bonus = 0.0
+    st = ctx.service_topic
+    topic_l = _chunk_topic(row)
+    dt_l = str(chunk_doc_type(row) or "").strip().lower()
+
+    if (
+        qm == "comparison"
+        and comparison_available
+        and dt_l == "comparison"
+        and st
+        and topic_conf_ok
+        and topic_l == st
+    ):
+        bonus += float(mf.comparison_doc_type_boost)
+        tel["comparison_prefer"] = True
+
+    if (
+        price_lookup
+        and _is_pricing_chunk(row)
+        and st
+        and topic_conf_ok
+        and topic_l == st
+    ):
+        bonus += float(mf.pricing_doc_type_boost)
+        tel["price_lookup_prefer"] = True
+
+    if st and topic_conf_ok and topic_l == st:
+        bonus += float(mf.service_topic_match_boost)
+        tel["metadata_topic_match"] = True
+
+    want_svc = ctx.service_id
+    if want_svc and _service_id_confidence_ok(ctx):
+        got_svc = _chunk_service_id(row)
+        if got_svc and got_svc == want_svc:
+            bonus += float(mf.service_id_match_boost)
+            tel["metadata_service_id_match"] = True
+
+    chunk_aspect = _chunk_aspect(row)
+    if chunk_aspect and ctx.query_aspects and chunk_aspect in ctx.query_aspects:
+        bonus += float(mf.aspect_match_boost)
+        tel["metadata_aspect_match"] = True
+
+    return bonus
+
+
+def _is_off_topic_service(ch: dict, *, want_topic: str) -> bool:
+    if str(chunk_doc_type(ch) or "").strip().lower() != "service":
+        return False
+    got = _chunk_topic(ch)
+    if not got:
+        return False
+    return got != want_topic
+
+
+def _apply_metadata_topic_soft_filter(
+    boosted: list[dict],
+    *,
+    ctx: MetadataRetrievalContext,
+    qm: str,
+    price_lookup: bool,
+) -> tuple[list[dict], dict[str, Any]]:
+    """Drop confident off-topic service rows when on-topic candidates exist (fail-open)."""
+    tel: dict[str, Any] = {}
+    mf = THRESHOLDS.metadata_first
+    if not bool(mf.metadata_soft_filter_enabled):
+        return boosted, tel
+    if qm == "comparison" or price_lookup:
+        return boosted, tel
+    st = ctx.service_topic
+    if not st or not _topic_confidence_ok(ctx):
+        return boosted, tel
+    if not any(_chunk_topic(ch) == st for ch in boosted):
+        return boosted, tel
+
+    kept: list[dict] = []
+    excluded = 0
+    for ch in boosted:
+        if _is_off_topic_service(ch, want_topic=st):
+            excluded += 1
+            continue
+        kept.append(ch)
+    if not kept or excluded == 0:
+        return boosted, tel
+    tel["metadata_topic_soft_filter"] = True
+    tel["metadata_topic_excluded_count"] = excluded
+    return kept, tel
+
+
 def _is_pricing_chunk(ch: dict) -> bool:
     dt = str(chunk_doc_type(ch) or "").strip().lower()
     if dt in ("pricing", "pricing_specific"):
@@ -207,39 +338,16 @@ def apply_metadata_candidate_boosts(
             continue
         row = dict(ch)
         base = float(row.get("_score") or 0.0)
-        bonus = 0.0
-        dt = chunk_doc_type(row)
-        dt_l = str(dt or "").strip().lower()
-        topic_l = _chunk_topic(row)
-
-        if (
-            qm == "comparison"
-            and comparison_available
-            and dt_l == "comparison"
-            and st
-            and topic_conf_ok
-            and topic_l == st
-        ):
-            bonus += float(mf.comparison_doc_type_boost)
-            tel["comparison_prefer"] = True
-
-        if (
-            price_lookup
-            and _is_pricing_chunk(row)
-            and st
-            and topic_conf_ok
-            and topic_l == st
-        ):
-            bonus += float(mf.pricing_doc_type_boost)
-            tel["price_lookup_prefer"] = True
-
-        if st and topic_conf_ok and topic_l == st:
-            bonus += float(mf.service_topic_match_boost)
-
-        chunk_aspect = _chunk_aspect(row)
-        if chunk_aspect and ctx.query_aspects and chunk_aspect in ctx.query_aspects:
-            bonus += float(mf.aspect_match_boost)
-
+        bonus = _metadata_boost_bonus(
+            row,
+            ctx=ctx,
+            mf=mf,
+            qm=qm,
+            comparison_available=comparison_available,
+            topic_conf_ok=topic_conf_ok,
+            price_lookup=price_lookup,
+            tel=tel,
+        )
         if bonus > 0:
             row["_score"] = base + bonus
             row["_metadata_boost"] = round(bonus, 4)
@@ -247,6 +355,14 @@ def apply_metadata_candidate_boosts(
         boosted.append(row)
 
     boosted.sort(key=lambda c: float(c.get("_score") or 0.0), reverse=True)
+
+    boosted, topic_filter_tel = _apply_metadata_topic_soft_filter(
+        boosted,
+        ctx=ctx,
+        qm=qm,
+        price_lookup=price_lookup,
+    )
+    tel.update(topic_filter_tel)
 
     if exclude_comparison:
         before = len(boosted)

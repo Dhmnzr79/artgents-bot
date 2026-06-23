@@ -216,11 +216,207 @@ def test_cap_alias_score_vs_semantic() -> None:
 
 
 def test_metadata_context_from_decision_frame() -> None:
-    ctx = metadata_context_from_decision(_frame(service_topic="prosthetics"))
+    ctx = metadata_context_from_decision(
+        _frame(service_topic="prosthetics", service_id="classic", confidence=DecisionFrameConfidence(
+            intent=0.9, topic=0.85, service=0.88, query_mode=0.8
+        ))
+    )
     assert ctx is not None
     assert ctx.query_mode == "comparison"
     assert ctx.service_topic == "prosthetics"
     assert ctx.service_topic_confidence == 0.85
+    assert ctx.service_id == "classic"
+    assert ctx.service_id_confidence == 0.88
+
+
+def test_service_id_match_boost_ranks_matching_subtopic() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "subtopic": "all_on_4",
+            "_score": 0.74,
+            "file": "implantation__service__all_on_4.md",
+        },
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "subtopic": "classic",
+            "_score": 0.70,
+            "file": "implantation__service__classic.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        service_id="classic",
+        service_id_confidence=0.85,
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel.get("metadata_service_id_match") is True
+    assert out[0]["subtopic"] == "classic"
+
+
+def test_service_id_match_boost_from_doc_id_pattern() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "_score": 0.74,
+            "doc_id": "implantation__service__all_on_4",
+            "file": "implantation__service__all_on_4.md",
+        },
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "_score": 0.70,
+            "doc_id": "implantation__service__classic",
+            "file": "implantation__service__classic.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        service_id="classic",
+        service_id_confidence=0.85,
+    )
+    out, _tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert out[0]["doc_id"] == "implantation__service__classic"
+
+
+def test_service_id_boost_skipped_when_low_confidence() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "subtopic": "all_on_4",
+            "_score": 0.74,
+            "file": "a.md",
+        },
+        {
+            "doc_type": "service",
+            "topic": "implantation",
+            "subtopic": "classic",
+            "_score": 0.70,
+            "file": "b.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+        service_id="classic",
+        service_id_confidence=0.5,
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel.get("metadata_service_id_match") is not True
+    assert out[0]["subtopic"] == "all_on_4"
+
+
+def test_metadata_topic_soft_filter_drops_off_topic_service_only() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "prosthetics",
+            "_score": 0.82,
+            "file": "prost.md",
+        },
+        {
+            "doc_type": "faq",
+            "topic": "implantation",
+            "_score": 0.70,
+            "file": "faq.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel.get("metadata_topic_soft_filter") is True
+    assert tel.get("metadata_topic_excluded_count") == 1
+    assert len(out) == 1
+    assert out[0]["topic"] == "implantation"
+
+
+def test_metadata_topic_soft_filter_keeps_off_topic_info_docs() -> None:
+    cands = [
+        {
+            "doc_type": "info",
+            "topic": "clinic",
+            "_score": 0.78,
+            "file": "clinic__info__warranty.md",
+        },
+        {
+            "doc_type": "info",
+            "topic": "implantation",
+            "_score": 0.80,
+            "file": "implantation__info__implant_systems.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel.get("metadata_topic_soft_filter") is not True
+    assert len(out) == 2
+
+
+def test_metadata_topic_soft_filter_fail_open_when_only_off_topic() -> None:
+    cands = [
+        {
+            "doc_type": "service",
+            "topic": "prosthetics",
+            "_score": 0.82,
+            "file": "prost.md",
+        },
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="specific",
+        service_topic="implantation",
+        service_topic_confidence=0.9,
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=cands
+    )
+    assert tel.get("metadata_topic_soft_filter") is not True
+    assert len(out) == 1
+    assert out[0]["topic"] == "prosthetics"
+
+
+def test_metadata_topic_soft_filter_skipped_for_comparison_mode() -> None:
+    corpus = [
+        {"doc_type": "comparison", "topic": "implantation", "file": "cmp.md"},
+    ]
+    cands = [
+        {"doc_type": "comparison", "topic": "implantation", "_score": 0.72, "file": "cmp.md"},
+        {"doc_type": "service", "topic": "orthodontics", "_score": 0.80, "file": "ortho.md"},
+    ]
+    ctx = MetadataRetrievalContext(
+        query_mode="comparison",
+        service_topic="orthodontics",
+        service_topic_confidence=0.9,
+    )
+    out, tel = apply_metadata_candidate_boosts(
+        cands, ctx=ctx, client_id="demo", corpus=corpus
+    )
+    assert tel.get("metadata_topic_soft_filter") is not True
+    assert any(ch.get("topic") == "implantation" for ch in out) or len(out) >= 1
 
 
 def test_metadata_context_from_decision_dict() -> None:

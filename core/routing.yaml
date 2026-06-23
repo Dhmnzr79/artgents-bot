@@ -35,6 +35,9 @@ metadata_first:
   pricing_doc_type_boost: 0.08
   service_topic_match_boost: 0.05
   aspect_match_boost: 0.05
+  service_id_match_boost: 0.06
+  service_id_min_confidence: 0.75
+  metadata_soft_filter_enabled: true
   alias_boost_max_delta: 0.12
   # comparison miss: drop foreign comparison docs from pool → RAG on service_topic
   comparison_miss_exclude_comparison: true

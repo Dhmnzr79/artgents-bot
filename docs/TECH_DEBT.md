@@ -55,8 +55,6 @@
 
 **Следующий slice (после checkpoint):** hybrid/rerank (`PRODUCT_WORK_PLAN.md` §611).
 
-**Cleanup (после green push):** в `query_selector.py` остались мёртвые `_match_score*` / `_norm` helpers после переезда в `core/catalog_match.py` — удалить отдельным cleanup PR.
-
 **Связано:** `facet_arbitration` (arbiter), `aspect_match_boost`, tomography topic guard (Stage 1.5, см. таблицу shims).
 
 ---

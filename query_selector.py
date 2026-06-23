@@ -16,7 +16,6 @@ from config import (
     PRICE_LOOKUP_RE,
     PRICE_SERVICE_MATCH_STRONG,
 )
-import alias_lexical
 from core.candidate_builder import (
     apply_metadata_candidate_boosts,
     effective_scope_topic_for_retrieval,
@@ -369,112 +368,6 @@ def _read_json_dict(path: str) -> dict:
         return {}
     except json.JSONDecodeError:
         return {}
-
-
-def _norm(s: str) -> str:
-    x = (s or "").strip().lower().replace("ё", "е")
-    x = re.sub(r"[^\w\s]", " ", x, flags=re.U)
-    return re.sub(r"\s+", " ", x, flags=re.U).strip()
-
-
-_STOP = frozenset({
-    "а", "в", "во", "на", "по", "за", "к", "ко", "с", "со", "из", "от", "до",
-    "не", "ли", "бы", "же", "и", "или", "но", "что", "как", "это", "для",
-    "при", "под", "над", "без", "то", "все", "мне", "мой", "моя", "моё",
-    "вы", "вас", "вам", "нас", "нам", "их", "его", "её",
-})
-
-
-def _token_set(s: str) -> set[str]:
-    return {t for t in _norm(s).split() if len(t) >= 2 or t.isdigit()}
-
-
-def _contains_token_phrase(query_norm: str, phrase_norm: str) -> bool:
-    if not query_norm or not phrase_norm:
-        return False
-    pattern = r"(?<!\w)" + re.escape(phrase_norm) + r"(?!\w)"
-    return bool(re.search(pattern, query_norm, flags=re.U))
-
-
-def _core_tokens_catalog(text: str) -> list[str]:
-    return [t for t in _norm(text).split() if (len(t) >= 2 or t.isdigit()) and t not in _STOP]
-
-
-def _match_score_lemma(query: str, phrase: str) -> float:
-    """Матч с лемматизацией — обрабатывает падежи ("коронки" = "коронка")."""
-    q_toks = _core_tokens_catalog(query)
-    p_toks = _core_tokens_catalog(phrase)
-    if not q_toks or not p_toks:
-        return 0.0
-    q_lem = set(alias_lexical.lemma_forms_for_tokens(q_toks))
-    p_lem = set(alias_lexical.lemma_forms_for_tokens(p_toks))
-    if not q_lem or not p_lem:
-        return 0.0
-    # Все леммы alias-фразы входят в запрос — сильный матч
-    if p_lem <= q_lem:
-        return 0.92
-    # Все леммы запроса входят в alias-фразу
-    if q_lem <= p_lem:
-        return 0.88
-    inter = len(q_lem & p_lem)
-    if inter == 0:
-        return 0.0
-    recall = inter / len(p_lem)
-    precision = inter / len(q_lem)
-    return round(max(recall, (recall + precision) / 2.0), 4)
-
-
-def _match_score(query: str, phrase: str) -> float:
-    qn = _norm(query)
-    pn = _norm(phrase)
-    if not qn or not pn:
-        return 0.0
-    if _contains_token_phrase(qn, pn):
-        return 1.0
-    qt = _token_set(qn)
-    pt = _token_set(pn)
-    if not qt or not pt:
-        return 0.0
-    inter = len(qt.intersection(pt))
-    if inter == 0:
-        return 0.0
-    recall = inter / len(pt)
-    precision = inter / len(qt)
-    return round(max(recall, (recall + precision) / 2.0), 4)
-
-
-def _catalog_typo_stem_overlap(q_token: str, phrase_norm: str, *, min_stem: int = 7) -> float:
-    """Длинный общий фрагмент токена внутри фразы каталога (обеливания → …беливан… в отбеливание)."""
-    qt = _norm(q_token)
-    if len(qt) < min_stem + 1 or not phrase_norm:
-        return 0.0
-    for start in range(len(qt) - min_stem + 1):
-        for length in range(len(qt) - start, min_stem - 1, -1):
-            sub = qt[start : start + length]
-            if len(sub) >= min_stem and sub in phrase_norm:
-                return 0.78
-    return 0.0
-
-
-def _match_score_catalog_typo(query: str, phrase: str) -> float:
-    """Char-trigram и stem-overlap по токенам (общий механизм, не список опечаток)."""
-    q_tokens = [t for t in _core_tokens_catalog(query) if len(t) >= 5]
-    if not q_tokens:
-        return 0.0
-    p_norm = _norm(phrase)
-    p_tokens = [_norm(t) for t in _core_tokens_catalog(phrase) if len(t) >= 4]
-    best = 0.0
-    for qt in q_tokens:
-        qt_n = _norm(qt)
-        for pt in p_tokens:
-            best = max(best, alias_lexical.trigram_alias_boost(qt_n, pt))
-        if p_norm:
-            best = max(best, alias_lexical.trigram_alias_boost(qt_n, p_norm))
-            if len(qt_n) >= 8:
-                trimmed = qt_n[:-1]
-                best = max(best, alias_lexical.trigram_alias_boost(trimmed, p_norm))
-            best = max(best, _catalog_typo_stem_overlap(qt_n, p_norm))
-    return round(float(best), 4)
 
 
 def commercial_info_query(q: str) -> bool:

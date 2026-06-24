@@ -18,8 +18,8 @@
 → Resolver (+ legacy safety-net)
 → contacts overlay (regex, до A3)
 → A3 source_routing (doctor / catalog / price)
-→ price_flow (price_ref + price_offers append) / content retrieval + arbiter (facet_arbitration: pain/duration/comparison over catalog service overview)
-→ chunk_responder: LLM → answer slots + price append → policy → session → JSON
+→ price_flow (PriceBook assembler или legacy price_ref + append) / content retrieval: pool → rerank → arbiter
+→ chunk_responder: LLM → answer slots + price tail → policy → session → JSON
 ```
 
 **Phase 4 (позже):** после A3 и до retrieval — `guide_router` (только при `features.yaml` → `guide_router.enabled: true`). См. раздел «Roadmap» внизу.
@@ -65,7 +65,7 @@
 | `doctor` + doc/overview | один ref | `retrieval_chunk` | `doctors__*.md#korotko` |
 | `catalog_facts` | content + facts в catalog | `catalog_facts` | `service_id` из catalog |
 | `catalog_md` | content + `md_entry_ref` | приоритет в A4/A5 → часто `catalog_md_first` или `retrieval_chunk` | `*.md#korotko` |
-| `price_card` / `price_ref` | price match | `price_lookup` | `price_offers.json` append + pricing md (`price_ref`) или `prices.json` |
+| `price_card` / `price_ref` | price match | `price_lookup` | **PriceBook** entry → assembler (demo); иначе `price_ref` md + LLM + legacy append (`price_offers` / `prices`) |
 | `price_concern` | catalog `concern_ref` / session / **default** | `price_concern` | см. ниже |
 | `price_lookup_clarify` | услуга не найдена / ambiguous / нет контекста | `price_lookup` | resolution payload |
 | `price_unavailable` | услуга найдена, цены нет | `price_unavailable` | korotko snippet + консультация |
@@ -86,7 +86,7 @@
 | Intent / сигнал | Источник | Примечание |
 |-----------------|----------|------------|
 | contacts | regex overlay в `ask_turn.py` | не через Resolver; retrieve full corpus |
-| price_lookup | A3 или `select_price_service_route` | суммы из `price_offers.json` (если есть) или `prices.json`; смысл — pricing md (`price_ref`) |
+| price_lookup | A3 или `select_price_service_route` | **PriceBook v2** при наличии `pricebook/services/{id}.json`; иначе legacy append + pricing md (`price_ref`) |
 | price_concern | A3 `concern_ref` / `concern_default` | без матча услуги → default cost FAQ |
 | doctor | A3 `doctors_lookup` | cards / overview / doc ref |
 | catalog facts | A3 `catalog_facts` | facts card без MD |
@@ -145,7 +145,7 @@ embed search → metadata boosts / soft filter → merge_alias_into_candidate_po
 | Я хочу удалить зуб и поставить имплант | `catalog_md_first` / `retrieval_chunk` | content, **не** lead | `smoke_cross_topic_extract_and_implant` |
 | Болит зуб, можете принять сегодня? | `expected_route_any` | не regex-lead; ingress/content | `smoke_booking_edge_pain_today` |
 | Сколько стоит имплантация? | `price_lookup` | unit clarify (или `price_ref` + offers при уточнении) | ambiguous unit → mini-summary |
-| Сколько стоит один имплант под ключ? | `price_lookup` | `price_ref` → pricing md + append `price_offers` | `classic` (demo) |
+| Сколько стоит один имплант под ключ? | `price_lookup` | PriceBook `classic` (demo) — assembler, без pricing-md | `classic` |
 | Почему так дорого? | `price_concern` | `implantation__faq__cost.md#korotko` | `concern_default` |
 | Почему протезирование такое дорогое? | `price_concern` | сейчас тот же default cost FAQ | баг: нет `concern_ref` у протезных услуг |
 | Какие врачи делают имплантацию? | `doctors_list` или `retrieval_chunk` | doctors cards / overview md | — |

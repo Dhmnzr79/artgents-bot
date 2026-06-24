@@ -28,7 +28,7 @@
 
 | Документ | Зачем |
 |----------|--------|
-| **`PRICEBOOK_V2.md`** | Целевая модель цен (PriceBook, сценарии S1–S8, миграция с offers/md) |
+| **`PRICEBOOK_V2.md`** | Целевая и фактическая модель цен (demo на PriceBook; legacy fallback) |
 | **`WIDGET_ANSWER_FORMAT.md`** | Контракт текста ответа для виджета |
 | **`DASHBOARD.md`** | Admin, Postgres, события, cost |
 

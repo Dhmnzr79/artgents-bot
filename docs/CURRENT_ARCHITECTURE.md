@@ -10,7 +10,7 @@
 
 | Реализовано | Ещё не prod |
 |-------------|-------------|
-| `clients/{id}/` — md, catalog, prices, **price_offers**, policies, tone, features | Контент nikadent / финализация cesi |
+| `clients/{id}/` — md, catalog, **pricebook/**, policies, tone, features | Контент nikadent / финализация cesi |
 | `data/{id}/` — corpus, embeddings, aliases, `bot.db` | VPS deploy (Caddy, wildcard TLS) |
 | `core/client_runtime.py`, `client_data_loader.py` | `allowed_origins` — домены сайтов клиник |
 | `meta_loader`, `doctors_lookup` → только pack md | Golden evals per `client_id` |
@@ -44,11 +44,11 @@ Debug: `/_debug/ping`, `/__debug/retrieval` — prod: 404 или token.
 ```
 ingress / rate limit → flow_handlers → ref / continuation
 → Resolver (или classify_intent при RESOLVER_OFF=1)
-→ contacts overlay → route_source (A3) → price_flow / retrieval + arbiter
+→ contacts overlay → route_source (A3) → price_flow / retrieval (pool → rerank → arbiter)
 → chunk_responder: LLM → answer slots + price append → policy → session → JSON
 ```
 
-На chunk-пути **детерминированная сборка** (без второго LLM): сначала слоты из frontmatter, затем `generator_append_text` (цены из `price_offers`), потом policy/CTA.
+На chunk-пути **детерминированная сборка** (без второго LLM): слоты из frontmatter, затем `generator_append_text` (legacy append) или полный price-ответ из PriceBook (`service_reply`), потом policy/CTA. Content retrieval: §4.5.
 
 Детали маршрутов: `ROUTING_MAP.md`.
 
@@ -66,7 +66,7 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `orchestration/policy_compat.py` | `apply_response_policy` signature shim |
 | `orchestration/route_guards.py` | pre-Resolver guards (noise, duplicate, anti-spam, continuation clarify payload) |
 | `orchestration/ask_turn.py` | post-Resolver: contacts → A3 → price fallback → content arbiter → selection |
-| `orchestration/price_flow.py` | A3 `price_ref` / concern / unit clarify; `build_price_append_for_lookup` → `AskOrchestrationResult` |
+| `orchestration/price_flow.py` | A3 `price_ref` / concern / unit clarify; PriceBook assembler или legacy append |
 | `orchestration/catalog_flow.py` | A3 doctor list + catalog facts + md priority |
 | `orchestration/retrieval_flow.py` | content arbiter path + legacy selection fallback |
 | `orchestration/helpers.py` | decision_dump, scope ctx, price line, guided menu, selection log |
@@ -85,7 +85,9 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `retriever.py` | RAG embed/search; `llm_rerank` — deprecated shim → `retrieval_rerank` |
 | `core/metadata_first_observability.py` | Metadata-first + retrieval pool telemetry (`meta.metadata_first`, events) |
 | `core/answer_slots.py` | Слоты ответа из frontmatter service-md |
-| `core/price_offers.py` | `price_offers.json`: loader, render append, unit/brand detect |
+| `core/pricebook_loader.py` | `clients/{id}/pricebook/`: manifest, facts, services |
+| `core/price_answer_assembler.py` | Детерминированная сборка price-ответа (S1–S8, `PRICEBOOK_V2.md`) |
+| `core/price_offers.py` | Legacy offers + brand/unit detect; делегирует в PriceBook при наличии entry |
 | `arbiter.py` / `content_arbiter.py` | Выбор ref при 2+ кандидатах (LLM arbiter, без score-margin skip) |
 | `chunk_responder.py` | Chunk → LLM → slots + price append → policy; merge `price_offer_meta` в `meta` |
 | `contracts/ask_orchestration.py` | `AskOrchestrationResult` (+ `generator_append_text`, `price_offer_meta`) |
@@ -256,16 +258,18 @@ Chat: `DASHSCOPE_API_KEY` + `CHAT_BASE_URL` (DashScope / MaaS). Дефолты �
 
 ---
 
-## 6. Контент и индекс
+## 6. Контент, цены и индекс
 
 | Что | Где |
 |-----|-----|
-| MD | `clients/{id}/md/` |
-| Catalog, prices, policies, **price_offers** | `clients/{id}/` |
+| MD (контент, не ₽) | `clients/{id}/md/` |
+| Catalog, policies | `clients/{id}/service_catalog.json`, `clinic_policies.yaml` |
+| **PriceBook v2** (суммы, сценарии S1–S8) | `clients/{id}/pricebook/` — `manifest.json`, `facts.json`, `services/*.json` |
+| Legacy цены (fallback) | `price_offers.json`, `prices.json` — если нет pricebook entry (cesi/nikadent) |
 | Индекс | `data/{id}/corpus.jsonl`, `embeddings.npy`, `alias_*` |
 | Пересборка | `python build_index.py --client {id\|all}` |
 
-**price_offers.json** (отдельный файл в `clients/{id}/`, не в каталоге): массив offers по `service_id` + `unit` + `brand`. Опционально **`price_brand_aliases.json`** — нормализация брендов в запросе (без хардкода в коде). Источник истины для сумм на price_lookup; md только объясняет состав и этапы.
+**Demo:** суммы только в `pricebook/`; legacy `prices.json` / `price_offers.json` удалены. Спека: `PRICEBOOK_V2.md`, контракт `contracts/pricebook.py`.
 
 ### Answer slots (stage 2)
 
@@ -280,25 +284,23 @@ Chat: `DASHSCOPE_API_KEY` + `CHAT_BASE_URL` (DashScope / MaaS). Дефолты �
 
 Поля: `clinic_note`, `consult_value`, `promo_note`, `h3_overrides` в frontmatter; читает `meta_loader.py`, логика — `core/answer_slots.py`. Повтор одного слота на doc — cooldown (`answer_slots.cooldown_turns` в `core/routing.yaml`, per `doc_id` в session). Telemetry: `meta.answer_slots`. Eval: `evals/v5/answer_slots_golden.json`.
 
-### Price offers (stage 3)
+### Цены на `price_lookup` (PriceBook v2 + legacy)
 
-`clients/{id}/price_offers.json` — structured offers (`service_id`, `unit`, `brand`, `total`, `payment_stages`, …). Контракт: `contracts/price_offer.py`. Loader/render: `core/price_offers.py`.
+**Порядок в runtime** (`core/price_offers.build_price_answer_for_lookup` → `orchestration/price_flow.py`):
 
-**Маршрут `price_lookup` + `price_ref`** (`orchestration/price_flow.py`):
+1. Есть `pricebook/services/{service_id}.json` → **`assemble_price_answer`** — полный детерминированный ответ (intro, ₽, fact_refs, quick replies по сценарию). Без LLM по pricing-md (`price_answer_mode=offers_only`, `service_reply`).
+2. Нет pricebook entry → **legacy:** chunk из `price_ref` (если есть в catalog) + LLM объясняет состав; **`build_price_append_for_lookup`** дописывает «Точные цены» / этапы из `price_offers.json` или `prices.json`.
+3. Опционально **`price_brand_aliases.json`** — нормализация бренда в запросе.
 
-1. Chunk из pricing-md (`price_ref` в каталоге) → LLM объясняет состав/этапы.
-2. `build_price_append_for_lookup` → детерминированный блок «Точные цены» / «Оплата по этапам» в `generator_append_text`.
-3. Суммы **только** из json; LLM получает hint не дублировать цифры.
+**Неоднозначный unit** («сколько имплантация» без зуб/челюсть) → `price_lookup_clarify` / mini-summary + quick_replies.
 
-**Неоднозначный unit** («сколько имплантация» без зуб/челюсть, без протез/коронк) → `price_lookup_clarify` / `build_price_unit_clarify_payload` (mini-summary + quick_replies).
+**Intent vs commercial:** вопрос с явной ценой (`PRICE_LOOKUP_RE`) остаётся `price_lookup`, даже при `COMMERCIAL_INFO_RE`. Порядок: `query_selector._lookup_intent_by_rules` → сначала `PRICE_LOOKUP_RE`; в `source_routing._resolve_route_intent` downgrade в `content` не при `PRICE_LOOKUP_RE`.
 
-**Intent vs commercial:** вопрос с явной ценой (`PRICE_LOOKUP_RE`, напр. «сколько стоит … под ключ») остаётся `price_lookup`, даже если фраза попадает в `COMMERCIAL_INFO_RE` (`под ключ`, «что входит»). Порядок в `query_selector._lookup_intent_by_rules`: сначала `PRICE_LOOKUP_RE`, затем commercial; в `source_routing._resolve_route_intent` downgrade в `content` не применяется при `PRICE_LOOKUP_RE`.
+**Telemetry** (`meta`): `price_offers_applied`, `price_offer_ids`, `price_offer_unit`, `price_offer_service_id`, `price_offer_brand_filter`; при PriceBook — также fact/scenario meta из assembler. Merge: `chunk_responder._merge_price_offer_meta_into_payload`.
 
-**Telemetry в ответе** (`meta`, после policy): `price_offers_applied`, `price_offer_ids`, `price_offer_unit`, `price_offer_service_id`, `price_offer_brand_filter`. Источник: `AskOrchestrationResult.price_offer_meta` из `price_flow` (дубль в `request.ctx["price_offer_meta"]` для совместимости); merge в `chunk_responder._merge_price_offer_meta_into_payload`.
+**Остаток (долг):** тройной legacy-path, миграция catalog на `pricebook_id`, сценарии S2/S6 — `TECH_DEBT.md` § PriceBook v2.
 
-**Append (demo):** `classic`, `one_stage`, `all_on_4`, `all_on_6` × 3 бренда; блок «Точные цены» + **Входит / Не входит / Оплата по этапам** (полная карточка при одном бренде, у recommended при нескольких).
-
-Eval: `evals/v5/price_offers_golden.json` (в т.ч. проверка meta, не только сумм в тексте).
+Eval: `tests/test_pricebook_golden.py`, `evals/v5/price_offers_golden.json`, `scripts/lint_pricebook.py`.
 
 ---
 

@@ -52,8 +52,12 @@ clients/
   demo/
     md/                      # вся база знаний demo
     service_catalog.json
-    prices.json
-    price_offers.json        # сложный прайс (бренды, unit, этапы) — demo pilot
+    pricebook/               # PriceBook v2 — единственный источник ₽ на demo
+      manifest.json
+      facts.json
+      services/*.json
+    price_offers.json        # legacy (опционально; на demo удалён)
+    prices.json              # legacy «от N ₽» (опционально; на demo удалён)
     clinic_policies.yaml
     video_catalog.yaml
     widget_config.json       # embed, allowed_origins, тексты виджета
@@ -97,9 +101,10 @@ data/
 | Файл | Содержимое |
 |------|------------|
 | `md/` | FAQ, услуги, врачи (`doctors__*.md`), контакты, цены-объяснения |
-| `service_catalog.json` | Услуги, aliases, `md_entry_ref`, `price_key` |
-| `prices.json` | Простые «от N ₽» (КТ, кариес); fallback |
-| `price_offers.json` | Structured offers: бренды, unit, payment_stages (если есть у клиента) |
+| `service_catalog.json` | Услуги, aliases, `md_entry_ref`, `price_key` / `pricebook_id` (целевое) |
+| `pricebook/` | **PriceBook v2:** суммы, сценарии, fact_refs, followups `price:*` (demo — основной канал) |
+| `prices.json` | Legacy простые «от N ₽»; fallback если нет pricebook entry |
+| `price_offers.json` | Legacy structured offers (бренды, unit, stages); fallback |
 | `clinic_policies.yaml` | «Нет детской», «нет ОМС», альтернативы услуг |
 | `video_catalog.yaml` | Ключи видео для виджета |
 | `widget_config.json` | Приветствие, teaser, **`allowed_origins`** (whitelist для проверки на сервере) |

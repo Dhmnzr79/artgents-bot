@@ -1,6 +1,6 @@
 # PriceBook v2 — спецификация (demo → multiclient)
 
-**Статус:** проект / целевая модель (не полный runtime).  
+**Статус:** MVP runtime на demo (`pricebook_loader`, `price_answer_assembler`); legacy `price_offers` / `prices` — fallback для других pack.  
 **Scope:** пилот на `clients/demo/`; cesi/nikadent — после отмашки.  
 **Связь:** этап 3 (MVP offers) → **3.5 PriceBook v2** → этап 4 planner-lite → этап 5 verifier gate.
 

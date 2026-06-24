@@ -42,13 +42,18 @@
 
 Порядок в `answer`: суть → слоты → (опционально) price append → policy/CTA не меняют уже записанный текст.
 
-## Price append (детерминированный хвост, stage 3)
+## Price tail (детерминированный хвост)
 
-На `price_lookup` с `price_ref` (или `price_key` + offers) бэкенд дописывает блок **«Точные цены»** / **«Оплата по этапам»** из `price_offers.json`. Суммы **не** из LLM.
+На `price_lookup` бэкенд дописывает или отдаёт **целиком** детерминированный price-блок. Суммы **не** из LLM.
 
-- Источник: `core/price_offers.py` → `generator_append_text` в `chunk_responder`.
-- Может содержать маркированный список с `**суммами**` — это разрешённый поднабор markdown (как у Generator).
-- Telemetry в `meta`: `price_offers_applied`, `price_offer_ids`, `price_offer_unit` (см. `CURRENT_ARCHITECTURE.md` §6).
+| Путь | Когда | Источник |
+|------|-------|----------|
+| **PriceBook v2** | есть `pricebook/services/{service_id}.json` | `core/price_answer_assembler.py` — полный ответ + quick replies |
+| **Legacy append** | нет pricebook entry | `core/price_offers.py` → `generator_append_text` («Точные цены», этапы) |
+
+Может содержать маркированный список с `**суммами**` — разрешённый поднабор markdown.
+
+Telemetry в `meta`: `price_offers_applied`, `price_offer_ids`, `price_offer_unit` (см. `CURRENT_ARCHITECTURE.md` §6).
 
 ---
 

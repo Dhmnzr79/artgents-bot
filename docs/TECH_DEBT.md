@@ -22,7 +22,6 @@
 | Задача | Направление | Phase |
 |--------|-------------|-------|
 | **Stage 1.5 routing shims** (см. блок ниже) | planner-lite + aspect metadata; удалить после этапов 2–4 | **1.5 → 4** |
-| Metadata-First: unified alias scoring pool (alias as bonus in one ranked list, not parallel arbiter channel) | `docs/METADATA_FIRST_V1.md` §5 target | post-V1 |
 | Карта маршрутов | `docs/ROUTING_MAP.md` | **2 ✓** |
 | Smoke routing guards + `meta.service_route` | `evals/v5/e2e_smoke.json`, runner | **3 ✓** |
 | `orchestration/route_guards.py` | pre-Resolver guards | **3 ✓** |
@@ -53,7 +52,7 @@
 | **Единое правило** | Одна функция в `candidate_builder` (расширение `_apply_metadata_topic_soft_filter`), пороги в `routing.yaml` — не размазывать по `source_routing` / `ask_turn` |
 | **Eval** | Кейс `demo_smoke_17_warranty` + golden с cross-topic clinic info; не ослаблять ожидания ради зелёного прогона |
 
-**Следующий slice:** metadata soft filter v2 (aspect-exempt) — см. ниже; arbiter comparison mode.
+**Следующий slice:** metadata soft filter v2 (aspect-exempt); при необходимости — финальная проверка comparison в arbiter.
 
 **Сделано (Retrieval 2.0 H1–H4):** unified pool, alias channel dedup, `core/retrieval_rerank.py`, pool telemetry — `CURRENT_ARCHITECTURE.md` §4.5.
 
@@ -63,7 +62,7 @@
 
 ## PriceBook v2 — остаток (3.5)
 
-**Статус (2026-06-21):** MVP runtime на demo — loader + assembler + `price:*` refs. Шаги 3.5a–3.5d ✅; 3.5e ⚠️; 3.5f ❌. Спека: `PRICEBOOK_V2.md`.
+**Статус:** MVP runtime на demo (loader + assembler + `price:*` refs). Шаги 3.5a–3.5d ✅; 3.5e ⚠️; 3.5f ❌. Спека: `PRICEBOOK_V2.md`. Архитектура: `CURRENT_ARCHITECTURE.md` §6.
 
 ### Блокеры UX
 
@@ -86,12 +85,6 @@
 | # | Проблема | Суть |
 |---|----------|------|
 | 7 | **`price_offers_golden.json`** | Ждёт legacy-формат («Точные цены», «Входит» в одном ответе). Конфликт с compact S4 (stages/includes — по кнопкам). |
-
-### Документация
-
-| # | Проблема | Суть |
-|---|----------|------|
-| 8 | **`CURRENT_ARCHITECTURE.md` / `ROUTING_MAP.md`** | Не описывают PriceBook v2; `price_offers.json` ещё указан как источник истины. |
 
 ### Конфликты с будущими этапами
 
@@ -132,6 +125,10 @@ Pre-Resolver **booking LLM** для lead gate убран: lead только `exp
 Arbiter **score-margin skip** убран: при 2+ кандидатах всегда LLM arbiter.
 
 Короткий **service follow-up** (rewrite validate + arbiter guard): `core/service_followup.py` — contextual rewrite overlap, generic FAQ отсекается при активной `last_catalog_service_id`.
+
+**Retrieval 2.0 H1–H4:** unified pool, alias channel dedup, `retrieval_rerank`, pool telemetry — runtime + `CURRENT_ARCHITECTURE.md` §4.5, `ROUTING_MAP.md` § Retrieval 2.0.
+
+**Доки ↔ runtime (2026-06):** PriceBook v2 и dual price-path описаны в `CURRENT_ARCHITECTURE.md` §6, `ROUTING_MAP.md`, `MULTICLIENT.md`, `WIDGET_ANSWER_FORMAT.md`.
 
 При закрытии новой задачи — удалить строку из таблицы в PR.
 
@@ -199,6 +196,6 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 | M3 | `aspect` в corpus + `aspect_match_boost` включены; индекс пересобран per client |
 | M4 | `run_demo_eval.py --suite product` и `--suite golden` green **без** shims E1–E7 |
 | M5 | `audit_client_readiness` (этап 6) для 2-й клиники — пробелы задокументированы |
-| M6 | `CURRENT_ARCHITECTURE.md` / `ROUTING_MAP.md` описывают retrieval 2.0, не regex→md |
+| M6 | Доки описывают retrieval 2.0 + PriceBook (**✓**); в **коде** ещё есть Stage 1.5 regex→md (таблица shims) |
 
 **Не путать с M5 prod (VPS):** таблица «До prod» выше — деплой; M1–M6 — чистота routing перед onboarding нового client pack.

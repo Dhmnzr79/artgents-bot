@@ -14,6 +14,7 @@ from core.service_followup import (
 def test_short_attribute_followup_detects_duration_pronoun():
     assert is_short_attribute_followup("А долго это?")
     assert is_short_attribute_followup("А по времени это сколько?")
+    assert not is_short_attribute_followup("А что по ценам?")
     assert not is_short_attribute_followup(
         "чем отличается имплантация от мостовидного протеза подробно"
     )

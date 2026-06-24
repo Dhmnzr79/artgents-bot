@@ -325,11 +325,19 @@ def resolve_catalog_match(
     ):
         containment_eligible = False
 
+    price_only_query = not [t for t in _core_tokens_catalog(q) if t not in _TYPO_TOKEN_STOP]
+    if price_only_query and top.channel == "lemma_weak":
+        containment_eligible = False
+
+    is_confident = bool(top.score >= float(strong_match_min))
+    if price_only_query and top.channel == "lemma_weak":
+        is_confident = False
+
     return {
         "matched_service_id": top.service_id,
         "service": top.service,
         "match_score": round(float(top.score), 4),
-        "is_confident": bool(top.score >= float(strong_match_min)),
+        "is_confident": is_confident,
         "containment_eligible": containment_eligible,
         "catalog_ambiguous": ambiguous,
         "match_channel": top.channel,

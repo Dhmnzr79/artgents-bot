@@ -18,6 +18,8 @@ python evals/v5/run_demo_eval.py --client demo --suite all      # всё
 python evals/v5/run_demo_eval.py --suite smoke --case-id demo_smoke_05_phone
 ```
 
+**Индекс `data/demo/`:** product/smoke eval читает закоммиченный corpus (`corpus.jsonl`, `embeddings.npy`, `alias_*`). Локальный `python build_index.py --client demo` меняет эти файлы — **не коммитить** в PR с кодом. Перед product eval: `git restore data/demo/` или свежая пересборка + явная пометка в PR. На «грязном» индексе risk-кейсы (retrieval/doc_id) могут ложно падать — это не ослабление ожиданий в JSON.
+
 Env: `DEMO_EVAL_CLIENT`, `DEMO_EVAL_SMOKE_PATH`, `DEMO_EVAL_RISK_PATH`, `DEMO_EVAL_CASE_ID`.
 
 ### Формат кейса (v5)

@@ -38,6 +38,11 @@ from core.price_offers import (
     resolve_implant_group_overview,
     should_offer_unit_clarify,
 )
+from core.price_followup import (
+    is_vague_price_followup,
+    is_weak_catalog_price_token_match,
+    price_query_has_explicit_service_object,
+)
 from core.pricebook_loader import load_pricebook_service
 from core.turn_timing import timed_stage
 from llm import classify_price_intent, rewrite_query_for_retrieval
@@ -549,7 +554,17 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
             "context_doc_id": context_doc_id,
         }
 
-    # Попытка 1: по current_doc_id (сервисы с md_entry_ref)
+    # Попытка 1: last_subject (диалоговый фокус; приоритет над устаревшим catalog id)
+    sub = st.get("last_subject")
+    age = int(st.get("subject_turn_age") or 0)
+    if isinstance(sub, dict) and age <= int(THRESHOLDS.follow_up.max_subject_turn_age):
+        sub_sid = (sub.get("service_id") or "").strip()
+        if sub_sid and sub_sid in catalog:
+            entry = catalog[sub_sid]
+            if isinstance(entry, dict) and bool(entry.get("active", True)):
+                return _make_result(sub_sid, entry, None)
+
+    # Попытка 2: по current_doc_id (сервисы с md_entry_ref)
     current_doc_id = (st.get("current_doc_id") or "").strip()
     if current_doc_id:
         doc_norm = current_doc_id.removesuffix(".md")
@@ -562,7 +577,7 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
             if md_ref.removesuffix(".md") == doc_norm:
                 return _make_result(service_id, entry, current_doc_id)
 
-    # Попытка 2: по last_catalog_service_id (сервисы без md_entry_ref, напр. КТ, отбеливание)
+    # Попытка 3: по last_catalog_service_id (сервисы без md_entry_ref, напр. КТ, отбеливание)
     last_svc_id = (st.get("last_catalog_service_id") or "").strip()
     if last_svc_id and last_svc_id in catalog:
         entry = catalog[last_svc_id]
@@ -586,23 +601,65 @@ def price_session_ctx_matches_catalog_leader(match: dict[str, Any], ctx: dict[st
 
 def _price_query_names_explicit_service(q: str) -> bool:
     """В ценовом вопросе есть название услуги, а не только «а сколько стоит»."""
-    if continuation_only_phrase(q):
-        return False
-    qn = re.sub(r"\s+", " ", (q or "").strip(), flags=re.U)
-    stripped = PRICE_LOOKUP_RE.sub("", qn).strip()
-    stripped = re.sub(r"^(?:а|и|ну)\s+", "", stripped, flags=re.I | re.U).strip()
-    stripped = re.sub(r"^[\s?.!,;:—\-]+", "", stripped).strip()
-    tokens = [t for t in re.findall(r"[0-9a-zа-яё]{3,}", stripped, flags=re.I | re.U)]
-    return bool(tokens)
+    return price_query_has_explicit_service_object(q)
 
 
 def price_lookup_allows_session_context(q: str, match: dict[str, Any], ctx: dict[str, Any]) -> bool:
     """Session fallback для цены: тот же service_id в каталоге или короткое продолжение без нового объекта."""
+    if is_vague_price_followup(q) and is_weak_catalog_price_token_match(match, q):
+        return True
     if not price_session_ctx_matches_catalog_leader(match, ctx):
         return False
     if not (match.get("matched_service_id") or "").strip() and _price_query_names_explicit_service(q):
         return False
     return True
+
+
+def _try_price_session_route(
+    q: str,
+    match: dict[str, Any],
+    ctx: dict[str, Any],
+    *,
+    intent: str,
+    sid: str | None,
+    client_id: str | None,
+    fallback_reason_default: str = "context_session",
+) -> dict | None:
+    if not price_lookup_allows_session_context(q, match, ctx):
+        return None
+    pi = ctx.get("price_item")
+    pr = ctx.get("price_ref")
+    rs = "catalog"
+    rs, pr2, fb = _resolve_price_lookup_route(
+        route_source=rs,
+        price_ref=pr,
+        price_item=pi,
+        pricebook_available=bool(ctx.get("pricebook_available")),
+        q=q,
+        sid=sid,
+        client_id=client_id,
+    )
+    fb_final = fb or fallback_reason_default
+    base = {
+        "intent": intent,
+        "route_source": rs,
+        "matched_service_id": ctx["service_id"],
+        "service": ctx["service"],
+        "match_score": 1.0,
+        "is_confident": True,
+        "price_key": ctx.get("price_key"),
+        "price_ref": pr2,
+        "price_item": pi,
+        "context_doc_id": ctx.get("context_doc_id"),
+        "fallback_reason": fb_final,
+    }
+    if _price_route_is_matched(rs, pr2):
+        return {"mode": "matched", **base}
+    return {
+        "mode": "unavailable",
+        "fallback_reason": fb_final or "price_not_in_catalog",
+        **base,
+    }
 
 
 def select_price_service_route(
@@ -640,6 +697,23 @@ def select_price_service_route(
             "intent": intent,
             **overview_match,
         }
+    if intent == "price_lookup" and is_vague_price_followup(q):
+        ctx = _service_from_session_context(sid, client_id)
+        if ctx:
+            session_route = _try_price_session_route(
+                q, match, ctx, intent=intent, sid=sid, client_id=client_id
+            )
+            if session_route:
+                return session_route
+        if is_weak_catalog_price_token_match(match, q) or (
+            match.get("is_confident") and not price_query_has_explicit_service_object(q)
+        ):
+            return {
+                "mode": "clarify",
+                "intent": intent,
+                "fallback_reason": "price_clarify_no_context",
+                **match,
+            }
     if not match.get("matched_service_id"):
         if intent == "price_lookup" and is_generic_implant_price_query(q):
             return {
@@ -650,43 +724,11 @@ def select_price_service_route(
             }
         ctx = _service_from_session_context(sid, client_id)
         if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
-            pi = ctx.get("price_item")
-            pr = ctx.get("price_ref")
-            rs = "catalog"
-            rs, pr2, fb = _resolve_price_lookup_route(
-                route_source=rs,
-                price_ref=pr,
-                price_item=pi,
-                pricebook_available=bool(ctx.get("pricebook_available")),
-                q=q,
-                sid=sid,
-                client_id=client_id,
+            session_route = _try_price_session_route(
+                q, match, ctx, intent=intent, sid=sid, client_id=client_id
             )
-            fb_final = fb or "context_session"
-            if _price_route_is_matched(rs, pr2):
-                return {
-                    "mode": "matched",
-                    "intent": intent,
-                    "route_source": rs,
-                    "matched_service_id": ctx["service_id"],
-                    "service": ctx["service"],
-                    "match_score": 1.0,
-                    "is_confident": True,
-                    "price_key": ctx.get("price_key"),
-                    "price_ref": pr2,
-                    "price_item": pi,
-                    "context_doc_id": ctx.get("context_doc_id"),
-                    "fallback_reason": fb_final,
-                }
-            return {
-                "mode": "unavailable",
-                "intent": intent,
-                "fallback_reason": fb_final or "price_not_in_catalog",
-                "matched_service_id": ctx.get("service_id"),
-                "service": ctx.get("service"),
-                "match_score": 1.0,
-                "is_confident": True,
-            }
+            if session_route:
+                return session_route
         if continuation_only_phrase(q) and not session_has_continuation_context(
             mem_get(sid) if sid else {}
         ):
@@ -705,43 +747,11 @@ def select_price_service_route(
     if not match.get("is_confident"):
         ctx = _service_from_session_context(sid, client_id)
         if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
-            pi = ctx.get("price_item")
-            pr = ctx.get("price_ref")
-            rs = "catalog"
-            rs, pr2, fb = _resolve_price_lookup_route(
-                route_source=rs,
-                price_ref=pr,
-                price_item=pi,
-                pricebook_available=bool(ctx.get("pricebook_available")),
-                q=q,
-                sid=sid,
-                client_id=client_id,
+            session_route = _try_price_session_route(
+                q, match, ctx, intent=intent, sid=sid, client_id=client_id
             )
-            fb_final = fb or "context_session"
-            if _price_route_is_matched(rs, pr2):
-                return {
-                    "mode": "matched",
-                    "intent": intent,
-                    "route_source": rs,
-                    "matched_service_id": ctx["service_id"],
-                    "service": ctx["service"],
-                    "match_score": 1.0,
-                    "is_confident": True,
-                    "price_key": ctx.get("price_key"),
-                    "price_ref": pr2,
-                    "price_item": pi,
-                    "context_doc_id": ctx.get("context_doc_id"),
-                    "fallback_reason": fb_final,
-                }
-            return {
-                "mode": "unavailable",
-                "intent": intent,
-                "fallback_reason": fb_final or "price_not_in_catalog",
-                "matched_service_id": ctx.get("service_id"),
-                "service": ctx.get("service"),
-                "match_score": 1.0,
-                "is_confident": True,
-            }
+            if session_route:
+                return session_route
         if continuation_only_phrase(q) and not session_has_continuation_context(
             mem_get(sid) if sid else {}
         ):

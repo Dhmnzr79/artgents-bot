@@ -53,7 +53,9 @@
 | **Единое правило** | Одна функция в `candidate_builder` (расширение `_apply_metadata_topic_soft_filter`), пороги в `routing.yaml` — не размазывать по `source_routing` / `ask_turn` |
 | **Eval** | Кейс `demo_smoke_17_warranty` + golden с cross-topic clinic info; не ослаблять ожидания ради зелёного прогона |
 
-**Следующий slice (после checkpoint):** hybrid/rerank (`PRODUCT_WORK_PLAN.md` §611).
+**Следующий slice:** metadata soft filter v2 (aspect-exempt) — см. ниже; arbiter comparison mode.
+
+**Сделано (Retrieval 2.0 H1–H4):** unified pool, alias channel dedup, `core/retrieval_rerank.py`, pool telemetry — `CURRENT_ARCHITECTURE.md` §4.5.
 
 **Связано:** `facet_arbitration` (arbiter), `aspect_match_boost`, tomography topic guard (Stage 1.5, см. таблицу shims).
 
@@ -157,7 +159,7 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 | Comparison `query_mode` override | `resolver_turn.py` + skip A3 catalog при comparison | дублирует resolver, если golden не доведён |
 | Сужение regex под golden | напр. `TEMPORARY_TEETH_QUERY_RE` после ложного q23 | **опасно:** словесные подборы под eval, не под живой диалог |
 
-**Цель замены:** `core/answer_planner.py` + **`aspect`** / subject metadata (boost/filter, не hard route) + session `last_subject` / `last_aspect`. См. `PRODUCT_WORK_PLAN.md` §3.1.
+**Цель замены:** `core/answer_planner.py` + **`aspect`** / subject metadata (boost/filter, не hard route) + session `last_subject` / `last_aspect`. См. `CURRENT_ARCHITECTURE.md` § Planner-lite.
 
 **Правило на этапы 2–4:** не добавлять новые **direct regex → doc** маршруты без крайней необходимости; новые словесные сигналы — **флаг плана / aspect**, не `ref` на md. Этап 4 planner-lite должен **поглотить** эти shims.
 
@@ -167,7 +169,7 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 
 ### Golden §2.1 → shim → aspect → pack (demo)
 
-План снятия Stage 1.5 для `evals/v5/demo/golden.json` §2.1 (14 кейсов). Связка с **этапом 6** (`PRODUCT_WORK_PLAN.md` §604): `aspect` в corpus + soft boost в `candidate_builder`, без hard route.
+План снятия Stage 1.5 для `evals/v5/demo/golden.json` §2.1 (14 кейсов). Связка: `aspect` в corpus + soft boost в `candidate_builder`, без hard route (таблица ниже).
 
 | golden_ref | Вопрос (кратко) | Временный shim (код) | Aspect (planner) | Целевой doc / route | Pack (aliases / catalog) |
 |------------|-----------------|---------------------|------------------|---------------------|--------------------------|
@@ -186,7 +188,7 @@ Arbiter **score-margin skip** убран: при 2+ кандидатах все�
 
 **Spike этапа 6 (код, без снятия shims):** `core/aspect_metadata.py`, поле `aspect` в `build_index`, `aspect_match_boost` в `routing.yaml`, boost в `apply_metadata_candidate_boosts` при `detect_aspects(q)`.
 
-**Порядок снятия shims (E1–E8):** см. `PRODUCT_WORK_PLAN.md` этап 6 + таблица «Временные shims» выше. После каждого шага: `run_demo_eval.py --suite product` + `--suite golden`.
+**Порядок снятия shims (E1–E8):** таблица «Временные shims» выше + golden §2.1. После каждого шага: `run_demo_eval.py --suite product` + `--suite golden`.
 
 ### Критерий «готово к multiclient» (routing)
 

@@ -225,7 +225,7 @@ admin.bot.artgents.ru
 
 ## 8. Инфраструктура на VPS (3–4 клиента, без Redis/n8n)
 
-**Пошаговый чеклист:** `VPS_CHECKLIST.md` (M5, новый чат в Cursor).
+Пошаговый чеклист — в этом разделе (M5).
 
 **Reverse proxy:** **Caddy** (единый выбор в этом проекте) — HTTPS и wildcard `*.bot.artgents.ru` с меньшей возней, чем ручной Nginx + certbot. Rate limit — на Caddy и/или в боте.
 

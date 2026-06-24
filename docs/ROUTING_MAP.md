@@ -91,8 +91,29 @@
 | doctor | A3 `doctors_lookup` | cards / overview / doc ref |
 | catalog facts | A3 `catalog_facts` | facts card без MD |
 | catalog md | A3 → A4/A5 | приоритетный ref |
-| content | RAG + rerank (+ arbiter) | topic scope опционально (`routing.yaml`) |
+| content | RAG + unified pool + rerank (+ arbiter) | topic scope опционально (`routing.yaml`); см. § Retrieval 2.0 |
 | unknown + clarify | Resolver | `guided` menu, не retrieval |
+
+---
+
+## Content retrieval (Retrieval 2.0)
+
+После A3 `content` / catalog fallback → `query_selector` + `retrieval_flow`:
+
+```
+embed search → metadata boosts / soft filter → merge_alias_into_candidate_pool
+→ maybe_rerank_top (core/retrieval_rerank.py) → winner ref
+→ content_arbiter (2+ distinct ref)
+```
+
+| Этап | Где | Примечание |
+|------|-----|------------|
+| Pool merge | `core/candidate_builder.py` | Alias и embed в одном пуле; `selected_source` |
+| Rerank gate | `core/retrieval_rerank.py` | Пороги `routing.yaml` → `rerank`; skip при strong alias (H3.1) |
+| Arbiter | `content_arbiter.py` | LLM выбор ref; alias channel dedup (H2) |
+| Telemetry | `metadata_first_observability.py` | `meta.metadata_first.retrieval_pool` при `E2E_USE_TEST_CLIENT=1` |
+
+Детали: `CURRENT_ARCHITECTURE.md` §4.5.
 
 ---
 

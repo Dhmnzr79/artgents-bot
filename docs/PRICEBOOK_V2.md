@@ -4,7 +4,7 @@
 **Scope:** пилот на `clients/demo/`; cesi/nikadent — после отмашки.  
 **Связь:** этап 3 (MVP offers) → **3.5 PriceBook v2** → этап 4 planner-lite → этап 5 verifier gate.
 
-**Парные документы:** `PRODUCT_WORK_PLAN.md`, `CLIENT_FILLING_SERVICES_PRICES.md`, `ROUTING_MAP.md`, `contracts/pricebook.py`.
+**Парные документы:** `CURRENT_ARCHITECTURE.md` §6, `ROUTING_MAP.md`, `contracts/pricebook.py`, `TECH_DEBT.md` § PriceBook v2.
 
 ---
 

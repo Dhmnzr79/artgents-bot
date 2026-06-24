@@ -79,8 +79,11 @@ ingress / rate limit → flow_handlers → ref / continuation
 | `resolver.py` | `DecisionFrame` + safety-net |
 | `source_routing.py` | A3: doctor, catalog, price; commercial→content downgrade (см. §6) |
 | `doctors_lookup.py` | Врачи из `clients/{id}/md/` |
-| `query_selector.py` | Catalog/price match, regex price hints (`PRICE_LOOKUP_RE`, `COMMERCIAL_INFO_RE`) |
-| `retriever.py` | RAG + rerank |
+| `query_selector.py` | Catalog/price match, regex price hints; unified pool + rerank hook |
+| `core/candidate_builder.py` | Metadata boosts, alias→pool merge, facet guards, `selected_source` |
+| `core/retrieval_rerank.py` | LLM rerank gate + fail-open; alias-strong skip (H3.1) |
+| `retriever.py` | RAG embed/search; `llm_rerank` — deprecated shim → `retrieval_rerank` |
+| `core/metadata_first_observability.py` | Metadata-first + retrieval pool telemetry (`meta.metadata_first`, events) |
 | `core/answer_slots.py` | Слоты ответа из frontmatter service-md |
 | `core/price_offers.py` | `price_offers.json`: loader, render append, unit/brand detect |
 | `arbiter.py` / `content_arbiter.py` | Выбор ref при 2+ кандидатах (LLM arbiter, без score-margin skip) |
@@ -191,8 +194,6 @@ Eval (целевое): `evals/v5/lead_turn_golden.json` — кейсы cancel/pa
 
 ### Follow-up & compatibility guard (этап 4a)
 
-Спека: `PRODUCT_WORK_PLAN.md` § **3.3**; обсуждение — `drafts/2.md`.
-
 **Runtime (demo):**
 
 - **Session focus:** `last_subject` `{ service_id, topic, label, last_route }`, `subject_turn_age`; пишется после content-ответа (`chunk_responder._persist_subject_focus`); сброс в `exit_lead_flow` / `clear_last_subject`.
@@ -206,8 +207,6 @@ Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`
 
 ### Planner-lite (этап 4b)
 
-Спека: `PRODUCT_WORK_PLAN.md` § **3.1** / этап **4b**.
-
 **Runtime (demo):**
 
 - **План:** `core/answer_planner.py` — без LLM; вход: `DecisionFrame`, A3 `SourceRouteResult`, session `last_subject` / `last_aspect`; regex → `aspects` + append kinds.
@@ -220,6 +219,26 @@ Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`
 - **Принцип:** append только при явном aspect в **текущем** вопросе; при сомнении — молчать. Follow-up (4a) важнее одноходового composite.
 
 Eval: unit — `tests/test_answer_planner.py`; E2E — `evals/v5/planner_golden.json` + `run_planner_eval.py`.
+
+---
+
+## 4.5. Content retrieval (Retrieval 2.0)
+
+Путь `route_intent=content` после A3: embed search → **единый candidate pool** → опциональный LLM rerank → arbiter при 2+ ref.
+
+| Slice | Модуль | Суть |
+|-------|--------|------|
+| **H1** unified pool | `core/candidate_builder.py` | `merge_alias_into_candidate_pool`: alias и embed-кандидаты в одном пуле; `infer_selected_source`; tie-break по score |
+| **H2** alias channel | `candidate_builder`, `arbiter.py`, `helpers.py` | `alias_channel_suppressed_for_arbiter` — не дублировать alias-сигнал в arbiter, если winner уже из pool |
+| **H3** rerank | `core/retrieval_rerank.py` | `evaluate_rerank_trigger` + `maybe_rerank_top`; пороги `routing.yaml` → `rerank`; fail-open |
+| **H3.1** alias guard | `retrieval_rerank.py` | Пропуск rerank при сильном pack-alias в gray-zone; при skip — prefer alias на tie (`pool_top_when_alias_rerank_skipped`) |
+| **H4** telemetry | `metadata_first_observability.py` | `RETRIEVAL_POOL_CTX_KEYS`, nested `retrieval_pool` в `meta.metadata_first` (E2E hook) |
+
+**Порядок в `query_selector`:** build embed candidates → metadata boosts / soft filters → merge alias → rerank (если trigger) → winner → content arbiter.
+
+**Eval:** `tests/test_retrieval_rerank.py`, `tests/test_alias_arbiter_channel.py`, `tests/test_metadata_first_observability.py`; product + golden suites.
+
+**Долг:** metadata soft filter v2 (aspect-exempt) — `TECH_DEBT.md` § Metadata soft filter.
 
 ---
 

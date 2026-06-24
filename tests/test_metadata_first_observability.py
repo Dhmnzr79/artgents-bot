@@ -8,7 +8,9 @@ from core.metadata_first_observability import (
     metadata_first_turn_details,
     record_decision_frame_ctx,
     record_selection_metadata,
+    retrieval_pool_turn_details,
     should_expose_metadata_first_in_response,
+    RETRIEVAL_POOL_CTX_KEYS,
 )
 
 
@@ -102,3 +104,34 @@ def test_metadata_first_response_meta_matches_turn_details() -> None:
         request.ctx = {"fallback_used": True, "selected_doc_type": "comparison"}
         assert metadata_first_response_meta()["fallback_used"] is True
         assert metadata_first_response_meta()["selected_doc_type"] == "comparison"
+
+
+def test_retrieval_pool_turn_details_slice() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "route_intent": "content",
+            "pool_sources": [{"ref": "a.md#korotko", "score": 0.64, "sources": ["semantic", "alias"]}],
+            "alias_in_pool": True,
+            "alias_pool_merged": True,
+            "selected_source": "unified_pool",
+            "pool_winner_ref": "a.md#korotko",
+            "rerank_trigger_reason": "strong_alias_in_pool",
+            "rerank_applied": False,
+            "alias_channel_suppressed": True,
+            "ignored": "skip",
+        }
+        pool = retrieval_pool_turn_details()
+        assert set(pool.keys()).issubset(set(RETRIEVAL_POOL_CTX_KEYS))
+        assert pool["alias_in_pool"] is True
+        assert pool["selected_source"] == "unified_pool"
+        assert pool["rerank_trigger_reason"] == "strong_alias_in_pool"
+        assert "ignored" not in pool
+
+        details = metadata_first_turn_details()
+        assert details["route_intent"] == "content"
+        assert isinstance(details.get("retrieval_pool"), dict)
+        assert details["retrieval_pool"]["pool_winner_ref"] == "a.md#korotko"
+        assert "ignored" not in details

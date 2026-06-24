@@ -1,4 +1,4 @@
-"""Metadata-First v1 telemetry helpers (request.ctx + bot_event details)."""
+"""Metadata-First v1 + Retrieval 2.0 pool telemetry (request.ctx + bot_event details)."""
 from __future__ import annotations
 
 import os
@@ -8,6 +8,61 @@ from flask import request
 
 from retriever import chunk_doc_type
 
+# Retrieval 2.0 H1–H3.1: unified pool + rerank observability slice.
+RETRIEVAL_POOL_CTX_KEYS: tuple[str, ...] = (
+    "pool_sources",
+    "alias_in_pool",
+    "alias_pool_merged",
+    "alias_fallback_used",
+    "alias_channel_suppressed",
+    "selected_source",
+    "pool_winner_ref",
+    "rerank_trigger_reason",
+    "rerank_applied",
+    "rerank_fallback_used",
+    "rerank_fallback_reason",
+)
+
+_METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
+    "route_intent",
+    "query_mode",
+    "service_topic",
+    "candidate_pool_before",
+    "candidate_pool_after",
+    "selected_doc_id",
+    "selected_doc_type",
+    "alias_hit",
+    "alias_boost",
+    "fallback_used",
+    "comparison_prefer",
+    "comparison_docs_for_topic",
+    "metadata_boost_applied",
+    "comparison_miss_excluded",
+    "comparison_excluded_count",
+    "alias_topic_guard_rejected",
+    "retrieval_scope_guard_reason",
+    "retrieval_scope_topic_candidate",
+    *RETRIEVAL_POOL_CTX_KEYS,
+)
+
+_MERGE_DEBUG_META_KEYS: tuple[str, ...] = (
+    "candidate_pool_before",
+    "candidate_pool_after",
+    "metadata_boost_applied",
+    "comparison_prefer",
+    "comparison_docs_for_topic",
+    "fallback_used",
+    "comparison_miss_excluded",
+    "comparison_excluded_count",
+    "comparison_miss_alias_rejected",
+    "alias_topic_guard_rejected",
+    "retrieval_scope_topic_effective",
+    "alias_boost_capped",
+    "alias_hit",
+    "alias_boost",
+    *RETRIEVAL_POOL_CTX_KEYS,
+)
+
 
 def should_expose_metadata_first_in_response() -> bool:
     """Test hook: attach telemetry to /ask meta only when E2E_USE_TEST_CLIENT=1."""
@@ -16,6 +71,27 @@ def should_expose_metadata_first_in_response() -> bool:
         "true",
         "yes",
     }
+
+
+def retrieval_pool_turn_details(ctx: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Retrieval 2.0 pool slice for events / eval (H4)."""
+    if ctx is None:
+        if not hasattr(request, "ctx"):
+            return {}
+        ctx = request.ctx
+    return {k: ctx[k] for k in RETRIEVAL_POOL_CTX_KEYS if k in ctx}
+
+
+def metadata_first_turn_details() -> dict[str, Any]:
+    """Subset for turn_complete / retrieval events."""
+    if not hasattr(request, "ctx"):
+        return {}
+    ctx = request.ctx
+    out = {k: ctx[k] for k in _METADATA_FIRST_TURN_KEYS if k in ctx}
+    pool = retrieval_pool_turn_details(ctx)
+    if pool:
+        out["retrieval_pool"] = pool
+    return out
 
 
 def metadata_first_response_meta() -> dict[str, Any]:
@@ -43,33 +119,7 @@ def record_decision_frame_ctx(decision: Any | None) -> None:
 def merge_retrieval_debug_meta(debug_meta: dict[str, Any] | None) -> None:
     if not isinstance(debug_meta, dict) or not hasattr(request, "ctx"):
         return
-    for key in (
-        "candidate_pool_before",
-        "candidate_pool_after",
-        "metadata_boost_applied",
-        "comparison_prefer",
-        "comparison_docs_for_topic",
-        "fallback_used",
-        "comparison_miss_excluded",
-        "comparison_excluded_count",
-        "comparison_miss_alias_rejected",
-        "alias_topic_guard_rejected",
-        "retrieval_scope_topic_effective",
-        "alias_boost_capped",
-        "alias_hit",
-        "alias_boost",
-        "pool_sources",
-        "alias_in_pool",
-        "alias_pool_merged",
-        "alias_fallback_used",
-        "selected_source",
-        "alias_channel_suppressed",
-        "pool_winner_ref",
-        "rerank_trigger_reason",
-        "rerank_applied",
-        "rerank_fallback_used",
-        "rerank_fallback_reason",
-    ):
+    for key in _MERGE_DEBUG_META_KEYS:
         if key in debug_meta:
             request.ctx[key] = debug_meta[key]
 
@@ -93,39 +143,3 @@ def record_selection_metadata(
         topic = selected_chunk.get("topic")
         if topic:
             request.ctx["selected_topic"] = str(topic).strip().lower()
-
-
-def metadata_first_turn_details() -> dict[str, Any]:
-    """Subset for turn_complete / retrieval events."""
-    if not hasattr(request, "ctx"):
-        return {}
-    ctx = request.ctx
-    keys = (
-        "route_intent",
-        "query_mode",
-        "service_topic",
-        "candidate_pool_before",
-        "candidate_pool_after",
-        "selected_doc_id",
-        "selected_doc_type",
-        "alias_hit",
-        "alias_boost",
-        "fallback_used",
-        "comparison_prefer",
-        "comparison_docs_for_topic",
-        "metadata_boost_applied",
-        "comparison_miss_excluded",
-        "comparison_excluded_count",
-        "alias_topic_guard_rejected",
-        "retrieval_scope_guard_reason",
-        "retrieval_scope_topic_candidate",
-        "pool_sources",
-        "alias_in_pool",
-        "alias_fallback_used",
-        "alias_channel_suppressed",
-        "selected_source",
-        "rerank_trigger_reason",
-        "rerank_applied",
-        "rerank_fallback_used",
-    )
-    return {k: ctx[k] for k in keys if k in ctx}

@@ -1,6 +1,7 @@
 """Metadata-First v1: soft score boosts on retrieval candidates."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -496,3 +497,152 @@ def cap_alias_score_vs_semantic(
     if alias_score <= top + cap:
         return alias_score, False
     return top + cap, True
+
+
+def _chunk_pool_key(ch: dict) -> tuple[Any, ...]:
+    return (
+        ch.get("file"),
+        ch.get("h2_id") or ch.get("h2"),
+        ch.get("h3_id") or ch.get("h3"),
+    )
+
+
+def chunk_ref_short(ch: dict) -> str | None:
+    file = os.path.basename(str(ch.get("file") or ""))
+    if not file:
+        return None
+    meta = ch.get("meta") or {}
+    if not isinstance(meta, dict):
+        meta = {}
+    anchor = str(
+        ch.get("h3_id") or meta.get("h3_id") or ch.get("h2_id") or meta.get("h2_id") or "korotko"
+    )
+    return f"{file}#{anchor.strip().lower() or 'korotko'}"
+
+
+def _pool_sources_summary(candidates: list[dict], *, limit: int = 8) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for ch in candidates[:limit]:
+        if not isinstance(ch, dict):
+            continue
+        sources = list(ch.get("_pool_sources") or ["semantic"])
+        out.append(
+            {
+                "ref": chunk_ref_short(ch),
+                "score": round(float(ch.get("_score") or 0.0), 4),
+                "sources": sources,
+            }
+        )
+    return out
+
+
+def merge_alias_into_candidate_pool(
+    candidates: list[dict],
+    *,
+    alias_leader: dict | None,
+    alias_score: float,
+) -> tuple[list[dict], dict[str, Any]]:
+    """H1: merge alias leader into the ranked retrieval pool (capped bonus, no overtaking semantic #1)."""
+    tel: dict[str, Any] = {
+        "alias_in_pool": False,
+        "alias_pool_merged": False,
+        "pool_sources": _pool_sources_summary(candidates),
+    }
+    delta = float(THRESHOLDS.metadata_first.alias_boost_max_delta)
+
+    if not candidates:
+        if isinstance(alias_leader, dict) and float(alias_score or 0.0) > 0:
+            row = dict(alias_leader)
+            sc = round(float(alias_score), 4)
+            row["_score"] = sc
+            row["_alias_score"] = sc
+            row["_pool_sources"] = ["alias"]
+            tel["alias_in_pool"] = True
+            tel["alias_pool_merged"] = True
+            tel["pool_sources"] = _pool_sources_summary([row])
+            return [row], tel
+        return candidates, tel
+
+    pre_top_key = _chunk_pool_key(candidates[0])
+    pre_max = max(float(c.get("_score") or 0.0) for c in candidates if isinstance(c, dict))
+
+    if not isinstance(alias_leader, dict) or float(alias_score or 0.0) <= 0:
+        out: list[dict] = []
+        for ch in candidates:
+            if not isinstance(ch, dict):
+                continue
+            row = dict(ch)
+            if "_pool_sources" not in row:
+                row["_pool_sources"] = ["semantic"]
+            out.append(row)
+        tel["pool_sources"] = _pool_sources_summary(out)
+        return out, tel
+
+    alias_key = _chunk_pool_key(alias_leader)
+    merged: list[dict] = []
+    matched = False
+    sc_alias = round(float(alias_score), 4)
+
+    for ch in candidates:
+        row = dict(ch)
+        sources = list(row.get("_pool_sources") or ["semantic"])
+        if _chunk_pool_key(row) == alias_key:
+            matched = True
+            old_sc = float(row.get("_score") or 0.0)
+            new_sc = old_sc + delta
+            if _chunk_pool_key(row) != pre_top_key:
+                new_sc = min(new_sc, pre_max)
+            row["_score"] = round(new_sc, 4)
+            if "alias" not in sources:
+                sources.append("alias")
+            row["_pool_sources"] = sources
+            if new_sc > old_sc:
+                row["_alias_pool_boost"] = round(new_sc - old_sc, 4)
+            row["_alias_score"] = sc_alias
+        elif "_pool_sources" not in row:
+            row["_pool_sources"] = sources
+        merged.append(row)
+
+    if not matched:
+        row = dict(alias_leader)
+        ins_sc = min(sc_alias, pre_max + delta)
+        row["_score"] = round(ins_sc, 4)
+        row["_alias_score"] = sc_alias
+        row["_pool_sources"] = ["alias"]
+        merged.append(row)
+
+    merged.sort(
+        key=lambda c: (
+            -float(c.get("_score") or 0.0),
+            0 if _chunk_pool_key(c) == pre_top_key else 1,
+        )
+    )
+    tel["alias_in_pool"] = True
+    tel["alias_pool_merged"] = True
+    tel["pool_sources"] = _pool_sources_summary(merged)
+    return merged, tel
+
+
+def infer_selected_source(chunk: dict | None, *, selected_by: str) -> str:
+    """Telemetry: how the winning chunk was chosen."""
+    sb = (selected_by or "").strip().lower()
+    if sb == "soft_alias_assist":
+        return "alias_fallback"
+    if sb in ("contacts", "price"):
+        return sb
+    if not isinstance(chunk, dict):
+        return sb or "semantic"
+    sources = list(chunk.get("_pool_sources") or ["semantic"])
+    if "alias" in sources:
+        return "alias" if sources == ["alias"] else "unified_pool"
+    return "semantic" if sb in ("semantic", "unified_pool", "") else sb
+
+
+def finalize_selection_selected_by(chunk: dict | None, *, selected_by: str) -> str:
+    """Map internal selected_by to unified-pool aware value for logs."""
+    sb = (selected_by or "").strip().lower()
+    if sb in ("contacts", "price", "soft_alias_assist"):
+        return sb
+    if isinstance(chunk, dict) and "alias" in list(chunk.get("_pool_sources") or []):
+        return "unified_pool"
+    return sb or "semantic"

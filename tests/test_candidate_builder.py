@@ -215,6 +215,75 @@ def test_cap_alias_score_vs_semantic() -> None:
     assert capped <= 0.70 + 0.12 + 1e-6
 
 
+def test_merge_alias_into_pool_boosts_existing_chunk() -> None:
+    from core.candidate_builder import merge_alias_into_candidate_pool
+
+    sem = {
+        "file": "clients/demo/md/implantation__service__classic.md",
+        "h3_id": "korotko",
+        "_score": 0.71,
+    }
+    alias = dict(sem)
+    out, tel = merge_alias_into_candidate_pool(
+        [sem], alias_leader=alias, alias_score=0.80
+    )
+    assert tel["alias_in_pool"] is True
+    assert out[0]["_score"] == pytest.approx(0.83, abs=1e-4)
+    assert out[0]["_pool_sources"] == ["semantic", "alias"]
+
+
+def test_merge_alias_cannot_overtake_semantic_leader() -> None:
+    from core.candidate_builder import merge_alias_into_candidate_pool
+
+    leader = {
+        "file": "clients/demo/md/implantation__info__bone_graft.md",
+        "h3_id": "korotko",
+        "_score": 0.76,
+    }
+    alias_target = {
+        "file": "clients/demo/md/implantation__service__zygomatic_implants.md",
+        "h3_id": "korotko",
+        "_score": 0.70,
+    }
+    out, tel = merge_alias_into_candidate_pool(
+        [leader, alias_target],
+        alias_leader=alias_target,
+        alias_score=0.88,
+    )
+    assert tel["alias_in_pool"] is True
+    assert out[0]["file"] == leader["file"]
+    assert float(out[1]["_score"]) <= 0.76
+
+
+def test_merge_alias_into_pool_inserts_new_chunk() -> None:
+    from core.candidate_builder import merge_alias_into_candidate_pool
+
+    sem = {
+        "file": "clients/demo/md/implantation__service__classic.md",
+        "h3_id": "korotko",
+        "_score": 0.71,
+    }
+    alias = {
+        "file": "clients/demo/md/clinic__info__warranty.md",
+        "h3_id": "korotko",
+    }
+    out, tel = merge_alias_into_candidate_pool(
+        [sem], alias_leader=alias, alias_score=0.78
+    )
+    assert tel["alias_in_pool"] is True
+    assert len(out) == 2
+    assert out[0]["_score"] == 0.78
+    assert out[0]["_pool_sources"] == ["alias"]
+
+
+def test_infer_selected_source_unified_pool() -> None:
+    from core.candidate_builder import infer_selected_source
+
+    ch = {"_pool_sources": ["semantic", "alias"]}
+    assert infer_selected_source(ch, selected_by="semantic") == "unified_pool"
+    assert infer_selected_source(None, selected_by="soft_alias_assist") == "alias_fallback"
+
+
 def test_metadata_context_from_decision_frame() -> None:
     ctx = metadata_context_from_decision(
         _frame(service_topic="prosthetics", service_id="classic", confidence=DecisionFrameConfidence(

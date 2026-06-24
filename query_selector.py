@@ -18,7 +18,11 @@ from config import (
 )
 from core.candidate_builder import (
     apply_metadata_candidate_boosts,
+    chunk_ref_short,
     effective_scope_topic_for_retrieval,
+    finalize_selection_selected_by,
+    infer_selected_source,
+    merge_alias_into_candidate_pool,
     metadata_context_from_decision,
     resolve_alias_for_turn,
 )
@@ -205,6 +209,18 @@ def select_chunk_for_question(
             "retrieval_scope_topic_effective": eff_scope,
         }
 
+    def _selection_telemetry(chunk: dict | None, *, selected_by: str, **extra: Any) -> dict[str, Any]:
+        sb = finalize_selection_selected_by(chunk, selected_by=selected_by)
+        out = {
+            "selected_by": sb,
+            "selected_source": infer_selected_source(chunk, selected_by=selected_by),
+            "pool_winner_ref": chunk_ref_short(chunk) if isinstance(chunk, dict) else None,
+            **extra,
+        }
+        if "alias_fallback_used" not in out:
+            out["alias_fallback_used"] = sb == "soft_alias_assist" or out.get("selected_source") == "alias_fallback"
+        return out
+
     cands = merge_retrieval_candidates(primary, secondary)[:8]
     cands = prefer_overview_if_broad(cands, broad_query_detect(q_policy))
     top_semantic_raw: float | None = None
@@ -229,6 +245,13 @@ def select_chunk_for_question(
         top_semantic_score=top_semantic_raw,
         follow_up_mode=follow_up_mode,
     )
+    cands, pool_tel = merge_alias_into_candidate_pool(
+        cands,
+        alias_leader=alias_leader,
+        alias_score=alias_score,
+    )
+    boost_tel.update(pool_tel)
+
     tier = str(alias_diag.get("alias_decision") or "")
     sim_raw = float(alias_diag.get("alias_similarity") or 0.0)
     ath = THRESHOLDS.alias
@@ -257,19 +280,22 @@ def select_chunk_for_question(
             soft = dict(alias_leader)
             soft["_alias_score"] = round(alias_score, 4)
             soft["_score"] = round(float(alias_score), 4)
+            soft["_pool_sources"] = ["alias"]
             return {
                 "mode": "chunk",
                 "chunk": soft,
                 "rerank_applied": False,
                 "debug_meta": _dm(
-                    {
-                        "selected_by": "soft_alias_assist",
-                        "top_score": round(top_score, 4),
-                        "threshold": LOW_SCORE_THRESHOLD,
-                        "alias_score": round(float(alias_score or 0.0), 4),
-                        "is_contacts": bool(is_contacts),
-                        "is_price": bool(is_price),
-                    }
+                    _selection_telemetry(
+                        soft,
+                        selected_by="soft_alias_assist",
+                        alias_fallback_used=True,
+                        top_score=round(top_score, 4),
+                        threshold=LOW_SCORE_THRESHOLD,
+                        alias_score=round(float(alias_score or 0.0), 4),
+                        is_contacts=bool(is_contacts),
+                        is_price=bool(is_price),
+                    )
                 ),
             }
         top_cinfo = chunk_info(cands[0], cands[0].get("_score")) if cands else None
@@ -295,11 +321,12 @@ def select_chunk_for_question(
                 "chunk": picked,
                 "rerank_applied": False,
                 "debug_meta": _dm(
-                    {
-                        "selected_by": "contacts",
-                        "top_score": round(top_score, 4),
-                        "alias_score": round(float(alias_score or 0.0), 4),
-                    }
+                    _selection_telemetry(
+                        picked,
+                        selected_by="contacts",
+                        top_score=round(top_score, 4),
+                        alias_score=round(float(alias_score or 0.0), 4),
+                    )
                 ),
             }
 
@@ -311,11 +338,12 @@ def select_chunk_for_question(
                 "chunk": picked,
                 "rerank_applied": False,
                 "debug_meta": _dm(
-                    {
-                        "selected_by": "price",
-                        "top_score": round(top_score, 4),
-                        "alias_score": round(float(alias_score or 0.0), 4),
-                    }
+                    _selection_telemetry(
+                        picked,
+                        selected_by="price",
+                        top_score=round(top_score, 4),
+                        alias_score=round(float(alias_score or 0.0), 4),
+                    )
                 ),
             }
 
@@ -340,12 +368,14 @@ def select_chunk_for_question(
         "chunk": top,
         "rerank_applied": bool(use_rerank),
         "debug_meta": _dm(
-            {
-                "selected_by": "semantic",
-                "top_score": round(top_score, 4),
-                "score_gap": round(float(score_gap), 4),
-                "alias_score": round(float(alias_score or 0.0), 4),
-            }
+            _selection_telemetry(
+                top,
+                selected_by="semantic",
+                top_score=round(top_score, 4),
+                score_gap=round(float(score_gap), 4),
+                alias_score=round(float(alias_score or 0.0), 4),
+                rerank_applied=bool(use_rerank),
+            )
         ),
     }
 

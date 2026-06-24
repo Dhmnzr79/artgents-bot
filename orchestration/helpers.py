@@ -130,14 +130,32 @@ def apply_metadata_first_after_content_route(
     alias_candidate: dict | None,
 ) -> None:
     """Merge §7 telemetry into request.ctx after content arbiter / retrieval."""
+    from arbiter import canonical_ref, ref_from_chunk
+
     record_decision_frame_ctx(decision)
-    merge_retrieval_debug_meta(retrieval_debug_meta)
-    if isinstance(alias_candidate, dict):
+    dbg = dict(retrieval_debug_meta) if isinstance(retrieval_debug_meta, dict) else {}
+    if isinstance(alias_candidate, dict) and hasattr(request, "ctx"):
         leader = alias_candidate.get("leader_chunk") or alias_candidate.get("leader")
         score = alias_candidate.get("alias_score")
         request.ctx["alias_hit"] = bool(leader)
         if score is not None:
             request.ctx["alias_boost"] = round(float(score), 4)
+    if isinstance(selected_chunk, dict) and isinstance(alias_candidate, dict):
+        pool_ref = str(dbg.get("pool_winner_ref") or "").strip()
+        sel_ref = ref_from_chunk(selected_chunk) or ""
+        alias_ch = alias_candidate.get("leader_chunk")
+        alias_ref = ref_from_chunk(alias_ch) if isinstance(alias_ch, dict) else ""
+        if (
+            not dbg.get("alias_fallback_used")
+            and pool_ref
+            and sel_ref
+            and alias_ref
+            and canonical_ref(sel_ref) == canonical_ref(alias_ref)
+            and canonical_ref(sel_ref) != canonical_ref(pool_ref)
+        ):
+            dbg["alias_fallback_used"] = True
+            dbg["selected_source"] = "alias_fallback"
+    merge_retrieval_debug_meta(dbg)
     record_selection_metadata(
         selected_doc_id=selected_doc_id,
         selected_chunk=selected_chunk,

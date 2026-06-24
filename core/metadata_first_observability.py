@@ -58,6 +58,12 @@ def merge_retrieval_debug_meta(debug_meta: dict[str, Any] | None) -> None:
         "alias_boost_capped",
         "alias_hit",
         "alias_boost",
+        "pool_sources",
+        "alias_in_pool",
+        "alias_pool_merged",
+        "alias_fallback_used",
+        "selected_source",
+        "pool_winner_ref",
     ):
         if key in debug_meta:
             request.ctx[key] = debug_meta[key]
@@ -108,5 +114,9 @@ def metadata_first_turn_details() -> dict[str, Any]:
         "alias_topic_guard_rejected",
         "retrieval_scope_guard_reason",
         "retrieval_scope_topic_candidate",
+        "pool_sources",
+        "alias_in_pool",
+        "alias_fallback_used",
+        "selected_source",
     )
     return {k: ctx[k] for k in keys if k in ctx}

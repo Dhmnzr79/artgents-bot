@@ -65,6 +65,10 @@ def merge_retrieval_debug_meta(debug_meta: dict[str, Any] | None) -> None:
         "selected_source",
         "alias_channel_suppressed",
         "pool_winner_ref",
+        "rerank_trigger_reason",
+        "rerank_applied",
+        "rerank_fallback_used",
+        "rerank_fallback_reason",
     ):
         if key in debug_meta:
             request.ctx[key] = debug_meta[key]
@@ -120,5 +124,8 @@ def metadata_first_turn_details() -> dict[str, Any]:
         "alias_fallback_used",
         "alias_channel_suppressed",
         "selected_source",
+        "rerank_trigger_reason",
+        "rerank_applied",
+        "rerank_fallback_used",
     )
     return {k: ctx[k] for k in keys if k in ctx}

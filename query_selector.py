@@ -29,6 +29,7 @@ from core.candidate_builder import (
 from core.catalog_match import resolve_catalog_match
 from core.client_config_loader import resolve_pack_client_id
 from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
+from core.retrieval_rerank import maybe_rerank_top
 from core.routing_loader import THRESHOLDS
 from core.price_offers import (
     is_crown_inclusion_content_query,
@@ -53,7 +54,6 @@ from retriever import (
     broad_query_detect,
     chunk_info,
     is_point_literal_query,
-    llm_rerank,
     merge_retrieval_candidates,
     normalize_retrieval_query,
     prefer_overview_if_broad,
@@ -353,20 +353,15 @@ def select_chunk_for_question(
         if len(cands) >= 2
         else 1.0
     )
-    use_rerank = (
-        len(cands) >= 2
-        and top_score >= LOW_SCORE_THRESHOLD
-        and top_score < 0.75
-        and score_gap < 0.15
-        and not is_point_literal_query(q_policy)
+    top, rerank_tel = maybe_rerank_top(
+        q_user, cands, point_literal=is_point_literal_query(q_policy)
     )
-    if use_rerank:
-        top = llm_rerank(q_user, cands[:3])
+    rerank_applied = bool(rerank_tel.get("rerank_applied"))
 
     return {
         "mode": "chunk",
         "chunk": top,
-        "rerank_applied": bool(use_rerank),
+        "rerank_applied": rerank_applied,
         "debug_meta": _dm(
             _selection_telemetry(
                 top,
@@ -374,7 +369,7 @@ def select_chunk_for_question(
                 top_score=round(top_score, 4),
                 score_gap=round(float(score_gap), 4),
                 alias_score=round(float(alias_score or 0.0), 4),
-                rerank_applied=bool(use_rerank),
+                **rerank_tel,
             )
         ),
     }

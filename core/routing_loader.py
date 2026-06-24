@@ -61,6 +61,18 @@ class RetrievalThresholds(BaseModel):
     alias_scope_guard_min: float = Field(..., ge=0.0, le=1.0)
 
 
+class RerankThresholds(BaseModel):
+    """LLM rerank gate (Retrieval 2.0 H3). score_min = retrieval.low_score_threshold."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    score_max: float = Field(..., ge=0.0, le=1.0)
+    score_gap_max: float = Field(..., ge=0.0, le=1.0)
+    top_k: int = Field(..., ge=2, le=8)
+    min_candidates: int = Field(..., ge=2, le=8)
+
+
 class MetadataFirstThresholds(BaseModel):
     """Metadata-First v1 retrieval boosts (see docs/METADATA_FIRST_V1.md)."""
 
@@ -171,6 +183,7 @@ class Thresholds(BaseModel):
     arbiter: ArbiterThresholds
     verifier: VerifierThresholds
     retrieval: RetrievalThresholds
+    rerank: RerankThresholds
     catalog_match: CatalogMatchThresholds
     alias: AliasThresholds
     metadata_first: MetadataFirstThresholds

@@ -29,6 +29,14 @@ retrieval:
   # ниже — игнорировать Resolver topic scope при сильном alias (конфликт-гард PR #1.4)
   alias_scope_guard_min: 0.85
 
+# Retrieval 2.0 H3 — LLM rerank gate (fail-open; score_min uses retrieval.low_score_threshold)
+rerank:
+  enabled: true
+  score_max: 0.75
+  score_gap_max: 0.15
+  top_k: 3
+  min_candidates: 2
+
 # Metadata-First v1 — candidate score boosts (see docs/METADATA_FIRST_V1.md)
 metadata_first:
   comparison_doc_type_boost: 0.08

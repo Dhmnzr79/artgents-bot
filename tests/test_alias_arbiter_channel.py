@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from arbiter import build_compact_content_candidates, ref_from_chunk
 from content_arbiter import ContentCandidates
-from core.candidate_builder import alias_ref_in_unified_pool
+from core.candidate_builder import (
+    alias_channel_suppressed_for_arbiter,
+    alias_ref_in_unified_pool,
+)
 
 
 def _chunk(file: str, h3: str = "korotko", score: float = 0.7) -> dict:
@@ -28,12 +31,6 @@ def test_alias_ref_in_unified_pool_matches_pool_sources() -> None:
     assert not alias_ref_in_unified_pool(
         meta, alias_ref="implantation__faq__pain.md#korotko"
     )
-
-
-from core.candidate_builder import (
-    alias_channel_suppressed_for_arbiter,
-    alias_ref_in_unified_pool,
-)
 
 
 def test_alias_channel_suppressed_only_when_pool_winner_matches() -> None:

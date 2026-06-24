@@ -71,6 +71,7 @@ class RerankThresholds(BaseModel):
     score_gap_max: float = Field(..., ge=0.0, le=1.0)
     top_k: int = Field(..., ge=2, le=8)
     min_candidates: int = Field(..., ge=2, le=8)
+    skip_on_strong_alias_in_pool: bool = True
 
 
 class MetadataFirstThresholds(BaseModel):

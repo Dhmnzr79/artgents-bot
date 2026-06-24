@@ -31,10 +31,65 @@ def _score_gap(candidates: list[dict]) -> float:
     )
 
 
+def _alias_backed(ch: dict) -> bool:
+    return "alias" in list(ch.get("_pool_sources") or [])
+
+
+def alias_pack_signal_strong(alias_decision: str) -> bool:
+    """Pack alias tier strong enough to defer to pool over LLM rerank."""
+    tier = str(alias_decision or "").strip().lower()
+    return tier in ("exact", "near_exact", "embed_high")
+
+
+def strong_alias_blocks_rerank(
+    candidates: list[dict],
+    *,
+    alias_strong: bool,
+    alias_decision: str = "",
+) -> bool:
+    """Skip LLM rerank when a strong pack alias sits in the ambiguous top band."""
+    rr = THRESHOLDS.rerank
+    if not bool(rr.skip_on_strong_alias_in_pool):
+        return False
+    if not alias_strong and not alias_pack_signal_strong(alias_decision):
+        return False
+    if not candidates:
+        return False
+    gap_max = float(rr.score_gap_max)
+    top_k = int(rr.top_k)
+    top_sc = float(candidates[0].get("_score") or 0.0)
+    band = [
+        c
+        for c in candidates[:top_k]
+        if abs(float(c.get("_score") or 0.0) - top_sc) <= gap_max + 1e-9
+    ]
+    return any(_alias_backed(c) for c in band)
+
+
+def pool_top_when_alias_rerank_skipped(candidates: list[dict]) -> dict:
+    """Prefer alias-backed pool row on score tie (H1 sort keeps pre-semantic leader)."""
+    if not candidates:
+        raise ValueError("pool_top_when_alias_rerank_skipped requires candidates")
+    top_k = int(THRESHOLDS.rerank.top_k)
+    top_sc = float(candidates[0].get("_score") or 0.0)
+    eps = 1e-4
+    ties = [
+        c
+        for c in candidates[:top_k]
+        if abs(float(c.get("_score") or 0.0) - top_sc) <= eps
+    ]
+    alias_ties = [c for c in ties if _alias_backed(c)]
+    if alias_ties:
+        return alias_ties[0]
+    return candidates[0]
+
+
 def evaluate_rerank_trigger(
     candidates: list[dict],
     *,
     point_literal: bool,
+    alias_strong: bool = False,
+    alias_decision: str = "",
 ) -> tuple[bool, str]:
     """Return (should_rerank, rerank_trigger_reason). Does not call LLM."""
     rr = THRESHOLDS.rerank
@@ -52,6 +107,10 @@ def evaluate_rerank_trigger(
         return False, "above_score_max"
     if _score_gap(candidates) >= float(rr.score_gap_max):
         return False, "gap_too_wide"
+    if strong_alias_blocks_rerank(
+        candidates, alias_strong=alias_strong, alias_decision=alias_decision
+    ):
+        return False, "strong_alias_in_pool"
     return True, "triggered"
 
 
@@ -164,11 +223,18 @@ def maybe_rerank_top(
     candidates: list[dict],
     *,
     point_literal: bool,
+    alias_strong: bool = False,
+    alias_decision: str = "",
 ) -> tuple[dict, dict[str, Any]]:
     """Apply rerank when gate passes; otherwise return pool top with skip telemetry."""
     if not candidates:
         raise ValueError("maybe_rerank_top requires at least one candidate")
-    should, reason = evaluate_rerank_trigger(candidates, point_literal=point_literal)
+    should, reason = evaluate_rerank_trigger(
+        candidates,
+        point_literal=point_literal,
+        alias_strong=alias_strong,
+        alias_decision=alias_decision,
+    )
     tel: dict[str, Any] = {
         "rerank_trigger_reason": reason,
         "rerank_applied": False,
@@ -176,7 +242,10 @@ def maybe_rerank_top(
         "rerank_fallback_reason": None,
     }
     if not should:
-        return candidates[0], tel
+        top = candidates[0]
+        if reason == "strong_alias_in_pool":
+            top = pool_top_when_alias_rerank_skipped(candidates)
+        return top, tel
     top_k = int(THRESHOLDS.rerank.top_k)
     pool = candidates[:top_k]
     chosen, inner = llm_rerank_candidates(q, pool)

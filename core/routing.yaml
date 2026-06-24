@@ -36,6 +36,7 @@ rerank:
   score_gap_max: 0.15
   top_k: 3
   min_candidates: 2
+  skip_on_strong_alias_in_pool: true
 
 # Metadata-First v1 — candidate score boosts (see docs/METADATA_FIRST_V1.md)
 metadata_first:

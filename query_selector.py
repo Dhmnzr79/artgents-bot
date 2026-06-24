@@ -354,7 +354,11 @@ def select_chunk_for_question(
         else 1.0
     )
     top, rerank_tel = maybe_rerank_top(
-        q_user, cands, point_literal=is_point_literal_query(q_policy)
+        q_user,
+        cands,
+        point_literal=is_point_literal_query(q_policy),
+        alias_strong=alias_strong,
+        alias_decision=tier,
     )
     rerank_applied = bool(rerank_tel.get("rerank_applied"))
 

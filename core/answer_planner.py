@@ -13,9 +13,10 @@ from config import (
 from contracts.answer_plan import AnswerPlan, AspectKind, PlanAppendKind, PlanRiskKind
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult
-from core.price_followup import (
-    is_vague_price_followup,
-    is_weak_catalog_price_token_match,
+from core.attribute_followup import (
+    catalog_match_is_authoritative,
+    detect_vague_attribute_kinds,
+    is_vague_attribute_followup_any,
 )
 from query_selector import match_service_from_catalog
 from core.service_followup import is_short_attribute_followup, normalize_service_id
@@ -129,23 +130,19 @@ def _resolve_service_id(
         if not svc:
             svc = normalize_service_id(str(decision.service_id or ""))
         topic = str(decision.service_topic or "").strip().lower() or None
-    if not svc:
-        subject = get_last_subject(sid)
-        if subject and is_vague_price_followup(q):
-            svc = normalize_service_id(str(subject.get("service_id") or ""))
-            topic = str(subject.get("topic") or topic or "").strip().lower() or topic
+    subject = get_last_subject(sid)
+    vague_kinds = detect_vague_attribute_kinds(q)
+    if not svc and subject and vague_kinds:
+        svc = normalize_service_id(str(subject.get("service_id") or ""))
+        topic = str(subject.get("topic") or topic or "").strip().lower() or topic
     if not svc:
         match = match_service_from_catalog(q, client_id=client_id)
-        catalog_confident = bool(match.get("is_confident"))
-        if catalog_confident and is_vague_price_followup(q) and is_weak_catalog_price_token_match(
-            match, q
-        ):
-            catalog_confident = False
-        if catalog_confident:
+        if catalog_match_is_authoritative(match, q):
             svc = normalize_service_id(str(match.get("matched_service_id") or ""))
-    subject = get_last_subject(sid)
     if not svc and subject and (
-        is_short_attribute_followup(q) or len((q or "").split()) <= 12
+        is_short_attribute_followup(q)
+        or is_vague_attribute_followup_any(q)
+        or len((q or "").split()) <= 12
     ):
         svc = normalize_service_id(str(subject.get("service_id") or ""))
         topic = str(subject.get("topic") or topic or "").strip().lower() or topic

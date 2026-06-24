@@ -53,6 +53,8 @@ _ATTRIBUTE_STOP: dict[AttributeFollowupKind, frozenset[str]] = {
     "duration": frozenset({
         "долго",
         "длительн",
+        "длит",
+        "длится",
         "время",
         "времени",
         "срок",
@@ -132,6 +134,8 @@ _QUERY_FILLER_STOP = _PRICE_STOP | frozenset({
     "же",
     "бы",
     "по",
+    "под",
+    "из",
     "за",
     "на",
     "в",
@@ -148,7 +152,6 @@ _QUERY_FILLER_STOP = _PRICE_STOP | frozenset({
     "такая",
     "такое",
     "такие",
-    "это",
     "эта",
     "этот",
     "эти",
@@ -166,7 +169,8 @@ _KIND_MARKER_RES: dict[AttributeFollowupKind, re.Pattern[str]] = {
     "price": PRICE_LOOKUP_RE,
     "duration": re.compile(
         r"\b("
-        r"долго|длительн|сколько\s+времени|по\s+времени|срок\w*|месяц\w*|недел\w*"
+        r"долго|длительн\w*|длит\w*|сколько\s+времени|сколько\s+длит\w*|"
+        r"по\s+времени|срок\w*|месяц\w*|недел\w*"
         r")\b",
         re.I | re.U,
     ),
@@ -184,6 +188,30 @@ _KIND_MARKER_RES: dict[AttributeFollowupKind, re.Pattern[str]] = {
 }
 
 _VAGUE_ATTRIBUTE_MAX_TOKENS = 10
+
+
+def _norm_tok(token: str) -> str:
+    return token.lower().replace("ё", "е")
+
+
+def _token_is_stop(token: str, stops: frozenset[str]) -> bool:
+    """Stem-aware stop check: exact token or shared prefix with stop entry."""
+    t = _norm_tok(token)
+    if not t:
+        return True
+    if t in stops:
+        return True
+    for raw in stops:
+        s = _norm_tok(raw)
+        if not s:
+            continue
+        if len(s) >= 3 and t.startswith(s):
+            return True
+        if len(t) >= 3 and s.startswith(t):
+            return True
+        if len(t) >= 4 and len(s) >= 4 and t[:4] == s[:4]:
+            return True
+    return False
 
 
 def _tokenize(q: str) -> list[str]:
@@ -215,7 +243,7 @@ def _strip_aspect_markers(q: str, kind: AttributeFollowupKind) -> str:
     tokens = [
         t
         for t in re.findall(r"[0-9a-zа-яё]{2,}", qn, flags=re.I | re.U)
-        if t.lower().replace("ё", "е") not in stops
+        if not _token_is_stop(t, stops)
     ]
     return " ".join(tokens)
 
@@ -237,7 +265,7 @@ def _service_signal_tokens(q: str, *, kind: AttributeFollowupKind | None = None)
     filler = _QUERY_FILLER_STOP
     if kind is not None:
         filler = filler | _ATTRIBUTE_STOP.get(kind, frozenset())
-    return [t for t in tokens if t not in filler]
+    return [t for t in tokens if not _token_is_stop(t, filler)]
 
 
 def query_has_explicit_service_object(

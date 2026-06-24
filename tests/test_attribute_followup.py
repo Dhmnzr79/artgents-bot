@@ -14,6 +14,37 @@ from core.attribute_followup import (
 from core.price_followup import is_vague_price_followup
 from session import mem_reset, set_last_subject
 
+# --- audit phrases (stem/stop; not route→file) ---
+
+
+def test_audit_strashno_pain():
+    assert is_vague_attribute_followup("Страшно?", "pain")
+    assert "pain" in detect_vague_attribute_kinds("Страшно?")
+
+
+def test_audit_skolko_dlitsya_duration():
+    assert is_vague_attribute_followup("А сколько длится?", "duration")
+    assert "duration" in detect_vague_attribute_kinds("А сколько длится?")
+
+
+def test_audit_pod_anesteziej_pain():
+    assert is_vague_attribute_followup("А под анестезией?", "pain")
+    assert "pain" in detect_vague_attribute_kinds("А под анестезией?")
+
+
+def test_audit_kto_iz_vrachej_doctor():
+    assert is_vague_attribute_followup("Кто из врачей?", "doctor")
+    assert "doctor" in detect_vague_attribute_kinds("Кто из врачей?")
+
+
+def test_chuvstvovat_not_detector_scope():
+    """Смысловые формулировки — retrieval/LLM/aspect, не regex-словарь."""
+    assert detect_vague_attribute_kinds("Я буду что-то чувствовать?") == []
+    assert not is_vague_attribute_followup("Я буду что-то чувствовать?", "pain")
+
+
+# --- core layer ---
+
 
 def test_vague_price_via_attribute_layer():
     assert is_vague_attribute_followup("А что по ценам?", "price")

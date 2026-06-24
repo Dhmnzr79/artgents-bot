@@ -12,6 +12,7 @@ import alias_lexical
 import yaml
 
 from config import KT_EXPLICIT_RE
+from core.attribute_followup import catalog_match_is_authoritative, is_vague_attribute_followup
 from core.client_config_loader import resolve_pack_client_id
 from core.client_runtime import client_md_dir
 from query_selector import match_service_from_catalog
@@ -654,7 +655,53 @@ def doctor_intent_probe(q: str) -> bool:
     return False
 
 
-def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
+def _doctor_lookup_result_for_facts(
+    by_svc: list[DoctorListFact],
+    *,
+    matched_service_id: str | None = None,
+    specialty: str | None = None,
+) -> dict[str, Any] | None:
+    by_svc = _dedupe_doctor_facts(by_svc)
+    n = len(by_svc)
+    if n == 0:
+        return None
+    if n == 1:
+        d0 = by_svc[0]
+        did = str(d0.get("doc_id") or "")
+        return {
+            "routing": "doc",
+            "doc_id": did,
+            "doctor_name": d0.get("name_full") or did,
+            "specialty": specialty,
+            "matched_service_id": matched_service_id,
+            "cards": [d0],
+        }
+    if 2 <= n <= 3:
+        return {
+            "routing": "cards",
+            "doc_id": None,
+            "doctor_name": "Несколько врачей",
+            "specialty": specialty,
+            "matched_service_id": matched_service_id,
+            "cards": by_svc,
+        }
+    return {
+        "routing": "overview",
+        "doc_id": _OVERVIEW_ID,
+        "doctor_name": "Наши врачи",
+        "specialty": specialty,
+        "matched_service_id": matched_service_id,
+        "matching_doctors_total": n,
+    }
+
+
+def doctors_lookup(
+    q: str,
+    *,
+    client_id: str,
+    session_service_id: str | None = None,
+    session_topic: str | None = None,
+) -> dict[str, Any] | None:
     """Результат для source_routing / app.
 
     routing:
@@ -697,49 +744,43 @@ def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
             "cards": [d],
         }
 
-    intent = doctor_intent_probe(q0)
+    intent = doctor_intent_probe(q0) or is_vague_attribute_followup(q0, "doctor")
+    vague_doctor = is_vague_attribute_followup(q0, "doctor")
     if not intent:
         return None
+
+    if vague_doctor:
+        svc_hint = (session_service_id or "").strip()
+        if svc_hint:
+            hit = _doctor_lookup_result_for_facts(
+                find_doctors_by_service(svc_hint, client_id=client_id),
+                matched_service_id=svc_hint,
+            )
+            if hit:
+                return hit
+        topic_hint = (session_topic or "").strip()
+        if topic_hint:
+            hit = _doctor_lookup_result_for_facts(
+                find_doctors_by_topic(topic_hint, client_id=client_id),
+                specialty=topic_hint,
+            )
+            if hit:
+                return hit
 
     # --- 2) Услуга из каталога (уверенный матч)
     cat_match = match_service_from_catalog(q0, client_id=client_id)
     if cat_match.get("matched_service_id") and bool(cat_match.get("is_confident")):
-        sid = str(cat_match.get("matched_service_id") or "")
-        if sid == "tomography" and not KT_EXPLICIT_RE.search(q0):
-            sid = ""
-        if sid:
-            by_svc = find_doctors_by_service(sid, client_id=client_id)
-            by_svc = _dedupe_doctor_facts(by_svc)
-            n = len(by_svc)
-            if n == 1:
-                d0 = by_svc[0]
-                did = str(d0.get("doc_id") or "")
-                return {
-                    "routing": "doc",
-                    "doc_id": did,
-                    "doctor_name": d0.get("name_full") or did,
-                    "specialty": None,
-                    "matched_service_id": sid,
-                    "cards": [d0],
-                }
-            if 2 <= n <= 3:
-                return {
-                    "routing": "cards",
-                    "doc_id": None,
-                    "doctor_name": "Несколько врачей",
-                    "specialty": None,
-                    "matched_service_id": sid,
-                    "cards": by_svc,
-                }
-            if n >= 4:
-                return {
-                    "routing": "overview",
-                    "doc_id": _OVERVIEW_ID,
-                    "doctor_name": "Наши врачи",
-                    "specialty": None,
-                    "matched_service_id": sid,
-                    "matching_doctors_total": n,
-                }
+        if not (vague_doctor and not catalog_match_is_authoritative(cat_match, q0)):
+            sid = str(cat_match.get("matched_service_id") or "")
+            if sid == "tomography" and not KT_EXPLICIT_RE.search(q0):
+                sid = ""
+            if sid:
+                hit = _doctor_lookup_result_for_facts(
+                    find_doctors_by_service(sid, client_id=client_id),
+                    matched_service_id=sid,
+                )
+                if hit:
+                    return hit
 
     # --- 3) Ключевые слова специализации
     st = _specialty_topic_from_query(q0)

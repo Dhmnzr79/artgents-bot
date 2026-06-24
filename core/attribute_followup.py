@@ -1,4 +1,11 @@
-"""Vague attribute follow-ups: session context before weak catalog marker matches."""
+"""Vague attribute follow-ups: session context before weak catalog marker matches.
+
+Doctor (`attribute_kind=doctor`) is classified here but routed via doctors_lookup (1C),
+not via AspectKind / content regex→file shims.
+
+Paraphrases like «чувствовать / терпимо / переживаю» are intentionally out of scope —
+use retrieval / LLM / aspect layer, not more regex here.
+"""
 
 from __future__ import annotations
 

@@ -35,7 +35,7 @@
 | **PriceBook v2 — остаток** | MVP 3.5a–3.5d ✅; детали — § PriceBook v2 ниже | **3.5 → 4** — см. `PRICEBOOK_V2.md` |
 | **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
 | **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
-| **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml` | **4** — optional |
+| **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml`; **planner `aspects` ← vague `attribute_followup`** (сейчас «А долго?» → `overview` в planner, `duration` в detector) | **4** — optional |
 | **Metadata soft filter v2 (aspect-aware exempt)** | см. § Metadata soft filter ниже | **retrieval 2.0** |
 
 ---

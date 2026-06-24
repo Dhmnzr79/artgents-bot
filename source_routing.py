@@ -11,6 +11,7 @@ from config import (
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
 
+from core.attribute_followup import is_vague_attribute_followup
 from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctor_intent_probe, doctor_name_probe, doctors_lookup
 from query_selector import (
@@ -25,6 +26,20 @@ from query_selector import (
 
 # Client default for price_concern without service match (see service_catalog concern_ref pattern).
 DEFAULT_PRICE_CONCERN_REF = "implantation__faq__cost.md#korotko"
+
+
+from session import get_last_subject
+
+
+def _vague_doctor_session_hints(sid: str | None) -> tuple[str | None, str | None]:
+    if not sid:
+        return None, None
+    sub = get_last_subject(sid)
+    if not isinstance(sub, dict):
+        return None, None
+    svc = str(sub.get("service_id") or "").strip() or None
+    topic = str(sub.get("topic") or "").strip() or None
+    return svc, topic
 
 
 def _short_followup(q: str, *, max_tokens: int = 8) -> bool:
@@ -110,9 +125,23 @@ def route_source(
     q0 = (q or "").strip()
     is_comparison = _comparison_query(q0, decision)
 
-    doctors_gate = doctor_name_probe(q0, client_id=client_id) or doctor_intent_probe(q0)
+    doctors_gate = (
+        doctor_name_probe(q0, client_id=client_id)
+        or doctor_intent_probe(q0)
+        or is_vague_attribute_followup(q0, "doctor")
+    )
     if doctors_gate and ri not in ("price_lookup", "price_concern"):
-        hit = doctors_lookup(q0, client_id=client_id)
+        session_svc, session_topic = (
+            _vague_doctor_session_hints(sid)
+            if is_vague_attribute_followup(q0, "doctor")
+            else (None, None)
+        )
+        hit = doctors_lookup(
+            q0,
+            client_id=client_id,
+            session_service_id=session_svc,
+            session_topic=session_topic,
+        )
         if hit:
             routing = str(hit.get("routing") or "doc")
             if routing == "cards":

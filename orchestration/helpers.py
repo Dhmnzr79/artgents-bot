@@ -145,8 +145,10 @@ def apply_metadata_first_after_content_route(
         sel_ref = ref_from_chunk(selected_chunk) or ""
         alias_ch = alias_candidate.get("leader_chunk")
         alias_ref = ref_from_chunk(alias_ch) if isinstance(alias_ch, dict) else ""
+        alias_channel_live = alias_candidate.get("arbiter_channel", True) is not False
         if (
             not dbg.get("alias_fallback_used")
+            and alias_channel_live
             and pool_ref
             and sel_ref
             and alias_ref

@@ -12,7 +12,12 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from core.candidate_builder import metadata_context_from_decision, resolve_alias_for_turn
+from core.candidate_builder import (
+    alias_channel_suppressed_for_arbiter,
+    chunk_ref_short,
+    metadata_context_from_decision,
+    resolve_alias_for_turn,
+)
 from core.routing_loader import THRESHOLDS
 from query_selector import select_catalog_content_route, select_chunk_for_question
 from retriever import broad_query_detect, normalize_retrieval_query
@@ -244,7 +249,7 @@ def collect_content_candidates(
         "last_catalog_service_id": (st.get("last_catalog_service_id") or None),
     }
 
-    retrieval_candidate = {
+    retrieval_candidate: dict[str, Any] = {
         "mode": retrieval_mode,
         "doc_id": retrieval_doc_id,
         "chunk_kind": retrieval_kind,
@@ -286,6 +291,17 @@ def collect_content_candidates(
         for k, v in (alias_diag or {}).items()
         if k.startswith("alias_") or k.startswith("old_")
     }
+    alias_ref = chunk_ref_short(alias_leader) if isinstance(alias_leader, dict) else None
+    alias_channel_suppressed = alias_channel_suppressed_for_arbiter(
+        sel_meta,
+        alias_ref=alias_ref,
+        alias_chunk=alias_leader,
+        retrieval_chunk=retrieval_chunk if isinstance(retrieval_chunk, dict) else None,
+    )
+    alias_arbiter_channel = bool(alias_leader) and not alias_channel_suppressed
+    retrieval_debug = dict(selection.get("debug_meta") or {})
+    retrieval_debug["alias_channel_suppressed"] = alias_channel_suppressed
+    retrieval_candidate["debug_meta"] = retrieval_debug
     alias_candidate = {
         "leader": _slim_chunk_for_log(alias_leader) if isinstance(alias_leader, dict) else None,
         # Full chunk kept for immediate execution if selected; never log this.
@@ -295,6 +311,8 @@ def collect_content_candidates(
         "alias_text": alias_text[:120] if isinstance(alias_text, str) else None,
         "alias_score": float(alias_score or 0.0) if alias_score is not None else None,
         "specificity": alias_spec,
+        "arbiter_channel": alias_arbiter_channel,
+        "channel_suppressed": alias_channel_suppressed,
         **alias_tel,
     }
 

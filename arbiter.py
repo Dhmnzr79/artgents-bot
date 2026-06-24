@@ -261,7 +261,8 @@ def build_compact_content_candidates(
     alias = cands.alias or {}
     alias_decision = str(alias.get("alias_decision") or "").strip() or None
     ach = alias.get("leader_chunk") if isinstance(alias.get("leader_chunk"), dict) else None
-    if isinstance(ach, dict):
+    alias_arbiter_channel = alias.get("arbiter_channel", True)
+    if isinstance(ach, dict) and alias_arbiter_channel:
         rr = ref_from_chunk(ach)
         meta = ach.get("meta") or {}
         if not isinstance(meta, dict):

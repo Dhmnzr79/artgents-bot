@@ -520,6 +520,73 @@ def chunk_ref_short(ch: dict) -> str | None:
     return f"{file}#{anchor.strip().lower() or 'korotko'}"
 
 
+def canonical_chunk_ref(ref: str) -> str:
+    """Normalize ref for pool / arbiter dedup (matches arbiter.canonical_ref)."""
+    r = (ref or "").strip().lower().replace("\\", "/")
+    if "#" not in r and r:
+        r = f"{r}#korotko"
+    left, _, right = r.partition("#")
+    base = os.path.basename(left.strip())
+    if base and not base.endswith(".md"):
+        base = f"{base}.md"
+    return f"{base}#{right.strip().lower() or 'korotko'}"
+
+
+def alias_ref_in_unified_pool(
+    retrieval_debug_meta: dict[str, Any] | None,
+    *,
+    alias_ref: str | None = None,
+    alias_chunk: dict | None = None,
+) -> bool:
+    """True when H1 pool already carries this alias ref (no separate arbiter channel)."""
+    if not isinstance(retrieval_debug_meta, dict) or not retrieval_debug_meta.get("alias_in_pool"):
+        return False
+    want = canonical_chunk_ref(alias_ref or "") if alias_ref else ""
+    if not want and isinstance(alias_chunk, dict):
+        want = canonical_chunk_ref(chunk_ref_short(alias_chunk) or "")
+    if not want:
+        return False
+    for row in retrieval_debug_meta.get("pool_sources") or []:
+        if not isinstance(row, dict):
+            continue
+        ref = str(row.get("ref") or "").strip()
+        sources = row.get("sources") or []
+        if not ref or "alias" not in sources:
+            continue
+        if canonical_chunk_ref(ref) == want:
+            return True
+    return False
+
+
+def alias_channel_suppressed_for_arbiter(
+    retrieval_debug_meta: dict[str, Any] | None,
+    *,
+    alias_ref: str | None = None,
+    alias_chunk: dict | None = None,
+    retrieval_chunk: dict | None = None,
+) -> bool:
+    """Suppress duplicate alias-channel only when pool already elevated this exact ref to winner."""
+    if not alias_ref_in_unified_pool(
+        retrieval_debug_meta, alias_ref=alias_ref, alias_chunk=alias_chunk
+    ):
+        return False
+    want = canonical_chunk_ref(alias_ref or "") if alias_ref else ""
+    if not want and isinstance(alias_chunk, dict):
+        want = canonical_chunk_ref(chunk_ref_short(alias_chunk) or "")
+    if not want:
+        return False
+    pool_winner = canonical_chunk_ref(
+        str((retrieval_debug_meta or {}).get("pool_winner_ref") or "")
+    )
+    if pool_winner and pool_winner == want:
+        return True
+    if isinstance(retrieval_chunk, dict):
+        retr = canonical_chunk_ref(chunk_ref_short(retrieval_chunk) or "")
+        if retr and retr == want:
+            return True
+    return False
+
+
 def _pool_sources_summary(candidates: list[dict], *, limit: int = 8) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for ch in candidates[:limit]:

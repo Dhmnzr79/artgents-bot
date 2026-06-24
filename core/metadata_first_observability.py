@@ -63,6 +63,7 @@ def merge_retrieval_debug_meta(debug_meta: dict[str, Any] | None) -> None:
         "alias_pool_merged",
         "alias_fallback_used",
         "selected_source",
+        "alias_channel_suppressed",
         "pool_winner_ref",
     ):
         if key in debug_meta:
@@ -117,6 +118,7 @@ def metadata_first_turn_details() -> dict[str, Any]:
         "pool_sources",
         "alias_in_pool",
         "alias_fallback_used",
+        "alias_channel_suppressed",
         "selected_source",
     )
     return {k: ctx[k] for k in keys if k in ctx}

@@ -72,7 +72,7 @@
 |---------|------|
 | **No hardcode from hints** | `exclude_service_ids` / `preferred_service_ids` / `preferred_groups` в контракте — **telemetry/заготовка**. Slice 2: влияние только через `patient_scope` + `price_scope` / `default_unit` / pricebook + **soft** boost/filter в candidate pool. Запрещено: `if kind == X → service_id Y`. |
 | **Shared cues** | ✅ `core/patient_scope_cues.py` — общие regex для `price_scope` / `price_offers` / `patient_situation`. Slice 2: soft unit bias в `candidate_builder` + `merge_price_scope` (не из contract hints). |
-| **Session persistence** | Отдельный slice: carry `patient_situation` для vague follow-up («А сколько стоит?» после «нет одного зуба») — см. `drafts/INCIDENT_classic_vs_all_on4_price.md`. |
+| **Session persistence** | ✅ Slice 3: `last_patient_situation` + `patient_situation_turn_age` + age guard; carry на vague price. **Next:** `default_one_tooth_price_service` в pricebook/client config (сейчас demo fallback `classic`). |
 | **LLM fallback** | Bounded classifier по фиксированному enum kind — после стабилизации rules + eval. |
 | **Urgent slice** | `urgent_problem` + `next_best_action=urgent_booking` — **только telemetry** в Slice 1. Не подключать к `flow_handlers` / booking. Cues вроде «можно сегодня?» слишком широкие — отдельный urgent slice с ужесточёнными правилами и safety review. |
 | **Real clarify** | `should_clarify` / `clarify_question` — telemetry; реальный clarify-route — отдельный slice. |

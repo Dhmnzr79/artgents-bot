@@ -12,7 +12,7 @@ from core.price_followup import (
 from core.pricebook_loader import load_pricebook_service
 from core.service_followup import is_short_attribute_followup
 from query_selector import match_service_from_catalog, select_price_service_route
-from session import get_last_subject, mem_reset, set_last_catalog_service, set_last_subject
+from session import get_last_subject, mem_add_user, mem_reset, set_last_catalog_service, set_last_subject
 
 
 def test_vague_price_not_short_attribute_followup():
@@ -38,6 +38,21 @@ def test_bare_vague_price_clarifies_not_all_on_4():
     route = select_price_service_route("А что по ценам?", client_id="demo", sid=sid)
     assert route.get("mode") == "clarify"
     assert route.get("fallback_reason") == "price_clarify_no_context"
+
+
+def test_one_tooth_patient_situation_vague_price_without_last_subject():
+    """Инцидент: content one-tooth → vague price без last_subject (Slice 3)."""
+    from core.patient_situation_session import persist_patient_situation_after_turn
+
+    sid = f"vague-ps-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid)
+    turn1 = "У меня нет одного зуба, что лучше?"
+    persist_patient_situation_after_turn(sid, turn1)
+    mem_add_user(sid, turn1)
+    route = select_price_service_route("А сколько стоит?", client_id="demo", sid=sid)
+    assert route.get("mode") == "matched"
+    assert route.get("matched_service_id") == "classic"
+    assert route.get("matched_service_id") != "all_on_4"
 
 
 def test_price_only_lemma_weak_not_confident():

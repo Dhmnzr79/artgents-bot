@@ -34,6 +34,7 @@ from core.routing_loader import THRESHOLDS
 from core.price_scope import PriceScopeResult, detect_price_scope, scope_catalog_excludes, scope_implant_topic
 from core.patient_situation import detect_patient_situation, patient_situation_from_ctx
 from core.patient_situation_routing import merge_price_scope, unit_bias_for_situation
+from core.patient_situation_session import resolve_patient_situation_for_turn
 from core.price_offers import is_crown_inclusion_content_query, is_generic_implant_price_query
 from core.price_followup import (
     is_vague_price_followup,
@@ -71,6 +72,22 @@ def _service_in_pricebook(
     if not sid:
         return False
     return load_pricebook_service(client_id, sid) is not None
+
+
+def _patient_situation_for_turn(q: str, *, sid: str | None) -> tuple[Any, bool]:
+    """Resolved patient situation for this turn + whether it was session-carried."""
+    try:
+        from flask import has_request_context, request
+    except ImportError:
+        has_request_context = lambda: False  # type: ignore[assignment,misc]
+        request = None  # type: ignore[assignment]
+    if has_request_context() and request is not None and hasattr(request, "ctx"):
+        ctx_result = patient_situation_from_ctx()
+        if ctx_result is not None:
+            carried = bool(request.ctx.get("patient_situation_carried", False))
+            return ctx_result, carried
+    situation, meta = resolve_patient_situation_for_turn(q, sid=sid)
+    return situation, bool(meta.get("patient_situation_carried"))
 
 
 def _price_route_is_matched(route_source: str, price_ref: str | None) -> bool:
@@ -232,9 +249,7 @@ def select_chunk_for_question(
             cands,
             ctx=meta_ctx,
             client_id=client_id,
-            patient_scope_bias=unit_bias_for_situation(
-                patient_situation_from_ctx() or detect_patient_situation(q_policy)
-            ),
+            patient_scope_bias=unit_bias_for_situation(_patient_situation_for_turn(q_policy, sid=sid)[0]),
         )
         boost_tel["top_semantic_raw"] = round(top_semantic_raw, 4)
     if not cands:
@@ -682,8 +697,13 @@ def select_price_service_route(
         else PriceScopeResult.none()
     )
     if intent == "price_lookup":
-        situation = patient_situation_from_ctx() or detect_patient_situation(q)
-        scope = merge_price_scope(scope, situation, client_id=client_id)
+        situation, vague_carry = _patient_situation_for_turn(q, sid=sid)
+        scope = merge_price_scope(
+            scope,
+            situation,
+            client_id=client_id,
+            vague_price_carry=vague_carry,
+        )
     exclude_ids = scope_catalog_excludes(scope)
     topic_hint = scope_implant_topic(scope)
     match: dict | None = None
@@ -722,22 +742,28 @@ def select_price_service_route(
             **overview_match,
         }
     if intent == "price_lookup" and is_vague_price_followup(q):
-        ctx = _service_from_session_context(sid, client_id)
-        if ctx:
-            session_route = _try_price_session_route(
-                q, match, ctx, intent=intent, sid=sid, client_id=client_id
-            )
-            if session_route:
-                return session_route
-        if is_weak_catalog_price_token_match(match, q) or (
-            match.get("is_confident") and not price_query_has_explicit_service_object(q)
-        ):
-            return {
-                "mode": "clarify",
-                "intent": intent,
-                "fallback_reason": "price_clarify_no_context",
-                **match,
-            }
+        scope_resolved_vague_price = bool(
+            scope.protocol_service_id
+            and (match.get("matched_service_id") or "") == scope.protocol_service_id
+            and match.get("is_confident")
+        )
+        if not scope_resolved_vague_price:
+            ctx = _service_from_session_context(sid, client_id)
+            if ctx:
+                session_route = _try_price_session_route(
+                    q, match, ctx, intent=intent, sid=sid, client_id=client_id
+                )
+                if session_route:
+                    return session_route
+            if is_weak_catalog_price_token_match(match, q) or (
+                match.get("is_confident") and not price_query_has_explicit_service_object(q)
+            ):
+                return {
+                    "mode": "clarify",
+                    "intent": intent,
+                    "fallback_reason": "price_clarify_no_context",
+                    **match,
+                }
     if not match.get("matched_service_id"):
         if intent == "price_lookup" and is_generic_implant_price_query(q):
             return {

@@ -182,6 +182,7 @@ class PatientSituationThresholds(BaseModel):
     min_confidence_for_routing: float = Field(..., ge=0.0, le=1.0)
     unit_match_boost: float = Field(..., ge=0.0, le=0.25)
     unit_mismatch_penalty: float = Field(..., ge=0.0, le=0.25)
+    max_turn_age: int = Field(..., ge=0, le=20)
 
 
 class Thresholds(BaseModel):

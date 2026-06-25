@@ -51,6 +51,8 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     "patient_situation_should_clarify",
     "patient_situation_clarify_question",
     "patient_situation_clarification_reason",
+    "patient_situation_carried",
+    "patient_situation_carry_age",
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 

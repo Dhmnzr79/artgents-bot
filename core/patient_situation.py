@@ -402,7 +402,11 @@ def patient_situation_telemetry(result: PatientSituationResult) -> dict[str, Any
     }
 
 
-def record_patient_situation_ctx(result: PatientSituationResult) -> None:
+def record_patient_situation_ctx(
+    result: PatientSituationResult,
+    *,
+    carry_meta: dict[str, Any] | None = None,
+) -> None:
     """Write patient situation telemetry to Flask request.ctx (Slice 1 observability)."""
     try:
         from flask import has_request_context, request
@@ -414,6 +418,8 @@ def record_patient_situation_ctx(result: PatientSituationResult) -> None:
         return
     request.ctx["patient_situation_result"] = result.model_dump()
     for key, value in patient_situation_telemetry(result).items():
+        request.ctx[key] = value
+    for key, value in (carry_meta or {}).items():
         request.ctx[key] = value
 
 

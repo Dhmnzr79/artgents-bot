@@ -73,11 +73,12 @@ def price_scope_from_situation(
     situation: PatientSituationResult,
     *,
     client_id: str | None,
+    vague_price_carry: bool = False,
 ) -> PriceScopeResult | None:
     """Supplement price_scope when price intent is clear from situation but regex scope missed."""
     if not situation_routing_eligible(situation):
         return None
-    if situation.cues.intent != "price":
+    if situation.cues.intent != "price" and not vague_price_carry:
         return None
 
     jaw = jaw_arch_service_ids(client_id)
@@ -85,7 +86,15 @@ def price_scope_from_situation(
     scope = situation.patient_scope
 
     if scope in {"one_tooth", "few_teeth"}:
-        return PriceScopeResult(kind="one_tooth", blocked_service_ids=jaw)
+        protocol = None
+        if vague_price_carry and "classic" in one:
+            # TECH_DEBT: demo-only default; next — default_one_tooth_price_service in pricebook/client config.
+            protocol = "classic"
+        return PriceScopeResult(
+            kind="one_tooth",
+            blocked_service_ids=jaw,
+            protocol_service_id=protocol,
+        )
     if scope == "prosthetic_stage":
         blocked = one | jaw | frozenset({"classic", "one_stage"})
         return PriceScopeResult(
@@ -113,8 +122,13 @@ def merge_price_scope(
     situation: PatientSituationResult,
     *,
     client_id: str | None,
+    vague_price_carry: bool = False,
 ) -> PriceScopeResult:
     if primary.kind != "none":
         return primary
-    supplemented = price_scope_from_situation(situation, client_id=client_id)
+    supplemented = price_scope_from_situation(
+        situation,
+        client_id=client_id,
+        vague_price_carry=vague_price_carry,
+    )
     return supplemented if supplemented is not None else primary

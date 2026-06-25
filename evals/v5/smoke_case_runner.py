@@ -239,6 +239,15 @@ def validate_smoke_case(
             coverage_class=cov,
         )
 
+    forbidden_service_id = str_list_field(row, "forbidden_service_id")
+    if forbidden_service_id and got_service_id and norm(got_service_id) in {norm(x) for x in forbidden_service_id}:
+        return CaseResult(
+            case_id=case_id,
+            status="FAIL",
+            reason=f"forbidden_service_id hit: {got_service_id!r}",
+            coverage_class=cov,
+        )
+
     expected_pricebook_group_id = row.get("expected_pricebook_group_id")
     if expected_pricebook_group_id is not None:
         want_gid = str(expected_pricebook_group_id).strip()

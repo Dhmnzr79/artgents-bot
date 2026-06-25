@@ -287,6 +287,23 @@ Per-client: `clients/{id}/features.yaml` — `guide_router.enabled` (Phase 4, с
 
 ---
 
+## Patient situation — примеры (Slice 3)
+
+| Вопрос / контекст | `patient_situation` | Ожидаемое направление |
+|-------------------|---------------------|------------------------|
+| «Нет одного зуба, что лучше?» | `one_tooth_missing` | content: comparison/FAQ; **не** All-on-4 |
+| «Сколько стоит… нет одного зуба?» | `one_tooth_missing` + price intent | `classic` / one_tooth; jaw blocked |
+| content one-tooth → «А сколько стоит?» | session carry | `classic`, не All-on-4 (без `last_subject`) |
+| «Нет зубов вообще» | `full_arch_missing` | протезы / overview; **не** classic one_tooth |
+| full-jaw content → «А что по ценам?» | session carry | `group_overview` / `full_jaw` |
+| «Имплант стоит, сколько коронка?» | `existing_implant_prosthetic_stage` | `implant_supported_prosthetics` |
+| «Мало кости, что делать?» | `bone_deficit_or_grafting` | comparison bone graft; без цены classic surgery |
+| «Удалить и сразу имплант?» | `extraction_then_implant` | `one_stage` / stages content |
+
+Пороги: `core/routing.yaml` → `patient_situation`. Детали: `CURRENT_ARCHITECTURE.md` § Patient situation router.
+
+---
+
 ## Roadmap routing cleanup
 
 | Phase | Задача | Статус |

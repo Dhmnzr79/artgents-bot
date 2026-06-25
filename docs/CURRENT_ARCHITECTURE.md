@@ -207,6 +207,20 @@ Eval: unit — `tests/test_follow_up_*.py`, `tests/test_compatibility_guard.py`;
 
 Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`.
 
+### Patient situation router (Slice 1–3)
+
+**Слой:** `core/patient_situation.py` — semantic business scope (`kind` + `patient_scope`), **не** route→file.
+
+| Slice | Runtime |
+|-------|---------|
+| **1** | Detection + telemetry (`patient_situation_*` в `request.ctx` / turn events) |
+| **2** | Soft bias: `patient_scope` → `default_unit` в retrieval (`candidate_builder`) и `merge_price_scope` для price |
+| **3** | Session: `last_patient_situation` + `patient_situation_turn_age` (age guard `routing.yaml` → `patient_situation.max_turn_age`); carry на vague price («А сколько стоит?») без `last_subject` |
+
+**Не делает:** hard route по contract hints (`preferred_service_ids`); real clarify (`should_clarify` — telemetry); urgent booking.
+
+Eval anchors: `evals/v5/demo/risk.json` → `risk_ps01`…`risk_ps08`; unit — `tests/test_patient_situation*.py`.
+
 ### Planner-lite (этап 4b)
 
 **Runtime (demo):**

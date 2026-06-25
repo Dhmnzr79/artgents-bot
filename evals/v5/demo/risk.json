@@ -1,6 +1,6 @@
 {
-  "baseline": 20,
-  "description": "Demo risk regression (drafts/test.md §3, cases 1–20): routing traps — group price overview, what_included, crown vs implant, policies. No known_failures skips.",
+  "baseline": 28,
+  "description": "Demo risk regression: routing traps (price scope, crown vs implant, policies) + patient_situation anchors (Slice 4). No known_failures skips.",
   "cases": [
     {
       "id": "risk_r01_generic_implant_price",
@@ -244,6 +244,93 @@
       "expected_route": "ingress_service_not_offered",
       "answer_signals_any": ["элайнер", "брекет"],
       "forbidden_signals": ["ставим брекеты", "да, делаем брекеты"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps01_one_tooth_choose_not_all_on_4",
+      "client_id": "demo",
+      "question": "Что мне подойдет, если нет одного зуба?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "forbidden_doc_id": ["implantation__service__all_on_4"],
+      "answer_signals_any": ["имплант", "мост", "один", "зуб"],
+      "forbidden_signals": ["all-on-4", "318 000"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps02_one_tooth_price_not_all_on_4",
+      "client_id": "demo",
+      "question": "Сколько стоит имплантация если нет одного зуба?",
+      "expected_route": "price_lookup",
+      "expected_service_id_any": ["classic", "one_stage"],
+      "forbidden_service_id": ["all_on_4"],
+      "expected_price_unit": "one_tooth",
+      "forbidden_signals": ["318 000", "all-on-4"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps03_vague_price_after_one_tooth_content",
+      "client_id": "demo",
+      "history": [
+        {"question": "У меня нет одного зуба, что лучше?"}
+      ],
+      "question": "А сколько стоит?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "classic",
+      "forbidden_service_id": ["all_on_4"],
+      "expected_price_unit": "one_tooth",
+      "forbidden_signals": ["318 000", "all-on-4"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps04_full_jaw_content_not_classic",
+      "client_id": "demo",
+      "question": "Что делать, если нет зубов вообще?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "forbidden_doc_id": ["implantation__service__classic"],
+      "answer_signals_any": ["протез", "челюст", "зуб"],
+      "forbidden_signals": ["76 200", "классическ"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps05_vague_price_after_full_jaw_content",
+      "client_id": "demo",
+      "history": [
+        {"question": "Что делать, если нет зубов вообще?"}
+      ],
+      "question": "А что по ценам?",
+      "expected_route": "price_lookup",
+      "expected_price_status": "group_overview",
+      "expected_pricebook_group_id": "full_jaw",
+      "forbidden_service_id": ["classic"],
+      "forbidden_signals": ["76 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps06_existing_implant_crown_not_classic",
+      "client_id": "demo",
+      "question": "Уже стоит имплант, сколько коронка?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "implant_supported_prosthetics",
+      "forbidden_service_id": ["classic", "all_on_4"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps07_bone_deficit_topic",
+      "client_id": "demo",
+      "question": "Мне сказали мало кости, что можно сделать?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "comparison__bone_graft_vs_all_on_4",
+      "forbidden_doc_id": ["implantation__service__classic"],
+      "answer_signals_any": ["кост", "КТ", "консультац"],
+      "coverage_class": "MEDIUM"
+    },
+    {
+      "id": "risk_ps08_extraction_then_implant_stages",
+      "client_id": "demo",
+      "question": "Можно удалить зуб и сразу поставить имплант?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_doc_id": "implantation__service__one_stage",
+      "forbidden_signals": ["запишем на имплант", "поставим имплант сегодня"],
       "coverage_class": "STRONG"
     }
   ]

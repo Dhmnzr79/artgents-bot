@@ -7,9 +7,10 @@ import uuid
 import pytest
 
 from contracts.decision_frame import DecisionFrame
+from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctors_lookup
-from source_routing import route_source
-from session import mem_reset, set_last_subject
+from source_routing import _vague_doctor_session_hints, route_source
+from session import mem_add_user, mem_get, mem_reset, set_last_subject
 
 
 def _content_frame(*, topic: str = "implantation") -> DecisionFrame:
@@ -62,6 +63,37 @@ def test_route_source_vague_doctor_with_session():
     payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
     assert isinstance(payload, dict)
     assert payload.get("matched_service_id") == "classic"
+
+
+def test_vague_doctor_session_hints_ignore_stale_subject():
+    sid = f"stale-doc-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid)
+    set_last_subject(
+        sid,
+        service_id="classic",
+        topic="implantation",
+        label="Классическая имплантация",
+    )
+    for _ in range(int(THRESHOLDS.follow_up.max_subject_turn_age) + 1):
+        mem_add_user(sid, "другой вопрос")
+    assert int(mem_get(sid).get("subject_turn_age") or 0) > int(
+        THRESHOLDS.follow_up.max_subject_turn_age
+    )
+
+    svc, topic = _vague_doctor_session_hints(sid)
+    assert svc is None
+    assert topic is None
+
+    sr = route_source(
+        "Кто делает?",
+        sid=sid,
+        client_id="demo",
+        decision=_content_frame(),
+        app_intent="content",
+    )
+    payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
+    if isinstance(payload, dict):
+        assert payload.get("matched_service_id") != "classic"
 
 
 @pytest.fixture

@@ -28,11 +28,15 @@ from query_selector import (
 DEFAULT_PRICE_CONCERN_REF = "implantation__faq__cost.md#korotko"
 
 
-from session import get_last_subject
+from session import get_last_subject, mem_get
 
 
 def _vague_doctor_session_hints(sid: str | None) -> tuple[str | None, str | None]:
     if not sid:
+        return None, None
+    st = mem_get(sid)
+    age = int(st.get("subject_turn_age") or 0)
+    if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
         return None, None
     sub = get_last_subject(sid)
     if not isinstance(sub, dict):

@@ -13,6 +13,7 @@ from orchestration.catalog_flow import (
     try_a3_doctor_route,
 )
 from orchestration.helpers import decision_dump
+from core.patient_situation import detect_patient_situation, record_patient_situation_ctx
 from core.price_offers import is_crown_inclusion_content_query
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
@@ -48,6 +49,7 @@ def orchestrate_routing_after_resolver(
     Extracted from app._orchestrate_ask_turn (Phase 3c).
     """
     decision_frame = decision_dump(decision)
+    record_patient_situation_ctx(detect_patient_situation(q))
 
     qp_loc = normalize_retrieval_query(q) or (q or "")
     if contacts_intent(qp_loc.strip()) or contacts_intent((q or "").strip()):

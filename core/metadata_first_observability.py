@@ -42,6 +42,15 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     "alias_topic_guard_rejected",
     "retrieval_scope_guard_reason",
     "retrieval_scope_topic_candidate",
+    "patient_situation_kind",
+    "patient_situation_confidence",
+    "patient_scope",
+    "patient_next_best_action",
+    "patient_situation_evidence",
+    "patient_situation_source",
+    "patient_situation_should_clarify",
+    "patient_situation_clarify_question",
+    "patient_situation_clarification_reason",
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 

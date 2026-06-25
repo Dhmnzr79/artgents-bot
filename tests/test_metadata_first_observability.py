@@ -135,3 +135,19 @@ def test_retrieval_pool_turn_details_slice() -> None:
         assert isinstance(details.get("retrieval_pool"), dict)
         assert details["retrieval_pool"]["pool_winner_ref"] == "a.md#korotko"
         assert "ignored" not in details
+
+
+def test_patient_situation_clarify_telemetry_in_turn_details() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        from core.patient_situation import detect_patient_situation, record_patient_situation_ctx
+
+        request.ctx = {}
+        record_patient_situation_ctx(detect_patient_situation("пустое место сбоку"))
+        details = metadata_first_turn_details()
+        assert details["patient_situation_kind"] == "unknown"
+        assert details["patient_situation_should_clarify"] is True
+        assert details["patient_situation_clarify_question"]
+        assert details["patient_situation_clarification_reason"] == "vague_location"

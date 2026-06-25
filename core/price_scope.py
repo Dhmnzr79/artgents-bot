@@ -9,13 +9,20 @@ import threading
 from dataclasses import dataclass
 from typing import Literal
 
-from config import PRICE_LOOKUP_RE
+from core.patient_scope_cues import (
+    ALL_ON_4_ONLY_RX,
+    ALL_ON_6_ONLY_RX,
+    IMPLANT_PRICE_RX,
+    ONE_STAGE_PRICE_RX,
+    ONE_TOOTH_EXPLICIT_RX,
+    ONE_TOOTH_SITUATION_RX,
+    PROSTHETIC_STAGE_RX,
+    PTERYGOID_RX,
+    ZYGOMATIC_RX,
+    has_price_intent,
+    is_one_tooth_situation_cue,
+)
 from core.price_offers import (
-    _ALL_ON_4_ONLY_RX,
-    _ALL_ON_6_ONLY_RX,
-    _IMPLANT_PRICE_RX,
-    _ONE_STAGE_PRICE_RX,
-    _ONE_TOOTH_EXPLICIT_RX,
     is_full_jaw_implant_price_query,
     is_generic_implant_price_query,
     is_one_stage_price_query,
@@ -32,21 +39,6 @@ PriceScopeKind = Literal[
     "specific_protocol",
     "prosthetic_stage",
 ]
-
-_SCOPE_PRICE_RX = re.compile(
-    r"(цена|стоимост|сколько\s+сто(?:ит|ят)|прайс|расценк|по\s+цене|сколько\s+будет|сколько\s+руб|сколько\s+обойд)",
-    re.I | re.U,
-)
-_ZYGOMATIC_RX = re.compile(r"скулов\w*|zygomatic", re.I | re.U)
-_PTERYGOID_RX = re.compile(r"птеригоид\w*|pterygoid", re.I | re.U)
-_ONE_TOOTH_SITUATION_RX = re.compile(
-    r"нет\s+одн\w+\s+зуб|восстанов\w*\s+один\s+зуб|один\s+зуб\s+имплант",
-    re.I | re.U,
-)
-_PROSTHETIC_STAGE_RX = re.compile(
-    r"уже\s+стоит\s+имплант|имплант\s+уже|коронк\w*\s+на\s+имплант",
-    re.I | re.U,
-)
 
 _CACHE_LOCK = threading.Lock()
 _UNIT_CACHE: dict[str, dict[str, str | None]] = {}
@@ -89,45 +81,43 @@ def _load_service_units(client_id: str | None) -> dict[str, str | None]:
     return units
 
 
-def _service_ids_with_units(client_id: str | None, units: frozenset[str]) -> frozenset[str]:
+def service_ids_with_default_units(
+    client_id: str | None, units: frozenset[str]
+) -> frozenset[str]:
     mapping = _load_service_units(client_id)
     return frozenset(sid for sid, unit in mapping.items() if unit in units)
 
 
-def _jaw_arch_service_ids(client_id: str | None) -> frozenset[str]:
-    jaw = _service_ids_with_units(client_id, frozenset({"jaw"}))
+def default_unit_for_service(client_id: str | None, service_id: str) -> str | None:
+    return _load_service_units(client_id).get(str(service_id or "").strip())
+
+
+def jaw_arch_service_ids(client_id: str | None) -> frozenset[str]:
+    jaw = service_ids_with_default_units(client_id, frozenset({"jaw"}))
     return jaw | frozenset({"zygomatic_implants", "pterygoid_implants"})
 
 
-def _one_tooth_implant_service_ids(client_id: str | None) -> frozenset[str]:
-    return _service_ids_with_units(client_id, frozenset({"one_tooth"}))
+def one_tooth_implant_service_ids(client_id: str | None) -> frozenset[str]:
+    return service_ids_with_default_units(client_id, frozenset({"one_tooth"}))
 
 
 def _is_prosthetic_stage_price(text: str) -> bool:
-    if not text or not _has_price_intent(text):
+    if not text or not has_price_intent(text):
         return False
-    if not _PROSTHETIC_STAGE_RX.search(text):
+    if not PROSTHETIC_STAGE_RX.search(text):
         return False
     if re.search(r"протезирован|коронк|абатмент", text, re.I | re.U):
         return True
     return bool(re.search(r"сколько|цена|стоим|стоит", text, re.I | re.U))
 
 
-def _is_one_tooth_scope(text: str) -> bool:
-    return bool(_ONE_TOOTH_EXPLICIT_RX.search(text) or _ONE_TOOTH_SITUATION_RX.search(text))
-
-
-def _has_price_intent(text: str) -> bool:
-    return bool(_SCOPE_PRICE_RX.search(text) or PRICE_LOOKUP_RE.search(text))
-
-
 def detect_price_scope(q: str, *, client_id: str | None = None) -> PriceScopeResult:
     text = (q or "").strip()
-    if not text or not _has_price_intent(text):
+    if not text or not has_price_intent(text):
         return PriceScopeResult.none()
 
-    jaw_arch = _jaw_arch_service_ids(client_id)
-    one_tooth_ids = _one_tooth_implant_service_ids(client_id)
+    jaw_arch = jaw_arch_service_ids(client_id)
+    one_tooth_ids = one_tooth_implant_service_ids(client_id)
 
     if _is_prosthetic_stage_price(text):
         blocked = one_tooth_ids | jaw_arch | frozenset({"classic", "one_stage"})
@@ -137,35 +127,35 @@ def detect_price_scope(q: str, *, client_id: str | None = None) -> PriceScopeRes
             blocked_service_ids=blocked - frozenset({"implant_supported_prosthetics"}),
         )
 
-    if is_one_stage_price_query(text) or _ONE_STAGE_PRICE_RX.search(text):
+    if is_one_stage_price_query(text) or ONE_STAGE_PRICE_RX.search(text):
         return PriceScopeResult(
             kind="specific_protocol",
             protocol_service_id="one_stage",
             blocked_service_ids=jaw_arch,
         )
 
-    if _ALL_ON_4_ONLY_RX.search(text) and not _ALL_ON_6_ONLY_RX.search(text):
+    if ALL_ON_4_ONLY_RX.search(text) and not ALL_ON_6_ONLY_RX.search(text):
         return PriceScopeResult(
             kind="specific_protocol",
             protocol_service_id="all_on_4",
             blocked_service_ids=one_tooth_ids,
         )
 
-    if _ALL_ON_6_ONLY_RX.search(text) and not _ALL_ON_4_ONLY_RX.search(text):
+    if ALL_ON_6_ONLY_RX.search(text) and not ALL_ON_4_ONLY_RX.search(text):
         return PriceScopeResult(
             kind="specific_protocol",
             protocol_service_id="all_on_6",
             blocked_service_ids=one_tooth_ids,
         )
 
-    if _ZYGOMATIC_RX.search(text) and _IMPLANT_PRICE_RX.search(text):
+    if ZYGOMATIC_RX.search(text) and IMPLANT_PRICE_RX.search(text):
         return PriceScopeResult(
             kind="specific_protocol",
             protocol_service_id="zygomatic_implants",
             blocked_service_ids=one_tooth_ids | frozenset({"all_on_4", "all_on_6"}),
         )
 
-    if _PTERYGOID_RX.search(text) and _IMPLANT_PRICE_RX.search(text):
+    if PTERYGOID_RX.search(text) and IMPLANT_PRICE_RX.search(text):
         return PriceScopeResult(
             kind="specific_protocol",
             protocol_service_id="pterygoid_implants",
@@ -186,7 +176,7 @@ def detect_price_scope(q: str, *, client_id: str | None = None) -> PriceScopeRes
             blocked_service_ids=one_tooth_ids,
         )
 
-    if _is_one_tooth_scope(text):
+    if is_one_tooth_situation_cue(text):
         return PriceScopeResult(
             kind="one_tooth",
             blocked_service_ids=jaw_arch,

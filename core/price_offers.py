@@ -14,6 +14,19 @@ from contracts.price_brand_aliases import PriceBrandAliasesFile
 from contracts.price_offer import PriceOffer, PriceOfferUnit, PriceOffersFile
 from contracts.pricebook import PricebookServiceEntry
 from core.client_runtime import client_pack_dir
+from core.patient_scope_cues import (
+    ALL_ON_4_ONLY_RX as _ALL_ON_4_ONLY_RX,
+    ALL_ON_6_ONLY_RX as _ALL_ON_6_ONLY_RX,
+    ALL_ON_6_RX as _ALL_ON_6_RX,
+    CROWN_INCLUSION_RX as _CROWN_INCLUSION_RX,
+    FULL_ARCH_RX as _FULL_ARCH_RX,
+    IMPLANT_PRICE_RX as _IMPLANT_PRICE_RX,
+    JAW_EXPLICIT_RX as _JAW_EXPLICIT_RX,
+    JAW_RESTORATION_RX as _JAW_RESTORATION_RX,
+    ONE_STAGE_PRICE_RX as _ONE_STAGE_PRICE_RX,
+    ONE_TOOTH_EXPLICIT_RX as _ONE_TOOTH_EXPLICIT_RX,
+    UPPER_JAW_RX as _UPPER_JAW_RX,
+)
 from core.pricebook_loader import (
     load_pricebook_service,
     offers_from_service_entry,
@@ -25,38 +38,6 @@ _UNIT_BY_SERVICE: dict[str, PriceOfferUnit] = {
     "all_on_4": "jaw",
     "all_on_6": "jaw",
 }
-
-_IMPLANT_PRICE_RX = re.compile(r"имплант|импланат|implant", re.I | re.U)
-_JAW_EXPLICIT_RX = re.compile(
-    r"all[\s-]?on|все\s+на|челюст|весь\s+зубной|полный\s+протез|all-on",
-    re.I | re.U,
-)
-_UPPER_JAW_RX = re.compile(
-    r"верхн\w*\s+челюст|на\s+верхн\w*\s+челюст|сверху",
-    re.I | re.U,
-)
-_JAW_RESTORATION_RX = re.compile(
-    r"в(?:ся|есь)\s+(?:верхн\w*\s+)?челюст|нет\s+зуб|восстанов|все\s+зуб",
-    re.I | re.U,
-)
-_ONE_TOOTH_EXPLICIT_RX = re.compile(
-    r"один\s+(?:зуб|имплант)|1\s+зуб|one\s+tooth|одного\s+зуба|одним\s+зубом|одного\s+импланта",
-    re.I | re.U,
-)
-_FULL_ARCH_RX = re.compile(
-    r"все\s+зуб|вставить\s+все|восстановить\s+все\s+зуб|полностью\s+зуб|весь\s+зубной",
-    re.I | re.U,
-)
-_CROWN_INCLUSION_RX = re.compile(
-    r"коронк\w*.*(?:отдельн|входит|входят)|(?:отдельн|входит|входят).*коронк",
-    re.I | re.U,
-)
-_ONE_STAGE_PRICE_RX = re.compile(
-    r"(?:удал\w*|удален\w*).{0,48}(?:сразу|одномомент|в\s+день).{0,48}имплант|"
-    r"имплант.{0,48}(?:сразу|одномомент).{0,48}удал",
-    re.I | re.U,
-)
-_ALL_ON_6_RX = re.compile(r"all[\s-]?on[\s-]?6|все\s+на\s+6|all-on-6", re.I | re.U)
 
 _CACHE_LOCK = threading.Lock()
 _CACHE: dict[str, list[PriceOffer]] = {}
@@ -161,10 +142,6 @@ def is_generic_implant_price_query(q: str) -> bool:
     if _JAW_EXPLICIT_RX.search(text) or _ONE_TOOTH_EXPLICIT_RX.search(text):
         return False
     return True
-
-
-_ALL_ON_4_ONLY_RX = re.compile(r"all[\s-]?on[\s-]?4|все\s+на\s+4", re.I | re.U)
-_ALL_ON_6_ONLY_RX = re.compile(r"all[\s-]?on[\s-]?6|все\s+на\s+6", re.I | re.U)
 
 
 def _jaw_scope_price_query_common(text: str) -> bool:

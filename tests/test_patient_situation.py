@@ -66,6 +66,12 @@ UNKNOWN_VAGUE_CASES = [
     "помогите",
 ]
 
+BROAD_RESTORE_TOOTH_CASES = [
+    "хочу восстановить зуб",
+    "сколько стоит восстановить зуб",
+    "нужно восстановить зуб",
+]
+
 
 @pytest.mark.parametrize("question", ONE_TOOTH_CASES)
 def test_one_tooth_missing(question: str) -> None:
@@ -129,6 +135,13 @@ def test_generic_implant_interest(question: str) -> None:
     result = detect_patient_situation(question)
     assert result.kind == "generic_implant_interest"
     assert result.patient_scope == "generic"
+
+
+@pytest.mark.parametrize("question", BROAD_RESTORE_TOOTH_CASES)
+def test_broad_restore_tooth_not_full_arch(question: str) -> None:
+    result = detect_patient_situation(question)
+    assert result.kind != "full_arch_missing"
+    assert result.patient_scope != "full_jaw"
 
 
 @pytest.mark.parametrize("question", UNKNOWN_VAGUE_CASES)

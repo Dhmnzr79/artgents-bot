@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.routing_loader import THRESHOLDS
 from core.service_followup import normalize_service_id
 from retriever import chunk_doc_type, load_corpus_if_needed
+
+if TYPE_CHECKING:
+    from core.patient_situation_routing import PatientScopeUnitBias
 
 
 @dataclass(frozen=True)
@@ -179,6 +182,31 @@ def _service_id_confidence_ok(ctx: MetadataRetrievalContext) -> bool:
     )
 
 
+def _patient_scope_unit_adjustment(
+    row: dict,
+    *,
+    bias: Any,
+    client_id: str | None,
+) -> float:
+    from core.price_scope import default_unit_for_service
+
+    sid = _chunk_service_id(row)
+    if not sid:
+        raw = row.get("service_id")
+        sid = normalize_service_id(str(raw or "")) or None
+    if not sid:
+        return 0.0
+    unit = default_unit_for_service(client_id, sid)
+    if not unit:
+        return 0.0
+    ps = THRESHOLDS.patient_situation
+    if unit in bias.preferred_units:
+        return float(ps.unit_match_boost)
+    if unit in bias.penalized_units:
+        return -float(ps.unit_mismatch_penalty)
+    return 0.0
+
+
 def _metadata_boost_bonus(
     row: dict,
     *,
@@ -305,6 +333,7 @@ def apply_metadata_candidate_boosts(
     ctx: MetadataRetrievalContext | None,
     client_id: str | None,
     corpus: list[dict] | None = None,
+    patient_scope_bias: Any | None = None,
 ) -> tuple[list[dict], dict[str, Any]]:
     """Re-rank retrieval candidates with soft metadata boosts; fail-open."""
     tel: dict[str, Any] = {
@@ -313,6 +342,7 @@ def apply_metadata_candidate_boosts(
         "comparison_prefer": False,
         "price_lookup_prefer": False,
         "fallback_used": False,
+        "patient_scope_unit_bias_applied": False,
     }
     if not candidates or ctx is None:
         tel["candidate_pool_after"] = len(candidates)
@@ -349,7 +379,15 @@ def apply_metadata_candidate_boosts(
             price_lookup=price_lookup,
             tel=tel,
         )
-        if bonus > 0:
+        if patient_scope_bias is not None:
+            unit_adj = _patient_scope_unit_adjustment(
+                row, bias=patient_scope_bias, client_id=client_id
+            )
+            if unit_adj != 0.0:
+                bonus += unit_adj
+                tel["patient_scope_unit_bias_applied"] = True
+                tel["patient_scope_bias"] = patient_scope_bias.patient_scope
+        if bonus != 0:
             row["_score"] = base + bonus
             row["_metadata_boost"] = round(bonus, 4)
             tel["metadata_boost_applied"] = True

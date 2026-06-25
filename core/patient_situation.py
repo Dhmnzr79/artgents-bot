@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from config import PRICE_LOOKUP_RE
 from contracts.patient_situation import (
     CueIntent,
     CueQuantity,
@@ -17,77 +16,35 @@ from contracts.patient_situation import (
     PatientSituationSessionContext,
     PatientSituationSource,
 )
-from core.price_offers import (
-    _FULL_ARCH_RX,
-    _JAW_RESTORATION_RX,
-    _ONE_STAGE_PRICE_RX,
-    _ONE_TOOTH_EXPLICIT_RX,
-    _UPPER_JAW_RX,
-)
-from core.price_scope import _ONE_TOOTH_SITUATION_RX, _PROSTHETIC_STAGE_RX
+from core import patient_scope_cues as psc
 
-_PRICE_INTENT_RX = re.compile(
-    r"(цена|стоимост|сколько\s+сто(?:ит|ят)|прайс|расценк|по\s+цене|сколько\s+будет|сколько\s+руб|сколько\s+обойд)",
-    re.I | re.U,
-)
-_CHOOSE_SOLUTION_RX = re.compile(
-    r"(что\s+(?:мне\s+)?подойд|что\s+делать|как\s+лучше|какой\s+вариант|что\s+можно|чем\s+лучше)",
-    re.I | re.U,
-)
-_RESTORE_RX = re.compile(r"восстанов\w*|постав\w*|встав\w*|вернут\w*", re.I | re.U)
-_COMPARE_RX = re.compile(r"сравн|отличи|чем\s+лучше|или\s+лучше", re.I | re.U)
-_DOCTOR_RX = re.compile(r"врач|доктор|хирург|имплантолог", re.I | re.U)
-_WARRANTY_RX = re.compile(r"гарант", re.I | re.U)
-
-_FEW_TEETH_RX = re.compile(
-    r"нескольк\w+\s+зуб|2\s+зуб|3\s+зуб|два\s+зуб|три\s+зуб|не\s+хватает\s+зуб",
-    re.I | re.U,
-)
-_ALL_TEETH_MISSING_RX = re.compile(
-    r"нет\s+зуб\w*\s+вообще|нет\s+всех\s+зуб|без\s+зуб|зубов\s+нет|зубов\s+почти\s+не\s+осталось",
-    re.I | re.U,
-)
-_FULL_JAW_RESTORE_RX = re.compile(
-    r"восстанов\w*\s+(?:всю|всей)\s+челюст|вся\s+челюсть|всю\s+челюсть",
-    re.I | re.U,
-)
-_UPPER_JAW_BONE_RX = re.compile(r"мало\s+кост\w*\s+сверху|кост\w*\s+на\s+верхн", re.I | re.U)
-_EXTRACTED_TOOTH_RX = re.compile(
-    r"удалил\w*|удален\w*|выдернул\w*|шест[её]рк|седьм[её]рк|восьм[её]рк",
-    re.I | re.U,
-)
-_GAP_RX = re.compile(r"промежуток|пустое\s+место|щел|щель|диастем", re.I | re.U)
-_CHEW_SIDE_RX = re.compile(r"нечем\s+жевать|жевать\s+нечем|не\s+могу\s+жевать", re.I | re.U)
-_EXISTING_IMPLANT_RX = re.compile(
-    r"уже\s+(?:стоит|вкручен|установлен)\s+имплант|имплант\s+уже|вкручен\w*\s+имплант",
-    re.I | re.U,
-)
-_CROWN_ON_IMPLANT_RX = re.compile(
-    r"коронк\w*\s+на\s+имплант|протез\s+на\s+имплант\w*|абатмент",
-    re.I | re.U,
-)
-_BONE_DEFICIT_RX = re.compile(
-    r"мало\s+кост|недостат\w*\s+кост|не\s+хватает\s+кост|кост\w*\s+мало",
-    re.I | re.U,
-)
-_SINUS_GRAFT_RX = re.compile(
-    r"синус[\s-]?лифт|костн\w*\s+пластик|наращив\w*\s+кост|без\s+костн\w*\s+пластик",
-    re.I | re.U,
-)
-_EXTRACTION_IMPLANT_RX = re.compile(
-    r"нужно\s+удал|удалить.{0,40}имплант|имплант.{0,40}удалить|сразу\s+после\s+удал",
-    re.I | re.U,
-)
-_URGENT_RX = re.compile(
-    r"болит|боль\s+в\s+зуб|сломал\w*\s+зуб|треснул\w*\s+зуб|срочно|можно\s+сегодня|сегодня\s+можно|от[её]к",
-    re.I | re.U,
-)
-_GENERIC_IMPLANT_RX = re.compile(
-    r"что\s+такое\s+имплант|виды\s+имплант|какие\s+есть\s+имплант|имплантаци\w*\s+—|хочу\s+имплант,\s+с\s+чего",
-    re.I | re.U,
-)
-_IMPLANT_INTEREST_RX = re.compile(r"имплант|имплантаци", re.I | re.U)
-_TOOTH_RX = re.compile(r"зуб", re.I | re.U)
+_CHOOSE_SOLUTION_RX = psc.CHOOSE_SOLUTION_RX
+_RESTORE_RX = psc.RESTORE_RX
+_COMPARE_RX = psc.COMPARE_RX
+_DOCTOR_RX = psc.DOCTOR_RX
+_WARRANTY_RX = psc.WARRANTY_RX
+_FEW_TEETH_RX = psc.FEW_TEETH_RX
+_ALL_TEETH_MISSING_RX = psc.ALL_TEETH_MISSING_RX
+_FULL_JAW_RESTORE_RX = psc.FULL_JAW_RESTORE_RX
+_UPPER_JAW_BONE_RX = psc.UPPER_JAW_BONE_RX
+_EXTRACTED_TOOTH_RX = psc.EXTRACTED_TOOTH_RX
+_GAP_RX = psc.GAP_RX
+_CHEW_SIDE_RX = psc.CHEW_SIDE_RX
+_EXISTING_IMPLANT_RX = psc.EXISTING_IMPLANT_RX
+_CROWN_ON_IMPLANT_RX = psc.CROWN_ON_IMPLANT_RX
+_BONE_DEFICIT_RX = psc.BONE_DEFICIT_RX
+_SINUS_GRAFT_RX = psc.SINUS_GRAFT_RX
+_EXTRACTION_IMPLANT_RX = psc.EXTRACTION_IMPLANT_RX
+_URGENT_RX = psc.URGENT_RX
+_GENERIC_IMPLANT_RX = psc.GENERIC_IMPLANT_RX
+_IMPLANT_INTEREST_RX = psc.IMPLANT_INTEREST_RX
+_TOOTH_RX = psc.TOOTH_RX
+_FULL_ARCH_RX = psc.FULL_ARCH_RX
+_ONE_STAGE_PRICE_RX = psc.ONE_STAGE_PRICE_RX
+_ONE_TOOTH_EXPLICIT_RX = psc.ONE_TOOTH_EXPLICIT_RX
+_UPPER_JAW_RX = psc.UPPER_JAW_RX
+_ONE_TOOTH_SITUATION_RX = psc.ONE_TOOTH_SITUATION_RX
+_PROSTHETIC_STAGE_RX = psc.PROSTHETIC_STAGE_RX
 
 _JAW_ARCH_EXCLUDES = ("all_on_4", "all_on_6", "zygomatic_implants", "pterygoid_implants")
 _ONE_TOOTH_EXCLUDES = _JAW_ARCH_EXCLUDES
@@ -95,7 +52,16 @@ _FULL_JAW_EXCLUDES = ("classic", "one_stage")
 
 
 def _has_price_intent(text: str) -> bool:
-    return bool(_PRICE_INTENT_RX.search(text) or PRICE_LOOKUP_RE.search(text))
+    return psc.has_price_intent(text)
+
+
+def _is_explicit_full_arch_cue(text: str) -> bool:
+    """Full-jaw patient situation — explicit arch cues only (not broad «восстановить»)."""
+    return bool(
+        _ALL_TEETH_MISSING_RX.search(text)
+        or _FULL_ARCH_RX.search(text)
+        or _FULL_JAW_RESTORE_RX.search(text)
+    )
 
 
 def _extract_cues(text: str) -> PatientSituationCues:
@@ -149,7 +115,7 @@ def _extract_cues(text: str) -> PatientSituationCues:
         quantity = "few"
     elif _ALL_TEETH_MISSING_RX.search(text) or _FULL_ARCH_RX.search(text):
         quantity = "all"
-    elif _FULL_JAW_RESTORE_RX.search(text) or _JAW_RESTORATION_RX.search(text):
+    elif _FULL_JAW_RESTORE_RX.search(text):
         quantity = "jaw"
     elif _UPPER_JAW_RX.search(text) or re.search(r"верхн\w*\s+челюст", text, re.I | re.U):
         quantity = "jaw"
@@ -306,16 +272,7 @@ def _resolve_from_cues(
         evidence.append("extraction_then_implant")
         return "extraction_then_implant", 0.9, evidence, False, None, None
 
-    if (
-        _ALL_TEETH_MISSING_RX.search(text)
-        or _FULL_ARCH_RX.search(text)
-        or _FULL_JAW_RESTORE_RX.search(text)
-        or (
-            cues.quantity in {"all", "jaw"}
-            and ("missing" in cues.state or cues.intent in {"restore", "choose_solution"})
-            and "upper_jaw" not in cues.anatomy
-        )
-    ):
+    if _is_explicit_full_arch_cue(text):
         evidence.append("full_arch_missing")
         return "full_arch_missing", 0.92, evidence, False, None, None
 
@@ -448,10 +405,32 @@ def patient_situation_telemetry(result: PatientSituationResult) -> dict[str, Any
 def record_patient_situation_ctx(result: PatientSituationResult) -> None:
     """Write patient situation telemetry to Flask request.ctx (Slice 1 observability)."""
     try:
-        from flask import request
+        from flask import has_request_context, request
     except ImportError:
+        return
+    if not has_request_context():
         return
     if not hasattr(request, "ctx"):
         return
+    request.ctx["patient_situation_result"] = result.model_dump()
     for key, value in patient_situation_telemetry(result).items():
         request.ctx[key] = value
+
+
+def patient_situation_from_ctx() -> PatientSituationResult | None:
+    """Read detection result from request.ctx when already computed this turn."""
+    try:
+        from flask import has_request_context, request
+    except ImportError:
+        return None
+    if not has_request_context():
+        return None
+    if not hasattr(request, "ctx"):
+        return None
+    raw = request.ctx.get("patient_situation_result")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return PatientSituationResult.model_validate(raw)
+    except Exception:
+        return None

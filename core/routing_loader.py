@@ -174,6 +174,16 @@ class FacetArbitrationThresholds(BaseModel):
     min_facet_score: float = Field(..., ge=0.0, le=1.0)
 
 
+class PatientSituationThresholds(BaseModel):
+    """Patient situation soft routing (see docs/TECH_DEBT.md § Patient situation)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_confidence_for_routing: float = Field(..., ge=0.0, le=1.0)
+    unit_match_boost: float = Field(..., ge=0.0, le=0.25)
+    unit_mismatch_penalty: float = Field(..., ge=0.0, le=0.25)
+
+
 class Thresholds(BaseModel):
     """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
@@ -193,6 +203,7 @@ class Thresholds(BaseModel):
     follow_up: FollowUpThresholds
     numeric_fact_gate: NumericFactGateThresholds
     facet_arbitration: FacetArbitrationThresholds
+    patient_situation: PatientSituationThresholds
 
 
 _LOCK = threading.Lock()

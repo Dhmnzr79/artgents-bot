@@ -114,3 +114,9 @@ facet_arbitration:
     - comparison
   min_facet_score: 0.72
 
+# Patient situation router — soft routing gates (Slice 2+)
+patient_situation:
+  min_confidence_for_routing: 0.8
+  unit_match_boost: 0.04
+  unit_mismatch_penalty: 0.06
+

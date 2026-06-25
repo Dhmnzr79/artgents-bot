@@ -32,6 +32,8 @@ from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
 from core.retrieval_rerank import maybe_rerank_top
 from core.routing_loader import THRESHOLDS
 from core.price_scope import PriceScopeResult, detect_price_scope, scope_catalog_excludes, scope_implant_topic
+from core.patient_situation import detect_patient_situation, patient_situation_from_ctx
+from core.patient_situation_routing import merge_price_scope, unit_bias_for_situation
 from core.price_offers import is_crown_inclusion_content_query, is_generic_implant_price_query
 from core.price_followup import (
     is_vague_price_followup,
@@ -227,7 +229,12 @@ def select_chunk_for_question(
     if cands:
         top_semantic_raw = float(cands[0].get("_score") or 0.0)
         cands, boost_tel = apply_metadata_candidate_boosts(
-            cands, ctx=meta_ctx, client_id=client_id
+            cands,
+            ctx=meta_ctx,
+            client_id=client_id,
+            patient_scope_bias=unit_bias_for_situation(
+                patient_situation_from_ctx() or detect_patient_situation(q_policy)
+            ),
         )
         boost_tel["top_semantic_raw"] = round(top_semantic_raw, 4)
     if not cands:
@@ -674,6 +681,9 @@ def select_price_service_route(
         if intent == "price_lookup"
         else PriceScopeResult.none()
     )
+    if intent == "price_lookup":
+        situation = patient_situation_from_ctx() or detect_patient_situation(q)
+        scope = merge_price_scope(scope, situation, client_id=client_id)
     exclude_ids = scope_catalog_excludes(scope)
     topic_hint = scope_implant_topic(scope)
     match: dict | None = None

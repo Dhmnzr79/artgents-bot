@@ -37,7 +37,7 @@
 | **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
 | **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml`; **planner `aspects` ← vague `attribute_followup`** (сейчас «А долго?» → `overview` в planner, `duration` в detector) | **4** — optional |
 | **Price scope router** | ✅ MVP `core/price_scope.py`: mostly **blocklist** по `default_unit` из pricebook (one_tooth vs jaw vs protocol) + group_overview; catalog match внутри scope. **Next:** явные `allowed_service_ids` / `patient_scope` в pricebook schema для multiclient | **3.5** |
-| **Patient situation router** | ✅ Slice 1: `contracts/patient_situation.py` + `core/patient_situation.py` — structured cues + rule-based kind/scope, telemetry в `request.ctx`, **без routing/LLM/session persist**. **Next:** см. § Patient situation ниже | **4** |
+| **Patient situation router** | ✅ Slice 1 telemetry; **Slice 2 (partial):** `patient_scope_cues` + `patient_situation_routing` — soft unit bias в retrieval, `merge_price_scope` для price (pricebook `default_unit`, не contract hints). **Next:** см. § Patient situation | **4** |
 | **Metadata soft filter v2 (aspect-aware exempt)** | см. § Metadata soft filter ниже | **retrieval 2.0** |
 
 ---
@@ -71,7 +71,7 @@
 | Правило | Суть |
 |---------|------|
 | **No hardcode from hints** | `exclude_service_ids` / `preferred_service_ids` / `preferred_groups` в контракте — **telemetry/заготовка**. Slice 2: влияние только через `patient_scope` + `price_scope` / `default_unit` / pricebook + **soft** boost/filter в candidate pool. Запрещено: `if kind == X → service_id Y`. |
-| **Shared cues** | Вынести общие regex/cues из `price_scope.py` / `price_offers.py` / `patient_situation.py` в **`core/patient_scope_cues.py`** (или аналог). Сейчас частичное дублирование + импорт private `_ONE_TOOTH_*` из соседних модулей. |
+| **Shared cues** | ✅ `core/patient_scope_cues.py` — общие regex для `price_scope` / `price_offers` / `patient_situation`. Slice 2: soft unit bias в `candidate_builder` + `merge_price_scope` (не из contract hints). |
 | **Session persistence** | Отдельный slice: carry `patient_situation` для vague follow-up («А сколько стоит?» после «нет одного зуба») — см. `drafts/INCIDENT_classic_vs_all_on4_price.md`. |
 | **LLM fallback** | Bounded classifier по фиксированному enum kind — после стабилизации rules + eval. |
 | **Urgent slice** | `urgent_problem` + `next_best_action=urgent_booking` — **только telemetry** в Slice 1. Не подключать к `flow_handlers` / booking. Cues вроде «можно сегодня?» слишком широкие — отдельный urgent slice с ужесточёнными правилами и safety review. |

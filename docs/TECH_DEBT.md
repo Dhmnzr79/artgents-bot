@@ -36,6 +36,7 @@
 | **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
 | **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
 | **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml`; **planner `aspects` ← vague `attribute_followup`** (сейчас «А долго?» → `overview` в planner, `duration` в detector) | **4** — optional |
+| **Price scope router** | ✅ MVP `core/price_scope.py`: mostly **blocklist** по `default_unit` из pricebook (one_tooth vs jaw vs protocol) + group_overview; catalog match внутри scope. **Next:** явные `allowed_service_ids` / `patient_scope` в pricebook schema для multiclient | **3.5** |
 | **Metadata soft filter v2 (aspect-aware exempt)** | см. § Metadata soft filter ниже | **retrieval 2.0** |
 
 ---

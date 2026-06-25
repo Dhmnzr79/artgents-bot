@@ -31,13 +31,8 @@ from core.client_config_loader import resolve_pack_client_id
 from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
 from core.retrieval_rerank import maybe_rerank_top
 from core.routing_loader import THRESHOLDS
-from core.price_offers import (
-    is_crown_inclusion_content_query,
-    is_generic_implant_price_query,
-    is_one_stage_price_query,
-    resolve_implant_group_overview,
-    should_offer_unit_clarify,
-)
+from core.price_scope import PriceScopeResult, detect_price_scope, scope_catalog_excludes, scope_implant_topic
+from core.price_offers import is_crown_inclusion_content_query, is_generic_implant_price_query
 from core.price_followup import (
     is_vague_price_followup,
     is_weak_catalog_price_token_match,
@@ -673,18 +668,37 @@ def select_price_service_route(
         return {"mode": "other", "intent": intent}
     if is_crown_inclusion_content_query(q):
         return {"mode": "other", "intent": "other"}
-    match = match_service_from_catalog(q, client_id=client_id)
-    if intent == "price_lookup" and is_one_stage_price_query(q):
+
+    scope = (
+        detect_price_scope(q, client_id=client_id)
+        if intent == "price_lookup"
+        else PriceScopeResult.none()
+    )
+    exclude_ids = scope_catalog_excludes(scope)
+    topic_hint = scope_implant_topic(scope)
+    match: dict | None = None
+
+    if intent == "price_lookup" and scope.protocol_service_id:
         catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
-        one_stage_svc = catalog.get("one_stage") if isinstance(catalog.get("one_stage"), dict) else None
-        if one_stage_svc:
+        proto = catalog.get(scope.protocol_service_id)
+        if isinstance(proto, dict):
             match = {
-                "matched_service_id": "one_stage",
-                "service": one_stage_svc,
+                "matched_service_id": scope.protocol_service_id,
+                "service": proto,
                 "match_score": 1.0,
                 "is_confident": True,
             }
-    group_id = resolve_implant_group_overview(q) if intent == "price_lookup" else None
+
+    if match is None:
+        match = match_service_from_catalog(
+            q,
+            client_id=client_id,
+            exclude_service_ids=exclude_ids if exclude_ids else None,
+            service_topic=topic_hint,
+            topic_confidence=0.9 if topic_hint else 0.0,
+        )
+
+    group_id = scope.group_id if intent == "price_lookup" else None
     if intent == "price_lookup" and group_id:
         overview_match = (
             match_catalog_for_implant_group_overview(q, client_id=client_id)

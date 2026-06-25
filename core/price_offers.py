@@ -229,15 +229,9 @@ def is_one_stage_price_query(q: str) -> bool:
 
 
 def resolve_implant_group_overview(q: str) -> str | None:
-    if is_one_stage_price_query(q):
-        return None
-    if is_upper_jaw_restoration_price_query(q):
-        return "upper_jaw"
-    if is_full_jaw_implant_price_query(q):
-        return "full_jaw"
-    if is_generic_implant_price_query(q):
-        return "implantation"
-    return None
+    from core.price_scope import detect_price_scope
+
+    return detect_price_scope(q).group_id
 
 
 def should_offer_unit_clarify(q: str, match: dict[str, Any]) -> bool:

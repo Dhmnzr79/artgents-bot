@@ -18,6 +18,7 @@ from core.price_offers import (
     render_price_offers_append,
     variants_are_brand_based,
 )
+from core.marketing_policy import filter_promo_facts
 from core.pricebook_loader import load_pricebook_service, resolve_fact_refs
 
 AspectKind = Literal["includes", "excludes", "stages", "overview"]
@@ -210,6 +211,20 @@ def assemble_price_answer(
             meta["pricebook_promo_applied"] = True
 
     facts = resolve_fact_refs(client_id, list(entry.fact_refs), usable_in="price_answer")
+    facts, promo_decisions = filter_promo_facts(
+        client_id=client_id,
+        facts=facts,
+        service_id=service_id,
+        route="price_lookup",
+        aspect=aspect or "overview",
+    )
+    if promo_decisions:
+        applied = [d.fact_id for d in promo_decisions if d.allowed]
+        suppressed = {d.fact_id: d.reason for d in promo_decisions if not d.allowed}
+        if applied:
+            meta["marketing_promos_applied"] = applied
+        if suppressed:
+            meta["marketing_promos_suppressed"] = suppressed
     if "fact_refs" in plan.blocks and facts:
         strict_block = _render_strict_facts(facts)
         natural_block = _render_natural_facts(facts)
@@ -271,9 +286,19 @@ def fact_followups_to_quick_replies(
     fact_refs: list[str],
     *,
     usable_in: str = "price_answer",
+    service_id: str | None = None,
+    route: str | None = "price_lookup",
+    aspect: str | None = None,
 ) -> list[dict[str, str]]:
     """Buttons from facts.json (detail_ref + followup_label)."""
     facts = resolve_fact_refs(client_id, fact_refs, usable_in=usable_in)
+    facts, _ = filter_promo_facts(
+        client_id=client_id,
+        facts=facts,
+        service_id=service_id,
+        route=route,
+        aspect=aspect or "overview",
+    )
     out: list[dict[str, str]] = []
     for fact in facts:
         label = str(fact.followup_label or "").strip()
@@ -296,7 +321,13 @@ def merge_price_quick_replies(
     merged: list[dict[str, str]] = []
     for item in (
         followups_to_quick_replies(entry, active_aspect=active_aspect)
-        + fact_followups_to_quick_replies(client_id, list(entry.fact_refs))
+        + fact_followups_to_quick_replies(
+            client_id,
+            list(entry.fact_refs),
+            service_id=entry.service_id,
+            route="price_lookup",
+            aspect=active_aspect or "overview",
+        )
     ):
         ref = str(item.get("ref") or "").strip()
         if not ref or ref in seen:

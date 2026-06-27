@@ -57,6 +57,8 @@ def test_s4_classic_three_brands_and_consult_fact(demo_client):
     assert "консульта" in answer.lower()
     assert meta.get("pricebook_applied") is True
     assert meta.get("price_offers_applied") is True
+    assert "free_implant_consult" in meta.get("marketing_promos_applied", [])
+    assert meta.get("marketing_promos_suppressed") in (None, {})
 
 
 def test_s5_all_on_4_jaw(demo_client):

@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 from datetime import date
+import re
 from typing import Any
 
 from config import TRIGGERS_COMPILED
 from contracts.answer_slots import AnswerSlotKind, AnswerSlotsTelemetry
+from core.marketing_loader import load_marketing_config
 from core.routing_loader import THRESHOLDS
 from query_selector import commercial_info_query
+
+_PROMO_QUERY_RE = re.compile(r"(акци\w*|скидк\w*|промо|спецпредлож\w*)", re.I | re.U)
 
 
 def doc_meta_has_consult_value(meta: dict | None, *, h3_id: str | None = None) -> bool:
@@ -71,7 +75,7 @@ def is_commercial_intent(q: str, route: str | None) -> bool:
     r = (route or "").strip().lower()
     if r == "price_lookup":
         return True
-    return commercial_info_query(q)
+    return commercial_info_query(q) or bool(_PROMO_QUERY_RE.search(q or ""))
 
 
 def is_promo_blocked(
@@ -115,6 +119,16 @@ def _slot_on_cooldown(
     return (next_turn - int(last)) < cooldown_turns
 
 
+def _marketing_text_limit(meta: dict) -> int:
+    cid = meta.get("client_id") if isinstance(meta, dict) else None
+    return load_marketing_config(cid).limits.max_text_ingredients
+
+
+def _slot_priority(kind: AnswerSlotKind) -> int:
+    # Promo is already gated to commercial turns, so it wins when eligible.
+    return {"promo_note": 0, "consult_value": 1, "clinic_note": 2}.get(kind, 99)
+
+
 def assemble_answer_slots(
     *,
     meta: dict,
@@ -128,7 +142,7 @@ def assemble_answer_slots(
     cfg = THRESHOLDS.answer_slots
     fields = _effective_slot_fields(meta, h3_id)
     telemetry = AnswerSlotsTelemetry()
-    paragraphs: list[str] = []
+    candidates: list[tuple[int, AnswerSlotKind, str]] = []
 
     if doc_meta_has_consult_value(meta, h3_id=h3_id):
         telemetry.suppressed["consult_nudge"] = "consult_value_in_doc"
@@ -161,6 +175,16 @@ def assemble_answer_slots(
             continue
         if len(text) > max_chars:
             text = text[: max_chars - 1].rstrip() + "…"
+        candidates.append((len(candidates), kind, text))
+
+    limit = _marketing_text_limit(meta)
+    selected = sorted(candidates, key=lambda item: (_slot_priority(item[1]), item[0]))[:limit]
+    selected_indexes = {idx for idx, _, _ in selected}
+    paragraphs: list[str] = []
+    for idx, kind, text in candidates:
+        if idx not in selected_indexes:
+            telemetry.suppressed[kind] = "text_ingredient_limit"
+            continue
         paragraphs.append(text)
         telemetry.appended.append(kind)
 

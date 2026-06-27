@@ -63,6 +63,30 @@ def test_promo_only_on_commercial_intent():
     assert "Акция" not in text
     assert telemetry.suppressed.get("promo_note") == "not_commercial_intent"
     assert is_commercial_intent("есть рассрочка?", "retrieval_chunk")
+    assert is_commercial_intent("есть акции на All-on-4?", "retrieval_chunk")
+
+
+def test_text_marketing_limit_prefers_eligible_promo():
+    meta = {
+        "doc_id": "implantation__service__all_on_4",
+        "clinic_note": "Клиника планирует по КТ.",
+        "consult_value": "На консультации врач скажет.",
+        "promo_note": {"text": "Акция до конца месяца.", "active_until": "2026-12-31"},
+    }
+    text, telemetry = assemble_answer_slots(
+        meta=meta,
+        h3_id=None,
+        q="есть акции на All-on-4?",
+        route="retrieval_chunk",
+        topic_state={},
+        lead_context=False,
+    )
+
+    assert "Акция" in text
+    assert "КТ" not in text
+    assert telemetry.appended == ["promo_note"]
+    assert telemetry.suppressed.get("clinic_note") == "text_ingredient_limit"
+    assert telemetry.suppressed.get("consult_value") == "text_ingredient_limit"
 
 
 def test_promo_blocked_on_pain_doc():
@@ -99,8 +123,9 @@ def test_cooldown_per_doc(sid):
         topic_state={"doc_turn_count": 0, "slots_last_turn": {}},
         lead_context=False,
     )
-    assert "КТ" in text1
-    assert set(t1.appended) == {"clinic_note", "consult_value"}
+    assert "консультац" in text1
+    assert t1.appended == ["consult_value"]
+    assert t1.suppressed.get("clinic_note") == "text_ingredient_limit"
     record_answer_slots_shown(sid, doc_id, slot_keys=list(t1.appended), turn=1)
 
     tstate = get_topic_state(sid, doc_id)
@@ -112,5 +137,6 @@ def test_cooldown_per_doc(sid):
         topic_state=tstate,
         lead_context=False,
     )
-    assert text2 == ""
-    assert set(t2.skipped_cooldown) == {"clinic_note", "consult_value"}
+    assert "КТ" in text2
+    assert t2.appended == ["clinic_note"]
+    assert t2.skipped_cooldown == ["consult_value"]

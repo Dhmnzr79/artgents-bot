@@ -1,0 +1,74 @@
+version: 1
+
+limits:
+  max_text_ingredients: 1
+  max_cta: 1
+  promo_cooldown_turns: 3
+  proof_cooldown_turns: 3
+
+blocked_aspects_for_promo:
+  - pain
+  - contraindications
+  - safety
+  - complications
+
+service_marketing: {}
+
+promos:
+  free_implant_consult:
+    active: true
+    active_until: "2026-12-31"
+    fact_ref: free_implant_consult
+    allowed_service_ids:
+      - all_on_4
+      - all_on_6
+      - classic
+      - one_stage
+      - pterygoid_implants
+      - sinus_lift
+      - temporary_teeth
+      - zygomatic_implants
+    allowed_routes:
+      - price_lookup
+    allowed_aspects:
+      - overview
+    blocked_aspects:
+      - pain
+      - contraindications
+      - safety
+      - complications
+    cta_key: consult
+
+  implant_same_day_discount:
+    active: true
+    active_until: "2026-12-31"
+    fact_ref: implant_same_day_discount
+    allowed_service_ids:
+      - classic
+      - one_stage
+    allowed_routes:
+      - price_lookup
+    allowed_aspects:
+      - overview
+    blocked_aspects:
+      - pain
+      - contraindications
+      - safety
+      - complications
+
+  all_on_same_day_discount:
+    active: true
+    active_until: "2026-12-31"
+    fact_ref: all_on_same_day_discount
+    allowed_service_ids:
+      - all_on_4
+      - all_on_6
+    allowed_routes:
+      - price_lookup
+    allowed_aspects:
+      - overview
+    blocked_aspects:
+      - pain
+      - contraindications
+      - safety
+      - complications

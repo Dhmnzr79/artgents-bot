@@ -48,6 +48,7 @@
 | 13 | contacts regex overlay | `contacts_chunk` | `ask_turn` + `pick_contacts_chunk` |
 | 14 | A3 `route_source` | см. таблицу A3 ниже | `source_routing` |
 | 15 | fallback `price_lookup` (если intent) | `price_lookup` | `price_flow` / `select_price_service_route` |
+| 15a | content + `patient_playbook` + choose/overview cues | `patient_options_overview` | `patient_playbook.yaml` → synthetic chunk + LLM (приоритеты/roles, не готовый copy) |
 | 16 | content: Resolver `unknown` + clarify | `guided` | `retrieval_flow` |
 | 17 | content: candidates + arbiter | `retrieval_chunk` / `catalog_*` / `guided` / fallbacks | `retrieval_flow`, `content_arbiter` (2+ кандидата → LLM arbiter) |
 
@@ -294,7 +295,7 @@ Per-client: `clients/{id}/features.yaml` — `guide_router.enabled` (Phase 4, с
 | «Нет одного зуба, что лучше?» | `one_tooth_missing` | content: comparison/FAQ; **не** All-on-4 |
 | «Сколько стоит… нет одного зуба?» | `one_tooth_missing` + price intent | `classic` / one_tooth; jaw blocked |
 | content one-tooth → «А сколько стоит?» | session carry | `classic`, не All-on-4 (без `last_subject`) |
-| «Нет зубов вообще» | `full_arch_missing` | протезы / overview; **не** classic one_tooth |
+| «Нет зубов вообще» / «какие варианты восстановить челюсть» | `full_arch_missing` + choose/overview | `patient_options_overview` (playbook: All-on-4/6, съёмный, …); **не** один случайный service doc |
 | full-jaw content → «А что по ценам?» | session carry | `group_overview` / `full_jaw` |
 | «Имплант стоит, сколько коронка?» | `existing_implant_prosthetic_stage` | `implant_supported_prosthetics` |
 | «Мало кости, что делать?» | `bone_deficit_or_grafting` | comparison bone graft; без цены classic surgery |

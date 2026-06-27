@@ -285,9 +285,9 @@
       "id": "risk_ps04_full_jaw_content_not_classic",
       "client_id": "demo",
       "question": "Что делать, если нет зубов вообще?",
-      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_route": "patient_options_overview",
       "forbidden_doc_id": ["implantation__service__classic"],
-      "answer_signals_any": ["протез", "челюст", "зуб"],
+      "answer_signals_all": ["All-on-4", "All-on-6", "съёмн", "консультац"],
       "forbidden_signals": ["76 200", "классическ"],
       "coverage_class": "STRONG"
     },
@@ -302,6 +302,16 @@
       "expected_price_status": "group_overview",
       "expected_pricebook_group_id": "full_jaw",
       "forbidden_service_id": ["classic"],
+      "forbidden_signals": ["76 200"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "risk_ps09_full_jaw_variants_overview",
+      "client_id": "demo",
+      "question": "Нужно восстановить всю челюсть, какие варианты?",
+      "expected_route": "patient_options_overview",
+      "answer_signals_all": ["All-on-4", "All-on-6", "съёмн", "КТ"],
+      "forbidden_doc_id": ["prosthetics__service__removable_dentures"],
       "forbidden_signals": ["76 200"],
       "coverage_class": "STRONG"
     },

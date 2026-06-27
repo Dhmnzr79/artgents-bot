@@ -116,3 +116,6 @@ def test_load_widget_config_merges_demo_logo():
     assert cfg["logoWidth"] == 110
     assert cfg["logoHeight"] == 28
     assert cfg["avatarUrl"] == "/static/clients/demo/avatar.png"
+    assert cfg["theme"]["button_1"] == "#7B4EFF"
+    assert cfg["theme"]["button_2"] == "#FF8DB2"
+    assert "demoLauncherColors" not in cfg

@@ -1,0 +1,32 @@
+# Marketing strategy: patient situation → priority options (not canned patient-facing copy).
+patient_situations:
+  full_arch_missing:
+    max_options: 4
+    primary_cta: ct_consultation
+    strategy: fixed_implant_first
+    answer_style:
+      max_options: 4
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: all_on_4
+        priority: 100
+        role: main_fixed_solution
+        positioning: primary
+        show_when: default
+      - service_id: all_on_6
+        priority: 90
+        role: stronger_fixed_solution
+        positioning: premium_or_more_support
+        show_when: default
+      - service_id: removable_dentures
+        priority: 50
+        role: budget_alternative
+        positioning: budget
+        show_when: default
+      - service_id: zygomatic_implants
+        priority: 40
+        role: complex_upper_jaw
+        positioning: complex_case
+        show_when: bone_deficit_or_upper_jaw

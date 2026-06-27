@@ -179,6 +179,7 @@ def build_ask_response(
         "h3_id": h3_id,
         "score": score,
         "followups": followups,
+        "ui_source_family": "md_navigation",
         "is_overview": bool(is_overview),
         "cta_mode": meta.get("cta_mode"),
         "tags": meta_tags(meta),
@@ -213,13 +214,20 @@ def normalize_policy_payload(payload: dict) -> dict:
         return payload
 
     meta = payload.setdefault("meta", {})
+    try:
+        from policy import infer_ui_source_family
+
+        family = infer_ui_source_family(payload)
+    except Exception:
+        family = str(meta.get("ui_source_family") or "md_navigation").strip().lower()
+
     followups = list(meta.get("followups") or [])
     if len(followups) > 2:
         dropped.append("followups_over_limit")
         meta["followups"] = followups[:2]
 
     refs = list(payload.get("quick_replies") or [])
-    if len(refs) > 1:
+    if family == "md_navigation" and len(refs) > 1:
         dropped.append("suggest_refs_over_limit")
         payload["quick_replies"] = refs[:1]
 
@@ -287,6 +295,7 @@ def low_score_response(sid: str, client_id: str | None = None) -> dict:
             "score": None,
             "followups": [],
             "file": None,
+            "ui_source_family": "guided_fallback",
         },
     )
     if payload.get("cta") is None:
@@ -396,6 +405,7 @@ def build_service_facts_card_payload(
         "match_score": round(float(match_score or 0.0), 4),
         "route_source": "catalog",
         "followups": [],
+        "ui_source_family": "md_navigation",
     }
     meta_out.update(consult_meta)
     return {
@@ -471,6 +481,7 @@ def build_price_lookup_payload(
             "после осмотра назовут сумму по вашей ситуации."
         )) else "price_not_found",
         "followups": [],
+        "ui_source_family": "price_navigation",
     }
     meta.update(offer_meta)
     gate_result = apply_numeric_fact_gate(
@@ -553,6 +564,7 @@ def build_price_aspect_payload(
         "pricebook_aspect": aspect_eff,
         "fallback_reason": None,
         "followups": [],
+        "ui_source_family": "price_navigation",
     }
     meta.update(offer_meta)
     gate_result = apply_numeric_fact_gate(
@@ -599,6 +611,7 @@ def build_price_group_overview_payload(
         "fallback_reason": "price_implant_overview",
         "price_status": "group_overview",
         "followups": [],
+        "ui_source_family": "price_navigation",
     }
     meta.update(overview_meta)
     return {
@@ -644,6 +657,7 @@ def build_price_unit_clarify_payload(
             "fallback_reason": "price_implant_overview",
             "price_status": "group_overview",
             "followups": [],
+            "ui_source_family": "price_navigation",
         },
     }
 
@@ -679,6 +693,7 @@ def build_price_concern_payload(
             "price_ref": (service or {}).get("price_ref"),
             "fallback_reason": None,
             "followups": [],
+            "ui_source_family": "price_navigation",
         },
     }
 
@@ -792,6 +807,7 @@ def build_price_resolution_payload(
             "price_status": price_status,
             "content_snippet_source": snippet_source,
             "followups": [],
+            "ui_source_family": "price_navigation",
         },
     }
 

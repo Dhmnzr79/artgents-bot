@@ -344,6 +344,16 @@ def validate_smoke_case(
             coverage_class=cov,
         )
 
+    answer_signals_all = str_list_field(row, "answer_signals_all")
+    missing_all = [x for x in answer_signals_all if x and not contains_ci(answer, x)]
+    if missing_all:
+        return CaseResult(
+            case_id=case_id,
+            status="FAIL",
+            reason=f"answer_signals_all missing: {missing_all[:4]!r}",
+            coverage_class=cov,
+        )
+
     must_match_any_regex = str_list_field(row, "must_match_any_regex")
     if must_match_any_regex:
         if not any(re.search(pat, answer, re.IGNORECASE) for pat in must_match_any_regex):

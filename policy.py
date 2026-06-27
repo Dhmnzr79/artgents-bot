@@ -157,6 +157,160 @@ def _is_topic_exhausted(doc_meta: dict, topic_state: dict) -> bool:
     return covered.issuperset(set(suggest_h3))
 
 
+UI_FAMILY_MD = "md_navigation"
+UI_FAMILY_PRICE = "price_navigation"
+UI_FAMILY_PATIENT_OPTIONS = "patient_options"
+UI_FAMILY_DOCTOR = "doctor_navigation"
+UI_FAMILY_GUIDED_FALLBACK = "guided_fallback"
+
+_UI_FAMILIES = {
+    UI_FAMILY_MD,
+    UI_FAMILY_PRICE,
+    UI_FAMILY_PATIENT_OPTIONS,
+    UI_FAMILY_DOCTOR,
+    UI_FAMILY_GUIDED_FALLBACK,
+}
+_PRICE_UI_ROUTES = {"price_lookup", "price_concern", "price_aspect", "price_clarify"}
+_PRICE_UI_INTENTS = {"price_lookup", "price_concern"}
+
+
+def _payload_route(payload: dict, route: str | None = None) -> str:
+    if route:
+        return str(route).strip().lower()
+    meta = payload.get("meta") if isinstance(payload, dict) else {}
+    if not isinstance(meta, dict):
+        return ""
+    return str(meta.get("service_route") or meta.get("orch_route") or "").strip().lower()
+
+
+def infer_ui_source_family(payload: dict, route: str | None = None) -> str:
+    """Classify which subsystem owns navigation controls for this answer."""
+    meta = payload.get("meta") if isinstance(payload, dict) else {}
+    if not isinstance(meta, dict):
+        meta = {}
+    explicit = str(meta.get("ui_source_family") or "").strip().lower()
+    if explicit in _UI_FAMILIES:
+        return explicit
+
+    route_eff = _payload_route(payload, route)
+    intent = str(meta.get("intent") or "").strip().lower()
+    if route_eff == "patient_options_overview" or meta.get("patient_options_overview_used"):
+        return UI_FAMILY_PATIENT_OPTIONS
+    if route_eff in _PRICE_UI_ROUTES or intent in _PRICE_UI_INTENTS:
+        return UI_FAMILY_PRICE
+    if route_eff == "doctors_list":
+        return UI_FAMILY_DOCTOR
+    if meta.get("low_score") or meta.get("offtopic") or meta.get("error"):
+        return UI_FAMILY_GUIDED_FALLBACK
+    return UI_FAMILY_MD
+
+
+def _is_price_ref(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
+    return str(item.get("ref") or "").strip().lower().startswith("price:")
+
+
+def _merge_policy_decision_meta(meta: dict, details: dict) -> None:
+    current = meta.get("policy_decision")
+    if not isinstance(current, dict):
+        current = {}
+    current.update(details)
+    meta["policy_decision"] = current
+
+
+def apply_ui_source_policy(payload: dict, route: str | None = None) -> dict:
+    """Keep quick replies/follow-ups owned by one UI source only."""
+    if not isinstance(payload, dict):
+        return payload
+    meta = payload.setdefault("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
+        payload["meta"] = meta
+
+    family_in = str(meta.get("ui_source_family") or "").strip().lower() or None
+    family = infer_ui_source_family(payload, route=route)
+    route_eff = _payload_route(payload, route)
+    quick_before = list(payload.get("quick_replies") or [])
+    followups_before = list(meta.get("followups") or [])
+    dropped: list[str] = []
+
+    if family == UI_FAMILY_PRICE:
+        if followups_before:
+            dropped.append("followups_non_price_ui")
+        meta["followups"] = []
+    elif family == UI_FAMILY_PATIENT_OPTIONS:
+        filtered = [item for item in quick_before if _is_price_ref(item)]
+        if len(filtered) != len(quick_before):
+            dropped.append("quick_replies_non_patient_options")
+        if followups_before:
+            dropped.append("followups_non_patient_options")
+        payload["quick_replies"] = filtered
+        meta["followups"] = []
+    elif family == UI_FAMILY_DOCTOR:
+        if quick_before:
+            dropped.append("quick_replies_non_doctor_ui")
+        if followups_before:
+            dropped.append("followups_non_doctor_ui")
+        payload["quick_replies"] = []
+        meta["followups"] = []
+    elif family == UI_FAMILY_GUIDED_FALLBACK:
+        if followups_before:
+            dropped.append("followups_guided_fallback")
+        meta["followups"] = []
+
+    meta["ui_source_family"] = family
+    _merge_policy_decision_meta(
+        meta,
+        {
+            "ui_source_family_in": family_in,
+            "ui_source_family_effective": family,
+            "ui_source_route": route_eff,
+            "quick_replies_before_ui_source_policy": len(quick_before),
+            "followups_before_ui_source_policy": len(followups_before),
+            "ui_source_dropped": dropped,
+        },
+    )
+    return payload
+
+
+def _apply_cta_gate_only(
+    payload: dict,
+    session_state: dict,
+    q: str,
+    *,
+    session_id: str | None = None,
+    client_id: str | None = None,
+) -> dict:
+    meta = payload.setdefault("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
+        payload["meta"] = meta
+
+    lead_flow_active = is_lead_context(session_state)
+    booking = booking_intent(q, sid=session_id, client_id=client_id)
+    show_cta = bool(payload.get("cta")) and not lead_flow_active and not bool(
+        (session_state or {}).get("situation_pending")
+    )
+    if show_cta and booking:
+        show_cta = False
+
+    dropped: list[str] = []
+    if payload.get("cta") and not show_cta:
+        dropped.append("cta")
+    payload["cta"] = payload.get("cta") if show_cta else None
+    _merge_policy_decision_meta(
+        meta,
+        {
+            "show_cta": bool(show_cta),
+            "lead_flow_active": bool(lead_flow_active),
+            "booking": bool(booking),
+            "dropped": dropped,
+        },
+    )
+    return payload
+
+
 def build_policy_decision(
     *,
     payload: dict,
@@ -332,6 +486,17 @@ def apply_response_policy(
 ) -> dict:
     topic_state = topic_state or {}
     doc_meta = doc_meta or {}
+    family = infer_ui_source_family(payload)
+    if family in {UI_FAMILY_PRICE, UI_FAMILY_PATIENT_OPTIONS, UI_FAMILY_DOCTOR, UI_FAMILY_GUIDED_FALLBACK}:
+        _apply_cta_gate_only(
+            payload,
+            session_state,
+            q,
+            session_id=session_id,
+            client_id=client_id,
+        )
+        return apply_ui_source_policy(payload)
+
     decision = build_policy_decision(
         payload=payload,
         session_state=session_state,
@@ -382,4 +547,5 @@ def apply_response_policy(
         "doc_turn_after": decision["doc_turn_after"],
         "cta_from_turn": decision["cta_from_turn"],
     }
+    apply_ui_source_policy(payload)
     return payload

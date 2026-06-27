@@ -8,18 +8,35 @@ const LAUNCHER_TEASER_DELAY_MS = 30000;
 const DEFAULT_LAUNCHER_TEASER_TEXT =
   "Есть вопросы? Задайте их онлайн консультанту.";
 
-const WELCOME_CHAR_MS = 32;
-const WELCOME_STREAM_START_MS = 280;
 const WELCOME_LEAVE_MS = 240;
 const TEXTAREA_MAX_HEIGHT = 112;
 const MOBILE_MAX_WIDTH_PX = 520;
 const SCROLL_NEAR_BOTTOM_PX = 80;
 const TURN_SCROLL_TOP_GAP_PX = 12;
+const SCROLLBAR_IDLE_MS = 900;
 const VIDEO_REVEAL_LABEL = "Посмотреть видео с врачом";
-const TYPING_LABEL_SEARCHING = "Ищет в базе знаний…";
-const TYPING_LABEL_WRITING = "Печатает ответ…";
-/** Минимум показа «Печатает ответ» перед появлением текста в пузыре */
 const TYPING_WRITING_MIN_MS = 200;
+const BOT_SOURCE_ATTRIBUTION = "по материалам клиники";
+const LEAD_ATTRIBUTION_LABEL = "Запись на консультацию";
+
+/** @typedef {'content'|'lead'|'plain'} TurnAttributionKind */
+
+const PLAIN_ATTRIBUTION_ROUTES = new Set([
+  "lead_cancelled",
+  "lead_deferred",
+  "lead_offer_declined",
+  "bare_affirmative",
+  "guided",
+  "continuation_clarify",
+  "duplicate_short_circuit",
+  "booking_flow",
+  "rate_limited",
+  "retrieval_no_candidates",
+  "low_score_fallback",
+  "error",
+  "offtopic",
+  "situation_collect",
+]);
 /** Синхронно с config.BOOKING_INTENT_RE — до ответа сервера не показываем «базу знаний». */
 const BOOKING_INTENT_RE =
   /(?:запишите\s+меня|хочу\s+запис(?:аться|ать)\b|запись\s+на\s+(?:консультац|приём|прием)|остав(?:ить|лю)\s+заявку|(?<!\bкак\s)(?<!\bгде\s)(?<!\bкуда\s)\bзапис(?:аться|ать)\b(?:\s+на\s+(?:консультац|приём|прием))?)/iu;
@@ -31,12 +48,6 @@ const SECRET_SESSION_RESET_TOKEN = "x7k9m2p4";
 const SEND_BTN_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const LINK_CHEVRON_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-function videoPlayIconSvg() {
-  return `<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 26C16.4478 26 19.7544 24.6304 22.1924 22.1924C24.6304 19.7544 26 16.4478 26 13C26 9.55219 24.6304 6.24558 22.1924 3.80761C19.7544 1.36964 16.4478 0 13 0C9.55219 0 6.24558 1.36964 3.80761 3.80761C1.36964 6.24558 0 9.55219 0 13C0 16.4478 1.36964 19.7544 3.80761 22.1924C6.24558 24.6304 9.55219 26 13 26ZM12.2769 8.398C12.0321 8.23472 11.7477 8.14094 11.4538 8.12667C11.16 8.1124 10.8678 8.17816 10.6084 8.31695C10.349 8.45575 10.1321 8.66235 9.98095 8.91474C9.82978 9.16712 9.74996 9.45581 9.75 9.75V16.25C9.74996 16.5442 9.82978 16.8329 9.98095 17.0853C10.1321 17.3376 10.349 17.5443 10.6084 17.683C10.8678 17.8218 11.16 17.8876 11.4538 17.8733C11.7477 17.8591 12.0321 17.7653 12.2769 17.602L17.1519 14.352C17.3744 14.2036 17.5569 14.0026 17.6831 13.7667C17.8093 13.5309 17.8754 13.2675 17.8754 13C17.8754 12.7325 17.8093 12.4691 17.6831 12.2333C17.5569 11.9974 17.3744 11.7964 17.1519 11.648L12.2769 8.398Z" fill="currentColor"/></svg>`;
-}
-
-const CTA_CHAT_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></svg>`;
 
 const CTA_CALENDAR_SVG = `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.75"/><path d="M8 3v4M16 3v4M3 10h18" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>`;
 
@@ -54,7 +65,7 @@ function _rgbCss(rgb) {
   return `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
 }
 
-/** Light tint for frame gradient (mix brand with white). */
+/** Light tint for composer/capsule (mix brand with white). */
 function _mixHexWithWhite(hex, whiteRatio) {
   const rgb = _hexToRgb(hex);
   if (!rgb) return "";
@@ -119,16 +130,7 @@ function applyWidgetTheme(shellEl, theme) {
     shellEl.style.setProperty("--clinic-bubble-user", `rgba(${rgb}, 0.12)`);
     shellEl.style.setProperty("--clinic-shadow", `0 8px 32px rgba(${rgb}, 0.14)`);
     shellEl.style.setProperty("--clinic-shadow-soft", `0 4px 16px rgba(${rgb}, 0.1)`);
-    shellEl.style.setProperty(
-      "--clinic-shadow-panel",
-      `0 24px 60px rgba(${rgb}, 0.16), 0 8px 24px rgba(${rgb}, 0.08)`
-    );
-    shellEl.style.setProperty(
-      "--clinic-surface-inset",
-      `inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 10px 30px rgba(${rgb}, 0.08)`
-    );
     shellEl.style.setProperty("--clinic-bg-tint", _mixHexWithWhite(brand, 0.96));
-    shellEl.style.setProperty("--clinic-bg-tint-deep", _mixHexWithWhite(brand, 0.92));
     shellEl.style.setProperty("--clinic-composer-bg", _mixHexWithWhite(brand, 0.97));
     shellEl.style.setProperty("--clinic-composer-border", `rgba(${rgb}, 0.18)`);
     shellEl.style.setProperty("--clinic-composer-focus-border", `rgba(${rgb}, 0.42)`);
@@ -145,38 +147,6 @@ function applyWidgetTheme(shellEl, theme) {
       `0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(${argb}, 0.32)`
     );
   }
-}
-
-/**
- * Демо-CTA: отдельные CSS-переменные на shell (не inline на кнопке, не button_1/2 чата).
- * @param {HTMLElement | null} shell
- * @param {Record<string, unknown>} config
- */
-function applyDemoLauncherTheme(shell, config) {
-  if (!shell || !config || typeof config !== "object") return;
-  const pack =
-    config.demoLauncherColors && typeof config.demoLauncherColors === "object"
-      ? config.demoLauncherColors
-      : null;
-  const theme =
-    config.theme && typeof config.theme === "object" ? config.theme : null;
-  const from = String(
-    /** @type {{ from?: unknown }} */ (pack)?.from ||
-      /** @type {{ button_1?: unknown }} */ (theme)?.button_1 ||
-      ""
-  ).trim();
-  const to = String(
-    /** @type {{ to?: unknown }} */ (pack)?.to ||
-      /** @type {{ button_2?: unknown }} */ (theme)?.button_2 ||
-      ""
-  ).trim();
-  if (!from || !to) return;
-  shell.style.setProperty("--clinic-demo-cta-from", from);
-  shell.style.setProperty("--clinic-demo-cta-to", to);
-  const rgb1 = _hexToRgb(from);
-  const rgb2 = _hexToRgb(to);
-  if (rgb1) shell.style.setProperty("--clinic-demo-cta-from-rgb", _rgbCss(rgb1));
-  if (rgb2) shell.style.setProperty("--clinic-demo-cta-to-rgb", _rgbCss(rgb2));
 }
 
 /** @param {string | undefined} apiBase @param {string | undefined} path */
@@ -220,7 +190,7 @@ function fillWelcomeLogo(logoWrap, logoEl, config) {
 function fillHeaderStatus(el, config) {
   const clinicName = String(config.clinicName || "").trim() || "клиники";
   el.textContent = "";
-  el.appendChild(document.createTextNode(`ИИ-консультант ${clinicName}. `));
+  el.appendChild(document.createTextNode(`ИИ-консультант ${clinicName} `));
   const badge = document.createElement("span");
   badge.className = "clinic-shell__header-status-badge";
   badge.textContent = "24/7";
@@ -342,6 +312,8 @@ function botTurnFromPayload(data) {
     situation: sit ? { show: Boolean(sit.show), mode: sit.mode || "normal" } : null,
     cta,
     trailingDismissed: false,
+    attributionKind: resolveTurnAttributionKind(meta),
+    serviceRoute: String(meta.service_route || ""),
   };
 }
 
@@ -355,27 +327,6 @@ function dismissLinksAll(messages) {
   for (const m of messages) {
     if (m.role === "bot") m.linksDismissed = true;
   }
-}
-
-/**
- * @param {string} avatarUrl
- * @returns {HTMLElement}
- */
-function createBotAvatarEl(avatarUrl) {
-  const wrap = document.createElement("div");
-  wrap.className = "clinic-row__avatar-wrap";
-  const av = document.createElement("img");
-  av.className = "clinic-row__avatar";
-  av.src = avatarUrl;
-  av.alt = "";
-  av.width = 38;
-  av.height = 38;
-  const dot = document.createElement("span");
-  dot.className = "clinic-row__avatar-online";
-  dot.setAttribute("aria-hidden", "true");
-  wrap.appendChild(av);
-  wrap.appendChild(dot);
-  return wrap;
 }
 
 /** @returns {boolean} */
@@ -394,28 +345,140 @@ function autoResizeTextarea(textarea) {
     textarea.scrollHeight > TEXTAREA_MAX_HEIGHT ? "auto" : "hidden";
 }
 
+/** @param {string} [botName] */
+function displayBotName(botName) {
+  const name = String(botName || "").trim();
+  return name || "Бот";
+}
+
+/** @param {string} [botName] */
+function botSourceAttributionLabel(botName) {
+  return `${displayBotName(botName)} · ${BOT_SOURCE_ATTRIBUTION}`;
+}
+
+/** @param {"searching"|"writing"} phase @param {string} [botName] */
+function typingStatusLabel(phase, botName) {
+  const name = displayBotName(botName);
+  return phase === "writing"
+    ? `${name} печатает ответ`
+    : `${name} ищет в базе знаний`;
+}
+
+/** @param {unknown} meta */
+function isLeadFlowBotMeta(meta) {
+  if (!meta || typeof meta !== "object" || !meta.lead_flow) return false;
+  const step = String(meta.lead_step || "");
+  return Boolean(step && step !== "done");
+}
+
 /**
- * Создаёт «живую» bubble в feed перед typing-wrap и скрывает typing indicator.
+ * @param {Record<string, unknown>} [body]
+ * @param {unknown} lastPayload
+ */
+function isLeadFlowAskBody(body, lastPayload) {
+  if (body?.cta_action === "lead") return true;
+  const ref = String(body?.ref || "");
+  if (ref.startsWith("lead:")) return true;
+  return isActiveLeadFlowPayload(lastPayload);
+}
+
+/** @returns {HTMLElement} */
+function createLeadAttributionEl() {
+  const el = document.createElement("div");
+  el.className = "clinic-msg__attribution clinic-msg__attribution--lead";
+  const icon = document.createElement("span");
+  icon.className = "clinic-msg__attribution-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.innerHTML = CTA_CALENDAR_SVG;
+  const text = document.createElement("span");
+  text.className = "clinic-msg__attribution-text";
+  text.textContent = LEAD_ATTRIBUTION_LABEL;
+  el.appendChild(icon);
+  el.appendChild(text);
+  return el;
+}
+
+/** @param {string} route */
+function isPlainAttributionRoute(route) {
+  const r = String(route || "").trim();
+  if (!r) return false;
+  if (PLAIN_ATTRIBUTION_ROUTES.has(r)) return true;
+  return r.startsWith("ingress_");
+}
+
+/** @param {unknown} meta @returns {TurnAttributionKind} */
+function resolveTurnAttributionKind(meta) {
+  if (isLeadFlowBotMeta(meta)) return "lead";
+  if (meta && typeof meta === "object") {
+    if (meta.offtopic) return "plain";
+    if (meta.situation_collect) return "plain";
+    const route = String(meta.service_route || "");
+    if (isPlainAttributionRoute(route)) return "plain";
+  }
+  return "content";
+}
+
+/**
+ * @param {Record<string, unknown>} [body]
+ * @param {unknown} lastPayload
+ * @returns {TurnAttributionKind}
+ */
+function predictLiveAttributionKind(body, lastPayload) {
+  const ref = String(body?.ref || "").trim();
+  if (ref === "lead:cancel") return "plain";
+  if (isLeadFlowAskBody(body, lastPayload)) return "lead";
+  return "content";
+}
+
+/** @param {TurnAttributionKind} kind @param {string} [botName] @returns {HTMLElement} */
+function createAttributionElForKind(kind, botName) {
+  if (kind === "lead") return createLeadAttributionEl();
+  if (kind === "plain") return createPlainAttributionEl(botName);
+  return createBotAttributionEl(botName);
+}
+
+/** @param {string} [botName] @returns {HTMLElement} */
+function createPlainAttributionEl(botName) {
+  const el = document.createElement("div");
+  el.className = "clinic-msg__attribution clinic-msg__attribution--plain";
+  el.textContent = displayBotName(botName);
+  return el;
+}
+
+/** @param {string} [botName] @param {{ attributionKind?: TurnAttributionKind }} [m] @returns {HTMLElement} */
+function createTurnAttributionEl(botName, m) {
+  const kind = m?.attributionKind || "content";
+  return createAttributionElForKind(kind, botName);
+}
+
+/** @param {string} [botName] @returns {HTMLElement} */
+function createBotAttributionEl(botName) {
+  const el = document.createElement("div");
+  el.className = "clinic-msg__attribution";
+  el.textContent = botSourceAttributionLabel(botName);
+  return el;
+}
+
+/**
+ * Создаёт «живой» ответ в feed перед typing-wrap и скрывает typing indicator.
  * Вызывается лениво — только при первом text_delta.
  * @param {HTMLElement} feed
- * @param {string} resolvedAvatarUrl
- * @returns {HTMLElement} row — корневой элемент bubble
+ * @param {string} [botName]
+ * @param {TurnAttributionKind} [attributionKind]
+ * @returns {HTMLElement} bubble
  */
-function _createLiveBubble(feed, resolvedAvatarUrl) {
+function _createLiveBubble(feed, botName, attributionKind = "content") {
   const typingWrap = feed.querySelector(".clinic-shell__typing-wrap");
-  const row = document.createElement("div");
-  row.className = "clinic-row clinic-row--bot";
-  row.setAttribute("data-live-bubble", "");
   const bubble = document.createElement("div");
   bubble.className = "clinic-msg clinic-msg--bot clinic-msg--bot--streaming";
+  bubble.setAttribute("data-live-bubble", "");
+  bubble.appendChild(createAttributionElForKind(attributionKind, botName));
   const body = document.createElement("div");
   body.className = "clinic-msg__body";
   bubble.appendChild(body);
-  row.appendChild(createBotAvatarEl(resolvedAvatarUrl));
-  row.appendChild(bubble);
-  feed.insertBefore(row, typingWrap);
+  feed.insertBefore(bubble, typingWrap);
   if (typingWrap) typingWrap.classList.remove("is-visible");
-  return row;
+  return bubble;
 }
 
 /**
@@ -438,6 +501,28 @@ function getChatScroller(feedEl) {
     node = node.parentElement;
   }
   return feed.closest(".clinic-shell__main");
+}
+
+/**
+ * Скроллбар: на десктопе полоска 2px, место в layout всегда; цвет ползунка — только при scroll.
+ * @param {HTMLElement | null} scroller
+ */
+function bindTransientChatScrollbar(scroller) {
+  if (!scroller || scroller.dataset.clinicScrollbarBound === "1") return;
+  scroller.dataset.clinicScrollbarBound = "1";
+  scroller.classList.add("clinic-chat-scrollbar");
+  let hideTimer = 0;
+  scroller.addEventListener(
+    "scroll",
+    () => {
+      scroller.classList.add("is-scrolling");
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => {
+        scroller.classList.remove("is-scrolling");
+      }, SCROLLBAR_IDLE_MS);
+    },
+    { passive: true }
+  );
 }
 
 /**
@@ -490,8 +575,8 @@ function scrollToLastTurnStart(feedEl) {
   }
 }
 
-function _updateLiveBubble(row, text, feed) {
-  const body = row.querySelector(".clinic-msg__body");
+function _updateLiveBubble(bubble, text, feed) {
+  const body = bubble.querySelector(".clinic-msg__body");
   if (body) setBotAnswerBody(body, text);
   scrollChatPaneToEnd(feed);
 }
@@ -566,8 +651,6 @@ export function mountWidget(root, config) {
     unread: false,
     started: false,
     errorLine: "",
-    welcomeAnimActive: false,
-    welcomeStreamDone: false,
   };
 
   /** @type {Record<string, { src: string, title: string }>} */
@@ -622,97 +705,6 @@ export function mountWidget(root, config) {
       });
     }
     return catalogFetchPromise;
-  }
-
-  let welcomeStreamTimer = 0;
-
-  function prefersReducedMotion() {
-    return (
-      typeof matchMedia !== "undefined" &&
-      matchMedia("(prefers-reduced-motion: reduce)").matches
-    );
-  }
-
-  function clearWelcomeStream() {
-    if (welcomeStreamTimer) {
-      clearTimeout(welcomeStreamTimer);
-      welcomeStreamTimer = 0;
-    }
-  }
-
-  /**
-   * @param {HTMLParagraphElement} textP
-   * @param {HTMLElement} textBody
-   * @param {HTMLElement} cursor
-   * @param {HTMLElement} card
-   */
-  function finishWelcomeStream(textP, card) {
-    clearWelcomeStream();
-    state.welcomeAnimActive = false;
-    state.welcomeStreamDone = true;
-    textP.classList.remove("is-typing");
-    textP.classList.add("is-done");
-    card.classList.remove("is-streaming");
-  }
-
-  /**
-   * @param {HTMLParagraphElement} textP
-   * @param {HTMLElement} textBody
-   * @param {HTMLElement} card
-   * @param {number} [startAt]
-   */
-  function startWelcomeTextStream(textP, textBody, card, startAt = 0) {
-    const full = String(config.welcomeText || "").trim();
-    clearWelcomeStream();
-    state.welcomeAnimActive = true;
-    textP.classList.remove("is-done");
-    textP.classList.add("is-typing");
-    card.classList.add("is-streaming");
-
-    if (prefersReducedMotion() || !full) {
-      textBody.textContent = full;
-      finishWelcomeStream(textP, card);
-      return;
-    }
-
-    let i = Math.min(Math.max(0, startAt), full.length);
-    textBody.textContent = full.slice(0, i);
-
-    if (i >= full.length) {
-      finishWelcomeStream(textP, card);
-      return;
-    }
-
-    const step = () => {
-      welcomeStreamTimer = 0;
-      if (state.started || !state.isOpen) return;
-      if (i < full.length) {
-        textBody.textContent = full.slice(0, i + 1);
-        i += 1;
-        welcomeStreamTimer = window.setTimeout(step, WELCOME_CHAR_MS);
-      } else {
-        finishWelcomeStream(textP, card);
-      }
-    };
-    welcomeStreamTimer = window.setTimeout(step, WELCOME_STREAM_START_MS);
-  }
-
-  function maybeStartWelcomeStream() {
-    if (!state.isOpen || state.started || state.welcomeStreamDone || state.welcomeAnimActive) {
-      return;
-    }
-    const textP = feed.querySelector(".clinic-shell__welcome-text");
-    const textBody = feed.querySelector(".clinic-shell__welcome-text-body");
-    const card = feed.querySelector(".clinic-shell__welcome-card");
-    if (!textP || !textBody || !card) return;
-
-    const full = String(config.welcomeText || "").trim();
-    const startAt = (textBody.textContent || "").length;
-    if (startAt >= full.length && full.length > 0) {
-      finishWelcomeStream(textP, card);
-      return;
-    }
-    startWelcomeTextStream(textP, textBody, card, startAt);
   }
 
   const useDemoLauncher = config.demoLauncher !== false;
@@ -774,46 +766,39 @@ export function mountWidget(root, config) {
       </button>
       ${launcherHtml}
       <div class="clinic-shell__panel" id="clinic-panel" role="dialog" aria-modal="true" aria-label="Чат" data-clinic-panel>
-        <div class="clinic-shell__frame">
-          <div class="clinic-shell__surface">
-            <main class="clinic-shell__main" aria-label="Сообщения">
-              <header class="clinic-shell__header clinic-shell__header--glass">
-              <div class="clinic-shell__header-main">
-                <div class="clinic-shell__header-avatar">
-                  <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--header" data-clinic-header-fb>
-                    <img class="clinic-shell__avatar-fallback-img" alt="" width="48" height="48" data-clinic-header-avatar />
-                  </span>
-                  <span class="clinic-shell__header-online-dot" aria-hidden="true"></span>
-                </div>
-                <div class="clinic-shell__header-text">
-                  <span class="clinic-shell__header-name" data-clinic-header-name></span>
-                  <span class="clinic-shell__header-status" data-clinic-header-online></span>
-                </div>
+        <main class="clinic-shell__main" aria-label="Сообщения">
+          <header class="clinic-shell__header clinic-shell__header--glass">
+            <div class="clinic-shell__header-main">
+              <div class="clinic-shell__header-avatar">
+                <span class="clinic-shell__avatar-fallback clinic-shell__avatar-fallback--header" data-clinic-header-fb>
+                  <img class="clinic-shell__avatar-fallback-img" alt="" width="48" height="48" data-clinic-header-avatar />
+                </span>
+                <span class="clinic-shell__header-online-dot" aria-hidden="true"></span>
               </div>
-              <div class="clinic-shell__header-actions">
-                <button type="button" class="clinic-shell__header-close clinic-btn-icon clinic-btn-ghost" data-clinic-close title="Свернуть" aria-label="Свернуть чат">✕</button>
+              <div class="clinic-shell__header-text">
+                <span class="clinic-shell__header-name" data-clinic-header-name></span>
+                <span class="clinic-shell__header-status" data-clinic-header-online></span>
               </div>
-            </header>
-              <div class="clinic-shell__feed" data-clinic-feed></div>
-            </main>
-            <form class="clinic-shell__composer" data-clinic-composer-form>
-              <div class="clinic-shell__error" data-clinic-err hidden></div>
-              <div class="clinic-shell__composer-inner">
-                <textarea class="clinic-shell__textarea" rows="1" data-clinic-input placeholder="Введите сообщение" aria-label="Введите сообщение"></textarea>
-                <button type="submit" class="clinic-btn-send" data-clinic-send disabled aria-label="Отправить сообщение">${SEND_BTN_SVG}</button>
-              </div>
-            </form>
+            </div>
+            <div class="clinic-shell__header-actions">
+              <button type="button" class="clinic-shell__header-close clinic-btn-icon clinic-btn-ghost" data-clinic-close title="Свернуть" aria-label="Свернуть чат">✕</button>
+            </div>
+          </header>
+          <div class="clinic-shell__feed" data-clinic-feed></div>
+        </main>
+        <form class="clinic-shell__composer" data-clinic-composer-form>
+          <div class="clinic-shell__error" data-clinic-err hidden></div>
+          <div class="clinic-shell__composer-inner">
+            <textarea class="clinic-shell__textarea" rows="1" data-clinic-input placeholder="Введите сообщение" aria-label="Введите сообщение"></textarea>
+            <button type="submit" class="clinic-btn-send" data-clinic-send disabled aria-label="Отправить сообщение">${SEND_BTN_SVG}</button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   `;
 
   const shell = root.querySelector("[data-clinic-root]");
   applyWidgetTheme(shell, config.theme);
-  if (useDemoLauncher) {
-    applyDemoLauncherTheme(shell, config);
-  }
   const launcher = root.querySelector("[data-clinic-launcher]");
   const launcherOpenBtn = root.querySelector("[data-clinic-launcher-open]");
   const launcherControl = launcherOpenBtn || launcher;
@@ -829,6 +814,9 @@ export function mountWidget(root, config) {
   if (launcher) launcher.setAttribute("aria-label", launcherMobileCtaLabel);
   const panel = root.querySelector("[data-clinic-panel]");
   const feed = root.querySelector("[data-clinic-feed]");
+  const chatMain = root.querySelector(".clinic-shell__main");
+  bindTransientChatScrollbar(chatMain);
+  bindTransientChatScrollbar(feed);
   const input = root.querySelector("[data-clinic-input]");
   const sendBtn = root.querySelector("[data-clinic-send]");
   const composerForm = root.querySelector("[data-clinic-composer-form]");
@@ -929,6 +917,20 @@ export function mountWidget(root, config) {
   }
 
   /**
+   * @param {HTMLElement} bubble
+   * @returns {HTMLElement}
+   */
+  function getOrCreateLinksBox(bubble) {
+    let box = bubble.querySelector(".clinic-msg__links");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "clinic-msg__links";
+      bubble.appendChild(box);
+    }
+    return box;
+  }
+
+  /**
    * Кнопка «Посмотреть видео…» или плеер после нажатия.
    * @param {HTMLElement} bubble
    * @param {object} m
@@ -943,18 +945,19 @@ export function mountWidget(root, config) {
       return;
     }
 
+    const box = getOrCreateLinksBox(bubble);
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "clinic-msg__link clinic-msg__video-reveal";
+    btn.className = "clinic-msg__link";
     const lab = document.createElement("span");
     lab.className = "clinic-msg__link-text";
     lab.textContent = VIDEO_REVEAL_LABEL;
-    const play = document.createElement("span");
-    play.className = "clinic-msg__video-play";
-    play.setAttribute("aria-hidden", "true");
-    play.innerHTML = videoPlayIconSvg();
+    const chev = document.createElement("span");
+    chev.className = "clinic-msg__link-chevron";
+    chev.setAttribute("aria-hidden", "true");
+    chev.innerHTML = LINK_CHEVRON_SVG;
     btn.appendChild(lab);
-    btn.appendChild(play);
+    btn.appendChild(chev);
     btn.setAttribute("aria-label", VIDEO_REVEAL_LABEL);
     btn.addEventListener("click", () => {
       const target = state.messages[msgIndex];
@@ -962,7 +965,7 @@ export function mountWidget(root, config) {
       target.videoRevealed = true;
       renderFeed();
     });
-    bubble.appendChild(btn);
+    box.appendChild(btn);
   }
 
   /**
@@ -988,6 +991,7 @@ export function mountWidget(root, config) {
       situation: null,
       cta: null,
       trailingDismissed: false,
+      attributionKind: "plain",
     });
     renderFeed();
   }
@@ -1074,14 +1078,11 @@ export function mountWidget(root, config) {
 
   function resetSession() {
     if (state.pending) return;
-    clearWelcomeStream();
     clearStoredSid();
     state.messages = [];
     state.lastPayload = null;
     state.typingPhase = "searching";
     state.started = false;
-    state.welcomeAnimActive = false;
-    state.welcomeStreamDone = false;
     state.unread = false;
     unreadDot?.classList.remove("is-visible");
     setError("");
@@ -1110,7 +1111,6 @@ export function mountWidget(root, config) {
     if (state.isOpen) return;
     setOpen(true);
     renderFeed();
-    maybeStartWelcomeStream();
   }
 
   /** @type {number} */
@@ -1192,17 +1192,13 @@ export function mountWidget(root, config) {
         unlockHostPageScroll();
         unbindMobileViewportListeners();
       }
-      if (state.welcomeAnimActive) {
-        clearWelcomeStream();
-        state.welcomeAnimActive = false;
-      }
       launcherControl?.focus();
     }
   }
 
   /** @returns {string} */
   function typingLabelForPhase(phase) {
-    return phase === "writing" ? TYPING_LABEL_WRITING : TYPING_LABEL_SEARCHING;
+    return typingStatusLabel(phase, config.botName);
   }
 
   function fillTypingLabel(labelWrap, text) {
@@ -1267,15 +1263,15 @@ export function mountWidget(root, config) {
 
   /**
    * @param {HTMLElement} feed
-   * @param {string} resolvedAvatarUrl
    * @param {string} apiBase
    * @param {Record<string, unknown>} body
    */
-  function runStreamAsk(feed, resolvedAvatarUrl, apiBase, body) {
+  function runStreamAsk(feed, apiBase, body) {
     let liveBubble = null;
     let fullText = "";
     let uiData = null;
     let writingRevealTimer = 0;
+    const liveAttributionKind = predictLiveAttributionKind(body, state.lastPayload);
 
     const revealLiveBubble = () => {
       if (writingRevealTimer) {
@@ -1283,7 +1279,7 @@ export function mountWidget(root, config) {
         writingRevealTimer = 0;
       }
       if (!liveBubble && fullText.length > 0) {
-        liveBubble = _createLiveBubble(feed, resolvedAvatarUrl);
+        liveBubble = _createLiveBubble(feed, config.botName, liveAttributionKind);
         _updateLiveBubble(liveBubble, fullText, feed);
       } else if (liveBubble) {
         _updateLiveBubble(liveBubble, fullText, feed);
@@ -1354,6 +1350,7 @@ export function mountWidget(root, config) {
             situation: null,
             cta: null,
             trailingDismissed: false,
+            attributionKind: liveAttributionKind,
           });
         }
         endPendingRequest();
@@ -1401,8 +1398,7 @@ export function mountWidget(root, config) {
     }
     if (!items.length) return;
 
-    const box = document.createElement("div");
-    box.className = "clinic-msg__links";
+    const box = getOrCreateLinksBox(bubble);
     for (const it of items) {
       if (!it.ref) continue;
       const btn = document.createElement("button");
@@ -1426,7 +1422,6 @@ export function mountWidget(root, config) {
       });
       box.appendChild(btn);
     }
-    bubble.appendChild(box);
   }
 
   /**
@@ -1445,7 +1440,7 @@ export function mountWidget(root, config) {
       const sb = document.createElement("button");
       sb.type = "button";
       sb.className = "clinic-turn__btn clinic-turn__btn--cta-secondary";
-      sb.innerHTML = `<span class="clinic-turn__btn-icon">${CTA_CHAT_SVG}</span><span class="clinic-turn__btn-label">Рассказать о ситуации</span><span class="clinic-turn__btn-spacer" aria-hidden="true"></span>`;
+      sb.textContent = "Рассказать о ситуации";
       sb.addEventListener("click", () => {
         dismissTrailingsAll(state.messages);
         dismissLinksAll(state.messages);
@@ -1472,8 +1467,7 @@ export function mountWidget(root, config) {
       c.type = "button";
       c.className = "clinic-turn__btn clinic-turn__btn--cta-primary";
       const ctaLabel = (m.cta.text || "Записаться на консультацию").trim();
-      c.innerHTML = `<span class="clinic-turn__btn-icon">${CTA_CALENDAR_SVG}</span><span class="clinic-turn__btn-label"></span><span class="clinic-turn__btn-spacer" aria-hidden="true"></span>`;
-      c.querySelector(".clinic-turn__btn-label").textContent = ctaLabel;
+      c.textContent = ctaLabel;
       c.addEventListener("click", () => {
         dismissTrailingsAll(state.messages);
         dismissLinksAll(state.messages);
@@ -1494,14 +1488,10 @@ export function mountWidget(root, config) {
 
   function renderFeed() {
     const prevWelcome = feed.querySelector(".clinic-shell__welcome-screen");
-    const keepWelcome = prevWelcome && !state.started && !state.welcomeStreamDone;
+    const keepWelcome = prevWelcome && !state.started;
 
     if (keepWelcome && prevWelcome) {
       prevWelcome.remove();
-    } else if (!state.started) {
-      clearWelcomeStream();
-      state.welcomeAnimActive = false;
-      state.welcomeStreamDone = false;
     }
 
     feed.textContent = "";
@@ -1539,20 +1529,13 @@ export function mountWidget(root, config) {
       textP.className = "clinic-shell__welcome-text";
       const textBody = document.createElement("span");
       textBody.className = "clinic-shell__welcome-text-body";
-      const cursor = document.createElement("span");
-      cursor.className = "clinic-shell__stream-cursor";
-      cursor.setAttribute("aria-hidden", "true");
+      textBody.textContent = String(config.welcomeText || "").trim();
+      textP.classList.add("is-done");
       textP.appendChild(textBody);
-      textP.appendChild(cursor);
       lead.appendChild(textP);
-
-      const wave = document.createElement("div");
-      wave.className = "clinic-shell__welcome-wave";
-      wave.setAttribute("aria-hidden", "true");
 
       card.appendChild(logoWrap);
       card.appendChild(lead);
-      card.appendChild(wave);
 
       const actions = document.createElement("div");
       actions.className = "clinic-shell__welcome-actions";
@@ -1599,11 +1582,6 @@ export function mountWidget(root, config) {
       screen.appendChild(card);
       screen.appendChild(actions);
       feed.appendChild(screen);
-
-      if (state.welcomeStreamDone) {
-        textBody.textContent = String(config.welcomeText || "").trim();
-        textP.classList.add("is-done");
-      }
     }
 
     state.messages.forEach((m, idx) => {
@@ -1621,8 +1599,8 @@ export function mountWidget(root, config) {
       const wrap = document.createElement("div");
       wrap.className = "clinic-turn";
 
-      const row = document.createElement("div");
-      row.className = "clinic-row clinic-row--bot";
+      wrap.appendChild(createTurnAttributionEl(config.botName, m));
+
       const bubble = document.createElement("div");
       bubble.className = "clinic-msg clinic-msg--bot";
       const text = String(m.text || "").trim();
@@ -1634,9 +1612,7 @@ export function mountWidget(root, config) {
       }
       appendVideoOffer(bubble, m, idx);
       renderInlineLinks(bubble, m, idx);
-      row.appendChild(createBotAvatarEl(resolvedAvatarUrl));
-      row.appendChild(bubble);
-      wrap.appendChild(row);
+      wrap.appendChild(bubble);
       renderTrail(wrap, m, idx);
       feed.appendChild(wrap);
     });
@@ -1644,7 +1620,6 @@ export function mountWidget(root, config) {
     const typingWrap = document.createElement("div");
     typingWrap.className = "clinic-shell__typing-wrap";
     fillTypingLabel(typingLabel, typingLabelForPhase(state.typingPhase));
-    typingWrap.appendChild(createBotAvatarEl(resolvedAvatarUrl));
     typingWrap.appendChild(typing);
     typingWrap.classList.toggle("is-visible", state.pending);
     feed.appendChild(typingWrap);
@@ -1673,7 +1648,6 @@ export function mountWidget(root, config) {
     welcome.classList.add("is-leaving");
     window.setTimeout(() => {
       state.started = true;
-      clearWelcomeStream();
       done();
     }, WELCOME_LEAVE_MS);
   }
@@ -1704,7 +1678,6 @@ export function mountWidget(root, config) {
       } else {
         if (!state.started) {
           state.started = true;
-          clearWelcomeStream();
         }
         applyUserEcho();
       }
@@ -1721,7 +1694,7 @@ export function mountWidget(root, config) {
 
     setError("");
     beginPendingRequest(body);
-    await runStreamAsk(feed, resolvedAvatarUrl, apiBase, body);
+    await runStreamAsk(feed, apiBase, body);
   }
 
   async function sendFromComposer() {
@@ -1757,7 +1730,7 @@ export function mountWidget(root, config) {
       const sid = getSid();
       const askBody = { client_id: clientId, sid, q };
       beginPendingRequest(askBody);
-      await runStreamAsk(feed, resolvedAvatarUrl, apiBase, askBody);
+      await runStreamAsk(feed, apiBase, askBody);
     };
 
     if (!state.started && feed.querySelector(".clinic-shell__welcome-screen")) {
@@ -1768,7 +1741,6 @@ export function mountWidget(root, config) {
     }
     if (!state.started) {
       state.started = true;
-      clearWelcomeStream();
     }
     await runSend();
   }
@@ -1824,7 +1796,6 @@ export function mountWidget(root, config) {
     launcher.addEventListener("click", () => {
       setOpen(!state.isOpen);
       renderFeed();
-      if (state.isOpen) maybeStartWelcomeStream();
     });
   }
 

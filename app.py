@@ -57,7 +57,8 @@ from orchestration.finalize_turn import finalize_ask
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from orchestration.resolver_turn import run_resolver_turn
 from orchestration.route_guards import resolve_client_ip
-from ux_builder import internal_error_response, reset_session_response
+from policy import apply_ui_source_policy
+from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
 
 
 def _enqueue_v5_resolver_trace(
@@ -201,6 +202,8 @@ def _service_reply(
             pmeta.get("consult_nudge"),
             str(payload.get("answer") or ""),
         )
+    payload = apply_ui_source_policy(payload, route=route)
+    payload = normalize_policy_payload(payload)
     answer = (payload.get("answer") or "").strip()
     turn_meta = None
     if track_user and (q or "").strip():

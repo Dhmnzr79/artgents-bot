@@ -19,6 +19,7 @@ from core.patient_situation_session import (
     resolve_patient_situation_for_turn,
 )
 from core.price_offers import is_crown_inclusion_content_query
+from orchestration.patient_playbook_flow import try_patient_options_overview
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
 from policy import (
@@ -170,6 +171,18 @@ def orchestrate_routing_after_resolver(
             return price_fb
 
     if intent == "content" or md_catalog_priority_ref:
+        playbook_result = try_patient_options_overview(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            intent=intent,
+            decision=decision,
+            situation=situation,
+            md_catalog_priority_ref=md_catalog_priority_ref,
+            decision_frame=decision_frame,
+        )
+        if playbook_result is not None:
+            return playbook_result
         return run_content_arbiter_path(
             q=q,
             sid=sid,

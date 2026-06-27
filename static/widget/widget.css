@@ -34,36 +34,27 @@
 
 /* Токены виджета (префикс .clinic-shell — не засоряем страницу-хост; палитра — drafts/widget_design.md) */
 .clinic-shell {
-  --clinic-radius-widget: 30px;
-  --clinic-radius-surface: 22px;
-  --clinic-frame-padding: 12px;
+  --clinic-radius-widget: 10px;
   --clinic-space-x: 28px;
-  --clinic-radius-lg: 16px;
+  --clinic-radius-lg: 10px;
   --clinic-radius-md: 12px;
   --clinic-radius-sm: 999px;
   /* Палитра: brand (заливки) + action (интерактив на белом); clients/{id}/brand.yaml */
   --clinic-brand: #6952e8;
-  --clinic-button-1: #6952e8;
-  --clinic-button-2: #bd35d8;
-  --clinic-button-2-rgb: 189, 53, 216;
+  --clinic-button-1: #7b4eff;
+  --clinic-button-2: #ff8db2;
+  --clinic-button-1-rgb: 123, 78, 255;
+  --clinic-button-2-rgb: 255, 141, 178;
   --clinic-gradient-cta: linear-gradient(130deg, var(--clinic-button-1) 0%, var(--clinic-button-2) 100%);
-  --clinic-video-play: #e02424;
   --clinic-action: #4a3ba8;
   --clinic-action-hover: #3f328f;
   --clinic-brand-rgb: 105, 82, 232;
   --clinic-action-rgb: 74, 59, 168;
   --clinic-shadow: 0 8px 32px rgba(var(--clinic-brand-rgb), 0.14);
   --clinic-shadow-soft: 0 4px 16px rgba(var(--clinic-brand-rgb), 0.1);
-  --clinic-shadow-panel: 0 24px 60px rgba(var(--clinic-brand-rgb), 0.16), 0 8px 24px rgba(var(--clinic-brand-rgb), 0.08);
-  --clinic-surface-inset: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 10px 30px rgba(var(--clinic-brand-rgb), 0.08);
   --clinic-bg: #ffffff;
   --clinic-bg-subtle: rgba(var(--clinic-brand-rgb), 0.06);
   --clinic-bg-tint: #f8f6fe;
-  --clinic-bg-tint-deep: #f3effc;
-  --clinic-frame-bg:
-    radial-gradient(circle at 82% 8%, rgba(var(--clinic-brand-rgb), 0.14), transparent 38%),
-    radial-gradient(circle at 8% 72%, rgba(var(--clinic-brand-rgb), 0.09), transparent 40%),
-    linear-gradient(145deg, #ffffff 0%, var(--clinic-bg-tint) 52%, var(--clinic-bg-tint-deep) 100%);
   --clinic-border: rgba(43, 30, 78, 0.1);
   --clinic-text: #211632;
   --clinic-text-soft: #6b6280;
@@ -73,7 +64,6 @@
   --clinic-focus: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(var(--clinic-action-rgb), 0.32);
   --clinic-gradient-online: linear-gradient(135deg, #8af447 0%, #32d33d 48%, #10b83a 100%);
   --clinic-online: #32d33d;
-  --clinic-bubble-bot: rgba(255, 255, 255, 0.88);
   --clinic-bubble-user: rgba(var(--clinic-brand-rgb), 0.12);
   --clinic-line: rgba(43, 30, 78, 0.09);
   --clinic-composer-bg: var(--clinic-bg-tint);
@@ -140,7 +130,7 @@
   box-shadow: var(--clinic-shadow), var(--clinic-focus);
 }
 
-/* Демо-CTA: сиренево-фиолетовая кнопка (--clinic-demo-cta-from/to из widget_config) */
+/* Демо-CTA и send: градиент из brand.yaml (button_1 → button_2) */
 .clinic-shell__launcher.clinic-shell__launcher--demo {
   display: inline-block;
   width: auto;
@@ -149,11 +139,10 @@
   padding: 14px 26px;
   border: none;
   border-radius: 999px;
-  background-color: var(--clinic-demo-cta-from, #6952e8);
-  background-image: linear-gradient(
-    130deg,
-    var(--clinic-demo-cta-from, #6952e8) 0%,
-    var(--clinic-demo-cta-to, #9b4dff) 100%
+  background-color: var(--clinic-button-1, #7b4eff);
+  background-image: var(
+    --clinic-gradient-cta,
+    linear-gradient(130deg, #7b4eff 0%, #ff8db2 100%)
   );
   color: #fff;
   font-family: inherit;
@@ -165,8 +154,8 @@
   white-space: nowrap;
   cursor: pointer;
   box-shadow:
-    0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
-    0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22);
+    0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
+    0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22);
   transition:
     transform 0.16s ease,
     box-shadow 0.16s ease,
@@ -181,8 +170,8 @@
   transform: translateY(-1px);
   filter: brightness(1.05);
   box-shadow:
-    0 14px 32px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.44),
-    0 6px 16px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.28);
+    0 14px 32px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.44),
+    0 6px 16px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.28);
 }
 
 .clinic-shell__launcher--demo:active {
@@ -193,8 +182,8 @@
 .clinic-shell__launcher--demo:focus-visible {
   outline: none;
   box-shadow:
-    0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
-    0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22),
+    0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
+    0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22),
     var(--clinic-focus);
 }
 
@@ -271,18 +260,6 @@
 .clinic-shell__unread--launcher {
   top: 14px;
   right: 14px;
-}
-
-/* Свернутый виджет: белый центр + градиентная «рамка» как у .clinic-shell__frame */
-.clinic-shell:not(.is-open) .clinic-shell__launcher:not(.clinic-shell__launcher--demo) {
-  border: 3px solid transparent;
-  border-radius: var(--clinic-radius-lg);
-  background-image:
-    linear-gradient(var(--clinic-bg), var(--clinic-bg)),
-    var(--clinic-frame-bg);
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  box-shadow: var(--clinic-shadow-panel);
 }
 
 .clinic-shell__launcher-link {
@@ -440,7 +417,7 @@
   margin-top: 10px;
   border-radius: var(--clinic-radius-widget);
   overflow: hidden;
-  background: transparent;
+  background: var(--clinic-bg);
   border: none;
   box-shadow: none;
 }
@@ -455,52 +432,48 @@
   margin-top: 0;
 }
 
-/* Градиентная подложка + внутренняя «стеклянная» поверхность (макет) */
-.clinic-shell__frame {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  border-radius: var(--clinic-radius-widget);
-  padding: var(--clinic-frame-padding);
-  position: relative;
-  overflow: hidden;
-  background: var(--clinic-frame-bg);
-  box-shadow: var(--clinic-shadow-panel);
-  display: flex;
-  flex-direction: column;
-}
-
-.clinic-shell__surface {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  border-radius: var(--clinic-radius-surface);
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  box-shadow: var(--clinic-surface-inset);
-  display: flex;
-  flex-direction: column;
-}
-
 .clinic-shell__main {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.clinic-chat-scrollbar {
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: rgba(var(--clinic-brand-rgb), 0.22) transparent;
+  scrollbar-color: transparent transparent;
 }
 
-.clinic-shell__main::-webkit-scrollbar {
-  width: 4px;
+.clinic-chat-scrollbar.is-scrolling {
+  scrollbar-color: rgba(var(--clinic-brand-rgb), 0.18) transparent;
 }
 
-.clinic-shell__main::-webkit-scrollbar-thumb {
-  background: rgba(var(--clinic-brand-rgb), 0.22);
+.clinic-chat-scrollbar::-webkit-scrollbar {
+  width: 2px;
+}
+
+.clinic-chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.clinic-chat-scrollbar::-webkit-scrollbar-thumb {
   border-radius: 999px;
+  background: transparent;
+}
+
+.clinic-chat-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(var(--clinic-brand-rgb), 0.18);
+}
+
+.clinic-chat-scrollbar::-webkit-scrollbar-button,
+.clinic-chat-scrollbar::-webkit-scrollbar-corner {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .clinic-shell__header {
@@ -647,7 +620,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  /* Прозрачно — виден общий «стеклянный» surface, как под шапкой при скролле */
   background: transparent;
 }
 
@@ -726,55 +698,6 @@
   white-space: pre-line;
 }
 
-.clinic-shell__welcome-text:not(.is-typing):not(.is-done) .clinic-shell__stream-cursor {
-  display: none;
-}
-
-.clinic-shell__stream-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1.1em;
-  margin-left: 6px;
-  vertical-align: -0.12em;
-  border-radius: 999px;
-  background: var(--clinic-brand);
-  animation: clinic-cursor-blink 0.9s steps(2, start) infinite;
-}
-
-.clinic-shell__welcome-wave {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 58px;
-  border-radius: 0;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0.55;
-}
-
-.clinic-shell__welcome-wave::before,
-.clinic-shell__welcome-wave::after {
-  content: "";
-  position: absolute;
-  left: -10%;
-  right: -10%;
-  height: 44px;
-  border-top: 1px solid rgba(var(--clinic-brand-rgb), 0.14);
-  border-radius: 50%;
-}
-
-.clinic-shell__welcome-wave::before {
-  bottom: -20px;
-  transform: none;
-}
-
-.clinic-shell__welcome-wave::after {
-  bottom: -8px;
-  transform: none;
-  opacity: 0.6;
-}
-
 .clinic-shell__welcome-actions {
   width: 100%;
   margin-top: 22px;
@@ -802,47 +725,6 @@
   justify-content: flex-end;
 }
 
-.clinic-row--bot {
-  justify-content: flex-start;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.clinic-row__avatar-wrap {
-  position: relative;
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-}
-
-.clinic-row__avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  border: none;
-  background: var(--clinic-bg-subtle);
-  box-shadow: 0 6px 14px rgba(var(--clinic-brand-rgb), 0.1);
-}
-
-.clinic-row__avatar-online {
-  position: absolute;
-  right: -1px;
-  bottom: 2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--clinic-gradient-online);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
-}
-
-.clinic-row__avatar[hidden],
-.clinic-row__avatar-wrap[hidden] {
-  display: none;
-}
-
 .clinic-msg {
   font-size: 14px;
   white-space: pre-wrap;
@@ -850,9 +732,10 @@
 }
 
 .clinic-msg--user {
-  max-width: 265px;
+  max-width: 290px;
   padding: 13px 18px;
-  line-height: 1.45;
+  font-size: 14.5px;
+  line-height: 1.6;
   font-weight: 400;
   color: var(--clinic-text);
   background: var(--clinic-bubble-user);
@@ -860,26 +743,48 @@
 }
 
 .clinic-msg--bot {
-  max-width: 300px;
-  padding: 22px 22px 18px;
-  line-height: 1.58;
+  width: 100%;
+  max-width: none;
+  padding: 0;
   font-weight: 400;
   color: var(--clinic-text);
-  background: var(--clinic-bubble-bot);
-  border: 1px solid rgba(43, 30, 78, 0.07);
-  border-radius: 0 18px 18px 18px;
-  box-shadow:
-    0 18px 38px rgba(var(--clinic-brand-rgb), 0.06),
-    0 2px 8px rgba(var(--clinic-brand-rgb), 0.03);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  transition:
-    height 0.24s ease,
-    min-height 0.24s ease,
-    padding 0.18s ease;
+}
+
+.clinic-msg__attribution {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 400;
+  color: var(--clinic-text-muted);
+}
+
+.clinic-msg__attribution--lead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clinic-msg__attribution-icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.clinic-msg__attribution-icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
 }
 
 .clinic-msg--bot--streaming {
@@ -887,6 +792,8 @@
 }
 
 .clinic-msg__body {
+  font-size: 14.5px;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -947,40 +854,7 @@
 }
 
 .clinic-msg--has-video {
-  max-width: min(300px, calc(100% - 8px));
-}
-
-.clinic-msg__video-reveal {
-  margin-top: 18px;
-  border-top: 1px solid var(--clinic-line);
-}
-
-.clinic-msg__video-reveal + .clinic-msg__links {
-  margin-top: 0;
-  border-top: none;
-}
-
-.clinic-msg__video-reveal:last-child {
-  border-bottom: 0;
-  padding-bottom: 2px;
-}
-
-.clinic-msg__video-play {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0;
-  background: transparent;
-  color: var(--clinic-video-play);
-}
-
-.clinic-msg__video-play svg {
-  display: block;
-  width: 26px;
-  height: 26px;
+  max-width: 100%;
 }
 
 .clinic-msg__video {
@@ -1047,8 +921,8 @@
   background: transparent;
   color: var(--clinic-action);
   font: inherit;
-  font-size: 14px;
-  line-height: 1.35;
+  font-size: 14.5px;
+  line-height: 1.6;
   font-weight: 400;
   text-align: left;
   cursor: pointer;
@@ -1097,7 +971,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin-bottom: 4px;
+  margin-bottom: 20px;
   scroll-margin-top: 12px;
 }
 
@@ -1135,7 +1009,8 @@
   border: 1px solid var(--clinic-chip-border);
   background: var(--clinic-chip-bg);
   color: var(--clinic-text);
-  font-size: 14px;
+  font-size: 14.5px;
+  line-height: 1.6;
   font-weight: 600;
   text-align: left;
 }
@@ -1153,103 +1028,80 @@
   border: 1px solid var(--clinic-chip-border);
   background: var(--clinic-bg);
   color: var(--clinic-text-muted);
-  font-size: 14px;
+  font-size: 14.5px;
+  line-height: 1.6;
   font-weight: 500;
   text-align: center;
 }
 
-.clinic-turn__btn--cta-secondary,
-.clinic-turn__btn--cta-primary {
+.clinic-turn__btn--cta-secondary {
   height: 56px;
-  border-radius: 14px;
-  border: 0;
-  display: grid;
-  grid-template-columns: 56px 1fr 56px;
+  border-radius: 10px;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 0 16px;
   font-size: 15px;
   line-height: 1;
-  font-weight: 500;
+  font-weight: 400;
+  text-align: center;
   transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease,
     background-color 0.16s ease,
     border-color 0.16s ease;
-}
-
-.clinic-turn__btn--cta-secondary {
-  background: rgba(255, 255, 255, 0.62);
+  background: transparent;
   border: 1px solid var(--clinic-action);
   color: var(--clinic-action);
-  box-shadow: 0 8px 18px rgba(var(--clinic-brand-rgb), 0.08);
+  box-shadow: none;
 }
 
 .clinic-turn__btn--cta-primary {
+  height: 56px;
+  border-radius: 10px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 400;
+  transition: background-color 0.16s ease;
   background: var(--clinic-gradient-cta, var(--clinic-brand));
   color: #fff;
-  box-shadow:
-    0 14px 28px rgba(var(--clinic-brand-rgb), 0.22),
-    0 4px 10px rgba(var(--clinic-brand-rgb), 0.12);
+  box-shadow: none;
+  text-align: center;
 }
 
 .clinic-turn__btn--cta-secondary:hover,
 .clinic-turn__btn--cta-primary:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .clinic-turn__btn--cta-secondary:active,
 .clinic-turn__btn--cta-primary:active {
-  transform: translateY(0);
-}
-
-.clinic-turn__btn-icon {
-  grid-column: 1;
-  justify-self: center;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.clinic-turn__btn-icon svg {
-  width: 24px;
-  height: 24px;
-  display: block;
-}
-
-.clinic-turn__btn-label {
-  grid-column: 2;
-  justify-self: center;
-  text-align: center;
-  font-weight: 500;
-}
-
-.clinic-turn__btn-spacer {
-  grid-column: 3;
+  transform: none;
 }
 
 .clinic-shell__typing-wrap {
   display: none;
   width: 100%;
-  align-items: flex-start;
-  gap: 12px;
   margin-bottom: 20px;
 }
 
 .clinic-shell__typing-wrap.is-visible {
-  display: flex;
+  display: block;
 }
 
 .clinic-shell__typing {
-  max-width: 300px;
-  padding: 16px 20px;
+  width: 100%;
+  max-width: none;
+  padding: 0;
   font-size: 14px;
   line-height: 1.58;
   color: var(--clinic-text-muted);
-  background: var(--clinic-bubble-bot);
-  border: 1px solid rgba(43, 30, 78, 0.07);
-  border-radius: 0 18px 18px 18px;
-  box-shadow: 0 8px 20px rgba(var(--clinic-brand-rgb), 0.08);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .clinic-shell__typing-label {
@@ -1312,7 +1164,7 @@
   min-height: 54px;
   padding: 6px;
   border: 1px solid var(--clinic-composer-border);
-  border-radius: 18px;
+  border-radius: 10px;
   background: var(--clinic-composer-bg);
   transition:
     background-color 0.18s ease,
@@ -1372,11 +1224,10 @@
   display: grid;
   place-items: center;
   align-self: flex-end;
-  box-shadow: 0 10px 22px rgba(var(--clinic-brand-rgb), 0.18);
+  box-shadow: none;
   transition:
     transform 0.16s ease,
     opacity 0.16s ease,
-    box-shadow 0.16s ease,
     filter 0.16s ease;
 }
 
@@ -1396,7 +1247,6 @@
 
 .clinic-btn-send:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 13px 28px rgba(var(--clinic-brand-rgb), 0.24);
   filter: saturate(1.05);
 }
 
@@ -1497,21 +1347,20 @@
   outline-offset: -2px;
 }
 
-@keyframes clinic-cursor-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-
-  46%,
-  100% {
-    opacity: 0;
-  }
-}
-
 @media (max-width: 520px) {
   .clinic-shell {
     transition: none;
+  }
+
+  .clinic-chat-scrollbar {
+    scrollbar-gutter: auto;
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+  }
+
+  .clinic-chat-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 
   .clinic-shell:not(.is-open) {
@@ -1521,9 +1370,6 @@
     --clinic-mobile-launcher-shadow:
       0 8px 26px rgba(var(--clinic-brand-rgb), 0.2),
       0 3px 10px rgba(var(--clinic-brand-rgb), 0.12);
-    --clinic-mobile-launcher-shadow-demo:
-      0 8px 26px rgba(var(--clinic-button-2-rgb), 0.28),
-      0 3px 10px rgba(var(--clinic-button-2-rgb), 0.16);
   }
 
   .clinic-shell:not(.is-open) .clinic-shell__launcher-teaser {
@@ -1590,9 +1436,7 @@
   }
 
   .clinic-shell.is-open.is-mobile-fullscreen {
-    --clinic-frame-padding: 0;
     --clinic-radius-widget: 0;
-    --clinic-radius-surface: 0;
     inset: 0;
     right: 0;
     bottom: 0;
@@ -1613,25 +1457,7 @@
     min-height: 0;
     margin: 0;
     border-radius: 0;
-  }
-
-  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__frame {
-    flex: 1;
-    min-height: 0;
-    padding: 0;
-    border-radius: 0;
     background: var(--clinic-bg);
-    box-shadow: none;
-  }
-
-  .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__surface {
-    flex: 1;
-    min-height: 0;
-    border-radius: 0;
-    background: var(--clinic-bg);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
   }
 
   .clinic-shell.is-open.is-mobile-fullscreen .clinic-shell__main {
@@ -1669,12 +1495,6 @@
     padding-left: calc(15px + env(safe-area-inset-left, 0px));
     padding-right: calc(15px + env(safe-area-inset-right, 0px));
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .clinic-row__avatar-wrap,
-  .clinic-row__avatar {
-    width: 30px;
-    height: 30px;
   }
 }
 
@@ -1722,11 +1542,6 @@
     transform: none;
   }
 
-  .clinic-shell__stream-cursor {
-    animation: none;
-    opacity: 0.85;
-  }
-
   .clinic-shell__typing--shimmer .clinic-shell__typing-label-shine {
     animation: none;
     display: none;
@@ -1739,22 +1554,22 @@
   100% {
     transform: scale(1);
     box-shadow:
-      0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
-      0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22);
+      0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
+      0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22);
   }
 
   88% {
     transform: scale(1.04);
     box-shadow:
-      0 16px 36px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.52),
-      0 8px 20px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.36);
+      0 16px 36px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.52),
+      0 8px 20px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.36);
   }
 
   94% {
     transform: scale(1);
     box-shadow:
-      0 10px 28px rgba(var(--clinic-demo-cta-from-rgb, 105, 82, 232), 0.38),
-      0 4px 12px rgba(var(--clinic-demo-cta-to-rgb, 155, 77, 255), 0.22);
+      0 10px 28px rgba(var(--clinic-button-1-rgb, 123, 78, 255), 0.38),
+      0 4px 12px rgba(var(--clinic-button-2-rgb, 255, 141, 178), 0.22);
   }
 }
 

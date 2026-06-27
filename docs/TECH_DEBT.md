@@ -37,7 +37,7 @@
 | **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
 | **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml`; **planner `aspects` ← vague `attribute_followup`** (сейчас «А долго?» → `overview` в planner, `duration` в detector) | **4** — optional |
 | **Price scope router** | ✅ MVP `core/price_scope.py`: mostly **blocklist** по `default_unit` из pricebook (one_tooth vs jaw vs protocol) + group_overview; catalog match внутри scope. **Next:** явные `allowed_service_ids` / `patient_scope` в pricebook schema для multiclient | **3.5** |
-| **Patient situation router** | ✅ Slice 1–3 + **Slice 4 anchors** (`risk_ps01`…`risk_ps08`). **Next:** real clarify, urgent slice, LLM fallback — см. § Patient situation | **5** |
+| **Patient situation router** | ✅ Slice 1–4 + **Slice 5 playbook** (`patient_options_overview`, demo `patient_playbook.yaml`). **Next:** `one_tooth_missing` playbook, real clarify, urgent slice, LLM fallback — см. § Patient situation | **5** |
 | **Metadata soft filter v2 (aspect-aware exempt)** | см. § Metadata soft filter ниже | **retrieval 2.0** |
 
 ---
@@ -62,7 +62,7 @@
 
 ---
 
-## Patient situation router (Slice 1 → 4)
+## Patient situation router (Slice 1 → 5)
 
 **Контекст (2026-06):** `core/patient_situation.py` — semantic business scope (kind + `patient_scope`), **не** route→file. Slice 1: detection + telemetry only.
 
@@ -73,12 +73,13 @@
 | **No hardcode from hints** | `exclude_service_ids` / `preferred_service_ids` / `preferred_groups` в контракте — **telemetry/заготовка**. Slice 2: влияние только через `patient_scope` + `price_scope` / `default_unit` / pricebook + **soft** boost/filter в candidate pool. Запрещено: `if kind == X → service_id Y`. |
 | **Shared cues** | ✅ `core/patient_scope_cues.py` — общие regex для `price_scope` / `price_offers` / `patient_situation`. Slice 2: soft unit bias в `candidate_builder` + `merge_price_scope` (не из contract hints). |
 | **Session persistence** | ✅ Slice 3: `last_patient_situation` + `patient_situation_turn_age` + age guard; carry на vague price. **Next:** `default_one_tooth_price_service` в pricebook/client config (сейчас demo fallback `classic`). |
-| **Eval anchors** | ✅ Slice 4: `evals/v5/demo/risk.json` → `risk_ps01`…`risk_ps08` (one tooth ≠ All-on-4, full jaw ≠ classic, prosthetic stage, bone, extraction). |
+| **Eval anchors** | ✅ Slice 4: `evals/v5/demo/risk.json` → `risk_ps01`…`risk_ps09`. |
+| **Options playbook** | ✅ Slice 5 (demo): `patient_playbook.yaml` = marketing priority config (strategy, roles, positioning), **не** canned copy; `patient_options_overview` → LLM. **Next:** `one_tooth_missing` playbook; CTA из `primary_cta`. |
 | **LLM fallback** | Bounded classifier по фиксированному enum kind — после стабилизации rules + eval. |
 | **Urgent slice** | `urgent_problem` + `next_best_action=urgent_booking` — **только telemetry** в Slice 1. Не подключать к `flow_handlers` / booking. Cues вроде «можно сегодня?» слишком широкие — отдельный urgent slice с ужесточёнными правилами и safety review. |
 | **Real clarify** | `should_clarify` / `clarify_question` — telemetry; реальный clarify-route — отдельный slice. |
 
-**Telemetry:** `patient_situation_*` + `patient_situation_clarify_question` / `patient_situation_clarification_reason` в `metadata_first_turn_details` / `request.ctx`.
+**Telemetry:** `patient_situation_*` + `patient_options_*` + clarify fields в `metadata_first_turn_details` / `request.ctx`.
 
 ---
 

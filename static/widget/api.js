@@ -61,10 +61,24 @@ export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone
       throw new Error(errMsg);
     }
 
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      if (data && typeof data === "object" && (data.answer || data.meta)) {
+        onUi?.(data);
+        onDone?.();
+      } else {
+        throw new Error("Некорректный ответ сервера");
+      }
+      return;
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let currentEvent = "";
+    let uiReceived = false;
+    let doneReceived = false;
 
     while (true) {
       const { value, done } = await reader.read();
@@ -85,12 +99,22 @@ export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone
               const phase = data.phase === "writing" ? "writing" : "searching";
               onTyping?.(phase);
             } else if (currentEvent === "text_delta") onDelta?.(String(data.delta ?? ""));
-            else if (currentEvent === "ui") onUi?.(data);
-            else if (currentEvent === "done") onDone?.();
+            else if (currentEvent === "ui") {
+              uiReceived = true;
+              onUi?.(data);
+            } else if (currentEvent === "done") {
+              doneReceived = true;
+              onDone?.();
+            }
           } catch { /* ignore malformed SSE data */ }
           currentEvent = "";
         }
       }
+    }
+
+    if (!doneReceived) {
+      if (uiReceived) onDone?.();
+      else onError?.("Не удалось получить ответ");
     }
   } catch (e) {
     onError?.(e instanceof Error ? e.message : "Ошибка сети");

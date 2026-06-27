@@ -207,7 +207,7 @@ Eval: unit — `tests/test_follow_up_*.py`, `tests/test_compatibility_guard.py`;
 
 Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`.
 
-### Patient situation router (Slice 1–3)
+### Patient situation router (Slice 1–4) + options playbook (Slice 5)
 
 **Слой:** `core/patient_situation.py` — semantic business scope (`kind` + `patient_scope`), **не** route→file.
 
@@ -216,10 +216,14 @@ Optional позже: flash rewrite gray zone; `clients/{id}/aspect_routing.yaml`
 | **1** | Detection + telemetry (`patient_situation_*` в `request.ctx` / turn events) |
 | **2** | Soft bias: `patient_scope` → `default_unit` в retrieval (`candidate_builder`) и `merge_price_scope` для price |
 | **3** | Session: `last_patient_situation` + `patient_situation_turn_age` (age guard `routing.yaml` → `patient_situation.max_turn_age`); carry на vague price («А сколько стоит?») без `last_subject` |
+| **4** | E2E risk anchors `risk_ps01`…`risk_ps08` |
+| **5** | **Options playbook:** `clients/{id}/patient_playbook.yaml` + `core/patient_playbook.py` → route `patient_options_overview` (маркетинговые приоритеты 3–4 options → **LLM** формулирует живой ответ; fail-open без playbook). Wiring: `orchestration/ask_turn.py` перед content retrieval. **Не** для price / конкретной услуги. |
+
+**Разделение:** `patient_situation` — что у пациента; `patient_playbook` — какие варианты и в каком порядке показывать (strategy/roles/positioning). Текст ответа пишет LLM по structured context + catalog/pricebook snippets, без готовых абзацев в YAML.
 
 **Не делает:** hard route по contract hints (`preferred_service_ids`); real clarify (`should_clarify` — telemetry); urgent booking.
 
-Eval anchors: `evals/v5/demo/risk.json` → `risk_ps01`…`risk_ps08`; unit — `tests/test_patient_situation*.py`.
+Eval anchors: `evals/v5/demo/risk.json` → `risk_ps01`…`risk_ps09`; unit — `tests/test_patient_situation*.py`, `tests/test_patient_playbook.py`.
 
 ### Planner-lite (этап 4b)
 

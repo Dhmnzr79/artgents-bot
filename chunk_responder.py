@@ -237,6 +237,32 @@ def _merge_price_offer_meta_into_payload(
         payload.setdefault("meta", {}).update(pom)
 
 
+def _apply_patient_playbook_ui(payload: dict, route: str) -> None:
+    """Inject playbook quick replies + telemetry meta after chunk generation."""
+    if route != "patient_options_overview":
+        return
+    try:
+        from flask import has_request_context, request
+    except ImportError:
+        return
+    if not has_request_context() or not hasattr(request, "ctx"):
+        return
+    ctx_qr = request.ctx.get("patient_options_quick_replies")
+    if isinstance(ctx_qr, list) and ctx_qr:
+        payload["quick_replies"] = ctx_qr
+    payload.setdefault("meta", {})["ui_source_family"] = "patient_options"
+    for key in (
+        "patient_options_overview_used",
+        "patient_options_situation_kind",
+        "patient_options_service_ids",
+        "patient_options_source",
+        "patient_options_skipped",
+        "patient_options_strategy",
+    ):
+        if key in request.ctx:
+            payload.setdefault("meta", {})[key] = request.ctx[key]
+
+
 def _apply_answer_slots_and_price_append(
     *,
     answer: str,
@@ -564,6 +590,7 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["orch_route"] = route
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
+    _apply_patient_playbook_ui(payload, route)
     if slot_meta:
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if plan_meta:
@@ -843,6 +870,7 @@ def respond_from_chunk_stream(
         payload.setdefault("meta", {})["orch_route"] = route
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
+    _apply_patient_playbook_ui(payload, route)
     if slot_meta:
         payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if plan_meta:

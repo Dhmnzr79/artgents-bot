@@ -48,15 +48,15 @@ Price / `service_reply` path: ответ часто **полностью determi
 | 11 | **`generator_append_text` merge** | orchestration (`price_flow`, etc.) + `answer_plan` | `merge_deterministic_appends(slots_text, generator_append_text=plan_append)` — **порядок: slots → plan_append** | **Literal** | Price tail | **high** if price in LLM + append | **gate** — см. answer_plan `price_offer` suppress if ₽ in body |
 | 12 | **`consult_nudge` (exhausted / streak)** | `clients/{id}/ui.yaml` → `consult_nudge.*_prompt`; fallback in `client_config_loader` | `plan_consult_nudge` → `meta.consult_nudge` → `llm._consult_nudge_addon` / `generate_facts_card_answer`; **chunk path only** | **LLM instruction** (не готовый абзац) | Consult invite in answer | **high** vs `consult_value` on same chunk; independent of doctors_lookup / playbook / base system | **keep** + strict suppress when `consult_value` on chunk |
 | 13 | **`consult_nudge` feature flag** | `clients/{id}/features.yaml` `consult_nudge.enabled` | `consult_nudge_enabled()` gates planning + prompt addon | Config | — | — | **keep** |
-| 14 | **`features.messaging.free_consultation`** | `clients/{id}/features.yaml` | `core/llm_system_prompt.build_base_system` → `_CONSULT_POLICY_FREE` vs `_NEUTRAL` on **every** Generator call; also `doctors_lookup` | **LLM** (global consult policy) | Consult «бесплатная» claim | **high** vs `consult_value`, facts, consult_nudge | **keep** as client flag; **gate** overlap with literal consult slots |
+| 14 | **`features.messaging.free_consultation`** | `clients/{id}/features.yaml` | Legacy flag; no longer used by base system prompt | — | — | **low** | **remove later** from client features if unused |
 | 15 | **LLM `RESPONSE_FORMAT` / `EMPATHY_ADDON`** | `llm.py` hardcoded | All chunk Generator calls via `build_messages_for_gpt` | **LLM** | Indirect (tone, no fake continuation) | **low** | **keep** in code; not client YAML |
 | 16 | **LLM `facts_card` system** | `llm._FACTS_CARD_SYSTEM` | `ux_builder.build_service_facts_card_payload` when catalog `response_mode: card` | **LLM** from catalog `facts[]` | May add consult via consult_nudge addon | **medium** vs consult_value on md path | **keep**; facts must stay factual |
 | 17 | **Pricebook `intro_text`** | `clients/{id}/pricebook/services/*.json` | `core/price_answer_assembler._complex_intro` / `_template_intro` | **Literal** (or code template if empty) | Price framing | **medium** vs LLM price concern chunk | **rewrite** client intros; **gate** code fallbacks (`all_on_4` template) to pricebook only |
-| 18 | **Pricebook `promo`** | service JSON `{text}` | `_render_promo` in `assemble_price_answer` (`promo_slot` block) | **Literal** | **Promo** | **high** vs md `promo_note` | **gate** — single promo source per route |
+| 18 | **Pricebook `promo`** | service JSON legacy field | Not rendered by assembler; promos should use `facts.json` + `marketing.yaml` `promo_rules` | — | **Promo** | **low** | **remove later** from schema/docs after migration |
 | 19 | **Pricebook `fact_refs` + `facts.json`** | `pricebook/facts.json` (`text_fact`, `render_mode`, `followup_label`, `usable_in`) | `resolve_fact_refs` → strict bullets or natural prose in price answer; `fact_followups_to_quick_replies` | strict=**Literal**; natural=**Literal** (today; comment says LLM later) | Payment/warranty/consult facts | **high** for installment + payment_terms append | **keep** facts central; **gate** `payment_terms` append when facts overlap |
 | 20 | **Pricebook `followups`** | service JSON `followups[]` | `followups_to_quick_replies` / `merge_price_quick_replies` | **Literal** (buttons) | Price navigation | **medium** vs manifest group overview | **keep** |
 | 21 | **Pricebook `recommended` + `includes`/`excludes`** | variant objects in service JSON | `render_price_offers_append`, stages/includes blocks | **Literal** price marketing | **Price** facts | **low** | **keep** |
-| 22 | **Pricebook closer template** | `core/price_answer_assembler._template_closer` (code) | Appended on price answers: «Точный план… после осмотра и консультации» | **Literal** | Consult | **high** vs consult_nudge + consult_value | **rewrite** → client `facts.json` or **move** to centralized closer policy |
+| 22 | **Pricebook closer template** | `core/price_answer_assembler._template_closer` (code) | Disabled by default; returns no consult closer | — | Consult | **low** | **keep disabled**; consult explanations should come from facts/slots |
 | 23 | **Legacy `price_offers.render_price_offers_append`** | built from offers / catalog prices | `build_price_append_for_lookup`, orchestration `generator_append_text`; also answer_plan `price_offer` | **Literal** | **Price** | **high** if PriceBook v2 also applied | **gate** — prefer PriceBook assembler; legacy append only fallback |
 | 24 | **`answer_plan` → `price_offer` append** | `core/answer_planner.py` (regex aspects) | `apply_answer_plan_append` → `build_price_append_for_lookup` | **Literal** | **Price** | **high** on content+price turns | **gate** — suppress if answer already has ₽ or stages |
 | 25 | **`answer_plan` → `payment_terms` append** | hardcoded ref `clinic__info__payment_terms.md#korotko` | `render_payment_terms_append` | **Literal** (chunk body) | Installment / tax | **high** vs `installment_12` fact | **gate** — existing `suppress_payment_terms`; **keep** |
@@ -79,7 +79,7 @@ Price / `service_reply` path: ответ часто **полностью determi
 | 42 | **`widget_config` / launcher** | `clients/{id}/widget_config.json`, `brand.yaml` | Widget shell only (not answer body) | UI chrome | Marketing chrome | — | **keep** out of answer pipeline |
 | 43 | **`pick_relevant_offer` stub** | `ux_builder` returns `None` | — | — | — | — | **remove** dead code when confirmed unused |
 | 44 | **`numeric_fact_gate`** | `core/numeric_fact_gate.py` — `_BLOCKED_FALLBACK` (code) | Post-append scrub ungrounded ₽/%/months; on `blocked` replaces answer with consult-like fallback | **Safety** layer; fallback **visible** to patient | Consult-like redirect when blocked | **medium** vs other consult channels on same turn | **keep** as safety; **not** pure marketing — review fallback copy in centralized policy |
-| 45 | **`doctors_lookup` LLM question** | `doctors_lookup.build_doctors_list_llm_question` (code) | Doctors list route → synthetic chunk → Generator; `invite` tail depends on `free_consultation_messaging` | **LLM instruction** | **Consult** invite («бесплатная» if flag) | **high** vs global `_CONSULT_POLICY_*`, consult_value, consult_nudge | **gate** consult budget on doctors route; **not** suppressed by md `consult_value` |
+| 45 | **`doctors_lookup` LLM question** | `doctors_lookup.build_doctors_list_llm_question` (code) + deterministic doctor consult bridge | Doctors list route → synthetic chunk → Generator; LLM does not add a separate consult invite | **LLM grounding + deterministic slot** | Consult explanation | **medium** vs consult_value | **keep** bridge; no global free-consult flag |
 | 46 | **`clinic_policies_loader`** | `clients/{id}/clinic_policies.yaml` — `service_not_offered_template`, `service_alternatives[]` (`note`, `match_keywords`, `suggest_ref`) | `ingress_gate` route `service_not_offered` → `build_service_not_offered_answer` + `service_alternative_quick_replies` | **Literal** answer (+ QR) | Soft redirect / alternative service | **low** vs md slots | **keep**; audit template consult claims in client YAML |
 
 ---
@@ -135,9 +135,9 @@ Cooldown per slot kind in session (`record_answer_slots_shown`). Telemetry: `met
 ### 3.4 PriceBook v2 (`core/price_answer_assembler.py`)
 
 Block order (typical complex price):
-`intro` → `price_table` → `promo_slot` → `fact_refs` → `closer` → followups as QR.
+`intro` → `price_table` → `fact_refs` → followups as QR.
 
-Code templates in `_complex_intro` / `_template_closer` apply when client fields empty — **marketing text in code**.
+Code templates in `_complex_intro` apply when client fields empty; `_template_closer` no longer adds a consult marketing tail.
 
 ### 3.5 Legacy price_offers (`core/price_offers.py`)
 
@@ -181,10 +181,10 @@ Route: `patient_options_overview` (synthetic chunk, same Generator stack as retr
 
 | Piece | Role |
 |-------|------|
-| `build_doctors_list_llm_question` | User-message instruction for Generator: list doctors + **mandatory consult closer** |
-| `free_consultation_messaging(client_id)` | If true: «Заверши приглашением на **бесплатную** консультацию»; else neutral wording |
+| `build_doctors_list_llm_question` | User-message instruction for Generator: list doctors without adding a separate consult invite |
+| deterministic doctor consult bridge | Adds one selected explanation of what happens on consultation when appropriate |
 
-Отдельный маршрут от md-chunk; **не** связан с `doc_meta_has_consult_value`. Может дублировать global `_CONSULT_POLICY_FREE` в system prompt.
+Отдельный маршрут от md-chunk; **не** связан с `doc_meta_has_consult_value`. Global consult/free-consult policy removed from base system prompt.
 
 ### 3.11 Clinic policies (`core/clinic_policies_loader.py`)
 

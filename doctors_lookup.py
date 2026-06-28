@@ -514,20 +514,11 @@ def doctor_list_fact_public_dict(f: DoctorListFact) -> dict[str, Any]:
 
 def build_doctors_list_llm_question(*, user_question: str, client_id: str | None = None) -> str:
     q0 = (user_question or "").strip()
-    from core.client_config_loader import free_consultation_messaging
-
-    if free_consultation_messaging(client_id):
-        invite = "Заверши приглашением на бесплатную консультацию.\n"
-    else:
-        invite = (
-            "Заверши приглашением записаться на консультацию "
-            "(без слова «бесплатная», если это не указано в фактах ниже).\n"
-        )
     rules = (
         "Перечисли врачей, которые делают эту услугу. Для каждого укажи: полное имя, должность; "
         "если в данных есть experience_years — добавь кратко стаж в годах; "
         "затем одно короткое предложение про подход по полю specialty_brief.\n"
-        f"{invite}"
+        "Не добавляй отдельное приглашение на консультацию — его добавит отдельная policy.\n"
         "Используй ТОЛЬКО факты ниже, ничего не выдумывай. "
         "Если для врача нет experience_years в данных — не упоминай его стаж и не подставляй чужие числа; "
         "не используй слово «null»."

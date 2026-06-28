@@ -30,3 +30,4 @@ class AnswerSlotsTelemetry(BaseModel):
     appended: list[AnswerSlotKind] = Field(default_factory=list)
     skipped_cooldown: list[AnswerSlotKind] = Field(default_factory=list)
     suppressed: dict[str, str] = Field(default_factory=dict)
+    sources: dict[str, str] = Field(default_factory=dict)

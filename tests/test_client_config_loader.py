@@ -36,8 +36,9 @@ def test_ui_cesi_low_score_differs_from_demo():
     demo = load_ui_bundle("demo")
     cesi = load_ui_bundle("cesi")
     assert demo.low_score.answer != cesi.low_score.answer
-    assert "бесплатная" in demo.low_score.answer.lower()
+    assert "бесплатная" not in demo.low_score.answer.lower()
     assert "бесплатная" not in cesi.low_score.answer.lower()
+    assert "налоговый вычет" not in demo.low_score.answer.lower()
     assert "бесплатн" not in cesi.anti_spam_soft_redirect.lower()
 
 

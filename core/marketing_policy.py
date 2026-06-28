@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 
 from contracts.pricebook import PricingFact
 from core.marketing_loader import MarketingPromo, load_marketing_config
@@ -15,6 +16,13 @@ class PromoFactDecision:
     allowed: bool
     reason: str
     promo_key: str | None = None
+
+
+@dataclass(frozen=True)
+class DoctorConsultBridge:
+    text: str
+    reason: str
+    service_id: str | None = None
 
 
 def _date_active(active_until: str | None, *, today: date | None = None) -> bool:
@@ -37,10 +45,10 @@ def _matches_any_or_empty(allowed: tuple[str, ...], value: str | None) -> bool:
 
 def _promo_rule_for_fact(client_id: str | None, fact: PricingFact) -> tuple[str, MarketingPromo] | None:
     cfg = load_marketing_config(client_id)
-    for key, promo in (cfg.promos or {}).items():
+    for key, promo in (cfg.promo_rules or {}).items():
         if str(promo.fact_ref or "").strip() == fact.id:
             return key, promo
-    direct = (cfg.promos or {}).get(fact.id)
+    direct = (cfg.promo_rules or {}).get(fact.id)
     if direct is not None:
         return fact.id, direct
     return None
@@ -107,3 +115,56 @@ def filter_promo_facts(
         if decision.allowed:
             kept.append(fact)
     return kept, decisions
+
+
+def _doctor_name_from_meta(meta: dict[str, Any]) -> str | None:
+    for key in ("name_short", "name_full"):
+        value = str(meta.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _service_candidates_from_meta(meta: dict[str, Any]) -> list[str]:
+    matched = str(meta.get("matched_service_id") or "").strip()
+    if matched:
+        return [matched]
+    raw = meta.get("services")
+    if isinstance(raw, str):
+        one = raw.strip()
+        return [one] if one else []
+    if isinstance(raw, list):
+        return [str(item).strip() for item in raw if str(item).strip()]
+    return []
+
+
+def select_doctor_consult_bridge(
+    *,
+    client_id: str | None,
+    meta: dict[str, Any],
+) -> DoctorConsultBridge:
+    """Pick one non-price consult reason for doctor answers."""
+    cfg = load_marketing_config(client_id)
+    candidates = _service_candidates_from_meta(meta)
+    matched = str(meta.get("matched_service_id") or "").strip()
+    allowed_candidates = candidates if matched or len(candidates) == 1 else []
+    for service_id in allowed_candidates:
+        svc_cfg = cfg.service(service_id)
+        if svc_cfg and svc_cfg.consult_reasons:
+            reason = svc_cfg.consult_reasons[0]
+            return DoctorConsultBridge(
+                text=f"На консультации врач сможет {reason}.",
+                reason="service_consult_reason",
+                service_id=service_id,
+            )
+
+    name = _doctor_name_from_meta(meta)
+    if name:
+        return DoctorConsultBridge(
+            text=f"На консультации {name} уточнит вашу ситуацию и подскажет, какой план лечения подойдет именно вам.",
+            reason="doctor_named_fallback",
+        )
+    return DoctorConsultBridge(
+        text="На консультации врач уточнит вашу ситуацию и поможет выбрать специалиста и план лечения под вашу задачу.",
+        reason="doctor_generic_fallback",
+    )

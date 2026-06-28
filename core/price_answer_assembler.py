@@ -35,13 +35,6 @@ def _format_simple_price(entry: PricebookServiceEntry) -> str | None:
     return line
 
 
-def _render_promo(entry: PricebookServiceEntry) -> str | None:
-    promo = entry.promo
-    if not promo or not promo.text.strip():
-        return None
-    return promo.text.strip()
-
-
 def _render_strict_facts(facts: list[PricingFact]) -> str | None:
     strict = [f.text_fact.strip() for f in facts if f.render_mode == "strict" and f.text_fact.strip()]
     if not strict:
@@ -92,7 +85,8 @@ def _template_closer(entry: PricebookServiceEntry, *, aspect: AspectKind | None 
     if aspect:
         return None
     _ = entry
-    return "Точный план и итоговая сумма — после осмотра и консультации."
+    # Price answers should not add a consult closer by default; configured facts/CTA handle next steps.
+    return None
 
 
 def plan_for_service(
@@ -120,7 +114,7 @@ def plan_for_service(
         sc = "complex"
     blocks = ["intro"]
     if entry.price_model == "simple":
-        blocks.extend(["price_line", "promo_slot", "fact_refs", "closer", "followups"])
+        blocks.extend(["price_line", "fact_refs", "closer", "followups"])
     else:
         blocks.extend(["price_table", "fact_refs", "closer", "followups"])
     return PriceAnswerPlan(
@@ -203,12 +197,6 @@ def assemble_price_answer(
         )
         if append:
             parts.append(append)
-
-    if "promo_slot" in plan.blocks:
-        promo = _render_promo(entry)
-        if promo:
-            parts.append(promo)
-            meta["pricebook_promo_applied"] = True
 
     facts = resolve_fact_refs(client_id, list(entry.fact_refs), usable_in="price_answer")
     facts, promo_decisions = filter_promo_facts(

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from contracts.pricebook import PricingFact
-from core.marketing_policy import decide_promo_fact, filter_promo_facts
+from core.marketing_policy import (
+    decide_promo_fact,
+    filter_promo_facts,
+    select_doctor_consult_bridge,
+)
 
 
 def _promo_fact(fact_id: str = "free_implant_consult") -> PricingFact:
@@ -72,3 +76,38 @@ def test_non_promo_fact_passes_through():
 
     assert kept == [fact]
     assert decisions == []
+
+
+def test_doctor_consult_bridge_uses_matched_service_reason():
+    bridge = select_doctor_consult_bridge(
+        client_id="demo",
+        meta={"matched_service_id": "classic", "services": ["classic", "all_on_4"]},
+    )
+
+    assert bridge.reason == "service_consult_reason"
+    assert bridge.service_id == "classic"
+    assert "врач сможет" in bridge.text
+    assert "сравнить системы имплантов" in bridge.text
+
+
+def test_doctor_consult_bridge_uses_single_service_reason():
+    bridge = select_doctor_consult_bridge(
+        client_id="demo",
+        meta={"services": ["periodontitis"]},
+    )
+
+    assert bridge.reason == "service_consult_reason"
+    assert bridge.service_id == "periodontitis"
+    assert "состояние десен" in bridge.text
+
+
+def test_doctor_consult_bridge_uses_named_fallback_for_many_services():
+    bridge = select_doctor_consult_bridge(
+        client_id="demo",
+        meta={"name_short": "Волков", "services": ["classic", "all_on_4"]},
+    )
+
+    assert bridge.reason == "doctor_named_fallback"
+    assert bridge.service_id is None
+    assert "Волков" in bridge.text
+    assert "именно вам" in bridge.text

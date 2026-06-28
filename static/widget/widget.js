@@ -36,6 +36,7 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
   "error",
   "offtopic",
   "situation_collect",
+  "situation_back",
 ]);
 /** Синхронно с config.BOOKING_INTENT_RE — до ответа сервера не показываем «базу знаний». */
 const BOOKING_INTENT_RE =

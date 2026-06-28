@@ -100,7 +100,7 @@
 |---|----------|------|
 | 3 | **Тройной источник цен** | pricebook + `price_offers.json` + `prices.json` + md-fallback при miss. Принцип P1 («суммы только в PriceBook») не закрыт. |
 | 4 | **`service_catalog.json`** | Ещё `price_ref` → pricing-md; целевой `pricebook_id` не внедрён. |
-| 5 | **Promo `active_until`** | Для `service.promo` runtime не проверяет дату (для facts в `facts.json` — проверяет). |
+| 5 | **Legacy `service.promo`** | Рендер `service.promo` выключен; промо должны идти через `facts.json` + `marketing.yaml` `promo_rules`. Осталось убрать legacy-поле из схемы/примеров. |
 | 6 | **Lint §9** | Нет проверки resolvable followup refs (`scripts/lint_pricebook.py`). |
 
 ### Eval / тесты

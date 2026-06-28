@@ -237,7 +237,7 @@ Planner (этап 4) выбирает **сценарий**; Assembler собир
 
 | Сценарий | Триггер (пример) | Блоки (порядок) | LLM | Кнопки |
 |----------|------------------|-----------------|-----|--------|
-| **S1 simple** | «Сколько стоит отбеливание?» | intro → **price_line** → promo_slot → closer | intro/closer | 0–1 followup |
+| **S1 simple** | «Сколько стоит отбеливание?» | intro → **price_line** → fact_refs | code / facts | 0–1 followup |
 | **S2 simple+aspect btn** | «Сколько пульпит?» | intro → price_line → closer | да | «Что входит» → aspect |
 | **S3 overview group** | «Сколько имплантация?» | intro → **mini_summary** (from по members) → closer | intro/closer | по member: `price:classic`, … |
 | **S4 complex specific** | «Классическая имплантация цена?» | intro → **price_table** → stages? → includes? → fact_refs → closer | intro/closer | followups из service |
@@ -256,9 +256,8 @@ Planner (этап 4) выбирает **сценарий**; Assembler собир
 | `mini_summary` | group.members[].from_total | **код** |
 | `stages` | variant.payment_stages | **код** |
 | `includes` / `excludes` | variant | **код** |
-| `promo_slot` | service.promo или fact_refs | **strict** → код; service.promo с датой — strict |
 | `fact_refs` | facts.json `text_fact` | **strict** → код дословно; **natural** → LLM по whitelist (+ verifier) |
-| `closer` | consult_value, boundary | LLM или шаблон из pack |
+| `closer` | centralized facts/slots only | disabled by default in PriceBook assembler |
 | `followups` | service.followups | **код** → widget quick_replies |
 
 ---
@@ -268,7 +267,7 @@ Planner (этап 4) выбирает **сценарий**; Assembler собир
 ### 6.1 Отбеливание (S1)
 
 **Q:** Сколько стоит отбеливание?  
-**A:** Живое intro (1–2 предложения) → «**15 000 ₽**» → «Скидка 10% до 15 июля» → короткая закрывашка про консультацию.  
+**A:** Живое intro (1–2 предложения) → «**18 000 ₽**» → fact_refs, например «Скидка 10% до 15 июля» / условия оплаты, если разрешены правилами маркетинга.  
 **must_not:** дубль суммы; «точную стоимость уточните» без данных.
 
 ### 6.2 Пульпит (S2)

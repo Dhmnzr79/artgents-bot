@@ -443,7 +443,7 @@ service_marketing:
       - "сравнить All-on-4 и All-on-6"
     primary_cta_key: plan
 
-promos:
+promo_rules:
   free_implant_consult:
     active: true
     active_until: "2026-12-31"
@@ -540,6 +540,14 @@ promos:
 - `no_candidates`;
 - service_not_offered, если там лишний consult push.
 
+## Косяки widget attribution (Stage 2)
+
+| Симптом | Причина | Статус |
+|---|---|---|
+| «Назад к диалогу» после «Рассказать о ситуации» показывает подпись «Алина · по материалам клиники» на сервисном тексте «Хорошо, продолжим…» | fallback `situation_back` шёл как `service_route=lead_flow`; виджет не относил turn к plain-attribution | ✅ fix: `service_route=situation_back` + `PLAIN_ATTRIBUTION_ROUTES` |
+
+Правило: service/fallback ответы без md-источника — только имя бота, без «по материалам клиники». Восстановление предыдущего content-snap при back — content-attribution сохраняется.
+
 ## Итоговое решение
 
 Новый слой нужен не для новых ответов. Он нужен, чтобы уже существующие ответы не спорили друг с другом.
@@ -558,4 +566,3 @@ promos:
 - отзывы/кейсы;
 - сложный proof-layer;
 - эмоциональный lead scoring.
-

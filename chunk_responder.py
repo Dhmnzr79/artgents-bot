@@ -20,6 +20,7 @@ from core.numeric_fact_gate import apply_numeric_fact_gate
 from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, format_answer_for_display
 
 import session as session_mod
+from contracts.answer_slots import AnswerSlotsTelemetry
 from llm import LLM_FALLBACK_ANSWER, generate_answer_stream, generate_answer_with_empathy
 from logging_setup import log_json
 from verifier import build_turn_trace_prefix, schedule_verifier_shadow_if_needed
@@ -263,6 +264,38 @@ def _apply_patient_playbook_ui(payload: dict, route: str) -> None:
             payload.setdefault("meta", {})[key] = request.ctx[key]
 
 
+def _is_doctor_meta(meta: dict, route: str) -> bool:
+    doc_type = str(meta.get("doc_type") or "").strip().lower()
+    doc_id = str(meta.get("doc_id") or "").strip().lower()
+    return route == "doctors_list" or doc_type == "doctor" or doc_id.startswith("doctors__doctor")
+
+
+def _append_doctor_consult_bridge(
+    *,
+    answer: str,
+    meta: dict,
+    route: str,
+    client_id: str | None,
+) -> tuple[str, dict | None]:
+    if not _is_doctor_meta(meta, route):
+        return answer, None
+    from core.marketing_policy import select_doctor_consult_bridge
+
+    meta["cta_action"] = "lead"
+    meta["cta_key"] = "doctor"
+    bridge = select_doctor_consult_bridge(client_id=client_id, meta=meta)
+    text = bridge.text.strip()
+    if not text or text in (answer or ""):
+        return answer, None
+    out = _append_generator_append_text(answer, text)
+    return out, {
+        "doctor_consult_bridge": {
+            "reason": bridge.reason,
+            "service_id": bridge.service_id,
+        }
+    }
+
+
 def _apply_answer_slots_and_price_append(
     *,
     answer: str,
@@ -276,6 +309,7 @@ def _apply_answer_slots_and_price_append(
     lead_context: bool,
     price_offer_meta: dict | None = None,
     matched_service_id: str | None = None,
+    skip_answer_slots_reason: str | None = None,
 ) -> tuple[str, dict | None, str, dict | None]:
     """Append clinic/consult/promo slots, planner append, then price tail."""
     tstate = get_topic_state(sid, doc_id) if doc_id else {}
@@ -290,14 +324,19 @@ def _apply_answer_slots_and_price_append(
         price_offer_meta=price_offer_meta,
         answer_body=answer,
     )
-    slots_text, telemetry = assemble_answer_slots(
-        meta=meta,
-        h3_id=chunk.get("h3_id"),
-        q=q,
-        route=route,
-        topic_state=tstate,
-        lead_context=lead_context,
-    )
+    if skip_answer_slots_reason:
+        slots_text = ""
+        telemetry = AnswerSlotsTelemetry()
+        telemetry.suppressed["answer_slots"] = skip_answer_slots_reason
+    else:
+        slots_text, telemetry = assemble_answer_slots(
+            meta=meta,
+            h3_id=chunk.get("h3_id"),
+            q=q,
+            route=route,
+            topic_state=tstate,
+            lead_context=lead_context,
+        )
     combined_append = merge_deterministic_appends(
         slots_text=slots_text,
         generator_append_text=plan_append,
@@ -527,6 +566,12 @@ def respond_from_chunk(
     )
     st_pre = mem_get(sid)
     lead_context = is_lead_context(st_pre)
+    answer, doctor_bridge_meta = _append_doctor_consult_bridge(
+        answer=answer,
+        meta=meta,
+        route=route,
+        client_id=client_id,
+    )
     answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
         answer=answer,
         meta=meta,
@@ -539,6 +584,7 @@ def respond_from_chunk(
         lead_context=lead_context,
         price_offer_meta=price_offer_meta,
         matched_service_id=sid_svc or None,
+        skip_answer_slots_reason="doctor_consult_bridge" if doctor_bridge_meta else None,
     )
     answer, numeric_gate_meta = _apply_numeric_fact_gate(
         answer=answer,
@@ -598,6 +644,8 @@ def respond_from_chunk(
     if numeric_gate_meta:
         payload.setdefault("meta", {}).update(numeric_gate_meta)
     _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
+    if doctor_bridge_meta:
+        payload.setdefault("meta", {}).update(doctor_bridge_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
     payload = _apply_response_policy_compat(
@@ -802,6 +850,12 @@ def respond_from_chunk_stream(
     )
     st_pre = mem_get(sid)
     lead_context = is_lead_context(st_pre)
+    answer_base, doctor_bridge_meta = _append_doctor_consult_bridge(
+        answer=answer_base,
+        meta=meta,
+        route=route,
+        client_id=client_id,
+    )
     answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
         answer=answer_base,
         meta=meta,
@@ -814,6 +868,7 @@ def respond_from_chunk_stream(
         lead_context=lead_context,
         price_offer_meta=price_offer_meta,
         matched_service_id=sid_svc or None,
+        skip_answer_slots_reason="doctor_consult_bridge" if doctor_bridge_meta else None,
     )
     answer, numeric_gate_meta = _apply_numeric_fact_gate(
         answer=answer,
@@ -878,6 +933,8 @@ def respond_from_chunk_stream(
     if numeric_gate_meta:
         payload.setdefault("meta", {}).update(numeric_gate_meta)
     _merge_price_offer_meta_into_payload(payload, price_offer_meta=price_offer_meta)
+    if doctor_bridge_meta:
+        payload.setdefault("meta", {}).update(doctor_bridge_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
     payload = _apply_response_policy_compat(

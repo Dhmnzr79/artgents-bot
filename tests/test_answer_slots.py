@@ -46,6 +46,103 @@ def test_consult_value_suppresses_consult_nudge_planning(sid):
     assert kind is None
 
 
+def test_marketing_yaml_consult_reason_suppresses_consult_nudge(sid):
+    from chunk_responder import _planned_consult_nudge_for_chunk
+
+    meta = {
+        "client_id": "demo",
+        "doc_id": "implantation__service__classic",
+        "subtopic": "classic",
+    }
+    kind = _planned_consult_nudge_for_chunk(
+        sid=sid,
+        route="retrieval_chunk",
+        meta=meta,
+        chunk={"h3_id": None},
+        topic_state={"covered_h3_ids": [], "doc_turn_count": 0},
+        client_id="demo",
+    )
+    assert kind is None
+
+
+def test_marketing_yaml_slots_prefer_client_config_over_md():
+    meta = {
+        "client_id": "demo",
+        "doc_id": "implantation__service__classic",
+        "subtopic": "classic",
+        "clinic_note": "MD proof should stay fallback.",
+        "consult_value": "MD consult should stay fallback.",
+    }
+    text, telemetry = assemble_answer_slots(
+        meta=meta,
+        h3_id=None,
+        q="расскажите про классическую имплантацию",
+        route="retrieval_chunk",
+        topic_state={},
+        lead_context=False,
+    )
+
+    assert "сравнить системы имплантов" in text
+    assert "MD consult" not in text
+    assert telemetry.appended == ["consult_value"]
+    assert telemetry.sources.get("consult_value") == "marketing.yaml"
+    assert telemetry.suppressed.get("clinic_note") == "text_ingredient_limit"
+
+
+def test_consult_value_falls_back_to_md_without_marketing_config():
+    md_consult = "На консультации врач скажет по md."
+    base = {
+        "doc_id": "demo__service__md_only_service",
+        "subtopic": "md_only_service",
+        "consult_value": md_consult,
+    }
+
+    text_no_client, telemetry_no_client = assemble_answer_slots(
+        meta=base,
+        h3_id=None,
+        q="демо услуга",
+        route="retrieval_chunk",
+        topic_state={},
+        lead_context=False,
+    )
+    assert md_consult in text_no_client
+    assert telemetry_no_client.sources.get("consult_value") == "md"
+
+    text_demo, telemetry_demo = assemble_answer_slots(
+        meta={**base, "client_id": "demo"},
+        h3_id=None,
+        q="демо услуга",
+        route="retrieval_chunk",
+        topic_state={},
+        lead_context=False,
+    )
+    assert md_consult in text_demo
+    assert telemetry_demo.sources.get("consult_value") == "md"
+
+
+def test_marketing_yaml_clinic_proof_used_after_consult_cooldown(sid):
+    doc_id = "implantation__service__classic"
+    meta = {
+        "client_id": "demo",
+        "doc_id": doc_id,
+        "subtopic": "classic",
+    }
+    record_answer_slots_shown(sid, doc_id, slot_keys=["consult_value"], turn=1)
+    text, telemetry = assemble_answer_slots(
+        meta=meta,
+        h3_id=None,
+        q="еще вопрос про классику",
+        route="retrieval_chunk",
+        topic_state=get_topic_state(sid, doc_id),
+        lead_context=False,
+    )
+
+    assert "3D-план по КТ" in text
+    assert telemetry.appended == ["clinic_note"]
+    assert telemetry.sources.get("clinic_note") == "marketing.yaml"
+    assert telemetry.skipped_cooldown == ["consult_value"]
+
+
 def test_promo_only_on_commercial_intent():
     meta = {
         "doc_id": "implantation__service__classic",

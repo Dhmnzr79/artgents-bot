@@ -25,7 +25,9 @@ def test_s1_whitening_simple_price(demo_client):
     assert answer
     assert "18 000" in answer
     assert meta.get("pricebook_applied") is True
-    assert "10%" in answer or meta.get("pricebook_promo_applied")
+    assert "10%" in answer
+    assert "professional_whitening_discount" in meta.get("marketing_promos_applied", [])
+    assert not meta.get("pricebook_promo_applied")
 
 
 def test_s2_pulpitis_with_followup(demo_client):

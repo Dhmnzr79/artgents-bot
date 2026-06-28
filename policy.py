@@ -198,7 +198,9 @@ def infer_ui_source_family(payload: dict, route: str | None = None) -> str:
         return UI_FAMILY_PATIENT_OPTIONS
     if route_eff in _PRICE_UI_ROUTES or intent in _PRICE_UI_INTENTS:
         return UI_FAMILY_PRICE
-    if route_eff == "doctors_list":
+    doc_type = str(meta.get("doc_type") or "").strip().lower()
+    doc_id = str(meta.get("doc_id") or "").strip().lower()
+    if route_eff == "doctors_list" or doc_type == "doctor" or doc_id.startswith("doctors__doctor"):
         return UI_FAMILY_DOCTOR
     if meta.get("low_score") or meta.get("offtopic") or meta.get("error"):
         return UI_FAMILY_GUIDED_FALLBACK

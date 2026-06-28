@@ -8,7 +8,7 @@ import pytest
 
 from contracts.decision_frame import DecisionFrame
 from core.routing_loader import THRESHOLDS
-from doctors_lookup import doctors_lookup
+from doctors_lookup import build_doctors_list_llm_question, doctors_lookup
 from source_routing import _vague_doctor_session_hints, route_source
 from session import mem_add_user, mem_get, mem_reset, set_last_subject
 
@@ -59,10 +59,20 @@ def test_route_source_vague_doctor_with_session():
         app_intent="content",
     )
     assert sr.source == "doctor"
+    assert sr.service_id is None
     assert sr.match_method == "doctors_lookup"
     payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
     assert isinstance(payload, dict)
     assert payload.get("matched_service_id") == "classic"
+
+
+def test_doctors_list_prompt_leaves_consult_invite_to_policy():
+    prompt = build_doctors_list_llm_question(
+        user_question="Кто делает имплантацию?",
+        client_id="demo",
+    )
+
+    assert "Не добавляй отдельное приглашение на консультацию" in prompt
 
 
 def test_vague_doctor_session_hints_ignore_stale_subject():

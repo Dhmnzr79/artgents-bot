@@ -710,6 +710,7 @@ def handle_flows(
                 situation_back=True,
             ),
             "doc_id": st.get("current_doc_id"),
+            "service_route": "situation_back",
         }
 
     if (data.get("ref") or "").strip() == LEAD_BOOKING_REF:

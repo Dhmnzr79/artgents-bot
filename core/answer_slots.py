@@ -7,16 +7,60 @@ from typing import Any
 
 from config import TRIGGERS_COMPILED
 from contracts.answer_slots import AnswerSlotKind, AnswerSlotsTelemetry
-from core.marketing_loader import load_marketing_config
+from core.marketing_loader import MarketingServiceConfig, load_marketing_config
 from core.routing_loader import THRESHOLDS
 from query_selector import commercial_info_query
 
 _PROMO_QUERY_RE = re.compile(r"(акци\w*|скидк\w*|промо|спецпредлож\w*)", re.I | re.U)
 
 
+def _unique_nonempty(values: list[Any]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out
+
+
+def _service_candidates_from_meta(meta: dict | None) -> list[str]:
+    m = meta if isinstance(meta, dict) else {}
+    doc_id = str(m.get("doc_id") or "").strip()
+    doc_service_id = None
+    if "__service__" in doc_id:
+        doc_service_id = doc_id.rsplit("__service__", 1)[-1].strip()
+    return _unique_nonempty(
+        [
+            m.get("matched_service_id"),
+            m.get("service_id"),
+            m.get("subtopic"),
+            doc_service_id,
+        ]
+    )
+
+
+def _marketing_service_for_meta(meta: dict | None) -> tuple[str | None, MarketingServiceConfig | None]:
+    m = meta if isinstance(meta, dict) else {}
+    client_id = m.get("client_id")
+    if not client_id:
+        return None, None
+    cfg = load_marketing_config(client_id)
+    for service_id in _service_candidates_from_meta(m):
+        svc_cfg = cfg.service(service_id)
+        if svc_cfg is not None:
+            return service_id, svc_cfg
+    return None, None
+
+
 def doc_meta_has_consult_value(meta: dict | None, *, h3_id: str | None = None) -> bool:
     """When true, consult_nudge LLM prompt is suppressed for this chunk."""
     m = meta if isinstance(meta, dict) else {}
+    _, svc_cfg = _marketing_service_for_meta(m)
+    if svc_cfg and svc_cfg.consult_reasons:
+        return True
     if str(m.get("consult_value") or "").strip():
         return True
     h3 = str(h3_id or "").strip().lower()
@@ -48,8 +92,19 @@ def _promo_active(promo: dict | None) -> bool:
 
 def _effective_slot_fields(meta: dict, h3_id: str | None) -> dict[str, Any]:
     """Doc-level slots with optional h3 override (override wins per field)."""
+    _, svc_cfg = _marketing_service_for_meta(meta)
+    clinic_source = "md"
+    consult_source = "md"
     clinic_note = str(meta.get("clinic_note") or "").strip() or None
     consult_value = str(meta.get("consult_value") or "").strip() or None
+    if svc_cfg and svc_cfg.clinic_proof:
+        clinic_note = str(svc_cfg.clinic_proof[0] or "").strip() or clinic_note
+        clinic_source = "marketing.yaml"
+    if svc_cfg and svc_cfg.consult_reasons:
+        reason = str(svc_cfg.consult_reasons[0] or "").strip()
+        if reason:
+            consult_value = f"На консультации врач сможет {reason}."
+            consult_source = "marketing.yaml"
     promo_note = meta.get("promo_note") if isinstance(meta.get("promo_note"), dict) else None
 
     h3 = str(h3_id or "").strip().lower()
@@ -59,15 +114,20 @@ def _effective_slot_fields(meta: dict, h3_id: str | None) -> dict[str, Any]:
         if isinstance(entry, dict):
             if str(entry.get("clinic_note") or "").strip():
                 clinic_note = str(entry.get("clinic_note") or "").strip()
+                clinic_source = "md.h3_overrides"
             if str(entry.get("consult_value") or "").strip():
                 consult_value = str(entry.get("consult_value") or "").strip()
+                consult_source = "md.h3_overrides"
             if isinstance(entry.get("promo_note"), dict):
                 promo_note = entry.get("promo_note")
 
     return {
         "clinic_note": clinic_note,
+        "clinic_note_source": clinic_source if clinic_note else None,
         "consult_value": consult_value,
+        "consult_value_source": consult_source if consult_value else None,
         "promo_note": promo_note if _promo_active(promo_note) else None,
+        "promo_note_source": "md" if _promo_active(promo_note) else None,
     }
 
 
@@ -187,6 +247,9 @@ def assemble_answer_slots(
             continue
         paragraphs.append(text)
         telemetry.appended.append(kind)
+        source = str(fields.get(f"{kind}_source") or "").strip()
+        if source:
+            telemetry.sources[kind] = source
 
     return ("\n\n".join(paragraphs), telemetry)
 

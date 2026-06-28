@@ -11,11 +11,9 @@
     "note": "Точная стоимость зависит от выбранного протокола"
   },
   "variants": [],
-  "promo": {
-    "text": "Сейчас на эту процедуру скидка 10% до 15 июля.",
-    "active_until": "2026-07-15"
-  },
+  "promo": null,
   "fact_refs": [
+    "professional_whitening_discount",
     "installment_12"
   ],
   "followups": [],

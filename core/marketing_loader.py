@@ -46,7 +46,12 @@ class MarketingConfig:
     limits: MarketingLimits = MarketingLimits()
     blocked_aspects_for_promo: tuple[str, ...] = ()
     service_marketing: dict[str, MarketingServiceConfig] | None = None
-    promos: dict[str, MarketingPromo] | None = None
+    promo_rules: dict[str, MarketingPromo] | None = None
+
+    @property
+    def promos(self) -> dict[str, MarketingPromo] | None:
+        """Legacy alias; client-facing YAML key is `promo_rules`."""
+        return self.promo_rules
 
     def service(self, service_id: str | None) -> MarketingServiceConfig | None:
         sid = str(service_id or "").strip()
@@ -58,7 +63,7 @@ class MarketingConfig:
         key = str(promo_key or "").strip()
         if not key:
             return None
-        return (self.promos or {}).get(key)
+        return (self.promo_rules or {}).get(key)
 
 
 _LOCK = threading.Lock()
@@ -151,12 +156,17 @@ def _parse_promos(raw: Any) -> dict[str, MarketingPromo]:
 
 def _parse_marketing_config(raw: Any) -> MarketingConfig:
     cfg = raw if isinstance(raw, dict) else {}
+    # Client-facing key is `promo_rules`: texts live in PriceBook facts,
+    # this section only controls whether/where those facts may be shown.
+    promo_rules = cfg.get("promo_rules")
+    if promo_rules is None:
+        promo_rules = cfg.get("promos")
     return MarketingConfig(
         version=_positive_int(cfg.get("version"), 1),
         limits=_parse_limits(cfg.get("limits")),
         blocked_aspects_for_promo=_string_tuple(cfg.get("blocked_aspects_for_promo")),
         service_marketing=_parse_service_marketing(cfg.get("service_marketing")),
-        promos=_parse_promos(cfg.get("promos")),
+        promo_rules=_parse_promos(promo_rules),
     )
 
 

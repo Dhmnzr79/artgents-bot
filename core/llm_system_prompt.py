@@ -1,7 +1,7 @@
-"""Per-client generator system prompt (identity + consult policy)."""
+"""Per-client generator system prompt (identity + style policy)."""
 from __future__ import annotations
 
-from core.client_config_loader import free_consultation_messaging, load_tone_raw
+from core.client_config_loader import load_tone_raw
 
 _SYSTEM_STYLE = (
     "Ты не врач — ты хорошо знаешь клинику и помогаешь человеку спокойно разобраться в вопросе.\n\n"
@@ -15,19 +15,13 @@ _SYSTEM_STYLE = (
     "а отвечай именно на тот вопрос, который задал пользователь. "
     "По умолчанию начинай сразу с сути ответа, без лишнего вступления.\n\n"
     "Если информации в базе нет, честно скажи об этом без попытки выкрутиться и без выдумок. "
-    "В таком случае можно спокойно предложить обсудить вопрос на консультации.\n\n"
+    "В таком случае предложи уточнить вопрос или выбрать подходящий раздел, без продажи.\n\n"
     "Не дави, не уговаривай и не делай каждый ответ «продающим»."
 )
 
-_CONSULT_POLICY_FREE = (
-    "\n\nЕсли уместно, можно мягко упомянуть, что на консультации можно разобраться подробнее, "
-    "и она бесплатная."
-)
-
-_CONSULT_POLICY_NEUTRAL = (
-    "\n\nЕсли уместно, можно мягко предложить консультацию в клинике как следующий шаг.\n"
-    "Не называй консультацию бесплатной в общих формулировках — "
-    "стоимость и условия приёма бери только из блока источника (md), если они там явно указаны."
+_MARKETING_SELECTION_POLICY = (
+    "\n\nНе добавляй в ответ самостоятельные приглашения на консультацию, акции, скидки или утверждение о бесплатности. "
+    "Такие смыслы можно упоминать только если они уже есть в источнике или детерминированной добавке для текущего ответа."
 )
 
 _NO_CONTINUE = (
@@ -51,6 +45,5 @@ def _role_intro(client_id: str | None) -> str:
 
 
 def build_base_system(client_id: str | None) -> str:
-    """Identity + style + consult marketing policy for chat generator."""
-    consult = _CONSULT_POLICY_FREE if free_consultation_messaging(client_id) else _CONSULT_POLICY_NEUTRAL
-    return _role_intro(client_id) + "\n\n" + _SYSTEM_STYLE + consult + _NO_CONTINUE
+    """Identity + style + marketing selection policy for chat generator."""
+    return _role_intro(client_id) + "\n\n" + _SYSTEM_STYLE + _MARKETING_SELECTION_POLICY + _NO_CONTINUE

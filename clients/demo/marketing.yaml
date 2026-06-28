@@ -116,6 +116,7 @@ promo_rules:
       - zygomatic_implants
     allowed_routes:
       - price_lookup
+      - promo_overview
     allowed_aspects:
       - overview
     blocked_aspects:
@@ -134,6 +135,7 @@ promo_rules:
       - one_stage
     allowed_routes:
       - price_lookup
+      - promo_overview
     allowed_aspects:
       - overview
     blocked_aspects:
@@ -150,6 +152,7 @@ promo_rules:
       - professional_whitening
     allowed_routes:
       - price_lookup
+      - promo_overview
     allowed_aspects:
       - overview
     blocked_aspects:
@@ -167,6 +170,7 @@ promo_rules:
       - all_on_6
     allowed_routes:
       - price_lookup
+      - promo_overview
     allowed_aspects:
       - overview
     blocked_aspects:

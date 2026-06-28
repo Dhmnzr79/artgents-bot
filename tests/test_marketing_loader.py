@@ -128,3 +128,4 @@ def test_demo_marketing_yaml_controls_pricebook_promo_facts():
     assert "fact_ref: free_implant_consult" in raw
     assert "allowed_routes:" in raw
     assert "price_lookup" in raw
+    assert "promo_overview" in raw

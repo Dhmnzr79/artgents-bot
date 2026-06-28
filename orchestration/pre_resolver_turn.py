@@ -32,6 +32,7 @@ from orchestration.route_guards import (
     soft_redirect_payload,
 )
 from core.price_ref_routing import orchestrate_price_widget_ref
+from core.promo_overview import build_promo_overview_payload, is_direct_promo_question
 from policy import continuation_only_phrase, continuation_without_context
 from retriever import get_chunk_by_ref
 from session import (
@@ -299,6 +300,21 @@ def run_pre_resolver_turn(
             service_route="continuation_clarify",
             decision_frame=decision_frame,
         )
+
+    if is_direct_promo_question(q):
+        promo_payload = build_promo_overview_payload(sid=sid, client_id=client_id, q=q)
+        if promo_payload is not None:
+            return AskOrchestrationResult(
+                kind="service_reply",
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                service_payload=promo_payload,
+                service_doc_id=None,
+                service_track_user=True,
+                service_route="promo_overview",
+                decision_frame=decision_frame,
+            )
 
     current_doc_id = (st.get("current_doc_id") or "").strip()
     if current_doc_id and continuation_only_phrase(q):

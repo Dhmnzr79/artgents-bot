@@ -213,6 +213,12 @@ def _is_price_ref(item: dict) -> bool:
     return str(item.get("ref") or "").strip().lower().startswith("price:")
 
 
+def _is_patient_option_ref(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
+    return str(item.get("source") or "").strip().lower() == "patient_option"
+
+
 def _merge_policy_decision_meta(meta: dict, details: dict) -> None:
     current = meta.get("policy_decision")
     if not isinstance(current, dict):
@@ -242,7 +248,7 @@ def apply_ui_source_policy(payload: dict, route: str | None = None) -> dict:
             dropped.append("followups_non_price_ui")
         meta["followups"] = []
     elif family == UI_FAMILY_PATIENT_OPTIONS:
-        filtered = [item for item in quick_before if _is_price_ref(item)]
+        filtered = [item for item in quick_before if _is_patient_option_ref(item)]
         if len(filtered) != len(quick_before):
             dropped.append("quick_replies_non_patient_options")
         if followups_before:

@@ -36,9 +36,18 @@ def test_patient_options_keep_only_option_buttons():
     payload = {
         "answer": "Есть несколько вариантов.",
         "quick_replies": [
-            {"label": "All-on-4", "ref": "price:all_on_4"},
+            {
+                "label": "Подробнее про All-on-4",
+                "ref": "implantation__service__all_on_4.md#korotko",
+                "source": "patient_option",
+            },
+            {"label": "Цена All-on-4", "ref": "price:all_on_4"},
             {"label": "Подробнее", "ref": "implants.md#overview"},
-            {"label": "All-on-6", "ref": "price:all_on_6"},
+            {
+                "label": "Подробнее про All-on-6",
+                "ref": "implantation__service__all_on_6.md#korotko",
+                "source": "patient_option",
+            },
         ],
         "cta": {"label": "Записаться", "action": "lead"},
         "meta": {
@@ -58,9 +67,10 @@ def test_patient_options_keep_only_option_buttons():
     normalize_policy_payload(out)
 
     assert [item["ref"] for item in out["quick_replies"]] == [
-        "price:all_on_4",
-        "price:all_on_6",
+        "implantation__service__all_on_4.md#korotko",
+        "implantation__service__all_on_6.md#korotko",
     ]
+    assert all(item.get("source") == "patient_option" for item in out["quick_replies"])
     assert out["meta"]["followups"] == []
     assert out["cta"] == {"label": "Записаться", "action": "lead"}
 

@@ -29,6 +29,9 @@ def test_promo_overview_lists_active_configured_promos():
     assert meta["intent"] == "promo_overview"
     assert payload["cta"] is None
     assert all((q.get("ref") or "").startswith("price:") for q in payload["quick_replies"])
+    labels = [q["label"] for q in payload["quick_replies"]]
+    assert all(not label.startswith("Стоимость:") for label in labels)
+    assert any(label.startswith("Цена и условия ") for label in labels)
     refs = [q["ref"] for q in payload["quick_replies"]]
     assert "price:professional_whitening" in refs
 

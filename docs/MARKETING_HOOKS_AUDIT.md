@@ -34,7 +34,7 @@ clinic_policies.yaml -> бизнес-ограничения клиники
 | Tone CTA registry | `tone.yaml/lead.cta_variants` | CTA label + первый lead prompt | низкий | источник CTA-текстов |
 | UI fallback/menu | `ui.yaml` | нейтральные fallback/menu тексты | низкий | не хранить тяжелый маркетинг |
 | Clinic policies | `clinic_policies.yaml` | hard-stop, услуги не оказываем, альтернативы | низкий | не хранить акции/общие consult rules |
-| Patient playbook | `patient_playbook.yaml` | стратегия выбора вариантов, не готовый copy | средний | проверить consult budget отдельно |
+| Patient playbook | `patient_playbook.yaml` + `service_catalog.md_entry_ref` | стратегия выбора вариантов, кнопки в md-описания, не готовый copy | средний | проверить consult budget отдельно |
 | Doctors route bridge | `doctors_lookup.py` + `chunk_responder.py` | мягкое объяснение консультации по врачам | средний | оставить, не добавлять цены пачкой |
 | Consult nudge | `ui.yaml/consult_nudge` + `core/consult_nudge.py` | нейтральный LLM-addon при исчерпании темы | средний | не должен продавать |
 | Legacy price append | `answer_plan`, `price_offers` | fallback price/payment append | средний | держать suppress-логику |
@@ -67,7 +67,9 @@ clinic_policies.yaml -> бизнес-ограничения клиники
 
 ### Patient playbook
 
-Маршрут `patient_options_overview` может мягко вести к КТ/консультации через LLM-инструкцию. Нужно проверить, что он не добавляет второй consult-смысл поверх `marketing.yaml` или CTA.
+Маршрут `patient_options_overview` даёт обзор вариантов и кнопки "Подробнее про ..." в md-описания услуг. Он не должен первым кликом вести в `price:*`; цены остаются для прямого price intent или отдельной price-кнопки.
+
+LLM-инструкция всё ещё может мягко вести к КТ/консультации. Нужно проверить, что она не добавляет второй consult-смысл поверх `marketing.yaml` или CTA.
 
 ### Legacy fields
 

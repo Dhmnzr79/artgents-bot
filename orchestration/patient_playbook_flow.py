@@ -42,7 +42,7 @@ def try_patient_options_overview(
     if options is None:
         return None
 
-    record_patient_options_ctx(options)
+    record_patient_options_ctx(options, client_id=client_id)
     emit_bot_event(
         logger,
         "patient_options_overview",

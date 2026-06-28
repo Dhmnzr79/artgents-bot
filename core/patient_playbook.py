@@ -390,14 +390,45 @@ def should_use_patient_options_overview(
     return False
 
 
-def patient_options_quick_replies(result: PatientOptionsResult) -> list[dict[str, str]]:
+def patient_options_quick_replies(
+    result: PatientOptionsResult,
+    *,
+    client_id: str | None = None,
+) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for opt in result.options:
         label = (opt.display_name or opt.service_id).strip()
         sid = (opt.service_id or "").strip()
-        if label and sid:
-            out.append({"label": label, "ref": f"price:{sid}"})
+        if not label or not sid:
+            continue
+        ref = _patient_option_ref(sid, client_id=client_id)
+        if not ref:
+            continue
+        out.append(
+            {"label": _patient_option_label(label), "ref": ref, "source": "patient_option"}
+        )
     return out
+
+
+def _patient_option_ref(service_id: str, *, client_id: str | None = None) -> str | None:
+    catalog = _read_service_catalog(client_id)
+    entry = catalog.get((service_id or "").strip())
+    if not isinstance(entry, dict):
+        return None
+    ref = str(entry.get("md_entry_ref") or "").strip()
+    if not ref:
+        return None
+    base, anchor = ref.split("#", 1) if "#" in ref else (ref, "korotko")
+    if not base.endswith(".md"):
+        base = f"{base}.md"
+    return f"{base}#{anchor or 'korotko'}"
+
+
+def _patient_option_label(label: str) -> str:
+    text = (label or "").strip()
+    if text.lower().startswith("имплантация "):
+        text = text[len("Имплантация "):].strip()
+    return f"Подробнее про {text}" if text else "Подробнее"
 
 
 def patient_options_telemetry(result: PatientOptionsResult) -> dict[str, Any]:
@@ -411,7 +442,11 @@ def patient_options_telemetry(result: PatientOptionsResult) -> dict[str, Any]:
     }
 
 
-def record_patient_options_ctx(result: PatientOptionsResult) -> None:
+def record_patient_options_ctx(
+    result: PatientOptionsResult,
+    *,
+    client_id: str | None = None,
+) -> None:
     try:
         from flask import has_request_context, request
     except ImportError:
@@ -420,4 +455,7 @@ def record_patient_options_ctx(result: PatientOptionsResult) -> None:
         return
     for key, value in patient_options_telemetry(result).items():
         request.ctx[key] = value
-    request.ctx["patient_options_quick_replies"] = patient_options_quick_replies(result)
+    request.ctx["patient_options_quick_replies"] = patient_options_quick_replies(
+        result,
+        client_id=client_id,
+    )

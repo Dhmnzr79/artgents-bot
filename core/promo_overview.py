@@ -146,7 +146,7 @@ def _quick_replies_for_items(
             if not sid_eff or sid_eff in seen:
                 continue
             seen.add(sid_eff)
-            out.append({"label": f"Стоимость: {_service_label(client_id, sid_eff)}", "ref": f"price:{sid_eff}"})
+            out.append({"label": f"Цена и условия {_service_label(client_id, sid_eff)}", "ref": f"price:{sid_eff}"})
             if len(out) >= limit:
                 return out
     return out

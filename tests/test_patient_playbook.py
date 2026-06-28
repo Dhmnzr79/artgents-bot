@@ -14,6 +14,7 @@ from contracts.patient_situation import (
 from core.patient_playbook import (
     build_patient_options_llm_context,
     load_patient_playbook,
+    patient_options_quick_replies,
     select_patient_options,
     should_use_patient_options_overview,
 )
@@ -134,3 +135,21 @@ def test_llm_context_contains_selected_options_not_canned_copy():
     assert "intro" not in ctx
     assert "closer" not in ctx
     assert "short_text" not in opts[0]
+
+
+def test_patient_options_buttons_open_md_not_price():
+    situation = detect_patient_situation("Нужно восстановить всю челюсть, какие варианты?")
+    result = select_patient_options(
+        situation,
+        "Нужно восстановить всю челюсть, какие варианты?",
+        "demo",
+    )
+
+    assert result is not None
+    quick = patient_options_quick_replies(result, client_id="demo")
+    refs = [item["ref"] for item in quick]
+
+    assert "implantation__service__all_on_4.md#korotko" in refs
+    assert "implantation__service__all_on_6.md#korotko" in refs
+    assert all(not ref.startswith("price:") for ref in refs)
+    assert all(item.get("source") == "patient_option" for item in quick)

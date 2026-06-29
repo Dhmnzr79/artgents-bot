@@ -58,9 +58,9 @@
 
 Подключить тот же focus contract к doctor/warranty/duration/included follow-up. Regex может остаться как быстрый детектор атрибута, но не как разрозненная память диалога.
 
-## Этап 5: observability
+## Этап 5: general follow-up + observability
 
-Статус: начато как bounded gray-zone follow-up.
+Статус: bounded gray-zone follow-up подключен, observability добавлен.
 
 Для коротких нормальных уточнений, которые не попали в частые атрибуты, `DialogFocusDecision` может получить `attribute=general` и `query_rewrite` от bounded LLM. LLM не выбирает бизнес-маршрут и не меняет услугу: она только формулирует поисковую фразу по уже выбранному фокусу.
 
@@ -73,5 +73,7 @@
 - использовалась ли LLM.
 
 ## Этап 6: cleanup
+
+Статус: начато. Старые маршруты постепенно переводятся на thin wrappers вокруг `DialogFocusDecision`.
 
 После зеленых golden-тестов убрать дублирующую follow-up логику или оставить старые функции только как тонкие совместимые обертки.

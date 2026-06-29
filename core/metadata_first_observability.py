@@ -59,6 +59,12 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     "patient_options_source",
     "patient_options_skipped",
     "patient_options_strategy",
+    "dialog_focus_service_id",
+    "dialog_focus_attribute",
+    "dialog_focus_explicit_topic_change",
+    "dialog_focus_resolved_service_id",
+    "dialog_focus_source",
+    "dialog_focus_used_llm",
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 

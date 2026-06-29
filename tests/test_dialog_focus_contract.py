@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
 from contracts.dialog_focus import DialogFocusGrayOutput
-from core.dialog_focus import build_dialog_focus_decision
+from core.dialog_focus import build_dialog_focus_decision, dialog_focus_for_turn
 from core.routing_loader import THRESHOLDS
 from session import mem_add_user, mem_reset, set_last_subject
 
@@ -100,6 +102,39 @@ def test_dialog_focus_gray_llm_skips_bare_ack(monkeypatch):
     assert focus.attribute == "overview"
     assert focus.used_llm is False
     assert focus.query_rewrite is None
+
+
+def test_dialog_focus_for_turn_prefers_cached_ctx(monkeypatch):
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "dialog_focus_decision": {
+                "focus_service_id": "classic",
+                "focus_topic": "implantation",
+                "focus_label": "Классическая имплантация",
+                "focus_turn_age": 0,
+                "attribute": "general",
+                "explicit_topic_change": False,
+                "resolved_service_id": "classic",
+                "source": "llm_gray",
+                "used_llm": True,
+                "confidence": 0.86,
+                "reason": "test",
+                "query_rewrite": "подойдет ли классическая имплантация пациенту",
+            }
+        }
+
+        def _raise_if_recomputed(*args, **kwargs):
+            raise AssertionError("cached dialog focus should be reused")
+
+        monkeypatch.setattr("core.dialog_focus.build_dialog_focus_decision", _raise_if_recomputed)
+        focus = dialog_focus_for_turn("А мне подойдет?", sid="sid", client_id="demo")
+
+    assert focus is not None
+    assert focus.resolved_service_id == "classic"
+    assert focus.query_rewrite == "подойдет ли классическая имплантация пациенту"
 
 
 def test_dialog_focus_contract_detects_explicit_topic_change():

@@ -6,6 +6,7 @@ from typing import Any
 from flask import request
 
 from core.turn_timing import summary_for_turn_complete
+from core.dialog_focus_observability import dialog_focus_response_meta, slim_dialog_focus_payload
 from core.metadata_first_observability import (
     metadata_first_response_meta,
     metadata_first_turn_details,
@@ -89,6 +90,9 @@ def finalize_ask(
         mf = metadata_first_response_meta()
         if mf:
             meta["metadata_first"] = mf
+        df = dialog_focus_response_meta()
+        if df:
+            meta["dialog_focus"] = df
 
     effective_route = str(route or request.ctx.get("route") or infer_route_from_payload(payload))
     request.ctx["route"] = effective_route
@@ -171,7 +175,9 @@ def finalize_ask(
                 "legacy_intent": request.ctx.get("legacy_intent"),
                 "effective_intent": str(request.ctx.get("effective_intent") or ""),
                 "source_route_decision": request.ctx.get("source_route_decision"),
-                "dialog_focus_decision": request.ctx.get("dialog_focus_decision"),
+                "dialog_focus_decision": slim_dialog_focus_payload(
+                    request.ctx.get("dialog_focus_decision")
+                ),
                 **verifier_trace_flat(request.ctx.get("verifier_turn")),
                 **summary_for_turn_complete(),
             },

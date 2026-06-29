@@ -84,15 +84,9 @@ def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent:
     hint = price_rules_hint(q)
     if hint:
         return hint
-    try:
-        from flask import has_request_context, request
-
-        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
-            focus = request.ctx.get("dialog_focus_decision")
-            if isinstance(focus, dict) and str(focus.get("attribute") or "") == "price":
-                return "price_lookup"
-    except Exception:
-        pass
+    focus = dialog_focus_from_ctx()
+    if focus is not None and focus.attribute == "price":
+        return "price_lookup"
     ri = "unknown"
     if decision is not None:
         ri = str(decision.route_intent or "unknown").strip().lower()

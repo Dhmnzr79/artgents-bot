@@ -42,7 +42,7 @@ from core.price_followup import (
     price_query_has_explicit_service_object,
 )
 from contracts.dialog_focus import DialogFocusDecision
-from core.dialog_focus import build_dialog_focus_decision
+from core.dialog_focus import dialog_focus_for_turn
 from core.pricebook_loader import load_pricebook_service
 from core.turn_timing import timed_stage
 from llm import classify_price_intent, rewrite_query_for_retrieval
@@ -640,19 +640,7 @@ def _dialog_focus_for_price_route(
     sid: str | None,
     client_id: str | None,
 ) -> DialogFocusDecision | None:
-    try:
-        from flask import has_request_context, request
-
-        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
-            raw = request.ctx.get("dialog_focus_decision")
-            if isinstance(raw, dict):
-                return DialogFocusDecision.model_validate(raw)
-    except Exception:
-        pass
-    try:
-        return build_dialog_focus_decision(q, sid=sid, client_id=client_id)
-    except Exception:
-        return None
+    return dialog_focus_for_turn(q, sid=sid, client_id=client_id)
 
 
 def _dialog_focus_price_intent(focus: DialogFocusDecision | None) -> bool:

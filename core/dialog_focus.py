@@ -235,6 +235,11 @@ def publish_dialog_focus_decision(focus: DialogFocusDecision) -> None:
             request.ctx["dialog_focus_service_id"] = focus.focus_service_id
             request.ctx["dialog_focus_attribute"] = focus.attribute
             request.ctx["dialog_focus_explicit_topic_change"] = focus.explicit_topic_change
+            request.ctx["dialog_focus_resolved_service_id"] = focus.resolved_service_id
+            request.ctx["dialog_focus_source"] = focus.source
+            request.ctx["dialog_focus_used_llm"] = focus.used_llm
+            if focus.query_rewrite:
+                request.ctx["dialog_focus_query_rewrite"] = focus.query_rewrite
     except Exception:
         pass
 
@@ -250,6 +255,22 @@ def dialog_focus_from_ctx() -> DialogFocusDecision | None:
     except Exception:
         return None
     return None
+
+
+def dialog_focus_for_turn(
+    q: str,
+    *,
+    sid: str | None,
+    client_id: str | None,
+    decision: DecisionFrame | None = None,
+) -> DialogFocusDecision | None:
+    cached = dialog_focus_from_ctx()
+    if cached is not None:
+        return cached
+    try:
+        return build_dialog_focus_decision(q, sid=sid, client_id=client_id, decision=decision)
+    except Exception:
+        return None
 
 
 def dialog_focus_service_id(focus: DialogFocusDecision | None) -> str | None:

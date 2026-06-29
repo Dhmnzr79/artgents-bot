@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from contracts.dialog_focus import DialogFocusDecision
 from core.follow_up_rewrite import (
     is_explicit_topic_change,
     prepare_follow_up_turn,
@@ -34,6 +37,42 @@ def test_rewrite_pain_and_payment():
         rewrite_follow_up_query("рассрочка?", focus)
         == "оплата и рассрочка классическую имплантацию"
     )
+
+
+def test_rewrite_included_from_focus_label():
+    focus = {
+        "service_id": "classic",
+        "topic": "implantation",
+        "label": "классическую имплантацию",
+        "last_route": "retrieval_chunk",
+    }
+    assert rewrite_follow_up_query("Что входит?", focus) == "что входит в классическую имплантацию"
+
+
+def test_prepare_follow_up_turn_uses_dialog_focus_ctx_without_session_subject():
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "dialog_focus_decision": DialogFocusDecision(
+                focus_service_id="classic",
+                focus_topic="implantation",
+                focus_label="Классическая имплантация",
+                focus_turn_age=0,
+                attribute="included",
+                explicit_topic_change=False,
+                resolved_service_id="classic",
+                source="last_subject",
+                used_llm=False,
+                confidence=0.8,
+                reason="test",
+            ).model_dump()
+        }
+        ctx = prepare_follow_up_turn("Что входит?", {}, client_id="demo")
+    assert ctx is not None
+    assert ctx.focus["service_id"] == "classic"
+    assert ctx.rewritten_query == "что входит в Классическая имплантация"
 
 
 def test_prepare_follow_up_turn_with_session_focus():

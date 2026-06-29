@@ -26,6 +26,13 @@ _DURATION_RE = re.compile(
     r"\b(долго|длительн|сколько\s+времени|по\s+времени|срок|сроки|месяц|недел)\w*\b",
     re.I | re.U,
 )
+_INCLUDED_RE = re.compile(
+    r"\b(под\s+ключ|что\s+входит|входит\s+в|не\s+входит|включено|состав)\b",
+    re.I | re.U,
+)
+_DIALOG_FOCUS_REWRITE_ATTRS = frozenset(
+    {"duration", "pain", "warranty", "payment", "included"}
+)
 
 
 @dataclass(frozen=True)
@@ -170,6 +177,8 @@ def rewrite_follow_up_query(q: str, focus: dict[str, str]) -> str:
         return f"больно ли {label}"
     if _PAYMENT_RE.search(low):
         return f"оплата и рассрочка {label}"
+    if _INCLUDED_RE.search(low):
+        return f"что входит в {label}"
     if _CONTACTS_RE.search(low):
         return "контакты и адрес клиники"
     if _DURATION_RE.search(low):
@@ -178,6 +187,52 @@ def rewrite_follow_up_query(q: str, focus: dict[str, str]) -> str:
     if cleaned:
         return f"{cleaned} {label}"
     return label
+
+
+def _dialog_focus_for_follow_up(
+    q: str,
+    *,
+    st: dict[str, Any],
+    client_id: str | None,
+) -> tuple[dict[str, str], int] | None:
+    try:
+        from core.dialog_focus import dialog_focus_from_ctx
+
+        focus_decision = dialog_focus_from_ctx()
+    except Exception:
+        return None
+    if focus_decision is None:
+        return None
+    if focus_decision.attribute not in _DIALOG_FOCUS_REWRITE_ATTRS:
+        return None
+    if focus_decision.explicit_topic_change:
+        return None
+    service_id = normalize_service_id(
+        focus_decision.resolved_service_id or focus_decision.focus_service_id
+    )
+    if not service_id:
+        return None
+    age = (
+        int(focus_decision.focus_turn_age)
+        if isinstance(focus_decision.focus_turn_age, int)
+        else int(st.get("subject_turn_age") or 0)
+    )
+    if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
+        return None
+    label = (
+        str(focus_decision.focus_label or "").strip()
+        or catalog_service_label(client_id, service_id)
+        or service_id
+    )
+    return (
+        {
+            "service_id": service_id,
+            "topic": str(focus_decision.focus_topic or "").strip().lower(),
+            "label": label,
+            "last_route": str(focus_decision.source or "").strip(),
+        },
+        age,
+    )
 
 
 def persist_focus_from_service_turn(
@@ -225,26 +280,32 @@ def prepare_follow_up_turn(
     client_id: str | None,
 ) -> FollowUpTurnContext | None:
     q0 = (q or "").strip()
-    if not q0 or not is_short_attribute_followup(q0):
+    if not q0:
         return None
 
-    sub = st.get("last_subject")
-    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
-        focus = {
-            "service_id": str(sub.get("service_id") or "").strip(),
-            "topic": str(sub.get("topic") or "").strip(),
-            "label": str(sub.get("label") or sub.get("service_id") or "").strip(),
-            "last_route": str(sub.get("last_route") or "").strip(),
-        }
+    dialog_focus = _dialog_focus_for_follow_up(q0, st=st, client_id=client_id)
+    if dialog_focus:
+        focus, age = dialog_focus
     else:
-        legacy = focus_from_legacy_session(st, client_id=client_id)
-        if not legacy:
+        if not is_short_attribute_followup(q0):
             return None
-        focus = legacy
+        sub = st.get("last_subject")
+        if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
+            focus = {
+                "service_id": str(sub.get("service_id") or "").strip(),
+                "topic": str(sub.get("topic") or "").strip(),
+                "label": str(sub.get("label") or sub.get("service_id") or "").strip(),
+                "last_route": str(sub.get("last_route") or "").strip(),
+            }
+        else:
+            legacy = focus_from_legacy_session(st, client_id=client_id)
+            if not legacy:
+                return None
+            focus = legacy
 
-    age = int(st.get("subject_turn_age") or 0)
-    if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
-        return None
+        age = int(st.get("subject_turn_age") or 0)
+        if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
+            return None
     if is_explicit_topic_change(q0, focus, client_id=client_id):
         return None
 

@@ -127,7 +127,7 @@ def test_e2e_multi_turn_vague_price_after_zygomatic_content(monkeypatch):
     turns_before_price = [
         "сколько стоит поставить один имплант?",
         "Сколько стоит имплантация всей челюсти?",
-        "чем скуловая имплантация отличается от классической?",
+        "расскажите про скуловую имплантацию",
     ]
     for i, q in enumerate(turns_before_price):
         resp = client.post("/ask", json={"q": q, "sid": sid, "client_id": "demo"})
@@ -143,7 +143,7 @@ def test_e2e_multi_turn_vague_price_after_zygomatic_content(monkeypatch):
 
     resp = client.post(
         "/ask",
-        json={"q": "А сколько стоит?", "sid": sid, "client_id": "demo"},
+        json={"q": "А сколько они стоят?", "sid": sid, "client_id": "demo"},
     )
     assert resp.status_code == 200
     body = resp.get_json() or {}

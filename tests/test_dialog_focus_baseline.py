@@ -9,14 +9,9 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from contracts.decision_frame import DecisionFrame
 from core.attribute_followup import detect_vague_attribute_kinds
-from core.price_followup import (
-    is_vague_price_followup,
-    price_query_has_explicit_service_object,
-)
+from core.dialog_focus import build_dialog_focus_decision
 from core.pricebook_loader import load_pricebook_service
 from core.routing_loader import THRESHOLDS
 from query_selector import select_price_service_route
@@ -66,10 +61,6 @@ def test_baseline_singular_price_followup_uses_last_focus():
     assert pb.price.value == 420_000
 
 
-@pytest.mark.xfail(
-    reason="Stage 0 baseline: pronoun/plural price follow-up is not unified yet.",
-    strict=False,
-)
 def test_target_pronoun_plural_price_followup_uses_last_focus():
     sid = f"df-price-pronoun-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
@@ -77,8 +68,9 @@ def test_target_pronoun_plural_price_followup_uses_last_focus():
 
     q = "А сколько они стоят?"
 
-    assert is_vague_price_followup(q)
-    assert not price_query_has_explicit_service_object(q)
+    focus = build_dialog_focus_decision(q, sid=sid, client_id="demo")
+    assert focus.attribute == "price"
+    assert focus.resolved_service_id == "zygomatic_implants"
     route = select_price_service_route(
         q,
         client_id="demo",

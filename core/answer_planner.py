@@ -18,6 +18,7 @@ from core.attribute_followup import (
     detect_vague_attribute_kinds,
     is_vague_attribute_followup_any,
 )
+from core.dialog_focus import dialog_focus_from_ctx, dialog_focus_service_id
 from query_selector import match_service_from_catalog
 from core.service_followup import is_short_attribute_followup, normalize_service_id
 from session import get_last_subject
@@ -130,6 +131,14 @@ def _resolve_service_id(
         if not svc:
             svc = normalize_service_id(str(decision.service_id or ""))
         topic = str(decision.service_topic or "").strip().lower() or None
+    focus_decision = dialog_focus_from_ctx()
+    focus_svc = dialog_focus_service_id(focus_decision)
+    if focus_svc and (not svc or bool(focus_decision and focus_decision.explicit_topic_change)):
+        svc = focus_svc
+        topic = (
+            str(getattr(focus_decision, "focus_topic", None) or topic or "").strip().lower()
+            or topic
+        )
     subject = get_last_subject(sid)
     vague_kinds = detect_vague_attribute_kinds(q)
     if not svc and subject and vague_kinds:
@@ -205,6 +214,15 @@ def build_answer_plan(
     reason_bits: list[str] = []
     if len(aspects) > 1:
         reason_bits.append("composite")
+    focus_decision = dialog_focus_from_ctx()
+    if service_id and focus_decision and focus_decision.attribute in (
+        "duration",
+        "pain",
+        "warranty",
+        "payment",
+        "included",
+    ):
+        reason_bits.append("dialog_focus")
     if service_id and get_last_subject(sid):
         reason_bits.append("subject_carry")
     return AnswerPlan(

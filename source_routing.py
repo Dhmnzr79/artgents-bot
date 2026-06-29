@@ -12,6 +12,7 @@ from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
 
 from core.attribute_followup import is_vague_attribute_followup
+from core.dialog_focus import dialog_focus_from_ctx, dialog_focus_service_id
 from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctor_intent_probe, doctor_name_probe, doctors_lookup
 from query_selector import (
@@ -32,6 +33,12 @@ from session import get_last_subject, mem_get
 
 
 def _vague_doctor_session_hints(sid: str | None) -> tuple[str | None, str | None]:
+    focus = dialog_focus_from_ctx()
+    if focus is not None and focus.attribute == "doctor" and not focus.explicit_topic_change:
+        svc = dialog_focus_service_id(focus)
+        topic = str(focus.focus_topic or "").strip() or None
+        if svc:
+            return svc, topic
     if not sid:
         return None, None
     st = mem_get(sid)
@@ -77,6 +84,15 @@ def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent:
     hint = price_rules_hint(q)
     if hint:
         return hint
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
+            focus = request.ctx.get("dialog_focus_decision")
+            if isinstance(focus, dict) and str(focus.get("attribute") or "") == "price":
+                return "price_lookup"
+    except Exception:
+        pass
     ri = "unknown"
     if decision is not None:
         ri = str(decision.route_intent or "unknown").strip().lower()

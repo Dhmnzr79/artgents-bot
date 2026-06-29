@@ -18,6 +18,13 @@ from core.service_followup import normalize_service_id
 from session import mem_get
 
 _PRICE_TOKEN_RE = re.compile(r"сто\w+|цен\w+|прайс|руб\w*|обойд\w*", re.I | re.U)
+_DIRECT_PRICE_TOKEN_RE = re.compile(
+    r"стоимост\w*|цен\w+|прайс|руб\w*|обойд\w*",
+    re.I | re.U,
+)
+ATTRIBUTE_FOLLOWUP_KINDS = frozenset(
+    {"price", "duration", "pain", "warranty", "doctor", "payment", "included"}
+)
 
 
 def _focus_from_last_subject(st: dict[str, Any]) -> tuple[dict[str, str] | None, int | None]:
@@ -50,7 +57,7 @@ def _primary_attribute(q: str) -> DialogFocusAttribute:
     q0 = (q or "").strip().lower().replace("ё", "е")
     if "сколько" in q0 and _PRICE_TOKEN_RE.search(q0):
         return "price"
-    if _PRICE_TOKEN_RE.search(q0) and len(q0.split()) <= 10:
+    if _DIRECT_PRICE_TOKEN_RE.search(q0) and len(q0.split()) <= 10:
         return "price"
     return "overview" if q0 else "unknown"
 
@@ -142,6 +149,26 @@ def publish_dialog_focus_decision(focus: DialogFocusDecision) -> None:
             request.ctx["dialog_focus_explicit_topic_change"] = focus.explicit_topic_change
     except Exception:
         pass
+
+
+def dialog_focus_from_ctx() -> DialogFocusDecision | None:
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
+            raw = request.ctx.get("dialog_focus_decision")
+            if isinstance(raw, dict):
+                return DialogFocusDecision.model_validate(raw)
+    except Exception:
+        return None
+    return None
+
+
+def dialog_focus_service_id(focus: DialogFocusDecision | None) -> str | None:
+    if focus is None or focus.attribute not in ATTRIBUTE_FOLLOWUP_KINDS:
+        return None
+    sid = normalize_service_id(focus.resolved_service_id or focus.focus_service_id)
+    return sid or None
 
 
 def record_dialog_focus_ctx(

@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 from contracts.decision_frame import DecisionFrame
+from contracts.dialog_focus import DialogFocusDecision
 from core.routing_loader import THRESHOLDS
 from doctors_lookup import build_doctors_list_llm_question, doctors_lookup
 from source_routing import _vague_doctor_session_hints, route_source
@@ -62,6 +63,39 @@ def test_route_source_vague_doctor_with_session():
     assert sr.service_id is None
     assert sr.match_method == "doctors_lookup"
     payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
+    assert isinstance(payload, dict)
+    assert payload.get("matched_service_id") == "classic"
+
+
+def test_route_source_vague_doctor_uses_dialog_focus_ctx_without_session_subject():
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "dialog_focus_decision": DialogFocusDecision(
+                focus_service_id="classic",
+                focus_topic="implantation",
+                focus_label="Классическая имплантация",
+                focus_turn_age=0,
+                attribute="doctor",
+                explicit_topic_change=False,
+                resolved_service_id="classic",
+                source="last_subject",
+                used_llm=False,
+                confidence=0.8,
+                reason="test",
+            ).model_dump()
+        }
+        sr = route_source(
+            "Кто делает?",
+            sid="doctor-dialog-focus",
+            client_id="demo",
+            decision=_content_frame(),
+            app_intent="content",
+        )
+    payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
+    assert sr.source == "doctor"
     assert isinstance(payload, dict)
     assert payload.get("matched_service_id") == "classic"
 

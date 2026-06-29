@@ -41,6 +41,8 @@ from core.price_followup import (
     is_weak_catalog_price_token_match,
     price_query_has_explicit_service_object,
 )
+from contracts.dialog_focus import DialogFocusDecision
+from core.dialog_focus import build_dialog_focus_decision
 from core.pricebook_loader import load_pricebook_service
 from core.turn_timing import timed_stage
 from llm import classify_price_intent, rewrite_query_for_retrieval
@@ -632,6 +634,45 @@ def price_lookup_allows_session_context(q: str, match: dict[str, Any], ctx: dict
     return True
 
 
+def _dialog_focus_for_price_route(
+    q: str,
+    *,
+    sid: str | None,
+    client_id: str | None,
+) -> DialogFocusDecision | None:
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
+            raw = request.ctx.get("dialog_focus_decision")
+            if isinstance(raw, dict):
+                return DialogFocusDecision.model_validate(raw)
+    except Exception:
+        pass
+    try:
+        return build_dialog_focus_decision(q, sid=sid, client_id=client_id)
+    except Exception:
+        return None
+
+
+def _dialog_focus_price_intent(focus: DialogFocusDecision | None) -> bool:
+    return bool(focus and focus.attribute == "price")
+
+
+def _dialog_focus_allows_price_session_context(
+    focus: DialogFocusDecision | None,
+    ctx: dict[str, Any],
+) -> bool:
+    if not _dialog_focus_price_intent(focus) or not focus:
+        return False
+    if focus.explicit_topic_change:
+        return False
+    resolved = (focus.resolved_service_id or focus.focus_service_id or "").strip()
+    if not resolved:
+        return False
+    return resolved == str(ctx.get("service_id") or "").strip()
+
+
 def _try_price_session_route(
     q: str,
     match: dict[str, Any],
@@ -641,9 +682,14 @@ def _try_price_session_route(
     sid: str | None,
     client_id: str | None,
     fallback_reason_default: str = "context_session",
+    dialog_focus: DialogFocusDecision | None = None,
 ) -> dict | None:
-    if not price_lookup_allows_session_context(q, match, ctx):
+    legacy_allowed = price_lookup_allows_session_context(q, match, ctx)
+    focus_allowed = _dialog_focus_allows_price_session_context(dialog_focus, ctx)
+    if not (legacy_allowed or focus_allowed):
         return None
+    if focus_allowed and not legacy_allowed:
+        fallback_reason_default = "dialog_focus"
     pi = ctx.get("price_item")
     pr = ctx.get("price_ref")
     rs = "catalog"
@@ -682,10 +728,13 @@ def _try_price_session_route(
 def select_price_service_route(
     q: str, *, client_id: str | None, sid: str | None = None, intent_override: str | None = None
 ) -> dict:
+    dialog_focus = _dialog_focus_for_price_route(q, sid=sid, client_id=client_id)
     if intent_override in ("price_lookup", "price_concern"):
         intent = intent_override
     else:
         intent = classify_price_route_intent(q, client_id=client_id, sid=sid)
+    if intent == "other" and _dialog_focus_price_intent(dialog_focus):
+        intent = "price_lookup"
     if intent == "other":
         return {"mode": "other", "intent": intent}
     if is_crown_inclusion_content_query(q):
@@ -751,7 +800,13 @@ def select_price_service_route(
             ctx = _service_from_session_context(sid, client_id)
             if ctx:
                 session_route = _try_price_session_route(
-                    q, match, ctx, intent=intent, sid=sid, client_id=client_id
+                    q,
+                    match,
+                    ctx,
+                    intent=intent,
+                    sid=sid,
+                    client_id=client_id,
+                    dialog_focus=dialog_focus,
                 )
                 if session_route:
                     return session_route
@@ -773,9 +828,18 @@ def select_price_service_route(
                 **match_catalog_for_implant_group_overview(q, client_id=client_id),
             }
         ctx = _service_from_session_context(sid, client_id)
-        if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
+        if ctx and intent == "price_lookup" and (
+            price_lookup_allows_session_context(q, match, ctx)
+            or _dialog_focus_allows_price_session_context(dialog_focus, ctx)
+        ):
             session_route = _try_price_session_route(
-                q, match, ctx, intent=intent, sid=sid, client_id=client_id
+                q,
+                match,
+                ctx,
+                intent=intent,
+                sid=sid,
+                client_id=client_id,
+                dialog_focus=dialog_focus,
             )
             if session_route:
                 return session_route
@@ -796,9 +860,18 @@ def select_price_service_route(
         }
     if not match.get("is_confident"):
         ctx = _service_from_session_context(sid, client_id)
-        if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
+        if ctx and intent == "price_lookup" and (
+            price_lookup_allows_session_context(q, match, ctx)
+            or _dialog_focus_allows_price_session_context(dialog_focus, ctx)
+        ):
             session_route = _try_price_session_route(
-                q, match, ctx, intent=intent, sid=sid, client_id=client_id
+                q,
+                match,
+                ctx,
+                intent=intent,
+                sid=sid,
+                client_id=client_id,
+                dialog_focus=dialog_focus,
             )
             if session_route:
                 return session_route

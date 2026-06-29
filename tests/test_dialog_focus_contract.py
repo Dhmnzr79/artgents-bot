@@ -36,6 +36,25 @@ def test_dialog_focus_contract_carries_last_subject_for_pronoun_price():
     assert focus.used_llm is False
 
 
+def test_dialog_focus_contract_common_attribute_followups():
+    sid = f"df-contract-attrs-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid)
+    _set_focus(sid, "classic")
+
+    cases = {
+        "Кто делает?": "doctor",
+        "Гарантия какая?": "warranty",
+        "Сколько это длится?": "duration",
+        "Что входит?": "included",
+        "Больно?": "pain",
+    }
+    for q, attr in cases.items():
+        focus = build_dialog_focus_decision(q, sid=sid, client_id="demo")
+        assert focus.resolved_service_id == "classic"
+        assert focus.attribute == attr
+        assert focus.explicit_topic_change is False
+
+
 def test_dialog_focus_contract_detects_explicit_topic_change():
     sid = f"df-contract-topic-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+from contracts.dialog_focus import DialogFocusDecision
 from contracts.answer_plan import AnswerPlan
 from core.answer_plan_apply import (
     append_text_has_payment_stages,
@@ -68,6 +71,39 @@ def test_follow_up_payment_uses_last_subject():
     assert "payment" in plan.aspects
     assert "payment_terms" in plan.append
     assert "price_offer" not in plan.append
+
+
+def test_planner_uses_dialog_focus_for_attribute_without_session_subject():
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "dialog_focus_decision": DialogFocusDecision(
+                focus_service_id="classic",
+                focus_topic="implantation",
+                focus_label="Классическая имплантация",
+                focus_turn_age=0,
+                attribute="warranty",
+                explicit_topic_change=False,
+                resolved_service_id="classic",
+                source="last_subject",
+                used_llm=False,
+                confidence=0.8,
+                reason="test",
+            ).model_dump()
+        }
+        plan = build_answer_plan(
+            q="Гарантия какая?",
+            sid="planner-dialog-focus",
+            client_id="demo",
+            intent="content",
+            decision=None,
+            source_route=None,
+        )
+    assert plan.service_id == "classic"
+    assert "warranty" in plan.aspects
+    assert "dialog_focus" in plan.plan_reason
 
 
 def test_suppress_payment_terms_when_answer_has_installment():

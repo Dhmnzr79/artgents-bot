@@ -15,6 +15,8 @@ from config import (
     chat_provider_is_qwen,
     CHAT_MODEL,
     COMPLAINT_CLASSIFY_MODEL,
+    DIALOG_FOCUS_LLM_CLASSIFY_ON,
+    DIALOG_FOCUS_LLM_MODEL,
     EMBED_API_KEY,
     EMPATHY_ON,
     LEAD_NAME_CLASSIFY_MODEL,
@@ -77,6 +79,18 @@ _REWRITE_SYSTEM = (
     "Не выдумывай факты: опирайся только на явное в диалоге и в текущем вопросе. "
     "Если вопрос уже самодостаточен — сожми до сути без лишних слов. "
     'Ответь одним JSON-объектом с ключом "search_query" (строка). Без markdown.'
+)
+
+_DIALOG_FOCUS_GRAY_SYSTEM = (
+    "Ты строгий классификатор коротких уточняющих вопросов в стоматологическом чате. "
+    "У тебя есть текущая тема диалога: конкретная услуга. "
+    "Задача: определить, является ли сообщение пациента нормальным уточнением по этой теме. "
+    "Не выбирай маршрут, не добавляй маркетинг, не выдумывай факты. "
+    "Если это уточнение по текущей теме, верни kind=follow_up и короткий query_rewrite для поиска по базе знаний. "
+    "query_rewrite должен явно включать текущую услугу и смысл вопроса пациента. "
+    "Если пациент явно меняет тему, просит записаться, называет другую услугу или непонятно о чем речь — верни kind=unclear. "
+    'Ответь одним JSON-объектом: {"kind":"follow_up|unclear","attribute":"general","query_rewrite":"...","confidence":0.0}. '
+    "Без markdown и текста вне JSON."
 )
 
 
@@ -1010,6 +1024,116 @@ def classify_lead_turn_gray_zone(
         log_json(
             logger,
             "lead_turn_gray_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
+def classify_dialog_focus_gray_zone(
+    user_message: str,
+    *,
+    focus_service_id: str,
+    focus_label: str,
+    focus_topic: str | None,
+    client_id: str | None,
+    sid: str | None,
+) -> dict | None:
+    """
+    Gray-zone LLM for short dialog follow-ups.
+    Returns parsed dict with kind/attribute/query_rewrite/confidence, or None.
+    """
+    if not DIALOG_FOCUS_LLM_CLASSIFY_ON:
+        return None
+    msg = (user_message or "").strip()
+    service_id = (focus_service_id or "").strip()
+    label = (focus_label or service_id).strip()
+    if len(msg) < 2 or not service_id or not label:
+        return None
+    payload = json.dumps(
+        {
+            "message": msg[:600],
+            "focus_service_id": service_id,
+            "focus_label": label,
+            "focus_topic": (focus_topic or "").strip() or None,
+        },
+        ensure_ascii=False,
+    )
+    try:
+        resp = chat_completions_create(
+            model=DIALOG_FOCUS_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=120,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _DIALOG_FOCUS_GRAY_SYSTEM},
+                {"role": "user", "content": payload},
+            ],
+        )
+        log_llm_usage(
+            logger, resp, call_type="dialog_focus_gray", model=DIALOG_FOCUS_LLM_MODEL
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("dialog_focus_gray_not_object")
+        kind = str(obj.get("kind") or "").strip().lower()
+        if kind not in {"follow_up", "unclear"}:
+            raise ValueError(f"dialog_focus_gray_bad_kind:{kind!r}")
+        rewrite = str(obj.get("query_rewrite") or "").strip()
+        if len(rewrite) > 300:
+            rewrite = rewrite[:300].strip()
+        conf_raw = obj.get("confidence")
+        try:
+            confidence = float(conf_raw)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        if kind != "follow_up":
+            log_json(
+                logger,
+                "dialog_focus_gray_unclear",
+                client_id=client_id,
+                sid=sid,
+                confidence=confidence,
+            )
+            return None
+        if confidence < 0.72 or not rewrite:
+            log_json(
+                logger,
+                "dialog_focus_gray_low_confidence",
+                client_id=client_id,
+                sid=sid,
+                confidence=confidence,
+                has_rewrite=bool(rewrite),
+            )
+            return None
+        log_json(
+            logger,
+            "dialog_focus_gray",
+            client_id=client_id,
+            sid=sid,
+            focus_service_id=service_id,
+            confidence=confidence,
+        )
+        return {
+            "kind": "follow_up",
+            "attribute": "general",
+            "query_rewrite": rewrite,
+            "confidence": confidence,
+        }
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="dialog_focus_gray",
+            err=str(e),
+            model=DIALOG_FOCUS_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "dialog_focus_gray_failed",
             client_id=client_id,
             sid=sid,
             err=str(e)[:300],

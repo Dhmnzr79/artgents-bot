@@ -23,7 +23,19 @@ _DIRECT_PRICE_TOKEN_RE = re.compile(
     re.I | re.U,
 )
 ATTRIBUTE_FOLLOWUP_KINDS = frozenset(
-    {"price", "duration", "pain", "warranty", "doctor", "payment", "included"}
+    {"price", "duration", "pain", "warranty", "doctor", "payment", "included", "general"}
+)
+_GRAY_FOLLOWUP_START_RE = re.compile(
+    r"^(?:а|и|ну|так|ещ[её]|а\s+если|а\s+что|можно|мне|после|потом)\b",
+    re.I | re.U,
+)
+_GRAY_TOPIC_CHANGE_RE = re.compile(
+    r"\b(?:запис|адрес|телефон|контакт|цена|стоим|прайс|винир|брекет|отбелив|кариес)\w*",
+    re.I | re.U,
+)
+_GRAY_BARE_ACK_RE = re.compile(
+    r"^(?:да|нет|неа|ага|угу|ок|okay|спасибо|благодарю|понял|поняла|хорошо)[\s!.?]*$",
+    re.I | re.U,
 )
 
 
@@ -71,6 +83,60 @@ def _explicit_service_match(q: str, *, client_id: str | None) -> str | None:
     return normalize_service_id(str(match.get("matched_service_id") or "")) or None
 
 
+def _gray_followup_candidate(q: str) -> bool:
+    q0 = (q or "").strip()
+    if not q0:
+        return False
+    if _GRAY_BARE_ACK_RE.match(q0):
+        return False
+    words = [w for w in re.split(r"\s+", q0, flags=re.U) if w]
+    if len(words) > 10:
+        return False
+    if _GRAY_TOPIC_CHANGE_RE.search(q0):
+        return False
+    if _GRAY_FOLLOWUP_START_RE.search(q0):
+        return True
+    return len(words) <= 4
+
+
+def _gray_llm_focus(
+    q: str,
+    *,
+    sid: str | None,
+    client_id: str | None,
+    focus: dict[str, str] | None,
+    attribute: DialogFocusAttribute,
+    explicit_topic_change: bool,
+) -> tuple[DialogFocusAttribute, bool, float | None, str | None, str | None, DialogFocusSource | None]:
+    if attribute not in ("overview", "unknown"):
+        return attribute, False, None, None, None, None
+    if explicit_topic_change or not focus or not _gray_followup_candidate(q):
+        return attribute, False, None, None, None, None
+    service_id = normalize_service_id(str(focus.get("service_id") or ""))
+    label = str(focus.get("label") or service_id).strip()
+    if not service_id or not label:
+        return attribute, False, None, None, None, None
+    try:
+        from core.dialog_focus_llm import classify_dialog_focus_gray_zone
+
+        out = classify_dialog_focus_gray_zone(
+            q,
+            focus_service_id=service_id,
+            focus_label=label,
+            focus_topic=str(focus.get("topic") or "").strip() or None,
+            client_id=client_id,
+            sid=sid,
+        )
+    except Exception:
+        return attribute, False, None, None, None, None
+    if out is None:
+        return attribute, False, None, None, None, None
+    rewrite = str(out.query_rewrite or "").strip()
+    if not rewrite:
+        return attribute, False, None, None, None, None
+    return "general", True, float(out.confidence), rewrite, "llm_gray", "llm_gray"
+
+
 def build_dialog_focus_decision(
     q: str,
     *,
@@ -100,12 +166,29 @@ def build_dialog_focus_decision(
     explicit_topic_change = bool(
         explicit_service_id and focus_service_id and explicit_service_id != focus_service_id
     )
+    (
+        attribute,
+        used_llm,
+        llm_confidence,
+        query_rewrite,
+        llm_reason,
+        llm_source,
+    ) = _gray_llm_focus(
+        q0,
+        sid=sid,
+        client_id=client_id,
+        focus=focus,
+        attribute=attribute,
+        explicit_topic_change=explicit_topic_change,
+    )
     resolved_service_id = (
         explicit_service_id
         if explicit_topic_change
         else (focus_service_id or explicit_service_id or decision_service_id)
     )
     out_source = "explicit_service" if explicit_service_id and explicit_service_id != focus_service_id else source
+    if llm_source:
+        out_source = llm_source
     confidence = 0.0
     reason_bits: list[str] = []
     if focus_service_id:
@@ -120,6 +203,10 @@ def build_dialog_focus_decision(
     if attribute not in ("overview", "unknown"):
         confidence = max(confidence, 0.8 if confidence else 0.6)
         reason_bits.append(f"attribute:{attribute}")
+    if used_llm and llm_confidence is not None:
+        confidence = max(confidence, llm_confidence)
+        if llm_reason:
+            reason_bits.append(llm_reason)
     if explicit_topic_change:
         reason_bits.append("explicit_topic_change")
 
@@ -132,9 +219,10 @@ def build_dialog_focus_decision(
         explicit_topic_change=explicit_topic_change,
         resolved_service_id=resolved_service_id,
         source=out_source,
-        used_llm=False,
+        used_llm=used_llm,
         confidence=confidence,
         reason="|".join(reason_bits) if reason_bits else "no_focus",
+        query_rewrite=query_rewrite,
     )
 
 

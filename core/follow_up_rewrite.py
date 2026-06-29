@@ -31,7 +31,7 @@ _INCLUDED_RE = re.compile(
     re.I | re.U,
 )
 _DIALOG_FOCUS_REWRITE_ATTRS = frozenset(
-    {"duration", "pain", "warranty", "payment", "included"}
+    {"duration", "pain", "warranty", "payment", "included", "general"}
 )
 
 
@@ -205,6 +205,10 @@ def _dialog_focus_for_follow_up(
         return None
     if focus_decision.attribute not in _DIALOG_FOCUS_REWRITE_ATTRS:
         return None
+    if focus_decision.attribute == "general" and not str(
+        focus_decision.query_rewrite or ""
+    ).strip():
+        return None
     if focus_decision.explicit_topic_change:
         return None
     service_id = normalize_service_id(
@@ -224,13 +228,16 @@ def _dialog_focus_for_follow_up(
         or catalog_service_label(client_id, service_id)
         or service_id
     )
+    focus = {
+        "service_id": service_id,
+        "topic": str(focus_decision.focus_topic or "").strip().lower(),
+        "label": label,
+        "last_route": str(focus_decision.source or "").strip(),
+    }
+    if focus_decision.query_rewrite:
+        focus["query_rewrite"] = str(focus_decision.query_rewrite).strip()
     return (
-        {
-            "service_id": service_id,
-            "topic": str(focus_decision.focus_topic or "").strip().lower(),
-            "label": label,
-            "last_route": str(focus_decision.source or "").strip(),
-        },
+        focus,
         age,
     )
 
@@ -309,7 +316,7 @@ def prepare_follow_up_turn(
     if is_explicit_topic_change(q0, focus, client_id=client_id):
         return None
 
-    rewritten = rewrite_follow_up_query(q0, focus)
+    rewritten = str(focus.get("query_rewrite") or "").strip() or rewrite_follow_up_query(q0, focus)
     return FollowUpTurnContext(
         follow_up_mode=True,
         rewritten_query=rewritten,

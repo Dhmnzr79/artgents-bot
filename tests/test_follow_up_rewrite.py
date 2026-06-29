@@ -75,6 +75,33 @@ def test_prepare_follow_up_turn_uses_dialog_focus_ctx_without_session_subject():
     assert ctx.rewritten_query == "что входит в Классическая имплантация"
 
 
+def test_prepare_follow_up_turn_uses_general_dialog_focus_rewrite():
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "dialog_focus_decision": DialogFocusDecision(
+                focus_service_id="classic",
+                focus_topic="implantation",
+                focus_label="Классическая имплантация",
+                focus_turn_age=0,
+                attribute="general",
+                explicit_topic_change=False,
+                resolved_service_id="classic",
+                source="llm_gray",
+                used_llm=True,
+                confidence=0.86,
+                reason="test",
+                query_rewrite="подойдет ли классическая имплантация пациенту",
+            ).model_dump()
+        }
+        ctx = prepare_follow_up_turn("А мне подойдет?", {}, client_id="demo")
+    assert ctx is not None
+    assert ctx.focus["service_id"] == "classic"
+    assert ctx.rewritten_query == "подойдет ли классическая имплантация пациенту"
+
+
 def test_prepare_follow_up_turn_with_session_focus():
     sid = "test-follow-up-focus"
     clear_last_subject(sid)

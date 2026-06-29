@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from contracts.dialog_focus import DialogFocusGrayOutput
 from core.dialog_focus import build_dialog_focus_decision
 from core.routing_loader import THRESHOLDS
 from session import mem_add_user, mem_reset, set_last_subject
@@ -53,6 +54,52 @@ def test_dialog_focus_contract_common_attribute_followups():
         assert focus.resolved_service_id == "classic"
         assert focus.attribute == attr
         assert focus.explicit_topic_change is False
+
+
+def test_dialog_focus_gray_llm_adds_general_rewrite(monkeypatch):
+    sid = f"df-contract-gray-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid)
+    _set_focus(sid, "classic")
+
+    def _fake_gray(q, **kwargs):
+        assert q == "А мне подойдет?"
+        assert kwargs["focus_service_id"] == "classic"
+        return DialogFocusGrayOutput(
+            kind="follow_up",
+            attribute="general",
+            query_rewrite="подойдет ли классическая имплантация пациенту",
+            confidence=0.86,
+        )
+
+    monkeypatch.setattr("core.dialog_focus_llm.classify_dialog_focus_gray_zone", _fake_gray)
+
+    focus = build_dialog_focus_decision("А мне подойдет?", sid=sid, client_id="demo")
+
+    assert focus.attribute == "general"
+    assert focus.resolved_service_id == "classic"
+    assert focus.query_rewrite == "подойдет ли классическая имплантация пациенту"
+    assert focus.used_llm is True
+    assert focus.source == "llm_gray"
+
+
+def test_dialog_focus_gray_llm_skips_bare_ack(monkeypatch):
+    sid = f"df-contract-ack-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid)
+    _set_focus(sid, "classic")
+
+    def _raise_if_called(*args, **kwargs):
+        raise AssertionError("gray LLM must not run for bare acknowledgement")
+
+    monkeypatch.setattr(
+        "core.dialog_focus_llm.classify_dialog_focus_gray_zone",
+        _raise_if_called,
+    )
+
+    focus = build_dialog_focus_decision("да", sid=sid, client_id="demo")
+
+    assert focus.attribute == "overview"
+    assert focus.used_llm is False
+    assert focus.query_rewrite is None
 
 
 def test_dialog_focus_contract_detects_explicit_topic_change():

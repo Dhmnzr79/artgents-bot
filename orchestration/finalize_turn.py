@@ -171,6 +171,7 @@ def finalize_ask(
                 "legacy_intent": request.ctx.get("legacy_intent"),
                 "effective_intent": str(request.ctx.get("effective_intent") or ""),
                 "source_route_decision": request.ctx.get("source_route_decision"),
+                "dialog_focus_decision": request.ctx.get("dialog_focus_decision"),
                 **verifier_trace_flat(request.ctx.get("verifier_turn")),
                 **summary_for_turn_complete(),
             },

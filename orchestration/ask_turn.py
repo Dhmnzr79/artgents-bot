@@ -18,6 +18,7 @@ from core.patient_situation_session import (
     persist_patient_situation_after_turn,
     resolve_patient_situation_for_turn,
 )
+from core.dialog_focus import record_dialog_focus_ctx
 from core.price_offers import is_crown_inclusion_content_query
 from orchestration.patient_playbook_flow import try_patient_options_overview
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
@@ -57,6 +58,7 @@ def orchestrate_routing_after_resolver(
     situation, carry_meta = resolve_patient_situation_for_turn(q, sid=sid)
     record_patient_situation_ctx(situation, carry_meta=carry_meta)
     persist_patient_situation_after_turn(sid, q, carry_meta=carry_meta)
+    record_dialog_focus_ctx(q, sid=sid, client_id=client_id, decision=decision)
 
     qp_loc = normalize_retrieval_query(q) or (q or "")
     if contacts_intent(qp_loc.strip()) or contacts_intent((q or "").strip()):

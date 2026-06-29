@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .arbiter_decision import ArbiterDecision
 from .decision_frame import DecisionFrame
+from .dialog_focus import DialogFocusDecision
 from .gate_trace import GateTrace
 from .ingress_route import IngressRouteResult
 from .retrieval_candidate import RetrievalCandidate
@@ -11,6 +12,7 @@ from .verifier_verdict import VerifierVerdict
 
 __all__ = [
     "DecisionFrame",
+    "DialogFocusDecision",
     "GateTrace",
     "IngressRouteResult",
     "SourceRouteResult",

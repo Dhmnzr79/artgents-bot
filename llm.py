@@ -27,6 +27,7 @@ from config import (
     PATIENT_SITUATION_LLM_ON,
     ASPECT_PLANNER_LLM_MODEL,
     ASPECT_PLANNER_LLM_ON,
+    COMPOSER_ON,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
     QUERY_REWRITE_MAX_MESSAGES,
@@ -423,6 +424,18 @@ GENERATOR_SINGLE_SOURCE_RULE = (
     "и как лучше сформулировать ответ."
 )
 
+COMPOSER_PACKET_RULE = (
+    "\n\n"
+    "Собери ОДИН связный ответ из разрешённых карточек ниже, В ПОРЯДКЕ их следования.\n"
+    "Факты, числа, акции и утверждения — ТОЛЬКО из карточек.\n"
+    "ЦЕНОВОЙ ФАКТБЛОК (помечен ДОСЛОВНО) воспроизведи дословно: суммы, единицу, список «входит» — "
+    "не меняй, не округляй, не дописывай и не выкидывай пункты.\n"
+    "Качественные аспекты (боль, гарантия, сроки) пересказывай из их текста, сохраняя оговорки "
+    "(«обычно», «зависит», «после осмотра», «индивидуально»), без обещаний "
+    "(«приживётся», «безболезненно», «гарантируем результат» — нельзя).\n"
+    "Вплетай естественно, без шва между темами. Приглашений и CTA не добавляй — их добавит интерфейс."
+)
+
 EMPATHY_ADDON = (
     "\n\n"
     "Если в YAML-шапке текущего документа включена эмпатия, начни ответ с одной короткой "
@@ -685,6 +698,94 @@ def generate_answer_with_empathy(
     update_topic_empathy(session_id, doc_key, use_empathy)
 
     return answer, profile
+
+
+def build_messages_for_packet_composer(
+    user_q: str,
+    materialized_cards: list,
+    meta: dict,
+    session_id: str,
+) -> list[dict[str, str]]:
+    """Messages for packet composer (phase 3a); cards are MaterializedCard-like."""
+    from contracts.answer_packet import MaterializedCard
+
+    client_id = meta.get("client_id")
+    system = (
+        build_base_system(client_id)
+        + RESPONSE_FORMAT
+        + COMPOSER_PACKET_RULE
+        + _consult_nudge_addon(meta)
+    )
+    blocks: list[str] = []
+    for idx, raw in enumerate(materialized_cards, start=1):
+        card = (
+            raw
+            if isinstance(raw, MaterializedCard)
+            else MaterializedCard.model_validate(raw)
+        )
+        aspect_bit = f", aspect={card.aspect}" if card.aspect else ""
+        mode = "ДОСЛОВНО" if card.verbatim else "пересказ с сохранением оговорок"
+        blocks.append(f"Карточка {idx} ({card.kind}{aspect_bit}) [{mode}]:\n{card.text}")
+    cards_blob = "\n\n---\n\n".join(blocks)
+    user_content = f"Вопрос пациента:\n{(user_q or '').strip()}\n\nРазрешённые карточки:\n{cards_blob}"
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def generate_answer_from_packet(
+    user_q: str,
+    materialized_cards: list,
+    meta: dict,
+    session_id: str,
+) -> tuple[str, dict]:
+    """Compose one answer from materialized packet cards (fail-open if disabled or empty)."""
+    if not COMPOSER_ON or not materialized_cards:
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    messages = build_messages_for_packet_composer(
+        user_q,
+        materialized_cards,
+        meta,
+        session_id,
+    )
+    kwargs: dict = dict(model=CHAT_MODEL, temperature=0.3, messages=messages)
+    if CHAT_JSON_MODE:
+        kwargs["response_format"] = {"type": "json_object"}
+    kwargs["timeout"] = LLM_REQUEST_TIMEOUT_SEC
+    try:
+        resp = chat_completions_create(**kwargs)
+        log_llm_usage(logger, resp, call_type="packet_composer", model=CHAT_MODEL)
+        raw = (resp.choices[0].message.content or "").strip()
+        answer = raw
+        if CHAT_JSON_MODE:
+            try:
+                obj = json.loads(raw)
+                if isinstance(obj, dict) and obj.get("answer"):
+                    answer = str(obj["answer"]).strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not (answer or "").strip():
+            answer = LLM_FALLBACK_ANSWER
+        log_json(
+            logger,
+            "packet_composer_generate",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            card_count=len(materialized_cards),
+            used_fallback=bool(answer == LLM_FALLBACK_ANSWER),
+        )
+        return answer, {"composer_used": True}
+    except Exception as e:
+        log_llm_error(logger, call_type="packet_composer", err=str(e), model=CHAT_MODEL)
+        log_json(
+            logger,
+            "packet_composer_failed",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            err=str(e)[:300],
+        )
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
 
 
 def generate_answer_stream(user_q: str, sources: list[dict], meta: dict, session_id: str):

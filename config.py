@@ -81,6 +81,13 @@ ANSWER_PACKET_ASSEMBLER_ON = os.getenv("ANSWER_PACKET_ASSEMBLER_ON", "0").lower(
     "yes",
 )
 
+# --- Packet composer (composer roadmap phase 3) ---
+COMPOSER_ON = os.getenv("COMPOSER_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

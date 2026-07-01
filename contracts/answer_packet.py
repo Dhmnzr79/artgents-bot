@@ -49,6 +49,19 @@ class PacketCard(BaseModel):
     suppressed_reason: str | None = None
 
 
+class MaterializedCard(BaseModel):
+    """Resolved text payload for composer LLM (phase 3a)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    aspect: AspectKind | None = None
+    kind: PacketCardKind
+    text: str
+    verbatim: bool = False
+    source_ref: str | None = None
+    fact_id: str | None = None
+
+
 class AnswerPacketSnapshot(BaseModel):
     """Deterministic packet snapshot for telemetry and eval (phase 0: derived from AnswerPlan)."""
 

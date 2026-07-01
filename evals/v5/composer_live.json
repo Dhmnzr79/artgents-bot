@@ -1,0 +1,140 @@
+{
+  "description": "Composer live eval — groups A/B/C/D from docs/COMPOSER_LIVE_EVAL.md",
+  "cases": [
+    {
+      "id": "A1",
+      "group": "A",
+      "question": "Сколько стоит all-on-4 и не больно ли?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "pain"],
+      "expected_amounts": [318000, 368000, 428000]
+    },
+    {
+      "id": "A2",
+      "group": "A",
+      "question": "Сколько стоит классическая имплантация и какая гарантия?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "warranty"],
+      "expected_amounts": [76200, 85200, 101200]
+    },
+    {
+      "id": "A3",
+      "group": "A",
+      "question": "Сколько стоит имплантация и есть ли рассрочка?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "payment"],
+      "expected_amounts": [76200, 85200, 101200]
+    },
+    {
+      "id": "A4",
+      "group": "A",
+      "question": "Сколько стоит all-on-6 и какие сроки лечения?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "duration"],
+      "expected_amounts": [398000, 458000, 528000]
+    },
+    {
+      "id": "A5",
+      "group": "A",
+      "question": "Больно ли ставить имплант и сколько времени всё заживает?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["pain", "duration"],
+      "expected_amounts": []
+    },
+    {
+      "id": "A6",
+      "group": "A",
+      "question": "Какая гарантия на импланты и есть ли рассрочка?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["warranty", "payment"],
+      "expected_amounts": []
+    },
+    {
+      "id": "A7",
+      "group": "A",
+      "question": "Сколько стоит одномоментная имплантация, больно ли и какая гарантия?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "pain", "warranty"],
+      "expected_amounts": [86500, 96500, 114500]
+    },
+    {
+      "id": "B1",
+      "group": "B",
+      "question": "Сколько стоит all-on-4 по разным системам и не больно ли?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "pain"],
+      "expected_amounts": [318000, 368000, 428000]
+    },
+    {
+      "id": "B2",
+      "group": "B",
+      "question": "Сколько стоит скуловая имплантация и какая гарантия?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "warranty"],
+      "expected_amounts": [420000]
+    },
+    {
+      "id": "C1",
+      "group": "C",
+      "question": "Сколько стоит отбеливание и не больно ли?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "pain"],
+      "expected_amounts": [18000]
+    },
+    {
+      "id": "C2",
+      "group": "C",
+      "question": "Сколько стоит винир и сколько он служит?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price", "duration"],
+      "expected_amounts": [35000]
+    },
+    {
+      "id": "C3",
+      "group": "C",
+      "question": "Больно ли удалять зуб и сколько это стоит?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["pain", "price"],
+      "expected_amounts": [4500]
+    },
+    {
+      "id": "D1",
+      "group": "D",
+      "question": "Сколько стоит all-on-4?",
+      "client_id": "demo",
+      "expected_path": "single_source",
+      "expected_aspects": ["price"],
+      "expected_amounts": [318000, 368000, 428000]
+    },
+    {
+      "id": "D2",
+      "group": "D",
+      "question": "Больно ли ставить имплант?",
+      "client_id": "demo",
+      "expected_path": "single_source",
+      "expected_aspects": ["pain"],
+      "expected_amounts": []
+    },
+    {
+      "id": "D3",
+      "group": "D",
+      "question": "А где вы находитесь?",
+      "client_id": "demo",
+      "expected_path": "single_source",
+      "expected_aspects": [],
+      "expected_amounts": []
+    }
+  ]
+}

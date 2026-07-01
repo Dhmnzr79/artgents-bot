@@ -17,7 +17,9 @@ from core.answer_plan_apply import (
     clean_answer_for_applied_appends,
     payment_terms_suppress_refs,
 )
-from core.answer_packet_snapshot import build_and_publish_answer_packet
+from core.answer_packet import assemble_answer_packet
+from core.answer_packet_materialize import materialize_cards
+from core.answer_packet_snapshot import build_and_publish_answer_packet, publish_answer_packet
 from core.answer_planner import answer_plan_from_ctx
 from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
@@ -26,7 +28,12 @@ from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, 
 
 import session as session_mod
 from contracts.answer_slots import AnswerSlotsTelemetry
-from llm import LLM_FALLBACK_ANSWER, generate_answer_stream, generate_answer_with_empathy
+from config import COMPOSER_ON
+from llm import (
+    generate_answer_from_packet,
+    generate_answer_stream,
+    generate_answer_with_empathy,
+)
 from logging_setup import log_json
 from verifier import build_turn_trace_prefix, schedule_verifier_shadow_if_needed
 from meta_loader import get_doc_meta
@@ -517,6 +524,68 @@ def meta_for_chunk(chunk: dict, client_id: str | None = None) -> dict:
     return meta
 
 
+def _packet_composer_generation(
+    *,
+    q: str,
+    llm_question: str | None,
+    meta: dict,
+    chunk: dict,
+    sid: str,
+    client_id: str | None,
+    route: str,
+    matched_service_id: str | None,
+    doc_id: str | None,
+) -> dict[str, Any] | None:
+    """Try packet composer path (>=2 materialized cards). None → fall back to single-source."""
+    if not COMPOSER_ON:
+        return None
+    plan = answer_plan_from_ctx()
+    if plan is None:
+        return None
+    svc_id = (
+        str(matched_service_id or meta.get("matched_service_id") or plan.service_id or "").strip()
+        or None
+    )
+    chunk_ref = None
+    if doc_id:
+        h3 = str(chunk.get("h3_id") or "").strip()
+        chunk_ref = f"{doc_id}.md#{h3}" if h3 else f"{doc_id}.md"
+    packet = assemble_answer_packet(
+        plan,
+        client_id=client_id,
+        route=route,
+        service_id=svc_id,
+        primary_chunk_ref=chunk_ref,
+    )
+    materialized = materialize_cards(packet, client_id=client_id)
+    if len(materialized) < 2:
+        return None
+    answer, profile = generate_answer_from_packet(
+        llm_question or q,
+        materialized,
+        meta,
+        sid,
+    )
+    if not profile.get("composer_used"):
+        return None
+    publish_answer_packet(packet)
+    if plan.primary_aspect:
+        set_last_aspect(sid, plan.primary_aspect)
+    allowed_source = "\n\n".join(
+        c.text for c in materialized if (c.text or "").strip()
+    )
+    return {
+        "answer": answer,
+        "profile": profile,
+        "deterministic_append": allowed_source,
+        "plan_meta": {
+            "answer_plan": plan.model_dump(),
+            "answer_packet": packet.model_dump(),
+        },
+        "slot_meta": None,
+    }
+
+
 def respond_from_chunk(
     *,
     chunk: dict,
@@ -569,9 +638,32 @@ def respond_from_chunk(
         client_id=client_id,
     )
 
-    answer, profile = generate_answer_with_empathy(
-        llm_question or q, sources, meta, sid
-    )
+    composer_hit: dict[str, Any] | None = None
+    try:
+        composer_hit = _packet_composer_generation(
+            q=q,
+            llm_question=llm_question,
+            meta=meta,
+            chunk=chunk,
+            sid=sid,
+            client_id=client_id,
+            route=route,
+            matched_service_id=sid_svc or None,
+            doc_id=doc_id,
+        )
+    except Exception:
+        composer_hit = None
+
+    if composer_hit is not None:
+        answer = str(composer_hit.get("answer") or "")
+        profile = composer_hit.get("profile") or {}
+        meta["answer_path"] = "composer"
+    else:
+        answer, profile = generate_answer_with_empathy(
+            llm_question or q, sources, meta, sid
+        )
+        meta["answer_path"] = "single_source"
+
     answer = ensure_answer(answer, chunk)
     answer = format_generator_answer(
         answer, user_question=llm_question or q, chunk=chunk, meta=meta
@@ -594,20 +686,25 @@ def respond_from_chunk(
         route=route,
         client_id=client_id,
     )
-    answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
-        answer=answer,
-        meta=meta,
-        chunk=chunk,
-        q=q,
-        route=route,
-        sid=sid,
-        doc_id=doc_id,
-        generator_append_text=generator_append_text,
-        lead_context=lead_context,
-        price_offer_meta=price_offer_meta,
-        matched_service_id=sid_svc or None,
-        skip_answer_slots_reason="doctor_consult_bridge" if doctor_bridge_meta else None,
-    )
+    if composer_hit is not None:
+        slot_meta = composer_hit.get("slot_meta")
+        deterministic_append = str(composer_hit.get("deterministic_append") or "")
+        plan_meta = composer_hit.get("plan_meta")
+    else:
+        answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
+            answer=answer,
+            meta=meta,
+            chunk=chunk,
+            q=q,
+            route=route,
+            sid=sid,
+            doc_id=doc_id,
+            generator_append_text=generator_append_text,
+            lead_context=lead_context,
+            price_offer_meta=price_offer_meta,
+            matched_service_id=sid_svc or None,
+            skip_answer_slots_reason="doctor_consult_bridge" if doctor_bridge_meta else None,
+        )
     answer, numeric_gate_meta = _apply_numeric_fact_gate(
         answer=answer,
         route=route,
@@ -656,6 +753,8 @@ def respond_from_chunk(
     )
     if route:
         payload.setdefault("meta", {})["orch_route"] = route
+    if meta.get("answer_path"):
+        payload.setdefault("meta", {})["answer_path"] = meta["answer_path"]
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
     _apply_patient_playbook_ui(payload, route)

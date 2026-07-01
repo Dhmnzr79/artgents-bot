@@ -40,9 +40,10 @@ def resolve_patient_situation_for_turn(
     q: str,
     *,
     sid: str | None = None,
+    client_id: str | None = None,
 ) -> tuple[PatientSituationResult, dict[str, Any]]:
     """Detect situation for this turn; optionally carry from session on vague price."""
-    fresh = detect_patient_situation(q)
+    fresh = detect_patient_situation(q, client_id=client_id, sid=sid)
     meta: dict[str, Any] = {
         "patient_situation_carried": False,
         "patient_situation_carry_age": None,
@@ -72,6 +73,8 @@ def persist_patient_situation_after_turn(
     sid: str | None,
     q: str,
     *,
+    client_id: str | None = None,
+    fresh_result: PatientSituationResult | None = None,
     carry_meta: dict[str, Any] | None = None,
 ) -> None:
     """Persist fresh patient situation from q when eligible (not vague carry-only turns)."""
@@ -82,6 +85,6 @@ def persist_patient_situation_after_turn(
         return
     from session import set_last_patient_situation
 
-    fresh = detect_patient_situation(q)
+    fresh = fresh_result or detect_patient_situation(q, client_id=client_id, sid=sid)
     if situation_routing_eligible(fresh) and not fresh.should_clarify:
         set_last_patient_situation(sid, fresh.model_dump())

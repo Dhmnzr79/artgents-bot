@@ -14,6 +14,7 @@ from contracts.patient_playbook import (
     PatientOption,
     PatientOptionsResult,
     PatientPlaybookAnswerStyle,
+    PatientPlaybookRuleConfig,
     PatientPlaybookSituationConfig,
 )
 from contracts.decision_frame import DecisionFrameConfidence
@@ -25,11 +26,13 @@ from core.routing_loader import THRESHOLDS
 
 _LOCK = threading.Lock()
 _PLAYBOOK_CACHE: dict[str, dict[str, PatientPlaybookSituationConfig] | None] = {}
+_PLAYBOOK_RULES_CACHE: dict[str, list[PatientPlaybookRuleConfig] | None] = {}
 
 _OPTIONS_OVERVIEW_RX = re.compile(
     r"(?:"
     r"что\s+делать|что\s+можно|какие\s+вариант|что\s+(?:мне\s+)?подойд|"
-    r"как\s+восстанов|что\s+лучше|какой\s+вариант|чем\s+лучше|как\s+лучше"
+    r"как\s+восстанов|что\s+лучше|какой\s+вариант|чем\s+лучше|как\s+лучше|посовет\w*|"
+    r"что\s+дальше|с\s+чего\s+начать|как\s+быть"
     r")",
     re.I | re.U,
 )
@@ -138,6 +141,33 @@ def load_patient_playbook(client_id: str | None) -> dict[str, PatientPlaybookSit
     return parsed
 
 
+def load_patient_playbook_rules(client_id: str | None) -> list[PatientPlaybookRuleConfig] | None:
+    """Load composable playbook rules; None when no rule section exists."""
+    cid = (client_id or "demo").strip() or "demo"
+    with _LOCK:
+        if cid in _PLAYBOOK_RULES_CACHE:
+            return _PLAYBOOK_RULES_CACHE[cid]
+
+    path = _playbook_path(cid)
+    parsed: list[PatientPlaybookRuleConfig] | None = None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        rules = raw.get("rules") if isinstance(raw, dict) else None
+        if isinstance(rules, list) and rules:
+            parsed = []
+            for cfg in rules:
+                if not isinstance(cfg, dict):
+                    continue
+                parsed.append(PatientPlaybookRuleConfig.model_validate(cfg))
+    except (OSError, yaml.YAMLError, ValueError):
+        parsed = None
+
+    with _LOCK:
+        _PLAYBOOK_RULES_CACHE[cid] = parsed
+    return parsed
+
+
 def _show_when_matches(
     show_when: str,
     *,
@@ -169,17 +199,75 @@ def _show_when_matches(
     return True
 
 
+def _rule_matches(rule: PatientPlaybookRuleConfig, situation: PatientSituationResult) -> bool:
+    match = rule.match
+    if match.kind and match.kind != situation.kind:
+        return False
+    if match.problem and match.problem != situation.problem:
+        return False
+    if match.extent and match.extent != situation.extent:
+        return False
+    if match.jaw and match.jaw != situation.jaw:
+        return False
+    if match.intent and match.intent != situation.cues.intent:
+        return False
+    modifiers = set(situation.modifiers or [])
+    modifiers.update(situation.cues.state or [])
+    modifiers.update(situation.cues.anatomy or [])
+    for item in match.modifiers:
+        if item not in modifiers:
+            return False
+    return True
+
+
+def _rule_specificity(rule: PatientPlaybookRuleConfig) -> int:
+    match = rule.match
+    score = 0
+    for value in (match.kind, match.problem, match.extent, match.jaw, match.intent):
+        if value:
+            score += 1
+    score += len(match.modifiers) * 2
+    return score
+
+
+def _select_patient_rule(
+    situation: PatientSituationResult,
+    client_id: str | None,
+) -> PatientPlaybookRuleConfig | None:
+    rules = load_patient_playbook_rules(client_id) or []
+    best: PatientPlaybookRuleConfig | None = None
+    best_score = -1
+    for rule in rules:
+        if not rule.options or not _rule_matches(rule, situation):
+            continue
+        score = _rule_specificity(rule)
+        if score > best_score:
+            best = rule
+            best_score = score
+    return best
+
+
+def _legacy_situation_config(
+    situation: PatientSituationResult,
+    client_id: str | None,
+) -> PatientPlaybookSituationConfig | None:
+    playbook = load_patient_playbook(client_id)
+    if not playbook:
+        return None
+    kind = str(situation.kind or "unknown")
+    return playbook.get(kind)
+
+
 def select_patient_options(
     situation: PatientSituationResult,
     q: str,
     client_id: str | None,
 ) -> PatientOptionsResult | None:
     """Pick playbook options for situation; None if playbook missing or no valid options."""
-    playbook = load_patient_playbook(client_id)
-    if not playbook:
-        return None
-    kind = str(situation.kind or "unknown")
-    cfg = playbook.get(kind)
+    cfg = _select_patient_rule(situation, client_id)
+    matched_rule_id = str(cfg.id).strip() if cfg is not None else None
+    if cfg is None:
+        cfg = _legacy_situation_config(situation, client_id)
     if cfg is None or not cfg.options:
         return None
 
@@ -226,6 +314,7 @@ def select_patient_options(
         source="patient_playbook",
         option_service_ids=[o.service_id for o in selected],
         skipped_options=skipped,
+        matched_rule_id=matched_rule_id or None,
     )
 
 
@@ -239,6 +328,7 @@ def build_patient_options_llm_context(
         "patient_situation_kind": result.situation_kind,
         "patient_scope": result.patient_scope,
         "strategy": result.strategy,
+        "matched_rule_id": result.matched_rule_id,
         "primary_cta": result.primary_cta,
         "answer_style": result.answer_style.model_dump(),
         "selected_options": [
@@ -297,8 +387,8 @@ def build_patient_options_llm_question(*, user_question: str, result: PatientOpt
         "Задача: пациент описывает ситуацию, а не конкретную услугу.",
         "Дай краткий обзор вариантов из selected_options в материале (JSON).",
         "Формулируй живым разговорным языком — не копируй текст дословно и не используй шаблонные маркетинговые абзацы.",
-        f"Покажи до {len(result.options)} вариантов в порядке приоритета клиники (strategy={result.strategy or 'default'}).",
-        "Сначала fixed implant solutions, затем budget alternative, если они есть в списке.",
+        f"Покажи до {len(result.options)} вариантов в порядке selected_options — это уже приоритет клиники (strategy={result.strategy or 'default'}).",
+        "Не меняй порядок вариантов и не добавляй услуги, которых нет в selected_options.",
     ]
     if style.avoid_single_winner:
         lines.append("Не представляй один вариант как единственно правильный для всех.")
@@ -351,6 +441,33 @@ def _is_specific_service_query(q: str, decision: Any | None) -> bool:
     return False
 
 
+def _has_patient_options_overview_signal(
+    q: str,
+    situation: PatientSituationResult,
+) -> bool:
+    text = q or ""
+    min_conf = float(THRESHOLDS.patient_situation.min_confidence_for_routing)
+    if situation.cues.intent in {"choose_solution", "restore"}:
+        return True
+    if _OPTIONS_OVERVIEW_RX.search(text):
+        return True
+    if float(situation.confidence or 0) >= min_conf:
+        if psc.ALL_TEETH_MISSING_RX.search(text) or psc.FULL_JAW_RESTORE_RX.search(text):
+            return True
+        if psc.FULL_ARCH_RX.search(text) and situation.extent == "full_arch":
+            return True
+    return False
+
+
+def _has_playbook_config_for(
+    situation: PatientSituationResult,
+    client_id: str | None,
+) -> bool:
+    if _select_patient_rule(situation, client_id) is not None:
+        return True
+    return _legacy_situation_config(situation, client_id) is not None
+
+
 def should_use_patient_options_overview(
     q: str,
     situation: PatientSituationResult,
@@ -362,8 +479,7 @@ def should_use_patient_options_overview(
     """True when playbook overview should replace single-doc content retrieval."""
     if situation.kind == "unknown":
         return False
-    playbook = load_patient_playbook(client_id)
-    if not playbook or str(situation.kind) not in playbook:
+    if not _has_playbook_config_for(situation, client_id):
         return False
 
     ri = ""
@@ -374,20 +490,11 @@ def should_use_patient_options_overview(
         return False
     if situation.cues.intent == "price":
         return False
-    if _is_specific_service_query(q, decision):
+    has_overview_signal = _has_patient_options_overview_signal(q, situation)
+    if _is_specific_service_query(q, decision) and not has_overview_signal:
         return False
 
-    min_conf = float(THRESHOLDS.patient_situation.min_confidence_for_routing)
-    if situation.cues.intent in {"choose_solution", "restore"}:
-        return True
-    if _OPTIONS_OVERVIEW_RX.search(q or ""):
-        return True
-    if float(situation.confidence or 0) >= min_conf:
-        if psc.ALL_TEETH_MISSING_RX.search(q or "") or psc.FULL_JAW_RESTORE_RX.search(q or ""):
-            return True
-        if psc.FULL_ARCH_RX.search(q or "") and situation.kind == "full_arch_missing":
-            return True
-    return False
+    return has_overview_signal
 
 
 def patient_options_quick_replies(
@@ -428,7 +535,7 @@ def _patient_option_label(label: str) -> str:
     text = (label or "").strip()
     if text.lower().startswith("имплантация "):
         text = text[len("Имплантация "):].strip()
-    return f"Подробнее про {text}" if text else "Подробнее"
+    return text or "Подробнее"
 
 
 def patient_options_telemetry(result: PatientOptionsResult) -> dict[str, Any]:
@@ -439,6 +546,7 @@ def patient_options_telemetry(result: PatientOptionsResult) -> dict[str, Any]:
         "patient_options_source": result.source,
         "patient_options_skipped": list(result.skipped_options),
         "patient_options_strategy": result.strategy,
+        "patient_options_rule_id": result.matched_rule_id,
     }
 
 

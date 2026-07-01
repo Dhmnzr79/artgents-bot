@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
+
 import pytest
 
 from core.patient_situation import detect_patient_situation
@@ -175,6 +178,65 @@ def test_choose_solution_intent() -> None:
     assert result.kind == "one_tooth_missing"
     assert result.cues.intent == "choose_solution"
     assert result.next_best_action == "consult"
+
+
+def test_composable_profile_for_upper_full_arch_bone_deficit() -> None:
+    result = detect_patient_situation("Нет зубов на верхней челюсти, мало кости, что посоветуете?")
+    assert result.problem == "missing_teeth"
+    assert result.extent == "full_arch"
+    assert result.jaw == "upper"
+    assert "bone_deficit" in result.modifiers
+    assert result.cues.intent == "choose_solution"
+
+
+def test_semantic_llm_can_fill_non_literal_choose_solution(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_classify(_q: str, *, client_id: str | None = None, sid: str | None = None):
+        return {
+            "intent": "choose_solution",
+            "problem": "missing_teeth",
+            "extent": "full_arch",
+            "jaw": "unknown",
+            "modifiers": [],
+            "confidence": 0.88,
+        }
+
+    monkeypatch.setitem(
+        sys.modules,
+        "core.patient_situation_llm",
+        SimpleNamespace(classify_patient_situation_semantic=fake_classify),
+    )
+
+    result = detect_patient_situation("Я запутался, какой вариант лечения выбрать", client_id="demo")
+
+    assert result.kind == "full_arch_missing"
+    assert result.problem == "missing_teeth"
+    assert result.extent == "full_arch"
+    assert result.cues.intent == "choose_solution"
+    assert "semantic_llm_profile" in result.evidence
+
+
+def test_semantic_llm_does_not_turn_direct_service_explain_into_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_classify(_q: str, *, client_id: str | None = None, sid: str | None = None):
+        return {
+            "intent": "choose_solution",
+            "problem": "missing_teeth",
+            "extent": "full_arch",
+            "jaw": "unknown",
+            "modifiers": [],
+            "confidence": 0.9,
+        }
+
+    monkeypatch.setitem(
+        sys.modules,
+        "core.patient_situation_llm",
+        SimpleNamespace(classify_patient_situation_semantic=fake_classify),
+    )
+
+    result = detect_patient_situation("Расскажите про All-on-4", client_id="demo")
+
+    assert result.cues.intent != "choose_solution"
 
 
 def test_no_doc_id_in_result() -> None:

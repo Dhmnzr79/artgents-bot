@@ -1,7 +1,9 @@
 """Unified dialog focus snapshot.
 
-Stage 1 is observe-only: the decision is recorded in request context but does
-not change source routing, price routing, doctors lookup, or retrieval.
+Dialog focus carries the active service/topic for short follow-ups and can be
+used as a bounded hint by follow-up rewrite, price routing, and doctor lookup.
+It is not the patient-situation layer and should not classify clinical/business
+scenarios such as missing teeth, bone deficit, or treatment option maps.
 """
 
 from __future__ import annotations
@@ -144,7 +146,7 @@ def build_dialog_focus_decision(
     client_id: str | None,
     decision: DecisionFrame | None = None,
 ) -> DialogFocusDecision:
-    """Build an observe-only focus decision for the current turn."""
+    """Build a bounded context hint for the current turn."""
     q0 = (q or "").strip()
     attribute = _primary_attribute(q0)
     st = mem_get(sid) if sid else {}

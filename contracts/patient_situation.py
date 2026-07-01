@@ -86,6 +86,22 @@ class PatientSituationResult(BaseModel):
     source: PatientSituationSource
     evidence: list[str] = Field(default_factory=list)
     patient_scope: PatientScope
+    problem: str = Field(
+        default="unknown",
+        description="Composable patient problem, e.g. missing_teeth, bone_deficit.",
+    )
+    extent: str = Field(
+        default="unknown",
+        description="Composable extent, e.g. one_tooth, few_teeth, full_arch.",
+    )
+    jaw: str = Field(
+        default="unknown",
+        description="Composable jaw scope: upper, lower, both, unknown.",
+    )
+    modifiers: list[str] = Field(
+        default_factory=list,
+        description="Composable modifiers such as bone_deficit or extracted.",
+    )
     exclude_service_ids: list[str] = Field(
         default_factory=list,
         description="Telemetry/contract only in Slice 1. Slice 2: no hard routing blocklist from this field.",

@@ -16,7 +16,7 @@ AspectKind = Literal[
     "overview",
 ]
 
-PlanAppendKind = Literal["price_offer", "payment_terms", "boundary"]
+PlanAppendKind = Literal["price_offer", "payment_terms", "warranty_terms", "boundary"]
 
 PlanRiskKind = Literal["price", "warranty", "pain", "included"]
 

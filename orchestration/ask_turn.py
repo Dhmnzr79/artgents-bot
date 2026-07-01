@@ -55,9 +55,15 @@ def orchestrate_routing_after_resolver(
     Extracted from app._orchestrate_ask_turn (Phase 3c).
     """
     decision_frame = decision_dump(decision)
-    situation, carry_meta = resolve_patient_situation_for_turn(q, sid=sid)
+    situation, carry_meta = resolve_patient_situation_for_turn(q, sid=sid, client_id=client_id)
     record_patient_situation_ctx(situation, carry_meta=carry_meta)
-    persist_patient_situation_after_turn(sid, q, carry_meta=carry_meta)
+    persist_patient_situation_after_turn(
+        sid,
+        q,
+        client_id=client_id,
+        fresh_result=situation,
+        carry_meta=carry_meta,
+    )
     record_dialog_focus_ctx(q, sid=sid, client_id=client_id, decision=decision)
 
     qp_loc = normalize_retrieval_query(q) or (q or "")

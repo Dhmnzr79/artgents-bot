@@ -45,6 +45,11 @@ _ONE_TOOTH_EXPLICIT_RX = psc.ONE_TOOTH_EXPLICIT_RX
 _UPPER_JAW_RX = psc.UPPER_JAW_RX
 _ONE_TOOTH_SITUATION_RX = psc.ONE_TOOTH_SITUATION_RX
 _PROSTHETIC_STAGE_RX = psc.PROSTHETIC_STAGE_RX
+_DIRECT_SERVICE_EXPLAIN_RX = re.compile(
+    r"(?:что\s+такое|расскаж\w*|объясн\w*).{0,40}"
+    r"(?:all[\s-]?on[\s-]?[46]|all-on|скулов\w*|zygomatic|синус[\s-]?лифт|съ[её]мн\w*\s+протез)",
+    re.I | re.U,
+)
 
 _JAW_ARCH_EXCLUDES = ("all_on_4", "all_on_6", "zygomatic_implants", "pterygoid_implants")
 _ONE_TOOTH_EXCLUDES = _JAW_ARCH_EXCLUDES
@@ -210,6 +215,152 @@ def _hints_for_kind(kind: PatientSituationKind) -> tuple[list[str], list[str], l
     return [], [], []
 
 
+def _profile_for(
+    kind: PatientSituationKind,
+    *,
+    cues: PatientSituationCues,
+    text: str,
+) -> tuple[str, str, str, list[str]]:
+    """Composable patient profile for clinic playbooks.
+
+    `kind` stays as a backward-compatible headline. These fields let playbooks
+    match combined situations like full upper arch + bone deficit.
+    """
+    problem = "unknown"
+    extent = "unknown"
+    jaw = "unknown"
+    modifiers: list[str] = []
+
+    if "upper_jaw" in cues.anatomy or _UPPER_JAW_RX.search(text):
+        jaw = "upper"
+    elif "lower_jaw" in cues.anatomy:
+        jaw = "lower"
+
+    if "bone_deficit" in cues.state or "bone" in cues.anatomy:
+        modifiers.append("bone_deficit")
+    if "extracted" in cues.state:
+        modifiers.append("extracted")
+    if "existing_implant" in cues.state:
+        modifiers.append("existing_implant")
+    if "urgent_pain" in cues.state:
+        modifiers.append("urgent")
+
+    if kind in {
+        "one_tooth_missing",
+        "few_teeth_missing",
+        "full_arch_missing",
+        "upper_jaw_missing_or_complex",
+        "extraction_then_implant",
+    }:
+        problem = "missing_teeth"
+    elif kind == "bone_deficit_or_grafting":
+        problem = "bone_deficit"
+    elif kind == "existing_implant_prosthetic_stage":
+        problem = "existing_implant"
+    elif kind == "urgent_problem":
+        problem = "urgent"
+    elif kind == "generic_implant_interest":
+        problem = "generic_implant_interest"
+
+    if kind in {"one_tooth_missing", "extraction_then_implant"} or cues.quantity == "one":
+        extent = "one_tooth"
+    elif kind == "few_teeth_missing" or cues.quantity in {"few", "many"}:
+        extent = "few_teeth"
+    elif (
+        kind == "full_arch_missing"
+        or cues.quantity in {"all", "jaw"}
+        or _is_explicit_full_arch_cue(text)
+    ):
+        extent = "full_arch"
+
+    return problem, extent, jaw, sorted(set(modifiers))
+
+
+def _apply_semantic_llm_profile(
+    *,
+    text: str,
+    cues: PatientSituationCues,
+    problem: str,
+    extent: str,
+    jaw: str,
+    modifiers: list[str],
+    client_id: str | None,
+    sid: str | None,
+) -> tuple[PatientSituationCues, str, str, str, list[str], list[str]]:
+    if not client_id:
+        return cues, problem, extent, jaw, modifiers, []
+    try:
+        from core.patient_situation_llm import classify_patient_situation_semantic
+    except ImportError:
+        return cues, problem, extent, jaw, modifiers, []
+
+    out = classify_patient_situation_semantic(text, client_id=client_id, sid=sid)
+    if not out:
+        return cues, problem, extent, jaw, modifiers, []
+
+    confidence = float(out.get("confidence") or 0.0)
+    if confidence < 0.62:
+        return cues, problem, extent, jaw, modifiers, []
+
+    llm_evidence: list[str] = ["semantic_llm_profile"]
+    new_intent = str(out.get("intent") or "unknown").strip()
+    if (
+        new_intent in {"choose_solution", "restore", "price", "doctor", "warranty", "compare"}
+        and not (new_intent == "choose_solution" and _DIRECT_SERVICE_EXPLAIN_RX.search(text))
+        and (cues.intent == "unknown" or new_intent == "choose_solution")
+    ):
+        cues = cues.model_copy(update={"intent": new_intent})
+        llm_evidence.append(f"semantic_intent:{new_intent}")
+
+    new_problem = str(out.get("problem") or "unknown").strip()
+    if problem == "unknown" and new_problem != "unknown":
+        problem = new_problem
+        llm_evidence.append(f"semantic_problem:{new_problem}")
+
+    new_extent = str(out.get("extent") or "unknown").strip()
+    if extent == "unknown" and new_extent != "unknown":
+        extent = new_extent
+        llm_evidence.append(f"semantic_extent:{new_extent}")
+
+    new_jaw = str(out.get("jaw") or "unknown").strip()
+    if jaw == "unknown" and new_jaw != "unknown":
+        jaw = new_jaw
+        llm_evidence.append(f"semantic_jaw:{new_jaw}")
+
+    merged_modifiers = list(modifiers)
+    for item in out.get("modifiers") or []:
+        text_item = str(item or "").strip()
+        if text_item and text_item not in merged_modifiers:
+            merged_modifiers.append(text_item)
+            llm_evidence.append(f"semantic_modifier:{text_item}")
+
+    return cues, problem, extent, jaw, sorted(set(merged_modifiers)), llm_evidence
+
+
+def _kind_from_profile(
+    *,
+    problem: str,
+    extent: str,
+    modifiers: list[str],
+) -> PatientSituationKind | None:
+    if problem == "missing_teeth":
+        if extent == "one_tooth":
+            return "one_tooth_missing"
+        if extent == "few_teeth":
+            return "few_teeth_missing"
+        if extent == "full_arch":
+            return "full_arch_missing"
+    if problem == "bone_deficit" or "bone_deficit" in modifiers:
+        return "bone_deficit_or_grafting"
+    if problem == "existing_implant":
+        return "existing_implant_prosthetic_stage"
+    if problem == "urgent" or "urgent" in modifiers:
+        return "urgent_problem"
+    if problem == "generic_implant_interest":
+        return "generic_implant_interest"
+    return None
+
+
 def _clarify_for_ambiguous(cues: PatientSituationCues) -> tuple[bool, str | None, str | None]:
     if cues.quantity == "few" and "urgent_pain" not in cues.state:
         return (
@@ -337,9 +488,9 @@ def detect_patient_situation(
     *,
     session_context: PatientSituationSessionContext | None = None,
     client_id: str | None = None,
+    sid: str | None = None,
 ) -> PatientSituationResult:
     """Detect patient situation from query (+ optional session context for future slices)."""
-    del client_id  # Slice 2+: pricebook-aware excludes
     text = (q or "").strip()
     if session_context and session_context.last_question and not text:
         text = session_context.last_question.strip()
@@ -367,6 +518,26 @@ def detect_patient_situation(
             clarify_q = amb_q
             clarify_reason = amb_reason
 
+    problem, extent, jaw, modifiers = _profile_for(kind, cues=cues, text=text)
+    cues, problem, extent, jaw, modifiers, llm_evidence = _apply_semantic_llm_profile(
+        text=text,
+        cues=cues,
+        problem=problem,
+        extent=extent,
+        jaw=jaw,
+        modifiers=modifiers,
+        client_id=client_id,
+        sid=sid,
+    )
+    if llm_evidence:
+        evidence.extend(llm_evidence)
+    if kind == "unknown" and confidence < 0.7:
+        inferred_kind = _kind_from_profile(problem=problem, extent=extent, modifiers=modifiers)
+        if inferred_kind is not None:
+            kind = inferred_kind
+            confidence = max(confidence, 0.72)
+            evidence.append(f"semantic_kind:{kind}")
+
     excludes, preferred_ids, preferred_groups = _hints_for_kind(kind)
     next_action = _next_action_for(kind, intent=cues.intent, should_clarify=should_clarify)
 
@@ -376,6 +547,10 @@ def detect_patient_situation(
         source="rule_based" if kind != "unknown" or confidence > 0 else "unknown",
         evidence=evidence,
         patient_scope=_scope_for_kind(kind),
+        problem=problem,
+        extent=extent,
+        jaw=jaw,
+        modifiers=modifiers,
         exclude_service_ids=excludes,
         preferred_service_ids=preferred_ids,
         preferred_groups=preferred_groups,
@@ -393,6 +568,10 @@ def patient_situation_telemetry(result: PatientSituationResult) -> dict[str, Any
         "patient_situation_kind": result.kind,
         "patient_situation_confidence": result.confidence,
         "patient_scope": result.patient_scope,
+        "patient_problem": result.problem,
+        "patient_extent": result.extent,
+        "patient_jaw": result.jaw,
+        "patient_modifiers": list(result.modifiers),
         "patient_next_best_action": result.next_best_action,
         "patient_situation_evidence": list(result.evidence),
         "patient_situation_source": result.source,

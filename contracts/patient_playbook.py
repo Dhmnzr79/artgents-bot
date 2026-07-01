@@ -50,6 +50,29 @@ class PatientPlaybookSituationConfig(BaseModel):
     options: list[PatientPlaybookOptionConfig] = Field(default_factory=list)
 
 
+class PatientPlaybookMatchConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: PatientSituationKind | None = None
+    problem: str | None = None
+    extent: str | None = None
+    jaw: str | None = None
+    intent: str | None = None
+    modifiers: list[str] = Field(default_factory=list)
+
+
+class PatientPlaybookRuleConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    match: PatientPlaybookMatchConfig = Field(default_factory=PatientPlaybookMatchConfig)
+    max_options: int = Field(default=4, ge=1, le=6)
+    primary_cta: str = "consult"
+    strategy: str = ""
+    answer_style: PatientPlaybookAnswerStyle = Field(default_factory=PatientPlaybookAnswerStyle)
+    options: list[PatientPlaybookOptionConfig] = Field(default_factory=list)
+
+
 class PatientOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -73,3 +96,4 @@ class PatientOptionsResult(BaseModel):
     source: PatientOptionsSource = "patient_playbook"
     option_service_ids: list[str] = Field(default_factory=list)
     skipped_options: list[str] = Field(default_factory=list)
+    matched_rule_id: str | None = None

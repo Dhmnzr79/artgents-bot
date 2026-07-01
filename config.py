@@ -54,6 +54,16 @@ DIALOG_FOCUS_LLM_CLASSIFY_ON = os.getenv("DIALOG_FOCUS_LLM_CLASSIFY", "1").lower
 )
 DIALOG_FOCUS_LLM_MODEL = (os.getenv("DIALOG_FOCUS_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 
+# --- Patient situation semantic classifier ---
+PATIENT_SITUATION_LLM_ON = os.getenv("PATIENT_SITUATION_LLM_ON", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+PATIENT_SITUATION_LLM_MODEL = (
+    (os.getenv("PATIENT_SITUATION_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

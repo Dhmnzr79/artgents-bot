@@ -23,6 +23,8 @@ from config import (
     LEAD_TURN_LLM_CLASSIFY_ON,
     LEAD_TURN_LLM_MODEL,
     MEMORY_ON,
+    PATIENT_SITUATION_LLM_MODEL,
+    PATIENT_SITUATION_LLM_ON,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
     QUERY_REWRITE_MAX_MESSAGES,
@@ -1134,6 +1136,89 @@ def classify_dialog_focus_gray_zone(
         log_json(
             logger,
             "dialog_focus_gray_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
+_PATIENT_SITUATION_SYSTEM = (
+    "Ты семантический классификатор ситуации пациента в стоматологическом чате. "
+    "Ты НЕ отвечаешь пациенту и НЕ ставишь диагноз. Ты только заполняешь JSON-карточку смысла сообщения.\n"
+    "Поля:\n"
+    "- intent: choose_solution|restore|price|doctor|warranty|compare|unknown. "
+    "choose_solution = человек просит подобрать/посоветовать/порекомендовать вариант, говорит что не знает что выбрать, "
+    "спрашивает что лучше в его случае, как быть, что поставить. "
+    "restore = человек описывает желание восстановить зубы без просьбы выбрать. "
+    "Не ставь choose_solution для прямого запроса объяснить конкретную услугу: «что такое All-on-4», «расскажите про скуловую».\n"
+    "- problem: missing_teeth|bone_deficit|existing_implant|urgent|generic_implant_interest|unknown.\n"
+    "- extent: one_tooth|few_teeth|full_arch|unknown.\n"
+    "- jaw: upper|lower|both|unknown.\n"
+    "- modifiers: массив из: bone_deficit, extracted, existing_implant, urgent. Можно пустой.\n"
+    "- confidence: число 0..1.\n"
+    "Если явно нет всех зубов, вся челюсть, верхняя/нижняя челюсть или полный ряд — extent=full_arch. "
+    "Если мало/не хватает/тонкая кость, атрофия кости, синус-лифтинг или костная пластика — добавь bone_deficit. "
+    "Верни только JSON без markdown."
+)
+
+
+def classify_patient_situation_semantic(
+    user_message: str,
+    *,
+    client_id: str | None,
+    sid: str | None,
+) -> dict | None:
+    """LLM semantic patient-situation classifier. Returns parsed JSON or None."""
+    if not PATIENT_SITUATION_LLM_ON:
+        return None
+    msg = (user_message or "").strip()
+    if len(msg) < 4:
+        return None
+    try:
+        resp = chat_completions_create(
+            model=PATIENT_SITUATION_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=180,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _PATIENT_SITUATION_SYSTEM},
+                {"role": "user", "content": msg[:800]},
+            ],
+        )
+        log_llm_usage(
+            logger,
+            resp,
+            call_type="patient_situation_classify",
+            model=PATIENT_SITUATION_LLM_MODEL,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("patient_situation_not_object")
+        log_json(
+            logger,
+            "patient_situation_llm",
+            client_id=client_id,
+            sid=sid,
+            intent=str(obj.get("intent") or "")[:40],
+            problem=str(obj.get("problem") or "")[:40],
+            extent=str(obj.get("extent") or "")[:40],
+            jaw=str(obj.get("jaw") or "")[:40],
+            confidence=obj.get("confidence"),
+        )
+        return obj
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="patient_situation_classify",
+            err=str(e),
+            model=PATIENT_SITUATION_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "patient_situation_classify_failed",
             client_id=client_id,
             sid=sid,
             err=str(e)[:300],

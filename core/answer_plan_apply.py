@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from contracts.answer_plan import AnswerPlan, PlanAppendKind
-from core.answer_planner import payment_terms_ref
+from core.answer_planner import payment_terms_ref, warranty_terms_ref
 from core.price_offers import build_price_append_for_lookup
 from retriever import get_chunk_by_ref
 
@@ -17,6 +17,21 @@ _PAYMENT_TERMS_DUPLICATE_MARKERS = (
     "рассроч",
     "налоговый вычет",
     "беспроцентн",
+)
+
+_WARRANTY_FACT_MARKERS = (
+    "гарантия на работу врача",
+    "пожизненн",
+    "implantium",
+    "nobel",
+    "impro",
+)
+
+_WARRANTY_NEGATIVE_MARKERS = (
+    "не указан",
+    "не указаны",
+    "нет информации",
+    "не содержит",
 )
 
 
@@ -32,6 +47,15 @@ def append_text_covers_payment_terms(text: str | None) -> bool:
     if not low:
         return False
     return any(m in low for m in _PAYMENT_TERMS_DUPLICATE_MARKERS)
+
+
+def append_text_covers_warranty_terms(text: str | None) -> bool:
+    low = (text or "").strip().lower()
+    if not low or "гарант" not in low:
+        return False
+    if any(m in low for m in _WARRANTY_NEGATIVE_MARKERS):
+        return False
+    return any(m in low for m in _WARRANTY_FACT_MARKERS)
 
 
 def price_meta_has_installment_fact(meta: dict[str, Any] | None) -> bool:
@@ -124,6 +148,30 @@ def render_payment_terms_append(*, client_id: str | None) -> str | None:
     return f"**Условия оплаты:**\n{body}"
 
 
+def render_warranty_terms_append(*, client_id: str | None) -> str | None:
+    ch = get_chunk_by_ref(warranty_terms_ref(), client_id=client_id)
+    if not ch:
+        return None
+    body = _korotko_body(ch)
+    if not body:
+        return None
+    return f"**Гарантия:**\n{body}"
+
+
+def clean_answer_for_applied_appends(answer: str, applied: list[str] | tuple[str, ...]) -> str:
+    """Remove source-limitation sentences that are contradicted by deterministic appends."""
+    if "warranty_terms" not in {str(x) for x in applied}:
+        return answer
+    paragraphs = (answer or "").split("\n\n")
+    kept: list[str] = []
+    for p in paragraphs:
+        low = p.strip().lower()
+        if "гарант" in low and any(m in low for m in _WARRANTY_NEGATIVE_MARKERS):
+            continue
+        kept.append(p)
+    return "\n\n".join(p for p in kept if p.strip()).strip()
+
+
 def _merge_append_parts(*parts: str | None) -> str | None:
     merged: list[str] = []
     for p in parts:
@@ -190,6 +238,17 @@ def apply_answer_plan_append(
             pt = render_payment_terms_append(client_id=client_id)
             if pt and not any("условия оплаты" in (p or "").lower() for p in parts):
                 parts.append(pt)
+                telemetry["applied"].append(kind)
+            continue
+        if kind == "warranty_terms":
+            combined = _merge_append_parts(*parts, answer_body)
+            if append_text_covers_warranty_terms(combined):
+                if kind not in suppressed:
+                    suppressed.append(kind)
+                continue
+            wt = render_warranty_terms_append(client_id=client_id)
+            if wt and not any("**гарантия:**" in (p or "").lower() for p in parts):
+                parts.append(wt)
                 telemetry["applied"].append(kind)
             continue
         if kind == "boundary":

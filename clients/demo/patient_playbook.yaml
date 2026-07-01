@@ -1,4 +1,248 @@
 # Marketing strategy: patient situation → priority options (not canned patient-facing copy).
+rules:
+  - id: one_tooth_restore
+    match:
+      problem: missing_teeth
+      extent: one_tooth
+    max_options: 2
+    primary_cta: ct_consultation
+    strategy: one_tooth_implant_first
+    answer_style:
+      max_options: 2
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: classic
+        priority: 100
+        role: main_one_tooth_solution
+        positioning: primary
+        show_when: default
+      - service_id: one_stage
+        priority: 80
+        role: extraction_context_solution
+        positioning: if_tooth_recently_removed_or_planned_extraction
+        show_when: extraction_context
+  - id: extraction_then_implant_restore
+    match:
+      kind: extraction_then_implant
+    max_options: 3
+    primary_cta: ct_consultation
+    strategy: extraction_implant_ct_first
+    answer_style:
+      max_options: 3
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: one_stage
+        priority: 100
+        role: same_day_implant_option
+        positioning: if_ct_and_socket_allow
+        show_when: default
+      - service_id: classic
+        priority: 80
+        role: staged_implant_option
+        positioning: predictable_staged_path
+        show_when: default
+      - service_id: tooth_extraction
+        priority: 40
+        role: first_clinical_step
+        positioning: if_tooth_cannot_be_saved
+        show_when: default
+  - id: few_teeth_restore
+    match:
+      problem: missing_teeth
+      extent: few_teeth
+    max_options: 4
+    primary_cta: ct_consultation
+    strategy: fixed_or_removable_by_defect
+    answer_style:
+      max_options: 4
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: implant_supported_prosthetics
+        priority: 100
+        role: fixed_or_implant_supported_solution
+        positioning: primary_when_implants_are_possible
+        show_when: default
+      - service_id: classic
+        priority: 80
+        role: single_implant_building_block
+        positioning: for_separate_missing_teeth
+        show_when: default
+      - service_id: clasp_dentures
+        priority: 50
+        role: removable_partial_alternative
+        positioning: budget_or_non_implant_option
+        show_when: default
+      - service_id: removable_dentures
+        priority: 40
+        role: removable_alternative
+        positioning: broader_budget_option
+        show_when: default
+  - id: existing_implant_prosthetic_stage
+    match:
+      kind: existing_implant_prosthetic_stage
+    max_options: 3
+    primary_cta: consult
+    strategy: prosthetic_stage_first
+    answer_style:
+      max_options: 3
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: implant_supported_prosthetics
+        priority: 100
+        role: main_prosthetic_stage
+        positioning: crown_or_prosthesis_on_implants
+        show_when: default
+      - service_id: zirconia_crowns
+        priority: 60
+        role: crown_material_option
+        positioning: if_single_crown_or_material_choice
+        show_when: default
+      - service_id: temporary_teeth
+        priority: 40
+        role: temporary_solution
+        positioning: if_temporary_restoration_is_needed
+        show_when: default
+  - id: full_arch_restore
+    match:
+      problem: missing_teeth
+      extent: full_arch
+    max_options: 4
+    primary_cta: ct_consultation
+    strategy: fixed_implant_first
+    answer_style:
+      max_options: 4
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: all_on_4
+        priority: 100
+        role: main_fixed_solution
+        positioning: primary
+        show_when: default
+      - service_id: all_on_6
+        priority: 90
+        role: stronger_fixed_solution
+        positioning: premium_or_more_support
+        show_when: default
+      - service_id: removable_dentures
+        priority: 50
+        role: budget_alternative
+        positioning: budget
+        show_when: default
+      - service_id: zygomatic_implants
+        priority: 40
+        role: complex_upper_jaw
+        positioning: complex_case
+        show_when: bone_deficit_or_upper_jaw
+  - id: upper_full_arch_with_bone_deficit
+    match:
+      problem: missing_teeth
+      extent: full_arch
+      jaw: upper
+      modifiers:
+        - bone_deficit
+    max_options: 4
+    primary_cta: ct_consultation
+    strategy: upper_jaw_complex_fixed_first
+    answer_style:
+      max_options: 4
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: zygomatic_implants
+        priority: 100
+        role: complex_upper_jaw
+        positioning: complex_case
+        show_when: default
+      - service_id: all_on_4
+        priority: 90
+        role: main_fixed_solution
+        positioning: primary
+        show_when: default
+      - service_id: all_on_6
+        priority: 80
+        role: stronger_fixed_solution
+        positioning: premium_or_more_support
+        show_when: default
+      - service_id: removable_dentures
+        priority: 40
+        role: budget_alternative
+        positioning: budget
+        show_when: default
+  - id: upper_full_arch_restore
+    match:
+      problem: missing_teeth
+      extent: full_arch
+      jaw: upper
+    max_options: 4
+    primary_cta: ct_consultation
+    strategy: upper_jaw_fixed_first
+    answer_style:
+      max_options: 4
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: all_on_4
+        priority: 100
+        role: main_fixed_solution
+        positioning: primary
+        show_when: default
+      - service_id: all_on_6
+        priority: 90
+        role: stronger_fixed_solution
+        positioning: premium_or_more_support
+        show_when: default
+      - service_id: zygomatic_implants
+        priority: 70
+        role: complex_upper_jaw
+        positioning: complex_case
+        show_when: default
+      - service_id: removable_dentures
+        priority: 40
+        role: budget_alternative
+        positioning: budget
+        show_when: default
+  - id: bone_deficit_solution
+    match:
+      modifiers:
+        - bone_deficit
+      intent: choose_solution
+    max_options: 3
+    primary_cta: ct_consultation
+    strategy: bone_deficit_ct_first
+    answer_style:
+      max_options: 3
+      mention_consult_ct: true
+      avoid_single_winner: true
+      avoid_medical_promise: true
+    options:
+      - service_id: sinus_lift
+        priority: 100
+        role: bone_volume_option
+        positioning: when_bone_is_limited
+        show_when: default
+      - service_id: all_on_4
+        priority: 80
+        role: fixed_solution_when_possible
+        positioning: primary
+        show_when: default
+      - service_id: zygomatic_implants
+        priority: 70
+        role: complex_upper_jaw
+        positioning: severe_upper_jaw_atrophy
+        show_when: default
+
 patient_situations:
   full_arch_missing:
     max_options: 4

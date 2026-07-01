@@ -12,7 +12,11 @@ from core.consult_nudge import (
     record_consult_nudge_after_answer,
     topic_exhausted_after_this_chunk,
 )
-from core.answer_plan_apply import apply_answer_plan_append, payment_terms_suppress_refs
+from core.answer_plan_apply import (
+    apply_answer_plan_append,
+    clean_answer_for_applied_appends,
+    payment_terms_suppress_refs,
+)
 from core.answer_planner import answer_plan_from_ctx
 from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
@@ -323,6 +327,10 @@ def _apply_answer_slots_and_price_append(
         existing_append=generator_append_text,
         price_offer_meta=price_offer_meta,
         answer_body=answer,
+    )
+    answer = clean_answer_for_applied_appends(
+        answer,
+        plan_apply_meta.get("applied") or [],
     )
     if skip_answer_slots_reason:
         slots_text = ""

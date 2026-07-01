@@ -76,7 +76,12 @@ def _service_in_pricebook(
     return load_pricebook_service(client_id, sid) is not None
 
 
-def _patient_situation_for_turn(q: str, *, sid: str | None) -> tuple[Any, bool]:
+def _patient_situation_for_turn(
+    q: str,
+    *,
+    sid: str | None,
+    client_id: str | None = None,
+) -> tuple[Any, bool]:
     """Resolved patient situation for this turn + whether it was session-carried."""
     try:
         from flask import has_request_context, request
@@ -88,7 +93,7 @@ def _patient_situation_for_turn(q: str, *, sid: str | None) -> tuple[Any, bool]:
         if ctx_result is not None:
             carried = bool(request.ctx.get("patient_situation_carried", False))
             return ctx_result, carried
-    situation, meta = resolve_patient_situation_for_turn(q, sid=sid)
+    situation, meta = resolve_patient_situation_for_turn(q, sid=sid, client_id=client_id)
     return situation, bool(meta.get("patient_situation_carried"))
 
 
@@ -251,7 +256,9 @@ def select_chunk_for_question(
             cands,
             ctx=meta_ctx,
             client_id=client_id,
-            patient_scope_bias=unit_bias_for_situation(_patient_situation_for_turn(q_policy, sid=sid)[0]),
+            patient_scope_bias=unit_bias_for_situation(
+                _patient_situation_for_turn(q_policy, sid=sid, client_id=client_id)[0]
+            ),
         )
         boost_tel["top_semantic_raw"] = round(top_semantic_raw, 4)
     if not cands:
@@ -734,7 +741,7 @@ def select_price_service_route(
         else PriceScopeResult.none()
     )
     if intent == "price_lookup":
-        situation, vague_carry = _patient_situation_for_turn(q, sid=sid)
+        situation, vague_carry = _patient_situation_for_turn(q, sid=sid, client_id=client_id)
         scope = merge_price_scope(
             scope,
             situation,

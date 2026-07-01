@@ -28,7 +28,7 @@ DialogFocusSource = Literal[
 
 
 class DialogFocusDecision(BaseModel):
-    """Per-turn dialog focus snapshot. It describes context; it is not a router."""
+    """Per-turn service/topic focus hint; not a patient-situation classifier."""
 
     model_config = ConfigDict(extra="forbid")
 

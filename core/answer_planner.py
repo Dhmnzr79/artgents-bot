@@ -54,10 +54,15 @@ _ASPECT_PRIORITY: tuple[AspectKind, ...] = (
 )
 
 _PAYMENT_TERMS_REF = "clinic__info__payment_terms.md#korotko"
+_WARRANTY_TERMS_REF = "clinic__info__warranty.md#korotko"
 
 
 def payment_terms_ref() -> str:
     return _PAYMENT_TERMS_REF
+
+
+def warranty_terms_ref() -> str:
+    return _WARRANTY_TERMS_REF
 
 
 def detect_aspects(q: str, *, decision: DecisionFrame | None = None) -> list[AspectKind]:
@@ -172,6 +177,8 @@ def _append_for_aspects(
         append.append("price_offer")
     if "payment" in aspects:
         append.append("payment_terms")
+    if "warranty" in aspects:
+        append.append("warranty_terms")
     if "included" in aspects and service_id and "price_offer" not in append:
         append.append("price_offer")
     return append

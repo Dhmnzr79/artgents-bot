@@ -12,6 +12,10 @@
       "client_id": "demo",
       "question": "Сколько стоит классическая имплантация с коронкой и есть ли рассрочка?",
       "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_plan_aspects": ["price", "payment"],
+      "expected_packet_aspects": ["price", "payment"],
+      "expected_packet_card_kinds": ["price", "payment"],
+      "require_answer_packet": true,
       "must_contain": ["рассроч", "оплат"],
       "comment": "IMPLANT #1+#8 composite: price + payment_terms append",
       "testability": "strong"
@@ -39,6 +43,9 @@
       "client_id": "demo",
       "question": "Сколько по времени длится протезирование на имплантах и больно ли это?",
       "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "expected_plan_aspects": ["duration", "pain"],
+      "expected_packet_aspects": ["duration", "pain"],
+      "require_answer_packet": true,
       "must_contain": ["срок", "боль"],
       "comment": "duration + pain composite",
       "testability": "medium"

@@ -73,6 +73,50 @@ def doc_type_from_doc_id(doc_id: str) -> str:
     return ""
 
 
+def packet_aspects(meta: dict[str, Any]) -> set[str]:
+    packet = meta.get("answer_packet")
+    if not isinstance(packet, dict):
+        return set()
+    cards = packet.get("cards")
+    if not isinstance(cards, list):
+        return set()
+    out: set[str] = set()
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        aspect = str(card.get("aspect") or "").strip()
+        if aspect:
+            out.add(norm(aspect))
+    return out
+
+
+def plan_aspects(meta: dict[str, Any]) -> set[str]:
+    plan = meta.get("answer_plan")
+    if not isinstance(plan, dict):
+        return set()
+    raw = plan.get("aspects")
+    if not isinstance(raw, list):
+        return set()
+    return {norm(str(x)) for x in raw if str(x).strip()}
+
+
+def packet_card_kinds(meta: dict[str, Any]) -> set[str]:
+    packet = meta.get("answer_packet")
+    if not isinstance(packet, dict):
+        return set()
+    cards = packet.get("cards")
+    if not isinstance(cards, list):
+        return set()
+    out: set[str] = set()
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        kind = str(card.get("kind") or "").strip()
+        if kind:
+            out.add(norm(kind))
+    return out
+
+
 def str_list_field(row: dict[str, Any], key: str) -> list[str]:
     raw = row.get(key)
     if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
@@ -399,6 +443,55 @@ def validate_smoke_case(
                 case_id=case_id,
                 status="FAIL",
                 reason=f"forbidden_answer_slots hit: {hit!r}",
+                coverage_class=cov,
+            )
+
+    expected_plan_aspects = str_list_field(row, "expected_plan_aspects")
+    if expected_plan_aspects:
+        got_aspects = plan_aspects(meta)
+        missing_aspects = [x for x in expected_plan_aspects if norm(x) not in got_aspects]
+        if missing_aspects:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"expected_plan_aspects missing: {missing_aspects!r} got={sorted(got_aspects)!r}",
+                coverage_class=cov,
+            )
+
+    expected_packet_aspects = str_list_field(row, "expected_packet_aspects")
+    if expected_packet_aspects:
+        got_packet_aspects = packet_aspects(meta)
+        missing_packet = [x for x in expected_packet_aspects if norm(x) not in got_packet_aspects]
+        if missing_packet:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=(
+                    f"expected_packet_aspects missing: {missing_packet!r} "
+                    f"got={sorted(got_packet_aspects)!r}"
+                ),
+                coverage_class=cov,
+            )
+
+    expected_packet_card_kinds = str_list_field(row, "expected_packet_card_kinds")
+    if expected_packet_card_kinds:
+        got_kinds = packet_card_kinds(meta)
+        missing_kinds = [x for x in expected_packet_card_kinds if norm(x) not in got_kinds]
+        if missing_kinds:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"expected_packet_card_kinds missing: {missing_kinds!r} got={sorted(got_kinds)!r}",
+                coverage_class=cov,
+            )
+
+    if row.get("require_answer_packet") is True:
+        packet = meta.get("answer_packet")
+        if not isinstance(packet, dict) or not isinstance(packet.get("cards"), list):
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason="require_answer_packet: meta.answer_packet.cards missing",
                 coverage_class=cov,
             )
 

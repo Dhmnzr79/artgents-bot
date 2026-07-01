@@ -144,6 +144,7 @@ def _service_reply(
     route: str | None = None,
 ):
     from core.answer_plan_apply import apply_answer_plan_append
+    from core.answer_packet_snapshot import build_answer_packet_snapshot, publish_answer_packet
     from core.answer_planner import answer_plan_from_ctx
     from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
     from session import set_last_aspect
@@ -174,6 +175,9 @@ def _service_reply(
         if plan.primary_aspect:
             set_last_aspect(sid, plan.primary_aspect)
         payload.setdefault("meta", {})["answer_plan"] = plan.model_dump()
+        packet = build_answer_packet_snapshot(plan, apply_meta=plan_apply_meta)
+        publish_answer_packet(packet)
+        payload.setdefault("meta", {})["answer_packet"] = packet.model_dump()
         if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
             _suppress_plan_append_quick_replies(payload, plan_apply_meta)
             payload.setdefault("meta", {})["answer_plan_apply"] = plan_apply_meta

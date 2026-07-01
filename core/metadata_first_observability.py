@@ -65,6 +65,7 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     "dialog_focus_resolved_service_id",
     "dialog_focus_source",
     "dialog_focus_used_llm",
+    "answer_packet",
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 

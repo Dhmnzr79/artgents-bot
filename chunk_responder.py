@@ -17,6 +17,7 @@ from core.answer_plan_apply import (
     clean_answer_for_applied_appends,
     payment_terms_suppress_refs,
 )
+from core.answer_packet_snapshot import build_answer_packet_snapshot, publish_answer_packet
 from core.answer_planner import answer_plan_from_ctx
 from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
@@ -363,8 +364,19 @@ def _apply_answer_slots_and_price_append(
     if plan is not None:
         if plan.primary_aspect:
             set_last_aspect(sid, plan.primary_aspect)
+        chunk_ref = None
+        if doc_id:
+            h3 = str(chunk.get("h3_id") or "").strip()
+            chunk_ref = f"{doc_id}.md#{h3}" if h3 else f"{doc_id}.md"
+        packet = build_answer_packet_snapshot(
+            plan,
+            apply_meta=plan_apply_meta,
+            primary_chunk_ref=chunk_ref,
+        )
+        publish_answer_packet(packet)
         plan_meta = {
             "answer_plan": plan.model_dump(),
+            "answer_packet": packet.model_dump(),
         }
         if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
             plan_meta["answer_plan_apply"] = plan_apply_meta

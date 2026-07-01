@@ -25,6 +25,8 @@ from config import (
     MEMORY_ON,
     PATIENT_SITUATION_LLM_MODEL,
     PATIENT_SITUATION_LLM_ON,
+    ASPECT_PLANNER_LLM_MODEL,
+    ASPECT_PLANNER_LLM_ON,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
     QUERY_REWRITE_MAX_MESSAGES,
@@ -1219,6 +1221,96 @@ def classify_patient_situation_semantic(
         log_json(
             logger,
             "patient_situation_classify_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
+_ASPECT_PLANNER_SYSTEM = (
+    "Ты классификатор аспектов вопроса в стоматологическом чате. "
+    "Ты НЕ отвечаешь пациенту. Ты только выбираешь подмножество аспектов из фиксированного списка.\n"
+    "Допустимые аспекты:\n"
+    "- price — цена, стоимость, сколько стоит/выйдет/обойдётся\n"
+    "- payment — рассрочка, оплата по частям/этапам, кредит, когда платить\n"
+    "- warranty — гарантия на работу/имплант/коронку\n"
+    "- pain — больно ли, страшно, анестезия, обезболивание\n"
+    "- included — что входит под ключ, что отдельно\n"
+    "- duration — срок, длительность, сколько по времени, заживление, реабилитация\n"
+    "- comparison — сравнение вариантов (что лучше, 4 или 6)\n"
+    "- stages — этапы лечения, визиты, последовательность\n"
+    "- overview — общий вопрос без явного аспекта выше\n"
+    "Правила:\n"
+    "- Верни все аспекты, о которых спрашивают в одном сообщении.\n"
+    "- Не добавляй аспект, которого нет в вопросе.\n"
+    "- Если вопрос только про цену — aspects=[\"price\"].\n"
+    "- confidence: 0..1, насколько уверен в разметке.\n"
+    "Примеры:\n"
+    'Вопрос: «Сколько стоит All-on-4 и есть ли рассрочка?» → {"aspects":["price","payment"],"confidence":0.95}\n'
+    'Вопрос: «Сколько стоит all-on-4, это больно и долго ли заживает?» → '
+    '{"aspects":["price","pain","duration"],"confidence":0.93}\n'
+    "Верни только JSON без markdown."
+)
+
+
+def classify_question_aspects(
+    user_message: str,
+    *,
+    client_id: str | None,
+    sid: str | None,
+    context_hint: str | None = None,
+) -> dict | None:
+    """LLM aspect planner for composite questions. Returns parsed JSON or None."""
+    if not ASPECT_PLANNER_LLM_ON:
+        return None
+    msg = (user_message or "").strip()
+    if len(msg) < 8:
+        return None
+    user_payload = msg[:900]
+    if (context_hint or "").strip():
+        user_payload = f"{msg[:800]}\n\nКонтекст: {(context_hint or '').strip()[:200]}"
+    try:
+        resp = chat_completions_create(
+            model=ASPECT_PLANNER_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=160,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _ASPECT_PLANNER_SYSTEM},
+                {"role": "user", "content": user_payload},
+            ],
+        )
+        log_llm_usage(
+            logger,
+            resp,
+            call_type="aspect_planner_classify",
+            model=ASPECT_PLANNER_LLM_MODEL,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("aspect_planner_not_object")
+        log_json(
+            logger,
+            "aspect_planner_llm",
+            client_id=client_id,
+            sid=sid,
+            aspects=obj.get("aspects"),
+            confidence=obj.get("confidence"),
+        )
+        return obj
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="aspect_planner_classify",
+            err=str(e),
+            model=ASPECT_PLANNER_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "aspect_planner_classify_failed",
             client_id=client_id,
             sid=sid,
             err=str(e)[:300],

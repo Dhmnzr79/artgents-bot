@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from config import (
+    ASPECT_PLANNER_LLM_ON,
     COMMERCIAL_INFO_RE,
     COMPARISON_QUERY_RE,
     PRICE_LOOKUP_RE,
@@ -65,7 +66,7 @@ def warranty_terms_ref() -> str:
     return _WARRANTY_TERMS_REF
 
 
-def detect_aspects(q: str, *, decision: DecisionFrame | None = None) -> list[AspectKind]:
+def detect_aspects_regex(q: str, *, decision: DecisionFrame | None = None) -> list[AspectKind]:
     text = (q or "").strip()
     if not text:
         return []
@@ -106,6 +107,72 @@ def detect_aspects(q: str, *, decision: DecisionFrame | None = None) -> list[Asp
         if a not in uniq:
             uniq.append(a)
     return uniq
+
+
+def is_composite_question(q: str) -> bool:
+    """Heuristic: long or multi-part question that may need LLM aspect planning."""
+    text = (q or "").strip()
+    if not text:
+        return False
+    low = text.lower()
+    words = len(text.split())
+    if words >= 12 or len(text) >= 60:
+        return True
+    if text.count("?") >= 2:
+        return True
+    if low.count(" и ") >= 2:
+        return True
+    if re.search(r",\s*.+\s+и\s+", low):
+        return True
+    if words >= 8 and " и " in low and (
+        PRICE_LOOKUP_RE.search(text)
+        or _PAIN_ASPECT_RE.search(low)
+        or _WARRANTY_ASPECT_RE.search(low)
+        or _DURATION_ASPECT_RE.search(low)
+        or _PAYMENT_ASPECT_RE.search(low)
+    ):
+        return True
+    return False
+
+
+def _real_aspect_count(aspects: list[AspectKind]) -> int:
+    return len([a for a in aspects if a != "overview"])
+
+
+def _record_aspect_planner_ctx(*, source: str, aspects: list[AspectKind]) -> None:
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context():
+            request.ctx["aspect_planner_source"] = source
+            request.ctx["aspect_planner_aspects"] = list(aspects)
+    except Exception:
+        pass
+
+
+def detect_aspects(
+    q: str,
+    *,
+    decision: DecisionFrame | None = None,
+    client_id: str | None = None,
+    sid: str | None = None,
+) -> list[AspectKind]:
+    regex_aspects = detect_aspects_regex(q, decision=decision)
+    if not ASPECT_PLANNER_LLM_ON or not is_composite_question(q):
+        _record_aspect_planner_ctx(source="regex", aspects=regex_aspects)
+        return regex_aspects
+    if _real_aspect_count(regex_aspects) > 1:
+        _record_aspect_planner_ctx(source="regex", aspects=regex_aspects)
+        return regex_aspects
+
+    from core.aspect_planner_llm import classify_aspects_llm
+
+    llm_aspects = classify_aspects_llm(q, client_id=client_id, sid=sid)
+    if llm_aspects:
+        _record_aspect_planner_ctx(source="llm", aspects=llm_aspects)
+        return llm_aspects
+    _record_aspect_planner_ctx(source="regex", aspects=regex_aspects)
+    return regex_aspects
 
 
 def pick_primary_aspect(aspects: list[AspectKind]) -> AspectKind | None:
@@ -206,7 +273,7 @@ def build_answer_plan(
     decision: DecisionFrame | None,
     source_route: SourceRouteResult | None,
 ) -> AnswerPlan:
-    aspects = detect_aspects(q, decision=decision)
+    aspects = detect_aspects(q, decision=decision, client_id=client_id, sid=sid)
     primary = _pick_primary_aspect(aspects)
     service_id, topic = _resolve_service_id(
         q=q,

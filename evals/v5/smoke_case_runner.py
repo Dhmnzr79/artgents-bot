@@ -212,6 +212,19 @@ def validate_smoke_case(
     if row.get("skip"):
         return CaseResult(case_id=case_id, status="SKIP", reason="marked skip", coverage_class=cov)
 
+    if row.get("aspect_planner_llm_required"):
+        if not (os.getenv("ASPECT_PLANNER_LLM_ON") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return CaseResult(
+                case_id=case_id,
+                status="SKIP",
+                reason="aspect_planner_llm_required (set ASPECT_PLANNER_LLM_ON=1)",
+                coverage_class=cov,
+            )
+
     expected_route = row.get("expected_route")
     if expected_route is not None:
         expected_route = str(expected_route).strip()

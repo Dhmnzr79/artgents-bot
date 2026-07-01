@@ -34,6 +34,9 @@
       "client_id": "demo",
       "question": "Сколько стоит поставить имплант и какая у вас гарантия?",
       "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_plan_aspects": ["price", "warranty"],
+      "expected_packet_aspects": ["price", "warranty"],
+      "require_answer_packet": true,
       "must_contain": ["гарант"],
       "comment": "IMPLANT #1+#15: price + warranty facet",
       "testability": "medium"
@@ -108,6 +111,18 @@
       "must_contain": ["рассроч"],
       "comment": "lead paused → content + planner append",
       "testability": "weak"
+    },
+    {
+      "id": "planner_composite_all_on_healing",
+      "client_id": "demo",
+      "aspect_planner_llm_required": true,
+      "question": "Сколько стоит all-on-4 и долго ли заживление, и насколько это переносимо по ощущениям?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "expected_plan_aspects": ["price", "pain", "duration"],
+      "expected_packet_aspects": ["price", "pain", "duration"],
+      "require_answer_packet": true,
+      "comment": "composite: regex catches price only; LLM adds pain+duration",
+      "testability": "strong"
     },
     {
       "id": "planner_negative_braces",

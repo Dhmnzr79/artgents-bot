@@ -64,6 +64,16 @@ PATIENT_SITUATION_LLM_MODEL = (
     (os.getenv("PATIENT_SITUATION_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
+# --- Aspect planner LLM (composite questions; composer roadmap phase 1) ---
+ASPECT_PLANNER_LLM_ON = os.getenv("ASPECT_PLANNER_LLM_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+ASPECT_PLANNER_LLM_MODEL = (
+    (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

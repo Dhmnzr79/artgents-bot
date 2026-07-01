@@ -211,6 +211,45 @@ def test_fail_open_when_composer_returns_not_used(sid, monkeypatch):
     assert out["_calls"]["empathy"] == 1
 
 
+def test_forbidden_claim_falls_back_to_single_source(sid, monkeypatch):
+    monkeypatch.setattr("chunk_responder.COMPOSER_ON", True)
+
+    def _forbidden(*_a, **_k):
+        return "Операция пройдёт безболезненно.", {"composer_used": True}
+
+    out = _respond(
+        sid=sid,
+        plan=_composite_plan(),
+        monkeypatch=monkeypatch,
+        composer_fn=_forbidden,
+    )
+    assert out["meta"]["answer_path"] == "single_source"
+    assert out["meta"].get("composer_skip_reason") == "forbidden_claim"
+    assert out["_calls"]["empathy"] == 1
+    assert out["_calls"]["slots"] == 1
+    assert "bezbolesnenno" in (out["meta"].get("forbidden_claim_hits") or [])
+
+
+def test_clean_composer_answer_stays_on_composer_path(sid, monkeypatch):
+    monkeypatch.setattr("chunk_responder.COMPOSER_ON", True)
+
+    def _clean(*_a, **_k):
+        return (
+            "Стоимость зависит от бренда импланта. Обычно дискомфорт минимальный.",
+            {"composer_used": True},
+        )
+
+    out = _respond(
+        sid=sid,
+        plan=_composite_plan(),
+        monkeypatch=monkeypatch,
+        composer_fn=_clean,
+    )
+    assert out["meta"]["answer_path"] == "composer"
+    assert out["_calls"]["composer"] == 1
+    assert out["_calls"]["empathy"] == 0
+
+
 def test_numeric_gate_strips_hallucinated_price_on_composer_path(sid, monkeypatch):
     monkeypatch.setattr("chunk_responder.COMPOSER_ON", True)
     monkeypatch.setattr(

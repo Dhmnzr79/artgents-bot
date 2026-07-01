@@ -7,6 +7,7 @@ import json as _json
 import os
 from typing import Any, Callable
 
+from core.claim_gate import detect_forbidden_claims
 from core.consult_nudge import (
     plan_consult_nudge,
     record_consult_nudge_after_answer,
@@ -571,6 +572,11 @@ def _packet_composer_generation(
     )
     if not profile.get("composer_used"):
         return None
+    hits = detect_forbidden_claims(answer)
+    if hits:
+        meta["composer_skip_reason"] = "forbidden_claim"
+        meta["forbidden_claim_hits"] = hits
+        return None
     publish_answer_packet(packet)
     if plan.primary_aspect:
         set_last_aspect(sid, plan.primary_aspect)
@@ -760,6 +766,8 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["answer_path"] = meta["answer_path"]
     if meta.get("composer_skip_reason"):
         payload.setdefault("meta", {})["composer_skip_reason"] = meta["composer_skip_reason"]
+    if meta.get("forbidden_claim_hits"):
+        payload.setdefault("meta", {})["forbidden_claim_hits"] = meta["forbidden_claim_hits"]
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
     _apply_patient_playbook_ui(payload, route)

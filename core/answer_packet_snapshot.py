@@ -15,6 +15,41 @@ _APPEND_CARD: dict[PlanAppendKind, tuple[PacketCardKind, AspectKind, str]] = {
     "boundary": ("content", "overview", "plan_append:boundary"),
 }
 
+def build_and_publish_answer_packet(
+    plan: AnswerPlan,
+    *,
+    client_id: str | None = None,
+    route: str | None = None,
+    service_id: str | None = None,
+    source_ref: str | None = None,
+    apply_meta: dict[str, Any] | None = None,
+    primary_chunk_ref: str | None = None,
+) -> AnswerPacketSnapshot:
+    """Phase 0 snapshot or phase 2 assembler, selected by ANSWER_PACKET_ASSEMBLER_ON."""
+    from config import ANSWER_PACKET_ASSEMBLER_ON
+
+    if ANSWER_PACKET_ASSEMBLER_ON:
+        from core.answer_packet import assemble_answer_packet
+
+        packet = assemble_answer_packet(
+            plan,
+            client_id=client_id,
+            route=route,
+            service_id=service_id,
+            source_ref=source_ref,
+            primary_chunk_ref=primary_chunk_ref,
+            apply_meta=apply_meta,
+        )
+    else:
+        packet = build_answer_packet_snapshot(
+            plan,
+            apply_meta=apply_meta,
+            primary_chunk_ref=primary_chunk_ref,
+        )
+    publish_answer_packet(packet)
+    return packet
+
+
 def build_answer_packet_snapshot(
     plan: AnswerPlan,
     *,

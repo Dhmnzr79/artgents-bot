@@ -74,6 +74,13 @@ ASPECT_PLANNER_LLM_MODEL = (
     (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
+# --- Answer packet assembler (composer roadmap phase 2) ---
+ANSWER_PACKET_ASSEMBLER_ON = os.getenv("ANSWER_PACKET_ASSEMBLER_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

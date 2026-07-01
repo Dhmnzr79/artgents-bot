@@ -508,6 +508,18 @@ def validate_smoke_case(
                 coverage_class=cov,
             )
 
+    forbidden_packet_card_kinds = str_list_field(row, "forbidden_packet_card_kinds")
+    if forbidden_packet_card_kinds:
+        got_kinds = packet_card_kinds(meta)
+        hit = [x for x in forbidden_packet_card_kinds if norm(x) in got_kinds]
+        if hit:
+            return CaseResult(
+                case_id=case_id,
+                status="FAIL",
+                reason=f"forbidden_packet_card_kinds hit: {hit!r}",
+                coverage_class=cov,
+            )
+
     expected_fb = row.get("expected_fallback_reason")
     if expected_fb is not None:
         got_fb = str(meta.get("fallback_reason") or "").strip()

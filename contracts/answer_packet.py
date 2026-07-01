@@ -18,7 +18,19 @@ PacketCardKind = Literal[
     "buttons",
 ]
 
-PacketSnapshotStage = Literal["plan", "apply"]
+PacketSnapshotStage = Literal["plan", "apply", "assembled"]
+
+
+class PromoDecisionRecord(BaseModel):
+    """Telemetry for marketing gate on promo facts (phase 2 assembler)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fact_id: str
+    allowed: bool
+    reason: str
+    promo_key: str | None = None
+    aspect: str | None = None
 
 
 class PacketCard(BaseModel):
@@ -49,3 +61,4 @@ class AnswerPacketSnapshot(BaseModel):
     plan_reason: str = ""
     snapshot_stage: PacketSnapshotStage = "plan"
     suppressed_append: list[PlanAppendKind] = Field(default_factory=list)
+    promo_decisions: list[PromoDecisionRecord] = Field(default_factory=list)

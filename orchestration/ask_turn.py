@@ -28,7 +28,7 @@ from policy import (
     pick_contacts_chunk,
 )
 from core.answer_planner import build_answer_plan, publish_answer_plan
-from core.answer_packet_snapshot import build_answer_packet_snapshot, publish_answer_packet
+from core.answer_packet_snapshot import build_and_publish_answer_packet
 from query_selector import select_price_service_route
 from retriever import get_chunk_by_ref, normalize_retrieval_query, retrieve
 from source_routing import route_source, slim_source_route_payload
@@ -118,7 +118,14 @@ def orchestrate_routing_after_resolver(
             source_route=sr,
         )
         publish_answer_plan(plan)
-        publish_answer_packet(build_answer_packet_snapshot(plan))
+        route_hint = str(getattr(decision, "route_intent", None) or intent or "content")
+        build_and_publish_answer_packet(
+            plan,
+            client_id=client_id,
+            route=route_hint,
+            service_id=plan.service_id,
+            source_ref=str(getattr(sr, "ref", None) or "") or None,
+        )
 
         doc_result = try_a3_doctor_route(
             q=q,

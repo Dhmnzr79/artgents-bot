@@ -20,7 +20,7 @@ from core.answer_plan_apply import (
 from core.answer_packet import assemble_answer_packet
 from core.answer_packet_materialize import materialize_cards
 from core.answer_packet_snapshot import build_and_publish_answer_packet, publish_answer_packet
-from core.answer_planner import answer_plan_from_ctx
+from core.answer_planner import _real_aspect_count, answer_plan_from_ctx
 from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
 from core.numeric_fact_gate import apply_numeric_fact_gate
@@ -536,11 +536,14 @@ def _packet_composer_generation(
     matched_service_id: str | None,
     doc_id: str | None,
 ) -> dict[str, Any] | None:
-    """Try packet composer path (>=2 materialized cards). None → fall back to single-source."""
+    """Try packet composer path (multi-aspect plan + >=2 materialized cards). None → single-source."""
     if not COMPOSER_ON:
         return None
     plan = answer_plan_from_ctx()
     if plan is None:
+        return None
+    if _real_aspect_count(plan.aspects) < 2:
+        meta["composer_skip_reason"] = "single_aspect"
         return None
     svc_id = (
         str(matched_service_id or meta.get("matched_service_id") or plan.service_id or "").strip()
@@ -755,6 +758,8 @@ def respond_from_chunk(
         payload.setdefault("meta", {})["orch_route"] = route
     if meta.get("answer_path"):
         payload.setdefault("meta", {})["answer_path"] = meta["answer_path"]
+    if meta.get("composer_skip_reason"):
+        payload.setdefault("meta", {})["composer_skip_reason"] = meta["composer_skip_reason"]
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
     _apply_patient_playbook_ui(payload, route)

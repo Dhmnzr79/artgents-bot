@@ -42,7 +42,6 @@ def _respond(
     matched_service_id: str = "all_on_4",
     **mocks: Any,
 ) -> dict:
-    from chunk_responder import _apply_numeric_fact_gate as _real_numeric_gate
     from chunk_responder import respond_from_chunk
 
     chunk = chunk or _pain_chunk()
@@ -135,6 +134,28 @@ def test_single_source_when_flag_off(sid, monkeypatch):
     assert out["_calls"]["composer"] == 0
     assert out["_calls"]["empathy"] == 1
     assert out["_calls"]["slots"] == 1
+
+
+def test_single_source_for_price_only_despite_promo_cards(sid, monkeypatch):
+    """Price-only plan materializes price + promos (3 cards) but must stay single-source."""
+    monkeypatch.setattr("chunk_responder.COMPOSER_ON", True)
+    out = _respond(
+        sid=sid,
+        plan=AnswerPlan(
+            aspects=["price"],
+            primary_aspect="price",
+            service_id="all_on_4",
+            topic="implantation",
+            append=["price_offer"],
+        ),
+        monkeypatch=monkeypatch,
+        route="price_lookup",
+    )
+    assert out["meta"]["answer_path"] == "single_source"
+    assert out["_calls"]["composer"] == 0
+    assert out["_calls"]["empathy"] == 1
+    assert out["_calls"]["slots"] == 1
+    assert out["meta"].get("composer_skip_reason") == "single_aspect"
 
 
 def test_single_source_when_only_one_materialized_card(sid, monkeypatch):

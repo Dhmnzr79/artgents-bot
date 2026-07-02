@@ -99,7 +99,8 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "duration"],
-      "expected_amounts": [35000]
+      "expected_amounts": [35000],
+      "known_gap": "price_route_defer: вопрос ушёл в price-путь вместо composer (маршрутизация/defer, не генерация); ждём этап 3"
     },
     {
       "id": "C3",

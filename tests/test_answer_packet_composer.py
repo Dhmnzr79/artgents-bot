@@ -212,11 +212,14 @@ def test_fullctx_composer_messages_include_kb_aspects_and_price_card(monkeypatch
     )
     assert answer == "ok"
     assert meta.get("composer_used") is True
-    blob = captured["messages"][1]["content"]
-    assert kb in blob
-    assert "price, pain" in blob
-    assert price_text in blob
-    assert "18 000" in blob
+    system = captured["messages"][0]["content"]
+    user = captured["messages"][1]["content"]
+    assert kb in system
+    assert "[БАЗА ЗНАНИЙ]" in system
+    assert kb not in user or "База знаний клиники" not in user
+    assert "price, pain" in user
+    assert price_text in user
+    assert "18 000" in user
 
 
 def test_build_messages_for_packet_composer_fullctx_structure():
@@ -247,11 +250,34 @@ def test_build_messages_for_packet_composer_fullctx_structure():
         "sid-2",
     )
     assert messages[0]["role"] == "system"
+    system = messages[0]["content"]
     user = messages[1]["content"]
-    assert "База знаний клиники" in user
+    assert "[БАЗА ЗНАНИЙ]" in system
+    assert kb in system
+    assert "База знаний клиники" not in user
     assert "Ответь на аспекты: price, pain" in user
     assert "ДОСЛОВНО" in user
     assert deterministic[0].text in user
+
+
+def test_fullctx_composer_kb_before_per_turn_addons(monkeypatch):
+    from core.knowledge_base import assemble_client_knowledge_base
+
+    monkeypatch.setattr(
+        "llm._consult_nudge_addon",
+        lambda meta: "\n\nPER_TURN_NUDGE_MARKER",
+    )
+    kb = assemble_client_knowledge_base("demo")
+    messages = build_messages_for_packet_composer_fullctx(
+        "цена?",
+        kb,
+        ["price"],
+        [],
+        {"client_id": "demo"},
+        "sid-order",
+    )
+    system = messages[0]["content"]
+    assert system.index("[БАЗА ЗНАНИЙ]") < system.index("PER_TURN_NUDGE_MARKER")
 
 
 def test_fullctx_composer_system_prompt_base_as_source_of_truth():
@@ -266,11 +292,12 @@ def test_fullctx_composer_system_prompt_base_as_source_of_truth():
         "sid-truth",
     )
     system = messages[0]["content"]
-    assert "ЖИВЫМ, естественным языком" in system
-    assert "факты, цифры и конкретные утверждения — СТРОГО" in system
-    assert "НИКОГДА не пиши абсолюты" not in system
-    assert "без обещаний" not in system
-    assert "смягчай" not in system.lower() or "не смягчай" in system
+    stable_prefix = system.split("[БАЗА ЗНАНИЙ]")[0]
+    assert "ЖИВЫМ, естественным языком" in stable_prefix
+    assert "факты, цифры и конкретные утверждения — СТРОГО" in stable_prefix
+    assert "НИКОГДА не пиши абсолюты" not in stable_prefix
+    assert "без обещаний" not in stable_prefix
+    assert "смягчай" not in stable_prefix.lower() or "не смягчай" in stable_prefix
 
 
 def test_packet_composer_system_prompt_base_as_source_of_truth():

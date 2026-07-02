@@ -771,10 +771,16 @@ def build_messages_for_packet_composer_fullctx(
 ) -> list[dict[str, str]]:
     """Messages for full-context composer — medical text from knowledge base, money from cards."""
     client_id = meta.get("client_id")
+    kb_block = (
+        "\n\n[БАЗА ЗНАНИЙ]\n"
+        f"База знаний клиники (источник медицинского текста):\n{(knowledge_base or '').strip()}"
+    )
+    # Stable prefix for DashScope context cache: identity + rules + KB; per-turn addons after KB.
     system = (
         build_base_system(client_id)
         + RESPONSE_FORMAT
         + COMPOSER_FULLCTX_RULE
+        + kb_block
         + _consult_nudge_addon(meta)
     )
     if CHAT_JSON_MODE:
@@ -784,7 +790,6 @@ def build_messages_for_packet_composer_fullctx(
     parts = [
         f"Вопрос пациента:\n{(user_q or '').strip()}",
         f"Ответь на аспекты: {aspect_line}",
-        f"База знаний клиники (источник медицинского текста):\n{(knowledge_base or '').strip()}",
     ]
     if cards_blob.strip():
         parts.append(

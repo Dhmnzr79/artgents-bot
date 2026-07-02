@@ -255,7 +255,7 @@ def usage_dict_from_completion(resp) -> dict | None:
         "total_tokens": tt,
     }
     cached = _cached_tokens_from_usage_obj(u)
-    if cached is not None and int(cached) > 0:
+    if cached is not None:
         out["cached_tokens"] = int(cached)
     est = estimate_llm_usage_usd(prompt_tokens=pt, completion_tokens=ct)
     if est is not None:
@@ -304,7 +304,7 @@ def log_llm_stream_usage(
         "total_tokens": tt,
     }
     cached = _cached_tokens_from_usage_obj(usage_obj)
-    if cached is not None and int(cached) > 0:
+    if cached is not None:
         det["cached_tokens"] = int(cached)
     est = estimate_llm_usage_usd(prompt_tokens=pt, completion_tokens=ct)
     if est is not None:

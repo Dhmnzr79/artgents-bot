@@ -22,3 +22,9 @@ def test_knowledge_base_excludes_doctors_and_service_markup():
     assert "doc_id:" not in low
     assert "<!-- aliases:" not in kb
     assert "cta_key:" not in kb
+
+
+def test_knowledge_base_document_headers():
+    kb = assemble_client_knowledge_base("demo")
+    assert "## implantation__faq__pain —" in kb
+    assert "Имплантация: боль и анестезия" in kb

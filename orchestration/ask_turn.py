@@ -128,6 +128,27 @@ def orchestrate_routing_after_resolver(
             source_ref=str(getattr(sr, "ref", None) or "") or None,
         )
 
+        md_prio = catalog_md_priority_from_a3(sr)
+        if md_prio is not None:
+            md_catalog_priority_ref = md_prio.ref
+            md_catalog_priority_sid = md_prio.service_id
+            md_catalog_priority_score = md_prio.match_score
+            md_catalog_priority_match_method = md_prio.match_method
+
+        if intent == "content" or md_catalog_priority_ref:
+            playbook_result = try_patient_options_overview(
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                intent=intent,
+                decision=decision,
+                situation=situation,
+                md_catalog_priority_ref=md_catalog_priority_ref,
+                decision_frame=decision_frame,
+            )
+            if playbook_result is not None:
+                return playbook_result
+
         composer_result = try_composer_overlay(
             q=q,
             sid=sid,
@@ -160,13 +181,6 @@ def orchestrate_routing_after_resolver(
         )
         if facts_result is not None:
             return facts_result
-
-        md_prio = catalog_md_priority_from_a3(sr)
-        if md_prio is not None:
-            md_catalog_priority_ref = md_prio.ref
-            md_catalog_priority_sid = md_prio.service_id
-            md_catalog_priority_score = md_prio.match_score
-            md_catalog_priority_match_method = md_prio.match_method
 
         if not is_crown_inclusion_content_query(q_raw):
             price_result = try_a3_price_route(
@@ -202,18 +216,6 @@ def orchestrate_routing_after_resolver(
             return price_fb
 
     if intent == "content" or md_catalog_priority_ref:
-        playbook_result = try_patient_options_overview(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            intent=intent,
-            decision=decision,
-            situation=situation,
-            md_catalog_priority_ref=md_catalog_priority_ref,
-            decision_frame=decision_frame,
-        )
-        if playbook_result is not None:
-            return playbook_result
         return run_content_arbiter_path(
             q=q,
             sid=sid,

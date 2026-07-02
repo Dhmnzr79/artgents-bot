@@ -188,7 +188,7 @@ def test_composite_specific_service_still_composes(monkeypatch):
     assert result.kind == "composer"
 
 
-def test_single_aspect_returns_none(monkeypatch):
+def test_single_aspect_returns_none_without_fullctx(monkeypatch):
     plan = AnswerPlan(
         aspects=["price"],
         primary_aspect="price",
@@ -198,6 +198,100 @@ def test_single_aspect_returns_none(monkeypatch):
     )
     result = _try_overlay(plan=plan, monkeypatch=monkeypatch)
     assert result is None
+
+
+def test_single_aspect_fullctx_composes(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", False)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.assemble_answer_packet",
+        lambda *a, **k: object(),
+    )
+    monkeypatch.setattr(
+        "query_selector.select_price_service_route",
+        lambda *a, **k: {"mode": "matched"},
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.assemble_client_knowledge_base",
+        lambda _cid: "kb",
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.materialize_deterministic_cards",
+        lambda *a, **k: [
+            MaterializedCard(aspect="price", kind="price", text="318 000 ₽ за челюсть.")
+        ],
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        lambda *a, **k: ("single price composed", {"composer_used": True}),
+    )
+
+    plan = AnswerPlan(
+        aspects=["price"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит all-on-4?",
+        sid="composer-flow-single-fullctx",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is not None
+    assert result.kind == "composer"
+    assert result.composed_answer == "single price composed"
+
+
+def test_single_aspect_generic_implant_defers_with_fullctx(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", False)
+    monkeypatch.setattr(
+        "query_selector.select_price_service_route",
+        lambda *a, **k: {"mode": "group_overview"},
+    )
+    composer_called = {"value": False}
+
+    def _fullctx(*_a, **_k):
+        composer_called["value"] = True
+        return "x", {"composer_used": True}
+
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        _fullctx,
+    )
+
+    plan = AnswerPlan(
+        aspects=["price"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит имплантация?",
+        sid="composer-flow-defer-fullctx",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
+    assert composer_called["value"] is False
 
 
 def test_composer_off_returns_none(monkeypatch):

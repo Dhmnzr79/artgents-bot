@@ -86,9 +86,9 @@ def try_composer_overlay(
     try:
         if not COMPOSER_ON:
             return None
-        if _real_aspect_count(plan.aspects) < 2:
-            return None
         aspects = list(plan.aspects or [])
+        if not FULLCTX_ON and _real_aspect_count(aspects) < 2:
+            return None
         has_price_aspect = "price" in aspects or "included" in aspects
         service_id_override: str | None = None
         llm_selection_applied = False

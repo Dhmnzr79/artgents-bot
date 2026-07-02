@@ -4,17 +4,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import COMPOSER_ON
+from config import COMPOSER_ON, FULLCTX_ON
 from contracts.answer_packet import MaterializedCard
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.answer_plan import AnswerPlan
 from contracts.source_route_result import SourceRouteResult
 from core.answer_packet import assemble_answer_packet
-from core.answer_packet_materialize import materialize_cards
+from core.answer_packet_materialize import materialize_cards, materialize_deterministic_cards
 from core.answer_packet_snapshot import publish_answer_packet
 from core.answer_planner import _real_aspect_count
 from core.claim_gate import detect_forbidden_claims
-from llm import generate_answer_from_packet
+from core.knowledge_base import assemble_client_knowledge_base
+from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
 _SPECIFIC_IMPLANT_PROTOCOL_MARKERS = (
@@ -99,10 +100,24 @@ def try_composer_overlay(
             service_id=service_id,
             primary_chunk_ref=primary_chunk_ref,
         )
-        materialized = materialize_cards(packet, client_id=client_id)
-        if len(materialized) < 2:
-            return None
-        answer, profile = generate_answer_from_packet(q, materialized, gate_meta, sid)
+        if FULLCTX_ON:
+            materialized: list[MaterializedCard] = materialize_deterministic_cards(
+                packet, client_id=client_id
+            )
+            knowledge_base = assemble_client_knowledge_base(client_id)
+            answer, profile = generate_answer_from_packet_fullctx(
+                q,
+                knowledge_base,
+                aspects,
+                materialized,
+                gate_meta,
+                sid,
+            )
+        else:
+            materialized = materialize_cards(packet, client_id=client_id)
+            if len(materialized) < 2:
+                return None
+            answer, profile = generate_answer_from_packet(q, materialized, gate_meta, sid)
         if not profile.get("composer_used"):
             return None
         hits = detect_forbidden_claims(answer)

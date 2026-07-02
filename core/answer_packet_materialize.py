@@ -23,6 +23,7 @@ _ASPECT_PRIORITY: tuple[AspectKind, ...] = (
 _CONTENT_PACKET_KINDS: frozenset[PacketCardKind] = frozenset(
     {"content", "price", "promo", "payment", "warranty"}
 )
+_DETERMINISTIC_CARD_KINDS: frozenset[PacketCardKind] = frozenset({"price", "promo"})
 
 
 def _aspect_sort_key(card: PacketCard, *, primary_aspect: AspectKind | None) -> tuple[int, int]:
@@ -74,23 +75,34 @@ def render_price_fact_block(*, client_id: str | None, service_id: str | None) ->
     if not entry:
         return None
     offers = offers_from_service_entry(entry)
-    if not offers:
-        return None
-    lines: list[str] = []
-    for offer in offers:
-        lines.append(f"{offer.brand_label} — {format_rub(offer.total)}")
-    unit_line = _unit_line(str(offers[0].unit or entry.default_unit or ""))
-    if unit_line:
-        lines.append(unit_line)
-    sample = next((o for o in offers if o.recommended), offers[0])
-    includes = [str(x).strip() for x in (sample.includes or []) if str(x).strip()]
-    if includes:
-        lines.append(f"В стоимость входят: {', '.join(includes)}.")
-    excludes = [str(x).strip() for x in (sample.excludes or []) if str(x).strip()]
-    for item in excludes:
-        lines.append(item if item.endswith(".") else f"{item}.")
-    text = "\n".join(lines).strip()
-    return text or None
+    if offers:
+        lines: list[str] = []
+        for offer in offers:
+            lines.append(f"{offer.brand_label} — {format_rub(offer.total)}")
+        unit_line = _unit_line(str(offers[0].unit or entry.default_unit or ""))
+        if unit_line:
+            lines.append(unit_line)
+        sample = next((o for o in offers if o.recommended), offers[0])
+        includes = [str(x).strip() for x in (sample.includes or []) if str(x).strip()]
+        if includes:
+            lines.append(f"В стоимость входят: {', '.join(includes)}.")
+        excludes = [str(x).strip() for x in (sample.excludes or []) if str(x).strip()]
+        for item in excludes:
+            lines.append(item if item.endswith(".") else f"{item}.")
+        text = "\n".join(lines).strip()
+        return text or None
+    if entry.price_model == "simple" and entry.price is not None:
+        price = entry.price
+        prefix = "от " if price.price_type == "from" else ""
+        lines = [f"{prefix}{format_rub(price.value)}"]
+        unit_line = _unit_line(str(entry.default_unit or ""))
+        if unit_line:
+            lines.append(unit_line)
+        note = str(price.note or "").strip()
+        if note:
+            lines.append(note if note.endswith(".") else f"{note}.")
+        return "\n".join(lines).strip() or None
+    return None
 
 
 def _promo_text(*, client_id: str | None, fact_id: str | None) -> str | None:
@@ -167,3 +179,12 @@ def materialize_cards(
         if materialized is not None:
             out.append(materialized)
     return out
+
+
+def materialize_deterministic_cards(
+    packet: AnswerPacketSnapshot,
+    *,
+    client_id: str | None,
+) -> list[MaterializedCard]:
+    """Price/promo cards only — for full-context composer (medical text from knowledge base)."""
+    return [c for c in materialize_cards(packet, client_id=client_id) if c.kind in _DETERMINISTIC_CARD_KINDS]

@@ -91,6 +91,7 @@ def _try_overlay(
     from orchestration.composer_flow import try_composer_overlay
 
     monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", composer_on)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", False)
     _overlay_mocks(monkeypatch, **mock_kw)
     return try_composer_overlay(
         q=q,
@@ -331,6 +332,92 @@ def test_stamp_service_answer_path_price():
     payload2: dict = {"meta": {}}
     _stamp_service_answer_path(payload2, "catalog_facts")
     assert "answer_path" not in payload2["meta"]
+
+
+def test_group_c_whitening_fullctx_triggers_composer(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.detect_forbidden_claims",
+        lambda _text: [],
+    )
+    monkeypatch.setattr(
+        "query_selector.select_price_service_route",
+        lambda *a, **k: {"mode": "matched"},
+    )
+
+    captured: dict = {}
+
+    def _fullctx(q, kb, aspects, cards, meta, sid):
+        captured["kb"] = kb
+        captured["aspects"] = aspects
+        captured["cards"] = cards
+        return "composed whitening", {"composer_used": True}
+
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        _fullctx,
+    )
+
+    plan = AnswerPlan(
+        aspects=["price", "pain"],
+        primary_aspect="price",
+        service_id="professional_whitening",
+        topic="whitening",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит отбеливание и не больно ли?",
+        sid="composer-flow-fullctx",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="professional_whitening"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is not None
+    assert result.kind == "composer"
+    assert result.composed_answer == "composed whitening"
+    assert captured["aspects"] == ["price", "pain"]
+    assert "отбеливание" in captured["kb"].lower()
+    price_cards = [c for c in captured["cards"] if c.kind == "price"]
+    assert len(price_cards) == 1
+    assert "18 000" in price_cards[0].text
+
+
+def test_group_c_whitening_without_fullctx_fail_open_on_single_card(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", False)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "query_selector.select_price_service_route",
+        lambda *a, **k: {"mode": "matched"},
+    )
+
+    plan = AnswerPlan(
+        aspects=["price", "pain"],
+        primary_aspect="price",
+        service_id="professional_whitening",
+        topic="whitening",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит отбеливание и не больно ли?",
+        sid="composer-flow-no-fullctx",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="professional_whitening"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
 
 
 def test_sse_composer_dispatch(monkeypatch):

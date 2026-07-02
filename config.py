@@ -88,6 +88,13 @@ COMPOSER_ON = os.getenv("COMPOSER_ON", "0").lower() in (
     "yes",
 )
 
+# --- Full-context composer content (step 1: whole md base, not chunk refs) ---
+FULLCTX_ON = os.getenv("FULLCTX_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

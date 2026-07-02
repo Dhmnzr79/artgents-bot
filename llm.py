@@ -28,6 +28,7 @@ from config import (
     ASPECT_PLANNER_LLM_MODEL,
     ASPECT_PLANNER_LLM_ON,
     COMPOSER_ON,
+    FULLCTX_ON,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
     QUERY_REWRITE_MAX_MESSAGES,
@@ -436,6 +437,19 @@ COMPOSER_PACKET_RULE = (
     "Вплетай естественно, без шва между темами. Приглашений и CTA не добавляй — их добавит интерфейс."
 )
 
+COMPOSER_FULLCTX_RULE = (
+    "\n\n"
+    "Собери ОДИН связный ответ по вопросу пациента.\n"
+    "Медицинские и информационные факты (боль, сроки, гарантия, этапы, сравнения) — "
+    "ТОЛЬКО из базы знаний клиники ниже; пересказывай с сохранением оговорок "
+    "(«обычно», «зависит», «после осмотра», «индивидуально»), без обещаний "
+    "(«приживётся», «безболезненно», «гарантируем результат» — нельзя).\n"
+    "Цены и промо — ТОЛЬКО из разрешённых карточек; "
+    "ценовой фактблок (помечен ДОСЛОВНО) воспроизведи дословно: суммы, единицу, список «входит» — "
+    "не меняй, не округляй, не дописывай и не выкидывай пункты.\n"
+    "Вплетай естественно, без шва между темами. Приглашений и CTA не добавляй — их добавит интерфейс."
+)
+
 EMPATHY_ADDON = (
     "\n\n"
     "Если в YAML-шапке текущего документа включена эмпатия, начни ответ с одной короткой "
@@ -700,24 +714,9 @@ def generate_answer_with_empathy(
     return answer, profile
 
 
-def build_messages_for_packet_composer(
-    user_q: str,
-    materialized_cards: list,
-    meta: dict,
-    session_id: str,
-) -> list[dict[str, str]]:
-    """Messages for packet composer (phase 3a); cards are MaterializedCard-like."""
+def _format_composer_card_blocks(materialized_cards: list) -> str:
     from contracts.answer_packet import MaterializedCard
 
-    client_id = meta.get("client_id")
-    system = (
-        build_base_system(client_id)
-        + RESPONSE_FORMAT
-        + COMPOSER_PACKET_RULE
-        + _consult_nudge_addon(meta)
-    )
-    if CHAT_JSON_MODE:
-        system += JSON_ANSWER_RULE
     blocks: list[str] = []
     for idx, raw in enumerate(materialized_cards, start=1):
         card = (
@@ -728,8 +727,66 @@ def build_messages_for_packet_composer(
         aspect_bit = f", aspect={card.aspect}" if card.aspect else ""
         mode = "ДОСЛОВНО" if card.verbatim else "пересказ с сохранением оговорок"
         blocks.append(f"Карточка {idx} ({card.kind}{aspect_bit}) [{mode}]:\n{card.text}")
-    cards_blob = "\n\n---\n\n".join(blocks)
+    return "\n\n---\n\n".join(blocks)
+
+
+def build_messages_for_packet_composer(
+    user_q: str,
+    materialized_cards: list,
+    meta: dict,
+    session_id: str,
+) -> list[dict[str, str]]:
+    """Messages for packet composer (phase 3a); cards are MaterializedCard-like."""
+    client_id = meta.get("client_id")
+    system = (
+        build_base_system(client_id)
+        + RESPONSE_FORMAT
+        + COMPOSER_PACKET_RULE
+        + _consult_nudge_addon(meta)
+    )
+    if CHAT_JSON_MODE:
+        system += JSON_ANSWER_RULE
+    cards_blob = _format_composer_card_blocks(materialized_cards)
     user_content = f"Вопрос пациента:\n{(user_q or '').strip()}\n\nРазрешённые карточки:\n{cards_blob}"
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def build_messages_for_packet_composer_fullctx(
+    user_q: str,
+    knowledge_base: str,
+    aspects: list[str],
+    deterministic_cards: list,
+    meta: dict,
+    session_id: str,
+) -> list[dict[str, str]]:
+    """Messages for full-context composer — medical text from knowledge base, money from cards."""
+    client_id = meta.get("client_id")
+    system = (
+        build_base_system(client_id)
+        + RESPONSE_FORMAT
+        + COMPOSER_FULLCTX_RULE
+        + _consult_nudge_addon(meta)
+    )
+    if CHAT_JSON_MODE:
+        system += JSON_ANSWER_RULE
+    aspect_line = ", ".join(str(a).strip() for a in (aspects or []) if str(a).strip())
+    cards_blob = _format_composer_card_blocks(deterministic_cards)
+    parts = [
+        f"Вопрос пациента:\n{(user_q or '').strip()}",
+        f"Ответь на аспекты: {aspect_line}",
+        f"База знаний клиники (источник медицинского текста):\n{(knowledge_base or '').strip()}",
+    ]
+    if cards_blob.strip():
+        parts.append(
+            "Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n"
+            + cards_blob
+        )
+    else:
+        parts.append("Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n(нет)")
+    user_content = "\n\n".join(parts)
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": user_content},
@@ -783,6 +840,68 @@ def generate_answer_from_packet(
         log_json(
             logger,
             "packet_composer_failed",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            err=str(e)[:300],
+        )
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+
+
+def generate_answer_from_packet_fullctx(
+    user_q: str,
+    knowledge_base: str,
+    aspects: list[str],
+    deterministic_cards: list,
+    meta: dict,
+    session_id: str,
+) -> tuple[str, dict]:
+    """Compose answer from full md knowledge base + deterministic price/promo cards."""
+    if not COMPOSER_ON or not FULLCTX_ON:
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    if not (knowledge_base or "").strip():
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    messages = build_messages_for_packet_composer_fullctx(
+        user_q,
+        knowledge_base,
+        aspects,
+        deterministic_cards,
+        meta,
+        session_id,
+    )
+    kwargs: dict = dict(model=CHAT_MODEL, temperature=0.3, messages=messages)
+    if CHAT_JSON_MODE:
+        kwargs["response_format"] = {"type": "json_object"}
+    kwargs["timeout"] = LLM_REQUEST_TIMEOUT_SEC
+    try:
+        resp = chat_completions_create(**kwargs)
+        log_llm_usage(logger, resp, call_type="packet_composer_fullctx", model=CHAT_MODEL)
+        raw = (resp.choices[0].message.content or "").strip()
+        answer = raw
+        if CHAT_JSON_MODE:
+            try:
+                obj = json.loads(raw)
+                if isinstance(obj, dict) and obj.get("answer"):
+                    answer = str(obj["answer"]).strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not (answer or "").strip():
+            answer = LLM_FALLBACK_ANSWER
+        log_json(
+            logger,
+            "packet_composer_fullctx_generate",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            aspect_count=len(aspects or []),
+            card_count=len(deterministic_cards or []),
+            kb_chars=len(knowledge_base or ""),
+            used_fallback=bool(answer == LLM_FALLBACK_ANSWER),
+        )
+        return answer, {"composer_used": True}
+    except Exception as e:
+        log_llm_error(logger, call_type="packet_composer_fullctx", err=str(e), model=CHAT_MODEL)
+        log_json(
+            logger,
+            "packet_composer_fullctx_failed",
             sid=session_id,
             client_id=meta.get("client_id"),
             err=str(e)[:300],

@@ -90,8 +90,7 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "pain"],
-      "expected_amounts": [18000],
-      "known_gap": "content_coverage_non_implantation"
+      "expected_amounts": [18000]
     },
     {
       "id": "C2",
@@ -100,8 +99,7 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "duration"],
-      "expected_amounts": [35000],
-      "known_gap": "content_coverage_non_implantation"
+      "expected_amounts": [35000]
     },
     {
       "id": "C3",
@@ -110,8 +108,7 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["pain", "price"],
-      "expected_amounts": [4500],
-      "known_gap": "content_coverage_non_implantation"
+      "expected_amounts": [4500]
     },
     {
       "id": "D1",

@@ -27,10 +27,9 @@ from orchestration.retrieval_flow import run_content_arbiter_path, run_selection
 from policy import contacts_intent
 from core.answer_planner import build_answer_plan, publish_answer_plan
 from core.answer_packet_snapshot import build_and_publish_answer_packet
+from core.md_chunks import CONTACTS_CHUNK_REF, get_chunk_by_ref
 from query_selector import select_price_service_route
-from retriever import get_chunk_by_ref, normalize_retrieval_query
-
-_CONTACTS_CHUNK_REF = "clinic__info__contacts.md#korotko"
+from retriever import normalize_retrieval_query
 from source_routing import route_source, slim_source_route_payload
 
 logger = get_logger("bot")
@@ -76,7 +75,7 @@ def orchestrate_routing_after_resolver(
         request.ctx["effective_intent"] = "contacts"
 
     if intent == "contacts":
-        picked = get_chunk_by_ref(_CONTACTS_CHUNK_REF, client_id=client_id)
+        picked = get_chunk_by_ref(CONTACTS_CHUNK_REF, client_id=client_id)
         if picked:
             return AskOrchestrationResult(
                 kind="chunk",

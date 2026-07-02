@@ -13,6 +13,7 @@ from config import EMB_MODEL
 from core.aspect_metadata import infer_chunk_aspect
 from core.client_runtime import client_md_dir, list_buildable_client_ids, per_client_data_dir
 from core.content_linter import format_lint_report, lint_all_clients
+from core.md_chunks import ALIAS_RX, extract_local_aliases, split_md_to_chunks
 
 # --- logging (устойчиво) ---
 try:
@@ -46,8 +47,6 @@ if not api_key:
     raise RuntimeError("OPENAI_API_KEY is not set in .env")
 
 client = OpenAI(api_key=api_key)
-
-ALIAS_RX = re.compile(r"<!--\s*aliases:\s*\[(.*?)\]\s*-->", re.I | re.S)
 
 
 def _norm_alias_key(s: str) -> str:
@@ -83,49 +82,6 @@ def _chunk_alias_terms_build(row: dict) -> list[str]:
     if h3_id:
         terms.append(h3_id.replace("-", " "))
     return terms
-
-
-def extract_local_aliases(block_text: str) -> list[str]:
-    m = ALIAS_RX.search(block_text or "")
-    if not m:
-        return []
-    return re.findall(r'"([^"]+)"', m.group(1))
-
-
-def split_md_to_chunks(text):
-    lines = text.splitlines()
-    chunks, h2, h2_id, h3, h3_id, buf = [], None, None, None, None, []
-
-    def flush():
-        if buf:
-            chunks.append(
-                {
-                    "h2": h2,
-                    "h2_id": h2_id,
-                    "h3": h3,
-                    "h3_id": h3_id,
-                    "text": "\n".join(buf).strip(),
-                }
-            )
-
-    h2rx = re.compile(r"^##\s+(.+?)(?:\s*\{#([a-z0-9\-\_]+)\})?\s*$", re.I)
-    h3rx = re.compile(r"^###\s+(.+?)(?:\s*\{#([a-z0-9\-\_]+)\})?\s*$", re.I)
-    for ln in lines:
-        m2 = h2rx.match(ln)
-        m3 = h3rx.match(ln)
-        if m2:
-            flush()
-            buf = []
-            h2, h2_id = m2.group(1).strip(), (m2.group(2) or "").strip()
-            h3, h3_id = None, None
-        elif m3:
-            flush()
-            buf = []
-            h3, h3_id = m3.group(1).strip(), (m3.group(2) or "").strip()
-        else:
-            buf.append(ln)
-    flush()
-    return [c for c in chunks if c["text"]]
 
 
 def embed_batch(texts):

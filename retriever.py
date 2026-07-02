@@ -78,51 +78,15 @@ def _alias_embed_state(client_id: str | None) -> tuple[np.ndarray | None, np.nda
 
 
 def extract_id_from_heading(txt: str) -> str | None:
-    if not isinstance(txt, str):
-        return None
-    m = re.search(r"\{\s*#([^\}]+)\s*\}", txt)
-    return m.group(1).strip() if m else None
+    from core.md_chunks import extract_id_from_heading as _extract
+
+    return _extract(txt)
 
 
 def get_chunk_by_ref(ref: str, *, client_id: str | None = None) -> dict | None:
-    if not ref or "#" not in ref:
-        return None
-    corpus_cid = effective_corpus_client_id(client_id)
-    fname, anchor = ref.split("#", 1)
-    base = os.path.basename(fname)
-    if not base.endswith(".md"):
-        base = base + ".md"
-    a = (anchor or "").strip().lower()
-    corpus = load_corpus_if_needed(client_id)
-    cands = [ch for ch in corpus if os.path.basename(ch.get("file", "") or "") == base]
-    if corpus_cid:
-        client_cands = [ch for ch in cands if (ch.get("client_id") or "") == corpus_cid]
-        if not client_cands:
-            return None
-        cands = client_cands
-    if not cands:
-        return None
-    if a in ("overview", "korotko", "", None):
-        for ch in cands:
-            h3_id = (ch.get("h3_id") or "").strip().lower()
-            if (not ch.get("h2_id") and not ch.get("h3_id")) or h3_id in {"overview", "korotko"}:
-                ch["_score"] = 1.0
-                return ch
-        ch = cands[0]
-        ch["_score"] = 1.0
-        return ch
-    for ch in cands:
-        hid2 = ch.get("h2_id") or extract_id_from_heading(ch.get("h2"))
-        hid3 = ch.get("h3_id") or extract_id_from_heading(ch.get("h3"))
-        if a in {
-            (hid3 or "").lower(),
-            (hid2 or "").lower(),
-            str(ch.get("h3") or "").lower(),
-            str(ch.get("h2") or "").lower(),
-        }:
-            ch["_score"] = 1.0
-            return ch
-    return None
+    from core.md_chunks import get_chunk_by_ref as _get_chunk_by_ref
+
+    return _get_chunk_by_ref(ref, client_id=client_id)
 
 
 def _load_doc_text(md_path: str) -> str:

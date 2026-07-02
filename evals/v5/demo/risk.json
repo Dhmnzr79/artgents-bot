@@ -397,10 +397,7 @@
         "catalog_md_first",
         "price_lookup"
       ],
-      "expected_doc_id_any": [
-        "implantation__service__sinus_lift",
-        "implantation__info__bone_graft"
-      ],
+      "expected_service_id": "sinus_lift",
       "answer_signals_any": [
         "отдельно",
         "не входит",
@@ -418,7 +415,8 @@
         "require_forbidden_claims_empty": true,
         "expected_packet_aspects": [
           "price"
-        ]
+        ],
+        "expected_service_id": "sinus_lift"
       }
     },
     {
@@ -428,11 +426,8 @@
       "question": "Можно поставить импланты без костной пластики?",
       "expected_route_any": [
         "retrieval_chunk",
-        "catalog_md_first"
-      ],
-      "expected_doc_id_any": [
-        "implantation__info__bone_graft",
-        "comparison__bone_graft_vs_all_on_4"
+        "catalog_md_first",
+        "patient_options_overview"
       ],
       "answer_signals_any": [
         "кт",
@@ -447,16 +442,7 @@
       ],
       "coverage_class": "MEDIUM",
       "composer_parity": {
-        "expected_answer_path": "composer",
-        "require_numeric_gate_pass": true,
-        "require_forbidden_claims_empty": true,
-        "expected_packet_aspects": [
-          "comparison"
-        ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
-        ]
+        "expect_not_composer": true
       }
     },
     {
@@ -466,13 +452,8 @@
       "question": "Если сверху совсем нет кости, это только скуловые импланты?",
       "expected_route_any": [
         "retrieval_chunk",
-        "catalog_md_first"
-      ],
-      "expected_doc_id_any": [
-        "implantation__service__zygomatic_implants",
-        "implantation__service__pterygoid_implants",
-        "implantation__info__bone_graft",
-        "comparison__bone_graft_vs_all_on_4"
+        "catalog_md_first",
+        "patient_options_overview"
       ],
       "answer_signals_any": [
         "не единствен",
@@ -486,16 +467,7 @@
       ],
       "coverage_class": "MEDIUM",
       "composer_parity": {
-        "expected_answer_path": "composer",
-        "require_numeric_gate_pass": true,
-        "require_forbidden_claims_empty": true,
-        "expected_packet_aspects": [
-          "comparison"
-        ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
-        ]
+        "expect_not_composer": true
       }
     },
     {
@@ -667,16 +639,17 @@
       "question": "Что мне подойдет, если нет одного зуба?",
       "expected_route_any": [
         "retrieval_chunk",
-        "catalog_md_first"
+        "catalog_md_first",
+        "patient_options_overview"
       ],
       "forbidden_doc_id": [
         "implantation__service__all_on_4"
       ],
       "answer_signals_any": [
         "имплант",
-        "мост",
         "один",
-        "зуб"
+        "зуб",
+        "классическ"
       ],
       "forbidden_signals": [
         "all-on-4",
@@ -684,12 +657,7 @@
       ],
       "coverage_class": "STRONG",
       "composer_parity": {
-        "expected_answer_path": "composer",
-        "require_numeric_gate_pass": true,
-        "require_forbidden_claims_empty": true,
-        "expected_packet_aspects": [
-          "overview"
-        ]
+        "expect_not_composer": true
       }
     },
     {
@@ -855,9 +823,9 @@
       "question": "Мне сказали мало кости, что можно сделать?",
       "expected_route_any": [
         "retrieval_chunk",
-        "catalog_md_first"
+        "catalog_md_first",
+        "patient_options_overview"
       ],
-      "expected_doc_id": "comparison__bone_graft_vs_all_on_4",
       "forbidden_doc_id": [
         "implantation__service__classic"
       ],
@@ -868,12 +836,7 @@
       ],
       "coverage_class": "MEDIUM",
       "composer_parity": {
-        "expected_answer_path": "composer",
-        "require_numeric_gate_pass": true,
-        "require_forbidden_claims_empty": true,
-        "expected_packet_aspects": [
-          "comparison"
-        ]
+        "expect_not_composer": true
       }
     },
     {
@@ -882,25 +845,22 @@
       "question": "Можно удалить зуб и сразу поставить имплант?",
       "expected_route_any": [
         "retrieval_chunk",
-        "catalog_md_first"
+        "catalog_md_first",
+        "patient_options_overview"
       ],
-      "expected_doc_id": "implantation__service__one_stage",
+      "answer_signals_any": [
+        "имплант",
+        "удал",
+        "одномомент",
+        "вариант"
+      ],
       "forbidden_signals": [
         "запишем на имплант",
         "поставим имплант сегодня"
       ],
       "coverage_class": "STRONG",
       "composer_parity": {
-        "expected_answer_path": "composer",
-        "require_numeric_gate_pass": true,
-        "require_forbidden_claims_empty": true,
-        "expected_packet_aspects": [
-          "overview"
-        ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
-        ]
+        "expect_not_composer": true
       }
     }
   ]

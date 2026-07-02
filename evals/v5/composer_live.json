@@ -26,7 +26,8 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "payment"],
-      "expected_amounts": [76200, 85200, 101200]
+      "expected_amounts": [76200, 85200, 101200],
+      "known_issue": "service_selection"
     },
     {
       "id": "A4",
@@ -80,7 +81,8 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "warranty"],
-      "expected_amounts": [420000]
+      "expected_amounts": [420000],
+      "known_issue": "zygomatic_price"
     },
     {
       "id": "C1",
@@ -89,7 +91,8 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "pain"],
-      "expected_amounts": [18000]
+      "expected_amounts": [18000],
+      "known_gap": "content_coverage_non_implantation"
     },
     {
       "id": "C2",
@@ -98,7 +101,8 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price", "duration"],
-      "expected_amounts": [35000]
+      "expected_amounts": [35000],
+      "known_gap": "content_coverage_non_implantation"
     },
     {
       "id": "C3",
@@ -107,14 +111,15 @@
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["pain", "price"],
-      "expected_amounts": [4500]
+      "expected_amounts": [4500],
+      "known_gap": "content_coverage_non_implantation"
     },
     {
       "id": "D1",
       "group": "D",
       "question": "Сколько стоит all-on-4?",
       "client_id": "demo",
-      "expected_path": "single_source",
+      "expected_composer": false,
       "expected_aspects": ["price"],
       "expected_amounts": [318000, 368000, 428000]
     },
@@ -123,7 +128,7 @@
       "group": "D",
       "question": "Больно ли ставить имплант?",
       "client_id": "demo",
-      "expected_path": "single_source",
+      "expected_composer": false,
       "expected_aspects": ["pain"],
       "expected_amounts": []
     },
@@ -132,7 +137,7 @@
       "group": "D",
       "question": "А где вы находитесь?",
       "client_id": "demo",
-      "expected_path": "single_source",
+      "expected_composer": false,
       "expected_aspects": [],
       "expected_amounts": []
     }

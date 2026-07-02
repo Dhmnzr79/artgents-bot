@@ -134,6 +134,13 @@ def _suppress_plan_append_quick_replies(payload: dict, plan_apply_meta: dict[str
         )
 
 
+def _stamp_service_answer_path(payload: dict, route: str | None) -> None:
+    """Telemetry only: mark which answer path produced the payload."""
+    r = (route or "").strip().lower()
+    if r in {"price_lookup", "price_concern"}:
+        payload.setdefault("meta", {})["answer_path"] = "price"
+
+
 def _service_reply(
     payload: dict,
     sid: str,
@@ -154,6 +161,7 @@ def _service_reply(
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
+    _stamp_service_answer_path(payload, route)
     r = (route or "").strip().lower()
     plan = answer_plan_from_ctx()
     pmeta = payload.get("meta") or {}
@@ -583,6 +591,7 @@ def _sse_service_reply(
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
+    _stamp_service_answer_path(payload, route)
     r = (route or "").strip().lower()
     if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
         pmeta = payload.get("meta") or {}

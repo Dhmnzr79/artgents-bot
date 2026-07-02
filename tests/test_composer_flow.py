@@ -234,6 +234,26 @@ def _parse_sse_ui_payload(body: str) -> dict[str, Any]:
     raise ValueError("no ui event in SSE body")
 
 
+def test_telemetry_answer_path_for_chunk_route():
+    from chunk_responder import _telemetry_answer_path_for_chunk
+
+    assert _telemetry_answer_path_for_chunk(route="contacts_chunk") == "contacts"
+    assert _telemetry_answer_path_for_chunk(route="retrieval_chunk") == "single_source"
+    assert _telemetry_answer_path_for_chunk(route="retrieval_chunk", composer=True) == "composer"
+
+
+def test_stamp_service_answer_path_price():
+    from app import _stamp_service_answer_path
+
+    payload: dict = {"meta": {}}
+    _stamp_service_answer_path(payload, "price_lookup")
+    assert payload["meta"]["answer_path"] == "price"
+
+    payload2: dict = {"meta": {}}
+    _stamp_service_answer_path(payload2, "catalog_facts")
+    assert "answer_path" not in payload2["meta"]
+
+
 def test_sse_composer_dispatch(monkeypatch):
     ensure = pytest.importorskip("app")
     _ = ensure

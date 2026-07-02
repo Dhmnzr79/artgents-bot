@@ -596,6 +596,15 @@ def _packet_composer_generation(
     }
 
 
+def _telemetry_answer_path_for_chunk(*, route: str | None, composer: bool = False) -> str:
+    if composer:
+        return "composer"
+    r = (route or "").strip().lower()
+    if r == "contacts_chunk":
+        return "contacts"
+    return "single_source"
+
+
 def _composer_display_chunk(
     *,
     client_id: str | None,
@@ -876,12 +885,14 @@ def respond_from_chunk(
     if composer_hit is not None:
         answer = str(composer_hit.get("answer") or "")
         profile = composer_hit.get("profile") or {}
-        meta["answer_path"] = "composer"
     else:
         answer, profile = generate_answer_with_empathy(
             llm_question or q, sources, meta, sid
         )
-        meta["answer_path"] = "single_source"
+    meta["answer_path"] = _telemetry_answer_path_for_chunk(
+        route=route,
+        composer=composer_hit is not None,
+    )
 
     answer = ensure_answer(answer, chunk)
     answer = format_generator_answer(
@@ -1281,6 +1292,7 @@ def respond_from_chunk_stream(
         payload.setdefault("meta", {}).update(doctor_bridge_meta)
     if consult_meta:
         payload.setdefault("meta", {}).update(consult_meta)
+    payload.setdefault("meta", {})["answer_path"] = _telemetry_answer_path_for_chunk(route=route)
     payload = _apply_response_policy_compat(
         payload,
         st,

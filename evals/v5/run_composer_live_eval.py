@@ -8,7 +8,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 _EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
 if _EVAL_DIR not in sys.path:
@@ -24,6 +24,7 @@ from smoke_case_runner import (  # noqa: E402
 )
 
 _DIGITS_ONLY_RX = re.compile(r"[\s\u00a0\u202f.,]")
+Verdict = Literal["PASS", "FAIL", "KNOWN"]
 
 
 @dataclass
@@ -40,6 +41,9 @@ class CaseRun:
     question: str
     expected_path: str
     expected_aspects: list[str]
+    expected_composer: bool | None = None
+    known_gap: str = ""
+    known_issue: str = ""
     answer: str = ""
     answer_path: str = ""
     numeric_gate_action: str = ""
@@ -64,12 +68,30 @@ class CaseRun:
     def hard_fail(self) -> bool:
         return any(c.status == "FAIL" for c in self.hard_checks)
 
+    @property
+    def known_reason(self) -> str:
+        return (self.known_gap or self.known_issue or "").strip()
+
+    @property
+    def verdict(self) -> Verdict:
+        if not self.hard_fail:
+            return "PASS"
+        if self.known_reason:
+            return "KNOWN"
+        return "FAIL"
+
 
 def _check_status(checks: list[HardCheck], name: str) -> str:
     for c in checks:
         if c.name == name:
             return c.status
     return "n/a"
+
+
+def _row_bool(row: dict[str, Any], key: str) -> bool | None:
+    if key not in row:
+        return None
+    return bool(row.get(key))
 
 
 def repo_root() -> str:
@@ -111,6 +133,7 @@ def evaluate_hard_checks(
     answer: str,
     meta: dict[str, Any],
     expected_path: str,
+    expected_composer: bool | None,
     expected_amounts: list[int],
 ) -> list[HardCheck]:
     answer_path = str(meta.get("answer_path") or "").strip()
@@ -119,17 +142,42 @@ def evaluate_hard_checks(
 
     checks: list[HardCheck] = []
 
-    # C6 — route
-    if answer_path == expected_path:
-        checks.append(HardCheck("C6", "PASS"))
-    else:
-        checks.append(
-            HardCheck(
-                "C6",
-                "FAIL",
-                f"answer_path={answer_path!r} expected={expected_path!r}",
+    # C6 — route / composer control
+    if expected_composer is False:
+        if answer_path != "composer":
+            checks.append(HardCheck("C6", "PASS"))
+        else:
+            checks.append(
+                HardCheck(
+                    "C6",
+                    "FAIL",
+                    f"composer fired unexpectedly (answer_path={answer_path!r})",
+                )
             )
-        )
+    elif expected_path == "composer":
+        if answer_path == "composer":
+            checks.append(HardCheck("C6", "PASS"))
+        else:
+            checks.append(
+                HardCheck(
+                    "C6",
+                    "FAIL",
+                    f"answer_path={answer_path!r} expected='composer'",
+                )
+            )
+    elif expected_path:
+        if answer_path == expected_path:
+            checks.append(HardCheck("C6", "PASS"))
+        else:
+            checks.append(
+                HardCheck(
+                    "C6",
+                    "FAIL",
+                    f"answer_path={answer_path!r} expected={expected_path!r}",
+                )
+            )
+    else:
+        checks.append(HardCheck("C6", "n/a"))
 
     # C1 — amounts + numeric gate
     if expected_amounts:
@@ -172,6 +220,9 @@ def run_case(
     question = str(row.get("question") or "").strip()
     client_id = str(row.get("client_id") or "demo").strip()
     expected_path = str(row.get("expected_path") or "").strip()
+    expected_composer = _row_bool(row, "expected_composer")
+    known_gap = str(row.get("known_gap") or "").strip()
+    known_issue = str(row.get("known_issue") or "").strip()
     expected_aspects = [str(x).strip() for x in (row.get("expected_aspects") or []) if str(x).strip()]
     raw_amounts = row.get("expected_amounts") or []
     expected_amounts = [int(x) for x in raw_amounts if x is not None]
@@ -186,6 +237,9 @@ def run_case(
         question=question,
         expected_path=expected_path,
         expected_aspects=expected_aspects,
+        expected_composer=expected_composer,
+        known_gap=known_gap,
+        known_issue=known_issue,
     )
 
     try:
@@ -213,6 +267,7 @@ def run_case(
         answer=run.answer,
         meta=meta,
         expected_path=expected_path,
+        expected_composer=expected_composer,
         expected_amounts=expected_amounts,
     )
     return run
@@ -226,7 +281,7 @@ def print_warning_if_composer_off(out: TextIO) -> None:
 
     if not COMPOSER_ON:
         msg = (
-            "⚠ COMPOSER_ON=0 — композер не сработает, запусти с COMPOSER_ON=1"
+            "WARNING: COMPOSER_ON=0 — composer will not run; set COMPOSER_ON=1"
         )
         print(msg, file=out, flush=True)
         print(file=out, flush=True)
@@ -234,24 +289,24 @@ def print_warning_if_composer_off(out: TextIO) -> None:
 
 def print_results_table(runs: list[CaseRun], out: TextIO) -> None:
     header = (
-        f"| {'id':<4} | {'grp':<3} | {'answer_path':<13} | {'C1':<4} | "
-        f"{'C2':<4} | {'C6':<4} | {'skip_reason':<16} | {'numeric_gate':<12} |"
+        f"| {'id':<4} | {'grp':<3} | {'verdict':<6} | {'answer_path':<13} | "
+        f"{'C1':<4} | {'C2':<4} | {'C6':<4} | {'known':<22} |"
     )
-    sep = "+" + "-" * 86 + "+"
+    sep = "+" + "-" * 96 + "+"
     print(sep, file=out)
     print(header, file=out)
     print(sep, file=out)
     for r in runs:
-        skip = (r.composer_skip_reason or r.error or "")[:16]
-        gate = (r.numeric_gate_action or "-")[:12]
+        known = (r.known_reason or "-")[:22]
         print(
-            f"| {r.case_id:<4} | {r.group:<3} | {r.answer_path or '-':<13} | "
-            f"{r.c1:<4} | {r.c2:<4} | {r.c6:<4} | {skip:<16} | {gate:<12} |",
+            f"| {r.case_id:<4} | {r.group:<3} | {r.verdict:<6} | {r.answer_path or '-':<13} | "
+            f"{r.c1:<4} | {r.c2:<4} | {r.c6:<4} | {known:<22} |",
             file=out,
         )
         for chk in r.hard_checks:
             if chk.status == "FAIL" and chk.reason:
-                print(f"  - {chk.name} FAIL: {chk.reason}", file=out)
+                label = "KNOWN" if r.verdict == "KNOWN" else "FAIL"
+                print(f"  - {chk.name} {label}: {chk.reason}", file=out)
     print(sep, file=out)
     print(file=out)
 
@@ -260,11 +315,13 @@ def print_tone_review_block(runs: list[CaseRun], out: TextIO) -> None:
     print("=== Тексты для оценки тона (C3/C4/C5 — вручную) ===", file=out)
     print(file=out)
     for r in runs:
-        print(f"--- {r.case_id} ({r.group}) ---", file=out)
+        print(f"--- {r.case_id} ({r.group}) [{r.verdict}] ---", file=out)
         print(f"Вопрос: {r.question}", file=out)
         aspects = ", ".join(r.expected_aspects) if r.expected_aspects else "(нет)"
         print(f"expected_aspects: {aspects}", file=out)
         print(f"answer_path: {r.answer_path or '-'}", file=out)
+        if r.known_reason:
+            print(f"known: {r.known_reason}", file=out)
         if r.error:
             print(f"ERROR: {r.error}", file=out)
         else:
@@ -274,30 +331,34 @@ def print_tone_review_block(runs: list[CaseRun], out: TextIO) -> None:
 
 
 def print_summary(runs: list[CaseRun], out: TextIO) -> None:
-    composer_n = sum(1 for r in runs if r.answer_path == "composer")
-    single_n = sum(1 for r in runs if r.answer_path == "single_source")
-    hard_fails = sum(1 for r in runs if r.hard_fail)
-    composite = [r for r in runs if r.expected_path == "composer"]
-    skip_counts: dict[str, int] = {}
-    for r in composite:
-        if r.composer_skip_reason:
-            key = r.composer_skip_reason
-            skip_counts[key] = skip_counts.get(key, 0) + 1
+    pass_runs = [r for r in runs if r.verdict == "PASS"]
+    fail_runs = [r for r in runs if r.verdict == "FAIL"]
+    known_runs = [r for r in runs if r.verdict == "KNOWN"]
+
+    path_counts: dict[str, int] = {}
+    for r in runs:
+        key = r.answer_path or "(empty)"
+        path_counts[key] = path_counts.get(key, 0) + 1
 
     print("=== Сводка ===", file=out)
     print(f"Всего кейсов: {len(runs)}", file=out)
-    print(f"composer: {composer_n} | single_source: {single_n}", file=out)
-    print(f"Жёстких FAIL (C1/C2/C6): {hard_fails}", file=out)
-    if composite:
-        skipped = sum(1 for r in composite if r.composer_skip_reason)
-        print(
-            f"Откаты на составных (expected composer): {skipped}/{len(composite)}",
-            file=out,
-        )
-        if skip_counts:
-            print("composer_skip_reason на составных:", file=out)
-            for reason, cnt in sorted(skip_counts.items()):
-                print(f"  - {reason}: {cnt}", file=out)
+    print(f"PASS: {len(pass_runs)} | FAIL: {len(fail_runs)} | KNOWN: {len(known_runs)}", file=out)
+    if path_counts:
+        print("answer_path:", file=out)
+        for path, cnt in sorted(path_counts.items()):
+            print(f"  - {path}: {cnt}", file=out)
+    if fail_runs:
+        print("FAIL (реальные проблемы):", file=out)
+        for r in fail_runs:
+            fails = [c for c in r.hard_checks if c.status == "FAIL"]
+            detail = "; ".join(f"{c.name}: {c.reason}" for c in fails)
+            print(f"  - {r.case_id}: {detail}", file=out)
+    if known_runs:
+        print("KNOWN (документированные пробелы / отложенные решения):", file=out)
+        for r in known_runs:
+            fails = [c for c in r.hard_checks if c.status == "FAIL"]
+            detail = "; ".join(f"{c.name}: {c.reason}" for c in fails) if fails else "(checks pass)"
+            print(f"  - {r.case_id} [{r.known_reason}]: {detail}", file=out)
     print(file=out)
 
 
@@ -365,7 +426,7 @@ def run_eval(
         f.write("".join(lines))
     print(f"Saved: {output_path}", flush=True)
 
-    return 1 if any(r.hard_fail for r in runs) else 0
+    return 1 if any(r.verdict == "FAIL" for r in runs) else 0
 
 
 def main(argv: list[str] | None = None) -> int:

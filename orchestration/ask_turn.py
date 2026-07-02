@@ -144,6 +144,16 @@ def orchestrate_routing_after_resolver(
             if playbook_result is not None:
                 return playbook_result
 
+        doc_result = try_a3_doctor_route(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            sr=sr,
+            decision_frame=decision_frame,
+        )
+        if doc_result is not None:
+            return doc_result
+
         composer_result = try_composer_overlay(
             q=q,
             sid=sid,
@@ -156,16 +166,6 @@ def orchestrate_routing_after_resolver(
         )
         if composer_result is not None:
             return composer_result
-
-        doc_result = try_a3_doctor_route(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            sr=sr,
-            decision_frame=decision_frame,
-        )
-        if doc_result is not None:
-            return doc_result
 
         facts_result = try_a3_catalog_facts(
             q=q,

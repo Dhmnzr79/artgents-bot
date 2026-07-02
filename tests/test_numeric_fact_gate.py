@@ -109,3 +109,39 @@ def test_gate_in_scope_with_deterministic_append():
         meta={},
         allowed_source_text="Рассрочка 0% на 12 месяцев",
     )
+
+
+def test_gate_pass_percent_from_knowledge_base_whitelist(monkeypatch):
+    monkeypatch.setattr(
+        "core.numeric_fact_gate.numeric_fact_gate_enabled",
+        lambda _cid: True,
+    )
+    kb = "Можно оформить налоговый вычет — государство возвращает 13% от стоимости лечения."
+    answer = "Также можно вернуть 13% через налоговый вычет."
+    result = apply_numeric_fact_gate(
+        answer=answer,
+        route="content",
+        meta={},
+        client_id="demo",
+        allowed_source_text=kb,
+    )
+    assert result.action == "pass"
+    assert "13%" in result.answer
+
+
+def test_gate_remove_hallucinated_percent_with_kb_whitelist(monkeypatch):
+    monkeypatch.setattr(
+        "core.numeric_fact_gate.numeric_fact_gate_enabled",
+        lambda _cid: True,
+    )
+    kb = "Можно оформить налоговый вычет — государство возвращает 13% от стоимости лечения."
+    answer = "Сейчас действует скидка 25% на все услуги."
+    result = apply_numeric_fact_gate(
+        answer=answer,
+        route="content",
+        meta={},
+        client_id="demo",
+        allowed_source_text=kb,
+    )
+    assert result.action == "blocked"
+    assert "25%" not in result.answer

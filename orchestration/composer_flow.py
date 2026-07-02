@@ -13,7 +13,6 @@ from core.answer_packet import assemble_answer_packet
 from core.answer_packet_materialize import materialize_cards, materialize_deterministic_cards
 from core.answer_packet_snapshot import publish_answer_packet
 from core.answer_planner import _real_aspect_count
-from core.claim_gate import detect_forbidden_claims
 from core.knowledge_base import assemble_client_knowledge_base
 from core.service_selector_llm import classify_service
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
@@ -144,9 +143,6 @@ def try_composer_overlay(
                 return None
             answer, profile = generate_answer_from_packet(q, materialized, gate_meta, sid)
         if not profile.get("composer_used"):
-            return None
-        hits = detect_forbidden_claims(answer)
-        if hits:
             return None
         publish_answer_packet(packet)
         return AskOrchestrationResult(

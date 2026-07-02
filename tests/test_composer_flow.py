@@ -44,7 +44,6 @@ def _overlay_mocks(
     monkeypatch: pytest.MonkeyPatch,
     *,
     composer_fn=None,
-    forbidden_hits=None,
     price_route_mode: str = "matched",
 ):
     from orchestration import composer_flow
@@ -72,11 +71,6 @@ def _overlay_mocks(
         return "composed answer", {"composer_used": True}
 
     monkeypatch.setattr(composer_flow, "generate_answer_from_packet", _gen)
-    monkeypatch.setattr(
-        composer_flow,
-        "detect_forbidden_claims",
-        lambda _text: list(forbidden_hits or []),
-    )
 
 
 def _try_overlay(
@@ -206,26 +200,6 @@ def test_single_aspect_returns_none(monkeypatch):
     assert result is None
 
 
-def test_forbidden_claim_returns_none(monkeypatch):
-    plan = AnswerPlan(
-        aspects=["price", "pain"],
-        primary_aspect="price",
-        service_id="all_on_4",
-        topic="implantation",
-    )
-
-    def _forbidden(*_a, **_k):
-        return "Операция пройдёт безболезненно.", {"composer_used": True}
-
-    result = _try_overlay(
-        plan=plan,
-        monkeypatch=monkeypatch,
-        composer_fn=_forbidden,
-        forbidden_hits=["bezbolesnenno"],
-    )
-    assert result is None
-
-
 def test_composer_off_returns_none(monkeypatch):
     plan = AnswerPlan(
         aspects=["price", "pain"],
@@ -287,6 +261,60 @@ def test_respond_from_composer_numeric_gate_whitelist(sid, monkeypatch):
     assert "дискомфорт" in allowed.lower()
 
 
+def test_respond_from_composer_fullctx_whitelist_includes_knowledge_base(sid, monkeypatch):
+    from chunk_responder import respond_from_composer
+
+    monkeypatch.setattr("chunk_responder.FULLCTX_ON", True)
+    kb = "Гарантия на имплантаты — 99,8% приживаемость."
+    monkeypatch.setattr(
+        "chunk_responder.assemble_client_knowledge_base",
+        lambda _cid: kb,
+    )
+    captured: dict[str, Any] = {}
+
+    def _numeric(**kwargs):
+        captured.update(kwargs)
+        return kwargs["answer"], None
+
+    monkeypatch.setattr("chunk_responder._apply_numeric_fact_gate", _numeric)
+    monkeypatch.setattr(
+        "chunk_responder._apply_response_policy_compat",
+        lambda payload, *_a, **_k: payload,
+    )
+    monkeypatch.setattr("chunk_responder.schedule_verifier_shadow_if_needed", lambda **_k: None)
+
+    plan = AnswerPlan(
+        aspects=["price", "pain"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+    )
+
+    def _finalize(payload, *_a, **_k):
+        return payload
+
+    with _app.test_request_context():
+        from flask import request
+
+        request.ctx = {"answer_plan": plan.model_dump()}
+        respond_from_composer(
+            composed_answer="Приживаемость высокая.",
+            materialized_cards=_two_cards(),
+            q="Какая приживаемость?",
+            sid=sid,
+            client_id="demo",
+            matched_service_id="all_on_4",
+            route="price_lookup",
+            primary_chunk_ref=None,
+            finalize_ask=_finalize,
+            logger=type("L", (), {"info": lambda *a, **k: None, "warning": lambda *a, **k: None})(),
+        )
+
+    allowed = str(captured.get("deterministic_append") or "")
+    assert "99,8%" in allowed
+    assert "318 000" in allowed
+
+
 def _parse_sse_ui_payload(body: str) -> dict[str, Any]:
     event_name: str | None = None
     for line in body.splitlines():
@@ -341,10 +369,6 @@ def test_group_c_whitening_fullctx_triggers_composer(monkeypatch):
     monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
     monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
     monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
-    monkeypatch.setattr(
-        "orchestration.composer_flow.detect_forbidden_claims",
-        lambda _text: [],
-    )
     monkeypatch.setattr(
         "query_selector.select_price_service_route",
         lambda *a, **k: {"mode": "matched"},
@@ -429,10 +453,6 @@ def test_extraction_composer_uses_llm_service_selection(monkeypatch):
     monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
     monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
     monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
-    monkeypatch.setattr(
-        "orchestration.composer_flow.detect_forbidden_claims",
-        lambda _text: [],
-    )
     monkeypatch.setattr(
         "orchestration.composer_flow.classify_service",
         lambda *a, **k: ServiceSelection(service_id="tooth_extraction", confidence=0.9),

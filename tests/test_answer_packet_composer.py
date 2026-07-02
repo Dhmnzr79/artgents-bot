@@ -254,7 +254,7 @@ def test_build_messages_for_packet_composer_fullctx_structure():
     assert deterministic[0].text in user
 
 
-def test_fullctx_composer_system_prompt_contains_pain_hedge_rule():
+def test_fullctx_composer_system_prompt_base_as_source_of_truth():
     from core.knowledge_base import assemble_client_knowledge_base
 
     messages = build_messages_for_packet_composer_fullctx(
@@ -263,11 +263,20 @@ def test_fullctx_composer_system_prompt_contains_pain_hedge_rule():
         ["pain"],
         [],
         {"client_id": "demo"},
-        "sid-hedge",
+        "sid-truth",
     )
     system = messages[0]["content"]
-    assert "По боли и анестезии" in system
-    assert "острой боли не будет" in system
-    assert "безболезненно" in system
-    assert "под анестезией боли обычно не чувствуют" in system
-    assert "не будет больно" in system
+    assert "ЖИВЫМ, естественным языком" in system
+    assert "факты, цифры и конкретные утверждения — СТРОГО" in system
+    assert "НИКОГДА не пиши абсолюты" not in system
+    assert "без обещаний" not in system
+    assert "смягчай" not in system.lower() or "не смягчай" in system
+
+
+def test_packet_composer_system_prompt_base_as_source_of_truth():
+    from llm import COMPOSER_PACKET_RULE
+
+    assert "ЖИВЫМ, естественным языком" in COMPOSER_PACKET_RULE
+    assert "факты, цифры и конкретные утверждения — СТРОГО" in COMPOSER_PACKET_RULE
+    assert "без обещаний" not in COMPOSER_PACKET_RULE
+    assert "НИКОГДА не пиши абсолюты" not in COMPOSER_PACKET_RULE

@@ -7,12 +7,13 @@ import json as _json
 import os
 from typing import Any, Callable
 
-from core.claim_gate import detect_forbidden_claims
+from config import COMPOSER_ON, FULLCTX_ON
 from core.consult_nudge import (
     plan_consult_nudge,
     record_consult_nudge_after_answer,
     topic_exhausted_after_this_chunk,
 )
+from core.knowledge_base import assemble_client_knowledge_base
 from core.answer_plan_apply import (
     apply_answer_plan_append,
     clean_answer_for_applied_appends,
@@ -29,7 +30,6 @@ from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, 
 
 import session as session_mod
 from contracts.answer_slots import AnswerSlotsTelemetry
-from config import COMPOSER_ON
 from llm import (
     generate_answer_from_packet,
     generate_answer_stream,
@@ -573,11 +573,6 @@ def _packet_composer_generation(
     )
     if not profile.get("composer_used"):
         return None
-    hits = detect_forbidden_claims(answer)
-    if hits:
-        meta["composer_skip_reason"] = "forbidden_claim"
-        meta["forbidden_claim_hits"] = hits
-        return None
     publish_answer_packet(packet)
     if plan.primary_aspect:
         set_last_aspect(sid, plan.primary_aspect)
@@ -633,6 +628,27 @@ def _composer_display_chunk(
     return {"file": "composer.md", "h3_id": None, "h2_id": None, "_score": 1.0}
 
 
+def _composer_allowed_source_text(
+    *,
+    client_id: str | None,
+    materialized_cards: list,
+) -> str:
+    """Whitelist for numeric_fact_gate: full KB (FULLCTX) + deterministic card texts."""
+    parts: list[str] = []
+    if FULLCTX_ON:
+        kb = assemble_client_knowledge_base(client_id)
+        if (kb or "").strip():
+            parts.append(kb.strip())
+    card_blob = "\n\n".join(
+        str(getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else "") or "").strip()
+        for c in (materialized_cards or [])
+        if str(getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else "") or "").strip()
+    )
+    if card_blob:
+        parts.append(card_blob)
+    return "\n\n".join(parts)
+
+
 def respond_from_composer(
     *,
     composed_answer: str,
@@ -682,10 +698,9 @@ def respond_from_composer(
     if plan is not None and plan.primary_aspect:
         set_last_aspect(sid, plan.primary_aspect)
 
-    allowed_source = "\n\n".join(
-        str(getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else "") or "").strip()
-        for c in (materialized_cards or [])
-        if str(getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else "") or "").strip()
+    allowed_source = _composer_allowed_source_text(
+        client_id=client_id,
+        materialized_cards=materialized_cards,
     )
     answer, numeric_gate_meta = _apply_numeric_fact_gate(
         answer=answer,

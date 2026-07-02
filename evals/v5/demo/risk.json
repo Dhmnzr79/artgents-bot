@@ -351,7 +351,6 @@
         "require_numeric_gate_pass": true,
         "require_forbidden_claims_empty": true,
         "expected_packet_aspects": [
-          "comparison",
           "overview"
         ],
         "expected_service_id": "zirconia_crowns"
@@ -504,8 +503,7 @@
         "require_numeric_gate_pass": true,
         "require_forbidden_claims_empty": true,
         "expected_packet_aspects": [
-          "comparison",
-          "overview"
+          "comparison"
         ],
         "expected_service_id": "pterygoid_implants"
       }

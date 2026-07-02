@@ -58,6 +58,7 @@ from session import (
     set_last_aspect,
 )
 from core.lead_context import lead_interrupt_no_topic
+from retriever import get_chunk_by_ref
 from ux_builder import build_ask_response, normalize_policy_payload
 
 _APPLY_POLICY_PARAMS = inspect.signature(apply_response_policy).parameters
@@ -593,6 +594,215 @@ def _packet_composer_generation(
         },
         "slot_meta": None,
     }
+
+
+def _composer_display_chunk(
+    *,
+    client_id: str | None,
+    matched_service_id: str | None,
+    primary_chunk_ref: str | None,
+) -> dict:
+    ref = (primary_chunk_ref or "").strip()
+    if ref:
+        ch = get_chunk_by_ref(ref, client_id=client_id)
+        if isinstance(ch, dict):
+            out = dict(ch)
+            out.setdefault("_score", 1.0)
+            return out
+    sid = (matched_service_id or "").strip()
+    if sid:
+        for guess in (
+            f"implantation__service__{sid}.md#korotko",
+            f"extraction__service__{sid}.md#korotko",
+            f"treatment__service__{sid}.md#korotko",
+        ):
+            ch = get_chunk_by_ref(guess, client_id=client_id)
+            if isinstance(ch, dict):
+                out = dict(ch)
+                out.setdefault("_score", 1.0)
+                return out
+    return {"file": "composer.md", "h3_id": None, "h2_id": None, "_score": 1.0}
+
+
+def respond_from_composer(
+    *,
+    composed_answer: str,
+    materialized_cards: list,
+    q: str,
+    sid: str,
+    client_id: str | None,
+    matched_service_id: str | None,
+    route: str,
+    primary_chunk_ref: str | None,
+    finalize_ask: Callable[..., dict],
+    logger,
+    log_event: str = "Answer generated from composer",
+) -> dict:
+    """Build full /ask payload for composer overlay (no slots/price append)."""
+    from core.consult_nudge import record_consult_nudge_after_answer
+    from core.follow_up_rewrite import persist_focus_from_service_turn
+
+    if (q or "").strip():
+        mem_add_user(sid, q)
+    skip_topic = lead_interrupt_no_topic()
+    chunk = _composer_display_chunk(
+        client_id=client_id,
+        matched_service_id=matched_service_id,
+        primary_chunk_ref=primary_chunk_ref,
+    )
+    meta = meta_for_chunk(chunk, client_id=client_id)
+    if client_id is not None:
+        meta["client_id"] = client_id
+    sid_svc = str(matched_service_id or "").strip()
+    if sid_svc:
+        meta["matched_service_id"] = sid_svc
+    doc_id = meta.get("doc_id")
+    if doc_id and not skip_topic:
+        set_current_doc(sid, doc_id)
+
+    answer = ensure_answer(str(composed_answer or ""), chunk)
+    answer = format_generator_answer(
+        answer,
+        user_question=q,
+        chunk=chunk,
+        meta=meta,
+    )
+    meta["answer_path"] = "composer"
+
+    plan = answer_plan_from_ctx()
+    if plan is not None and plan.primary_aspect:
+        set_last_aspect(sid, plan.primary_aspect)
+
+    allowed_source = "\n\n".join(
+        str(getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else "") or "").strip()
+        for c in (materialized_cards or [])
+        if str(getattr(c, "text", None) or (c.get("text") if isinstance(c, dict) else "") or "").strip()
+    )
+    answer, numeric_gate_meta = _apply_numeric_fact_gate(
+        answer=answer,
+        route=route,
+        meta=meta,
+        client_id=client_id,
+        deterministic_append=allowed_source,
+        price_offer_meta=None,
+    )
+
+    _persist_subject_focus(
+        sid=sid,
+        client_id=client_id,
+        doc_id=doc_id,
+        matched_service_id=sid_svc or None,
+        route=route,
+        meta=meta,
+        skip_topic=skip_topic,
+        answer=answer,
+    )
+    if route in {"price_lookup", "price_concern"} and sid_svc:
+        persist_focus_from_service_turn(
+            sid,
+            client_id=client_id,
+            matched_service_id=sid_svc,
+            route=route,
+            answer=answer,
+            topic=(plan.topic if plan else None),
+        )
+
+    st = mem_get(sid)
+    lead_context = is_lead_context(st)
+    pre_turn = _increment_doc_turn_with_pre(
+        sid,
+        doc_id,
+        contentful=bool(answer.strip()),
+        is_low_score=False,
+        is_error=False,
+        lead_flow_active=lead_context,
+    )
+    tstate = get_topic_state(sid, doc_id) if doc_id else {}
+
+    plan_meta: dict[str, Any] | None = None
+    if plan is not None:
+        plan_meta = {"answer_plan": plan.model_dump()}
+        try:
+            from core.answer_packet_snapshot import answer_packet_from_ctx
+
+            packet = answer_packet_from_ctx()
+            if packet is not None:
+                plan_meta["answer_packet"] = packet.model_dump()
+        except Exception:
+            pass
+
+    s0_ref = source_ref_from_chunk(chunk)
+    generator_input = {
+        "source_ref": s0_ref,
+        "source_count": len(materialized_cards or []),
+        "route": route,
+        "doc_id": meta.get("doc_id"),
+        "doc_type": meta.get("doc_type"),
+        "subtype": meta.get("subtype"),
+        "h2_id": chunk.get("h2_id"),
+        "h3_id": chunk.get("h3_id"),
+        "composer": True,
+    }
+
+    payload = build_ask_response(
+        answer=answer,
+        top=chunk,
+        meta=meta,
+        sid=sid,
+        profile={},
+        client_id=client_id,
+        topic_state=tstate,
+        suppress_refs=_plan_append_suppress_refs(plan_meta, doc_id=doc_id, answer_body=answer),
+    )
+    if route:
+        payload.setdefault("meta", {})["orch_route"] = route
+    payload.setdefault("meta", {})["answer_path"] = "composer"
+    if plan_meta:
+        payload.setdefault("meta", {}).update(plan_meta)
+    if numeric_gate_meta:
+        payload.setdefault("meta", {}).update(numeric_gate_meta)
+    _apply_patient_playbook_ui(payload, route)
+    payload = _apply_response_policy_compat(
+        payload,
+        st,
+        q,
+        topic_state=tstate,
+        doc_meta=meta,
+        pre_doc_turn_count=pre_turn,
+        session_id=sid,
+        client_id=client_id,
+    )
+    payload = normalize_policy_payload(payload)
+    payload.setdefault("meta", {})["generator_input"] = generator_input
+
+    consult_meta = (
+        {}
+        if lead_context
+        else record_consult_nudge_after_answer(sid, route, None, answer)
+    )
+    if consult_meta:
+        payload.setdefault("meta", {}).update(consult_meta)
+
+    log_json(
+        logger,
+        log_event,
+        file=chunk.get("file"),
+        score=round(float(chunk.get("_score", 0.0)), 3),
+        answer_length=len(answer),
+        generator_input=generator_input,
+        answer_path="composer",
+    )
+    qs = (q or "").strip()
+    turn_meta = (
+        {"interaction": "user_message", "question_len": len(qs), "preview": qs[:120]}
+        if qs
+        else None
+    )
+    out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
+    bot_text = str(out.get("answer") or answer).strip()
+    if bot_text:
+        mem_add_bot(sid, bot_text)
+    return out
 
 
 def respond_from_chunk(

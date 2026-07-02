@@ -716,6 +716,8 @@ def build_messages_for_packet_composer(
         + COMPOSER_PACKET_RULE
         + _consult_nudge_addon(meta)
     )
+    if CHAT_JSON_MODE:
+        system += JSON_ANSWER_RULE
     blocks: list[str] = []
     for idx, raw in enumerate(materialized_cards, start=1):
         card = (

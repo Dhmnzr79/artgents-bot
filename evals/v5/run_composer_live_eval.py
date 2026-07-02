@@ -18,6 +18,7 @@ from smoke_case_runner import (  # noqa: E402
     here,
     load_json,
     post_ask_json,
+    post_ask_stream,
     reset_smoke_session,
     uses_test_client,
 )
@@ -164,6 +165,7 @@ def run_case(
     timeout_sec: float,
     run_tag: str,
     ts: int,
+    use_stream: bool,
 ) -> CaseRun:
     case_id = str(row.get("id") or "").strip() or "case"
     group = str(row.get("group") or "").strip()
@@ -187,11 +189,11 @@ def run_case(
     )
 
     try:
-        resp = post_ask_json(
-            bot_url,
-            {"q": question, "sid": sid, "client_id": client_id},
-            timeout_sec,
-        )
+        ask_payload = {"q": question, "sid": sid, "client_id": client_id}
+        if use_stream:
+            resp = post_ask_stream(bot_url, ask_payload, timeout_sec)
+        else:
+            resp = post_ask_json(bot_url, ask_payload, timeout_sec)
     except Exception as e:
         run.error = str(e)[:300]
         run.hard_checks = [
@@ -249,7 +251,7 @@ def print_results_table(runs: list[CaseRun], out: TextIO) -> None:
         )
         for chk in r.hard_checks:
             if chk.status == "FAIL" and chk.reason:
-                print(f"  └ {chk.name} FAIL: {chk.reason}", file=out)
+                print(f"  - {chk.name} FAIL: {chk.reason}", file=out)
     print(sep, file=out)
     print(file=out)
 
@@ -306,6 +308,7 @@ def run_eval(
     timeout_sec: float,
     filter_ids: set[str] | None,
     output_path: str,
+    use_stream: bool,
 ) -> int:
     spec = load_json(spec_path)
     cases = spec.get("cases")
@@ -323,7 +326,14 @@ def run_eval(
     runs: list[CaseRun] = []
     for row in rows:
         runs.append(
-            run_case(row, bot_url=bot_url, timeout_sec=timeout_sec, run_tag=run_tag, ts=ts)
+            run_case(
+                row,
+                bot_url=bot_url,
+                timeout_sec=timeout_sec,
+                run_tag=run_tag,
+                ts=ts,
+                use_stream=use_stream,
+            )
         )
 
     lines: list[str] = []
@@ -341,7 +351,8 @@ def run_eval(
 
     print("=== Composer Live Eval ===", file=out)
     print(f"spec: {spec_path}", file=out)
-    print(f"bot: {bot_url} | test_client={uses_test_client()}", file=out)
+    door = "/ask/stream (widget)" if use_stream else "/ask (json)"
+    print(f"bot: {bot_url} | door={door} | test_client={uses_test_client()}", file=out)
     print(file=out)
 
     print_warning_if_composer_off(out)
@@ -364,6 +375,11 @@ def main(argv: list[str] | None = None) -> int:
         allow_abbrev=False,
     )
     ap.add_argument("--case-id", action="append", default=None, metavar="ID")
+    ap.add_argument(
+        "--json",
+        action="store_true",
+        help="Use POST /ask JSON door instead of default /ask/stream (widget).",
+    )
     ns, unknown = ap.parse_known_args(argv)
     if unknown:
         print(f"WARNING: ignored unknown args: {unknown!r}", file=sys.stderr, flush=True)
@@ -385,6 +401,7 @@ def main(argv: list[str] | None = None) -> int:
         timeout_sec=timeout_sec,
         filter_ids=filter_ids,
         output_path=output_path,
+        use_stream=not ns.json,
     )
 
 

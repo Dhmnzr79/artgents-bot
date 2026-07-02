@@ -639,6 +639,52 @@ def http_post_json(url: str, payload: dict[str, Any], timeout_sec: float) -> dic
     return out
 
 
+def parse_sse_ui_payload(body: str) -> dict[str, Any]:
+    """Parse final ``ui`` event JSON from /ask/stream SSE body."""
+    event_name: str | None = None
+    for line in (body or "").splitlines():
+        if line.startswith("event: "):
+            event_name = line[7:].strip()
+        elif line.startswith("data: ") and event_name == "ui":
+            raw = json.loads(line[6:])
+            if not isinstance(raw, dict):
+                raise ValueError("ui payload is not a JSON object")
+            return raw
+    raise ValueError("no ui event in SSE body")
+
+
+def ask_stream_url(bot_url: str) -> str:
+    u = (bot_url or "").strip().rstrip("/")
+    if u.endswith("/ask"):
+        return f"{u}/stream"
+    return f"{u}/ask/stream"
+
+
+def post_ask_stream(bot_url: str, payload: dict[str, Any], timeout_sec: float) -> dict[str, Any]:
+    """POST /ask/stream and return full payload from the ``ui`` SSE event."""
+    if uses_test_client():
+        ensure_repo_on_path()
+        from app import app
+
+        _ = bot_url
+        _ = timeout_sec
+        client = app.test_client()
+        resp = client.post("/ask/stream", json=payload)
+        return parse_sse_ui_payload(resp.get_data(as_text=True))
+
+    url = ask_stream_url(bot_url)
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        url=url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+    return parse_sse_ui_payload(raw)
+
+
 def post_ask_json(bot_url: str, payload: dict[str, Any], timeout_sec: float) -> dict[str, Any]:
     if uses_test_client():
         ensure_repo_on_path()

@@ -33,7 +33,7 @@ from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
 from core.observability_pii import observability_turn_preview, observability_user_texts
 from logging_setup import LOG_FILE, emit_bot_event, get_logger, make_request_context, log_json, redact_text
-from chunk_responder import respond_from_chunk, respond_from_chunk_stream
+from chunk_responder import respond_from_chunk, respond_from_chunk_stream, respond_from_composer
 from retriever import (
     alias_debug_score_for_chunk,
     best_alias_hit_in_corpus,
@@ -446,6 +446,21 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
+    if orch_r.kind == "composer":
+        out = respond_from_composer(
+            composed_answer=str(orch_r.composed_answer or ""),
+            materialized_cards=list(orch_r.materialized_cards or []),
+            q=orch_r.q,
+            sid=orch_r.sid,
+            client_id=orch_r.client_id,
+            matched_service_id=orch_r.matched_service_id,
+            route=orch_r.chunk_route or "retrieval_chunk",
+            primary_chunk_ref=orch_r.composer_primary_chunk_ref,
+            finalize_ask=finalize_ask,
+            logger=logger,
+            log_event="Answer generated from composer",
+        )
+        return safe_jsonify(out)
     if orch_r.kind == "chunk":
         return respond_from_chunk(
             chunk=orch_r.chosen_chunk,
@@ -528,6 +543,8 @@ def _sse_typing_phase(*, kind: str, route: str | None) -> str:
     """Фаза индикатора в виджете: searching = «база знаний», writing = только «печатает»."""
     if kind == "chunk":
         return "searching"
+    if kind == "composer":
+        return "searching"
     r = (route or "").strip().lower()
     if r.startswith("ingress_"):
         return "writing"
@@ -599,6 +616,34 @@ def _sse_service_reply(
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
 
 
+def _sse_composer_reply(
+    orch_r: AskOrchestrationResult,
+):
+    """Composer overlay via SSE: typing + ui + done (no text_delta)."""
+    out = respond_from_composer(
+        composed_answer=str(orch_r.composed_answer or ""),
+        materialized_cards=list(orch_r.materialized_cards or []),
+        q=orch_r.q,
+        sid=orch_r.sid,
+        client_id=orch_r.client_id,
+        matched_service_id=orch_r.matched_service_id,
+        route=orch_r.chunk_route or "retrieval_chunk",
+        primary_chunk_ref=orch_r.composer_primary_chunk_ref,
+        finalize_ask=finalize_ask,
+        logger=logger,
+        log_event="Answer generated from composer",
+    )
+    route = orch_r.chunk_route or "retrieval_chunk"
+    phase = _sse_typing_phase(kind="composer", route=route)
+
+    def _gen():
+        yield _sse_typing_line(phase)
+        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+        yield "event: done\ndata: {}\n\n"
+
+    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
+
+
 def _sse_chunk_response(
     chunk: dict,
     q: str,
@@ -653,6 +698,8 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
+    if orch_r.kind == "composer":
+        return _sse_composer_reply(orch_r)
     if orch_r.kind == "chunk":
         return _sse_chunk_response(
             orch_r.chosen_chunk,

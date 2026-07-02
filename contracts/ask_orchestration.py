@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from contracts.answer_packet import MaterializedCard
+
 
 class AskOrchestrationResult(BaseModel):
     """
@@ -13,7 +15,7 @@ class AskOrchestrationResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["unknown_client", "reset_session", "service_reply", "chunk"]
+    kind: Literal["unknown_client", "reset_session", "service_reply", "chunk", "composer"]
 
     q: str = ""
     sid: str = ""
@@ -38,3 +40,7 @@ class AskOrchestrationResult(BaseModel):
     generator_append_text: str | None = None
     price_offer_meta: dict[str, Any] | None = None
     matched_service_id: str | None = None
+
+    composed_answer: str | None = None
+    materialized_cards: list[MaterializedCard] | None = None
+    composer_primary_chunk_ref: str | None = None

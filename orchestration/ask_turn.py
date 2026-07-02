@@ -20,6 +20,7 @@ from core.patient_situation_session import (
 )
 from core.dialog_focus import record_dialog_focus_ctx
 from core.price_offers import is_crown_inclusion_content_query
+from orchestration.composer_flow import try_composer_overlay
 from orchestration.patient_playbook_flow import try_patient_options_overview
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
@@ -126,6 +127,19 @@ def orchestrate_routing_after_resolver(
             service_id=plan.service_id,
             source_ref=str(getattr(sr, "ref", None) or "") or None,
         )
+
+        composer_result = try_composer_overlay(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            intent=intent,
+            plan=plan,
+            sr=sr,
+            decision=decision,
+            decision_frame=decision_frame,
+        )
+        if composer_result is not None:
+            return composer_result
 
         doc_result = try_a3_doctor_route(
             q=q,

@@ -15,6 +15,7 @@ from core.answer_packet_snapshot import publish_answer_packet
 from core.answer_planner import _real_aspect_count
 from core.knowledge_base import assemble_client_knowledge_base
 from core.service_selector_llm import classify_service
+from core.turn_planner_llm import turn_plan_from_ctx
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
@@ -143,11 +144,17 @@ def try_composer_overlay(
         has_price_aspect = "price" in aspects or "included" in aspects
         service_id_override: str | None = None
         llm_selection_applied = False
+        turn_plan = turn_plan_from_ctx()
+        if turn_plan is not None:
+            llm_selection_applied = True
+            service_id_override = str(turn_plan.service_id or "").strip() or None
+            if has_price_aspect and service_id_override is None:
+                return None
 
         if has_price_aspect and _composer_should_defer_jaw_scope_price(q):
             return None
 
-        if has_price_aspect and SERVICE_SELECT_LLM_ON:
+        if has_price_aspect and SERVICE_SELECT_LLM_ON and turn_plan is None:
             sel = classify_service(q, client_id=client_id, sid=sid)
             if sel is not None:
                 llm_selection_applied = True

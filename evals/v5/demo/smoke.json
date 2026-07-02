@@ -1,10 +1,7 @@
 {
   "baseline": 24,
   "description": "Demo smoke (drafts/test.md §1): 24 must-pass questions — route, service/doc, answer signals. Format v5: no brittle must_contain on LLM prose.",
-  "known_failures": [
-    "demo_smoke_15_installment",
-    "demo_smoke_17_warranty"
-  ],
+  "known_failures": [],
   "cases": [
     {
       "id": "demo_smoke_01_clinic_location",

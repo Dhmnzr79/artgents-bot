@@ -6,14 +6,28 @@ import json
 from typing import Any
 
 from config import TURN_PLANNER_LLM_MODEL
+from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
 from contracts.turn_plan import TurnPlan
+from contracts.answer_plan import AspectKind
 from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
-from core.service_selector_llm import build_compact_service_catalog
+from core.service_selector_llm import build_compact_service_catalog, _read_service_catalog
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
 from session import format_dialog_context_for_understanding, recent_dialog_history
 
 logger = get_logger(__name__)
+
+_ASPECT_PRIORITY: tuple[AspectKind, ...] = (
+    "price",
+    "payment",
+    "included",
+    "warranty",
+    "pain",
+    "duration",
+    "comparison",
+    "stages",
+    "overview",
+)
 
 _SYSTEM = (
     "Ты единый планировщик одного хода диалога для стоматологического чата. "
@@ -61,6 +75,17 @@ def _catalog_lines(rows: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def order_plan_aspects(aspects: list[AspectKind]) -> list[AspectKind]:
+    uniq: list[AspectKind] = []
+    for aspect in _ASPECT_PRIORITY:
+        if aspect in aspects and aspect not in uniq:
+            uniq.append(aspect)
+    for aspect in aspects:
+        if aspect not in uniq:
+            uniq.append(aspect)
+    return uniq
+
+
 def _validate_plan(
     raw: dict[str, Any],
     *,
@@ -69,6 +94,7 @@ def _validate_plan(
     allowed_brands: frozenset[str],
 ) -> TurnPlan | None:
     plan = TurnPlan.model_validate(raw)
+    plan = plan.model_copy(update={"aspects": order_plan_aspects(list(plan.aspects))})
     for field in ("service_id", "followup_of"):
         value = str(getattr(plan, field) or "").strip()
         if value and value not in allowed_service_ids:
@@ -81,6 +107,115 @@ def _validate_plan(
         if brand and brand not in allowed_brands:
             raise ValueError("turn_plan_brand_not_in_pricebook")
     return plan
+
+
+def _service_topic_for_plan(client_id: str | None, service_id: str | None) -> str:
+    sid = (service_id or "").strip()
+    if not sid:
+        return "unknown"
+    catalog = _read_service_catalog(client_id)
+    entry = catalog.get(sid) if isinstance(catalog, dict) else None
+    ref = ""
+    if isinstance(entry, dict):
+        ref = str(entry.get("md_entry_ref") or entry.get("price_ref") or "").strip().lower()
+    if ref.startswith("implantation__") or sid in {
+        "classic",
+        "one_stage",
+        "all_on_4",
+        "all_on_6",
+        "zygomatic_implants",
+        "pterygoid_implants",
+        "sinus_lift",
+        "implant_supported_prosthetics",
+    }:
+        return "implantation"
+    if ref.startswith("prosthetics__") or sid in {
+        "veneers",
+        "zirconia_crowns",
+        "removable_dentures",
+        "clasp_dentures",
+        "temporary_teeth",
+    }:
+        return "prosthetics"
+    if ref.startswith("clinic__"):
+        return "clinic"
+    if ref.startswith("doctors__"):
+        return "doctors"
+    return "unknown"
+
+
+def _query_mode_for_plan(plan: TurnPlan) -> str:
+    aspects = set(plan.aspects or [])
+    if "comparison" in aspects:
+        return "comparison"
+    if "stages" in aspects:
+        return "process"
+    if aspects == {"overview"}:
+        return "overview"
+    return "specific"
+
+
+def turn_plan_to_decision_frame(plan: TurnPlan, *, client_id: str | None) -> DecisionFrame:
+    """Materialize a resolver-compatible frame so downstream guards stay unchanged."""
+    service_id = str(plan.service_id or "").strip() or None
+    topic = _service_topic_for_plan(client_id, service_id)
+    service_conf = 0.9 if service_id else 0.0
+    topic_conf = 0.85 if topic != "unknown" else 0.0
+    return DecisionFrame(
+        route_intent=plan.route,
+        service_topic=topic,  # type: ignore[arg-type]
+        service_id=service_id,
+        query_mode=_query_mode_for_plan(plan),  # type: ignore[arg-type]
+        confidence=DecisionFrameConfidence(
+            intent=0.9 if plan.route != "unknown" else 0.0,
+            topic=topic_conf,
+            service=service_conf,
+            query_mode=0.85,
+        ),
+        needs_clarification=bool(plan.needs_clarify),
+    )
+
+
+def publish_turn_plan(plan: TurnPlan) -> None:
+    try:
+        from flask import has_request_context, request
+
+        if has_request_context() and isinstance(getattr(request, "ctx", None), dict):
+            request.ctx["turn_plan"] = plan.model_dump()
+            request.ctx["turn_planner_used"] = True
+            request.ctx["turn_plan_route"] = plan.route
+            request.ctx["turn_plan_aspects"] = list(plan.aspects)
+            request.ctx["turn_plan_service_id"] = plan.service_id
+            request.ctx["turn_plan_followup_of"] = plan.followup_of
+            request.ctx["turn_plan_needs_clarify"] = plan.needs_clarify
+            request.ctx["turn_plan_patient_situation"] = plan.patient_situation
+            if plan.brand_filter is not None:
+                request.ctx["turn_plan_brand_filter"] = plan.brand_filter.model_dump()
+    except Exception:
+        pass
+
+
+def turn_plan_from_ctx() -> TurnPlan | None:
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context() or not isinstance(getattr(request, "ctx", None), dict):
+            return None
+        raw = request.ctx.get("turn_plan")
+        if not isinstance(raw, dict):
+            return None
+        return TurnPlan.model_validate(raw)
+    except Exception:
+        return None
+
+
+def turn_plan_brand_filter_from_ctx() -> tuple[str | None, str | None]:
+    plan = turn_plan_from_ctx()
+    if plan is None or plan.brand_filter is None:
+        return None, None
+    brand = str(plan.brand_filter.brand or "").strip() or None
+    brand_group = str(plan.brand_filter.brand_group or "").strip().lower() or None
+    return brand, brand_group
 
 
 def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None:

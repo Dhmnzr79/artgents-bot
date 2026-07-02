@@ -4,10 +4,78 @@ from __future__ import annotations
 
 from typing import Any
 
-from contracts.patient_situation import PatientSituationCues, PatientSituationResult
+from contracts.patient_situation import PatientSituationCues, PatientSituationKind, PatientSituationResult
 from core.patient_situation import detect_patient_situation
 from core.patient_situation_routing import situation_routing_eligible
 from core.price_followup import is_vague_price_followup
+
+
+_PLANNER_SCOPE_BY_KIND: dict[PatientSituationKind, str] = {
+    "one_tooth_missing": "one_tooth",
+    "few_teeth_missing": "few_teeth",
+    "full_arch_missing": "full_jaw",
+    "upper_jaw_missing_or_complex": "upper_jaw",
+    "existing_implant_prosthetic_stage": "prosthetic_stage",
+    "extraction_then_implant": "one_tooth",
+    "bone_deficit_or_grafting": "adjunct",
+    "urgent_problem": "urgent",
+    "generic_implant_interest": "generic",
+    "unknown": "unknown",
+}
+
+_PLANNER_EXTENT_BY_SCOPE = {
+    "one_tooth": "one_tooth",
+    "few_teeth": "few_teeth",
+    "full_jaw": "full_arch",
+    "upper_jaw": "full_arch",
+}
+
+
+def _result_from_turn_plan(kind: PatientSituationKind, *, q: str) -> PatientSituationResult:
+    scope = _PLANNER_SCOPE_BY_KIND.get(kind, "unknown")
+    problem = "unknown"
+    if kind in {
+        "one_tooth_missing",
+        "few_teeth_missing",
+        "full_arch_missing",
+        "upper_jaw_missing_or_complex",
+        "extraction_then_implant",
+    }:
+        problem = "missing_teeth"
+    elif kind == "bone_deficit_or_grafting":
+        problem = "bone_deficit"
+    elif kind == "existing_implant_prosthetic_stage":
+        problem = "existing_implant"
+    elif kind == "urgent_problem":
+        problem = "urgent"
+    elif kind == "generic_implant_interest":
+        problem = "generic_implant_interest"
+    modifiers: list[str] = []
+    if kind == "bone_deficit_or_grafting":
+        modifiers.append("bone_deficit")
+    if kind == "extraction_then_implant":
+        modifiers.append("extracted")
+    if kind == "existing_implant_prosthetic_stage":
+        modifiers.append("existing_implant")
+    if kind == "urgent_problem":
+        modifiers.append("urgent")
+    jaw = "upper" if kind == "upper_jaw_missing_or_complex" else "unknown"
+    extent = _PLANNER_EXTENT_BY_SCOPE.get(scope, "unknown")
+    intent = "price" if is_vague_price_followup(q) else "unknown"
+    return PatientSituationResult(
+        kind=kind,
+        confidence=0.9 if kind != "unknown" else 0.0,
+        source="llm_fallback",
+        evidence=["turn_planner"],
+        patient_scope=scope,  # type: ignore[arg-type]
+        problem=problem,
+        extent=extent,
+        jaw=jaw,
+        modifiers=modifiers,
+        next_best_action="none",
+        should_clarify=False,
+        cues=PatientSituationCues(intent=intent),  # type: ignore[arg-type]
+    )
 
 
 def _result_from_snapshot(snapshot: dict[str, Any], *, cues: PatientSituationCues) -> PatientSituationResult:
@@ -43,6 +111,18 @@ def resolve_patient_situation_for_turn(
     client_id: str | None = None,
 ) -> tuple[PatientSituationResult, dict[str, Any]]:
     """Detect situation for this turn; optionally carry from session on vague price."""
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        plan = turn_plan_from_ctx()
+        if plan is not None and plan.patient_situation:
+            return _result_from_turn_plan(plan.patient_situation, q=q), {
+                "patient_situation_carried": False,
+                "patient_situation_carry_age": None,
+                "patient_situation_source": "turn_planner",
+            }
+    except Exception:
+        pass
     fresh = detect_patient_situation(q, client_id=client_id, sid=sid)
     meta: dict[str, Any] = {
         "patient_situation_carried": False,

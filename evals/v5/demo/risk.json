@@ -1,11 +1,7 @@
 {
   "baseline": 28,
   "description": "Demo risk regression: routing traps (price scope, crown vs implant, policies) + patient_situation anchors (Slice 4). Stage-4 KNOWN: fuzzy service on non-price aspects.",
-  "known_failures": [
-    "risk_r08_crown_paid_separately",
-    "risk_r17_sedation_sleep",
-    "risk_ps06_existing_implant_crown_not_classic"
-  ],
+  "known_failures": [],
   "cases": [
     {
       "id": "risk_r01_generic_implant_price",

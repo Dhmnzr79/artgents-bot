@@ -7,7 +7,7 @@ from typing import Any
 
 from flask import request
 
-from config import COMPARISON_QUERY_RE
+from config import COMPARISON_QUERY_RE, TURN_PLANNER_ON
 from core.metadata_first_observability import record_decision_frame_ctx
 from query_selector import commercial_info_query, consultation_info_query
 from core.routing_loader import THRESHOLDS
@@ -48,7 +48,54 @@ def run_resolver_turn(
     decision = None
     intent: str
 
-    if resolver_bypassed_env:
+    if TURN_PLANNER_ON and not resolver_bypassed_env:
+        from core.turn_planner_llm import plan_turn, publish_turn_plan, turn_plan_to_decision_frame
+
+        plan = plan_turn(q, sid, client_id)
+        if plan is not None:
+            decision = turn_plan_to_decision_frame(plan, client_id=client_id)
+            publish_turn_plan(plan)
+            request.ctx["legacy_intent"] = None
+            request.ctx["resolver_used"] = False
+            request.ctx["turn_planner_used"] = True
+            request.ctx["safety_net_used"] = False
+            emit_bot_event(
+                logger,
+                "turn_plan_decision_frame_used",
+                status="ok",
+                details={
+                    "turn_plan": plan.model_dump(),
+                    "decision_frame": decision.model_dump(),
+                    "resolver_bypassed_env": False,
+                },
+            )
+            enqueue_resolver_trace(
+                decision=decision,
+                safety_net_used=[],
+                resolver_bypassed_env=False,
+            )
+            ri = str(decision.route_intent or "").strip().lower()
+            if consultation_info_query(q) or commercial_info_query(q):
+                intent = "content"
+                decision = decision.model_copy(update={"route_intent": "content"})
+            elif ri in ("price_lookup", "price_concern"):
+                intent = ri
+            else:
+                intent = "content"
+            if COMPARISON_QUERY_RE.search(q or ""):
+                decision = decision.model_copy(update={"query_mode": "comparison"})
+            request.ctx["effective_intent"] = str(intent)
+            record_decision_frame_ctx(decision)
+        else:
+            request.ctx["turn_planner_used"] = False
+            log_json(
+                logger,
+                "turn_planner_fail_open_to_resolver",
+                sid=sid,
+                client_id=client_id,
+            )
+
+    if decision is None and resolver_bypassed_env:
         log_json(logger, "resolver_bypassed_env", sid=sid, client_id=client_id)
         intent = classify_intent(q, client_id=client_id, sid=sid)
         request.ctx["legacy_intent"] = intent
@@ -59,7 +106,7 @@ def run_resolver_turn(
         enqueue_resolver_trace(
             decision=None, safety_net_used=[], resolver_bypassed_env=True
         )
-    else:
+    elif decision is None:
         hist = list((st or {}).get("hist") or [])
         decision, safety_net_used, legacy_intent = resolve_with_fallback(
             question=q,

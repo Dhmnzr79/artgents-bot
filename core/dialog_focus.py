@@ -13,6 +13,7 @@ from typing import Any
 
 from contracts.decision_frame import DecisionFrame
 from contracts.dialog_focus import DialogFocusAttribute, DialogFocusDecision, DialogFocusSource
+from contracts.turn_plan import TurnPlan
 from core.attribute_followup import catalog_match_is_authoritative, detect_vague_attribute_kinds
 from core.follow_up_rewrite import focus_from_legacy_session
 from core.routing_loader import THRESHOLDS
@@ -246,6 +247,65 @@ def publish_dialog_focus_decision(focus: DialogFocusDecision) -> None:
         pass
 
 
+def build_dialog_focus_from_turn_plan(
+    plan: TurnPlan,
+    *,
+    sid: str | None,
+    client_id: str | None,
+    decision: DecisionFrame | None = None,
+) -> DialogFocusDecision:
+    """Publish focus telemetry from turn planner output without gray-zone LLM."""
+    _ = client_id
+    st = mem_get(sid) if sid else {}
+    focus, age = _focus_from_last_subject(st)
+    focus_service_id = normalize_service_id(str(plan.followup_of or (focus or {}).get("service_id") or "")) or None
+    resolved_service_id = normalize_service_id(str(plan.service_id or plan.followup_of or "")) or None
+    decision_service_id = (
+        normalize_service_id(str(decision.service_id or "")) if decision is not None else None
+    )
+    if not resolved_service_id:
+        resolved_service_id = decision_service_id
+    explicit_topic_change = bool(
+        resolved_service_id
+        and focus_service_id
+        and resolved_service_id != focus_service_id
+        and not plan.followup_of
+    )
+    attr: DialogFocusAttribute = "overview"
+    for aspect in ("price", "payment", "included", "warranty", "pain", "duration"):
+        if aspect in plan.aspects:
+            attr = aspect  # type: ignore[assignment]
+            break
+    if "overview" in plan.aspects and attr == "overview":
+        attr = "overview"
+    source: DialogFocusSource = "none"
+    if plan.followup_of:
+        source = "last_subject"
+    elif resolved_service_id:
+        source = "explicit_service"
+    elif focus_service_id:
+        source = "last_subject"
+    reason_bits = ["turn_planner"]
+    if plan.followup_of:
+        reason_bits.append("followup_of")
+    if explicit_topic_change:
+        reason_bits.append("explicit_topic_change")
+    return DialogFocusDecision(
+        focus_service_id=focus_service_id,
+        focus_topic=str((focus or {}).get("topic") or getattr(decision, "service_topic", "") or "").strip().lower() or None,
+        focus_label=str((focus or {}).get("label") or focus_service_id or "").strip() or None,
+        focus_turn_age=age,
+        attribute=attr,
+        explicit_topic_change=explicit_topic_change,
+        resolved_service_id=resolved_service_id,
+        source=source,
+        used_llm=False,
+        confidence=0.9,
+        reason="|".join(reason_bits),
+        query_rewrite=None,
+    )
+
+
 def dialog_focus_from_ctx() -> DialogFocusDecision | None:
     try:
         from flask import has_request_context, request
@@ -289,6 +349,21 @@ def record_dialog_focus_ctx(
     client_id: str | None,
     decision: DecisionFrame | None = None,
 ) -> DialogFocusDecision:
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        plan = turn_plan_from_ctx()
+        if plan is not None:
+            focus = build_dialog_focus_from_turn_plan(
+                plan,
+                sid=sid,
+                client_id=client_id,
+                decision=decision,
+            )
+            publish_dialog_focus_decision(focus)
+            return focus
+    except Exception:
+        pass
     focus = build_dialog_focus_decision(q, sid=sid, client_id=client_id, decision=decision)
     publish_dialog_focus_decision(focus)
     return focus

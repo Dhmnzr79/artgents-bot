@@ -255,11 +255,11 @@ def get_price_offers(
     for offer in pool:
         if unit_eff and offer.unit != unit_eff:
             continue
-        if brand and offer.brand != brand:
+        if brand and offer.brand.strip().lower() != str(brand).strip().lower():
             continue
         if brand_group:
             variant = next((v for v in (entry.variants if entry else []) if v.offer_id == offer.offer_id), None)
-            if variant and variant.brand_group != brand_group:
+            if variant and str(variant.brand_group or "").strip().lower() != str(brand_group).strip().lower():
                 continue
         out.append(offer)
     out.sort(key=lambda o: (not o.recommended, o.total, o.brand))
@@ -421,9 +421,24 @@ def build_price_answer_for_lookup(
         return build_price_append_for_lookup(client_id=client_id, service_id=sid, q=q)
 
     brand = detect_brand_in_query(q, client_id=client_id)
+    planner_brand = None
+    planner_brand_group = None
+    try:
+        from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
+
+        planner_brand, planner_brand_group = turn_plan_brand_filter_from_ctx()
+    except Exception:
+        pass
+    brand = planner_brand or brand
     unit = entry.default_unit or default_unit_for_service(sid)
-    offers = get_price_offers(client_id, sid, unit=unit, brand=brand)
-    if brand and not offers and entry.price_model == "complex":
+    offers = get_price_offers(
+        client_id,
+        sid,
+        unit=unit,
+        brand=brand,
+        brand_group=planner_brand_group,
+    )
+    if (brand or planner_brand_group) and not offers and entry.price_model == "complex":
         offers = get_price_offers(client_id, sid, unit=unit)
 
     aspect_norm = (aspect or "").strip().lower() or None
@@ -437,6 +452,7 @@ def build_price_answer_for_lookup(
     if answer:
         meta.setdefault("price_offer_unit", unit)
         meta.setdefault("price_offer_brand_filter", brand)
+        meta.setdefault("price_offer_brand_group_filter", planner_brand_group)
         return answer, meta
     return build_price_append_for_lookup(client_id=client_id, service_id=sid, q=q)
 
@@ -448,9 +464,24 @@ def build_price_append_for_lookup(
     q: str,
 ) -> tuple[str | None, dict[str, Any]]:
     brand = detect_brand_in_query(q, client_id=client_id)
+    planner_brand = None
+    planner_brand_group = None
+    try:
+        from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
+
+        planner_brand, planner_brand_group = turn_plan_brand_filter_from_ctx()
+    except Exception:
+        pass
+    brand = planner_brand or brand
     unit = default_unit_for_service(service_id)
-    offers = get_price_offers(client_id, service_id, unit=unit, brand=brand)
-    if brand and not offers:
+    offers = get_price_offers(
+        client_id,
+        service_id,
+        unit=unit,
+        brand=brand,
+        brand_group=planner_brand_group,
+    )
+    if (brand or planner_brand_group) and not offers:
         offers = get_price_offers(client_id, service_id, unit=unit)
     append = render_price_offers_append(offers)
     if not append:
@@ -460,6 +491,7 @@ def build_price_append_for_lookup(
         "price_offer_service_id": service_id,
         "price_offer_unit": unit,
         "price_offer_brand_filter": brand,
+        "price_offer_brand_group_filter": planner_brand_group,
         "price_offer_ids": [o.offer_id for o in offers],
     }
     return append, meta

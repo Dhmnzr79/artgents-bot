@@ -106,6 +106,11 @@ SERVICE_SELECT_LLM_MODEL = (
 )
 
 # --- Single turn planner (full-context roadmap stage 4) ---
+TURN_PLANNER_ON = os.getenv("TURN_PLANNER_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 TURN_PLANNER_LLM_MODEL = (
     (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )

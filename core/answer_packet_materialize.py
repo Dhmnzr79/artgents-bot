@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contracts.answer_packet import AnswerPacketSnapshot, MaterializedCard, PacketCard, PacketCardKind
 from contracts.answer_plan import AspectKind
-from core.price_offers import format_rub, offers_from_service_entry
+from core.price_offers import format_rub, get_price_offers, offers_from_service_entry
 from core.pricebook_loader import load_pricebook_service, load_pricing_facts
 from retriever import get_chunk_by_ref
 
@@ -66,7 +66,22 @@ def _unit_line(unit: str | None) -> str | None:
     return None
 
 
-def render_price_fact_block(*, client_id: str | None, service_id: str | None) -> str | None:
+def _planner_brand_filter() -> tuple[str | None, str | None]:
+    try:
+        from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
+
+        return turn_plan_brand_filter_from_ctx()
+    except Exception:
+        return None, None
+
+
+def render_price_fact_block(
+    *,
+    client_id: str | None,
+    service_id: str | None,
+    brand: str | None = None,
+    brand_group: str | None = None,
+) -> str | None:
     """Deterministic price fact block (brands + unit + includes/excludes), no intro/CTA."""
     sid = (service_id or "").strip()
     if not sid:
@@ -74,7 +89,20 @@ def render_price_fact_block(*, client_id: str | None, service_id: str | None) ->
     entry = load_pricebook_service(client_id, sid)
     if not entry:
         return None
-    offers = offers_from_service_entry(entry)
+    planner_brand, planner_brand_group = _planner_brand_filter()
+    brand_eff = brand or planner_brand
+    group_eff = brand_group or planner_brand_group
+    offers = (
+        get_price_offers(
+            client_id,
+            sid,
+            unit=entry.default_unit,
+            brand=brand_eff,
+            brand_group=group_eff,
+        )
+        if brand_eff or group_eff
+        else offers_from_service_entry(entry)
+    )
     if offers:
         lines: list[str] = []
         for offer in offers:

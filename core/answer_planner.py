@@ -157,6 +157,16 @@ def detect_aspects(
     client_id: str | None = None,
     sid: str | None = None,
 ) -> list[AspectKind]:
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        turn_plan = turn_plan_from_ctx()
+        if turn_plan is not None:
+            aspects = list(turn_plan.aspects or [])
+            _record_aspect_planner_ctx(source="turn_planner", aspects=aspects)
+            return aspects
+    except Exception:
+        pass
     regex_aspects = detect_aspects_regex(q, decision=decision)
     if not ASPECT_PLANNER_LLM_ON or not is_composite_question(q):
         _record_aspect_planner_ctx(source="regex", aspects=regex_aspects)
@@ -197,6 +207,16 @@ def _resolve_service_id(
     source_route: SourceRouteResult | None,
     sid: str,
 ) -> tuple[str | None, str | None]:
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        turn_plan = turn_plan_from_ctx()
+        if turn_plan is not None and turn_plan.service_id:
+            svc = normalize_service_id(str(turn_plan.service_id or ""))
+            topic = str(getattr(decision, "service_topic", None) or "").strip().lower() or None
+            return svc or None, topic
+    except Exception:
+        pass
     svc = normalize_service_id(str(getattr(source_route, "service_id", None) or ""))
     topic: str | None = None
     if decision is not None:
@@ -299,6 +319,13 @@ def build_answer_plan(
         reason_bits.append("dialog_focus")
     if service_id and get_last_subject(sid):
         reason_bits.append("subject_carry")
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        if turn_plan_from_ctx() is not None:
+            reason_bits.append("turn_planner")
+    except Exception:
+        pass
     return AnswerPlan(
         aspects=aspects,
         primary_aspect=primary,

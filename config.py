@@ -105,6 +105,11 @@ SERVICE_SELECT_LLM_MODEL = (
     (os.getenv("SERVICE_SELECT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
+# --- Single turn planner (full-context roadmap stage 4) ---
+TURN_PLANNER_LLM_MODEL = (
+    (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

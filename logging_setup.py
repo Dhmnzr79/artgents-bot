@@ -18,7 +18,7 @@ _LOG_PURGE_DONE = False
 _LOG_NAME_RX = re.compile(r"\.(?:jsonl|log)(?:\.\d+)?$", re.IGNORECASE)
 
 SENSITIVE_KEYS = ("api_key", "apikey", "token", "secret", "authorization", "password")
-_USAGE_TOKEN_KEYS = frozenset({"prompt_tokens", "completion_tokens", "total_tokens"})
+_USAGE_TOKEN_KEYS = frozenset({"prompt_tokens", "completion_tokens", "total_tokens", "cached_tokens"})
 _PHONE_DIGIT_MIN = 10
 _PHONE_DIGIT_MAX = 15
 # Ловим номера в разных форматах: +7..., 8(...), с пробелами/скобками/дефисами.

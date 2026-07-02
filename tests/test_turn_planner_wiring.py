@@ -228,3 +228,126 @@ def test_composer_defers_when_turn_plan_price_service_is_null(monkeypatch):
         )
 
     assert result is None
+
+
+def _composer_env(monkeypatch):
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.classify_service",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("selector skipped")),
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        lambda *a, **k: ("composed", {"composer_used": True}),
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow._composer_should_defer_jaw_scope_price",
+        lambda _q: False,
+    )
+
+
+def test_composer_plan_null_service_is_final_no_fuzzy_fallback(monkeypatch):
+    """Plan svc=None on non-price aspect: composer proceeds with service=None,
+    fuzzy sr.service_id (all_on_4-style bias) must NOT leak into the packet."""
+    from core.turn_planner_llm import publish_turn_plan
+    from orchestration.composer_flow import try_composer_overlay
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    _composer_env(monkeypatch)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="content",
+                aspects=["payment"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=False,
+            )
+        )
+        result = try_composer_overlay(
+            q="Есть рассрочка на имплантацию?",
+            sid="turn-plan-null-final",
+            client_id="demo",
+            intent="content",
+            plan=AnswerPlan(aspects=["payment"], primary_aspect="payment", service_id="all_on_4"),
+            sr=SourceRouteResult(
+                source="catalog_md",
+                service_id="all_on_4",
+                ref="implantation__service__all_on_4.md#korotko",
+                match_score=0.9,
+                match_method="catalog_containment",
+            ),
+            decision=_decision("all_on_4"),
+            decision_frame={},
+        )
+
+    assert result is not None
+    assert result.matched_service_id is None
+
+
+def test_composer_included_without_service_proceeds(monkeypatch):
+    """Plan svc=None + aspect included: answer comes from KB, no defer to price."""
+    from core.turn_planner_llm import publish_turn_plan
+    from orchestration.composer_flow import try_composer_overlay
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    _composer_env(monkeypatch)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="content",
+                aspects=["included"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=True,
+            )
+        )
+        result = try_composer_overlay(
+            q="Коронка входит в цену импланта?",
+            sid="turn-plan-included",
+            client_id="demo",
+            intent="content",
+            plan=AnswerPlan(aspects=["included"], primary_aspect="included", service_id=None),
+            sr=SourceRouteResult(
+                source="none", service_id=None, ref=None, match_score=0.0, match_method="none"
+            ),
+            decision=_decision(None),
+            decision_frame={},
+        )
+
+    assert result is not None
+
+
+def test_detect_aspects_appends_comparison_to_turn_plan():
+    from core.answer_planner import detect_aspects
+    from core.turn_planner_llm import publish_turn_plan
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="content",
+                aspects=["overview"],
+                service_id="classic",
+                followup_of=None,
+                needs_clarify=False,
+            )
+        )
+        aspects = detect_aspects(
+            "Что лучше — имплант или мост?",
+            decision=None,
+        )
+
+    assert "comparison" in aspects

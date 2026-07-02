@@ -148,7 +148,9 @@ def try_composer_overlay(
         if turn_plan is not None:
             llm_selection_applied = True
             service_id_override = str(turn_plan.service_id or "").strip() or None
-            if has_price_aspect and service_id_override is None:
+            # Только чистый price требует услугу (цена = карточка из pricebook);
+            # included без услуги композер отвечает из базы (what_included FAQ).
+            if "price" in aspects and service_id_override is None:
                 return None
 
         if has_price_aspect and _composer_should_defer_jaw_scope_price(q):
@@ -166,11 +168,17 @@ def try_composer_overlay(
             if _defer_group_price_via_price_route(q=q, client_id=client_id, sid=sid):
                 return None
 
-        service_id = (
-            service_id_override
-            or str(getattr(sr, "service_id", None) or plan.service_id or "").strip()
-            or None
-        )
+        if turn_plan is not None:
+            # Решение планировщика окончательно: None значит «без конкретной
+            # услуги», fuzzy-фолбэк не применяется (иначе возвращается баг
+            # «имплантация → случайный дорогой протокол»).
+            service_id = service_id_override
+        else:
+            service_id = (
+                service_id_override
+                or str(getattr(sr, "service_id", None) or plan.service_id or "").strip()
+                or None
+            )
         primary_chunk_ref = str(getattr(sr, "ref", None) or "").strip() or None
         route_hint = str(intent or "content").strip() or "content"
         gate_meta: dict[str, Any] = dict(meta) if isinstance(meta, dict) else {}

@@ -163,6 +163,17 @@ def detect_aspects(
         turn_plan = turn_plan_from_ctx()
         if turn_plan is not None:
             aspects = list(turn_plan.aspects or [])
+            # Deterministic augmentation: comparison questions are already
+            # detected by regex/decision; the planner must not lose them.
+            if "comparison" not in aspects and (
+                COMPARISON_QUERY_RE.search(q or "")
+                or (
+                    decision is not None
+                    and str(getattr(decision, "query_mode", None) or "").strip().lower()
+                    == "comparison"
+                )
+            ):
+                aspects.append("comparison")
             _record_aspect_planner_ctx(source="turn_planner", aspects=aspects)
             return aspects
     except Exception:

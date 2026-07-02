@@ -92,6 +92,7 @@ def _try_overlay(
 
     monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", composer_on)
     monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", False)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", False)
     _overlay_mocks(monkeypatch, **mock_kw)
     return try_composer_overlay(
         q=q,
@@ -418,6 +419,129 @@ def test_group_c_whitening_without_fullctx_fail_open_on_single_card(monkeypatch)
         decision_frame={},
     )
     assert result is None
+
+
+def test_extraction_composer_uses_llm_service_selection(monkeypatch):
+    from contracts.service_selection import ServiceSelection
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.detect_forbidden_claims",
+        lambda _text: [],
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.classify_service",
+        lambda *a, **k: ServiceSelection(service_id="tooth_extraction", confidence=0.9),
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        lambda *a, **k: ("composed extraction", {"composer_used": True}),
+    )
+
+    plan = AnswerPlan(
+        aspects=["pain", "price"],
+        primary_aspect="pain",
+        service_id="pulpitis",
+        topic="treatment",
+    )
+    result = try_composer_overlay(
+        q="Больно ли удалять зуб и сколько это стоит?",
+        sid="composer-flow-extraction",
+        client_id="demo",
+        intent="content",
+        plan=plan,
+        sr=_sr(service_id="pulpitis"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is not None
+    assert result.kind == "composer"
+    assert result.matched_service_id == "tooth_extraction"
+    price_cards = [c for c in (result.materialized_cards or []) if c.kind == "price"]
+    assert len(price_cards) == 1
+    assert "4 500" in price_cards[0].text
+
+
+def test_generic_implant_llm_null_defers_composer(monkeypatch):
+    from contracts.service_selection import ServiceSelection
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.classify_service",
+        lambda *a, **k: ServiceSelection(service_id=None, confidence=0.85),
+    )
+    composer_called = {"value": False}
+
+    def _composer(*_a, **_k):
+        composer_called["value"] = True
+        return "x", {"composer_used": True}
+
+    monkeypatch.setattr("orchestration.composer_flow.generate_answer_from_packet", _composer)
+
+    plan = AnswerPlan(
+        aspects=["price", "payment"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит имплантация и есть ли рассрочка?",
+        sid="composer-flow-defer",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
+    assert composer_called["value"] is False
+
+
+def test_service_select_off_keeps_marker_defer(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", False)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "query_selector.select_price_service_route",
+        lambda *a, **k: {"mode": "group_overview"},
+    )
+    selector_called = {"value": False}
+
+    def _selector(*_a, **_k):
+        selector_called["value"] = True
+        return None
+
+    monkeypatch.setattr("orchestration.composer_flow.classify_service", _selector)
+
+    plan = AnswerPlan(
+        aspects=["price", "payment"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит имплантация и есть ли рассрочка?",
+        sid="composer-flow-off",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
+    assert selector_called["value"] is False
 
 
 def test_sse_composer_dispatch(monkeypatch):

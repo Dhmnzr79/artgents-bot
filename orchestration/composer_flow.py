@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import COMPOSER_ON, FULLCTX_ON
+from config import COMPOSER_ON, FULLCTX_ON, SERVICE_SELECT_LLM_ON
 from contracts.answer_packet import MaterializedCard
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.answer_plan import AnswerPlan
@@ -15,6 +15,7 @@ from core.answer_packet_snapshot import publish_answer_packet
 from core.answer_planner import _real_aspect_count
 from core.claim_gate import detect_forbidden_claims
 from core.knowledge_base import assemble_client_knowledge_base
+from core.service_selector_llm import classify_service
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
@@ -49,6 +50,26 @@ def _composer_should_defer_group_price(q: str, pr: dict) -> bool:
     return is_generic_implant_price_query(q) and not _query_names_specific_implant_protocol(q)
 
 
+def _defer_group_price_via_price_route(
+    *,
+    q: str,
+    client_id: str,
+    sid: str,
+) -> bool:
+    try:
+        from query_selector import select_price_service_route
+
+        pr = select_price_service_route(
+            q,
+            client_id=client_id,
+            sid=sid,
+            intent_override="price_lookup",
+        )
+        return _composer_should_defer_group_price(q, pr)
+    except Exception:
+        return False
+
+
 def try_composer_overlay(
     *,
     q: str,
@@ -69,22 +90,26 @@ def try_composer_overlay(
         if _real_aspect_count(plan.aspects) < 2:
             return None
         aspects = list(plan.aspects or [])
-        if "price" in aspects or "included" in aspects:
-            try:
-                from query_selector import select_price_service_route
+        has_price_aspect = "price" in aspects or "included" in aspects
+        service_id_override: str | None = None
+        llm_selection_applied = False
 
-                pr = select_price_service_route(
-                    q,
-                    client_id=client_id,
-                    sid=sid,
-                    intent_override="price_lookup",
-                )
-                if _composer_should_defer_group_price(q, pr):
+        if has_price_aspect and SERVICE_SELECT_LLM_ON:
+            sel = classify_service(q, client_id=client_id, sid=sid)
+            if sel is not None:
+                llm_selection_applied = True
+                if sel.service_id is None:
                     return None
-            except Exception:
-                pass
+                service_id_override = str(sel.service_id).strip() or None
+
+        if has_price_aspect and not llm_selection_applied:
+            if _defer_group_price_via_price_route(q=q, client_id=client_id, sid=sid):
+                return None
+
         service_id = (
-            str(getattr(sr, "service_id", None) or plan.service_id or "").strip() or None
+            service_id_override
+            or str(getattr(sr, "service_id", None) or plan.service_id or "").strip()
+            or None
         )
         primary_chunk_ref = str(getattr(sr, "ref", None) or "").strip() or None
         route_hint = str(intent or "content").strip() or "content"

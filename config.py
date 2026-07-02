@@ -95,6 +95,16 @@ FULLCTX_ON = os.getenv("FULLCTX_ON", "0").lower() in (
     "yes",
 )
 
+# --- LLM service selection in composer price path (step 2) ---
+SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+SERVICE_SELECT_LLM_MODEL = (
+    (os.getenv("SERVICE_SELECT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

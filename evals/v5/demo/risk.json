@@ -189,9 +189,12 @@
         "expected_packet_aspects": [
           "included"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -219,9 +222,12 @@
         "expected_packet_aspects": [
           "included"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -395,7 +401,6 @@
         "catalog_md_first",
         "price_lookup"
       ],
-      "expected_service_id": "sinus_lift",
       "answer_signals_any": [
         "отдельно",
         "не входит",
@@ -413,8 +418,7 @@
         "require_forbidden_claims_empty": true,
         "expected_packet_aspects": [
           "included"
-        ],
-        "expected_service_id": "sinus_lift"
+        ]
       }
     },
     {
@@ -534,9 +538,12 @@
         "expected_packet_aspects": [
           "pain"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -680,9 +687,12 @@
         "expected_packet_aspects": [
           "price"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },

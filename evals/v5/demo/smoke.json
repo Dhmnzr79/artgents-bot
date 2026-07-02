@@ -349,9 +349,12 @@
         "expected_packet_aspects": [
           "payment"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -378,9 +381,12 @@
         "expected_packet_aspects": [
           "pain"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -406,9 +412,12 @@
         "expected_packet_aspects": [
           "warranty"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -549,9 +558,12 @@
         "expected_packet_aspects": [
           "overview"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     },
@@ -581,9 +593,12 @@
         "expected_packet_aspects": [
           "overview"
         ],
-        "expected_service_id_any": [
-          "classic",
-          "one_stage"
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
         ]
       }
     }

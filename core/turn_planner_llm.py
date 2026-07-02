@@ -54,6 +54,53 @@ _SYSTEM = (
 )
 
 
+def _implantation_tagged_service_ids(client_id: str | None) -> frozenset[str]:
+    """Pricebook services tagged 'implantation' (data-driven protocol group)."""
+    out: set[str] = set()
+    for service_id in list_pricebook_service_ids(client_id):
+        entry = load_pricebook_service(client_id, service_id)
+        if not entry:
+            continue
+        tags = [str(t or "").strip().lower() for t in (entry.tags or [])]
+        if "implantation" in tags:
+            out.add(service_id)
+    return frozenset(out)
+
+
+def _apply_protocol_choice_guard(plan: TurnPlan, *, q: str, client_id: str | None) -> TurnPlan:
+    """Не решать имплант-протокол за пациента (детерминированно, поверх LLM).
+
+    Услуга имплант-группы в плане остаётся только если пациент сам назвал
+    протокол, продолжает предыдущий фокус (followup_of) или речь про коронку
+    на уже установленный имплант. Иначе service_id → None: пациент получит
+    обзор вариантов / ответ из базы, а не навязанный протокол.
+    """
+    svc = str(plan.service_id or "").strip()
+    if not svc or plan.followup_of:
+        return plan
+    if svc not in _implantation_tagged_service_ids(client_id):
+        return plan
+    from core.patient_scope_cues import (
+        CROWN_ON_IMPLANT_RX,
+        EXISTING_IMPLANT_RX,
+        query_names_specific_implant_protocol,
+    )
+
+    text = (q or "").strip()
+    if query_names_specific_implant_protocol(text):
+        return plan
+    if EXISTING_IMPLANT_RX.search(text) or CROWN_ON_IMPLANT_RX.search(text):
+        return plan
+    log_json(
+        logger,
+        "turn_plan_service_downgraded",
+        client_id=client_id,
+        service_id=svc,
+        reason="implant_protocol_not_named",
+    )
+    return plan.model_copy(update={"service_id": None})
+
+
 def _allowed_pricebook_filters(client_id: str | None) -> tuple[frozenset[str], frozenset[str]]:
     groups: set[str] = set()
     brands: set[str] = set()
@@ -275,6 +322,7 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
         )
         if plan is None:
             raise ValueError("turn_plan_invalid")
+        plan = _apply_protocol_choice_guard(plan, q=msg, client_id=client_id)
         log_json(
             logger,
             "turn_planner_llm",

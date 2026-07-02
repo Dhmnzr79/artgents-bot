@@ -38,6 +38,27 @@ ONE_STAGE_PRICE_RX = re.compile(
     re.I | re.U,
 )
 ALL_ON_4_ONLY_RX = re.compile(r"all[\s-]?on[\s-]?4|все\s+на\s+4", re.I | re.U)
+
+# Пациент явно назвал конкретный имплант-протокол (канонический список; общий
+# для composer defer и protocol-choice guard планировщика).
+SPECIFIC_IMPLANT_PROTOCOL_MARKERS: tuple[str, ...] = (
+    "классическ",
+    "одномомент",
+    "all-on-4",
+    "all on 4",
+    "all-on-6",
+    "all on 6",
+    "скулов",
+    "синус",
+    "zygomatic",
+)
+
+
+def query_names_specific_implant_protocol(q: str) -> bool:
+    text = (q or "").strip().lower()
+    if not text:
+        return False
+    return any(marker in text for marker in SPECIFIC_IMPLANT_PROTOCOL_MARKERS)
 ALL_ON_6_ONLY_RX = re.compile(r"all[\s-]?on[\s-]?6|все\s+на\s+6|all-on-6", re.I | re.U)
 ALL_ON_6_RX = re.compile(r"all[\s-]?on[\s-]?6|все\s+на\s+6|all-on-6", re.I | re.U)
 

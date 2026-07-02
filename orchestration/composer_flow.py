@@ -20,24 +20,12 @@ from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
 _JAW_GROUP_PATIENT_SCOPES = frozenset({"full_jaw", "upper_jaw"})
-_SPECIFIC_IMPLANT_PROTOCOL_MARKERS = (
-    "классическ",
-    "одномомент",
-    "all-on-4",
-    "all on 4",
-    "all-on-6",
-    "all on 6",
-    "скулов",
-    "синус",
-    "zygomatic",
-)
 
 
 def _query_names_specific_implant_protocol(q: str) -> bool:
-    text = (q or "").strip().lower()
-    if not text:
-        return False
-    return any(marker in text for marker in _SPECIFIC_IMPLANT_PROTOCOL_MARKERS)
+    from core.patient_scope_cues import query_names_specific_implant_protocol
+
+    return query_names_specific_implant_protocol(q)
 
 
 def _composer_should_defer_group_price(q: str, pr: dict) -> bool:

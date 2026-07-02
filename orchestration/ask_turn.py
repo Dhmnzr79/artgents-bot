@@ -24,14 +24,13 @@ from orchestration.composer_flow import try_composer_overlay
 from orchestration.patient_playbook_flow import try_patient_options_overview
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
-from policy import (
-    contacts_intent,
-    pick_contacts_chunk,
-)
+from policy import contacts_intent
 from core.answer_planner import build_answer_plan, publish_answer_plan
 from core.answer_packet_snapshot import build_and_publish_answer_packet
 from query_selector import select_price_service_route
-from retriever import get_chunk_by_ref, normalize_retrieval_query, retrieve
+from retriever import get_chunk_by_ref, normalize_retrieval_query
+
+_CONTACTS_CHUNK_REF = "clinic__info__contacts.md#korotko"
 from source_routing import route_source, slim_source_route_payload
 
 logger = get_logger("bot")
@@ -77,10 +76,7 @@ def orchestrate_routing_after_resolver(
         request.ctx["effective_intent"] = "contacts"
 
     if intent == "contacts":
-        cands = retrieve(q, topk=24, client_id=client_id, scope_topic=None)
-        picked = pick_contacts_chunk(cands)
-        if picked is None:
-            picked = get_chunk_by_ref("clinic__info__contacts.md#korotko", client_id=client_id)
+        picked = get_chunk_by_ref(_CONTACTS_CHUNK_REF, client_id=client_id)
         if picked:
             return AskOrchestrationResult(
                 kind="chunk",

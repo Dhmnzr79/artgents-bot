@@ -252,6 +252,118 @@ def test_single_aspect_fullctx_composes(monkeypatch):
     assert result.composed_answer == "single price composed"
 
 
+def test_jaw_scope_upper_jaw_defer_before_service_selector(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
+    selector_called = {"value": False}
+
+    def _selector(*_a, **_k):
+        selector_called["value"] = True
+        return None
+
+    monkeypatch.setattr("orchestration.composer_flow.classify_service", _selector)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        lambda *a, **k: ("should not run", {"composer_used": True}),
+    )
+
+    plan = AnswerPlan(
+        aspects=["price"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит имплантация всей верхней челюсти?",
+        sid="composer-flow-jaw-defer",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
+    assert selector_called["value"] is False
+
+
+def test_jaw_scope_all_teeth_defer_before_service_selector(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
+    selector_called = {"value": False}
+
+    def _selector(*_a, **_k):
+        selector_called["value"] = True
+        return None
+
+    monkeypatch.setattr("orchestration.composer_flow.classify_service", _selector)
+
+    plan = AnswerPlan(
+        aspects=["price"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит вставить все зубы под ключ?",
+        sid="composer-flow-all-teeth-defer",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
+    assert selector_called["value"] is False
+
+
+def test_jaw_scope_named_protocol_on_jaw_does_not_defer(monkeypatch):
+    from contracts.service_selection import ServiceSelection
+    from orchestration.composer_flow import try_composer_overlay
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "orchestration.composer_flow.classify_service",
+        lambda *a, **k: ServiceSelection(service_id="all_on_4", confidence=0.9),
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        lambda *a, **k: ("all-on-4 upper jaw", {"composer_used": True}),
+    )
+
+    plan = AnswerPlan(
+        aspects=["price"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="Сколько стоит all-on-4 на верхнюю челюсть?",
+        sid="composer-flow-named-jaw",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is not None
+    assert result.kind == "composer"
+
+
 def test_single_aspect_generic_implant_defers_with_fullctx(monkeypatch):
     from orchestration.composer_flow import try_composer_overlay
 

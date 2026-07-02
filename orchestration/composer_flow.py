@@ -18,6 +18,7 @@ from core.service_selector_llm import classify_service
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
+_JAW_GROUP_PATIENT_SCOPES = frozenset({"full_jaw", "upper_jaw"})
 _SPECIFIC_IMPLANT_PROTOCOL_MARKERS = (
     "классическ",
     "одномомент",
@@ -69,6 +70,56 @@ def _defer_group_price_via_price_route(
         return False
 
 
+def _patient_scope_from_request_ctx() -> str | None:
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context() or not hasattr(request, "ctx"):
+            return None
+        raw = request.ctx.get("patient_situation_result")
+        if isinstance(raw, dict):
+            scope = str(raw.get("patient_scope") or "").strip()
+            return scope or None
+    except Exception:
+        return None
+    return None
+
+
+def _query_indicates_jaw_group_price_scope(q: str) -> bool:
+    text = (q or "").strip()
+    if not text:
+        return False
+    from core import patient_scope_cues as psc
+    from core.price_offers import (
+        is_full_jaw_implant_price_query,
+        is_upper_jaw_restoration_price_query,
+    )
+
+    if is_full_jaw_implant_price_query(text) or is_upper_jaw_restoration_price_query(text):
+        return True
+    if not psc.has_price_intent(text):
+        return False
+    jaw_cue = bool(
+        psc.UPPER_JAW_RX.search(text)
+        or psc.FULL_ARCH_RX.search(text)
+        or psc.ALL_TEETH_MISSING_RX.search(text)
+        or psc.JAW_EXPLICIT_RX.search(text)
+    )
+    if not jaw_cue:
+        return False
+    return bool(psc.IMPLANT_PRICE_RX.search(text) or psc.JAW_RESTORATION_RX.search(text))
+
+
+def _composer_should_defer_jaw_scope_price(q: str) -> bool:
+    """Jaw/full-arch price without named protocol → price-route group overview (before LLM selector)."""
+    if _query_names_specific_implant_protocol(q):
+        return False
+    scope = _patient_scope_from_request_ctx()
+    if scope in _JAW_GROUP_PATIENT_SCOPES:
+        return True
+    return _query_indicates_jaw_group_price_scope(q)
+
+
 def try_composer_overlay(
     *,
     q: str,
@@ -92,6 +143,9 @@ def try_composer_overlay(
         has_price_aspect = "price" in aspects or "included" in aspects
         service_id_override: str | None = None
         llm_selection_applied = False
+
+        if has_price_aspect and _composer_should_defer_jaw_scope_price(q):
+            return None
 
         if has_price_aspect and SERVICE_SELECT_LLM_ON:
             sel = classify_service(q, client_id=client_id, sid=sid)

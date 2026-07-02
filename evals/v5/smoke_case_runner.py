@@ -14,6 +14,9 @@ import urllib.error
 import urllib.request
 
 
+from composer_parity import should_skip_legacy_retrieval_checks, validate_composer_parity
+
+
 @dataclass(frozen=True)
 class CaseResult:
     case_id: str
@@ -235,28 +238,41 @@ def validate_smoke_case(
         else:
             expected_route_any = None
 
-    if expected_route_any:
-        if norm(route) not in {norm(x) for x in expected_route_any}:
+    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+    skip_legacy_doc = should_skip_legacy_retrieval_checks(meta=meta, row=row)
+
+    # Route asserts describe legacy retrieval paths; on the composer path the
+    # route is validated via composer_parity (expected_answer_path).
+    if not skip_legacy_doc:
+        if expected_route_any:
+            if norm(route) not in {norm(x) for x in expected_route_any}:
+                return CaseResult(
+                    case_id=case_id,
+                    status="FAIL",
+                    reason=f"route: got={route!r} want_any={expected_route_any!r}",
+                    coverage_class=cov,
+                )
+        elif expected_route and norm(route) != norm(expected_route):
             return CaseResult(
                 case_id=case_id,
                 status="FAIL",
-                reason=f"route: got={route!r} want_any={expected_route_any!r}",
+                reason=f"route: got={route!r} want={expected_route!r}",
                 coverage_class=cov,
             )
-    elif expected_route and norm(route) != norm(expected_route):
+
+    parity_reason = validate_composer_parity(row=row, answer=answer, meta=meta)
+    if parity_reason:
         return CaseResult(
             case_id=case_id,
             status="FAIL",
-            reason=f"route: got={route!r} want={expected_route!r}",
+            reason=parity_reason,
             coverage_class=cov,
         )
-
-    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
     got_doc_id = doc_id_from_meta(meta)
     got_doc_type = doc_type_from_doc_id(got_doc_id)
 
     expected_doc_id = row.get("expected_doc_id")
-    if expected_doc_id is not None:
+    if not skip_legacy_doc and expected_doc_id is not None:
         want = str(expected_doc_id).strip()
         if want and norm(got_doc_id) != norm(want):
             return CaseResult(
@@ -267,7 +283,11 @@ def validate_smoke_case(
             )
 
     expected_doc_id_any = str_list_field(row, "expected_doc_id_any")
-    if expected_doc_id_any and norm(got_doc_id) not in {norm(x) for x in expected_doc_id_any}:
+    if (
+        not skip_legacy_doc
+        and expected_doc_id_any
+        and norm(got_doc_id) not in {norm(x) for x in expected_doc_id_any}
+    ):
         return CaseResult(
             case_id=case_id,
             status="FAIL",
@@ -330,7 +350,11 @@ def validate_smoke_case(
             )
 
     forbidden_doc_id = str_list_field(row, "forbidden_doc_id")
-    if forbidden_doc_id and norm(got_doc_id) in {norm(x) for x in forbidden_doc_id}:
+    if (
+        not skip_legacy_doc
+        and forbidden_doc_id
+        and norm(got_doc_id) in {norm(x) for x in forbidden_doc_id}
+    ):
         return CaseResult(
             case_id=case_id,
             status="FAIL",
@@ -339,7 +363,12 @@ def validate_smoke_case(
         )
 
     forbidden_doc_type = str_list_field(row, "forbidden_doc_type")
-    if forbidden_doc_type and got_doc_type and norm(got_doc_type) in {norm(x) for x in forbidden_doc_type}:
+    if (
+        not skip_legacy_doc
+        and forbidden_doc_type
+        and got_doc_type
+        and norm(got_doc_type) in {norm(x) for x in forbidden_doc_type}
+    ):
         return CaseResult(
             case_id=case_id,
             status="FAIL",
@@ -367,7 +396,7 @@ def validate_smoke_case(
                 coverage_class=cov,
             )
 
-    if row.get("expected_doc_type") is not None:
+    if not skip_legacy_doc and row.get("expected_doc_type") is not None:
         want_dt = str(row.get("expected_doc_type") or "").strip().lower()
         mf = meta.get("metadata_first")
         if isinstance(mf, dict) and str(mf.get("selected_doc_type") or "").strip():

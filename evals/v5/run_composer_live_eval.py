@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 import time
 import uuid
@@ -22,8 +21,12 @@ from smoke_case_runner import (  # noqa: E402
     reset_smoke_session,
     uses_test_client,
 )
-
-_DIGITS_ONLY_RX = re.compile(r"[\s\u00a0\u202f.,]")
+from composer_parity import (  # noqa: E402
+    amount_in_text,
+    meta_gate_action,
+    meta_str_list,
+    normalize_digits,
+)
 Verdict = Literal["PASS", "FAIL", "KNOWN"]
 
 
@@ -103,29 +106,6 @@ def default_output_path() -> str:
     if env:
         return env
     return os.path.join(repo_root(), "eval_composer_live_last.txt")
-
-
-def normalize_digits(text: str) -> str:
-    return _DIGITS_ONLY_RX.sub("", text or "")
-
-
-def amount_in_text(amount: int, text: str) -> bool:
-    needle = str(int(amount))
-    return needle in normalize_digits(text)
-
-
-def meta_gate_action(meta: dict[str, Any]) -> str:
-    gate = meta.get("numeric_fact_gate")
-    if isinstance(gate, dict):
-        return str(gate.get("action") or "").strip()
-    return ""
-
-
-def meta_str_list(meta: dict[str, Any], key: str) -> list[str]:
-    raw = meta.get(key)
-    if not isinstance(raw, list):
-        return []
-    return [str(x).strip() for x in raw if str(x).strip()]
 
 
 def evaluate_hard_checks(

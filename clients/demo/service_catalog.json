@@ -175,7 +175,10 @@
     ],
     "active": true,
     "response_mode": null,
-    "facts": [],
+    "facts": [
+      "Коронка на уже установленный имплант — отдельная услуга протезирования на абатменте, не установка нового импланта",
+      "восстановление зуба на ранее установленном импланте"
+    ],
     "md_entry_ref": "prosthetics__service__implant_supported_prosthetics",
     "price_key": "implant_supported_prosthetics",
     "price_ref": null,

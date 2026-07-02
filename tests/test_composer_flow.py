@@ -40,7 +40,13 @@ def _two_cards() -> list[MaterializedCard]:
     ]
 
 
-def _overlay_mocks(monkeypatch: pytest.MonkeyPatch, *, composer_fn=None, forbidden_hits=None):
+def _overlay_mocks(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    composer_fn=None,
+    forbidden_hits=None,
+    price_route_mode: str = "matched",
+):
     from orchestration import composer_flow
 
     monkeypatch.setattr(composer_flow, "publish_answer_packet", lambda _p: None)
@@ -53,6 +59,10 @@ def _overlay_mocks(monkeypatch: pytest.MonkeyPatch, *, composer_fn=None, forbidd
         composer_flow,
         "materialize_cards",
         lambda *a, **k: _two_cards(),
+    )
+    monkeypatch.setattr(
+        "query_selector.select_price_service_route",
+        lambda *a, **k: {"mode": price_route_mode},
     )
 
     def _gen(q, materialized, meta, session_id):
@@ -75,6 +85,7 @@ def _try_overlay(
     monkeypatch: pytest.MonkeyPatch,
     intent: str = "price_lookup",
     composer_on: bool = True,
+    q: str = "тестовый вопрос",
     **mock_kw: Any,
 ):
     from orchestration.composer_flow import try_composer_overlay
@@ -82,7 +93,7 @@ def _try_overlay(
     monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", composer_on)
     _overlay_mocks(monkeypatch, **mock_kw)
     return try_composer_overlay(
-        q="тестовый вопрос",
+        q=q,
         sid="composer-flow-test",
         client_id="demo",
         intent=intent,
@@ -124,6 +135,59 @@ def test_composite_content_returns_composer(monkeypatch):
         topic="implantation",
     )
     result = _try_overlay(plan=plan, monkeypatch=monkeypatch, intent="content")
+    assert result is not None
+    assert result.kind == "composer"
+
+
+def test_composite_ambiguous_group_price_defers_to_price_path(monkeypatch):
+    plan = AnswerPlan(
+        aspects=["price", "payment"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = _try_overlay(
+        plan=plan,
+        monkeypatch=monkeypatch,
+        q="Сколько стоит имплантация и есть ли рассрочка?",
+        price_route_mode="group_overview",
+    )
+    assert result is None
+
+
+def test_composite_named_protocol_still_composes_on_group_overview(monkeypatch):
+    plan = AnswerPlan(
+        aspects=["price", "warranty"],
+        primary_aspect="price",
+        service_id="classic",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = _try_overlay(
+        plan=plan,
+        monkeypatch=monkeypatch,
+        q="Сколько стоит классическая имплантация и какая гарантия?",
+        price_route_mode="group_overview",
+    )
+    assert result is not None
+    assert result.kind == "composer"
+
+
+def test_composite_specific_service_still_composes(monkeypatch):
+    plan = AnswerPlan(
+        aspects=["price", "pain"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = _try_overlay(
+        plan=plan,
+        monkeypatch=monkeypatch,
+        q="Сколько стоит all-on-4 и не больно ли?",
+        price_route_mode="matched",
+    )
     assert result is not None
     assert result.kind == "composer"
 
@@ -232,6 +296,21 @@ def _parse_sse_ui_payload(body: str) -> dict[str, Any]:
                 raise ValueError("ui payload is not a dict")
             return raw
     raise ValueError("no ui event in SSE body")
+
+
+def test_composer_should_defer_group_price_helpers():
+    from orchestration.composer_flow import _composer_should_defer_group_price
+
+    assert _composer_should_defer_group_price(
+        "Сколько стоит имплантация и есть ли рассрочка?",
+        {"mode": "group_overview"},
+    )
+    assert not _composer_should_defer_group_price(
+        "Сколько стоит классическая имплантация и какая гарантия?",
+        {"mode": "group_overview"},
+    )
+    assert _composer_should_defer_group_price("q", {"mode": "unit_clarify"})
+    assert _composer_should_defer_group_price("q", {"mode": "matched"}) is False
 
 
 def test_telemetry_answer_path_for_chunk_route():

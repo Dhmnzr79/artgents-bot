@@ -16,6 +16,37 @@ from core.answer_planner import _real_aspect_count
 from core.claim_gate import detect_forbidden_claims
 from llm import generate_answer_from_packet
 
+_GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
+_SPECIFIC_IMPLANT_PROTOCOL_MARKERS = (
+    "классическ",
+    "одномомент",
+    "all-on-4",
+    "all on 4",
+    "all-on-6",
+    "all on 6",
+    "скулов",
+    "синус",
+    "zygomatic",
+)
+
+
+def _query_names_specific_implant_protocol(q: str) -> bool:
+    text = (q or "").strip().lower()
+    if not text:
+        return False
+    return any(marker in text for marker in _SPECIFIC_IMPLANT_PROTOCOL_MARKERS)
+
+
+def _composer_should_defer_group_price(q: str, pr: dict) -> bool:
+    mode = str(pr.get("mode") or "")
+    if mode in {"unit_clarify", "clarify"}:
+        return True
+    if mode != "group_overview":
+        return False
+    from core.price_offers import is_generic_implant_price_query
+
+    return is_generic_implant_price_query(q) and not _query_names_specific_implant_protocol(q)
+
 
 def try_composer_overlay(
     *,
@@ -36,6 +67,21 @@ def try_composer_overlay(
             return None
         if _real_aspect_count(plan.aspects) < 2:
             return None
+        aspects = list(plan.aspects or [])
+        if "price" in aspects or "included" in aspects:
+            try:
+                from query_selector import select_price_service_route
+
+                pr = select_price_service_route(
+                    q,
+                    client_id=client_id,
+                    sid=sid,
+                    intent_override="price_lookup",
+                )
+                if _composer_should_defer_group_price(q, pr):
+                    return None
+            except Exception:
+                pass
         service_id = (
             str(getattr(sr, "service_id", None) or plan.service_id or "").strip() or None
         )

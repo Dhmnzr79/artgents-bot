@@ -24,10 +24,9 @@
       "group": "A",
       "question": "Сколько стоит имплантация и есть ли рассрочка?",
       "client_id": "demo",
-      "expected_path": "composer",
+      "expected_composer": false,
       "expected_aspects": ["price", "payment"],
-      "expected_amounts": [76200, 85200, 101200],
-      "known_issue": "service_selection"
+      "expected_amounts": []
     },
     {
       "id": "A4",

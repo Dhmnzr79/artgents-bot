@@ -10,6 +10,7 @@ from contracts.service_selection import ServiceSelection
 from core.client_runtime import client_pack_dir
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
+from session import format_dialog_context_for_understanding, recent_dialog_history
 
 logger = get_logger(__name__)
 
@@ -87,6 +88,7 @@ def classify_service(
     *,
     client_id: str | None,
     sid: str | None,
+    dialog_history: str | None = None,
 ) -> ServiceSelection | None:
     """Pick catalog service for price aspect, or null for group/defer. None = fail-open."""
     if not SERVICE_SELECT_LLM_ON:
@@ -103,7 +105,15 @@ def classify_service(
         for r in rows
     ]
     catalog_blob = "\n".join(lines)
-    user_content = f"Каталог услуг:\n{catalog_blob}\n\nВопрос пациента:\n{msg[:900]}"
+    hist = (dialog_history or "").strip()
+    if not hist and sid:
+        hist = recent_dialog_history(sid)
+    dialog_block = format_dialog_context_for_understanding(hist)
+    user_content = (
+        f"Каталог услуг:\n{catalog_blob}\n\n"
+        f"{dialog_block}"
+        f"Вопрос пациента:\n{msg[:900]}"
+    )
     try:
         resp = chat_completions_create(
             model=SERVICE_SELECT_LLM_MODEL,

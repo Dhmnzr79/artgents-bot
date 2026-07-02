@@ -126,3 +126,40 @@ def test_unknown_service_id_coerced_to_null():
 def test_classify_off_returns_none(monkeypatch):
     monkeypatch.setattr("core.service_selector_llm.SERVICE_SELECT_LLM_ON", False)
     assert classify_service("сколько стоит удаление зуба", client_id="demo", sid="sel-off") is None
+
+
+def test_classify_followup_price_after_all_on_4_uses_dialog_history(monkeypatch):
+    from session import mem_add_bot, mem_add_user, mem_reset
+
+    sid = "sel-followup-all-on-4"
+    mem_reset(sid)
+    mem_add_user(sid, "Делаете all-on-4?")
+    mem_add_bot(sid, "Да, в клинике выполняем протокол All-on-4.")
+
+    monkeypatch.setattr("core.service_selector_llm.SERVICE_SELECT_LLM_ON", True)
+    captured: dict = {}
+
+    def _fake(**kwargs):
+        captured.update(kwargs)
+        payload = {"service_id": "all_on_4", "confidence": 0.93}
+
+        class _Msg:
+            content = json.dumps(payload)
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("core.service_selector_llm.chat_completions_create", _fake)
+    sel = classify_service("а сколько стоит?", client_id="demo", sid=sid)
+    assert sel is not None
+    assert sel.service_id == "all_on_4"
+    user = captured["messages"][1]["content"]
+    assert "Контекст диалога" in user
+    assert "не источник фактов" in user
+    assert "all-on-4" in user.lower()
+    assert user.count("а сколько стоит?") == 1

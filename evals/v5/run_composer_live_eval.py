@@ -1,4 +1,4 @@
-"""Composer live eval — 15 questions, hard checks + manual tone review block."""
+"""Composer live eval — 16 questions, hard checks + manual tone review block."""
 from __future__ import annotations
 
 import argparse
@@ -231,6 +231,15 @@ def run_case(
     if uses_test_client():
         reset_smoke_session(sid)
 
+    history_raw = row.get("history") or []
+    prior_questions: list[str] = []
+    if isinstance(history_raw, list):
+        for item in history_raw:
+            if isinstance(item, dict):
+                pq = str(item.get("question") or "").strip()
+                if pq:
+                    prior_questions.append(pq)
+
     run = CaseRun(
         case_id=case_id,
         group=group,
@@ -243,6 +252,12 @@ def run_case(
     )
 
     try:
+        for pq in prior_questions:
+            setup_payload = {"q": pq, "sid": sid, "client_id": client_id}
+            if use_stream:
+                post_ask_stream(bot_url, setup_payload, timeout_sec)
+            else:
+                post_ask_json(bot_url, setup_payload, timeout_sec)
         ask_payload = {"q": question, "sid": sid, "client_id": client_id}
         if use_stream:
             resp = post_ask_stream(bot_url, ask_payload, timeout_sec)

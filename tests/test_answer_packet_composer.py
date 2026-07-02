@@ -280,6 +280,74 @@ def test_fullctx_composer_kb_before_per_turn_addons(monkeypatch):
     assert system.index("[БАЗА ЗНАНИЙ]") < system.index("PER_TURN_NUDGE_MARKER")
 
 
+def test_fullctx_composer_includes_dialog_history_in_user_message():
+    from core.knowledge_base import assemble_client_knowledge_base
+
+    kb = assemble_client_knowledge_base("demo")
+    hist = "user: Делаете all-on-4?\nassistant: Да, выполняем All-on-4."
+    messages = build_messages_for_packet_composer_fullctx(
+        "а сколько стоит?",
+        kb,
+        ["price"],
+        [],
+        {"client_id": "demo"},
+        "sid-hist",
+        dialog_history=hist,
+    )
+    user = messages[1]["content"]
+    assert "Контекст диалога" in user
+    assert "не источник фактов" in user
+    assert "all-on-4" in user.lower()
+    assert user.index("Контекст диалога") < user.index("Вопрос пациента:")
+    assert user.count("а сколько стоит?") == 1
+    assert kb in messages[0]["content"]
+    assert kb not in user
+
+
+def test_generate_fullctx_loads_history_before_current_turn(monkeypatch):
+    from core.knowledge_base import assemble_client_knowledge_base
+    from session import mem_add_bot, mem_add_user, mem_reset
+
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+    sid = "fullctx-hist-load"
+    mem_reset(sid)
+    mem_add_user(sid, "Делаете all-on-4?")
+    mem_add_bot(sid, "Да.")
+
+    captured: dict = {}
+
+    def _fake_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+
+        class _Msg:
+            content = json.dumps({"answer": "ok"})
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    current = "а сколько стоит?"
+    answer, meta = generate_answer_from_packet_fullctx(
+        current,
+        assemble_client_knowledge_base("demo"),
+        ["price"],
+        [],
+        {"client_id": "demo"},
+        sid,
+    )
+    assert answer == "ok"
+    assert meta.get("composer_used") is True
+    user = captured["messages"][1]["content"]
+    assert "Делаете all-on-4" in user
+    assert user.count(current) == 1
+
+
 def test_fullctx_composer_system_prompt_base_as_source_of_truth():
     from core.knowledge_base import assemble_client_knowledge_base
 

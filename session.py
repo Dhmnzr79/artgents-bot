@@ -213,6 +213,40 @@ def mem_context(session_id: str) -> tuple[str, dict]:
     return (f"Недавний диалог:\n{history}" if history else ""), st["profile"]
 
 
+RECENT_DIALOG_MAX_MESSAGES = 6
+
+
+def recent_dialog_history(
+    session_id: str,
+    *,
+    max_messages: int = RECENT_DIALOG_MAX_MESSAGES,
+) -> str:
+    """Last N chat messages for LLM understanding (not a fact source)."""
+    if not (session_id or "").strip():
+        return ""
+    hist = list(mem_get(session_id).get("hist") or [])
+    if not hist:
+        return ""
+    tail = hist[-max(1, int(max_messages)) :]
+    lines = [
+        f"{m['role']}: {m['content']}"
+        for m in tail
+        if isinstance(m, dict) and str(m.get("content") or "").strip()
+    ]
+    return "\n".join(lines)
+
+
+def format_dialog_context_for_understanding(dialog_history: str) -> str:
+    """Prompt block: dialog context only for continuation, not facts."""
+    dctx = (dialog_history or "").strip()
+    if not dctx:
+        return ""
+    return (
+        "Контекст диалога (не источник фактов, только для понимания продолжения диалога):\n"
+        f"{dctx}\n\n"
+    )
+
+
 def mem_reset(session_id: str) -> None:
     with _lock:
         conn = _connect()

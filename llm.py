@@ -42,9 +42,11 @@ from config import (
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_stream_usage, log_llm_usage
 from meta_loader import get_doc_meta, get_doc_path
 from session import (
+    format_dialog_context_for_understanding,
     is_first_in_topic,
     mem_context,
     mem_get,
+    recent_dialog_history,
     update_topic_empathy,
 )
 
@@ -768,6 +770,7 @@ def build_messages_for_packet_composer_fullctx(
     deterministic_cards: list,
     meta: dict,
     session_id: str,
+    dialog_history: str | None = None,
 ) -> list[dict[str, str]]:
     """Messages for full-context composer — medical text from knowledge base, money from cards."""
     client_id = meta.get("client_id")
@@ -787,10 +790,16 @@ def build_messages_for_packet_composer_fullctx(
         system += JSON_ANSWER_RULE
     aspect_line = ", ".join(str(a).strip() for a in (aspects or []) if str(a).strip())
     cards_blob = _format_composer_card_blocks(deterministic_cards)
-    parts = [
-        f"Вопрос пациента:\n{(user_q or '').strip()}",
-        f"Ответь на аспекты: {aspect_line}",
-    ]
+    dialog_block = format_dialog_context_for_understanding(dialog_history or "")
+    parts: list[str] = []
+    if dialog_block:
+        parts.append(dialog_block.rstrip())
+    parts.extend(
+        [
+            f"Вопрос пациента:\n{(user_q or '').strip()}",
+            f"Ответь на аспекты: {aspect_line}",
+        ]
+    )
     if cards_blob.strip():
         parts.append(
             "Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n"
@@ -872,6 +881,9 @@ def generate_answer_from_packet_fullctx(
         return LLM_FALLBACK_ANSWER, {"composer_used": False}
     if not (knowledge_base or "").strip():
         return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    dialog_history = ""
+    if MEMORY_ON and session_id:
+        dialog_history = recent_dialog_history(session_id)
     messages = build_messages_for_packet_composer_fullctx(
         user_q,
         knowledge_base,
@@ -879,6 +891,7 @@ def generate_answer_from_packet_fullctx(
         deterministic_cards,
         meta,
         session_id,
+        dialog_history=dialog_history or None,
     )
     kwargs: dict = dict(model=CHAT_MODEL, temperature=0.3, messages=messages)
     if CHAT_JSON_MODE:

@@ -137,6 +137,17 @@
       "expected_composer": false,
       "expected_aspects": [],
       "expected_amounts": []
+    },
+    {
+      "id": "E1",
+      "group": "E",
+      "history": [{"question": "Делаете all-on-4?"}],
+      "question": "а сколько стоит?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price"],
+      "expected_amounts": [318000, 368000, 428000],
+      "known_gap": "этап 3: одноаспектный follow-up price уйдёт в legacy до снятия гейта ≥2 аспекта"
     }
   ]
 }

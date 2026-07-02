@@ -92,14 +92,6 @@
 
 **Telemetry:** `patient_situation_*` + `patient_options_*` + clarify fields в `metadata_first_turn_details` / `request.ctx`.
 
-### KNOWN — `risk_r13` (content → price misroute)
-
-**Вопрос:** «Синус-лифтинг входит в цену импланта?» — контентный FAQ (входит/не входит), не запрос цены.
-
-**Факт:** маршрут `price_lookup` + `service_id=sinus_lift`, `doc_id` пустой. Ответ по смыслу корректен («оплачиваются отдельно» + цены синус-лифтинга), но путь — price card, не retrieval chunk.
-
-**Eval:** `risk_r13` принимает `price_lookup` + `expected_service_id: sinus_lift`; контентные ассерты (`отдельно`, forbidden «входит в цену») сохранены. **Починка:** отдельная задача — resolver/source_routing для «входит ли в цену» без keyword→sinus_lift price.
-
 ---
 
 ## PriceBook v2 — остаток (3.5)

@@ -252,3 +252,22 @@ def test_build_messages_for_packet_composer_fullctx_structure():
     assert "Ответь на аспекты: price, pain" in user
     assert "ДОСЛОВНО" in user
     assert deterministic[0].text in user
+
+
+def test_fullctx_composer_system_prompt_contains_pain_hedge_rule():
+    from core.knowledge_base import assemble_client_knowledge_base
+
+    messages = build_messages_for_packet_composer_fullctx(
+        "больно ли?",
+        assemble_client_knowledge_base("demo"),
+        ["pain"],
+        [],
+        {"client_id": "demo"},
+        "sid-hedge",
+    )
+    system = messages[0]["content"]
+    assert "По боли и анестезии" in system
+    assert "острой боли не будет" in system
+    assert "безболезненно" in system
+    assert "под анестезией боли обычно не чувствуют" in system
+    assert "не будет больно" in system

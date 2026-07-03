@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from config import TURN_PLANNER_LLM_MODEL
+from config import CLARIFY_STATE_ON, TURN_PLANNER_LLM_MODEL
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
 from contracts.turn_plan import TurnPlan
 from contracts.answer_plan import AspectKind
@@ -13,7 +13,7 @@ from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_ser
 from core.service_selector_llm import build_compact_service_catalog, _read_service_catalog
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
-from session import format_dialog_context_for_understanding, recent_dialog_history
+from session import format_dialog_context_for_understanding, get_pending_clarify, recent_dialog_history
 
 logger = get_logger(__name__)
 
@@ -136,6 +136,18 @@ def _apply_protocol_choice_guard(
         return plan
     if EXISTING_IMPLANT_RX.search(text) or CROWN_ON_IMPLANT_RX.search(text):
         return plan
+    # Выбор из вариантов, предложенных ботом (pending clarify) — сильнейшее
+    # доказательство контекста: пациент явно ткнул/назвал вариант.
+    try:
+        from session import get_pending_clarify
+
+        pending = get_pending_clarify(sid) if (sid or "").strip() else None
+        if isinstance(pending, dict) and svc in {
+            str(x or "").strip() for x in (pending.get("option_service_ids") or [])
+        }:
+            return plan
+    except Exception:
+        pass
     log_json(
         logger,
         "turn_plan_service_downgraded",
@@ -172,6 +184,41 @@ def _catalog_lines(rows: list[dict[str, str]]) -> str:
         suffix = f" — {about}" if about and about != title else ""
         lines.append(f"- {sid}: {title}{suffix}")
     return "\n".join(lines)
+
+
+def _pending_clarify_prompt_block(
+    *,
+    sid: str | None,
+    client_id: str | None,
+) -> str:
+    if not CLARIFY_STATE_ON or not (sid or "").strip():
+        return ""
+    pending = get_pending_clarify(str(sid))
+    if not isinstance(pending, dict):
+        return ""
+    question = str(pending.get("question") or "").strip()
+    option_ids = [
+        str(x or "").strip()
+        for x in list(pending.get("option_service_ids") or [])
+        if str(x or "").strip()
+    ]
+    if not question or not option_ids:
+        return ""
+    from core.clarify_state import (
+        TURN_PLANNER_PENDING_CLARIFY_INSTRUCTION,
+        pending_options_line,
+    )
+
+    options = pending_options_line(client_id=client_id, option_service_ids=option_ids)
+    if not options:
+        return ""
+    return (
+        TURN_PLANNER_PENDING_CLARIFY_INSTRUCTION.format(
+            question=json.dumps(question, ensure_ascii=False),
+            options=options,
+        )
+        + "\n\n"
+    )
 
 
 def order_plan_aspects(aspects: list[AspectKind]) -> list[AspectKind]:
@@ -340,6 +387,7 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
         f"Каталог услуг:\n{_catalog_lines(rows)}\n\n"
         f"{brand_hint}"
         f"{format_dialog_context_for_understanding(hist)}"
+        f"{_pending_clarify_prompt_block(sid=sid, client_id=client_id)}"
         f"Вопрос пациента:\n{msg[:900]}"
     )
     try:

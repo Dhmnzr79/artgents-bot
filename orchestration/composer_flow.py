@@ -17,6 +17,7 @@ from core.knowledge_base import assemble_client_knowledge_base
 from core.service_selector_llm import classify_service
 from core.turn_planner_llm import turn_plan_from_ctx
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
+from ux_builder import build_clarify_payload
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
 _JAW_GROUP_PATIENT_SCOPES = frozenset({"full_jaw", "upper_jaw"})
@@ -202,6 +203,31 @@ def try_composer_overlay(
         if not profile.get("composer_used"):
             return None
         publish_answer_packet(packet)
+        clarify = profile.get("clarify")
+        if isinstance(clarify, dict):
+            question = str(clarify.get("question") or answer or "").strip()
+            option_service_ids = [
+                str(x or "").strip()
+                for x in list(clarify.get("option_service_ids") or [])
+                if str(x or "").strip()
+            ]
+            if question and option_service_ids:
+                return AskOrchestrationResult(
+                    kind="service_reply",
+                    q=q,
+                    sid=sid,
+                    client_id=client_id,
+                    service_payload=build_clarify_payload(
+                        question=question,
+                        option_service_ids=option_service_ids,
+                        sid=sid,
+                        client_id=client_id,
+                    ),
+                    service_doc_id=None,
+                    service_track_user=True,
+                    service_route="composer_clarify",
+                    decision_frame=decision_frame,
+                )
         return AskOrchestrationResult(
             kind="composer",
             q=q,

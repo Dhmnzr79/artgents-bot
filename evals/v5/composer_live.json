@@ -147,6 +147,49 @@
       "expected_path": "composer",
       "expected_aspects": ["price"],
       "expected_amounts": [318000, 368000, 428000]
+    },
+    {
+      "id": "F1",
+      "group": "F",
+      "question": "Сколько стоит коронка?",
+      "client_id": "demo",
+      "expected_path": "clarify",
+      "expected_aspects": ["price"],
+      "expected_amounts": [],
+      "expected_option_service_ids": ["zirconia_crowns", "implant_supported_prosthetics"]
+    },
+    {
+      "id": "F2",
+      "group": "F",
+      "history": [{"question": "Сколько стоит коронка?"}],
+      "question": "на имплант",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price"],
+      "expected_service_id": "implant_supported_prosthetics"
+    },
+    {
+      "id": "F3",
+      "group": "F",
+      "history": [{"question": "Сколько стоит коронка?"}],
+      "question": "а где вы находитесь?",
+      "client_id": "demo",
+      "expected_path": "contacts",
+      "expected_aspects": [],
+      "expected_amounts": [],
+      "expected_pending_cleared": true
+    },
+    {
+      "id": "F4",
+      "group": "F",
+      "question": "болит зуб, сколько будет стоить лечение?",
+      "client_id": "demo",
+      "expected_composer": true,
+      "expected_not_path": "clarify",
+      "expected_aspects": ["price", "pain"],
+      "expected_amounts": [],
+      "expected_mentions": ["кариес", "пульпит"],
+      "forbidden_substrings": ["кариес или пульпит?", "у вас кариес или пульпит"]
     }
   ]
 }

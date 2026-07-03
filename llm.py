@@ -14,6 +14,7 @@ from config import (
     QWEN_ENABLE_THINKING,
     chat_provider_is_qwen,
     CHAT_MODEL,
+    CLARIFY_STATE_ON,
     COMPLAINT_CLASSIFY_MODEL,
     DIALOG_FOCUS_LLM_CLASSIFY_ON,
     DIALOG_FOCUS_LLM_MODEL,
@@ -835,6 +836,7 @@ def build_messages_for_packet_composer_fullctx(
 ) -> list[dict[str, str]]:
     """Messages for full-context composer — medical text from knowledge base, money from cards."""
     client_id = meta.get("client_id")
+    allow_clarify = _composer_fullctx_clarify_allowed()
     kb_block = (
         "\n\n[БАЗА ЗНАНИЙ]\n"
         f"База знаний клиники (источник медицинского текста):\n{(knowledge_base or '').strip()}"
@@ -848,6 +850,8 @@ def build_messages_for_packet_composer_fullctx(
         + _consult_nudge_addon(meta)
     )
     if CHAT_JSON_MODE:
+        # JSON-правило всегда в system (дефолтная форма {"answer": ...});
+        # clarify-инструкция в user-части явно описывает альтернативную форму.
         system += JSON_ANSWER_RULE
     aspect_line = ", ".join(str(a).strip() for a in (aspects or []) if str(a).strip())
     cards_blob = _format_composer_card_blocks(deterministic_cards)
@@ -870,11 +874,48 @@ def build_messages_for_packet_composer_fullctx(
         )
     else:
         parts.append("Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n(нет)")
+    if allow_clarify:
+        from core.clarify_state import CLARIFY_ALLOW_INSTRUCTION
+
+        parts.append(CLARIFY_ALLOW_INSTRUCTION)
     user_content = "\n\n".join(parts)
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": user_content},
     ]
+
+
+def _composer_fullctx_clarify_allowed() -> bool:
+    if not CLARIFY_STATE_ON:
+        return False
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        plan = turn_plan_from_ctx()
+        if plan is None:
+            return False
+        return bool(plan.needs_clarify) and not str(plan.service_id or "").strip()
+    except Exception:
+        return False
+
+
+def _parse_packet_composer_fullctx_json(raw: str, *, client_id: str | None) -> tuple[str, dict]:
+    obj = json.loads(raw)
+    if not isinstance(obj, dict):
+        raise ValueError("packet_composer_fullctx_not_object")
+    answer = str(obj.get("answer") or "").strip()
+    if answer:
+        return answer, {}
+    if obj.get("clarify") is not None:
+        if not _composer_fullctx_clarify_allowed():
+            raise ValueError("packet_composer_fullctx_clarify_not_allowed")
+        from core.clarify_state import validate_clarify_payload
+
+        clarify = validate_clarify_payload(obj.get("clarify"), client_id=client_id)
+        if clarify is None:
+            raise ValueError("packet_composer_fullctx_invalid_clarify")
+        return str(clarify["question"]).strip(), {"clarify": clarify}
+    raise ValueError("packet_composer_fullctx_missing_answer")
 
 
 def generate_answer_from_packet(
@@ -971,13 +1012,17 @@ def generate_answer_from_packet_fullctx(
         log_llm_usage(logger, resp, call_type="packet_composer_fullctx", model=CHAT_MODEL)
         raw = (resp.choices[0].message.content or "").strip()
         answer = raw
+        extra_profile: dict = {}
         if CHAT_JSON_MODE:
             try:
-                obj = json.loads(raw)
-                if isinstance(obj, dict) and obj.get("answer"):
-                    answer = str(obj["answer"]).strip()
-            except (json.JSONDecodeError, TypeError):
-                pass
+                answer, extra_profile = _parse_packet_composer_fullctx_json(
+                    raw,
+                    client_id=meta.get("client_id"),
+                )
+            except json.JSONDecodeError:
+                # Модель вернула не-JSON текст: показываем как есть (старое
+                # поведение), а не роняем ход в fallback-заглушку.
+                answer = raw
         if not (answer or "").strip():
             answer = LLM_FALLBACK_ANSWER
         log_json(
@@ -993,7 +1038,9 @@ def generate_answer_from_packet_fullctx(
         )
         if doc_key:
             update_topic_empathy(session_id, doc_key, use_empathy)
-        return answer, {"composer_used": True, "empathy_used": bool(use_empathy)}
+        profile = {"composer_used": True, "empathy_used": bool(use_empathy)}
+        profile.update(extra_profile)
+        return answer, profile
     except Exception as e:
         log_llm_error(logger, call_type="packet_composer_fullctx", err=str(e), model=CHAT_MODEL)
         log_json(

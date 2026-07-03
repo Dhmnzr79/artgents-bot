@@ -8,6 +8,7 @@ from flask import request
 from config import (
     ANTI_SPAM_BURST_MESSAGES,
     ANTI_SPAM_BURST_WINDOW_SEC,
+    CLARIFY_STATE_ON,
     INPUT_MAX_CHARS,
 )
 from contracts.ask_orchestration import AskOrchestrationResult
@@ -37,10 +38,12 @@ from policy import continuation_only_phrase, continuation_without_context
 from core.md_chunks import get_chunk_by_ref
 from session import (
     get_topic_state,
+    clear_pending_clarify,
     is_active_lead_flow,
     is_lead_context,
     mark_nav_ref_used,
     mem_get,
+    pending_clarify_age,
     mem_reset,
     set_anti_spam_redirect_shown,
     sid_from_body,
@@ -116,6 +119,10 @@ def run_pre_resolver_turn(
 
     st = mem_get(sid)
     decision_frame = decision_dump(decision)
+    pending_clarify = st.get("pending_clarify") if CLARIFY_STATE_ON else None
+    if isinstance(pending_clarify, dict) and pending_clarify_age(st) > 2:
+        clear_pending_clarify(sid)
+        pending_clarify = None
 
     if is_obvious_noise(q) and not is_lead_context(st):
         noise_res = obvious_noise_ingress_result()
@@ -251,6 +258,25 @@ def run_pre_resolver_turn(
             except Exception:
                 pass
             mark_nav_ref_used(sid, ref_eff)
+            if isinstance(pending_clarify, dict):
+                try:
+                    from core.clarify_state import active_service_catalog, service_ref
+
+                    catalog = active_service_catalog(client_id)
+                    option_ids = {
+                        str(x or "").strip()
+                        for x in list(pending_clarify.get("option_service_ids") or [])
+                        if str(x or "").strip()
+                    }
+                    option_refs = {
+                        service_ref(entry)
+                        for sid_opt, entry in catalog.items()
+                        if sid_opt in option_ids and isinstance(entry, dict)
+                    }
+                    if ref_eff in option_refs:
+                        clear_pending_clarify(sid)
+                except Exception:
+                    pass
         price_from_ref = orchestrate_price_widget_ref(
             ref,
             q=q,

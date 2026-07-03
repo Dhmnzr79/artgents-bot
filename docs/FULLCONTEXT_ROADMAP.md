@@ -1,6 +1,7 @@
 # Full-context Roadmap (audit-driven)
 
 **Статус:** ядро full-context собрано и проверено на demo; впереди — эксплуатационные правки, объединение путей и уборка легаси. Инкорпорирует внешний аудит (2026-07).
+**Прогресс (2026-07-03):** Этап 1 ✓ (кэш: cached_tokens 0→17024) · Этап 2 ✓ (история) · 3.0–3.3 ✓ (parity, wiring, контакты, md_chunks) · 3.1c ✓ · **Этап 4 ✓ принят** (плановый вызов: flags-on smoke 24/24, risk 28/29 + r17 закрыт якорем с unit-доказательством, live 16/16; бывшие KNOWN зелёные). Следующий: **3.4 снос RAG** (с переключением дефолтов флагов — см. прим. в 3.4).
 **Связано:** `CURRENT_ARCHITECTURE.md`, `COMPOSER_ROADMAP.md` (Фазы 0–3), `COMPOSER_LIVE_EVAL.md`, `TECH_DEBT.md`.
 
 ---
@@ -113,6 +114,10 @@
 **3.2 — Контакты снять с embed-поиска.** Контактный путь сейчас зовёт `retrieve(q, topk=24)` + `pick_contacts_chunk` (`ask_turn.py:80`) — это embed-поиск на маршруте, который мы «оставляем как есть». Перевести на прямой `get_chunk_by_ref("clinic__info__contacts.md#korotko")` **до** удаления embed-поиска.
 
 **3.3 — Разделить embed-поиск и резолв ref→чанк.** Удаляется только **embed-поиск**: `retrieve`, rerank, alias-матрицы/`.npy`, arbiter. **`get_chunk_by_ref` — НЕ RAG и остаётся:** его используют ~15 выживающих мест (контакты-fallback `ask_turn.py:83`, price flow `price_flow.py:89/183/288`, **материализация карточек самого композера** `answer_packet_materialize.py:45`, payment/warranty appends `answer_plan_apply.py`, lead redirect `lead_flow.py:58`, continuation `pre_resolver_turn.py`, catalog_flow). Вынести `get_chunk_by_ref` в тонкий `core/md_chunks.py`, парсящий `clients/{id}/md/` напрямую — тогда `corpus.jsonl` и `build_index.py` тоже можно убрать, а правки md подхватываются без пересборки индекса.
+
+**3.4-0 — Сначала дефолты флагов ON (часть 3.5, переносится сюда).** Нельзя удалять легаси-путь, пока он дефолтный: `FULLCTX_ON`, `COMPOSER_ON`, `SERVICE_SELECT_LLM_ON`, `TURN_PLANNER_ON` → default "1" (env-переключатель в "0" остаётся как kill-switch). После — полный прогон уже БЕЗ выставления флагов (новые дефолты = прежний flags-on результат).
+
+**3.4-0b — Fail-open политика после сноса (решение):** плановый вызов упал → resolver (он НЕ удаляется); композер упал → честный `LLM_FALLBACK_ANSWER` («не нашла ответа», предложить связаться) — retrieval-путь НЕ реанимируется. Деньги/контакты/врачи/лид — детерминированные маршруты, их fail-open не меняется.
 
 **3.4 — Удаление по графу вызовов, НЕ по списку файлов.** Пример мины: `query_selector.py` выживает (`select_price_service_route` нужен даже композеру для defer группового прайса), но **импортирует** `core/candidate_builder.py` из списка на удаление — снос «по файлам» даст ImportError на старте. Перед каждым удалением — проверить импортёров (grep), после — импорт-smoke (`python -c "import app"`) + eval.
 

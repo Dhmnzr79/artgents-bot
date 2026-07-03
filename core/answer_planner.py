@@ -163,17 +163,13 @@ def detect_aspects(
         turn_plan = turn_plan_from_ctx()
         if turn_plan is not None:
             aspects = list(turn_plan.aspects or [])
-            # Deterministic augmentation: comparison questions are already
-            # detected by regex/decision; the planner must not lose them.
-            if "comparison" not in aspects and (
-                COMPARISON_QUERY_RE.search(q or "")
-                or (
-                    decision is not None
-                    and str(getattr(decision, "query_mode", None) or "").strip().lower()
-                    == "comparison"
-                )
-            ):
-                aspects.append("comparison")
+            # Детерминированная стабилизация: канонические сигналы (цена,
+            # гарантия, сравнение…) якорит regex-слой — планировщик добавляет
+            # нюансы, но не может потерять очевидное («а сколько стоит?» без
+            # аспекта price). overview из regex не добавляем (это дефолт).
+            for anchor in detect_aspects_regex(q, decision=decision):
+                if anchor != "overview" and anchor not in aspects:
+                    aspects.append(anchor)
             _record_aspect_planner_ctx(source="turn_planner", aspects=aspects)
             return aspects
     except Exception:
@@ -222,10 +218,12 @@ def _resolve_service_id(
         from core.turn_planner_llm import turn_plan_from_ctx
 
         turn_plan = turn_plan_from_ctx()
-        if turn_plan is not None and turn_plan.service_id:
-            svc = normalize_service_id(str(turn_plan.service_id or ""))
+        if turn_plan is not None:
+            # Решение планировщика окончательно, включая None («без услуги»):
+            # fuzzy-фолбэк ниже возвращает баг «имплантация → дорогой протокол».
+            svc = normalize_service_id(str(turn_plan.service_id or "")) or None
             topic = str(getattr(decision, "service_topic", None) or "").strip().lower() or None
-            return svc or None, topic
+            return svc, topic
     except Exception:
         pass
     svc = normalize_service_id(str(getattr(source_route, "service_id", None) or ""))

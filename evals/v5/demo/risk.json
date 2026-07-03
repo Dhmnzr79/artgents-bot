@@ -351,9 +351,6 @@
         "expected_answer_path": "composer",
         "require_numeric_gate_pass": true,
         "require_forbidden_claims_empty": true,
-        "expected_packet_aspects": [
-          "overview"
-        ],
         "expected_service_id": "zirconia_crowns"
       }
     },

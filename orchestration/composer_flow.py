@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import COMPOSER_ON, FULLCTX_ON, SERVICE_SELECT_LLM_ON
+from config import CLARIFY_STATE_ON, COMPOSER_ON, FULLCTX_ON, SERVICE_SELECT_LLM_ON
 from contracts.answer_packet import MaterializedCard
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.answer_plan import AnswerPlan
@@ -140,7 +140,18 @@ def try_composer_overlay(
             # Только чистый price требует услугу (цена = карточка из pricebook);
             # included без услуги композер отвечает из базы (what_included FAQ).
             if "price" in aspects and service_id_override is None:
-                return None
+                # needs_clarify уступает defer только там, где у прайса НЕТ
+                # детерминированного группового ответа (обзор имплант-протоколов
+                # для «сколько стоит имплантация?» неприкосновенен — D1).
+                clarify_may_ask = (
+                    CLARIFY_STATE_ON
+                    and bool(turn_plan.needs_clarify)
+                    and not _defer_group_price_via_price_route(
+                        q=q, client_id=client_id, sid=sid
+                    )
+                )
+                if not clarify_may_ask:
+                    return None
 
         if has_price_aspect and _composer_should_defer_jaw_scope_price(q):
             return None

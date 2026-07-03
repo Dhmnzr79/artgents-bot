@@ -193,3 +193,53 @@ def test_fullctx_parse_non_json_degrades_to_raw():
 
     with _pytest.raises(_json.JSONDecodeError):
         _parse_packet_composer_fullctx_json("просто текст без JSON", client_id="demo")
+
+
+def test_composer_price_defer_yields_to_clarify(monkeypatch):
+    """needs_clarify + нет группового ответа (коронка) → композер получает ход и может спросить."""
+    import pytest as _pytest
+    from contracts.answer_plan import AnswerPlan
+    from contracts.source_route_result import SourceRouteResult
+    from contracts.turn_plan import TurnPlan
+    from core.turn_planner_llm import publish_turn_plan
+    from orchestration.composer_flow import try_composer_overlay
+
+    app = _pytest.importorskip("flask").Flask(__name__)
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.CLARIFY_STATE_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.publish_answer_packet", lambda _p: None)
+    monkeypatch.setattr(
+        "orchestration.composer_flow._defer_group_price_via_price_route",
+        lambda **_k: False,
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow._composer_should_defer_jaw_scope_price",
+        lambda _q: False,
+    )
+    monkeypatch.setattr(
+        "orchestration.composer_flow.generate_answer_from_packet_fullctx",
+        lambda *a, **k: ("Про какую коронку речь?", {"composer_used": True, "clarify": {
+            "question": "Про какую коронку речь?",
+            "option_service_ids": ["zirconia_crowns", "implant_supported_prosthetics"],
+        }}),
+    )
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(route="price_lookup", aspects=["price"], service_id=None, needs_clarify=True)
+        )
+        result = try_composer_overlay(
+            q="Сколько стоит коронка?",
+            sid="clarify-defer-yield",
+            client_id="demo",
+            intent="price_lookup",
+            plan=AnswerPlan(aspects=["price"], primary_aspect="price", service_id=None),
+            sr=SourceRouteResult(source="none", service_id=None, ref=None, match_score=0.0, match_method="none"),
+            decision=None,
+            decision_frame={},
+        )
+
+    assert result is not None

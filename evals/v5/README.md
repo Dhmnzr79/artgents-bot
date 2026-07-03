@@ -1,73 +1,83 @@
-# v5 per-layer evals
+# v5 evals
 
-Этот каталог содержит per-layer golden sets и минимальный runner для v5 (см. `docs/ARCHITECTURE V5.md` §E3).
+Контекст: `docs/CURRENT_ARCHITECTURE.md`, `docs/MULTICLIENT.md`, план вопросов: `drafts/test.md`.
 
-## Файлы
+## Demo product eval (CI)
 
-- `resolver_golden.json` — кейсы для Resolver (`DecisionFrame`)
-- `arbiter_golden.json` — кейсы для Arbiter (`ArbiterDecision`)
-- `verifier_golden.json` — кейсы для Verifier (`VerifierVerdict`)
-- `generator_golden.json` — кейсы для Generator (faithfulness)
-- `run_layer_eval.py` — запуск eval по слоям
-
-## Запуск
+| Suite | Cases | Path |
+|-------|-------|------|
+| smoke | 24 | `demo/smoke.json` |
+| risk | 20 | `demo/risk.json` |
+| golden | 14 (§2.1, растёт) | `demo/golden.json` |
 
 ```bash
-python evals/v5/run_layer_eval.py --layer resolver
-python evals/v5/run_layer_eval.py --layer all
+set E2E_USE_TEST_CLIENT=1
+python evals/v5/run_demo_eval.py --client demo --suite product   # CI: smoke+risk
+python evals/v5/run_demo_eval.py --client demo --suite golden   # core golden batch
+python evals/v5/run_demo_eval.py --client demo --suite all      # всё
+python evals/v5/run_demo_eval.py --suite smoke --case-id demo_smoke_05_phone
 ```
 
-Пока runtime-слои ещё не реализованы, runner будет помечать результаты как `SKIP` (это ожидаемо на Phase 0).
+**Индекс `data/demo/`:** product/smoke eval читает закоммиченный corpus (`corpus.jsonl`, `embeddings.npy`, `alias_*`). Локальный `python build_index.py --client demo` меняет эти файлы — **не коммитить** в PR с кодом. Перед product eval: `git restore data/demo/` или свежая пересборка + явная пометка в PR. На «грязном» индексе risk-кейсы (retrieval/doc_id) могут ложно падать — это не ослабление ожиданий в JSON.
 
-## E2E smoke (PR #E.0)
+Env: `DEMO_EVAL_CLIENT`, `DEMO_EVAL_SMOKE_PATH`, `DEMO_EVAL_RISK_PATH`, `DEMO_EVAL_CASE_ID`.
 
-Цель: минимальный end-to-end smoke runner, который дёргает `/ask` целиком и проверяет:
-- `meta.route` (если указан `expected_route`)
-- `must_contain` — подстроки, которые **обязаны** быть в `answer` (case-insensitive)
-- `must_not_contain` — подстроки, которых **не должно** быть в `answer` (case-insensitive)
+### Формат кейса (v5)
 
-### Файлы
+- `expected_route` / `expected_route_any` — главный сигнал (см. `smoke_case_runner.infer_route_from_response`, `docs/ROUTING_MAP.md`)
+- `expected_doc_id` / `expected_doc_id_any`, `expected_service_id` / `expected_service_id_any`
+- `expected_pricebook_group_id`, `expected_price_status` — group overview из pricebook manifest
+- `expected_packet_aspects` / `expected_plan_aspects` — composer packet (T1)
+- `composer_parity` — **stage 3.0:** parity contract when `answer_path=composer` (see below)
+- `answer_signals_any` — OR по подстрокам (предпочтительно для LLM-текста)
+- `forbidden_signals` / `must_not_contain` — запрещённые обещания или неверный маршрут
+- `must_contain` — только для детерминированных шаблонов (lead flow)
 
-- `e2e_smoke.json` — набор кейсов + baseline (root `baseline`)
-- `run_e2e_smoke.py` — runner
+Не использовать `must_contain` на свободный текст LLM. Не ослаблять ожидания ради зелёного прогона.
 
-### Формат кейса (кратко)
+### Composer parity (этап 3.0+)
 
-- `question`: текущий turn
-- `history`: опционально, массив предыдущих turns вида `[{\"question\": \"...\"}]` (runner проигрывает их в `/ask` с той же `sid`)
-- `expected_route`: опционально, строка
-- `expected_route_any`: опционально, массив строк (ambiguous кейсы)
-- `must_contain` / `must_not_contain`: опционально, массив строк (case-insensitive substring)
+На пути `answer_path=composer` нет выбранного retrieval-чанка — `expected_doc_id` не проверяется.
+Вместо этого у кейса блок `composer_parity`:
 
-### Как запустить
+| Поле | Смысл |
+|------|--------|
+| `expect_not_composer: true` | контакты, ingress, patient_options — композер не должен срабатывать |
+| `expected_answer_path: "composer"` | C6: ответ с композера |
+| `expected_service_id` / `_any` | услуга из пакета |
+| `expected_packet_aspects` | аспекты в `answer_packet` / `answer_plan` |
+| `expected_packet_amounts` | суммы из price-карточки в тексте (T2 / C1) |
+| `require_numeric_gate_pass` | `numeric_fact_gate.action == pass` |
+| `require_forbidden_claims_empty` | C2: `forbidden_claim_hits` пуст |
 
-1) Подними бота локально (по умолчанию ожидается `http://localhost:5000/ask`).
+Движок: `evals/v5/composer_parity.py`, вызывается из `smoke_case_runner.validate_smoke_case`.
+До этапа 3.1 (wiring) большинство кейсов идут legacy — parity-ассерты активны только когда ответ уже с композера.
 
-2) Запусти:
+## Детерминированные слои (CI + локально)
 
 ```bash
-python evals/v5/run_e2e_smoke.py
+python evals/v5/run_layer_eval.py --layer ingress
+python evals/v5/run_price_offers_eval.py --client demo
+python -m pytest tests/test_price_offers.py tests/test_price_group_overview.py -q
 ```
 
-Параметры через env:
-- `BOT_URL` — URL endpoint `/ask` (default: `http://localhost:5000/ask`)
-- `BOT_TIMEOUT_SEC` — timeout на запрос (default: 20)
-- `CLIENT_ID` — client_id для запроса (default: `default`)
-- `E2E_SMOKE_PATH` — путь к json (default: `evals/v5/e2e_smoke.json`)
+## Per-layer golden (разработка слоёв)
 
-### Как обновлять baseline
+- `resolver_golden.json`, `arbiter_golden.json`, `generator_golden.json`, …
+- `run_layer_eval.py --layer resolver|all`
 
-- Первый запуск: если `baseline=null`, runner выдаёт таблицу PASS/FAIL. После этого baseline фиксируется вручную: поставить `baseline=<passed>` в `e2e_smoke.json`.
-- После улучшений: baseline обновлять **только** когда изменения осознанные и ожидаемые (не “подгонка” под текущий вывод).
+## Metadata-first (опционально, multiclient branch)
 
-### Что считать регрессией
+- `metadata_first_golden.json`, `metadata_first_smoke.json`
+- `run_metadata_first_eval.py`
 
-- Любое падение ниже `baseline - 2` по количеству PASS (при фиксированном baseline).
-- Сдвиг route в критичных кейсах (contacts/lead/price/handoff) даже если ответ «примерно похож».
+## Архив
 
-### known_v4_failures
+`archive/` — `e2e_smoke.v4.json`, `implant_golden.v4.json` (не в CI).
 
-В корне `e2e_smoke.json` есть массив `known_v4_failures`: каждая запись связывает `case_id` с кратким описанием причины (типичный v4-баг) и полем `expected_fix_in_pr` (например `#1.3`, `#1.7`).
+## Deprecated runners
 
-Это **намеренные регрессионные цели**, а не «сломанный» набор целиком: соответствующие кейсы в `cases[]` могут сейчас быть FAIL, но после merge указанного PR ожидается, что кейс начнёт **стабильно проходить**. Baseline по количеству PASS по-прежнему задаётся вручную; список `known_v4_failures` нужен для отслеживания прогресса и приоритетов без потери истории «почему этот сценарий важен».
+- `run_e2e_smoke.py` → `run_demo_eval.py --suite smoke`
+- `run_implant_eval.py` → `run_demo_eval.py --suite risk`
 
+Общий движок: `smoke_case_runner.py`.

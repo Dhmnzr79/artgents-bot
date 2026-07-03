@@ -1,0 +1,606 @@
+{
+  "baseline": 24,
+  "description": "Demo smoke (drafts/test.md §1): 24 must-pass questions — route, service/doc, answer signals. Format v5: no brittle must_contain on LLM prose.",
+  "known_failures": [],
+  "cases": [
+    {
+      "id": "demo_smoke_01_clinic_location",
+      "client_id": "demo",
+      "question": "Где находится клиника?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "тверск",
+        "москв",
+        "адрес",
+        "находит"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_02_address",
+      "client_id": "demo",
+      "question": "Какой у вас адрес?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "тверск",
+        "москв",
+        "пушкинск"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_03_metro",
+      "client_id": "demo",
+      "question": "Вы рядом с метро?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "метро",
+        "тверск",
+        "москв",
+        "минут"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_04_parking",
+      "client_id": "demo",
+      "question": "Есть парковка?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "парков",
+        "машин",
+        "рядом"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_05_phone",
+      "client_id": "demo",
+      "question": "Какой телефон клиники?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "телефон",
+        "+7",
+        "495",
+        "128"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_06_saturday_hours",
+      "client_id": "demo",
+      "question": "Как вы работаете в субботу?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "суббот",
+        "график",
+        "работа",
+        "час"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_07_sunday_hours",
+      "client_id": "demo",
+      "question": "Работаете в воскресенье?",
+      "expected_route_any": [
+        "contacts_chunk",
+        "retrieval_chunk"
+      ],
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": [
+        "воскресен",
+        "график",
+        "работа",
+        "выходн"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_08_booking",
+      "client_id": "demo",
+      "question": "Как записаться на консультацию?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first",
+        "lead_flow"
+      ],
+      "expected_doc_id_any": [
+        "clinic__info__consultation",
+        "clinic__info__contacts"
+      ],
+      "answer_signals_any": [
+        "запис",
+        "консультац",
+        "телефон",
+        "как к вам"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_09_consultation_free",
+      "client_id": "demo",
+      "question": "Консультация бесплатная?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "clinic__info__consultation",
+      "answer_signals_any": [
+        "консультац",
+        "бесплат",
+        "осмотр",
+        "план"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_10_implant_doctors",
+      "client_id": "demo",
+      "question": "Кто у вас занимается имплантацией?",
+      "expected_route_any": [
+        "doctors_list",
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "doctors__doctor__overview",
+        "doctors__doctor__orlov"
+      ],
+      "answer_signals_any": [
+        "имплант",
+        "врач",
+        "хирург",
+        "доктор"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_11_classic_one_implant_price",
+      "client_id": "demo",
+      "question": "Сколько стоит поставить один имплант?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "classic",
+      "answer_signals_any": [
+        "76 200",
+        "85 200",
+        "₽",
+        "руб",
+        "implantium"
+      ],
+      "forbidden_signals": [
+        "318 000"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "price"
+        ],
+        "expected_service_id": "classic",
+        "expected_packet_amounts": [
+          76200,
+          85200
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_12_all_on_4_price",
+      "client_id": "demo",
+      "question": "Сколько стоит All-on-4?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "all_on_4",
+      "answer_signals_any": [
+        "318 000",
+        "368 000",
+        "all-on",
+        "₽"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "price"
+        ],
+        "expected_service_id": "all_on_4",
+        "expected_packet_amounts": [
+          318000,
+          368000
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_13_ct_price",
+      "client_id": "demo",
+      "question": "Сколько стоит КТ?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "tomography",
+      "answer_signals_any": [
+        "кт",
+        "₽",
+        "руб",
+        "томограф"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "price"
+        ],
+        "expected_service_id": "tomography"
+      }
+    },
+    {
+      "id": "demo_smoke_14_caries_price",
+      "client_id": "demo",
+      "question": "Сколько стоит лечение кариеса?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "caries",
+      "answer_signals_any": [
+        "кариес",
+        "₽",
+        "руб"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "price"
+        ],
+        "expected_service_id": "caries"
+      }
+    },
+    {
+      "id": "demo_smoke_15_installment",
+      "client_id": "demo",
+      "question": "Есть рассрочка на имплантацию?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first",
+        "price_concern"
+      ],
+      "expected_doc_id_any": [
+        "clinic__info__payment_terms",
+        "implantation__faq__cost",
+        "implantation__service__classic"
+      ],
+      "answer_signals_any": [
+        "рассроч",
+        "оплат",
+        "этап"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "payment"
+        ],
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_16_implant_pain",
+      "client_id": "demo",
+      "question": "Больно ли ставить имплант?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "implantation__faq__pain",
+      "answer_signals_any": [
+        "анестез",
+        "боль",
+        "небольно",
+        "обезбол"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "pain"
+        ],
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_17_warranty",
+      "client_id": "demo",
+      "question": "Какая гарантия на импланты?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "clinic__info__warranty",
+      "answer_signals_any": [
+        "гарант",
+        "имплант",
+        "лет"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "warranty"
+        ],
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_18_braces_policy",
+      "client_id": "demo",
+      "question": "Ставите брекеты?",
+      "expected_route_any": [
+        "ingress_service_not_offered",
+        "catalog_md_first",
+        "retrieval_chunk"
+      ],
+      "answer_signals_any": [
+        "элайнер",
+        "брекет"
+      ],
+      "forbidden_signals": [
+        "ставим брекеты",
+        "да, делаем брекеты"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_19_oms_policy",
+      "client_id": "demo",
+      "question": "Лечите по ОМС?",
+      "expected_route": "ingress_not_offered_policy",
+      "answer_signals_any": [
+        "омс",
+        "платн"
+      ],
+      "forbidden_signals": [
+        "работаем по омс",
+        "принимаем по омс"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_20_dms_policy",
+      "client_id": "demo",
+      "question": "Принимаете по ДМС?",
+      "expected_route": "ingress_not_offered_policy",
+      "answer_signals_any": [
+        "дмс",
+        "оплат",
+        "договор"
+      ],
+      "forbidden_signals": [
+        "принимаем по дмс",
+        "работаем по дмс"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_21_pediatric_policy",
+      "client_id": "demo",
+      "question": "Есть детский стоматолог?",
+      "expected_route": "ingress_not_offered_policy",
+      "answer_signals_any": [
+        "взросл",
+        "детск"
+      ],
+      "forbidden_signals": [
+        "есть детский стоматолог",
+        "принимаем детей"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expect_not_composer": true
+      }
+    },
+    {
+      "id": "demo_smoke_22_osstem_policy",
+      "client_id": "demo",
+      "question": "Ставите Osstem?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first",
+        "ingress_service_not_offered"
+      ],
+      "answer_signals_any": [
+        "implantium",
+        "impro",
+        "nobel",
+        "osstem"
+      ],
+      "forbidden_signals": [
+        "ставим osstem",
+        "да, osstem"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_23_basal_policy",
+      "client_id": "demo",
+      "question": "Делаете базальную имплантацию?",
+      "expected_route_any": [
+        "ingress_service_not_offered",
+        "catalog_md_first",
+        "retrieval_chunk"
+      ],
+      "answer_signals_any": [
+        "базальн",
+        "классическ",
+        "имплант"
+      ],
+      "forbidden_signals": [
+        "делаем базальную",
+        "ставим базальн"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ],
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
+        ]
+      }
+    },
+    {
+      "id": "demo_smoke_24_mini_implants_policy",
+      "client_id": "demo",
+      "question": "Ставите мини-импланты?",
+      "expected_route_any": [
+        "ingress_service_not_offered",
+        "catalog_md_first",
+        "retrieval_chunk"
+      ],
+      "answer_signals_any": [
+        "мини",
+        "классическ",
+        "имплант"
+      ],
+      "forbidden_signals": [
+        "ставим мини-имплант",
+        "делаем мини"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ],
+        "forbidden_service_id": [
+          "all_on_4",
+          "all_on_6",
+          "zygomatic_implants",
+          "pterygoid_implants",
+          "implant_supported_prosthetics"
+        ]
+      }
+    }
+  ]
+}

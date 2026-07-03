@@ -1,0 +1,120 @@
+{
+  "baseline": 11,
+  "description": "Metadata-first Phase 2 golden: route + doc_id (+ doc_type guards). Demo client only until other packs are ready.",
+  "deferred": [
+    {
+      "id": "mf_comparison_fallback_telemetry",
+      "reason": "fallback_used e2e unstable when alias picks wrong comparison doc; covered by unit test_finalize_ask_metadata_first_hook"
+    }
+  ],
+  "cases": [
+    {
+      "id": "mf_contacts_demo",
+      "client_id": "demo",
+      "question": "Где вы находитесь?",
+      "expected_route": "contacts_chunk",
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": ["тверск", "москв"],
+      "must_not_contain": ["елизово", "рябиков"],
+      "testability": "strong"
+    },
+    {
+      "id": "mf_price_all_on_4",
+      "client_id": "demo",
+      "question": "Сколько стоит All-on-4?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "all_on_4",
+      "answer_signals_any": ["₽", "руб"],
+      "testability": "strong"
+    },
+    {
+      "id": "mf_price_classic",
+      "client_id": "demo",
+      "question": "Сколько стоит классическая имплантация?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "classic",
+      "answer_signals_any": ["₽", "руб"],
+      "testability": "strong"
+    },
+    {
+      "id": "mf_concern_cost",
+      "client_id": "demo",
+      "question": "Почему так дорого импланты?",
+      "expected_route": "price_concern",
+      "expected_doc_id": "implantation__faq__cost",
+      "answer_signals_any": ["материал", "стоим", "цен"],
+      "must_not_contain": ["уточнить у администратор"],
+      "testability": "medium"
+    },
+    {
+      "id": "mf_faq_osseo",
+      "client_id": "demo",
+      "question": "Какая приживаемость имплантов?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__osseointegration",
+      "forbidden_doc_id": ["implantation__service__classic"],
+      "answer_signals_any": ["прижив", "остеоинтеграц"],
+      "must_not_contain": ["₽"],
+      "testability": "strong"
+    },
+    {
+      "id": "mf_faq_pain",
+      "client_id": "demo",
+      "question": "Больно ли ставить имплант?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__pain",
+      "forbidden_doc_id": ["implantation__service__classic"],
+      "answer_signals_any": ["анестез", "боль", "небольно"],
+      "testability": "strong"
+    },
+    {
+      "id": "mf_info_bone_graft",
+      "client_id": "demo",
+      "question": "Если кости мало, что делать?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__info__bone_graft",
+      "forbidden_doc_id": ["implantation__service__classic"],
+      "answer_signals_any": ["кост", "наращ", "пластик"],
+      "testability": "strong"
+    },
+    {
+      "id": "mf_service_classic_overview",
+      "client_id": "demo",
+      "question": "Расскажите про классическую имплантацию",
+      "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
+      "expected_doc_id": "implantation__service__classic",
+      "testability": "medium"
+    },
+    {
+      "id": "mf_comparison_hit",
+      "client_id": "demo",
+      "question": "Что лучше: имплант или мост?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__implant_vs_bridge",
+      "forbidden_doc_type": ["service", "pricing"],
+      "answer_signals_any": ["имплант", "мост"],
+      "testability": "medium"
+    },
+    {
+      "id": "mf_comparison_bugel",
+      "client_id": "demo",
+      "question": "Что лучше: бюгельный протез или мост?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__bugel_prosthesis_vs_fixed_bridge",
+      "forbidden_doc_type": ["service", "pricing"],
+      "answer_signals_any": ["бюгель", "мост"],
+      "testability": "medium"
+    },
+    {
+      "id": "mf_wrong_topic_aligners",
+      "client_id": "demo",
+      "question": "Чем брекеты лучше элайнеров?",
+      "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
+      "forbidden_doc_type": ["comparison"],
+      "expected_doc_id": "orthodontics__service__aligners",
+      "answer_signals_any": ["элайнер", "брекет", "ортодонт"],
+      "testability": "medium",
+      "comment": "orthodontics via catalog; implant comparison doc must not win"
+    }
+  ]
+}

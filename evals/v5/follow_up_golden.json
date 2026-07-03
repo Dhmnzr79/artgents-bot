@@ -1,0 +1,58 @@
+{
+  "baseline": 5,
+  "description": "Follow-up golden (PRODUCT_WORK_PLAN stage 4a): classic focus → warranty/pain/payment/contacts; negative topic change.",
+  "known_failures": [],
+  "cases": [
+    {
+      "id": "followup_classic_warranty",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "а гарантия?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "must_contain": ["гарант"],
+      "comment": "short warranty follow-up after classic service",
+      "testability": "strong"
+    },
+    {
+      "id": "followup_classic_pain",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "а больно?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "must_contain": ["боль"],
+      "comment": "pain follow-up stays on classic subject",
+      "testability": "strong"
+    },
+    {
+      "id": "followup_classic_payment",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "рассрочка?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["рассроч", "оплат"],
+      "comment": "payment follow-up after classic",
+      "testability": "medium"
+    },
+    {
+      "id": "followup_classic_contacts",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "а адрес?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first"],
+      "must_contain": ["адрес", "контакт"],
+      "comment": "contacts cross-topic follow-up",
+      "testability": "medium"
+    },
+    {
+      "id": "followup_negative_veneers_price",
+      "client_id": "demo",
+      "history": [{"question": "Расскажите про классическую имплантацию"}],
+      "question": "сколько стоят виниры?",
+      "expected_route_any": ["retrieval_chunk", "catalog_md_first", "price_lookup"],
+      "must_contain": ["винир"],
+      "must_not_contain": ["классическ"],
+      "comment": "explicit new service — not classic warranty follow-up",
+      "testability": "medium"
+    }
+  ]
+}

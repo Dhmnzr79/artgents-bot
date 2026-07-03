@@ -1,0 +1,30 @@
+# clients/demo/features.yaml — демо для artgents.ru (embed) + demo.bot.artgents.ru (API на VPS)
+leads:
+  enabled: false
+  mode: demo_stub
+
+admin:
+  enabled: false
+
+postgres_events:
+  enabled: false
+
+guide_router:
+  enabled: false
+
+consult_nudge:
+  enabled: true
+
+situation:
+  enabled: true
+
+messaging:
+  free_consultation: true
+
+ingress:
+  strict: true
+
+# Stage 5a: deterministic numeric fact safety (demo only until eval green)
+verifier_gate:
+  numeric_fact:
+    enabled: true

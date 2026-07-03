@@ -1,37 +1,235 @@
 # Tech Debt
 
-Здесь фиксируются временные решения, компромиссы и места, которые могут помешать масштабированию.
+Открытый долг. Runtime: **`CURRENT_ARCHITECTURE.md`**. Ops / prod: **`MULTICLIENT.md`**.
 
-## SQLite + single worker
+---
 
-Сейчас проект работает через SQLite и один worker gunicorn. Это допустимо для demo-prod одного клиента, но может стать ограничением для мультиклиентности и нагрузки.
+## До prod (M5)
 
-Решение на будущее:
-- оценить переход на PostgreSQL;
-- продумать миграции;
-- отдельно хранить usage, sessions, leads, tenants.
+| Задача | Примечание |
+|--------|------------|
+| **Freeze pack cesi / nikadent** | до отмашки владельца; вся продуктовая работа — **только `clients/demo/`** |
+| VPS + Caddy + wildcard `*.bot.artgents.ru` | один bot-сервис |
+| Smoke 10–20 вопросов на клиента | цена, врач, контакты, lead |
+| `allowed_origins` — реальные домены сайтов клиник | не только bot-поддомены |
+| Контент nikadent / финализация cesi | `NOT_PROD.md` в pack |
+| `demo_video.mp4` в demo `video_catalog.yaml` | placeholder |
 
-## Нет полноценной multitenant-изоляции
+---
 
-Сейчас проект ориентирован на одного клиента/default. Будущая мультиклиентность требует аккуратной изоляции данных, контента, логов, тарифов и настроек.
+## Runtime / код
 
-Решение на будущее:
-- clients/{client_id};
-- tenant config;
-- отдельные индексы/данные;
-- usage tracking по client_id.
+| Задача | Направление | Phase |
+|--------|-------------|-------|
+| **Stage 1.5 routing shims** (см. блок ниже) | planner-lite + aspect metadata; удалить после этапов 2–4 | **1.5 → 4** |
+| Карта маршрутов | `docs/ROUTING_MAP.md` | **2 ✓** |
+| Smoke routing guards + `meta.service_route` | `evals/v5/e2e_smoke.json`, runner | **3 ✓** |
+| `orchestration/route_guards.py` | pre-Resolver guards | **3 ✓** |
+| `orchestration/ask_turn.py` + price/catalog/retrieval flows | post-Resolver | **3 ✓** |
+| `pre_resolver_turn` + `resolver_turn` + `lead_flow` | pre-Resolver + Resolver | **3 ✓** |
+| `finalize_turn.py`; slim `app.py` | dispatch остаётся в `app.py` | **3 ✓** |
+| Legacy `classify_intent` только safety-net / `RESOLVER_OFF` | `resolver.resolve_with_fallback` | **3 ✓** |
+| Smoke multiclient (`client_id` per case) | cesi, nikadent contacts | **3 ✓** |
+| `pending_followup_ref` / guide_router | после стабильного routing | **4** |
+| **`pick_relevant_offer` / `offer` в ответе** | заглушка; promo через `promo_note` в answer slots | **2 частично** |
+| **PriceBook v2 — остаток** | MVP 3.5a–3.5d ✅; детали — § PriceBook v2 ниже | **3.5 → 4** — см. `PRICEBOOK_V2.md` |
+| **`price_concern` + протезирование:** каталог матчится, `concern_ref` пуст → `concern_default` на имплантационный cost-FAQ | контент `concern_ref` в catalog **или** fallback в A3 (`build_price_concern_payload` / topic) | **3** |
+| **Lead flow v2** | Расширение gray-zone LLM (few-shot / eval на длинном хвосте отмен) | low |
+| **Follow-up compatibility** | ✅ MVP 4a: `follow_up_rewrite`, `compatibility_guard`, `last_subject`, `follow_up_mode`. Осталось: flash rewrite gray zone; optional `aspect_routing.yaml`; **planner `aspects` ← vague `attribute_followup`** (сейчас «А долго?» → `overview` в planner, `duration` в detector) | **4** — optional |
+| **Price scope router** | ✅ MVP `core/price_scope.py`: mostly **blocklist** по `default_unit` из pricebook (one_tooth vs jaw vs protocol) + group_overview; catalog match внутри scope. **Next:** явные `allowed_service_ids` / `patient_scope` в pricebook schema для multiclient | **3.5** |
+| **Patient situation router** | ✅ Slice 1–4 + **Slice 5 playbook** (`patient_options_overview`, demo `patient_playbook.yaml`). **Next:** `one_tooth_missing` playbook, real clarify, urgent slice, LLM fallback — см. § Patient situation | **5** |
+| **Metadata soft filter v2 (aspect-aware exempt)** | см. § Metadata soft filter ниже | **retrieval 2.0** |
+| **Facet arbitration live test (duration)** | `test_aspect_arbitration::test_decide_content_route_duration_facet_suppresses_catalog` — live `collect_content_candidates` + embeddings; `facet_arbitration_applied` не стабилен на текущей модели/среде (падает и на baseline без composer). Временно `@pytest.mark.xfail`; починить или замокать pool | **retrieval 2.0** |
 
-## JSONL: legacy + `bot_event` (два параллельных формата)
+---
 
-События с `kind=bot_event` добавлены для дашборда; старые `msg` вида `selection`, `Processing question` сохранены для обратной совместимости и отладки.
+## Metadata soft filter v2 (retrieval 2.0)
 
-Решение на будущее: выгрузка `bot_event` в Postgres (`bot_events`), сжатие/ротация по политике хранения.
+**Контекст (2026-06):** в `core/candidate_builder.py` soft filter по `service_topic` режет только **`doc_type=service`** с чужим `topic` (при высокой confidence resolver'а, fail-open). Info/faq не трогаем — иначе ломаются кросс-topic ответы (напр. «гарантия на импланты» → `clinic__info__warranty` при `service_topic=implantation`).
 
-## Evals пока ручные
+**Долг:** сделать фильтр **умнее**, без возврата к точечным guards (`if warranty → …`):
 
-Пока нет автоматического набора проверочных сценариев.
+| Направление | Суть |
+|-------------|------|
+| **Aspect-exempt** | Не вырезать info/faq/comparison, если `chunk.aspect` (или subtopic/aspect metadata) **совпадает** с `query_aspects` из planner/resolver — напр. aspect `warranty` → оставить `clinic__info__warranty` даже при topic mismatch |
+| **Единое правило** | Одна функция в `candidate_builder` (расширение `_apply_metadata_topic_soft_filter`), пороги в `routing.yaml` — не размазывать по `source_routing` / `ask_turn` |
+| **Eval** | Кейс `demo_smoke_17_warranty` + golden с cross-topic clinic info; не ослаблять ожидания ради зелёного прогона |
 
-Решение на будущее:
-- создать evals/golden_questions.md;
-- затем сделать скрипт run_evals.py;
-- проверять ответы после изменений.
+**Следующий slice:** metadata soft filter v2 (aspect-exempt); при необходимости — финальная проверка comparison в arbiter.
+
+**Сделано (Retrieval 2.0 H1–H4):** unified pool, alias channel dedup, `core/retrieval_rerank.py`, pool telemetry — `CURRENT_ARCHITECTURE.md` §4.5.
+
+**Связано:** `facet_arbitration` (arbiter), `aspect_match_boost`, tomography topic guard (Stage 1.5, см. таблицу shims).
+
+### Facet arbitration live test
+
+**Тест:** `tests/test_aspect_arbitration.py::test_decide_content_route_duration_facet_suppresses_catalog`
+
+**Симптом:** на «Сколько по времени ставят один имплант?» ожидается `facet_arbitration_applied=True` и `implantation__faq__duration`, но live pool не всегда подавляет catalog overview.
+
+**Статус:** pre-existing (падает на baseline без composer). Зависит от embeddings/retrieval, не от aspect planner.
+
+**Временно:** `@pytest.mark.xfail(strict=False)`. **Починка:** отдельная задача перед Phase 2 — mock pool или стабилизировать live retrieval; не ослаблять golden.
+
+---
+
+## Patient situation router (Slice 1 → 5)
+
+**Контекст (2026-06):** `core/patient_situation.py` — semantic business scope (kind + `patient_scope`), **не** route→file. Slice 1: detection + telemetry only.
+
+### Slice 2 — правила (не превращать в скрытые шорткаты)
+
+| Правило | Суть |
+|---------|------|
+| **No hardcode from hints** | `exclude_service_ids` / `preferred_service_ids` / `preferred_groups` в контракте — **telemetry/заготовка**. Slice 2: влияние только через `patient_scope` + `price_scope` / `default_unit` / pricebook + **soft** boost/filter в candidate pool. Запрещено: `if kind == X → service_id Y`. |
+| **Shared cues** | ✅ `core/patient_scope_cues.py` — общие regex для `price_scope` / `price_offers` / `patient_situation`. Slice 2: soft unit bias в `candidate_builder` + `merge_price_scope` (не из contract hints). |
+| **Session persistence** | ✅ Slice 3: `last_patient_situation` + `patient_situation_turn_age` + age guard; carry на vague price. **Next:** `default_one_tooth_price_service` в pricebook/client config (сейчас demo fallback `classic`). |
+| **Eval anchors** | ✅ Slice 4: `evals/v5/demo/risk.json` → `risk_ps01`…`risk_ps09`. |
+| **Options playbook** | ✅ Slice 5 (demo): `patient_playbook.yaml` = marketing priority config (strategy, roles, positioning), **не** canned copy; `patient_options_overview` → LLM. **Next:** `one_tooth_missing` playbook; CTA из `primary_cta`. |
+| **LLM fallback** | Bounded classifier по фиксированному enum kind — после стабилизации rules + eval. |
+| **Urgent slice** | `urgent_problem` + `next_best_action=urgent_booking` — **только telemetry** в Slice 1. Не подключать к `flow_handlers` / booking. Cues вроде «можно сегодня?» слишком широкие — отдельный urgent slice с ужесточёнными правилами и safety review. |
+| **Real clarify** | `should_clarify` / `clarify_question` — telemetry; реальный clarify-route — отдельный slice. |
+
+**Telemetry:** `patient_situation_*` + `patient_options_*` + clarify fields в `metadata_first_turn_details` / `request.ctx`.
+
+---
+
+## PriceBook v2 — остаток (3.5)
+
+**Статус:** MVP runtime на demo (loader + assembler + `price:*` refs). Шаги 3.5a–3.5d ✅; 3.5e ⚠️; 3.5f ❌. Спека: `PRICEBOOK_V2.md`. Архитектура: `CURRENT_ARCHITECTURE.md` §6.
+
+### Блокеры UX
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 1 | **S2 пульпит — «Что входит»** | `pulpitis.json` → followup `price_aspect/includes` + `detail_ref`. Клик не работает: assembler требует `offers` (complex), у simple их нет. Нужен путь: aspect + `detail_ref` → retrieval/md **без новой цены**. |
+| 2 | **S6 brand_group** | «Корейские импланты» — фильтра `brand_group` в маршруте нет (поле в данных есть, routing/planner — нет). |
+
+### Данные / миграция
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 3 | **Тройной источник цен** | pricebook + `price_offers.json` + `prices.json` + md-fallback при miss. Принцип P1 («суммы только в PriceBook») не закрыт. |
+| 4 | **`service_catalog.json`** | Ещё `price_ref` → pricing-md; целевой `pricebook_id` не внедрён. |
+| 5 | **Legacy `service.promo`** | Рендер `service.promo` выключен; промо должны идти через `facts.json` + `marketing.yaml` `promo_rules`. Осталось убрать legacy-поле из схемы/примеров. |
+| 6 | **Lint §9** | Нет проверки resolvable followup refs (`scripts/lint_pricebook.py`). |
+
+### Eval / тесты
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 7 | **`price_offers_golden.json`** | Ждёт legacy-формат («Точные цены», «Входит» в одном ответе). Конфликт с compact S4 (stages/includes — по кнопкам). |
+
+### Конфликты с будущими этапами
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 9 | **Этап 4 planner-lite** | Риск дубля `installment_12`: fact_refs в price-ответе + append payment_terms md. |
+| 10 | **Этап 5 verifier** | 5a numeric gate (demo) — done; 5b: `natural` facts, гарантии без ₽, другие client pack. |
+| 11 | **S5 policy** | «1 member в group → сразу S4» не реализовано. |
+
+### Demo-контент (не код)
+
+| # | Проблема | Суть |
+|---|----------|------|
+| 12 | Цифры spec vs demo | Отбеливание 15k→18k, пульпит 15k→12k — осознанная «рыба». |
+| 13 | Скуловая в `full_jaw` | Не решено (`PRICEBOOK_V2.md` §13). |
+
+**При закрытии пункта** — удалить строку из таблицы в PR.
+
+---
+
+## Observability
+
+| Задача | Направление |
+|--------|-------------|
+| Admin без PG для demo | норма (`features.yaml`) |
+| JSONL + PG параллельно | см. `DASHBOARD.md` |
+
+---
+
+## Закрыто (не возвращать)
+
+Multiclient M1–M4 локально: client packs, `data/{id}/`, `client_data_loader`, per-client session/SQLite, Host+Origin, leads email, admin token, legacy `md/` + `clients/default/` удалены.
+
+Pre-Resolver **booking LLM** для lead gate убран: lead только `explicit_booking_intent()` (regex); `booking_intent()` LLM остаётся в `policy.py` для CTA.
+
+**Answer slots + price offers (этапы 2–3, demo):** `core/answer_slots.py`, `core/price_offers.py` — см. `CURRENT_ARCHITECTURE.md` §6.
+
+Arbiter **score-margin skip** убран: при 2+ кандидатах всегда LLM arbiter.
+
+Короткий **service follow-up** (rewrite validate + arbiter guard): `core/service_followup.py` — contextual rewrite overlap, generic FAQ отсекается при активной `last_catalog_service_id`.
+
+**Retrieval 2.0 H1–H4:** unified pool, alias channel dedup, `retrieval_rerank`, pool telemetry — runtime + `CURRENT_ARCHITECTURE.md` §4.5, `ROUTING_MAP.md` § Retrieval 2.0.
+
+**Доки ↔ runtime (2026-06):** PriceBook v2 и dual price-path описаны в `CURRENT_ARCHITECTURE.md` §6, `ROUTING_MAP.md`, `MULTICLIENT.md`, `WIDGET_ANSWER_FORMAT.md`.
+
+При закрытии новой задачи — удалить строку из таблицы в PR.
+
+---
+
+## Stage 1.5 — routing shims (временный слой, не финальная архитектура)
+
+**Контекст:** implant golden **28/28** на demo достигнуты, но **не** «чистой» целевой схемой (Resolver → metadata-first → arbiter). Между этапами 1 и 2 добавлен **deterministic hint layer**: regex-сигналы, прямые маршруты на md, обход arbiter для части типов вопросов. Этапы **2–3** (answer slots, price offers) сделаны на demo; shims **ещё в коде** — замена в этапе 4 (planner-lite + aspect).
+
+### Что считать продуктовой логикой (оставить, позже обобщить)
+
+| Правка | Где | Замена в целевой архитектуре |
+|--------|-----|------------------------------|
+| Commercial vs `price_concern` | `COMMERCIAL_INFO_RE`, `_lookup_intent_by_rules`, `resolver_turn` | `aspect` + `route_intent`; рассрочка / «что входит» / «под ключ» / оценка по снимку — content/commercial facet, не concern |
+| Comparison signal | `COMPARISON_QUERY_RE` → `query_mode=comparison` | aspect/query-mode signal; не «фраза → файл» |
+| Алиасы в client pack | `clients/{id}/md`, `service_catalog.json` | основной путь doc selection; не единственный |
+
+### Временные shims (удалить после этапов 2–4)
+
+| Shim | Где | Риск |
+|------|-----|------|
+| `try_a3_catalog_md_direct` | `orchestration/catalog_flow.py` | жёсткий список `consultation` / `steps` / `temporary_teeth` / `methods_overview` / `tooth_one_day`; **обход arbiter** |
+| Regex → конкретный md | `STEPS_VISITS`, `TEMPORARY_TEETH`, `CONSULTATION`, `IMPLANTATION_WHAT_IS`, `TREATMENT_SEQUENCE`, `PERMANENT_CROWN_WHY_WAIT` в `source_routing.py` | «если фраза похожа на X → файл Y» |
+| Tomography topic guard | ~~`source_routing._catalog_match_blocked_for_topic`~~ | **снят** `571f717+`: `core/catalog_match.py` — channel-aware containment + topic tie-break; tomography только при exact/strong match (КТ в вопросе) |
+| Comparison `query_mode` override | `resolver_turn.py` + skip A3 catalog при comparison | дублирует resolver, если golden не доведён |
+| Сужение regex под golden | напр. `TEMPORARY_TEETH_QUERY_RE` после ложного q23 | **опасно:** словесные подборы под eval, не под живой диалог |
+
+**Цель замены:** `core/answer_planner.py` + **`aspect`** / subject metadata (boost/filter, не hard route) + session `last_subject` / `last_aspect`. См. `CURRENT_ARCHITECTURE.md` § Planner-lite.
+
+**Правило на этапы 2–4:** не добавлять новые **direct regex → doc** маршруты без крайней необходимости; новые словесные сигналы — **флаг плана / aspect**, не `ref` на md. Этап 4 planner-lite должен **поглотить** эти shims.
+
+**Файлы:** `config.py`, `source_routing.py`, `orchestration/resolver_turn.py`, `orchestration/catalog_flow.py`, `orchestration/ask_turn.py`, `query_selector.py`.
+
+**Freeze (2026-06):** новые **regex → конкретный md** в общем коде **запрещены** до снятия shims (замена: aliases + aspect boost + catalog). Исключение — явная задача в PR с записью в таблицу снятия ниже.
+
+### Golden §2.1 → shim → aspect → pack (demo)
+
+План снятия Stage 1.5 для `evals/v5/demo/golden.json` §2.1 (14 кейсов). Связка: `aspect` в corpus + soft boost в `candidate_builder`, без hard route (таблица ниже).
+
+| golden_ref | Вопрос (кратко) | Временный shim (код) | Aspect (planner) | Целевой doc / route | Pack (aliases / catalog) |
+|------------|-----------------|---------------------|------------------|---------------------|--------------------------|
+| 1 | Что такое имплантация | `IMPLANTATION_WHAT_IS_RE` → methods_overview; `_DIRECT_CATALOG` | `overview` | `implantation__info__methods_overview` | alias «что такое имплантация зубов» ✅ |
+| 2 | Как проходит | `STEPS_VISITS` (частично) | `stages` | `implantation__info__steps` | aliases на steps ✅ |
+| 3–4 | Сроки / время в кресле | — | `duration` | `implantation__faq__duration` | aliases duration ✅ |
+| 5 | Когда коронка | `TEMPORARY_TEETH` (частично) | `duration` | `temporary_teeth` / duration / aftercare | alias на temporary_teeth ✅ |
+| 6 | Почему не постоянная коронка сразу | `PERMANENT_CROWN_WHY_WAIT_RE` | `duration` | `tooth_one_day` | aliases tooth_one_day ✅ |
+| 7 | Зуб за один день | — | `duration` | `tooth_one_day` / `one_stage` | existing aliases |
+| 8–9 | Удаление + имплант / сроки | — | `stages` / `duration` | one_stage / extraction / comparison | h3 aliases extraction |
+| 10 | Нет зуба 8 лет | — | `overview` | `bone_graft` / classic | aliases bone_graft ✅ |
+| 11 | Не ставить имплант | — | `overview` | `osseointegration` h3 | alias в md ✅ |
+| 12 | КТ перед имплантацией | tomography topic guard | `overview` | `catalog_facts` + `tomography` | facts OK при явном КТ |
+| 13 | Зачем 3D | — | `overview` | `clinic__info__technology` | aliases technology ✅ |
+| 14 | Что сначала (КТ, удаление…) | `TREATMENT_SEQUENCE_RE` | `stages` | `implantation__info__steps` | aliases steps ✅ |
+
+**Spike этапа 6 (код, без снятия shims):** `core/aspect_metadata.py`, поле `aspect` в `build_index`, `aspect_match_boost` в `routing.yaml`, boost в `apply_metadata_candidate_boosts` при `detect_aspects(q)`.
+
+**Порядок снятия shims (E1–E8):** таблица «Временные shims» выше + golden §2.1. После каждого шага: `run_demo_eval.py --suite product` + `--suite golden`.
+
+### Критерий «готово к multiclient» (routing)
+
+| # | Критерий |
+|---|----------|
+| M1 | Нет новых direct regex→md после freeze |
+| M2 | Таблица «Временные shims» — все строки закрыты или перенесены в pack-driven hints |
+| M3 | `aspect` в corpus + `aspect_match_boost` включены; индекс пересобран per client |
+| M4 | `run_demo_eval.py --suite product` и `--suite golden` green **без** shims E1–E7 |
+| M5 | `audit_client_readiness` (этап 6) для 2-й клиники — пробелы задокументированы |
+| M6 | Доки описывают retrieval 2.0 + PriceBook (**✓**); в **коде** ещё есть Stage 1.5 regex→md (таблица shims) |
+
+**Не путать с M5 prod (VPS):** таблица «До prod» выше — деплой; M1–M6 — чистота routing перед onboarding нового client pack.

@@ -1,0 +1,18 @@
+{
+  "service_id": "periodontitis",
+  "price_model": "simple",
+  "display_name": "Лечение пародонтита",
+  "tags": [],
+  "default_unit": null,
+  "price": {
+    "price_type": "from",
+    "value": 15000,
+    "currency": "RUB",
+    "note": "Комплекс терапии; точный план после диагностики дёсен"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": ["installment_12"],
+  "followups": [],
+  "cta_key": "price"
+}

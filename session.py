@@ -9,7 +9,9 @@ import uuid
 from collections import deque
 from datetime import datetime
 
-from config import DATA_DIR, MAX_IDLE_SEC, MAX_TURNS, SQLITE_PATH
+from config import MAX_IDLE_SEC, MAX_TURNS
+from core.client_config_loader import resolve_pack_client_id
+from core.client_runtime import sqlite_path_for_client
 
 PHONE_RX = re.compile(r"(?:\+7|8)?[\s\-()]?\d{3}[\s\-()]?\d{3}[\s\-()]?\d{2}[\s\-()]?\d{2}")
 YES_RX = re.compile(
@@ -21,19 +23,31 @@ YES_RX = re.compile(
 )
 
 _lock = threading.RLock()
-_conn: sqlite3.Connection | None = None
+_conns: dict[str, sqlite3.Connection] = {}
+_tls = threading.local()
+
+
+def bind_session_client(client_id: str | None) -> None:
+    """Thread-local client pack for SQLite path (set before mem_get)."""
+    _tls.client_id = resolve_pack_client_id(client_id)
+
+
+def _session_pack_id() -> str:
+    return getattr(_tls, "client_id", None) or "demo"
 
 
 def _connect() -> sqlite3.Connection:
-    global _conn
+    pack = _session_pack_id()
     with _lock:
-        if _conn is None:
-            os.makedirs(DATA_DIR, exist_ok=True)
-            _conn = sqlite3.connect(
-                SQLITE_PATH, check_same_thread=False, isolation_level=None
+        conn = _conns.get(pack)
+        if conn is None:
+            db_path = sqlite_path_for_client(pack)
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            conn = sqlite3.connect(
+                db_path, check_same_thread=False, isolation_level=None
             )
-            _conn.execute("PRAGMA journal_mode=WAL")
-            _conn.execute(
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (
                     sid TEXT PRIMARY KEY,
@@ -42,7 +56,8 @@ def _connect() -> sqlite3.Connection:
                 )
                 """
             )
-        return _conn
+            _conns[pack] = conn
+        return conn
 
 
 def _fresh_defaults() -> dict:
@@ -62,6 +77,10 @@ def _fresh_defaults() -> dict:
         "situation_pending": False,
         "situation_note": "",
         "lead_intent": "none",
+        "lead_resume_step": "",
+        "lead_return_doc_id": "",
+        "lead_interrupt_kind": "",
+        "lead_paused_answer_count": 0,
         "booking_intent_ever": False,
         "anti_spam_redirect_shown": False,
         "lead_pending_name": "",
@@ -69,9 +88,15 @@ def _fresh_defaults() -> dict:
         "topic_state": {},
         "last_content_ui_payload": None,
         "last_catalog_service_id": None,
+        "last_subject": None,
+        "last_patient_situation": None,
+        "last_aspect": None,
+        "subject_turn_age": 0,
+        "patient_situation_turn_age": 0,
         "pending_lead_offer": False,
         "user_turn_timestamps": [],
         "consult_streak": 0,
+        "nav_refs_used": [],
     }
 
 
@@ -105,10 +130,11 @@ def _now() -> float:
 
 
 def bind_client_id(session_id: str, client_id: str | None) -> None:
-    """Фиксируем client_id в SQLite-сессии (дашборд / мультиклиент позже)."""
+    """Фиксируем client_id в SQLite-сессии (дашборд / мультиклиент)."""
     cid = (client_id or "").strip()
     if not cid:
         return
+    bind_session_client(cid)
     with _lock:
         st = mem_get(session_id)
         if st.get("client_id") == cid:
@@ -145,12 +171,21 @@ def mem_get(session_id: str) -> dict:
 def mem_add_user(session_id: str, text: str) -> None:
     with _lock:
         st = mem_get(session_id)
-        st["hist"].append({"role": "user", "content": text})
+        if isinstance(st.get("last_subject"), dict) and st["last_subject"].get("service_id"):
+            st["subject_turn_age"] = int(st.get("subject_turn_age") or 0) + 1
+        if isinstance(st.get("last_patient_situation"), dict) and str(
+            st["last_patient_situation"].get("kind") or ""
+        ).strip():
+            st["patient_situation_turn_age"] = int(st.get("patient_situation_turn_age") or 0) + 1
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
         st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
         ts_list = list(st.get("user_turn_timestamps") or [])
         ts_list.append(time.time())
         st["user_turn_timestamps"] = ts_list[-50:]
+        if is_lead_context(st):
+            _persist_unlocked(session_id, st)
+            return
+        st["hist"].append({"role": "user", "content": text})
         m = PHONE_RX.search(text)
         if m:
             st["profile"]["phone"] = m.group().replace(" ", "")
@@ -176,6 +211,40 @@ def mem_context(session_id: str) -> tuple[str, dict]:
     st = mem_get(session_id)
     history = "\n".join(f"{m['role']}: {m['content']}" for m in list(st["hist"]))
     return (f"Недавний диалог:\n{history}" if history else ""), st["profile"]
+
+
+RECENT_DIALOG_MAX_MESSAGES = 6
+
+
+def recent_dialog_history(
+    session_id: str,
+    *,
+    max_messages: int = RECENT_DIALOG_MAX_MESSAGES,
+) -> str:
+    """Last N chat messages for LLM understanding (not a fact source)."""
+    if not (session_id or "").strip():
+        return ""
+    hist = list(mem_get(session_id).get("hist") or [])
+    if not hist:
+        return ""
+    tail = hist[-max(1, int(max_messages)) :]
+    lines = [
+        f"{m['role']}: {m['content']}"
+        for m in tail
+        if isinstance(m, dict) and str(m.get("content") or "").strip()
+    ]
+    return "\n".join(lines)
+
+
+def format_dialog_context_for_understanding(dialog_history: str) -> str:
+    """Prompt block: dialog context only for continuation, not facts."""
+    dctx = (dialog_history or "").strip()
+    if not dctx:
+        return ""
+    return (
+        "Контекст диалога (не источник фактов, только для понимания продолжения диалога):\n"
+        f"{dctx}\n\n"
+    )
 
 
 def mem_reset(session_id: str) -> None:
@@ -289,6 +358,15 @@ def is_active_lead_flow(session_state: dict) -> bool:
     }
 
 
+def is_lead_paused(session_state: dict) -> bool:
+    return (session_state or {}).get("lead_intent") == "paused"
+
+
+def is_lead_context(session_state: dict) -> bool:
+    """Active slot collection or paused booking — PII / side-effect guard zone."""
+    return is_active_lead_flow(session_state) or is_lead_paused(session_state)
+
+
 def _topic_state_container(st: dict) -> dict:
     ts = st.get("topic_state")
     if not isinstance(ts, dict):
@@ -333,6 +411,127 @@ def set_last_catalog_service(session_id: str, service_id: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["last_catalog_service_id"] = (service_id or "").strip() or None
+        _persist_unlocked(session_id, st)
+
+
+def get_last_subject(session_id: str) -> dict | None:
+    st = mem_get(session_id)
+    sub = st.get("last_subject")
+    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
+        return sub
+    return None
+
+
+def set_last_subject(
+    session_id: str,
+    *,
+    service_id: str,
+    topic: str,
+    label: str,
+    last_route: str = "",
+) -> None:
+    sid = (service_id or "").strip()
+    if not sid:
+        return
+    with _lock:
+        st = mem_get(session_id)
+        st["last_subject"] = {
+            "service_id": sid,
+            "topic": (topic or "").strip() or "unknown",
+            "label": (label or sid).strip(),
+            "last_route": (last_route or "").strip(),
+        }
+        st["subject_turn_age"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def get_last_patient_situation(session_id: str) -> dict | None:
+    from core.routing_loader import THRESHOLDS
+
+    st = mem_get(session_id)
+    snap = st.get("last_patient_situation")
+    if not isinstance(snap, dict) or not str(snap.get("kind") or "").strip():
+        return None
+    age = int(st.get("patient_situation_turn_age") or 0)
+    if age > int(THRESHOLDS.patient_situation.max_turn_age):
+        return None
+    return dict(snap)
+
+
+def patient_situation_turn_age(session_id: str) -> int:
+    st = mem_get(session_id)
+    return int(st.get("patient_situation_turn_age") or 0)
+
+
+def set_last_patient_situation(session_id: str, snapshot: dict) -> None:
+    kind = str((snapshot or {}).get("kind") or "").strip()
+    if not kind or kind == "unknown":
+        return
+    with _lock:
+        st = mem_get(session_id)
+        st["last_patient_situation"] = dict(snapshot)
+        st["patient_situation_turn_age"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def clear_last_patient_situation(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("last_patient_situation") is None and int(st.get("patient_situation_turn_age") or 0) == 0:
+            return
+        st["last_patient_situation"] = None
+        st["patient_situation_turn_age"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def clear_focus_context(session_id: str) -> None:
+    """Reset dialog focus: subject, aspect, patient_situation, turn ages (4a/4b)."""
+    with _lock:
+        st = mem_get(session_id)
+        if (
+            st.get("last_subject") is None
+            and st.get("last_aspect") is None
+            and st.get("last_patient_situation") is None
+            and int(st.get("subject_turn_age") or 0) == 0
+            and int(st.get("patient_situation_turn_age") or 0) == 0
+        ):
+            return
+        st["last_subject"] = None
+        st["last_aspect"] = None
+        st["subject_turn_age"] = 0
+        st["last_patient_situation"] = None
+        st["patient_situation_turn_age"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def clear_last_subject(session_id: str) -> None:
+    clear_focus_context(session_id)
+
+
+def get_last_aspect(session_id: str) -> str | None:
+    st = mem_get(session_id)
+    raw = st.get("last_aspect")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    return None
+
+
+def set_last_aspect(session_id: str, aspect: str | None) -> None:
+    val = (aspect or "").strip().lower() or None
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("last_aspect") == val:
+            return
+        st["last_aspect"] = val
+        _persist_unlocked(session_id, st)
+
+
+def clear_last_aspect(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        if st.get("last_aspect") is None:
+            return
+        st["last_aspect"] = None
         _persist_unlocked(session_id, st)
 
 
@@ -429,6 +628,26 @@ def mark_situation_offered(session_id: str, doc_id: str) -> None:
         _persist_unlocked(session_id, st)
 
 
+def mark_nav_ref_used(session_id: str, ref: str) -> None:
+    """Track widget ref clicks so price/chunk UIs can hide already-used buttons."""
+    r = (ref or "").strip()
+    if not r:
+        return
+    with _lock:
+        st = mem_get(session_id)
+        used = [x for x in list(st.get("nav_refs_used") or []) if str(x).strip()]
+        if r in used:
+            used.remove(r)
+        used.append(r)
+        st["nav_refs_used"] = used[-12:]
+        _persist_unlocked(session_id, st)
+
+
+def get_nav_refs_used(session_id: str) -> list[str]:
+    st = mem_get(session_id)
+    return [str(x).strip() for x in list(st.get("nav_refs_used") or []) if str(x).strip()]
+
+
 def mark_suggest_ref_used(session_id: str, doc_id: str, used: bool = True) -> None:
     with _lock:
         st = mem_get(session_id)
@@ -487,7 +706,80 @@ def set_lead_intent(session_id: str, intent: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["lead_intent"] = intent
+        if intent not in {"paused", "none"}:
+            st["lead_resume_step"] = ""
+            st["lead_return_doc_id"] = ""
+            st["lead_interrupt_kind"] = ""
+        if intent == "none":
+            st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)
+
+
+def pause_lead_flow(
+    session_id: str,
+    *,
+    resume_step: str,
+    return_doc_id: str | None = None,
+    interrupt_kind: str | None = None,
+) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        already_paused = st.get("lead_intent") == "paused"
+        if not already_paused:
+            st["lead_intent"] = "paused"
+            st["lead_resume_step"] = (resume_step or "").strip()
+            st["lead_return_doc_id"] = (return_doc_id or "").strip()
+        kind = (interrupt_kind or "").strip()
+        if kind:
+            st["lead_interrupt_kind"] = kind
+        _persist_unlocked(session_id, st)
+
+
+def resume_lead_from_pause(session_id: str) -> str:
+    """Restore slot step from pause; returns new lead_intent."""
+    with _lock:
+        st = mem_get(session_id)
+        step = (st.get("lead_resume_step") or "collecting_name").strip()
+        if step not in {"collecting_name", "collecting_phone", "confirming_name"}:
+            step = "collecting_name"
+        st["lead_intent"] = step
+        st["lead_resume_step"] = ""
+        st["lead_interrupt_kind"] = ""
+        st["lead_paused_answer_count"] = 0
+        _persist_unlocked(session_id, st)
+        return step
+
+
+def exit_lead_flow(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_intent"] = "none"
+        st["lead_resume_step"] = ""
+        st["lead_return_doc_id"] = ""
+        st["lead_interrupt_kind"] = ""
+        st["lead_paused_answer_count"] = 0
+        _persist_unlocked(session_id, st)
+    clear_lead_pii(session_id)
+    clear_focus_context(session_id)
+
+
+def get_lead_paused_answer_count(session_id: str) -> int:
+    st = mem_get(session_id)
+    return int(st.get("lead_paused_answer_count") or 0)
+
+
+def increment_lead_paused_answer_count(session_id: str) -> int:
+    with _lock:
+        st = mem_get(session_id)
+        n = int(st.get("lead_paused_answer_count") or 0) + 1
+        st["lead_paused_answer_count"] = n
+        _persist_unlocked(session_id, st)
+        return n
+
+
+def get_lead_resume_step(session_id: str) -> str:
+    st = mem_get(session_id)
+    return (st.get("lead_resume_step") or "").strip()
 
 
 def mark_booking_intent_ever(session_id: str) -> None:
@@ -537,19 +829,6 @@ def get_lead_pending_name(session_id: str) -> str:
     return (st.get("lead_pending_name") or "").strip()
 
 
-# Токены, которые нельзя принимать за имя после «я …» / однословный ответ.
-_LEAD_NAME_REJECT = frozenset(
-    {
-        "боюсь", "хочу", "переживаю", "переживал", "переживала", "беспокоюсь",
-        "думаю", "знаю", "понимаю", "слышал", "слышала", "видел", "видела",
-        "устал", "устала", "устали", "надеюсь", "сомневаюсь",
-        "хотел", "хотела", "хотели", "хотелось", "узнать", "узнаю", "спрашиваю",
-        "бы", "же", "не", "тоже", "также", "просто", "очень", "уже", "ещё",
-        "еще", "пока", "только", "да", "нет", "ок", "ага", "угу",
-        "хорошо", "ладно", "спасибо", "привет", "здравствуйте", "понятно",
-        "ясно", "конечно", "извините", "простите",
-    }
-)
 
 _NAME_TOKEN_RX = re.compile(r"^[А-ЯЁA-Za-zа-яё\-]{2,40}$", re.U)
 
@@ -563,20 +842,26 @@ def _strip_lead_name_filler(s: str) -> str:
     ).strip()
 
 
+def _format_name_parts(parts: list[str]) -> str:
+    return " ".join(
+        (p[:1].upper() + p[1:].lower()) if len(p) > 1 else p.capitalize()
+        for p in parts
+    )
+
+
 def _token_ok_for_name(tok: str) -> bool:
-    t = (tok or "").strip()
-    if not t or not _NAME_TOKEN_RX.fullmatch(t):
-        return False
-    if t.lower() in _LEAD_NAME_REJECT:
-        return False
-    return True
+    from name_gate import is_plausible_name_token
+
+    return is_plausible_name_token(tok)
 
 
 def extract_name(text: str) -> str | None:
+    from name_gate import _normalize_lead_name_input, hard_reject_lead_name
+
     s0 = (text or "").strip()
-    if not s0:
+    if not s0 or hard_reject_lead_name(s0):
         return None
-    s = _strip_lead_name_filler(s0)
+    s = _strip_lead_name_filler(_normalize_lead_name_input(s0))
     if not s:
         return None
 
@@ -590,28 +875,18 @@ def extract_name(text: str) -> str | None:
         parts = m.group(1).split()
         if not parts or not all(_token_ok_for_name(p) for p in parts):
             return None
-        return " ".join(p[:1].upper() + p[1:].lower() if len(p) > 1 else p.capitalize() for p in parts)
+        return _format_name_parts(parts)
 
     m_ya = re.match(r"^я\s+([А-ЯЁA-Za-zа-яё\-]+)\s*$", s, re.I | re.U)
     if m_ya:
         tok = m_ya.group(1)
         if not _token_ok_for_name(tok):
             return None
-        t = tok
-        return (t[:1].upper() + t[1:].lower()) if len(t) > 1 else t.capitalize()
-
-    if re.fullmatch(r"[А-ЯЁA-Za-zа-яё\-]{2,40}", s, re.U):
-        if not _token_ok_for_name(s):
-            return None
-        t = s
-        return (t[:1].upper() + t[1:].lower()) if len(t) > 1 else t.capitalize()
+        return _format_name_parts([tok])
 
     parts = s.split()
-    if len(parts) == 2 and all(_token_ok_for_name(p) for p in parts):
-        return " ".join(
-            (p[:1].upper() + p[1:].lower()) if len(p) > 1 else p.capitalize()
-            for p in parts
-        )
+    if 1 <= len(parts) <= 3 and all(_token_ok_for_name(p) for p in parts):
+        return _format_name_parts(parts)
 
     return None
 
@@ -640,4 +915,21 @@ def update_profile(session_id: str, **fields) -> None:
             if v:
                 prof[k] = v
         st["profile"] = prof
+        _persist_unlocked(session_id, st)
+
+
+def clear_lead_pii(session_id: str) -> None:
+    """Drop lead-flow PII from SQLite session after submit (name/phone/situation)."""
+    with _lock:
+        st = mem_get(session_id)
+        prof = dict(st.get("profile") or {})
+        prof.pop("name", None)
+        prof.pop("phone", None)
+        st["profile"] = prof
+        st["situation_note"] = ""
+        st["lead_pending_name"] = ""
+        st["lead_resume_step"] = ""
+        st["lead_return_doc_id"] = ""
+        st["lead_interrupt_kind"] = ""
+        st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)

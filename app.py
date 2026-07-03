@@ -2,14 +2,11 @@ import os
 import re
 import sys
 import time
-import inspect
 import json
 import threading
 from datetime import datetime, timezone
 from typing import Any
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
-import numpy as np
 
 from flask import (
     Flask,
@@ -19,63 +16,23 @@ from flask import (
     send_from_directory,
     stream_with_context,
 )
-import session as session_mod
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
-from config import (
-    ANTI_SPAM_NO_INTENT_TURNS,
-    ANTI_SPAM_BURST_MESSAGES,
-    ANTI_SPAM_BURST_WINDOW_SEC,
-    CONTACTS_RE,
-    DEBUG_TOKEN,
-    DEFAULT_CLIENT_ID,
-    INPUT_MAX_CHARS,
-    PORT,
-    PRICE_CONCERN_RE,
-    PRICE_LOOKUP_RE,
-    RATE_LIMIT_MAX_PER_IP,
-    RATE_LIMIT_WINDOW_SEC,
-    resolve_client_id,
-)
+from config import DEBUG_TOKEN, PORT
+from core.client_host import resolve_request_client_id
 from contracts.ask_orchestration import AskOrchestrationResult
+from core.client_config_loader import load_widget_config, tone_to_txt_dict
+from core.origin_guard import validate_widget_origin
+from core.widget_cors import (
+    apply_widget_cors_headers,
+    widget_cors_preflight_response,
+)
 from core.routing_loader import THRESHOLDS
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
+from core.observability_pii import observability_turn_preview, observability_user_texts
 from logging_setup import LOG_FILE, emit_bot_event, get_logger, make_request_context, log_json, redact_text
-from chunk_responder import respond_from_chunk, respond_from_chunk_stream
-from flow_handlers import handle_flows, resume_active_lead_flow
-from llm import classify_intent
-from ingress_gate import (
-    build_ingress_payload,
-    classify_ingress,
-    ingress_service_route,
-)
-from contracts.ingress_route import IngressRouteResult
-from resolver import maybe_start_shadow_resolver, resolve_with_fallback
-from arbiter import decide_content_route
-from content_arbiter import ContentCandidates, collect_content_candidates
-from query_selector import (
-    compute_retrieval_scope_with_conflict_guard,
-    select_chunk_for_question,
-    select_price_service_route,
-)
-from doctors_lookup import build_doctors_list_llm_question, build_synthetic_doctors_list_chunk
-from source_routing import route_source, slim_source_route_payload
-from policy import (
-    apply_response_policy,
-    contacts_intent,
-    continuation_only_phrase,
-    continuation_without_context,
-    pick_contacts_chunk,
-)
-from retriever import (
-    alias_debug_score_for_chunk,
-    best_alias_hit_in_corpus,
-    chunk_info,
-    get_chunk_by_ref,
-    normalize_retrieval_query,
-    retrieve,
-)
+from chunk_responder import respond_from_chunk, respond_from_chunk_stream, respond_from_composer
 from session import (
     bind_client_id,
     get_topic_state,
@@ -83,35 +40,18 @@ from session import (
     mem_add_user,
     mem_get,
     is_active_lead_flow,
-    mem_reset,
     record_last_bot_payload,
-    set_last_catalog_service,
-    set_anti_spam_redirect_shown,
-    sid_from_body,
 )
-from dialog_offer import parse_lead_offer_no, parse_lead_offer_yes
-from ux_builder import (
-    build_price_clarify_payload,
-    build_price_concern_payload,
-    build_price_lookup_payload,
-    format_price_answer_from_item,
-    build_service_facts_card_payload,
-    empty_question_response,
-    internal_error_response,
-    low_score_response,
-    no_candidates_response,
-    reset_session_response,
-)
-def _is_resolver_bypassed_env() -> bool:
-    """PR #1.2: emergency v4 path — only exact ``RESOLVER_OFF=1``."""
-    return os.environ.get("RESOLVER_OFF") == "1"
-
-
-def _verifier_trace_flat(v: Any) -> dict[str, Any]:
-    """Поля A7 для bot_event details (без лишних ключей)."""
-    if not isinstance(v, dict):
-        return {}
-    return {k: val for k, val in v.items() if str(k).startswith("verifier_")}
+from orchestration.ask_turn import orchestrate_routing_after_resolver
+from orchestration.helpers import get_last_content_ui_payload_compat
+from orchestration.lead_flow import build_service_payload, lead_flow_orchestration_result
+from orchestration.policy_compat import apply_response_policy_compat
+from orchestration.finalize_turn import finalize_ask
+from orchestration.pre_resolver_turn import run_pre_resolver_turn
+from orchestration.resolver_turn import run_resolver_turn
+from orchestration.route_guards import resolve_client_ip
+from policy import apply_ui_source_policy
+from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
 
 
 def _enqueue_v5_resolver_trace(
@@ -147,151 +87,51 @@ def _enqueue_v5_resolver_trace(
 app = Flask(__name__, static_folder="static")
 logger = get_logger("bot")
 APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
-_APPLY_POLICY_PARAMS = inspect.signature(apply_response_policy).parameters
 init_pg_sink(logger)
-TXT = {
-    "lead_name_prompt": "Хорошо, помогу с записью. Как к вам можно обращаться?",
-    "lead_name_retry": "Как к вам можно обращаться? Напишите, пожалуйста, имя.",
-    "lead_name_hard": "Напишите просто имя — например, Мария или Андрей.",
-    "lead_name_invalid": "Не совсем поняла — напишите просто имя, например Мария.",
-    "lead_name_confirm_tpl": "Вас зовут {name}, правильно?",
-    "lead_name_reenter": "Хорошо. Как к вам можно обращаться?",
-    "lead_phone_prompt_tpl": (
-        "{name}, оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
-        "чтобы подтвердить запись."
-    ),
-    "lead_phone_retry": "Не получилось распознать номер. Напишите в формате +7XXXXXXXXXX.",
-    "lead_submit_ok": (
-        "Спасибо! Это демо-бот: заявка никуда не ушла, звонка не будет. "
-        "В рабочем боте для клиники после телефона заявка автоматически придёт вам на почту и в CRM."
-    ),
-    "lead_submit_error": "Что-то пошло не так. Проверьте номер и попробуйте ещё раз.",
-    "situation_prompt": (
-        "Опишите коротко ситуацию — что болит, что беспокоит, или просто какой вопрос. "
-        "Врач заранее будет в курсе и это поможет при консультации"
-    ),
-    "situation_retry_short": (
-        "Напишите чуть подробнее — буквально 1–2 фразы. "
-        "Чем точнее, тем лучше врач подготовится."
-    ),
-    "situation_to_lead_name": (
-        "Спасибо, записала. Эту информацию передадим в клинику, "
-        "чтобы врач заранее понимал вашу ситуацию. Как к вам можно обращаться?"
-    ),
-    "situation_back_fallback": "Хорошо, продолжим. Задайте вопрос или выберите тему.",
-    "followup_choose_topic": "Могу рассказать про этапы или про сроки — что выбрать?",
-    "lead_offer_declined": "Хорошо. Если появятся вопросы — спрашивайте.",
-    "bare_affirmative_fallback": (
-        "Напишите, пожалуйста, ваш вопрос — так будет проще подсказать."
-    ),
-}
-GUIDED_MENU_ANSWER = (
-    "Могу коротко подсказать и помочь выбрать направление — что для вас важнее?"
-)
-CONTINUATION_CLARIFY_ANSWER = (
-    "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
-)
 
 
-def _guided_quick_replies() -> list[dict]:
-    return [
-        {"label": "Стоимость имплантации", "ref": "implantation__pricing__implants.md#korotko"},
-        {"label": "Больно ли ставить имплант?", "ref": "implantation__faq__pain.md#korotko"},
-        {"label": "Что будет на консультации?", "ref": "clinic__info__consultation.md#korotko"},
-        {"label": "Хочу записаться", "ref": "lead:booking"},
-    ]
+def _client_txt(client_id: str | None) -> dict[str, str]:
+    return tone_to_txt_dict(client_id)
 
 
-def _guided_menu_payload(sid: str, client_id: str | None) -> dict:
-    return _service_payload(
-        GUIDED_MENU_ANSWER,
-        sid,
-        client_id,
-        quick_replies=_guided_quick_replies(),
+def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
+    pmeta = payload.get("meta") or {}
+    return bool(pmeta.get("lead_flow") or pmeta.get("situation_collect"))
+
+
+def _suppress_plan_append_quick_replies(payload: dict, plan_apply_meta: dict[str, Any]) -> None:
+    from core.answer_plan_apply import payment_terms_suppress_refs
+    from core.price_answer_assembler import hide_navigated_quick_replies
+
+    meta = payload.get("meta") or {}
+    suppress_list = payment_terms_suppress_refs(
+        plan_meta={
+            "answer_plan": meta.get("answer_plan"),
+            "answer_plan_apply": plan_apply_meta,
+        },
+        doc_id=meta.get("doc_id"),
+        answer_body=str(payload.get("answer") or ""),
     )
-
-
-def _continuation_clarify_payload(sid: str, client_id: str | None) -> dict:
-    return _service_payload(
-        CONTINUATION_CLARIFY_ANSWER,
-        sid,
-        client_id,
-        quick_replies=_guided_quick_replies(),
+    if not suppress_list:
+        return
+    suppress = {str(r).strip().lower() for r in suppress_list if str(r).strip()}
+    payload["quick_replies"] = hide_navigated_quick_replies(
+        list(payload.get("quick_replies") or []),
+        exclude_refs=suppress,
     )
+    meta = payload.setdefault("meta", {})
+    if isinstance(meta.get("followups"), list):
+        meta["followups"] = hide_navigated_quick_replies(
+            list(meta.get("followups") or []),
+            exclude_refs=suppress,
+        )
 
 
-def _lead_flow_orchestration_result(
-    *,
-    q: str,
-    sid: str,
-    client_id: str | None,
-    flow_result: dict,
-    decision,
-) -> AskOrchestrationResult:
-    redirect_ref = (flow_result.get("redirect_ref") or "").strip()
-    if redirect_ref:
-        ch = get_chunk_by_ref(redirect_ref, client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(
-                kind="chunk",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=q or f"Информация из {redirect_ref}",
-                log_event="Answer generated from flow redirect_ref",
-                chunk_route="flow_redirect_ref",
-                decision_frame=_orch_decision_dump(decision),
-            )
-    return AskOrchestrationResult(
-        kind="service_reply",
-        q=q,
-        sid=sid,
-        client_id=client_id,
-        service_payload=flow_result["payload"],
-        service_doc_id=flow_result.get("doc_id"),
-        service_track_user=True,
-        service_route="lead_flow",
-        decision_frame=_orch_decision_dump(decision),
-    )
-_IP_RATE_LOCK = threading.RLock()
-_IP_RATE_BUCKETS: dict[str, deque] = {}
-_OBVIOUS_NOISE_RE = re.compile(r"^[^А-Яа-яЁёA-Za-z]{4,}$", re.U)
-_REPEATED_CHAR_RE = re.compile(r"(.)\1{5,}", re.U)
-
-
-def _get_last_content_ui_payload_compat(sid: str) -> dict | None:
-    fn = getattr(session_mod, "get_last_content_ui_payload", None)
-    if callable(fn):
-        return fn(sid)
-    return None
-
-
-def _apply_response_policy_compat(
-    payload: dict,
-    session_state: dict,
-    q: str,
-    *,
-    topic_state: dict,
-    doc_meta: dict,
-    pre_doc_turn_count: int | None,
-    session_id: str | None = None,
-    client_id: str | None = None,
-) -> dict:
-    kw: dict = {
-        "payload": payload,
-        "session_state": session_state,
-        "q": q,
-        "topic_state": topic_state,
-        "doc_meta": doc_meta,
-    }
-    if "pre_doc_turn_count" in _APPLY_POLICY_PARAMS:
-        kw["pre_doc_turn_count"] = pre_doc_turn_count
-    if "session_id" in _APPLY_POLICY_PARAMS:
-        kw["session_id"] = session_id
-    if "client_id" in _APPLY_POLICY_PARAMS:
-        kw["client_id"] = client_id
-    return apply_response_policy(**kw)
+def _stamp_service_answer_path(payload: dict, route: str | None) -> None:
+    """Telemetry only: mark which answer path produced the payload."""
+    r = (route or "").strip().lower()
+    if r in {"price_lookup", "price_concern"}:
+        payload.setdefault("meta", {})["answer_path"] = "price"
 
 
 def _service_reply(
@@ -303,12 +143,67 @@ def _service_reply(
     track_user: bool = True,
     route: str | None = None,
 ):
+    from core.answer_plan_apply import apply_answer_plan_append
+    from core.answer_packet_snapshot import build_and_publish_answer_packet
+    from core.answer_planner import answer_plan_from_ctx
     from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
+    from session import set_last_aspect
 
     reset_consult_nudge_on_route(route, sid)
-    if track_user and q:
+    if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
+    if route:
+        payload.setdefault("meta", {})["service_route"] = str(route).strip()
+    _stamp_service_answer_path(payload, route)
     r = (route or "").strip().lower()
+    plan = answer_plan_from_ctx()
+    pmeta = payload.get("meta") or {}
+    if plan is not None and r in {"price_lookup", "price_concern", "catalog_facts"}:
+        svc_id = str(pmeta.get("matched_service_id") or plan.service_id or "").strip() or None
+        plan_tail, plan_apply_meta = apply_answer_plan_append(
+            plan,
+            client_id=pmeta.get("client_id"),
+            service_id=svc_id,
+            q=q,
+            existing_append=None,
+            price_offer_meta=pmeta if isinstance(pmeta, dict) else None,
+            answer_body=str(payload.get("answer") or ""),
+        )
+        if plan_tail:
+            base = str(payload.get("answer") or "").strip()
+            if plan_tail not in base:
+                payload["answer"] = f"{base}\n\n{plan_tail}" if base else plan_tail
+        if plan.primary_aspect:
+            set_last_aspect(sid, plan.primary_aspect)
+        payload.setdefault("meta", {})["answer_plan"] = plan.model_dump()
+        packet = build_and_publish_answer_packet(
+            plan,
+            client_id=pmeta.get("client_id"),
+            route=r,
+            service_id=svc_id,
+            apply_meta=plan_apply_meta,
+        )
+        payload.setdefault("meta", {})["answer_packet"] = packet.model_dump()
+        if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
+            _suppress_plan_append_quick_replies(payload, plan_apply_meta)
+            payload.setdefault("meta", {})["answer_plan_apply"] = plan_apply_meta
+    if (
+        r in {"price_lookup", "price_concern", "catalog_facts"}
+        and not _skip_lead_pii_in_session_hist(payload)
+    ):
+        from core.follow_up_rewrite import persist_focus_from_service_turn
+
+        pmeta = payload.get("meta") or {}
+        svc_id = str(pmeta.get("matched_service_id") or "").strip() or None
+        topic = (plan.topic if plan else None) or str(pmeta.get("service_topic") or "").strip() or None
+        persist_focus_from_service_turn(
+            sid,
+            client_id=pmeta.get("client_id"),
+            matched_service_id=svc_id,
+            route=r,
+            answer=str(payload.get("answer") or ""),
+            topic=topic,
+        )
     if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
         pmeta = payload.get("meta") or {}
         record_consult_nudge_after_answer(
@@ -317,58 +212,22 @@ def _service_reply(
             pmeta.get("consult_nudge"),
             str(payload.get("answer") or ""),
         )
+    payload = apply_ui_source_policy(payload, route=route)
+    payload = normalize_policy_payload(payload)
     answer = (payload.get("answer") or "").strip()
     turn_meta = None
     if track_user and (q or "").strip():
         qs = (q or "").strip()
+        pmeta = payload.get("meta") or {}
         turn_meta = {
             "interaction": "user_message",
             "question_len": len(qs),
-            "preview": qs[:120],
+            "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
     if answer:
         mem_add_bot(sid, answer)
     return safe_jsonify(out)
-
-
-def _service_payload(
-    answer: str,
-    sid: str,
-    client_id: str | None,
-    *,
-    lead_flow: bool = False,
-    lead_step: str | None = None,
-    situation_mode: str = "normal",
-    situation_collect: bool = False,
-    booking_intent_flag: bool = False,
-    situation_back: bool = False,
-    lead_error: str | None = None,
-    quick_replies: list | None = None,
-    cta: dict | None = None,
-) -> dict:
-    meta = {"sid": sid, "client_id": client_id}
-    if lead_flow:
-        meta["lead_flow"] = True
-    if lead_step:
-        meta["lead_step"] = lead_step
-    if situation_collect:
-        meta["situation_collect"] = True
-    if booking_intent_flag:
-        meta["booking_intent"] = True
-    if situation_back:
-        meta["situation_back"] = True
-    if lead_error:
-        meta["lead_error"] = lead_error
-    return {
-        "answer": answer,
-        "quick_replies": list(quick_replies or []),
-        "cta": cta,
-        "video": None,
-        "situation": {"show": situation_mode == "pending", "mode": situation_mode},
-        "offer": None,
-        "meta": meta,
-    }
 
 
 def _to_plain(o):
@@ -393,320 +252,11 @@ def _sanitize(x):
     return _to_plain(x)
 
 
-def _is_short_contextual(q: str, st: dict) -> bool:
-    """True если запрос короткий и без явного интента — нет смысла гнать в retrieval."""
-    tokens = q.split()
-    if len(tokens) > 3:
-        return False
-    if PRICE_LOOKUP_RE.search(q) or PRICE_CONCERN_RE.search(q) or CONTACTS_RE.search(q):
-        return False
-    if parse_lead_offer_yes(q) and not bool((st or {}).get("pending_lead_offer")):
-        return True
-    if parse_lead_offer_no(q) and not bool((st or {}).get("pending_lead_offer")):
-        return True
-    # Короткие нейтральные реплики: "понятно", "спасибо", "хм", "ясно" и т.п.
-    _NEUTRAL_RX = re.compile(
-        r"^(понятно|спасибо|хм+|ясно|окей|ок|ok|интересно|угу|ага|ладно|"
-        r"хорошо|понял|поняла|ничего|неплохо|круто|отлично|супер)\W*$",
-        re.I,
-    )
-    if _NEUTRAL_RX.search(q):
-        return True
-    return False
-
-
-def _normalize_question_text(text: str) -> tuple[str, bool]:
-    q = (text or "").strip()
-    if len(q) <= INPUT_MAX_CHARS:
-        return q, False
-    return q[:INPUT_MAX_CHARS], True
-
-
 def _resolve_request_ip() -> str:
-    xff = (request.headers.get("X-Forwarded-For") or "").strip()
-    if xff:
-        return xff.split(",", 1)[0].strip() or (request.remote_addr or "unknown")
-    return request.remote_addr or "unknown"
-
-
-def _check_rate_limit(ip: str) -> bool:
-    now = time.time()
-    with _IP_RATE_LOCK:
-        q = _IP_RATE_BUCKETS.get(ip)
-        if q is None:
-            q = deque()
-            _IP_RATE_BUCKETS[ip] = q
-        threshold = now - float(RATE_LIMIT_WINDOW_SEC)
-        while q and q[0] < threshold:
-            q.popleft()
-        if len(q) >= int(RATE_LIMIT_MAX_PER_IP):
-            return False
-        q.append(now)
-        return True
-
-
-def _rate_limited_response_payload() -> dict:
-    return {
-        "answer": "Слишком много запросов за короткое время. Подождите немного и попробуйте снова.",
-        "quick_replies": [],
-        "cta": None,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {"error": "rate_limited"},
-    }
-
-
-def _is_obvious_noise(q: str) -> bool:
-    s = (q or "").strip()
-    if not s:
-        return False
-    if len(s) <= 3 and not any(ch.isalpha() for ch in s):
-        return True
-    if _OBVIOUS_NOISE_RE.fullmatch(s):
-        return True
-    if _REPEATED_CHAR_RE.search(s):
-        return True
-    return False
-
-
-def _obvious_noise_ingress_result() -> IngressRouteResult:
-    return IngressRouteResult(
-        route="hard_stop_non_target",
-        confidence=1.0,
-        reason="obvious_noise",
-        policy_key=None,
-        requested_service=None,
-        source="rule",
-        is_urgent=False,
+    return resolve_client_ip(
+        x_forwarded_for=request.headers.get("X-Forwarded-For"),
+        remote_addr=request.remote_addr,
     )
-
-
-def _norm_dup_text(q: str) -> str:
-    x = (q or "").strip().lower().replace("ё", "е")
-    x = re.sub(r"[^\w\s]", " ", x, flags=re.U)
-    x = re.sub(r"\s+", " ", x).strip()
-    return x
-
-
-def _is_duplicate_question(st: dict, q: str) -> bool:
-    qn = _norm_dup_text(q)
-    if len(qn) < 5:
-        return False
-    hist = list((st or {}).get("hist") or [])
-    last_users = [m.get("content", "") for m in hist if isinstance(m, dict) and m.get("role") == "user"]
-    if not last_users:
-        return False
-    recent = last_users[-2:]
-    return any(_norm_dup_text(x) == qn for x in recent)
-
-
-def _duplicate_payload(sid: str, client_id: str | None, snap: dict | None) -> dict:
-    quick = list((snap or {}).get("quick_replies") or [])
-    cta = (snap or {}).get("cta")
-    return {
-        "answer": "Похоже, мы это уже обсудили чуть выше. Если хотите, могу продолжить по следующему шагу.",
-        "quick_replies": quick[:2],
-        "cta": cta if isinstance(cta, dict) else None,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {"sid": sid, "client_id": client_id, "duplicate_short_circuit": True},
-    }
-
-
-def _should_soft_redirect_no_intent(st: dict) -> bool:
-    turns = int((st or {}).get("session_turn_count") or 0)
-    booking_ever = bool((st or {}).get("booking_intent_ever"))
-    shown = bool((st or {}).get("anti_spam_redirect_shown"))
-    return turns >= ANTI_SPAM_NO_INTENT_TURNS and (not booking_ever) and (not shown)
-
-
-def _is_message_burst(st: dict) -> bool:
-    ts = list((st or {}).get("user_turn_timestamps") or [])
-    if not ts:
-        return False
-    now = time.time()
-    recent = [
-        float(x)
-        for x in ts
-        if isinstance(x, (int, float)) and float(x) >= (now - ANTI_SPAM_BURST_WINDOW_SEC)
-    ]
-    return len(recent) >= ANTI_SPAM_BURST_MESSAGES
-
-
-def _soft_redirect_payload(sid: str, client_id: str | None) -> dict:
-    payload = _service_payload(
-        "Я рассказал уже довольно много о разных темах. Возможно, удобнее обсудить вашу ситуацию напрямую — консультация бесплатна, врач ответит на всё сразу.",
-        sid,
-        client_id,
-        lead_flow=False,
-        lead_step=None,
-        quick_replies=[],
-        cta={"text": "Связаться с администратором", "action": "lead"},
-    )
-    meta = payload.setdefault("meta", {})
-    meta["anti_spam_soft_redirect"] = True
-    return payload
-
-
-def _with_default_anchor(md_entry_ref: str) -> str:
-    ref = (md_entry_ref or "").strip()
-    if not ref:
-        return ""
-    return ref if "#" in ref else f"{ref}#korotko"
-
-
-def _orchestrate_price_matched_from_route(
-    *,
-    q: str,
-    sid: str,
-    client_id: str,
-    price_route: dict,
-    decision,
-) -> AskOrchestrationResult:
-    intent = str(price_route.get("intent") or "other")
-    request.ctx["effective_intent"] = str(intent)
-    service = price_route.get("service") or {}
-    service_id = str(price_route.get("matched_service_id") or "")
-    match_score = float(price_route.get("match_score") or 0.0)
-    route_source = str(price_route.get("route_source") or "catalog")
-    if service_id:
-        set_last_catalog_service(sid, service_id)
-    if intent == "price_concern":
-        concern_ref = str(service.get("concern_ref") or "").strip()
-        if concern_ref:
-            ch = get_chunk_by_ref(concern_ref, client_id=client_id)
-            if ch:
-                log_json(
-                    logger,
-                    "price_route",
-                    intent="price_concern",
-                    matched_service_id=service_id,
-                    match_score=round(match_score, 4),
-                    route_source="concern_ref",
-                    concern_ref=concern_ref,
-                    fallback_reason=None,
-                )
-                return AskOrchestrationResult(
-                    kind="chunk",
-                    q=q,
-                    sid=sid,
-                    client_id=client_id,
-                    chosen_chunk=ch,
-                    llm_question=q,
-                    log_event="Answer generated from concern_ref",
-                    chunk_route="price_concern",
-                    decision_frame=_orch_decision_dump(decision),
-                )
-        payload = build_price_concern_payload(
-            sid=sid, client_id=client_id, service_id=service_id, service=service, match_score=match_score
-        )
-        log_json(logger, "price_route", **payload.get("meta") or {})
-        return AskOrchestrationResult(
-            kind="service_reply",
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=payload,
-            service_doc_id=None,
-            service_track_user=True,
-            service_route="price_concern",
-            decision_frame=_orch_decision_dump(decision),
-        )
-    if route_source == "price_ref" and price_route.get("price_ref"):
-        ref_px = str(price_route.get("price_ref") or "").strip()
-        ch = get_chunk_by_ref(ref_px, client_id=client_id)
-        if ch:
-            log_json(
-                logger,
-                "price_route",
-                intent="price_lookup",
-                matched_service_id=service_id,
-                match_score=round(match_score, 4),
-                route_source="price_ref",
-                price_key=price_route.get("price_key"),
-                price_ref=ref_px,
-                fallback_reason=price_route.get("fallback_reason"),
-            )
-            q0 = (q or "").strip()
-            llmq = (
-                f"{q0}\n\n"
-                "Ответь по ценам только из материала ниже. "
-                "Без вступлений вроде «такая услуга есть», «стоимость составляет». "
-                "Сразу по сути, цифры только из текста."
-            )
-            if str(price_route.get("fallback_reason") or "") == "context_session":
-                svc_ctx = price_route.get("service") if isinstance(price_route.get("service"), dict) else {}
-                ttl = str(svc_ctx.get("title") or price_route.get("matched_service_id") or "").strip()
-                if ttl:
-                    llmq = (
-                        f"{llmq}\n\n"
-                        f"Контекст: пользователь продолжает вопрос об услуге «{ttl}». "
-                        "Упомяни в ответе это название или короткий синоним из каталога "
-                        "(например all-on-4), чтобы было ясно, о какой услуге речь."
-                    )
-            return AskOrchestrationResult(
-                kind="chunk",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=llmq,
-                log_event="Answer generated from price_ref",
-                chunk_route="price_lookup",
-                decision_frame=_orch_decision_dump(decision),
-            )
-    payload = build_price_lookup_payload(
-        sid=sid,
-        client_id=client_id,
-        service_id=service_id,
-        service=service,
-        match_score=match_score,
-        route_source=route_source,
-        price_key=price_route.get("price_key"),
-        price_ref=price_route.get("price_ref"),
-        price_item=price_route.get("price_item"),
-    )
-    log_json(logger, "price_route", **payload.get("meta") or {})
-    return AskOrchestrationResult(
-        kind="service_reply",
-        q=q,
-        sid=sid,
-        client_id=client_id,
-        service_payload=payload,
-        service_doc_id=None,
-        service_track_user=True,
-        service_route="price_lookup",
-        decision_frame=_orch_decision_dump(decision),
-    )
-
-
-def _load_prices_for_client(client_id: str | None) -> dict:
-    cid = (client_id or DEFAULT_CLIENT_ID).strip() or DEFAULT_CLIENT_ID
-    p = os.path.join("clients", cid, "prices.json")
-    try:
-        with open(p, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def _service_price_line_for_content(service: dict, client_id: str | None) -> str | None:
-    if not isinstance(service, dict):
-        return None
-    if str(service.get("price_display") or "").strip().lower() != "always":
-        return None
-    price_key = str(service.get("price_key") or "").strip()
-    if not price_key:
-        return None
-    prices = _load_prices_for_client(client_id)
-    price_item = prices.get(price_key) if isinstance(prices, dict) else None
-    if not isinstance(price_item, dict):
-        return None
-    title = str(service.get("title") or price_key).strip()
-    return format_price_answer_from_item(price_item, title_fallback=title)
 
 
 def safe_jsonify(payload):
@@ -721,274 +271,17 @@ def _bind_chat_ctx(sid: str, client_id: str) -> None:
     bind_client_id(sid, client_id)
 
 
-def _apply_content_retrieval_scope_ctx(
-    scope_topic_candidate: str | None,
-    q: str,
-    client_id: str,
-) -> str | None:
-    """Пороги и гарды — только через ``compute_retrieval_scope_with_conflict_guard`` (routing.yaml)."""
-    eff, gr = compute_retrieval_scope_with_conflict_guard(
-        scope_topic_candidate=scope_topic_candidate,
-        q=q,
-        client_id=client_id,
-    )
-    request.ctx["retrieval_scope_topic"] = eff
-    request.ctx["retrieval_scope_guard_reason"] = gr
-    return eff
-
-
-def _set_route(route: str | None) -> None:
-    if route:
-        request.ctx["route"] = str(route).strip()
-
-
-def _infer_route(payload: dict) -> str:
-    meta = payload.get("meta") or {}
-    if meta.get("error") == "rate_limited":
-        return "rate_limited"
-    if bool(meta.get("low_score")):
-        return "low_score_fallback"
-    if bool(meta.get("lead_flow")):
-        return "lead_flow"
-    ingress_route = str(meta.get("ingress_route") or "").strip().lower()
-    if ingress_route and ingress_route != "normal":
-        return f"ingress_{ingress_route}"
-    if bool(meta.get("handoff_filter")):
-        return "handoff_filter"
-    intent = str(meta.get("intent") or "").strip().lower()
-    if intent == "catalog_facts":
-        return "catalog_facts"
-    if intent == "offtopic":
-        return "offtopic"
-    return "retrieval_chunk"
-
-
-def _slim_content_arbiter_details(details: dict) -> dict:
-    """Remove large/PII-ish fields from arbiter telemetry (P0).
-
-    - Never store full chunk `text` inside bot_event.details.
-    """
-    if not isinstance(details, dict):
-        return {}
-    out = dict(details)
-    cands = out.get("candidates")
-    if isinstance(cands, dict):
-        c2 = dict(cands)
-        ret = c2.get("retrieval_candidate")
-        if isinstance(ret, dict):
-            r2 = dict(ret)
-            # drop full chunk if present
-            r2.pop("chunk", None)
-            c2["retrieval_candidate"] = r2
-        alias_c = c2.get("alias_candidate")
-        if isinstance(alias_c, dict):
-            a2 = dict(alias_c)
-            leader = a2.get("leader")
-            if isinstance(leader, dict):
-                # Ensure no heavy fields (text) ever leak into telemetry
-                leader2 = dict(leader)
-                leader2.pop("text", None)
-                a2["leader"] = leader2
-            # Full alias leader chunk must never be logged.
-            a2.pop("leader_chunk", None)
-            c2["alias_candidate"] = a2
-        out["candidates"] = c2
-    return out
-
-
-def finalize_ask(
-    payload: dict,
-    sid: str,
-    q: str,
-    *,
-    doc_id: str | None = None,
-    turn_meta: dict | None = None,
-    route: str | None = None,
-) -> dict:
-    record_last_bot_payload(sid, payload)
-    st = mem_get(sid)
-    meta = payload.setdefault("meta", {})
-    session_turn_count = int(st.get("session_turn_count") or 0)
-    if doc_id:
-        tstate = get_topic_state(sid, doc_id)
-        meta["turn_count"] = int(tstate.get("doc_turn_count") or 0)
-    else:
-        meta["turn_count"] = session_turn_count
-    meta["session_turn_count"] = session_turn_count
-
-    if turn_meta and turn_meta.get("interaction") == "user_message":
-        emit_bot_event(logger, "user_turn_completed", status="ok", details=turn_meta)
-    effective_route = str(route or request.ctx.get("route") or _infer_route(payload))
-    request.ctx["route"] = effective_route
-    pmeta = payload.get("meta") or {}
-    answer_text = str(payload.get("answer") or "")
-    user_text_redacted = redact_text((q or ""), max_len=8000)
-    user_preview_redacted = redact_text((q or ""), max_len=200)
-    bot_text_redacted = redact_text(answer_text, max_len=8000)
-    emit_bot_event(
-        logger,
-        "bot_reply_completed",
-        status="ok",
-        details={
-            "answer_chars": len(answer_text),
-            "doc_id": doc_id or pmeta.get("doc_id"),
-            "low_score": bool(pmeta.get("low_score")),
-            "handoff_filter": bool(pmeta.get("handoff_filter")),
-            "lead_flow": bool(pmeta.get("lead_flow")),
-            "intent": pmeta.get("intent"),
-            "meta_error": pmeta.get("error"),
-            "route": effective_route,
-            "resolver_used": bool(request.ctx.get("resolver_used")),
-            "safety_net_used": bool(request.ctx.get("safety_net_used")),
-            **(_verifier_trace_flat(request.ctx.get("verifier_turn"))),
-        },
-    )
-    if turn_meta and turn_meta.get("interaction") == "user_message":
-        t0 = request.ctx.get("turn_t0_monotonic")
-        lat_ms = None
-        if isinstance(t0, (int, float)):
-            lat_ms = max(0, int((time.monotonic() - float(t0)) * 1000))
-        emit_bot_event(
-            logger,
-            "turn_complete",
-            status="ok",
-            details={
-                "turn_number": int(meta.get("session_turn_count") or 0),
-                "user_text_redacted": user_text_redacted,
-                "user_preview_redacted": user_preview_redacted,
-                "bot_text_redacted": bot_text_redacted,
-                "intent": pmeta.get("intent"),
-                "doc_id": doc_id or pmeta.get("doc_id"),
-                "route": effective_route,
-                "low_score": bool(pmeta.get("low_score")),
-                "lead_flow": bool(pmeta.get("lead_flow")),
-                "handoff_filter": bool(pmeta.get("handoff_filter")),
-                "answer_chars": len(answer_text),
-                "latency_ms": lat_ms,
-                "fallback_reason": pmeta.get("fallback_reason"),
-                "resolver_used": bool(request.ctx.get("resolver_used")),
-                "safety_net_used": bool(request.ctx.get("safety_net_used")),
-                "retrieval_scope_topic": request.ctx.get("retrieval_scope_topic"),
-                "retrieval_scope_guard_reason": str(
-                    request.ctx.get("retrieval_scope_guard_reason") or "none"
-                ),
-                "retrieval_scope_widen_fallback": bool(
-                    request.ctx.get("retrieval_scope_widen_fallback")
-                ),
-                "legacy_intent": request.ctx.get("legacy_intent"),
-                "effective_intent": str(request.ctx.get("effective_intent") or ""),
-                "source_route_decision": request.ctx.get("source_route_decision"),
-                **_verifier_trace_flat(request.ctx.get("verifier_turn")),
-            },
-        )
-    cta = payload.get("cta")
-    if isinstance(cta, dict) and (cta.get("action") or cta.get("text")):
-        emit_bot_event(
-            logger,
-            "cta_shown",
-            details={
-                "action": str(cta.get("action") or ""),
-                "text_preview": str(cta.get("text") or "")[:120],
-            },
-        )
-    return payload
-
-
-def _log_selection(
-    *,
-    q: str,
-    chosen_chunk: dict,
-    chosen_score,
-    original_top_score,
-    rerank_applied: bool,
-):
-    chosen = chunk_info(chosen_chunk, chosen_score)
-    log_json(
-        logger,
-        "selection",
-        question=q[:200],
-        original_top_score=(
-            round(float(original_top_score), 4) if original_top_score is not None else None
-        ),
-        rerank_applied=bool(rerank_applied),
-        chosen=chosen,
-    )
-    emit_bot_event(
-        logger,
-        "retrieval_selected",
-        status="chunk",
-        details={
-            "question_preview": (q or "")[:200],
-            "original_top_score": (
-                round(float(original_top_score), 4) if original_top_score is not None else None
-            ),
-            "rerank_applied": bool(rerank_applied),
-            "chosen": chosen,
-        },
-    )
-
-
-log_json(logger, "app_start", env=os.getenv("APP_ENV"), version=os.getenv("APP_VERSION"))
+def _widget_origin_forbidden(client_id: str | None):
+    err = validate_widget_origin(client_id)
+    if not err:
+        return None
+    return safe_jsonify({"error": err, "client_id": client_id}), 403
 
 
 def _startup_check() -> None:
-    emb_path = os.path.join("data", "embeddings.npy")
-    corpus_path = os.path.join("data", "corpus.jsonl")
-    service_catalog_path = os.path.join("clients", DEFAULT_CLIENT_ID, "service_catalog.json")
-    prices_path = os.path.join("clients", DEFAULT_CLIENT_ID, "prices.json")
+    from core.startup_check import run_startup_check
 
-    if not os.path.isfile(emb_path):
-        logger.error("startup_check_failed: embeddings file is missing: %s", emb_path)
-        sys.exit(1)
-    try:
-        arr = np.load(emb_path)
-        if not isinstance(arr, np.ndarray):
-            logger.error("startup_check_failed: embeddings file is not a numpy array: %s", emb_path)
-            sys.exit(1)
-    except Exception as e:
-        logger.error("startup_check_failed: cannot read embeddings file %s: %s", emb_path, e)
-        sys.exit(1)
-
-    if not os.path.isfile(corpus_path):
-        logger.error("startup_check_failed: corpus file is missing: %s", corpus_path)
-        sys.exit(1)
-    try:
-        with open(corpus_path, "r", encoding="utf-8") as f:
-            chunks = sum(1 for line in f if line.strip())
-    except Exception as e:
-        logger.error("startup_check_failed: cannot read corpus file %s: %s", corpus_path, e)
-        sys.exit(1)
-    if chunks == 0:
-        logger.error("startup_check_failed: corpus file is empty: %s", corpus_path)
-        sys.exit(1)
-
-    if not os.path.isfile(service_catalog_path):
-        logger.error("startup_check_failed: service catalog file is missing: %s", service_catalog_path)
-        sys.exit(1)
-    try:
-        with open(service_catalog_path, "r", encoding="utf-8") as f:
-            service_catalog = json.load(f)
-        if not isinstance(service_catalog, dict):
-            logger.error("startup_check_failed: service catalog must be a JSON object: %s", service_catalog_path)
-            sys.exit(1)
-    except Exception as e:
-        logger.error("startup_check_failed: invalid service catalog file %s: %s", service_catalog_path, e)
-        sys.exit(1)
-
-    if not os.path.isfile(prices_path):
-        logger.error("startup_check_failed: prices file is missing: %s", prices_path)
-        sys.exit(1)
-    try:
-        with open(prices_path, "r", encoding="utf-8") as f:
-            prices = json.load(f)
-        if not isinstance(prices, dict):
-            logger.error("startup_check_failed: prices must be a JSON object: %s", prices_path)
-            sys.exit(1)
-    except Exception as e:
-        logger.error("startup_check_failed: invalid prices file %s: %s", prices_path, e)
-        sys.exit(1)
-
-    log_json(logger, "startup_check_ok", chunks=chunks, services=len(service_catalog))
+    run_startup_check(logger)
 
 
 _startup_check()
@@ -1000,6 +293,11 @@ def _before():
     request.ctx["path"] = request.path
     request.ctx["method"] = request.method
     request.ctx["t0"] = time.time()
+
+
+@app.before_request
+def _widget_cors_preflight():
+    return widget_cors_preflight_response()
 
 
 @app.after_request
@@ -1017,7 +315,7 @@ def _after(resp):
             "ip": request.remote_addr,
         },
     )
-    return resp
+    return apply_widget_cors_headers(resp)
 
 
 @app.get("/_debug/ping")
@@ -1030,18 +328,10 @@ def debug_ping():
 
 
 def _dashboard_guard():
-    """Локально / не-prod — без токена. В prod нужен X-Dashboard-Token или ?token= (env DASHBOARD_TOKEN или DEBUG_TOKEN)."""
-    if APP_ENV != "prod":
-        return None
-    want = (os.getenv("DASHBOARD_TOKEN") or "").strip() or DEBUG_TOKEN
-    got = (
-        request.headers.get("X-Dashboard-Token")
-        or request.args.get("token")
-        or ""
-    ).strip()
-    if got == want:
-        return None
-    return jsonify({"error": "not_found"}), 404
+    """Legacy JSONL dashboard — disabled in prod (use admin_dashboard/)."""
+    if APP_ENV == "prod":
+        return jsonify({"error": "not_found"}), 404
+    return None
 
 
 def _load_recent_bot_events(
@@ -1102,623 +392,41 @@ def dashboard_events_api():
     return jsonify(payload)
 
 
-def _ru_doctor_count_word(n: int) -> str:
-    n_abs = abs(int(n))
-    n10 = n_abs % 10
-    n100 = n_abs % 100
-    if n10 == 1 and n100 != 11:
-        return "врач"
-    if n10 in (2, 3, 4) and n100 not in (12, 13, 14):
-        return "врача"
-    return "врачей"
-
-
-def _orch_decision_dump(decision):
-    """DecisionFrame после Resolver либо None (RESOLVER_OFF / ранний выход)."""
-    return decision.model_dump() if decision is not None else None
-
-
 def _orchestrate_ask_turn(data: dict):
-    decision = None
-    client_id = resolve_client_id(data.get('client_id'))
-    if client_id is None:
-        return AskOrchestrationResult(kind='unknown_client', client_error={'error': 'unknown_client'}, http_status=403)
-    q_raw = data.get('q') or ''
-    q = (q_raw or '').strip()
-    ref = (data.get('ref') or '').strip()
-    sid = sid_from_body(data)
-    if q and q.lower() in ('/reset', '/новая'):
-        mem_reset(sid)
-        return AskOrchestrationResult(kind='reset_session', q=q, sid=sid, client_id=client_id)
-    q, truncated = _normalize_question_text(q_raw)
-    _bind_chat_ctx(sid, client_id)
-    request.ctx["retrieval_scope_topic"] = None
-    request.ctx["retrieval_scope_guard_reason"] = "none"
-    request.ctx["retrieval_scope_widen_fallback"] = False
-    request.ctx["legacy_intent"] = None
-    request.ctx["effective_intent"] = None
-    if truncated:
-        log_json(logger, 'input_truncated', sid=sid, client_id=client_id, original_len=len((q_raw or '').strip()), max_len=INPUT_MAX_CHARS)
-    ip = _resolve_request_ip()
-    if not _check_rate_limit(ip):
-        log_json(logger, 'rate_limited', sid=sid, client_id=client_id, ip=ip)
-        return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=_rate_limited_response_payload(), service_route='rate_limited', http_status=429)
-    st = mem_get(sid)
-    if _is_obvious_noise(q) and not is_active_lead_flow(st):
-        noise_res = _obvious_noise_ingress_result()
-        log_json(logger, 'obvious_noise_short_circuit', sid=sid, client_id=client_id)
-        return AskOrchestrationResult(
-            kind='service_reply',
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=build_ingress_payload(noise_res, sid=sid, client_id=client_id, question=q),
-            service_doc_id=None,
-            service_track_user=True,
-            service_route=ingress_service_route(noise_res),
-            decision_frame=_orch_decision_dump(decision),
-        )
-    ingress_skip = (
-        bool(ref)
-        or is_active_lead_flow(st)
-        or bool(st.get("situation_pending"))
+    pre = run_pre_resolver_turn(
+        data,
+        resolve_client_id=resolve_request_client_id,
+        bind_chat_ctx=_bind_chat_ctx,
+        resolve_ip=_resolve_request_ip,
+        client_txt=_client_txt,
+        service_payload=build_service_payload,
+        get_last_content_ui_payload=get_last_content_ui_payload_compat,
     )
-    if q and not ingress_skip:
-        ingress_res = classify_ingress(q, client_id=client_id, sid=sid, skip=False)
-        log_json(
-            logger,
-            'ingress_gate',
-            sid=sid,
-            client_id=client_id,
-            route=ingress_res.route,
-            reason=ingress_res.reason[:64],
-            confidence=round(float(ingress_res.confidence), 4),
-            source=ingress_res.source,
-        )
-        if ingress_res.route != 'normal':
-            return AskOrchestrationResult(
-                kind='service_reply',
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=build_ingress_payload(
-                    ingress_res, sid=sid, client_id=client_id, question=q
-                ),
-                service_doc_id=None,
-                service_track_user=True,
-                service_route=ingress_service_route(ingress_res),
-                decision_frame=_orch_decision_dump(decision),
-            )
-    flow_result = handle_flows(data=data, st=st, sid=sid, q=q, client_id=client_id, txt=TXT, service_payload=_service_payload, get_last_content_ui_payload=_get_last_content_ui_payload_compat, get_topic_state=get_topic_state)
-    if flow_result is not None:
-        return _lead_flow_orchestration_result(
-            q=q, sid=sid, client_id=client_id, flow_result=flow_result, decision=decision
-        )
-    st = mem_get(sid)
-    if is_active_lead_flow(st) and (q or "").strip():
-        flow_result = resume_active_lead_flow(
-            data=data,
-            sid=sid,
-            q=q,
-            client_id=client_id,
-            txt=TXT,
-            service_payload=_service_payload,
-        )
-        if flow_result is not None:
-            log_json(logger, "lead_flow_resume", sid=sid, client_id=client_id)
-            return _lead_flow_orchestration_result(
-                q=q, sid=sid, client_id=client_id, flow_result=flow_result, decision=decision
-            )
-    if _is_duplicate_question(st, q):
-        snap = _get_last_content_ui_payload_compat(sid)
-        log_json(logger, 'duplicate_short_circuit', sid=sid, client_id=client_id)
-        return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=_duplicate_payload(sid, client_id, snap), service_doc_id=None, service_track_user=True, service_route='duplicate_short_circuit', decision_frame=_orch_decision_dump(decision))
-    if not is_active_lead_flow(st):
-        if _is_message_burst(st):
-            set_anti_spam_redirect_shown(sid, True)
-            log_json(logger, 'anti_spam_burst_redirect', sid=sid, client_id=client_id, burst_window_sec=ANTI_SPAM_BURST_WINDOW_SEC, burst_messages=ANTI_SPAM_BURST_MESSAGES)
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=_soft_redirect_payload(sid, client_id), service_doc_id=None, service_track_user=True, service_route='booking_flow', decision_frame=_orch_decision_dump(decision))
-        if _should_soft_redirect_no_intent(st):
-            set_anti_spam_redirect_shown(sid, True)
-            log_json(logger, 'anti_spam_soft_redirect', sid=sid, client_id=client_id, session_turn_count=int(st.get('session_turn_count') or 0))
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=_soft_redirect_payload(sid, client_id), service_doc_id=None, service_track_user=True, service_route='booking_flow', decision_frame=_orch_decision_dump(decision))
-    if ref:
-        ch = get_chunk_by_ref(ref, client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(kind='chunk', q=q, sid=sid, client_id=client_id, chosen_chunk=ch, llm_question=q or f'Информация из {ref}', log_event='Answer generated from ref', chunk_route='retrieval_chunk', decision_frame=_orch_decision_dump(decision))
-    if not q:
-        return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=empty_question_response(), service_doc_id=None, service_track_user=False, service_route='error', decision_frame=_orch_decision_dump(decision))
-    if continuation_without_context(q, st):
-        log_json(logger, 'continuation_no_context', sid=sid, client_id=client_id)
-        return AskOrchestrationResult(
-            kind='service_reply',
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=_continuation_clarify_payload(sid, client_id),
-            service_doc_id=None,
-            service_track_user=True,
-            service_route='continuation_clarify',
-            decision_frame=_orch_decision_dump(decision),
-        )
-    current_doc_id = (st.get('current_doc_id') or '').strip()
-    if current_doc_id and continuation_only_phrase(q):
-        ch = get_chunk_by_ref(f'{current_doc_id}#korotko', client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(
-                kind='chunk',
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=q,
-                log_event='Answer from continuation topic fallback',
-                chunk_route='retrieval_chunk',
-                decision_frame=_orch_decision_dump(decision),
-            )
-    if _is_short_contextual(q, st):
-        if current_doc_id:
-            ch = get_chunk_by_ref(f'{current_doc_id}#korotko', client_id=client_id)
-            if ch:
-                return AskOrchestrationResult(kind='chunk', q=q, sid=sid, client_id=client_id, chosen_chunk=ch, llm_question=q, log_event='Answer from short_contextual fallback', chunk_route='retrieval_chunk', decision_frame=_orch_decision_dump(decision))
-    resolver_bypassed_env = _is_resolver_bypassed_env()
-    safety_net_used: list[str] = []
-    decision = None
-    if resolver_bypassed_env:
-        log_json(logger, 'resolver_bypassed_env', sid=sid, client_id=client_id)
-        intent = classify_intent(q, client_id=client_id, sid=sid)
-        request.ctx['legacy_intent'] = intent
-        request.ctx['effective_intent'] = str(intent)
-        request.ctx['resolver_used'] = False
-        request.ctx['safety_net_used'] = False
-        maybe_start_shadow_resolver(question=q, sid=sid, client_id=client_id)
-        _enqueue_v5_resolver_trace(decision=None, safety_net_used=[], resolver_bypassed_env=True)
-    else:
-        hist = list((st or {}).get('hist') or [])
-        with ThreadPoolExecutor(max_workers=2) as _tp:
-            fut_legacy = _tp.submit(classify_intent, q, client_id=client_id, sid=sid)
-            decision, safety_net_used = resolve_with_fallback(
-                question=q, history=hist, client_id=client_id, sid=sid, session_state=st
-            )
-            try:
-                legacy_intent = fut_legacy.result(timeout=180)
-            except Exception as ex_lr:
-                log_json(
-                    logger,
-                    'legacy_intent_parallel_failed',
-                    sid=sid,
-                    client_id=client_id,
-                    err=str(ex_lr)[:400],
-                )
-                legacy_intent = None
-        request.ctx['legacy_intent'] = legacy_intent
-        request.ctx['resolver_used'] = True
-        request.ctx['safety_net_used'] = bool(safety_net_used)
-        emit_bot_event(logger, 'v5_decision_frame_used', status='ok', details={'decision_frame': decision.model_dump(), 'safety_net_used': safety_net_used, 'resolver_bypassed_env': False})
-        _enqueue_v5_resolver_trace(decision=decision, safety_net_used=safety_net_used, resolver_bypassed_env=False)
-        ri = str(decision.route_intent or '').strip().lower()
-        if ri in ('price_lookup', 'price_concern'):
-            intent = ri
-        else:
-            intent = 'content'
-        request.ctx['effective_intent'] = str(intent)
-    # Кандидат topic от Resolver — в retrieval подставляем только после A3/guard (PR #1.4).
-    scope_topic_candidate: str | None = None
-    if decision is not None:
-        st_tp = decision.service_topic
-        if (
-            st_tp
-            and str(st_tp).strip().lower() not in ('', 'unknown')
-            and float(decision.confidence.topic or 0.0)
-            >= float(THRESHOLDS.retrieval.scope_topic_min_confidence)
-        ):
-            scope_topic_candidate = str(st_tp).strip().lower()
-        # Topic scope мешает кросс-темным и многоэтапным вопросам (см. smoke_cross_topic_extract_and_implant).
-        qm_rs = str(decision.query_mode or "").strip().lower()
-        if qm_rs in ("comparison", "process") and scope_topic_candidate is not None:
-            scope_topic_candidate = None
+    if isinstance(pre, AskOrchestrationResult):
+        return pre
 
-    qp_loc = normalize_retrieval_query(q) or (q or "")
-    if (
-        contacts_intent(qp_loc.strip()) or contacts_intent((q or '').strip())
-    ):
-        intent = 'contacts'
-        scope_topic_candidate = None
-        request.ctx['retrieval_scope_topic'] = None
-        request.ctx['retrieval_scope_guard_reason'] = 'none'
-        request.ctx['effective_intent'] = 'contacts'
-
-    if intent == 'contacts':
-        # Contacts retrieval must stay full-corpus so clinic chunks aren't dropped by stale topic scope.
-        cands = retrieve(q, topk=24, client_id=client_id, scope_topic=None)
-        picked = pick_contacts_chunk(cands)
-        if picked is None:
-            picked = get_chunk_by_ref("clinic__info__contacts.md#korotko", client_id=client_id)
-        if picked:
-            return AskOrchestrationResult(kind='chunk', q=q, sid=sid, client_id=client_id, chosen_chunk=picked, llm_question=q, log_event='Answer generated from contacts intent', chunk_route='contacts_chunk', decision_frame=_orch_decision_dump(decision))
-    md_catalog_priority_ref = None
-    md_catalog_priority_sid = None
-    md_catalog_priority_score = None
-    if intent != 'contacts':
-        sr = route_source(q, sid=sid, client_id=client_id, decision=decision, app_intent=intent)
-        srd = slim_source_route_payload(sr)
-        request.ctx['source_route_decision'] = srd
-        emit_bot_event(logger, 'source_route_decision', status='ok', details=srd)
-        if sr.source == 'doctor':
-            doc_hit = (sr.payload or {}).get('doctor') if isinstance(sr.payload, dict) else None
-            routing = str(doc_hit.get('routing') or 'doc') if isinstance(doc_hit, dict) else 'doc'
-            if routing == 'cards' and isinstance(doc_hit, dict):
-                cards_raw = doc_hit.get('cards') or []
-                if (
-                    isinstance(cards_raw, list)
-                    and len(cards_raw) >= 2
-                    and isinstance(cards_raw[0], dict)
-                    and cards_raw[0].get('name_full')
-                ):
-                    syn = build_synthetic_doctors_list_chunk(
-                        client_id=client_id, facts=cards_raw
-                    )
-                    llmq_cards = build_doctors_list_llm_question(user_question=q or '')
-                    return AskOrchestrationResult(
-                        kind='chunk',
-                        q=q,
-                        sid=sid,
-                        client_id=client_id,
-                        chosen_chunk=syn,
-                        llm_question=llmq_cards,
-                        log_event='Answer generated from doctors_lookup (LLM list)',
-                        chunk_route='doctors_list',
-                        decision_frame=_orch_decision_dump(decision),
-                    )
-            if sr.ref:
-                ch = get_chunk_by_ref(sr.ref, client_id=client_id)
-                if ch:
-                    llmq = q or f'Информация о враче ({sr.ref})'
-                    if routing == 'overview' and isinstance(doc_hit, dict):
-                        n_tot = doc_hit.get('matching_doctors_total')
-                        if isinstance(n_tot, int) and n_tot >= 4:
-                            w = _ru_doctor_count_word(n_tot)
-                            llmq = (
-                                f'{llmq}\n\nКонтекст: упомяни, что услугу делают ровно {n_tot} {w} '
-                                '(точное число), без перечисления каждого по имени. '
-                                'Предложи записаться на консультацию для подбора врача.'
-                            )
-                        elif n_tot == 0:
-                            llmq = (
-                                f'{llmq}\n\nКонтекст: узких врачей по этому направлению в карточках '
-                                'сейчас нет — ответь по общему обзору клиники из материала.'
-                            )
-                    return AskOrchestrationResult(
-                        kind='chunk',
-                        q=q,
-                        sid=sid,
-                        client_id=client_id,
-                        chosen_chunk=ch,
-                        llm_question=llmq,
-                        log_event='Answer generated from doctors_lookup',
-                        chunk_route='retrieval_chunk',
-                        decision_frame=_orch_decision_dump(decision),
-                    )
-        if sr.source == 'catalog_facts' and sr.payload:
-            svc = (sr.payload.get('service') or {}) if isinstance(sr.payload, dict) else {}
-            sid_svc = str(sr.service_id or sr.payload.get('matched_service_id') or '')
-            payload = build_service_facts_card_payload(
-                sid=sid,
-                client_id=client_id,
-                service_id=sid_svc,
-                service=svc,
-                match_score=float(sr.match_score or 0.0),
-                user_question=q,
-            )
-            price_line = _service_price_line_for_content(svc, client_id)
-            price_applied = False
-            if price_line:
-                base = (payload.get('answer') or '').strip()
-                payload['answer'] = f'{base}\n\n{price_line}' if base else price_line
-                payload.setdefault('meta', {})['price_display_applied'] = 'always'
-                price_applied = True
-            log_json(logger, 'catalog_route', route='facts', matched_service_id=sid_svc, match_score=sr.match_score)
-            if sid_svc:
-                set_last_catalog_service(sid, sid_svc)
-            emit_bot_event(
-                logger,
-                'content_arbiter_price_injection',
-                status='ok',
-                details={'selected_route': 'catalog_facts_a3', 'price_line_applied': bool(price_applied), 'matched_service_id': sid_svc},
-            )
-            return AskOrchestrationResult(
-                kind='service_reply',
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=payload,
-                service_doc_id=None,
-                service_track_user=True,
-                service_route='catalog_facts',
-                decision_frame=_orch_decision_dump(decision),
-            )
-        if sr.source == 'catalog_md' and sr.ref:
-            md_catalog_priority_ref = sr.ref
-            md_catalog_priority_sid = sr.service_id
-            md_catalog_priority_score = float(sr.match_score or 0.0)
-            if str(sr.match_method or "") == "session_fallback":
-                request.ctx["a3_catalog_md_session_hint"] = True
-        if sr.source in ('price_card', 'price_ref'):
-            pr_inner = (sr.payload or {}).get('price_route') if isinstance(sr.payload, dict) else None
-            if isinstance(pr_inner, dict):
-                return _orchestrate_price_matched_from_route(
-                    q=q, sid=sid, client_id=client_id, price_route=pr_inner, decision=decision
-                )
-        if sr.source == 'price_concern' and sr.ref:
-            ch = get_chunk_by_ref(sr.ref, client_id=client_id)
-            if ch:
-                log_json(
-                    logger,
-                    'price_route',
-                    intent='price_concern',
-                    matched_service_id=sr.service_id,
-                    match_score=round(float(sr.match_score or 0.0), 4),
-                    route_source='concern_ref',
-                    concern_ref=str(sr.concern_ref or sr.ref),
-                    fallback_reason=str(sr.match_method),
-                )
-                return AskOrchestrationResult(
-                    kind='chunk',
-                    q=q,
-                    sid=sid,
-                    client_id=client_id,
-                    chosen_chunk=ch,
-                    llm_question=q,
-                    log_event='Answer generated from concern_ref',
-                    chunk_route='price_concern',
-                    decision_frame=_orch_decision_dump(decision),
-                )
-        if sr.source == 'price_lookup_clarify' and isinstance(sr.payload, dict):
-            pr_cl = sr.payload.get('price_route')
-            if isinstance(pr_cl, dict):
-                request.ctx['effective_intent'] = 'price_lookup'
-                payload_cl = build_price_clarify_payload(
-                    sid=sid,
-                    client_id=client_id,
-                    intent=str(pr_cl.get('intent') or 'price_lookup'),
-                    fallback_reason=str(pr_cl.get('fallback_reason') or 'service_not_found'),
-                    question=q,
-                )
-                log_json(logger, 'price_route', **payload_cl.get('meta') or {})
-                return AskOrchestrationResult(
-                    kind='service_reply',
-                    q=q,
-                    sid=sid,
-                    client_id=client_id,
-                    service_payload=payload_cl,
-                    service_doc_id=None,
-                    service_track_user=True,
-                    service_route='price_lookup',
-                    decision_frame=_orch_decision_dump(decision),
-                )
-    else:
-        request.ctx['source_route_decision'] = {
-            'source': 'contacts',
-            'ref': None,
-            'service_id': None,
-            'concern_ref': None,
-            'match_method': 'none',
-            'match_score': 0.0,
-        }
-
-    if intent == 'price_lookup':
-        price_route = select_price_service_route(q, client_id=client_id, sid=sid, intent_override='price_lookup')
-        if price_route.get('mode') == 'clarify':
-            payload = build_price_clarify_payload(
-                sid=sid,
-                client_id=client_id,
-                intent=str(price_route.get('intent') or 'other'),
-                fallback_reason=str(price_route.get('fallback_reason') or 'service_not_found'),
-                question=q,
-            )
-            log_json(logger, 'price_route', **payload.get('meta') or {})
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=payload, service_doc_id=None, service_track_user=True, service_route='price_lookup', decision_frame=_orch_decision_dump(decision))
-        if price_route.get('mode') == 'matched':
-            return _orchestrate_price_matched_from_route(
-                q=q, sid=sid, client_id=client_id, price_route=price_route, decision=decision
-            )
-    if intent == 'content' or md_catalog_priority_ref:
-        # Resolver: неясный запрос — не гоняем A4/A5 shortcut на один случайный chunk (см. smoke_noise_unclear_short).
-        if (
-            decision is not None
-            and not resolver_bypassed_env
-            and str(decision.route_intent or '').strip().lower() == 'unknown'
-            and bool(decision.needs_clarification)
-            and intent == 'content'
-            and not md_catalog_priority_ref
-            and not is_active_lead_flow(mem_get(sid))
-        ):
-            return AskOrchestrationResult(
-                kind='service_reply',
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=_guided_menu_payload(sid, client_id),
-                service_doc_id=None,
-                service_track_user=True,
-                service_route='guided',
-                decision_frame=_orch_decision_dump(decision),
-            )
-        effective_scope_topic = _apply_content_retrieval_scope_ctx(
-            scope_topic_candidate,
-            q,
-            client_id,
-        )
-        cands = collect_content_candidates(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            scope_topic=effective_scope_topic,
-            catalog_md_priority_ref=md_catalog_priority_ref,
-            catalog_md_priority_service_id=md_catalog_priority_sid,
-            catalog_md_priority_match_score=md_catalog_priority_score,
-        )
-        rdbg_turn = (cands.retrieval or {}).get('debug_meta') or {}
-        if rdbg_turn.get('scope_widen_fallback'):
-            request.ctx['retrieval_scope_widen_fallback'] = True
-        sel = decide_content_route(
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            candidates=cands,
-            decision_frame=decision,
-        )
-        dm_sel = sel.debug_meta if isinstance(sel.debug_meta, dict) else {}
-        request.ctx["arbiter_status"] = dm_sel.get("arbiter_status")
-        request.ctx["arbiter_selected_ref"] = dm_sel.get("arbiter_selected_ref")
-        request.ctx["arbiter_confidence"] = dm_sel.get("arbiter_confidence")
-        request.ctx["arbiter_reason"] = dm_sel.get("arbiter_reason")
-        request.ctx["arbiter_candidate_count"] = dm_sel.get("candidate_count")
-        emit_bot_event(
-            logger,
-            "content_arbiter_selected",
-            status="ok",
-            details=_slim_content_arbiter_details(
-                {
-                    "selected_kind": sel.kind,
-                    "selected_route": sel.selected_route,
-                    "selected_doc_id": sel.selected_doc_id,
-                    "reason": sel.reason,
-                    "selected_by": dm_sel.get("selected_by"),
-                    "arbiter_status": dm_sel.get("arbiter_status"),
-                    "arbiter_selected_ref": dm_sel.get("arbiter_selected_ref"),
-                    "arbiter_confidence": dm_sel.get("arbiter_confidence"),
-                    "arbiter_reason": dm_sel.get("arbiter_reason"),
-                    "arbiter_alternative": dm_sel.get("arbiter_alternative"),
-                    "candidate_count": dm_sel.get("candidate_count"),
-                    "candidate_refs": dm_sel.get("candidate_refs"),
-                    "min_confidence": dm_sel.get("min_confidence"),
-                    "debug_meta": sel.debug_meta,
-                    "candidates": sel.candidates,
-                    "rejected_candidates": sel.rejected_candidates,
-                }
-            ),
-        )
-        if sel.selected_route == 'catalog_md_first':
-            cat = cands.catalog
-            sid_svc = str(cat.get('matched_service_id') or '')
-            md_ref = _with_default_anchor(str(cat.get('md_entry_ref') or ''))
-            service = cat.get('service') or {}
-            price_line = _service_price_line_for_content(service, client_id)
-            gen_append = (price_line or "").strip() or None
-            if md_ref:
-                ch = get_chunk_by_ref(md_ref, client_id=client_id)
-                if ch:
-                    log_json(logger, 'catalog_route', route='md_first', matched_service_id=sid_svc, match_score=cat.get('match_score'), md_entry_ref=md_ref)
-                    if sid_svc:
-                        set_last_catalog_service(sid, sid_svc)
-                    llm_q = q or f'Информация из {md_ref}'
-                    if request.ctx.get('a3_catalog_md_session_hint'):
-                        low = (q or '').lower()
-                        if 'врем' in low or 'срок' in low or 'сколько' in low:
-                            llm_q = (
-                                f'{llm_q}\n\n'
-                                'Пациент спрашивает про длительность или сроки по этой услуге. Ответь кратко и '
-                                'обязательно включи в ответ слово «срок» или «сроки» (типичный ориентир по этапам).'
-                            )
-                    emit_bot_event(logger, 'content_arbiter_price_injection', status='ok', details={'selected_route': 'catalog_md_first', 'price_line_applied': bool(gen_append), 'md_entry_ref': md_ref, 'matched_service_id': sid_svc})
-                    return AskOrchestrationResult(kind='chunk', q=q, sid=sid, client_id=client_id, chosen_chunk=ch, llm_question=llm_q, log_event='Answer generated from md_entry_ref', chunk_route='catalog_md_first', decision_frame=_orch_decision_dump(decision), generator_append_text=gen_append)
-        if sel.selected_route == 'catalog_facts':
-            cat = cands.catalog
-            svc = cat.get('service') or {}
-            sid_svc = str(cat.get('matched_service_id') or '')
-            payload = build_service_facts_card_payload(sid=sid, client_id=client_id, service_id=sid_svc, service=svc, match_score=float(cat.get('match_score') or 0.0), user_question=q)
-            price_line = _service_price_line_for_content(svc, client_id)
-            price_applied = False
-            if price_line:
-                base = (payload.get('answer') or '').strip()
-                payload['answer'] = f'{base}\n\n{price_line}' if base else price_line
-                payload.setdefault('meta', {})['price_display_applied'] = 'always'
-                price_applied = True
-            log_json(logger, 'catalog_route', route='facts', matched_service_id=sid_svc, match_score=cat.get('match_score'))
-            if sid_svc:
-                set_last_catalog_service(sid, sid_svc)
-            emit_bot_event(logger, 'content_arbiter_price_injection', status='ok', details={'selected_route': 'catalog_facts', 'price_line_applied': bool(price_applied), 'matched_service_id': sid_svc})
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=payload, service_doc_id=None, service_track_user=True, service_route='catalog_facts', decision_frame=_orch_decision_dump(decision))
-        if sel.selected_route == 'guided':
-            if is_active_lead_flow(mem_get(sid)) and (q or "").strip():
-                flow_result = resume_active_lead_flow(
-                    data=data,
-                    sid=sid,
-                    q=q,
-                    client_id=client_id,
-                    txt=TXT,
-                    service_payload=_service_payload,
-                )
-                if flow_result is not None:
-                    log_json(logger, "lead_flow_resume", sid=sid, client_id=client_id, stage="arbiter_guided")
-                    return _lead_flow_orchestration_result(
-                        q=q, sid=sid, client_id=client_id, flow_result=flow_result, decision=decision
-                    )
-            return AskOrchestrationResult(
-                kind='service_reply',
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=_guided_menu_payload(sid, client_id),
-                service_doc_id=None,
-                service_track_user=True,
-                service_route='guided',
-                decision_frame=_orch_decision_dump(decision),
-            )
-        if sel.selected_route == 'retrieval_chunk' and isinstance(sel.selected_chunk, dict):
-            dmeta = cands.retrieval.get('debug_meta') or {} if isinstance(cands.retrieval, dict) else {}
-            _log_selection(q=q, chosen_chunk=sel.selected_chunk, chosen_score=sel.selected_chunk.get('_score'), original_top_score=dmeta.get('top_score'), rerank_applied=bool((cands.retrieval or {}).get('rerank_applied')))
-            return AskOrchestrationResult(kind='chunk', q=q, sid=sid, client_id=client_id, chosen_chunk=sel.selected_chunk, llm_question=None, log_event='Answer generated', chunk_route='retrieval_chunk', decision_frame=_orch_decision_dump(decision))
-        rmode = str((cands.retrieval or {}).get('mode') or '')
-        if rmode == 'no_candidates':
-            emit_bot_event(logger, 'retrieval_fallback', status='no_candidates', details={'reason': 'no_candidates', 'question_preview': (q or '')[:200], 'top_score': ((cands.retrieval or {}).get('debug_meta') or {}).get('top_score')})
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=no_candidates_response(), service_doc_id=None, service_track_user=True, service_route='retrieval_no_candidates', decision_frame=_orch_decision_dump(decision))
-        if rmode == 'low_score':
-            dmeta = cands.retrieval.get('debug_meta') or {} if isinstance(cands.retrieval, dict) else {}
-            emit_bot_event(logger, 'retrieval_fallback', status='low_score', details={'reason': 'low_score', 'question_preview': (q or '')[:200], 'top_score': dmeta.get('top_score'), 'threshold': dmeta.get('threshold'), 'alias_score': dmeta.get('alias_score'), 'top_candidate': dmeta.get('top_candidate'), 'query_user_raw': (dmeta.get('query_user_raw') or '')[:200]})
-            st_ls = mem_get(sid)
-            pls = low_score_response(sid, client_id)
-            pls = _apply_response_policy_compat(pls, st_ls, q, topic_state={}, doc_meta={}, pre_doc_turn_count=None, session_id=sid, client_id=client_id)
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=pls, service_doc_id=None, service_track_user=True, service_route='low_score_fallback', decision_frame=_orch_decision_dump(decision))
-        return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=no_candidates_response(), service_doc_id=None, service_track_user=True, service_route='error', decision_frame=_orch_decision_dump(decision))
-    log_json(logger, 'Processing question', question=q[:100], question_length=len(q))
-    effective_scope_topic = _apply_content_retrieval_scope_ctx(
-        scope_topic_candidate,
-        q,
-        client_id,
+    resolver = run_resolver_turn(
+        q=pre.q,
+        sid=pre.sid,
+        client_id=pre.client_id,
+        st=pre.st,
+        enqueue_resolver_trace=_enqueue_v5_resolver_trace,
     )
-    selection = select_chunk_for_question(
-        q, client_id=client_id, sid=sid, scope_topic=effective_scope_topic
+
+    return orchestrate_routing_after_resolver(
+        q=pre.q,
+        sid=pre.sid,
+        client_id=pre.client_id,
+        intent=resolver.intent,
+        decision=resolver.decision,
+        scope_topic_candidate=resolver.scope_topic_candidate,
+        resolver_bypassed_env=resolver.resolver_bypassed_env,
+        data=pre.data,
+        client_txt=_client_txt,
+        service_payload=build_service_payload,
+        lead_flow_from_result=lead_flow_orchestration_result,
+        apply_response_policy=apply_response_policy_compat,
     )
-    mode = selection.get('mode')
-    dmeta = selection.get('debug_meta') or {}
-    if dmeta.get('scope_widen_fallback'):
-        request.ctx['retrieval_scope_widen_fallback'] = True
-    if mode == 'no_candidates':
-        log_json(logger, 'No candidates found', question=q[:50])
-        emit_bot_event(logger, 'retrieval_fallback', status='no_candidates', details={'reason': 'no_candidates', 'question_preview': (q or '')[:200], 'top_score': dmeta.get('top_score')})
-        return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=no_candidates_response(), service_doc_id=None, service_track_user=True, service_route='retrieval_no_candidates', decision_frame=_orch_decision_dump(decision))
-    if mode == 'low_score':
-        log_json(logger, 'low_score_fallback', **dmeta)
-        emit_bot_event(logger, 'retrieval_fallback', status='low_score', details={'reason': 'low_score', 'question_preview': (q or '')[:200], 'top_score': dmeta.get('top_score'), 'threshold': dmeta.get('threshold'), 'alias_score': dmeta.get('alias_score'), 'top_candidate': dmeta.get('top_candidate'), 'query_user_raw': (dmeta.get('query_user_raw') or '')[:200]})
-        st_ls = mem_get(sid)
-        pls = low_score_response(sid, client_id)
-        pls = _apply_response_policy_compat(pls, st_ls, q, topic_state={}, doc_meta={}, pre_doc_turn_count=None, session_id=sid, client_id=client_id)
-        return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=pls, service_doc_id=None, service_track_user=True, service_route='low_score_fallback', decision_frame=_orch_decision_dump(decision))
-    if mode == 'chunk':
-        final_chunk = selection.get('chunk')
-        if not isinstance(final_chunk, dict):
-            log_json(logger, 'selection_invalid_chunk', debug_meta=dmeta)
-            emit_bot_event(logger, 'retrieval_fallback', status='invalid_chunk', details={'reason': 'selection_invalid_chunk', 'question_preview': (q or '')[:200], 'debug_meta': dmeta})
-            return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=no_candidates_response(), service_doc_id=None, service_track_user=True, service_route='error', decision_frame=_orch_decision_dump(decision))
-        if dmeta.get('selected_by') == 'alias':
-            log_json(logger, 'alias_hit_selected', alias_score=dmeta.get('alias_score'), file=final_chunk.get('file'), h2_id=final_chunk.get('h2_id'), h3_id=final_chunk.get('h3_id'))
-        _log_selection(q=q, chosen_chunk=final_chunk, chosen_score=final_chunk.get('_score'), original_top_score=dmeta.get('top_score'), rerank_applied=bool(selection.get('rerank_applied')))
-        return AskOrchestrationResult(kind='chunk', q=q, sid=sid, client_id=client_id, chosen_chunk=final_chunk, llm_question=None, log_event='Answer generated', chunk_route='retrieval_chunk', decision_frame=_orch_decision_dump(decision))
-    log_json(logger, 'selection_unknown_mode', mode=mode, debug_meta=dmeta)
-    emit_bot_event(logger, 'retrieval_fallback', status='unknown_mode', details={'reason': 'selection_unknown_mode', 'mode': mode, 'question_preview': (q or '')[:200], 'debug_meta': dmeta})
-    return AskOrchestrationResult(kind='service_reply', q=q, sid=sid, client_id=client_id, service_payload=no_candidates_response(), service_doc_id=None, service_track_user=True, service_route='error', decision_frame=_orch_decision_dump(decision))
 
 
 def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
@@ -1739,6 +447,21 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
+    if orch_r.kind == "composer":
+        out = respond_from_composer(
+            composed_answer=str(orch_r.composed_answer or ""),
+            materialized_cards=list(orch_r.materialized_cards or []),
+            q=orch_r.q,
+            sid=orch_r.sid,
+            client_id=orch_r.client_id,
+            matched_service_id=orch_r.matched_service_id,
+            route=orch_r.chunk_route or "retrieval_chunk",
+            primary_chunk_ref=orch_r.composer_primary_chunk_ref,
+            finalize_ask=finalize_ask,
+            logger=logger,
+            log_event="Answer generated from composer",
+        )
+        return safe_jsonify(out)
     if orch_r.kind == "chunk":
         return respond_from_chunk(
             chunk=orch_r.chosen_chunk,
@@ -1752,6 +475,8 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
             log_event=orch_r.log_event,
             route=orch_r.chunk_route,
             generator_append_text=orch_r.generator_append_text,
+            price_offer_meta=orch_r.price_offer_meta,
+            matched_service_id=orch_r.matched_service_id,
         )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 
@@ -1761,7 +486,16 @@ def ask():
     request.ctx["turn_t0_monotonic"] = time.monotonic()
     try:
         data = request.get_json(force=True) or {}
+        client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
+        if client_id is None:
+            return safe_jsonify({"error": "unknown_client"}), 403
+        blocked = _widget_origin_forbidden(client_id)
+        if blocked:
+            return blocked
         orch_r = _orchestrate_ask_turn(data)
+        from core.turn_timing import mark
+
+        mark("orchestrate_done")
         q = orch_r.q or ""
         return _dispatch_orchestration_json(orch_r)
     except Exception as e:
@@ -1810,6 +544,8 @@ def _sse_typing_phase(*, kind: str, route: str | None) -> str:
     """Фаза индикатора в виджете: searching = «база знаний», writing = только «печатает»."""
     if kind == "chunk":
         return "searching"
+    if kind == "composer":
+        return "searching"
     r = (route or "").strip().lower()
     if r.startswith("ingress_"):
         return "writing"
@@ -1844,8 +580,11 @@ def _sse_service_reply(
     from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
 
     reset_consult_nudge_on_route(route, sid)
-    if track_user and q:
+    if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
+    if route:
+        payload.setdefault("meta", {})["service_route"] = str(route).strip()
+    _stamp_service_answer_path(payload, route)
     r = (route or "").strip().lower()
     if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
         pmeta = payload.get("meta") or {}
@@ -1859,16 +598,45 @@ def _sse_service_reply(
     turn_meta = None
     if track_user and (q or "").strip():
         qs = (q or "").strip()
+        pmeta = payload.get("meta") or {}
         turn_meta = {
             "interaction": "user_message",
             "question_len": len(qs),
-            "preview": qs[:120],
+            "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
     if answer:
         mem_add_bot(sid, answer)
 
     phase = _sse_typing_phase(kind="service_reply", route=route)
+
+    def _gen():
+        yield _sse_typing_line(phase)
+        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+        yield "event: done\ndata: {}\n\n"
+
+    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
+
+
+def _sse_composer_reply(
+    orch_r: AskOrchestrationResult,
+):
+    """Composer overlay via SSE: typing + ui + done (no text_delta)."""
+    out = respond_from_composer(
+        composed_answer=str(orch_r.composed_answer or ""),
+        materialized_cards=list(orch_r.materialized_cards or []),
+        q=orch_r.q,
+        sid=orch_r.sid,
+        client_id=orch_r.client_id,
+        matched_service_id=orch_r.matched_service_id,
+        route=orch_r.chunk_route or "retrieval_chunk",
+        primary_chunk_ref=orch_r.composer_primary_chunk_ref,
+        finalize_ask=finalize_ask,
+        logger=logger,
+        log_event="Answer generated from composer",
+    )
+    route = orch_r.chunk_route or "retrieval_chunk"
+    phase = _sse_typing_phase(kind="composer", route=route)
 
     def _gen():
         yield _sse_typing_line(phase)
@@ -1888,6 +656,8 @@ def _sse_chunk_response(
     log_event: str = "Answer generated",
     route: str = "retrieval_chunk",
     generator_append_text: str | None = None,
+    price_offer_meta: dict | None = None,
+    matched_service_id: str | None = None,
 ):
     """Стриминговый ответ из чанка через SSE."""
     return app.response_class(
@@ -1903,6 +673,8 @@ def _sse_chunk_response(
                 log_event=log_event,
                 route=route,
                 generator_append_text=generator_append_text,
+                price_offer_meta=price_offer_meta,
+                matched_service_id=matched_service_id,
             ),
         ),
         mimetype="text/event-stream",
@@ -1928,6 +700,8 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
+    if orch_r.kind == "composer":
+        return _sse_composer_reply(orch_r)
     if orch_r.kind == "chunk":
         return _sse_chunk_response(
             orch_r.chosen_chunk,
@@ -1938,6 +712,8 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
             log_event=orch_r.log_event,
             route=orch_r.chunk_route,
             generator_append_text=orch_r.generator_append_text,
+            price_offer_meta=orch_r.price_offer_meta,
+            matched_service_id=orch_r.matched_service_id,
         )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 
@@ -1955,7 +731,16 @@ def ask_stream():
     request.ctx["turn_t0_monotonic"] = time.monotonic()
     try:
         data = request.get_json(force=True) or {}
+        client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
+        if client_id is None:
+            return safe_jsonify({"error": "unknown_client"}), 403
+        blocked = _widget_origin_forbidden(client_id)
+        if blocked:
+            return blocked
         orch_r = _orchestrate_ask_turn(data)
+        from core.turn_timing import mark
+
+        mark("orchestrate_done")
         q = orch_r.q or ""
         return _dispatch_orchestration_sse(orch_r)
     except Exception as e:
@@ -2000,48 +785,18 @@ def dbg():
         return jsonify({"error": "not_found"}), 404
     if request.headers.get("X-Debug-Token") != DEBUG_TOKEN:
         return jsonify({"error": "unauthorized"}), 401
-    q = request.args.get("q", "")
-    client_id = resolve_client_id(request.args.get("client_id"))
-    if client_id is None:
-        return jsonify({"error": "unknown_client"}), 403
-    q_raw = (q or "").strip()
-    q_use = normalize_retrieval_query(q_raw) or q_raw
-    c = retrieve(q_raw, topk=5, client_id=client_id)
-    alias_selected, alias_score = best_alias_hit_in_corpus(
-        q_use,
-        client_id=client_id,
-        strong_threshold=float(THRESHOLDS.alias.strong_effective_min),
-    )
-    for x in c:
-        dbg = alias_debug_score_for_chunk(q_use, x, client_id=client_id)
-        x["alias_score"] = dbg.get("alias_effective")
-        x["alias_debug"] = dbg
-        x.pop("text", None)
-    alias_summary = None
-    if isinstance(alias_selected, dict):
-        alias_summary = {
-            "file": alias_selected.get("file"),
-            "h2_id": alias_selected.get("h2_id"),
-            "h3_id": alias_selected.get("h3_id"),
-            "score": alias_selected.get("_score"),
-        }
-    return jsonify(
-        {
-            "q": q,
-            "client_id": client_id,
-            "alias_score": round(float(alias_score or 0.0), 4),
-            "alias_selected": alias_summary,
-            "candidates": c,
-        }
-    )
+    return jsonify({"error": "retrieval_removed", "message": "Embed search debug endpoint is retired."}), 410
 
 
 @app.get("/api/video-catalog")
 def api_video_catalog():
     """Публичный каталог медиа по client_id для виджета (play-URL через прокси)."""
-    client_id = resolve_client_id(request.args.get("client_id"))
+    client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
     if client_id is None:
         return jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
     return jsonify({"client_id": client_id, "videos": catalog_for_widget(client_id)}), 200
 
 
@@ -2051,9 +806,13 @@ def api_media_proxy(video_key: str):
     import urllib.error
     import urllib.request
 
-    client_id = resolve_client_id(request.args.get("client_id"))
+    client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
     if client_id is None:
         return jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        body, status = blocked
+        return body, status
     external = get_external_video_src(client_id=client_id, video_key=video_key)
     if not external:
         return jsonify({"error": "not_found"}), 404
@@ -2095,6 +854,20 @@ def api_media_proxy(video_key: str):
     )
 
 
+@app.get("/api/widget-config")
+def api_widget_config():
+    client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
+    if client_id is None:
+        return jsonify({"error": "unknown_client"}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        return blocked
+    cfg = load_widget_config(client_id)
+    if not cfg:
+        return jsonify({"error": "widget_config_not_found"}), 404
+    return jsonify(cfg)
+
+
 @app.get("/static/<path:path>")
 def static_files(path):
     return send_from_directory("static", path)
@@ -2106,9 +879,13 @@ def create_lead():
         data = request.get_json(force=True) or {}
     except Exception:
         return jsonify({"ok": False, "error_code": "bad_json", "delivery": None}), 400
-    client_id = resolve_client_id(data.get("client_id"))
+    client_id = resolve_request_client_id(data.get("client_id"), host=request.host)
     if client_id is None:
         return jsonify({"ok": False, "error_code": "unknown_client", "delivery": None}), 403
+    blocked = _widget_origin_forbidden(client_id)
+    if blocked:
+        body, status = blocked
+        return body, status
     data["client_id"] = client_id
     sid = sid_from_body(data)
     data["sid"] = sid

@@ -1,0 +1,86 @@
+{
+  "baseline": 8,
+  "description": "Lead flow v2 golden (PRODUCT_WORK_PLAN stage 3.6): intent-before-slot during booking. Demo client, E2E_USE_TEST_CLIENT=1.",
+  "known_failures": [],
+  "cases": [
+    {
+      "id": "lead_active_pain_interrupt",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "Я боюсь боли",
+      "expected_route_any": ["retrieval_chunk", "price_lookup", "catalog_md_first"],
+      "must_contain": ["Если захотите продолжить запись"],
+      "comment": "pain concern during name step → content + paused overlay",
+      "testability": "strong"
+    },
+    {
+      "id": "lead_active_cancel_text",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "не хочу записываться",
+      "expected_route": "lead_cancelled",
+      "must_not_contain": ["напишите имя", "как к вам можно обращаться"],
+      "comment": "text cancel during active lead",
+      "testability": "strong"
+    },
+    {
+      "id": "lead_active_cancel_ne_hochu",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "Не хочу",
+      "expected_route": "lead_cancelled",
+      "must_not_contain": ["напишите имя", "задать вопрос"],
+      "comment": "bare ne hochu during active lead",
+      "testability": "strong"
+    },
+    {
+      "id": "lead_active_cancel_ya_peredumal",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "Я передумал",
+      "expected_route": "lead_cancelled",
+      "must_not_contain": ["номер телефона", "Передумал,"],
+      "comment": "ya peredumal must not become a name",
+      "testability": "strong"
+    },
+    {
+      "id": "lead_active_cancel_ne_comma_ya_peredumal",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "Не, я передумал",
+      "expected_route": "lead_cancelled",
+      "must_not_contain": ["номер телефона", "напишите имя"],
+      "comment": "conversational cancel → gray-zone LLM, not regex",
+      "testability": "strong"
+    },
+    {
+      "id": "lead_active_meta_pause_text",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "задать вопрос",
+      "expected_route": "lead_flow",
+      "must_contain": ["вопрос"],
+      "comment": "typed meta_pause during active lead",
+      "testability": "medium"
+    },
+    {
+      "id": "lead_active_price_interrupt",
+      "client_id": "demo",
+      "history": [{"question": "Хочу записаться"}],
+      "question": "Сколько стоит один имплант?",
+      "expected_route_any": ["price_lookup", "retrieval_chunk"],
+      "must_contain": ["Если захотите продолжить запись"],
+      "comment": "price question during lead → pause + overlay on all routes",
+      "testability": "strong"
+    },
+    {
+      "id": "lead_first_screen_no_exit_qr",
+      "client_id": "demo",
+      "question": "Хочу записаться",
+      "expected_route": "lead_flow",
+      "must_contain": ["как к вам"],
+      "comment": "first booking screen: name only, no cancel/pause buttons",
+      "testability": "medium"
+    }
+  ]
+}

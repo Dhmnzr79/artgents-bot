@@ -4,13 +4,21 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from config import (
+    COMPARISON_QUERY_RE,
+    PRICE_LOOKUP_RE,
+)
 from contracts.decision_frame import DecisionFrame
 from contracts.source_route_result import SourceRouteResult, SourceType
 
+from core.attribute_followup import is_vague_attribute_followup
+from core.dialog_focus import dialog_focus_from_ctx, dialog_focus_service_id
 from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctor_intent_probe, doctor_name_probe, doctors_lookup
 from query_selector import (
     catalog_service_session_context,
+    commercial_info_query,
+    consultation_info_query,
     match_service_from_catalog,
     price_rules_hint,
     price_lookup_allows_session_context,
@@ -19,6 +27,30 @@ from query_selector import (
 
 # Client default for price_concern without service match (see service_catalog concern_ref pattern).
 DEFAULT_PRICE_CONCERN_REF = "implantation__faq__cost.md#korotko"
+
+
+from session import get_last_subject, mem_get
+
+
+def _vague_doctor_session_hints(sid: str | None) -> tuple[str | None, str | None]:
+    focus = dialog_focus_from_ctx()
+    if focus is not None and focus.attribute == "doctor" and not focus.explicit_topic_change:
+        svc = dialog_focus_service_id(focus)
+        topic = str(focus.focus_topic or "").strip() or None
+        if svc:
+            return svc, topic
+    if not sid:
+        return None, None
+    st = mem_get(sid)
+    age = int(st.get("subject_turn_age") or 0)
+    if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
+        return None, None
+    sub = get_last_subject(sid)
+    if not isinstance(sub, dict):
+        return None, None
+    svc = str(sub.get("service_id") or "").strip() or None
+    topic = str(sub.get("topic") or "").strip() or None
+    return svc, topic
 
 
 def _short_followup(q: str, *, max_tokens: int = 8) -> bool:
@@ -42,20 +74,36 @@ def _facts_nonempty(service: dict[str, Any]) -> list[str]:
     return [str(x).strip() for x in (service.get("facts") or []) if str(x).strip()]
 
 
+def _comparison_query(q: str, decision: DecisionFrame | None) -> bool:
+    if decision is not None and str(decision.query_mode or "").strip().lower() == "comparison":
+        return True
+    return bool(COMPARISON_QUERY_RE.search(q or ""))
+
+
 def _resolve_route_intent(*, q: str, decision: DecisionFrame | None, app_intent: str) -> str:
     hint = price_rules_hint(q)
     if hint:
         return hint
+    focus = dialog_focus_from_ctx()
+    if focus is not None and focus.attribute == "price":
+        return "price_lookup"
+    ri = "unknown"
     if decision is not None:
-        return str(decision.route_intent or "unknown").strip().lower()
-    return str(app_intent or "content").strip().lower()
+        ri = str(decision.route_intent or "unknown").strip().lower()
+    else:
+        ri = str(app_intent or "content").strip().lower()
+    if ri in ("price_lookup", "price_concern") and (
+        commercial_info_query(q) or consultation_info_query(q)
+    ) and not PRICE_LOOKUP_RE.search(q or ""):
+        return "content"
+    return ri
 
 
 def _source_type_from_price_route(pr: dict[str, Any]) -> SourceType:
     if str(pr.get("intent") or "") == "price_concern":
         return "price_concern"
     rs = str(pr.get("route_source") or "")
-    if rs == "prices_json":
+    if rs in ("prices_json", "pricebook"):
         return "price_card"
     return "price_ref"
 
@@ -89,10 +137,25 @@ def route_source(
     """Run A3 routing. Caller handles `source == none` via legacy branches."""
     ri = _resolve_route_intent(q=q, decision=decision, app_intent=app_intent)
     q0 = (q or "").strip()
+    is_comparison = _comparison_query(q0, decision)
 
-    doctors_gate = doctor_name_probe(q0, client_id=client_id) or doctor_intent_probe(q0)
+    doctors_gate = (
+        doctor_name_probe(q0, client_id=client_id)
+        or doctor_intent_probe(q0)
+        or is_vague_attribute_followup(q0, "doctor")
+    )
     if doctors_gate and ri not in ("price_lookup", "price_concern"):
-        hit = doctors_lookup(q0, client_id=client_id)
+        session_svc, session_topic = (
+            _vague_doctor_session_hints(sid)
+            if is_vague_attribute_followup(q0, "doctor")
+            else (None, None)
+        )
+        hit = doctors_lookup(
+            q0,
+            client_id=client_id,
+            session_service_id=session_svc,
+            session_topic=session_topic,
+        )
         if hit:
             routing = str(hit.get("routing") or "doc")
             if routing == "cards":
@@ -117,14 +180,23 @@ def route_source(
                 match_method="doctors_lookup",
             )
 
-    match = match_service_from_catalog(q0, client_id=client_id)
+    match = match_service_from_catalog(
+        q0,
+        client_id=client_id,
+        service_topic=str(decision.service_topic or "").strip().lower() if decision else None,
+        topic_confidence=(
+            float(decision.confidence.topic or 0.0)
+            if decision is not None and decision.confidence is not None
+            else 0.0
+        ),
+    )
     score = float(match.get("match_score") or 0.0)
-    contain = score >= float(THRESHOLDS.catalog_match.containment_min)
+    contain = bool(match.get("containment_eligible"))
     mid = match.get("matched_service_id")
     svc = match.get("service") if isinstance(match.get("service"), dict) else {}
     svc = dict(svc)
 
-    if contain and ri == "content":
+    if contain and ri == "content" and not is_comparison:
         facts = _facts_nonempty(svc)
         if facts:
             return SourceRouteResult(
@@ -214,14 +286,25 @@ def route_source(
         pr = select_price_service_route(q0, client_id=client_id, sid=sid, intent_override="price_lookup")
         if pr.get("mode") == "matched":
             return _price_route_to_source_result(pr)
+        if pr.get("mode") == "unavailable":
+            mid_u = str(pr.get("matched_service_id") or "") or None
+            return SourceRouteResult(
+                source="price_unavailable",
+                service_id=mid_u,
+                ref=None,
+                concern_ref=None,
+                payload={"price_route": pr},
+                match_score=float(pr.get("match_score") or 0.0),
+                match_method="catalog_containment",
+            )
         return SourceRouteResult(
             source="price_lookup_clarify",
-            service_id=None,
+            service_id=str(pr.get("matched_service_id") or "") or None,
             ref=None,
             concern_ref=None,
             payload={"price_route": pr},
-            match_score=0.0,
-            match_method="none",
+            match_score=float(pr.get("match_score") or 0.0),
+            match_method="none" if not pr.get("matched_service_id") else "catalog_containment",
         )
 
     return SourceRouteResult(

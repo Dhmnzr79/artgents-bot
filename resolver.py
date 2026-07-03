@@ -8,13 +8,14 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from contracts.decision_frame import DecisionFrame
-from llm import client
+from config import RESOLVER_MODEL
+from llm import chat_completions_create
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage, emit_bot_event
 
 
 logger = get_logger("bot")
 
-_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or "gpt-5.4-nano"
+_MODEL = RESOLVER_MODEL
 _ON = (os.getenv("V5_RESOLVER_SHADOW_ON") or "1").strip().lower() in ("1", "true", "yes")
 _TIMEOUT_SEC = float(os.getenv("V5_RESOLVER_TIMEOUT_SEC", "8"))
 
@@ -106,17 +107,20 @@ def _call_resolver_llm(
     user = _resolver_user_content(question=question, history=history)
     raw = ""
     try:
-        resp = client.chat.completions.create(
-            model=_MODEL,
-            temperature=0,
-            max_completion_tokens=250,
-            response_format={"type": "json_object"},
-            timeout=_TIMEOUT_SEC,
-            messages=[
-                {"role": "system", "content": RESOLVER_SYSTEM_PROMPT},
-                {"role": "user", "content": user},
-            ],
-        )
+        from core.turn_timing import timed_stage
+
+        with timed_stage("resolver_ms"):
+            resp = chat_completions_create(
+                model=_MODEL,
+                temperature=0,
+                max_completion_tokens=250,
+                response_format={"type": "json_object"},
+                timeout=_TIMEOUT_SEC,
+                messages=[
+                    {"role": "system", "content": RESOLVER_SYSTEM_PROMPT},
+                    {"role": "user", "content": user},
+                ],
+            )
         log_llm_usage(logger, resp, call_type=log_call_type, model=_MODEL)
         raw = (resp.choices[0].message.content or "").strip()
         obj = json.loads(raw)
@@ -181,19 +185,20 @@ def resolve_with_fallback(
     client_id: str,
     sid: str,
     session_state: dict[str, Any] | None = None,
-) -> tuple[DecisionFrame, list[str]]:
+) -> tuple[DecisionFrame, list[str], str | None]:
     """
     Run Resolver LLM decision, apply safety-net against THRESHOLDS via classify_intent fallback.
     session_state reserved for future (context); not used in PR #1.2.
 
-    Returns (DecisionFrame, safety_net_used) where safety_net_used is a subset of
-    ["intent", "topic", "query_mode"].
+    Returns (DecisionFrame, safety_net_used, legacy_intent) where safety_net_used is a subset of
+    ["intent", "topic", "query_mode"], and legacy_intent is set only when safety-net calls classify_intent.
     """
     _ = session_state  # intentional no-op until multi-client/context wiring
     from core.routing_loader import THRESHOLDS
 
     decision = resolve_decision_frame(question=question, history=history)
     flags: list[str] = []
+    legacy_intent: str | None = None
 
     thresh = THRESHOLDS.resolver.min_confidence
     ci = float(decision.confidence.intent or 0.0)
@@ -201,6 +206,7 @@ def resolve_with_fallback(
         from llm import classify_intent
 
         old_intent = classify_intent(question, client_id=client_id, sid=sid)
+        legacy_intent = str(old_intent)
         decision.route_intent = map_classify_intent_to_route_intent(old_intent)
         flags.append("intent")
         log_json(
@@ -229,7 +235,7 @@ def resolve_with_fallback(
         flags.append("query_mode")
         log_json(logger, "safety_net_query_mode_used", sid=sid, client_id=client_id, conf=round(cm, 4))
 
-    return decision, flags
+    return decision, flags, legacy_intent
 
 
 def maybe_start_shadow_resolver(*, question: str, sid: str, client_id: str) -> None:

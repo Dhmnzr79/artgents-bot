@@ -4,12 +4,35 @@ from __future__ import annotations
 import os
 import re
 
-from config import BOOKING_INTENT_LLM_ON, BOOKING_INTENT_RE, CONTACTS_RE, PRICES_RE
+from config import (
+    BOOKING_INTENT_LLM_ON,
+    BOOKING_INTENT_RE,
+    CONTACTS_RE,
+    IMPLANT_PAIN_FAQ_FEAR_RE,
+    IMPLANT_PAIN_FAQ_IMPLANT_RE,
+    PRICE_CONCERN_RE,
+    PRICES_RE,
+)
 from core.video_catalog_loader import resolve_video_payload
 from llm import classify_booking_wants_appointment
-from retriever import chunk_doc_type
-from session import is_active_lead_flow
+from session import is_lead_context
 from dialog_offer import sanitize_ungrounded_continuation_invites
+
+
+def chunk_doc_type(ch: dict | None) -> str | None:
+    if not isinstance(ch, dict):
+        return None
+    meta = ch.get("meta") if isinstance(ch.get("meta"), dict) else {}
+    for source in (meta, ch):
+        val = source.get("doc_type") if isinstance(source, dict) else None
+        if val:
+            return str(val)
+    file_name = str(ch.get("file") or "").lower()
+    if "__contacts" in file_name or "contacts" in file_name:
+        return "contacts"
+    if "__pricing" in file_name or "pricing" in file_name or "prices" in file_name:
+        return "pricing"
+    return None
 
 
 def contacts_intent(q: str) -> bool:
@@ -18,6 +41,18 @@ def contacts_intent(q: str) -> bool:
 
 def price_intent(q: str) -> bool:
     return bool(PRICES_RE.search(q or ""))
+
+
+def implant_pain_faq_intent(q: str) -> bool:
+    """Страх/боль/анестезия при имплантации (lead_interrupt; routing — facet_arbitration)."""
+    q0 = (q or "").strip()
+    if len(q0) < 4:
+        return False
+    if price_intent(q0) or PRICE_CONCERN_RE.search(q0):
+        return False
+    return bool(
+        IMPLANT_PAIN_FAQ_IMPLANT_RE.search(q0) and IMPLANT_PAIN_FAQ_FEAR_RE.search(q0)
+    )
 
 
 _CONTINUATION_ONLY_RE = re.compile(
@@ -52,19 +87,60 @@ def continuation_without_context(q: str, st: dict | None) -> bool:
     return continuation_only_phrase(q) and not session_has_continuation_context(st)
 
 
+def _booking_intent_cache_key(q0: str, sid: str | None, client_id: str | None) -> str:
+    return f"{(client_id or '').strip()}|{(sid or '').strip()}|{q0[:600]}"
+
+
+def _booking_intent_cache() -> dict[str, bool] | None:
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context():
+            return None
+        ctx = getattr(request, "ctx", None)
+        if not isinstance(ctx, dict):
+            return None
+        raw = ctx.setdefault("booking_intent_cache", {})
+        return raw if isinstance(raw, dict) else None
+    except Exception:
+        return None
+
+
+def explicit_booking_intent(q: str) -> bool:
+    """Pre-Resolver lead gate: explicit booking phrases only (no LLM)."""
+    q0 = (q or "").strip()
+    return len(q0) >= 2 and bool(BOOKING_INTENT_RE.search(q0))
+
+
 def booking_intent(
     q: str, *, sid: str | None = None, client_id: str | None = None
 ) -> bool:
     q0 = (q or "").strip()
     if len(q0) < 2:
         return False
+
+    cache_key = _booking_intent_cache_key(q0, sid, client_id)
+    cache = _booking_intent_cache()
+    if cache is not None:
+        hit = cache.get(cache_key)
+        if hit is not None:
+            from core.turn_timing import set_flag
+
+            set_flag("booking_intent_cache_hit", True)
+            return bool(hit)
+
     if BOOKING_INTENT_RE.search(q0):
-        return True
-    if not BOOKING_INTENT_LLM_ON:
-        return False
-    return classify_booking_wants_appointment(
-        q0[:600], client_id=client_id, sid=sid or ""
-    )
+        out = True
+    elif not BOOKING_INTENT_LLM_ON:
+        out = False
+    else:
+        out = classify_booking_wants_appointment(
+            q0[:600], client_id=client_id, sid=sid or ""
+        )
+
+    if cache is not None:
+        cache[cache_key] = out
+    return out
 
 
 def pick_contacts_chunk(cands: list) -> dict | None:
@@ -96,6 +172,168 @@ def _is_topic_exhausted(doc_meta: dict, topic_state: dict) -> bool:
     return covered.issuperset(set(suggest_h3))
 
 
+UI_FAMILY_MD = "md_navigation"
+UI_FAMILY_PRICE = "price_navigation"
+UI_FAMILY_PATIENT_OPTIONS = "patient_options"
+UI_FAMILY_DOCTOR = "doctor_navigation"
+UI_FAMILY_GUIDED_FALLBACK = "guided_fallback"
+
+_UI_FAMILIES = {
+    UI_FAMILY_MD,
+    UI_FAMILY_PRICE,
+    UI_FAMILY_PATIENT_OPTIONS,
+    UI_FAMILY_DOCTOR,
+    UI_FAMILY_GUIDED_FALLBACK,
+}
+_PRICE_UI_ROUTES = {"price_lookup", "price_concern", "price_aspect", "price_clarify"}
+_PRICE_UI_INTENTS = {"price_lookup", "price_concern"}
+
+
+def _payload_route(payload: dict, route: str | None = None) -> str:
+    if route:
+        return str(route).strip().lower()
+    meta = payload.get("meta") if isinstance(payload, dict) else {}
+    if not isinstance(meta, dict):
+        return ""
+    return str(meta.get("service_route") or meta.get("orch_route") or "").strip().lower()
+
+
+def infer_ui_source_family(payload: dict, route: str | None = None) -> str:
+    """Classify which subsystem owns navigation controls for this answer."""
+    meta = payload.get("meta") if isinstance(payload, dict) else {}
+    if not isinstance(meta, dict):
+        meta = {}
+    explicit = str(meta.get("ui_source_family") or "").strip().lower()
+    if explicit in _UI_FAMILIES:
+        return explicit
+
+    route_eff = _payload_route(payload, route)
+    intent = str(meta.get("intent") or "").strip().lower()
+    if route_eff == "patient_options_overview" or meta.get("patient_options_overview_used"):
+        return UI_FAMILY_PATIENT_OPTIONS
+    if route_eff in _PRICE_UI_ROUTES or intent in _PRICE_UI_INTENTS:
+        return UI_FAMILY_PRICE
+    doc_type = str(meta.get("doc_type") or "").strip().lower()
+    doc_id = str(meta.get("doc_id") or "").strip().lower()
+    if route_eff == "doctors_list" or doc_type == "doctor" or doc_id.startswith("doctors__doctor"):
+        return UI_FAMILY_DOCTOR
+    if meta.get("low_score") or meta.get("offtopic") or meta.get("error"):
+        return UI_FAMILY_GUIDED_FALLBACK
+    return UI_FAMILY_MD
+
+
+def _is_price_ref(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
+    return str(item.get("ref") or "").strip().lower().startswith("price:")
+
+
+def _is_patient_option_ref(item: dict) -> bool:
+    if not isinstance(item, dict):
+        return False
+    return str(item.get("source") or "").strip().lower() == "patient_option"
+
+
+def _merge_policy_decision_meta(meta: dict, details: dict) -> None:
+    current = meta.get("policy_decision")
+    if not isinstance(current, dict):
+        current = {}
+    current.update(details)
+    meta["policy_decision"] = current
+
+
+def apply_ui_source_policy(payload: dict, route: str | None = None) -> dict:
+    """Keep quick replies/follow-ups owned by one UI source only."""
+    if not isinstance(payload, dict):
+        return payload
+    meta = payload.setdefault("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
+        payload["meta"] = meta
+
+    family_in = str(meta.get("ui_source_family") or "").strip().lower() or None
+    family = infer_ui_source_family(payload, route=route)
+    route_eff = _payload_route(payload, route)
+    quick_before = list(payload.get("quick_replies") or [])
+    followups_before = list(meta.get("followups") or [])
+    dropped: list[str] = []
+
+    if family == UI_FAMILY_PRICE:
+        if followups_before:
+            dropped.append("followups_non_price_ui")
+        meta["followups"] = []
+    elif family == UI_FAMILY_PATIENT_OPTIONS:
+        filtered = [item for item in quick_before if _is_patient_option_ref(item)]
+        if len(filtered) != len(quick_before):
+            dropped.append("quick_replies_non_patient_options")
+        if followups_before:
+            dropped.append("followups_non_patient_options")
+        payload["quick_replies"] = filtered
+        meta["followups"] = []
+    elif family == UI_FAMILY_DOCTOR:
+        if quick_before:
+            dropped.append("quick_replies_non_doctor_ui")
+        if followups_before:
+            dropped.append("followups_non_doctor_ui")
+        payload["quick_replies"] = []
+        meta["followups"] = []
+    elif family == UI_FAMILY_GUIDED_FALLBACK:
+        if followups_before:
+            dropped.append("followups_guided_fallback")
+        meta["followups"] = []
+
+    meta["ui_source_family"] = family
+    _merge_policy_decision_meta(
+        meta,
+        {
+            "ui_source_family_in": family_in,
+            "ui_source_family_effective": family,
+            "ui_source_route": route_eff,
+            "quick_replies_before_ui_source_policy": len(quick_before),
+            "followups_before_ui_source_policy": len(followups_before),
+            "ui_source_dropped": dropped,
+        },
+    )
+    return payload
+
+
+def _apply_cta_gate_only(
+    payload: dict,
+    session_state: dict,
+    q: str,
+    *,
+    session_id: str | None = None,
+    client_id: str | None = None,
+) -> dict:
+    meta = payload.setdefault("meta", {})
+    if not isinstance(meta, dict):
+        meta = {}
+        payload["meta"] = meta
+
+    lead_flow_active = is_lead_context(session_state)
+    booking = booking_intent(q, sid=session_id, client_id=client_id)
+    show_cta = bool(payload.get("cta")) and not lead_flow_active and not bool(
+        (session_state or {}).get("situation_pending")
+    )
+    if show_cta and booking:
+        show_cta = False
+
+    dropped: list[str] = []
+    if payload.get("cta") and not show_cta:
+        dropped.append("cta")
+    payload["cta"] = payload.get("cta") if show_cta else None
+    _merge_policy_decision_meta(
+        meta,
+        {
+            "show_cta": bool(show_cta),
+            "lead_flow_active": bool(lead_flow_active),
+            "booking": bool(booking),
+            "dropped": dropped,
+        },
+    )
+    return payload
+
+
 def build_policy_decision(
     *,
     payload: dict,
@@ -109,7 +347,7 @@ def build_policy_decision(
 ) -> dict:
     meta = payload.get("meta") or {}
     low_score = bool(meta.get("low_score"))
-    lead_flow_active = is_active_lead_flow(session_state)
+    lead_flow_active = is_lead_context(session_state)
     booking = booking_intent(q, sid=session_id, client_id=client_id)
     exhausted = _is_topic_exhausted(doc_meta, topic_state)
     doc_turn_after = int(topic_state.get("doc_turn_count") or 0)
@@ -271,6 +509,17 @@ def apply_response_policy(
 ) -> dict:
     topic_state = topic_state or {}
     doc_meta = doc_meta or {}
+    family = infer_ui_source_family(payload)
+    if family in {UI_FAMILY_PRICE, UI_FAMILY_PATIENT_OPTIONS, UI_FAMILY_DOCTOR, UI_FAMILY_GUIDED_FALLBACK}:
+        _apply_cta_gate_only(
+            payload,
+            session_state,
+            q,
+            session_id=session_id,
+            client_id=client_id,
+        )
+        return apply_ui_source_policy(payload)
+
     decision = build_policy_decision(
         payload=payload,
         session_state=session_state,
@@ -321,4 +570,5 @@ def apply_response_policy(
         "doc_turn_after": decision["doc_turn_after"],
         "cta_from_turn": decision["cta_from_turn"],
     }
+    apply_ui_source_policy(payload)
     return payload

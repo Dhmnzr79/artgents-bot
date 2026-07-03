@@ -1,0 +1,30 @@
+{
+  "service_id": "pulpitis",
+  "price_model": "simple",
+  "display_name": "Лечение пульпита",
+  "tags": [],
+  "default_unit": null,
+  "price": {
+    "price_type": "from",
+    "value": 12000,
+    "currency": "RUB",
+    "note": "Лечение каналов и восстановление зуба; при необходимости — коронка отдельно"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": [
+    "installment_12"
+  ],
+  "followups": [
+    {
+      "label": "Что входит в лечение",
+      "action": "price_aspect",
+      "service_id": null,
+      "aspect": "includes",
+      "ref": null,
+      "detail_ref": "therapy__service__pulpitis.md#chto-vhodit",
+      "group_id": null
+    }
+  ],
+  "cta_key": "price"
+}

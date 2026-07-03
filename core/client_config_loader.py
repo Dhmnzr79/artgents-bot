@@ -1,0 +1,633 @@
+"""Load client pack configs: features, tone, ui, lead, widget (M3)."""
+from __future__ import annotations
+
+import json
+import os
+import threading
+from dataclasses import dataclass, field
+from typing import Any
+
+import yaml
+
+from config import DEFAULT_CLIENT_ID
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_LOCK = threading.Lock()
+_FEATURES_CACHE: dict[str, dict[str, Any]] = {}
+_TONE_CACHE: dict[str, dict[str, Any]] = {}
+_UI_CACHE: dict[str, dict[str, Any]] = {}
+_LEAD_CACHE: dict[str, dict[str, Any]] = {}
+_BRAND_CACHE: dict[str, dict[str, Any]] = {}
+_TXT_CACHE: dict[str, dict[str, str]] = {}
+
+# Legacy flat keys used by flow_handlers / app (from tone.yaml).
+_TONE_KEY_MAP: tuple[tuple[str, str], ...] = (
+    (("lead", "name_prompt"), "lead_name_prompt"),
+    (("lead", "name_retry"), "lead_name_retry"),
+    (("lead", "name_hard"), "lead_name_hard"),
+    (("lead", "name_invalid"), "lead_name_invalid"),
+    (("lead", "name_confirm_tpl"), "lead_name_confirm_tpl"),
+    (("lead", "name_reenter"), "lead_name_reenter"),
+    (("lead", "phone_prompt_tpl"), "lead_phone_prompt_tpl"),
+    (("lead", "phone_retry"), "lead_phone_retry"),
+    (("lead", "submit_ok"), "lead_submit_ok"),
+    (("lead", "submit_ok_after_hours"), "lead_submit_ok_after_hours"),
+    (("lead", "submit_error"), "lead_submit_error"),
+    (("lead", "paused_bridge_name"), "lead_paused_bridge_name"),
+    (("lead", "paused_bridge_phone"), "lead_paused_bridge_phone"),
+    (("lead", "ask_question_label"), "lead_ask_question_label"),
+    (("lead", "ask_question_prompt"), "lead_ask_question_prompt"),
+    (("lead", "unclear_retry"), "lead_unclear_retry"),
+    (("lead", "defer_exit"), "lead_defer_exit"),
+    (("lead", "offer_declined"), "lead_offer_declined"),
+    (("situation", "prompt"), "situation_prompt"),
+    (("situation", "retry_short"), "situation_retry_short"),
+    (("situation", "to_lead_name"), "situation_to_lead_name"),
+    (("situation", "back_fallback"), "situation_back_fallback"),
+    (("guided_menu", "answer"), "guided_menu_answer"),
+    (("continuation", "clarify_answer"), "continuation_clarify_answer"),
+    (("fallback", "bare_affirmative"), "bare_affirmative_fallback"),
+    (("followup", "choose_topic"), "followup_choose_topic"),
+)
+
+_FALLBACK_TXT: dict[str, str] = {
+    "lead_name_prompt": "Хорошо, помогу с записью. Как к вам можно обращаться?",
+    "lead_name_retry": "Как к вам можно обращаться? Напишите, пожалуйста, имя.",
+    "lead_name_hard": "Напишите просто имя — например, Мария или Андрей.",
+    "lead_name_invalid": "Не совсем поняла — напишите просто имя, например Мария.",
+    "lead_name_confirm_tpl": "Вас зовут {name}, правильно?",
+    "lead_name_reenter": "Хорошо. Как к вам можно обращаться?",
+    "lead_phone_prompt_tpl": (
+        "{name}, оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
+        "чтобы подтвердить запись."
+    ),
+    "lead_phone_retry": "Не получилось распознать номер. Напишите в формате +7XXXXXXXXXX.",
+    "lead_submit_ok": "Спасибо! Администратор свяжется с вами в ближайшее время.",
+    "lead_submit_ok_after_hours": (
+        "Спасибо за заявку. Клиника сейчас не работает. "
+        "Мы свяжемся с вами в рабочее время."
+    ),
+    "lead_submit_error": "Что-то пошло не так. Проверьте номер и попробуйте ещё раз.",
+    "situation_prompt": (
+        "Опишите коротко ситуацию — что болит, что беспокоит, или просто какой вопрос. "
+        "Врач заранее будет в курсе и это поможет при консультации"
+    ),
+    "situation_retry_short": (
+        "Напишите чуть подробнее — буквально 1–2 фразы. "
+        "Чем точнее, тем лучше врач подготовится."
+    ),
+    "situation_to_lead_name": (
+        "Спасибо, записала. Эту информацию передадим в клинику, "
+        "чтобы врач заранее понимал вашу ситуацию. Как к вам можно обращаться?"
+    ),
+    "situation_back_fallback": "Хорошо, продолжим. Задайте вопрос или выберите тему.",
+    "lead_offer_declined": "Хорошо. Если появятся вопросы — спрашивайте.",
+    "lead_paused_bridge_name": (
+        "Если захотите продолжить запись — напишите, как к вам можно обращаться."
+    ),
+    "lead_paused_bridge_phone": (
+        "Если захотите продолжить запись — напишите номер телефона."
+    ),
+    "lead_ask_question_label": "Задать вопрос",
+    "lead_ask_question_prompt": (
+        "Хорошо, задайте вопрос — после ответа сможете продолжить запись."
+    ),
+    "lead_unclear_retry": (
+        "Напишите, пожалуйста, имя — или задайте вопрос, и я отвечу."
+    ),
+    "lead_defer_exit": (
+        "Хорошо, без спешки. Когда будете готовы — нажмите «Записаться» или напишите."
+    ),
+    "bare_affirmative_fallback": "Напишите, пожалуйста, ваш вопрос — так будет проще подсказать.",
+    "followup_choose_topic": "Могу рассказать про этапы или про сроки — что выбрать?",
+    "guided_menu_answer": "Могу коротко подсказать и помочь выбрать направление — что для вас важнее?",
+    "continuation_clarify_answer": (
+        "Могу подсказать по услугам, ценам, врачам или записи. Что вас интересует?"
+    ),
+}
+
+
+def resolve_pack_client_id(client_id: str | None) -> str:
+    """Map API client_id to client pack directory name."""
+    raw = (client_id or "").strip() or DEFAULT_CLIENT_ID
+    if raw == "default":
+        return "demo"
+    return raw
+
+
+def _pack_path(client_id: str | None, file_name: str) -> str:
+    pack = resolve_pack_client_id(client_id)
+    return os.path.join(_REPO_ROOT, "clients", pack, file_name)
+
+
+def _read_yaml(path: str) -> dict[str, Any]:
+    if not os.path.isfile(path):
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _cached_load(cache: dict[str, dict[str, Any]], key: str, file_name: str) -> dict[str, Any]:
+    with _LOCK:
+        if key in cache:
+            return cache[key]
+    data = _read_yaml(_pack_path(key, file_name))
+    with _LOCK:
+        cache[key] = data
+    return data
+
+
+def load_features(client_id: str | None) -> dict[str, Any]:
+    pack = resolve_pack_client_id(client_id)
+    return _cached_load(_FEATURES_CACHE, pack, "features.yaml")
+
+
+def load_tone_raw(client_id: str | None) -> dict[str, Any]:
+    pack = resolve_pack_client_id(client_id)
+    return _cached_load(_TONE_CACHE, pack, "tone.yaml")
+
+
+def load_ui_raw(client_id: str | None) -> dict[str, Any]:
+    pack = resolve_pack_client_id(client_id)
+    return _cached_load(_UI_CACHE, pack, "ui.yaml")
+
+
+def load_lead_config(client_id: str | None) -> dict[str, Any]:
+    pack = resolve_pack_client_id(client_id)
+    return _cached_load(_LEAD_CACHE, pack, "lead_config.yaml")
+
+
+@dataclass(frozen=True)
+class LeadCtaVariant:
+    key: str
+    label: str
+    name_prompt: str
+
+
+_LEAD_CTA_VARIANTS_CACHE: dict[str, tuple[LeadCtaVariant, ...]] = {}
+
+
+def load_lead_cta_variants(client_id: str | None) -> tuple[LeadCtaVariant, ...]:
+    """Marketing pairs CTA label + first lead phrase from clients/{id}/tone.yaml."""
+    pack = resolve_pack_client_id(client_id)
+    with _LOCK:
+        if pack in _LEAD_CTA_VARIANTS_CACHE:
+            return _LEAD_CTA_VARIANTS_CACHE[pack]
+    lead = load_tone_raw(client_id).get("lead")
+    raw = lead.get("cta_variants") if isinstance(lead, dict) else None
+    out: list[LeadCtaVariant] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("key") or "").strip()
+            label = str(item.get("label") or "").strip()
+            prompt = str(item.get("name_prompt") or "").strip()
+            if key and label and prompt:
+                out.append(LeadCtaVariant(key=key, label=label, name_prompt=prompt))
+    variants = tuple(out)
+    with _LOCK:
+        _LEAD_CTA_VARIANTS_CACHE[pack] = variants
+    return variants
+
+
+def _lead_cta_index(client_id: str | None) -> tuple[dict[str, LeadCtaVariant], dict[str, LeadCtaVariant]]:
+    by_key: dict[str, LeadCtaVariant] = {}
+    by_label: dict[str, LeadCtaVariant] = {}
+    for variant in load_lead_cta_variants(client_id):
+        by_key[variant.key] = variant
+        by_label[variant.label.lower()] = variant
+    return by_key, by_label
+
+
+def resolve_lead_name_prompt(
+    client_id: str | None,
+    *,
+    cta_key: str | None = None,
+    cta_label: str | None = None,
+    txt: dict[str, str] | None = None,
+) -> str:
+    """First lead-flow phrase: by cta_key, then cta_label, else lead.name_prompt."""
+    by_key, by_label = _lead_cta_index(client_id)
+    key = (cta_key or "").strip()
+    if key and key in by_key:
+        return by_key[key].name_prompt
+    label = (cta_label or "").strip()
+    if label:
+        matched = by_label.get(label.lower())
+        if matched:
+            return matched.name_prompt
+    if txt is None:
+        txt = tone_to_txt_dict(client_id)
+    return txt.get("lead_name_prompt") or _FALLBACK_TXT["lead_name_prompt"]
+
+
+def lead_cta_dict_from_meta(client_id: str | None, meta: dict[str, Any]) -> dict[str, str] | None:
+    """Build widget CTA payload {text, action, key} from doc frontmatter or defaults."""
+    action = str(meta.get("cta_action") or "").strip()
+    if not action:
+        return None
+    by_key, by_label = _lead_cta_index(client_id)
+    if action == "lead":
+        key = str(meta.get("cta_key") or "").strip()
+        if key and key in by_key:
+            variant = by_key[key]
+            return {"text": variant.label, "action": "lead", "key": variant.key}
+        cta_text = str(meta.get("cta_text") or "").strip()
+        if cta_text:
+            matched = by_label.get(cta_text.lower())
+            if matched:
+                return {"text": matched.label, "action": "lead", "key": matched.key}
+            return {"text": cta_text, "action": "lead", "key": ""}
+        from config import default_cta_dict
+
+        default = default_cta_dict()
+        matched = by_label.get(str(default.get("text") or "").strip().lower())
+        if matched:
+            return {"text": matched.label, "action": "lead", "key": matched.key}
+        return {
+            "text": str(default.get("text") or "Записаться на консультацию"),
+            "action": "lead",
+            "key": "booking",
+        }
+    cta_text = str(meta.get("cta_text") or "").strip()
+    if cta_text:
+        return {"text": cta_text, "action": action, "key": ""}
+    return None
+
+
+def lead_cta_dict_for_menu(
+    client_id: str | None,
+    cta_text: str | None,
+    cta_action: str | None,
+) -> dict[str, str] | None:
+    return lead_cta_dict_from_meta(
+        client_id,
+        {
+            "cta_text": cta_text,
+            "cta_action": cta_action,
+        },
+    )
+
+
+_BRAND_COLOR_TO_THEME: tuple[tuple[str, str], ...] = (
+    ("brand", "brand"),
+    ("action", "action"),
+    ("button_1", "button_1"),
+    ("button_2", "button_2"),
+)
+
+
+def widget_theme_from_brand(client_id: str | None) -> dict[str, str]:
+    """Palette for embed: canonical source is clients/{id}/brand.yaml colors."""
+    colors = load_brand(client_id).get("colors")
+    if not isinstance(colors, dict):
+        return {}
+    out: dict[str, str] = {}
+    for yaml_key, theme_key in _BRAND_COLOR_TO_THEME:
+        val = colors.get(yaml_key)
+        if isinstance(val, str) and val.strip():
+            out[theme_key] = val.strip()
+    return out
+
+
+def widget_logo_from_brand(client_id: str | None) -> dict[str, Any]:
+    """Welcome-screen logo: url and display size from clients/{id}/brand.yaml."""
+    brand = load_brand(client_id)
+    if not isinstance(brand, dict):
+        return {}
+    out: dict[str, Any] = {}
+    logo_url = brand.get("logo_url")
+    if isinstance(logo_url, str) and logo_url.strip():
+        out["logoUrl"] = logo_url.strip()
+    for yaml_key, cfg_key in (("logo_width", "logoWidth"), ("logo_height", "logoHeight")):
+        val = brand.get(yaml_key)
+        if isinstance(val, bool):
+            continue
+        if isinstance(val, (int, float)) and val > 0:
+            out[cfg_key] = int(val)
+    return out
+
+
+def widget_avatar_from_brand(client_id: str | None) -> dict[str, str]:
+    """Bot avatar (launcher, header, message rows) from clients/{id}/brand.yaml."""
+    brand = load_brand(client_id)
+    if not isinstance(brand, dict):
+        return {}
+    avatar_url = brand.get("avatar_url")
+    if isinstance(avatar_url, str) and avatar_url.strip():
+        return {"avatarUrl": avatar_url.strip()}
+    return {}
+
+
+def load_widget_config(client_id: str | None) -> dict[str, Any]:
+    path = _pack_path(client_id, "widget_config.json")
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    theme_from_brand = widget_theme_from_brand(client_id)
+    if theme_from_brand:
+        existing = raw.get("theme") if isinstance(raw.get("theme"), dict) else {}
+        raw = {**raw, "theme": {**existing, **theme_from_brand}}
+    brand = load_brand(client_id)
+    clinic_name = brand.get("clinic_name") if isinstance(brand, dict) else None
+    if isinstance(clinic_name, str) and clinic_name.strip():
+        raw = {**raw, "clinicName": clinic_name.strip()}
+    logo = widget_logo_from_brand(client_id)
+    if logo:
+        raw = {**raw, **logo}
+    avatar = widget_avatar_from_brand(client_id)
+    if avatar:
+        raw = {**raw, **avatar}
+    return raw
+
+
+def _nested_get(data: dict[str, Any], path: tuple[str, ...]) -> Any:
+    cur: Any = data
+    for part in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
+def tone_to_txt_dict(client_id: str | None) -> dict[str, str]:
+    pack = resolve_pack_client_id(client_id)
+    with _LOCK:
+        if pack in _TXT_CACHE:
+            return dict(_TXT_CACHE[pack])
+    tone = load_tone_raw(client_id)
+    out = dict(_FALLBACK_TXT)
+    for path, flat_key in _TONE_KEY_MAP:
+        val = _nested_get(tone, path)
+        if isinstance(val, str) and val.strip():
+            out[flat_key] = val.strip()
+    with _LOCK:
+        _TXT_CACHE[pack] = dict(out)
+    return out
+
+
+def feature_flag(client_id: str | None, *path: str, default: bool = False) -> bool:
+    cur: Any = load_features(client_id)
+    for part in path:
+        if not isinstance(cur, dict):
+            return default
+        cur = cur.get(part)
+    if isinstance(cur, bool):
+        return cur
+    return default
+
+
+def postgres_events_enabled(client_id: str | None) -> bool:
+    feats = load_features(client_id)
+    if not feats:
+        return True
+    pg = feats.get("postgres_events")
+    if isinstance(pg, bool):
+        return pg
+    if isinstance(pg, dict) and "enabled" in pg:
+        return bool(pg.get("enabled"))
+    return feature_flag(client_id, "postgres_events", "enabled", default=False)
+
+
+def admin_enabled(client_id: str | None) -> bool:
+    return feature_flag(client_id, "admin", "enabled", default=False)
+
+
+def load_brand(client_id: str | None) -> dict[str, Any]:
+    pack = resolve_pack_client_id(client_id)
+    return _cached_load(_BRAND_CACHE, pack, "brand.yaml")
+
+
+def list_admin_client_ids() -> list[str]:
+    from config import ALLOWED_CLIENTS
+
+    clients_root = os.path.join(_REPO_ROOT, "clients")
+    if not os.path.isdir(clients_root):
+        return []
+    out: list[str] = []
+    for name in sorted(os.listdir(clients_root)):
+        if name.startswith("_"):
+            continue
+        if not os.path.isdir(os.path.join(clients_root, name)):
+            continue
+        if name not in ALLOWED_CLIENTS:
+            continue
+        if admin_enabled(name):
+            out.append(name)
+    return out
+
+
+def admin_client_options() -> list[dict[str, str]]:
+    return [
+        {
+            "client_id": cid,
+            "label": str(load_brand(cid).get("clinic_name") or cid),
+        }
+        for cid in list_admin_client_ids()
+    ]
+
+
+def numeric_fact_gate_enabled(client_id: str | None) -> bool:
+    return feature_flag(client_id, "verifier_gate", "numeric_fact", "enabled", default=False)
+
+
+def consult_nudge_enabled(client_id: str | None) -> bool:
+    return feature_flag(client_id, "consult_nudge", "enabled", default=True)
+
+
+def situation_enabled(client_id: str | None) -> bool:
+    return feature_flag(client_id, "situation", "enabled", default=True)
+
+
+def leads_enabled(client_id: str | None) -> bool:
+    return feature_flag(client_id, "leads", "enabled", default=False)
+
+
+def leads_mode(client_id: str | None) -> str:
+    feats = load_features(client_id)
+    leads = feats.get("leads") if isinstance(feats.get("leads"), dict) else {}
+    mode = str((leads or {}).get("mode") or "").strip()
+    if mode:
+        return mode
+    lead_cfg = load_lead_config(client_id)
+    return str(lead_cfg.get("delivery") or "demo_stub").strip() or "demo_stub"
+
+
+@dataclass(frozen=True)
+class UiMenu:
+    answer: str
+    quick_replies: tuple[dict[str, str], ...] = ()
+    cta_text: str | None = None
+    cta_action: str | None = None
+
+
+def _parse_quick_replies(raw: Any) -> tuple[dict[str, str], ...]:
+    if not isinstance(raw, list):
+        return ()
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        if not label:
+            continue
+        ref = str(item.get("ref") or "").strip()
+        action = str(item.get("action") or "").strip()
+        if ref:
+            out.append({"label": label, "ref": ref})
+        elif action:
+            out.append({"label": label, "action": action})
+    return tuple(out)
+
+
+def _parse_menu(raw: Any, *, default_answer: str) -> UiMenu:
+    if not isinstance(raw, dict):
+        return UiMenu(answer=default_answer)
+    answer = str(raw.get("answer") or default_answer).strip() or default_answer
+    cta_text = str(raw.get("cta_text") or "").strip() or None
+    cta_action = str(raw.get("cta_action") or "").strip() or None
+    return UiMenu(
+        answer=answer,
+        quick_replies=_parse_quick_replies(raw.get("quick_replies")),
+        cta_text=cta_text,
+        cta_action=cta_action,
+    )
+
+
+@dataclass(frozen=True)
+class UiBundle:
+    guided_menu: UiMenu
+    continuation_clarify: UiMenu
+    low_score: UiMenu
+    no_candidates: UiMenu
+    offtopic: UiMenu
+    empty_question: UiMenu
+    bare_affirmative: UiMenu
+    consult_nudge_exhausted: str
+    consult_nudge_streak: str
+    anti_spam_soft_redirect: str
+
+
+_DEFAULT_ANTI_SPAM_REDIRECT = (
+    "Я рассказал уже довольно много о разных темах. "
+    "Если хотите, уточните конкретный вопрос или выберите раздел ниже — так я точнее подскажу."
+)
+
+
+_DEFAULT_GUIDED_REPLIES: tuple[dict[str, str], ...] = (
+    {"label": "Стоимость имплантации", "ref": "price:classic"},
+    {"label": "Больно ли ставить имплант?", "ref": "implantation__faq__pain.md#korotko"},
+    {"label": "Что будет на консультации?", "ref": "clinic__info__consultation.md#korotko"},
+    {"label": "Хочу записаться", "ref": "lead:booking"},
+)
+
+_DEFAULT_CONSULT_EXHAUSTED = (
+    "\n\nЗадача на этот ответ:\n"
+    "Тема для справочного ответа исчерпана.\n"
+    "Не добавляй рекламный хвост, скидки или утверждение о бесплатной консультации.\n"
+    "Если нужен следующий шаг, сформулируй его нейтрально и кратко: можно уточнить ситуацию у администратора или врача."
+)
+
+_DEFAULT_CONSULT_STREAK = (
+    "\n\nЗадача на этот ответ:\n"
+    "Пациент уже несколько раз уточнял по теме клиники.\n"
+    "Сначала ответь по существу на вопрос.\n"
+    "Не добавляй рекламный хвост, скидки или утверждение о бесплатной консультации.\n"
+    "Если нужен следующий шаг, сформулируй его нейтрально: можно уточнить ситуацию у администратора или врача."
+)
+
+
+def load_ui_bundle(client_id: str | None) -> UiBundle:
+    ui = load_ui_raw(client_id)
+    fb = ui.get("fallback_menu") if isinstance(ui.get("fallback_menu"), dict) else {}
+    guided = ui.get("guided_menu") if isinstance(ui.get("guided_menu"), dict) else {}
+    cont = ui.get("continuation_clarify") if isinstance(ui.get("continuation_clarify"), dict) else {}
+    cn = ui.get("consult_nudge") if isinstance(ui.get("consult_nudge"), dict) else {}
+    msg = ui.get("messaging") if isinstance(ui.get("messaging"), dict) else {}
+
+    guided_menu = _parse_menu(
+        guided,
+        default_answer=_FALLBACK_TXT["guided_menu_answer"],
+    )
+    if not guided_menu.quick_replies:
+        guided_menu = UiMenu(
+            answer=guided_menu.answer,
+            quick_replies=_DEFAULT_GUIDED_REPLIES,
+            cta_text=guided_menu.cta_text,
+            cta_action=guided_menu.cta_action,
+        )
+
+    continuation = _parse_menu(
+        cont,
+        default_answer=_FALLBACK_TXT["continuation_clarify_answer"],
+    )
+    if not continuation.quick_replies:
+        continuation = UiMenu(
+            answer=continuation.answer,
+            quick_replies=guided_menu.quick_replies,
+            cta_text=continuation.cta_text,
+            cta_action=continuation.cta_action,
+        )
+
+    low_default = "Не нашла точного ответа. Попробуйте переформулировать вопрос или выберите подходящий раздел ниже."
+
+    anti_default = _DEFAULT_ANTI_SPAM_REDIRECT
+    anti_spam = str(msg.get("anti_spam_soft_redirect") or anti_default).strip() or anti_default
+
+    return UiBundle(
+        guided_menu=guided_menu,
+        continuation_clarify=continuation,
+        low_score=_parse_menu(fb.get("low_score"), default_answer=low_default),
+        no_candidates=_parse_menu(
+            fb.get("no_candidates"),
+            default_answer=(
+                "Не нашла ответа на этот вопрос. Попробуйте спросить иначе или уточните услугу/ситуацию."
+            ),
+        ),
+        offtopic=_parse_menu(
+            fb.get("offtopic"),
+            default_answer=(
+                "Я помогаю по вопросам клиники: услуги, цены, подготовка, сроки, запись и контакты. "
+                "Если хотите, подскажу по вашему вопросу в этом контексте."
+            ),
+        ),
+        empty_question=_parse_menu(fb.get("empty_question"), default_answer="Уточните вопрос."),
+        bare_affirmative=_parse_menu(
+            fb.get("bare_affirmative"),
+            default_answer=_FALLBACK_TXT["bare_affirmative_fallback"],
+        ),
+        consult_nudge_exhausted=str(cn.get("exhausted_prompt") or _DEFAULT_CONSULT_EXHAUSTED).strip(),
+        consult_nudge_streak=str(cn.get("streak_prompt") or _DEFAULT_CONSULT_STREAK).strip(),
+        anti_spam_soft_redirect=anti_spam,
+    )
+
+
+def ui_menu_to_payload(menu: UiMenu, *, sid: str, client_id: str | None, extra_meta: dict | None = None) -> dict:
+    meta: dict[str, Any] = {"sid": sid}
+    if client_id is not None:
+        meta["client_id"] = client_id
+    if extra_meta:
+        meta.update(extra_meta)
+    cta = None
+    if menu.cta_text and menu.cta_action:
+        cta = lead_cta_dict_for_menu(client_id, menu.cta_text, menu.cta_action)
+    elif menu.cta_action == "lead":
+        cta = lead_cta_dict_for_menu(client_id, None, "lead")
+    quick = [{"label": q["label"], "ref": q.get("ref") or q.get("action") or ""} for q in menu.quick_replies]
+    return {
+        "answer": menu.answer,
+        "quick_replies": quick,
+        "cta": cta,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }

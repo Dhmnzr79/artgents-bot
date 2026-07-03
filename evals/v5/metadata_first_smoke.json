@@ -1,0 +1,185 @@
+{
+  "baseline": 22,
+  "description": "Metadata-first smoke: Phase 2 critical + Phase 3 (doctors, faq/process, cross-topic). Demo client only until other packs are ready.",
+  "cases": [
+    {
+      "id": "mfs_contacts_phone",
+      "question": "Телефон клиники",
+      "expected_route": "contacts_chunk",
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": ["телефон", "+7", "495"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_contacts_address",
+      "question": "Где вы находитесь?",
+      "expected_route": "contacts_chunk",
+      "expected_doc_id": "clinic__info__contacts",
+      "answer_signals_any": ["тверск", "москв"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_price_all_on_4",
+      "question": "Сколько стоит All-on-4?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "all_on_4",
+      "answer_signals_any": ["₽", "руб"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_price_classic",
+      "question": "Сколько стоит классическая имплантация?",
+      "expected_route": "price_lookup",
+      "expected_service_id": "classic",
+      "answer_signals_any": ["₽", "руб"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_price_concern_expensive",
+      "question": "Дорого",
+      "expected_route": "price_concern",
+      "expected_doc_id": "implantation__faq__cost",
+      "answer_signals_any": ["материал", "стоим", "цен"],
+      "must_not_contain": ["уточнить у администратор", "записать вас на консультац"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_price_concern_why",
+      "question": "Почему так дорого?",
+      "expected_route": "price_concern",
+      "expected_doc_id": "implantation__faq__cost",
+      "answer_signals_any": ["материал", "стоим", "цен"],
+      "must_not_contain": ["уточнить у администратор"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_booking_want",
+      "question": "Хочу записаться",
+      "expected_route": "lead_flow",
+      "must_contain": ["как к вам"],
+      "coverage_class": "TEMPLATE"
+    },
+    {
+      "id": "mfs_booking_today",
+      "question": "Можно записаться сегодня?",
+      "expected_route": "lead_flow",
+      "must_contain": ["как к вам"],
+      "coverage_class": "TEMPLATE"
+    },
+    {
+      "id": "mfs_pending_lead_offer_no",
+      "question": "нет",
+      "session_seed": {"pending_lead_offer": true},
+      "expected_route": "lead_offer_declined",
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_pending_lead_offer_yes",
+      "question": "Да",
+      "session_seed": {"pending_lead_offer": true},
+      "expected_route": "lead_flow",
+      "must_contain": ["как к вам"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_comparison_implant_vs_bridge",
+      "question": "Что лучше: имплант или мост?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "comparison__implant_vs_bridge",
+      "answer_signals_any": ["имплант", "мост"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cross_topic_veneers",
+      "question": "Сколько стоят виниры?",
+      "expected_route_any": ["price_lookup", "catalog_facts", "catalog_md_first", "retrieval_chunk"],
+      "answer_signals_any": ["винир", "₽", "руб", "стоим", "цен"],
+      "coverage_class": "MEDIUM",
+      "comment": "veneers may be catalog card without meta.file in response; route+signals only"
+    },
+    {
+      "id": "mfs_content_impl_pain",
+      "question": "Больно ли ставить имплант?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__pain",
+      "answer_signals_any": ["анестез", "боль"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_content_impl_osseointegration",
+      "question": "Какая приживаемость имплантов?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__osseointegration",
+      "answer_signals_any": ["прижив", "остеоинтеграц"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_content_impl_contra",
+      "question": "Какие противопоказания к имплантации?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__info__contraindications",
+      "answer_signals_any": ["противопоказ"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_doctors_overview",
+      "client_id": "demo",
+      "question": "Какие врачи работают в клинике?",
+      "expected_route_any": ["doctors_list", "retrieval_chunk"],
+      "expected_doc_id": "doctors__doctor__overview",
+      "answer_signals_any": ["врач", "специалист", "имплант", "хирург"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_doctors_orlov",
+      "client_id": "demo",
+      "question": "Расскажите про врача Орлова",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "doctors__doctor__orlov",
+      "answer_signals_any": ["орлов", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_faq_duration",
+      "question": "Сколько по времени длится имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__duration",
+      "answer_signals_any": ["месяц", "срок", "этап", "прижив"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_faq_safety",
+      "question": "Безопасна ли имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__faq__safety",
+      "answer_signals_any": ["безопас", "стерил", "риск"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_info_impl_steps",
+      "question": "Как проходит имплантация?",
+      "expected_route": "retrieval_chunk",
+      "expected_doc_id": "implantation__info__steps",
+      "answer_signals_any": ["этап", "консультац", "имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cross_topic_extraction",
+      "question": "Нужно удалить зуб, что делать?",
+      "expected_route_any": ["catalog_md_first", "retrieval_chunk"],
+      "expected_doc_id": "extraction__service__tooth_extraction",
+      "answer_signals_any": ["удал", "зуб", "анестез"],
+      "must_not_contain": ["сделаем имплант", "поставим имплант", "запишем на имплант"],
+      "coverage_class": "STRONG"
+    },
+    {
+      "id": "mfs_cross_topic_braces",
+      "question": "А брекеты делаете?",
+      "expected_route": "ingress_service_not_offered",
+      "answer_signals_any": ["элайнер", "ортодонт", "выравн"],
+      "must_not_contain": ["да, делаем брекеты", "ставим брекеты"],
+      "coverage_class": "STRONG",
+      "comment": "брекеты не в каталоге — альтернатива элайнеры (clinic_policies)"
+    }
+  ]
+}

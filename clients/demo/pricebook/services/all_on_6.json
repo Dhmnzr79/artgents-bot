@@ -1,0 +1,132 @@
+{
+  "service_id": "all_on_6",
+  "price_model": "complex",
+  "display_name": "All-on-6",
+  "intro_text": "All-on-6 — восстановление зубного ряда на одной челюсти на 6 имплантах: несъёмный протез в день операции, постоянная конструкция через 3–6 месяцев.",
+  "tags": [
+    "implantation"
+  ],
+  "default_unit": "jaw",
+  "price": null,
+  "variants": [
+    {
+      "offer_id": "all_on_6.jaw.implantium",
+      "brand": "Implantium",
+      "brand_label": "Implantium (Южная Корея)",
+      "brand_group": "korean",
+      "unit": "jaw",
+      "total": 398000,
+      "currency": "RUB",
+      "recommended": false,
+      "payment_stages": [
+        {
+          "name": "Этап 1 — хирургия и временный протез (60%)",
+          "amount": 238800
+        },
+        {
+          "name": "Этап 2 — постоянный протез (40%)",
+          "amount": 159200
+        }
+      ],
+      "includes": [
+        "6 имплантов с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": [
+        "КТ и костная пластика по показаниям — отдельно"
+      ]
+    },
+    {
+      "offer_id": "all_on_6.jaw.impro",
+      "brand": "Impro",
+      "brand_label": "Impro (Германия)",
+      "brand_group": "german",
+      "unit": "jaw",
+      "total": 458000,
+      "currency": "RUB",
+      "recommended": true,
+      "payment_stages": [
+        {
+          "name": "Этап 1 — хирургия и временный протез (60%)",
+          "amount": 274800
+        },
+        {
+          "name": "Этап 2 — постоянный протез (40%)",
+          "amount": 183200
+        }
+      ],
+      "includes": [
+        "6 имплантов с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": [
+        "КТ и костная пластика по показаниям — отдельно"
+      ]
+    },
+    {
+      "offer_id": "all_on_6.jaw.nobel",
+      "brand": "Nobel Biocare",
+      "brand_label": "Nobel Biocare (Швейцария)",
+      "brand_group": "swiss",
+      "unit": "jaw",
+      "total": 528000,
+      "currency": "RUB",
+      "recommended": false,
+      "payment_stages": [
+        {
+          "name": "Этап 1 — хирургия и временный протез (60%)",
+          "amount": 316800
+        },
+        {
+          "name": "Этап 2 — постоянный протез (40%)",
+          "amount": 211200
+        }
+      ],
+      "includes": [
+        "6 имплантов с документами",
+        "хирургия и анестезия",
+        "несъёмный протез в день операции",
+        "постоянный протез через 3–6 месяцев",
+        "куратор лечения"
+      ],
+      "excludes": [
+        "КТ и костная пластика по показаниям — отдельно"
+      ]
+    }
+  ],
+  "promo": null,
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "all_on_6_installment",
+    "all_on_same_day_discount",
+    "tax_deduction"
+  ],
+  "followups": [
+    {
+      "label": "Оплата по этапам",
+      "action": "price_aspect",
+      "service_id": null,
+      "aspect": "stages",
+      "ref": null,
+      "detail_ref": null,
+      "group_id": null
+    },
+    {
+      "label": "Что входит",
+      "action": "price_aspect",
+      "service_id": null,
+      "aspect": "includes",
+      "ref": null,
+      "detail_ref": null,
+      "group_id": null
+    }
+  ],
+  "cta_key": "price"
+}

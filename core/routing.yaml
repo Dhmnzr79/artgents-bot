@@ -29,8 +29,41 @@ retrieval:
   # ниже — игнорировать Resolver topic scope при сильном alias (конфликт-гард PR #1.4)
   alias_scope_guard_min: 0.85
 
+# Retrieval 2.0 H3 — LLM rerank gate (fail-open; score_min uses retrieval.low_score_threshold)
+rerank:
+  enabled: true
+  score_max: 0.75
+  score_gap_max: 0.15
+  top_k: 3
+  min_candidates: 2
+  skip_on_strong_alias_in_pool: true
+
+# Metadata-First v1 — candidate score boosts (see docs/METADATA_FIRST_V1.md)
+metadata_first:
+  comparison_doc_type_boost: 0.08
+  pricing_doc_type_boost: 0.08
+  service_topic_match_boost: 0.05
+  aspect_match_boost: 0.05
+  service_id_match_boost: 0.06
+  service_id_min_confidence: 0.75
+  metadata_soft_filter_enabled: true
+  alias_boost_max_delta: 0.12
+  # comparison miss: drop foreign comparison docs from pool → RAG on service_topic
+  comparison_miss_exclude_comparison: true
+  # price_lookup: drop service chunks when pricing doc is already in candidate pool
+  price_lookup_exclude_service_when_pricing_present: true
+  # reject embed alias on wrong topic when resolver topic confidence is high (exact/near_exact exempt)
+  alias_topic_guard_enabled: true
+  # v1: no hard corpus filter by service_topic (boosts in candidate_builder instead)
+  soft_scope_enabled: true
+
 catalog_match:
   containment_min: 0.88
+  tie_score_margin: 0.01
+  typo_support_min: 0.65
+  lemma_weak_phrase_recall_min: 0.75
+  topic_tiebreak_boost: 0.04
+  topic_tiebreak_min_confidence: 0.75
 
 # PR #1.10 — corpus alias (exact + build-time alias embeddings + controlled rescue).
 # Runtime source of truth for alias behavior; do not duplicate as 0.x literals in *.py.
@@ -51,4 +84,33 @@ alias:
   rescue_effective_cap: 0.88
   scope_guard_min: 0.85
   embed_matrix_top_chunks: 48
+
+lead_turn:
+  min_confidence: 0.65
+
+# Follow-up compatibility (PRODUCT_WORK_PLAN stage 4a)
+follow_up:
+  max_subject_turn_age: 4
+  min_compat_score: 0.15
+  doc_type_boost: 0.04
+
+# Numeric fact safety gate (PRODUCT_WORK_PLAN stage 5a)
+numeric_fact_gate:
+  min_answer_chars_after_remove: 80
+
+# Facet-aware catalog suppression in A5 arbiter (Retrieval 2.0 slice 1 — pain only)
+facet_arbitration:
+  enabled: true
+  aspects:
+    - pain
+    - duration
+    - comparison
+  min_facet_score: 0.72
+
+# Patient situation router — soft routing gates (Slice 2+)
+patient_situation:
+  min_confidence_for_routing: 0.8
+  unit_match_boost: 0.04
+  unit_mismatch_penalty: 0.06
+  max_turn_age: 4
 

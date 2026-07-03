@@ -31,14 +31,14 @@
 
   {
     "id": "g_faith_price_rub",
-    "source_ref": "implantation__pricing__implants.md#korotko",
+    "source_ref": "implantation__service__classic.md#korotko",
     "source_text": "Классическая имплантация от 70 000 руб. за зуб по акции.",
     "answer": "Классическая имплантация стоит от 70 000 руб. за зуб по акции.",
     "expected": { "faithful": true }
   },
   {
     "id": "g_faith_price_ruble_sign",
-    "source_ref": "implantation__pricing__implants.md#korotko",
+    "source_ref": "implantation__service__classic.md#korotko",
     "source_text": "All-on-4 от 250 000 ₽ за челюсть.",
     "answer": "Для протезирования All-on-4 цена начинается от 250 000 ₽ за одну челюсть.",
     "expected": { "faithful": true }
@@ -181,14 +181,14 @@
 
   {
     "id": "g_faith_price_range_rub",
-    "source_ref": "implantation__pricing__single_tooth.md#korotko",
+    "source_ref": "implantation__service__classic.md#korotko",
     "source_text": "Имплантация одного зуба стоит от 60 000 до 80 000 руб. в зависимости от ситуации.",
     "answer": "Имплантация одного зуба стоит от 60 000 до 80 000 руб. в зависимости от ситуации.",
     "expected": { "faithful": true }
   },
   {
     "id": "g_unfaithful_price_range_rub",
-    "source_ref": "implantation__pricing__single_tooth.md#korotko",
+    "source_ref": "implantation__service__classic.md#korotko",
     "source_text": "Имплантация одного зуба стоит от 60 000 до 80 000 руб. в зависимости от ситуации.",
     "answer": "Имплантация одного зуба стоит около 100 000 руб.",
     "expected": { "faithful": false }

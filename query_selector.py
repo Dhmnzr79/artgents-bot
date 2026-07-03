@@ -5,47 +5,93 @@ import re
 from typing import Any
 
 from config import (
-    LOW_SCORE_THRESHOLD,
-    QUERY_REWRITE_ON,
+    COMMERCIAL_INFO_RE,
+    CONSULTATION_QUERY_RE,
+    KT_EXPLICIT_RE,
     DEFAULT_CLIENT_ID,
     PRICE_CONCERN_RE,
     PRICE_LOOKUP_RE,
     PRICE_SERVICE_MATCH_STRONG,
 )
-import alias_lexical
+from core.catalog_match import resolve_catalog_match
+from core.client_config_loader import resolve_pack_client_id
 from core.routing_loader import THRESHOLDS
-from llm import classify_price_intent, rewrite_query_for_retrieval
+from core.price_scope import PriceScopeResult, detect_price_scope, scope_catalog_excludes, scope_implant_topic
+from core.patient_situation import patient_situation_from_ctx
+from core.patient_situation_routing import merge_price_scope
+from core.patient_situation_session import resolve_patient_situation_for_turn
+from core.price_offers import is_crown_inclusion_content_query, is_generic_implant_price_query
+from core.price_followup import (
+    is_vague_price_followup,
+    is_weak_catalog_price_token_match,
+    price_query_has_explicit_service_object,
+)
+from contracts.dialog_focus import DialogFocusDecision
+from core.dialog_focus import dialog_focus_for_turn
+from core.pricebook_loader import load_pricebook_service
+from llm import classify_price_intent
 from session import mem_get
 from policy import (
-    contacts_intent,
     continuation_only_phrase,
-    pick_contacts_chunk,
-    pick_prices_chunk,
-    price_intent,
     session_has_continuation_context,
 )
-from retriever import (
-    broad_query_detect,
-    chunk_info,
-    corpus_alias_leader,
-    is_point_literal_query,
-    llm_rerank,
-    merge_retrieval_candidates,
-    normalize_retrieval_query,
-    prefer_overview_if_broad,
-    retrieve,
-)
+
+
+def normalize_retrieval_query(q: str) -> str:
+    """Legacy public normalizer kept for callers after embed retrieval removal."""
+    text = (q or "").strip().lower().replace("ё", "е")
+    text = re.sub(r"[^\w\s\-]", " ", text, flags=re.U)
+    return re.sub(r"\s+", " ", text, flags=re.U).strip()
+
+def _service_in_pricebook(
+    client_id: str | None,
+    service_id: str | None,
+    price_key: str | None,
+) -> bool:
+    sid = (service_id or price_key or "").strip()
+    if not sid:
+        return False
+    return load_pricebook_service(client_id, sid) is not None
+
+
+def _patient_situation_for_turn(
+    q: str,
+    *,
+    sid: str | None,
+    client_id: str | None = None,
+) -> tuple[Any, bool]:
+    """Resolved patient situation for this turn + whether it was session-carried."""
+    try:
+        from flask import has_request_context, request
+    except ImportError:
+        has_request_context = lambda: False  # type: ignore[assignment,misc]
+        request = None  # type: ignore[assignment]
+    if has_request_context() and request is not None and hasattr(request, "ctx"):
+        ctx_result = patient_situation_from_ctx()
+        if ctx_result is not None:
+            carried = bool(request.ctx.get("patient_situation_carried", False))
+            return ctx_result, carried
+    situation, meta = resolve_patient_situation_for_turn(q, sid=sid, client_id=client_id)
+    return situation, bool(meta.get("patient_situation_carried"))
+
+
+def _price_route_is_matched(route_source: str, price_ref: str | None) -> bool:
+    if price_ref and route_source == "price_ref":
+        return True
+    return route_source in {"prices_json", "pricebook"}
+
 
 def _resolve_price_lookup_route(
     *,
     route_source: str,
     price_ref: Any,
     price_item: dict | None,
+    pricebook_available: bool = False,
     q: str = "",
     sid: str | None = None,
     client_id: str | None = None,
 ) -> tuple[str, str | None, str | None]:
-    """price_ref → md; иначе prices.json; без авто-подстановки payment_terms."""
+    """price_ref → md; pricebook or prices.json; без авто-подстановки payment_terms."""
     if continuation_only_phrase(q) and not _service_from_session_context(sid, client_id):
         return route_source, None, None
     pref = str(price_ref or "").strip()
@@ -54,6 +100,8 @@ def _resolve_price_lookup_route(
         return rs, pref, None
     if price_item is not None:
         return "prices_json", None, None
+    if pricebook_available:
+        return "pricebook", None, None
     return route_source, None, "price_not_in_catalog"
 
 
@@ -63,202 +111,18 @@ def select_chunk_for_question(
     client_id: str | None,
     sid: str | None = None,
     scope_topic: str | None = None,
+    decision: Any | None = None,
 ) -> dict:
-    """Return selection result for /ask.
-
-    mode:
-      - no_candidates
-      - low_score
-      - chunk
-    """
-    q_user = (q or "").strip()
-    if sid and QUERY_REWRITE_ON:
-        q_rewrite_eff = rewrite_query_for_retrieval(sid, q_user, client_id=client_id)
-    else:
-        q_rewrite_eff = q_user
-
-    # Интенты и алиасы — только по исходному вопросу пациента (не по rewrite).
-    q_policy = normalize_retrieval_query(q_user) or q_user
-    nu = (normalize_retrieval_query(q_user) or q_user).strip().lower()
-    nr = (normalize_retrieval_query(q_rewrite_eff) or q_rewrite_eff).strip().lower()
-
-    nr_meta = normalize_retrieval_query(q_rewrite_eff) or q_rewrite_eff
-    base_meta = {
-        "query_user_raw": q_user[:200],
-        "query_rewrite_effective": q_rewrite_eff[:200],
-        "query_normalized_user": q_policy[:200],
-        "query_normalized_rewrite": nr_meta[:200],
-        "rewrite_applied": bool(q_rewrite_eff.strip().lower() != q_user.strip().lower()),
-    }
-
-    tel_p: dict[str, Any] = {}
-    tel_s: dict[str, Any] = {}
-    primary = retrieve(
-        q_user,
-        topk=8,
-        client_id=client_id,
-        scope_topic=scope_topic,
-        telemetry=tel_p,
-    )
-    secondary: list = []
-    if nr != nu:
-        secondary = retrieve(
-            q_rewrite_eff,
-            topk=8,
-            client_id=client_id,
-            silent=True,
-            scope_topic=scope_topic,
-            telemetry=tel_s,
-        )
-    widen_fb = bool(tel_p.get("scope_widen_fallback")) or bool(tel_s.get("scope_widen_fallback"))
-
-    # Defaults so early returns (e.g. no_candidates) can call _dm() before corpus_alias_leader runs.
-    alias_leader: dict | None = None
-    alias_score = 0.0
-    alias_diag: dict[str, Any] = {}
-
-    def _dm(extra: dict) -> dict:
-        tel = {
-            k: v
-            for k, v in alias_diag.items()
-            if k.startswith("alias_") or k.startswith("old_")
-        }
-        return {**base_meta, **extra, **tel, "scope_widen_fallback": widen_fb}
-
-    cands = merge_retrieval_candidates(primary, secondary)[:8]
-    cands = prefer_overview_if_broad(cands, broad_query_detect(q_policy))
-    if not cands:
-        return {
-            "mode": "no_candidates",
-            "debug_meta": _dm({"top_score": None}),
-        }
-
-    is_contacts = contacts_intent(q_policy)
-    is_price = price_intent(q_policy)
-    alias_leader, alias_score, alias_diag = corpus_alias_leader(q_policy, client_id=client_id)
-    tier = str(alias_diag.get("alias_decision") or "")
-    sim_raw = float(alias_diag.get("alias_similarity") or 0.0)
-    ath = THRESHOLDS.alias
-    alias_strong = bool(
-        alias_leader
-        and alias_score >= float(ath.strong_effective_min)
-        and (
-            tier in ("exact", "near_exact")
-            or (
-                tier == "embed_high"
-                and sim_raw >= float(ath.embedding_strong_cosine_min)
-            )
-            or (
-                tier == "rescue"
-                and sim_raw >= float(ath.embedding_strong_cosine_min)
-            )
-        )
-    )
-
-    top_score = float(cands[0].get("_score") or 0.0)
-    allow_low = alias_strong or (is_contacts and pick_contacts_chunk(cands)) or (
-        is_price and pick_prices_chunk(cands)
-    )
-    if top_score < LOW_SCORE_THRESHOLD and not allow_low:
-        if alias_leader and alias_score >= float(THRESHOLDS.alias.soft_assist_min):
-            soft = dict(alias_leader)
-            soft["_alias_score"] = round(alias_score, 4)
-            soft["_score"] = round(float(alias_score), 4)
-            return {
-                "mode": "chunk",
-                "chunk": soft,
-                "rerank_applied": False,
-                "debug_meta": _dm(
-                    {
-                        "selected_by": "soft_alias_assist",
-                        "top_score": round(top_score, 4),
-                        "threshold": LOW_SCORE_THRESHOLD,
-                        "alias_score": round(float(alias_score or 0.0), 4),
-                        "is_contacts": bool(is_contacts),
-                        "is_price": bool(is_price),
-                    }
-                ),
-            }
-        top_cinfo = chunk_info(cands[0], cands[0].get("_score")) if cands else None
-        return {
-            "mode": "low_score",
-            "debug_meta": _dm(
-                {
-                    "top_score": round(top_score, 4),
-                    "threshold": LOW_SCORE_THRESHOLD,
-                    "alias_score": round(float(alias_score or 0.0), 4),
-                    "is_contacts": bool(is_contacts),
-                    "is_price": bool(is_price),
-                    "top_candidate": top_cinfo,
-                }
-            ),
-        }
-
-    if is_contacts:
-        picked = pick_contacts_chunk(cands)
-        if picked is not None:
-            return {
-                "mode": "chunk",
-                "chunk": picked,
-                "rerank_applied": False,
-                "debug_meta": _dm(
-                    {
-                        "selected_by": "contacts",
-                        "top_score": round(top_score, 4),
-                        "alias_score": round(float(alias_score or 0.0), 4),
-                    }
-                ),
-            }
-
-    if is_price:
-        picked = pick_prices_chunk(cands)
-        if picked is not None:
-            return {
-                "mode": "chunk",
-                "chunk": picked,
-                "rerank_applied": False,
-                "debug_meta": _dm(
-                    {
-                        "selected_by": "price",
-                        "top_score": round(top_score, 4),
-                        "alias_score": round(float(alias_score or 0.0), 4),
-                    }
-                ),
-            }
-
-    top = cands[0]
-    score_gap = (
-        abs(float(cands[0].get("_score") or 0.0) - float(cands[1].get("_score") or 0.0))
-        if len(cands) >= 2
-        else 1.0
-    )
-    use_rerank = (
-        len(cands) >= 2
-        and top_score >= LOW_SCORE_THRESHOLD
-        and top_score < 0.75
-        and score_gap < 0.15
-        and not is_point_literal_query(q_policy)
-    )
-    if use_rerank:
-        top = llm_rerank(q_user, cands[:3])
-
+    """Embed retrieval is removed in full-context 3.4; content uses composer."""
+    _ = (q, client_id, sid, scope_topic, decision)
     return {
-        "mode": "chunk",
-        "chunk": top,
-        "rerank_applied": bool(use_rerank),
-        "debug_meta": _dm(
-            {
-                "selected_by": "semantic",
-                "top_score": round(top_score, 4),
-                "score_gap": round(float(score_gap), 4),
-                "alias_score": round(float(alias_score or 0.0), 4),
-            }
-        ),
+        "mode": "no_candidates",
+        "debug_meta": {"retrieval_removed": True},
     }
 
 
 def _safe_client_id(client_id: str | None) -> str:
-    return (client_id or DEFAULT_CLIENT_ID or "default").strip() or "default"
+    return resolve_pack_client_id(client_id)
 
 
 def _client_json_path(client_id: str | None, file_name: str) -> str:
@@ -277,110 +141,12 @@ def _read_json_dict(path: str) -> dict:
         return {}
 
 
-def _norm(s: str) -> str:
-    x = (s or "").strip().lower().replace("ё", "е")
-    x = re.sub(r"[^\w\s]", " ", x, flags=re.U)
-    return re.sub(r"\s+", " ", x, flags=re.U).strip()
+def commercial_info_query(q: str) -> bool:
+    return bool(COMMERCIAL_INFO_RE.search(q or ""))
 
 
-_STOP = frozenset({
-    "а", "в", "во", "на", "по", "за", "к", "ко", "с", "со", "из", "от", "до",
-    "не", "ли", "бы", "же", "и", "или", "но", "что", "как", "это", "для",
-    "при", "под", "над", "без", "то", "все", "мне", "мой", "моя", "моё",
-    "вы", "вас", "вам", "нас", "нам", "их", "его", "её",
-})
-
-
-def _token_set(s: str) -> set[str]:
-    return {t for t in _norm(s).split() if len(t) >= 2 or t.isdigit()}
-
-
-def _contains_token_phrase(query_norm: str, phrase_norm: str) -> bool:
-    if not query_norm or not phrase_norm:
-        return False
-    pattern = r"(?<!\w)" + re.escape(phrase_norm) + r"(?!\w)"
-    return bool(re.search(pattern, query_norm, flags=re.U))
-
-
-def _core_tokens_catalog(text: str) -> list[str]:
-    return [t for t in _norm(text).split() if (len(t) >= 2 or t.isdigit()) and t not in _STOP]
-
-
-def _match_score_lemma(query: str, phrase: str) -> float:
-    """Матч с лемматизацией — обрабатывает падежи ("коронки" = "коронка")."""
-    q_toks = _core_tokens_catalog(query)
-    p_toks = _core_tokens_catalog(phrase)
-    if not q_toks or not p_toks:
-        return 0.0
-    q_lem = set(alias_lexical.lemma_forms_for_tokens(q_toks))
-    p_lem = set(alias_lexical.lemma_forms_for_tokens(p_toks))
-    if not q_lem or not p_lem:
-        return 0.0
-    # Все леммы alias-фразы входят в запрос — сильный матч
-    if p_lem <= q_lem:
-        return 0.92
-    # Все леммы запроса входят в alias-фразу
-    if q_lem <= p_lem:
-        return 0.88
-    inter = len(q_lem & p_lem)
-    if inter == 0:
-        return 0.0
-    recall = inter / len(p_lem)
-    precision = inter / len(q_lem)
-    return round(max(recall, (recall + precision) / 2.0), 4)
-
-
-def _match_score(query: str, phrase: str) -> float:
-    qn = _norm(query)
-    pn = _norm(phrase)
-    if not qn or not pn:
-        return 0.0
-    if _contains_token_phrase(qn, pn):
-        return 1.0
-    qt = _token_set(qn)
-    pt = _token_set(pn)
-    if not qt or not pt:
-        return 0.0
-    inter = len(qt.intersection(pt))
-    if inter == 0:
-        return 0.0
-    recall = inter / len(pt)
-    precision = inter / len(qt)
-    return round(max(recall, (recall + precision) / 2.0), 4)
-
-
-def _catalog_typo_stem_overlap(q_token: str, phrase_norm: str, *, min_stem: int = 7) -> float:
-    """Длинный общий фрагмент токена внутри фразы каталога (обеливания → …беливан… в отбеливание)."""
-    qt = _norm(q_token)
-    if len(qt) < min_stem + 1 or not phrase_norm:
-        return 0.0
-    for start in range(len(qt) - min_stem + 1):
-        for length in range(len(qt) - start, min_stem - 1, -1):
-            sub = qt[start : start + length]
-            if len(sub) >= min_stem and sub in phrase_norm:
-                return 0.78
-    return 0.0
-
-
-def _match_score_catalog_typo(query: str, phrase: str) -> float:
-    """Char-trigram и stem-overlap по токенам (общий механизм, не список опечаток)."""
-    q_tokens = [t for t in _core_tokens_catalog(query) if len(t) >= 5]
-    if not q_tokens:
-        return 0.0
-    p_norm = _norm(phrase)
-    p_tokens = [_norm(t) for t in _core_tokens_catalog(phrase) if len(t) >= 4]
-    best = 0.0
-    for qt in q_tokens:
-        qt_n = _norm(qt)
-        for pt in p_tokens:
-            best = max(best, alias_lexical.trigram_alias_boost(qt_n, pt))
-        if p_norm:
-            best = max(best, alias_lexical.trigram_alias_boost(qt_n, p_norm))
-            if len(qt_n) >= 8:
-                trimmed = qt_n[:-1]
-                best = max(best, alias_lexical.trigram_alias_boost(trimmed, p_norm))
-            best = max(best, _catalog_typo_stem_overlap(qt_n, p_norm))
-    return round(float(best), 4)
+def consultation_info_query(q: str) -> bool:
+    return bool(CONSULTATION_QUERY_RE.search(q or ""))
 
 
 def _lookup_intent_by_rules(q: str) -> str:
@@ -389,10 +155,14 @@ def _lookup_intent_by_rules(q: str) -> str:
         return "other"
     if continuation_only_phrase(q0):
         return "other"
+    if is_crown_inclusion_content_query(q0):
+        return "other"
     if PRICE_CONCERN_RE.search(q0):
         return "price_concern"
     if PRICE_LOOKUP_RE.search(q0):
         return "price_lookup"
+    if consultation_info_query(q0) or commercial_info_query(q0):
+        return "other"
     return "other"
 
 
@@ -418,38 +188,39 @@ def classify_price_route_intent(q: str, *, client_id: str | None, sid: str | Non
     return classify_price_intent(q, client_id=client_id, sid=sid or "")
 
 
-def match_service_from_catalog(q: str, *, client_id: str | None) -> dict:
+def match_service_from_catalog(
+    q: str,
+    *,
+    client_id: str | None,
+    exclude_service_ids: frozenset[str] | None = None,
+    service_topic: str | None = None,
+    topic_confidence: float = 0.0,
+) -> dict:
     catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
-    best_id = None
-    best_obj = None
-    best_score = 0.0
-    for service_id, entry in catalog.items():
-        if not isinstance(entry, dict) or not bool(entry.get("active", True)):
-            continue
-        phrases = []
-        title = str(entry.get("title") or "").strip()
-        if title:
-            phrases.append(title)
-        aliases = list(entry.get("aliases") or [])
-        phrases.extend(str(x).strip() for x in aliases if str(x).strip())
-        local_best = 0.0
-        for ph in phrases:
-            local_best = max(
-                local_best,
-                _match_score(q, ph),
-                _match_score_lemma(q, ph),
-                _match_score_catalog_typo(q, ph),
-            )
-        if local_best > best_score:
-            best_id = str(service_id)
-            best_obj = entry
-            best_score = local_best
-    return {
-        "matched_service_id": best_id,
-        "service": best_obj,
-        "match_score": round(float(best_score), 4),
-        "is_confident": bool(best_obj is not None and best_score >= PRICE_SERVICE_MATCH_STRONG),
-    }
+    return resolve_catalog_match(
+        q,
+        catalog,
+        exclude_service_ids=exclude_service_ids,
+        service_topic=service_topic,
+        topic_confidence=topic_confidence,
+        strong_match_min=float(PRICE_SERVICE_MATCH_STRONG),
+    )
+
+
+def match_catalog_for_implant_group_overview(q: str, *, client_id: str | None) -> dict:
+    """Generic implant price overview: prefer implant services; no typo-only containment."""
+    q0 = (q or "").strip()
+    exclude: frozenset[str] = frozenset()
+    if not KT_EXPLICIT_RE.search(q0):
+        exclude = frozenset({"tomography"})
+    m = match_service_from_catalog(
+        q0,
+        client_id=client_id,
+        exclude_service_ids=exclude,
+        service_topic="implantation",
+        topic_confidence=0.9,
+    )
+    return {**m, "containment_eligible": False}
 
 
 def compute_retrieval_scope_with_conflict_guard(
@@ -457,28 +228,18 @@ def compute_retrieval_scope_with_conflict_guard(
     scope_topic_candidate: str | None,
     q: str,
     client_id: str | None,
+    decision: Any | None = None,
 ) -> tuple[str | None, str]:
-    """Вернуть эффективный topic scope для retrieval и причину гарда.
-
-    Порядок: containment catalog (как в A3) блокирует scope; затем сильный alias.
-    ``guard_reason``: ``catalog_match`` | ``alias_hit`` | ``none``.
-    """
+    """Legacy no-op after embed retrieval removal."""
     raw = (scope_topic_candidate or "").strip().lower()
     if not raw or raw == "unknown":
         return None, "none"
 
     q0 = (q or "").strip()
     match = match_service_from_catalog(q0, client_id=client_id)
-    cat_score = float(match.get("match_score") or 0.0)
-    if cat_score >= float(THRESHOLDS.catalog_match.containment_min):
+    if match.get("containment_eligible"):
         return None, "catalog_match"
-
-    q_pol = normalize_retrieval_query(q0) or q0
-    _leader, alias_sc, _alias_diag = corpus_alias_leader(q_pol, client_id=client_id)
-    alias_val = float(alias_sc or 0.0)
-    if alias_val >= float(THRESHOLDS.alias.scope_guard_min):
-        return None, "alias_hit"
-
+    _ = decision
     return raw, "none"
 
 
@@ -497,20 +258,34 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
         return None
 
     def _make_result(service_id: str, entry: dict, context_doc_id: str | None) -> dict:
-        prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
         price_key = entry.get("price_key")
         price_ref = entry.get("price_ref")
-        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+        pb_avail = _service_in_pricebook(client_id, service_id, price_key)
+        price_item = None
+        if not pb_avail:
+            prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
+            price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
         return {
             "service_id": str(service_id),
             "service": entry,
             "price_key": price_key,
             "price_ref": price_ref,
             "price_item": price_item if isinstance(price_item, dict) else None,
+            "pricebook_available": pb_avail,
             "context_doc_id": context_doc_id,
         }
 
-    # Попытка 1: по current_doc_id (сервисы с md_entry_ref)
+    # Попытка 1: last_subject (диалоговый фокус; приоритет над устаревшим catalog id)
+    sub = st.get("last_subject")
+    age = int(st.get("subject_turn_age") or 0)
+    if isinstance(sub, dict) and age <= int(THRESHOLDS.follow_up.max_subject_turn_age):
+        sub_sid = (sub.get("service_id") or "").strip()
+        if sub_sid and sub_sid in catalog:
+            entry = catalog[sub_sid]
+            if isinstance(entry, dict) and bool(entry.get("active", True)):
+                return _make_result(sub_sid, entry, None)
+
+    # Попытка 2: по current_doc_id (сервисы с md_entry_ref)
     current_doc_id = (st.get("current_doc_id") or "").strip()
     if current_doc_id:
         doc_norm = current_doc_id.removesuffix(".md")
@@ -523,7 +298,7 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
             if md_ref.removesuffix(".md") == doc_norm:
                 return _make_result(service_id, entry, current_doc_id)
 
-    # Попытка 2: по last_catalog_service_id (сервисы без md_entry_ref, напр. КТ, отбеливание)
+    # Попытка 3: по last_catalog_service_id (сервисы без md_entry_ref, напр. КТ, отбеливание)
     last_svc_id = (st.get("last_catalog_service_id") or "").strip()
     if last_svc_id and last_svc_id in catalog:
         entry = catalog[last_svc_id]
@@ -547,18 +322,13 @@ def price_session_ctx_matches_catalog_leader(match: dict[str, Any], ctx: dict[st
 
 def _price_query_names_explicit_service(q: str) -> bool:
     """В ценовом вопросе есть название услуги, а не только «а сколько стоит»."""
-    if continuation_only_phrase(q):
-        return False
-    qn = re.sub(r"\s+", " ", (q or "").strip(), flags=re.U)
-    stripped = PRICE_LOOKUP_RE.sub("", qn).strip()
-    stripped = re.sub(r"^(?:а|и|ну)\s+", "", stripped, flags=re.I | re.U).strip()
-    stripped = re.sub(r"^[\s?.!,;:—\-]+", "", stripped).strip()
-    tokens = [t for t in re.findall(r"[0-9a-zа-яё]{3,}", stripped, flags=re.I | re.U)]
-    return bool(tokens)
+    return price_query_has_explicit_service_object(q)
 
 
 def price_lookup_allows_session_context(q: str, match: dict[str, Any], ctx: dict[str, Any]) -> bool:
     """Session fallback для цены: тот же service_id в каталоге или короткое продолжение без нового объекта."""
+    if is_vague_price_followup(q) and is_weak_catalog_price_token_match(match, q):
+        return True
     if not price_session_ctx_matches_catalog_leader(match, ctx):
         return False
     if not (match.get("matched_service_id") or "").strip() and _price_query_names_explicit_service(q):
@@ -566,50 +336,203 @@ def price_lookup_allows_session_context(q: str, match: dict[str, Any], ctx: dict
     return True
 
 
+def _dialog_focus_for_price_route(
+    q: str,
+    *,
+    sid: str | None,
+    client_id: str | None,
+) -> DialogFocusDecision | None:
+    return dialog_focus_for_turn(q, sid=sid, client_id=client_id)
+
+
+def _dialog_focus_price_intent(focus: DialogFocusDecision | None) -> bool:
+    return bool(focus and focus.attribute == "price")
+
+
+def _dialog_focus_allows_price_session_context(
+    focus: DialogFocusDecision | None,
+    ctx: dict[str, Any],
+) -> bool:
+    if not _dialog_focus_price_intent(focus) or not focus:
+        return False
+    if focus.explicit_topic_change:
+        return False
+    resolved = (focus.resolved_service_id or focus.focus_service_id or "").strip()
+    if not resolved:
+        return False
+    return resolved == str(ctx.get("service_id") or "").strip()
+
+
+def _try_price_session_route(
+    q: str,
+    match: dict[str, Any],
+    ctx: dict[str, Any],
+    *,
+    intent: str,
+    sid: str | None,
+    client_id: str | None,
+    fallback_reason_default: str = "context_session",
+    dialog_focus: DialogFocusDecision | None = None,
+) -> dict | None:
+    legacy_allowed = price_lookup_allows_session_context(q, match, ctx)
+    focus_allowed = _dialog_focus_allows_price_session_context(dialog_focus, ctx)
+    if not (legacy_allowed or focus_allowed):
+        return None
+    if focus_allowed and not legacy_allowed:
+        fallback_reason_default = "dialog_focus"
+    pi = ctx.get("price_item")
+    pr = ctx.get("price_ref")
+    rs = "catalog"
+    rs, pr2, fb = _resolve_price_lookup_route(
+        route_source=rs,
+        price_ref=pr,
+        price_item=pi,
+        pricebook_available=bool(ctx.get("pricebook_available")),
+        q=q,
+        sid=sid,
+        client_id=client_id,
+    )
+    fb_final = fb or fallback_reason_default
+    base = {
+        "intent": intent,
+        "route_source": rs,
+        "matched_service_id": ctx["service_id"],
+        "service": ctx["service"],
+        "match_score": 1.0,
+        "is_confident": True,
+        "price_key": ctx.get("price_key"),
+        "price_ref": pr2,
+        "price_item": pi,
+        "context_doc_id": ctx.get("context_doc_id"),
+        "fallback_reason": fb_final,
+    }
+    if _price_route_is_matched(rs, pr2):
+        return {"mode": "matched", **base}
+    return {
+        "mode": "unavailable",
+        "fallback_reason": fb_final or "price_not_in_catalog",
+        **base,
+    }
+
+
 def select_price_service_route(
     q: str, *, client_id: str | None, sid: str | None = None, intent_override: str | None = None
 ) -> dict:
+    dialog_focus = _dialog_focus_for_price_route(q, sid=sid, client_id=client_id)
     if intent_override in ("price_lookup", "price_concern"):
         intent = intent_override
     else:
         intent = classify_price_route_intent(q, client_id=client_id, sid=sid)
+    if intent == "other" and _dialog_focus_price_intent(dialog_focus):
+        intent = "price_lookup"
     if intent == "other":
         return {"mode": "other", "intent": intent}
-    match = match_service_from_catalog(q, client_id=client_id)
-    if not match.get("matched_service_id"):
-        ctx = _service_from_session_context(sid, client_id)
-        if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
-            pi = ctx.get("price_item")
-            pr = ctx.get("price_ref")
-            rs = "catalog"
-            rs, pr2, fb = _resolve_price_lookup_route(
-                route_source=rs, price_ref=pr, price_item=pi, q=q, sid=sid, client_id=client_id
-            )
-            fb_final = fb or "context_session"
-            if rs == "prices_json" or (pr2 and rs == "price_ref"):
-                return {
-                    "mode": "matched",
-                    "intent": intent,
-                    "route_source": rs,
-                    "matched_service_id": ctx["service_id"],
-                    "service": ctx["service"],
-                    "match_score": 1.0,
-                    "is_confident": True,
-                    "price_key": ctx.get("price_key"),
-                    "price_ref": pr2,
-                    "price_item": pi,
-                    "context_doc_id": ctx.get("context_doc_id"),
-                    "fallback_reason": fb_final,
-                }
-            return {
-                "mode": "clarify",
-                "intent": intent,
-                "fallback_reason": fb_final or "price_not_in_catalog",
-                "matched_service_id": ctx.get("service_id"),
-                "service": ctx.get("service"),
+    if is_crown_inclusion_content_query(q):
+        return {"mode": "other", "intent": "other"}
+
+    scope = (
+        detect_price_scope(q, client_id=client_id)
+        if intent == "price_lookup"
+        else PriceScopeResult.none()
+    )
+    if intent == "price_lookup":
+        situation, vague_carry = _patient_situation_for_turn(q, sid=sid, client_id=client_id)
+        scope = merge_price_scope(
+            scope,
+            situation,
+            client_id=client_id,
+            vague_price_carry=vague_carry,
+        )
+    exclude_ids = scope_catalog_excludes(scope)
+    topic_hint = scope_implant_topic(scope)
+    match: dict | None = None
+
+    if intent == "price_lookup" and scope.protocol_service_id:
+        catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
+        proto = catalog.get(scope.protocol_service_id)
+        if isinstance(proto, dict):
+            match = {
+                "matched_service_id": scope.protocol_service_id,
+                "service": proto,
                 "match_score": 1.0,
                 "is_confident": True,
             }
+
+    if match is None:
+        match = match_service_from_catalog(
+            q,
+            client_id=client_id,
+            exclude_service_ids=exclude_ids if exclude_ids else None,
+            service_topic=topic_hint,
+            topic_confidence=0.9 if topic_hint else 0.0,
+        )
+
+    group_id = scope.group_id if intent == "price_lookup" else None
+    if intent == "price_lookup" and group_id:
+        overview_match = (
+            match_catalog_for_implant_group_overview(q, client_id=client_id)
+            if group_id == "implantation"
+            else match
+        )
+        return {
+            "mode": "group_overview",
+            "group_id": group_id,
+            "intent": intent,
+            **overview_match,
+        }
+    if intent == "price_lookup" and is_vague_price_followup(q):
+        scope_resolved_vague_price = bool(
+            scope.protocol_service_id
+            and (match.get("matched_service_id") or "") == scope.protocol_service_id
+            and match.get("is_confident")
+        )
+        if not scope_resolved_vague_price:
+            ctx = _service_from_session_context(sid, client_id)
+            if ctx:
+                session_route = _try_price_session_route(
+                    q,
+                    match,
+                    ctx,
+                    intent=intent,
+                    sid=sid,
+                    client_id=client_id,
+                    dialog_focus=dialog_focus,
+                )
+                if session_route:
+                    return session_route
+            if is_weak_catalog_price_token_match(match, q) or (
+                match.get("is_confident") and not price_query_has_explicit_service_object(q)
+            ):
+                return {
+                    "mode": "clarify",
+                    "intent": intent,
+                    "fallback_reason": "price_clarify_no_context",
+                    **match,
+                }
+    if not match.get("matched_service_id"):
+        if intent == "price_lookup" and is_generic_implant_price_query(q):
+            return {
+                "mode": "group_overview",
+                "group_id": "implantation",
+                "intent": intent,
+                **match_catalog_for_implant_group_overview(q, client_id=client_id),
+            }
+        ctx = _service_from_session_context(sid, client_id)
+        if ctx and intent == "price_lookup" and (
+            price_lookup_allows_session_context(q, match, ctx)
+            or _dialog_focus_allows_price_session_context(dialog_focus, ctx)
+        ):
+            session_route = _try_price_session_route(
+                q,
+                match,
+                ctx,
+                intent=intent,
+                sid=sid,
+                client_id=client_id,
+                dialog_focus=dialog_focus,
+            )
+            if session_route:
+                return session_route
         if continuation_only_phrase(q) and not session_has_continuation_context(
             mem_get(sid) if sid else {}
         ):
@@ -627,38 +550,21 @@ def select_price_service_route(
         }
     if not match.get("is_confident"):
         ctx = _service_from_session_context(sid, client_id)
-        if ctx and intent == "price_lookup" and price_lookup_allows_session_context(q, match, ctx):
-            pi = ctx.get("price_item")
-            pr = ctx.get("price_ref")
-            rs = "catalog"
-            rs, pr2, fb = _resolve_price_lookup_route(
-                route_source=rs, price_ref=pr, price_item=pi, q=q, sid=sid, client_id=client_id
+        if ctx and intent == "price_lookup" and (
+            price_lookup_allows_session_context(q, match, ctx)
+            or _dialog_focus_allows_price_session_context(dialog_focus, ctx)
+        ):
+            session_route = _try_price_session_route(
+                q,
+                match,
+                ctx,
+                intent=intent,
+                sid=sid,
+                client_id=client_id,
+                dialog_focus=dialog_focus,
             )
-            fb_final = fb or "context_session"
-            if rs == "prices_json" or (pr2 and rs == "price_ref"):
-                return {
-                    "mode": "matched",
-                    "intent": intent,
-                    "route_source": rs,
-                    "matched_service_id": ctx["service_id"],
-                    "service": ctx["service"],
-                    "match_score": 1.0,
-                    "is_confident": True,
-                    "price_key": ctx.get("price_key"),
-                    "price_ref": pr2,
-                    "price_item": pi,
-                    "context_doc_id": ctx.get("context_doc_id"),
-                    "fallback_reason": fb_final,
-                }
-            return {
-                "mode": "clarify",
-                "intent": intent,
-                "fallback_reason": fb_final or "price_not_in_catalog",
-                "matched_service_id": ctx.get("service_id"),
-                "service": ctx.get("service"),
-                "match_score": 1.0,
-                "is_confident": True,
-            }
+            if session_route:
+                return session_route
         if continuation_only_phrase(q) and not session_has_continuation_context(
             mem_get(sid) if sid else {}
         ):
@@ -678,7 +584,11 @@ def select_price_service_route(
     service = match.get("service") or {}
     price_ref = service.get("price_ref")
     price_key = service.get("price_key")
-    price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+    matched_sid = str(match.get("matched_service_id") or "")
+    pb_avail = _service_in_pricebook(client_id, matched_sid, price_key)
+    price_item = None
+    if not pb_avail:
+        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
     route_source = "catalog"
     if intent == "price_concern":
         route_source = "catalog"
@@ -688,11 +598,12 @@ def select_price_service_route(
             route_source=route_source,
             price_ref=price_ref,
             price_item=price_item if isinstance(price_item, dict) else None,
+            pricebook_available=pb_avail,
             q=q,
             sid=sid,
             client_id=client_id,
         )
-        if continuation_only_phrase(q) and not price_ref and price_item is None:
+        if continuation_only_phrase(q) and not price_ref and price_item is None and not pb_avail:
             return {
                 "mode": "clarify",
                 "intent": intent,
@@ -701,7 +612,7 @@ def select_price_service_route(
             }
         if fallback_reason == "price_not_in_catalog":
             return {
-                "mode": "clarify",
+                "mode": "unavailable",
                 "intent": intent,
                 "fallback_reason": fallback_reason,
                 **match,
@@ -715,6 +626,56 @@ def select_price_service_route(
         "price_item": price_item if isinstance(price_item, dict) else None,
         "fallback_reason": fallback_reason,
         **match,
+    }
+
+
+def build_price_route_for_service_id(
+    service_id: str,
+    *,
+    client_id: str | None,
+    sid: str | None = None,
+    q: str = "",
+) -> dict | None:
+    """Deterministic price route for widget ref `price:{service_id}` (catalog match score = 1)."""
+    sid_clean = (service_id or "").strip()
+    if not sid_clean:
+        return None
+    catalog = _read_json_dict(_client_json_path(client_id, "service_catalog.json"))
+    if not isinstance(catalog, dict):
+        return None
+    entry = catalog.get(sid_clean)
+    if not isinstance(entry, dict) or not bool(entry.get("active", True)):
+        return None
+    prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
+    price_key = entry.get("price_key")
+    price_ref = entry.get("price_ref")
+    pb_avail = _service_in_pricebook(client_id, sid_clean, price_key)
+    price_item = None
+    if not pb_avail:
+        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
+    q_eff = (q or "").strip() or f"Сколько стоит {entry.get('title') or sid_clean}?"
+    route_source = "catalog"
+    route_source, price_ref, fallback_reason = _resolve_price_lookup_route(
+        route_source=route_source,
+        price_ref=price_ref,
+        price_item=price_item if isinstance(price_item, dict) else None,
+        pricebook_available=pb_avail,
+        q=q_eff,
+        sid=sid,
+        client_id=client_id,
+    )
+    return {
+        "mode": "matched",
+        "intent": "price_lookup",
+        "route_source": route_source,
+        "matched_service_id": sid_clean,
+        "service": entry,
+        "match_score": 1.0,
+        "is_confident": True,
+        "price_key": price_key,
+        "price_ref": price_ref,
+        "price_item": price_item if isinstance(price_item, dict) else None,
+        "fallback_reason": fallback_reason or "price_ref_click",
     }
 
 

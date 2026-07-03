@@ -1,0 +1,18 @@
+{
+  "service_id": "tomography",
+  "price_model": "simple",
+  "display_name": "КТ (компьютерная томография)",
+  "tags": [],
+  "default_unit": null,
+  "price": {
+    "price_type": "fixed",
+    "value": 3000,
+    "currency": "RUB",
+    "note": null
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": [],
+  "followups": [],
+  "cta_key": "price"
+}

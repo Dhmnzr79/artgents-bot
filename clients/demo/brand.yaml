@@ -1,0 +1,12 @@
+# clients/demo/brand.yaml
+clinic_name: "Artgents"
+logo_url: "/static/clients/demo/logo.svg"
+logo_width: 110
+logo_height: 28
+avatar_url: "/static/clients/demo/avatar.png"
+
+colors:
+  brand: "#6952e8"
+  action: "#4A3BA8"
+  button_1: "#7B4EFF"
+  button_2: "#FF8DB2"

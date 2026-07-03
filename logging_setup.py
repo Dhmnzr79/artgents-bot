@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import sys
+import time
 import uuid
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
@@ -12,9 +13,12 @@ from config import estimate_llm_usage_usd
 
 LOG_DIR = os.getenv("BOT_LOG_DIR", "logs")
 LOG_FILE = os.path.join(LOG_DIR, os.getenv("BOT_LOG_FILE", "app.jsonl"))
+_LOG_RETENTION_DAYS = int(os.getenv("BOT_LOG_RETENTION_DAYS", "7"))
+_LOG_PURGE_DONE = False
+_LOG_NAME_RX = re.compile(r"\.(?:jsonl|log)(?:\.\d+)?$", re.IGNORECASE)
 
 SENSITIVE_KEYS = ("api_key", "apikey", "token", "secret", "authorization", "password")
-_USAGE_TOKEN_KEYS = frozenset({"prompt_tokens", "completion_tokens", "total_tokens"})
+_USAGE_TOKEN_KEYS = frozenset({"prompt_tokens", "completion_tokens", "total_tokens", "cached_tokens"})
 _PHONE_DIGIT_MIN = 10
 _PHONE_DIGIT_MAX = 15
 # Ловим номера в разных форматах: +7..., 8(...), с пробелами/скобками/дефисами.
@@ -87,11 +91,48 @@ class JsonLineFormatter(logging.Formatter):
         return json.dumps(base, ensure_ascii=False)
 
 
+def log_retention_days() -> int:
+    """File log retention window; 0 disables time-based purge."""
+    return max(0, _LOG_RETENTION_DAYS)
+
+
+def _is_log_file_name(name: str) -> bool:
+    return bool(_LOG_NAME_RX.search(name or ""))
+
+
+def purge_old_log_files(*, logger: logging.Logger | None = None) -> list[str]:
+    """Delete rotated/local log files older than BOT_LOG_RETENTION_DAYS (by mtime)."""
+    days = log_retention_days()
+    if days <= 0 or not os.path.isdir(LOG_DIR):
+        return []
+    cutoff = time.time() - days * 86400
+    removed: list[str] = []
+    for name in os.listdir(LOG_DIR):
+        if not _is_log_file_name(name):
+            continue
+        path = os.path.join(LOG_DIR, name)
+        if not os.path.isfile(path):
+            continue
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                removed.append(name)
+        except OSError:
+            continue
+    if removed and logger is not None:
+        log_json(logger, "log_retention_purge", retention_days=days, removed=removed)
+    return removed
+
+
 def get_logger(name="bot"):
+    global _LOG_PURGE_DONE
     os.makedirs(LOG_DIR, exist_ok=True)
     logger = logging.getLogger(name)
     if logger.handlers:
         return logger
+    if not _LOG_PURGE_DONE:
+        _LOG_PURGE_DONE = True
+        purge_old_log_files()
     logger.setLevel(logging.INFO)
     fh = RotatingFileHandler(LOG_FILE, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
     ch = logging.StreamHandler(sys.stdout)
@@ -159,11 +200,20 @@ def emit_bot_event(
     if status is not None:
         row["status"] = status
     row["details"] = dict(details or {})
+    try:
+        from core.observability_pii import scrub_observability_details
+
+        row["details"] = scrub_observability_details(row["details"])
+    except Exception:
+        pass
     safe_row = _sanitize(row)
     try:
+        from core.client_config_loader import postgres_events_enabled
         from pg_sink import enqueue_bot_event
 
-        enqueue_bot_event(safe_row)
+        cid = safe_row.get("client_id")
+        if postgres_events_enabled(cid):
+            enqueue_bot_event(safe_row)
     except Exception:
         pass
     logger.info("bot_event", extra={"extra_data": safe_row})
@@ -179,6 +229,19 @@ def log_json(logger, message, **fields):
     logger.info(message, extra={"extra_data": _sanitize(fields)})
 
 
+def _cached_tokens_from_usage_obj(u: object) -> int | None:
+    details = getattr(u, "prompt_tokens_details", None)
+    if details is None:
+        return None
+    ct = getattr(details, "cached_tokens", None)
+    if ct is None and isinstance(details, dict):
+        ct = details.get("cached_tokens")
+    try:
+        return int(ct) if ct is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def usage_dict_from_completion(resp) -> dict | None:
     u = getattr(resp, "usage", None)
     if u is None:
@@ -191,6 +254,9 @@ def usage_dict_from_completion(resp) -> dict | None:
         "completion_tokens": ct,
         "total_tokens": tt,
     }
+    cached = _cached_tokens_from_usage_obj(u)
+    if cached is not None:
+        out["cached_tokens"] = int(cached)
     est = estimate_llm_usage_usd(prompt_tokens=pt, completion_tokens=ct)
     if est is not None:
         out["estimated_usd"] = est
@@ -237,6 +303,9 @@ def log_llm_stream_usage(
         "completion_tokens": ct,
         "total_tokens": tt,
     }
+    cached = _cached_tokens_from_usage_obj(usage_obj)
+    if cached is not None:
+        det["cached_tokens"] = int(cached)
     est = estimate_llm_usage_usd(prompt_tokens=pt, completion_tokens=ct)
     if est is not None:
         det["estimated_usd"] = est

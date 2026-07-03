@@ -16,7 +16,7 @@ def test_ensure_lead_before_list_adds_pricing_intro() -> None:
         user_question="Сколько стоит классическая имплантация?",
         h2="Цены на импланты",
         h3="Коротко",
-        doc_id="implantation__pricing__implants",
+        doc_id="implantation__service__classic",
     )
     assert out.startswith("Стоимость имплантации")
     assert "\n\n- **Implantium**" in out

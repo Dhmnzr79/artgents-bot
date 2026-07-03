@@ -8,13 +8,26 @@ from openai import OpenAI
 from config import (
     BOOKING_INTENT_LLM_MODEL,
     BOOKING_INTENT_LLM_ON,
+    CHAT_API_KEY,
+    CHAT_BASE_URL,
     CHAT_JSON_MODE,
+    QWEN_ENABLE_THINKING,
+    chat_provider_is_qwen,
     CHAT_MODEL,
     COMPLAINT_CLASSIFY_MODEL,
+    DIALOG_FOCUS_LLM_CLASSIFY_ON,
+    DIALOG_FOCUS_LLM_MODEL,
     EMPATHY_ON,
     LEAD_NAME_CLASSIFY_MODEL,
+    LEAD_TURN_LLM_CLASSIFY_ON,
+    LEAD_TURN_LLM_MODEL,
     MEMORY_ON,
-    OPENAI_API_KEY,
+    PATIENT_SITUATION_LLM_MODEL,
+    PATIENT_SITUATION_LLM_ON,
+    ASPECT_PLANNER_LLM_MODEL,
+    ASPECT_PLANNER_LLM_ON,
+    COMPOSER_ON,
+    FULLCTX_ON,
     PRICE_INTENT_LLM_MODEL,
     PRICE_INTENT_LLM_ON,
     QUERY_REWRITE_MAX_MESSAGES,
@@ -28,14 +41,45 @@ from config import (
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_stream_usage, log_llm_usage
 from meta_loader import get_doc_meta, get_doc_path
 from session import (
+    format_dialog_context_for_understanding,
     is_first_in_topic,
     mem_context,
     mem_get,
+    recent_dialog_history,
     update_topic_empathy,
 )
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+_chat_client_kwargs: dict = {"api_key": CHAT_API_KEY}
+if CHAT_BASE_URL:
+    _chat_client_kwargs["base_url"] = CHAT_BASE_URL
+chat_client = OpenAI(**_chat_client_kwargs)
+client = chat_client
+
 logger = get_logger("bot")
+
+COMPOSER_FULLCTX_EMPATHY_FIRST_TOUCH = (
+    "Это первое касание чувствительной темы в диалоге: начни с одной короткой "
+    "человеческой фразы, снижающей напряжение, затем сразу суть."
+)
+COMPOSER_FULLCTX_EMPATHY_REPEAT_TOUCH = (
+    "Тема уже обсуждалась — без вступительных фраз сочувствия, сразу по существу."
+)
+
+
+def _qwen_disable_thinking(*, model: str, kwargs: dict) -> dict:
+    """DashScope Qwen only: thinking adds latency; off by default (QWEN_ENABLE_THINKING=0)."""
+    extra_body = dict(kwargs.pop("extra_body", None) or {})
+    if not QWEN_ENABLE_THINKING and chat_provider_is_qwen():
+        extra_body.setdefault("enable_thinking", False)
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+    return kwargs
+
+
+def chat_completions_create(*, model: str, **kwargs):
+    """Chat completion via chat_client with Qwen-compatible extras."""
+    kwargs = _qwen_disable_thinking(model=model, kwargs=dict(kwargs))
+    return chat_client.chat.completions.create(model=model, **kwargs)
 LLM_REQUEST_TIMEOUT_SEC = float(os.getenv("LLM_REQUEST_TIMEOUT_SEC", "20"))
 LLM_FALLBACK_ANSWER = os.getenv(
     "LLM_FALLBACK_ANSWER",
@@ -51,6 +95,18 @@ _REWRITE_SYSTEM = (
     'Ответь одним JSON-объектом с ключом "search_query" (строка). Без markdown.'
 )
 
+_DIALOG_FOCUS_GRAY_SYSTEM = (
+    "Ты строгий классификатор коротких уточняющих вопросов в стоматологическом чате. "
+    "У тебя есть текущая тема диалога: конкретная услуга. "
+    "Задача: определить, является ли сообщение пациента нормальным уточнением по этой теме. "
+    "Не выбирай маршрут, не добавляй маркетинг, не выдумывай факты. "
+    "Если это уточнение по текущей теме, верни kind=follow_up и короткий query_rewrite для поиска по базе знаний. "
+    "query_rewrite должен явно включать текущую услугу и смысл вопроса пациента. "
+    "Если пациент явно меняет тему, просит записаться, называет другую услугу или непонятно о чем речь — верни kind=unclear. "
+    'Ответь одним JSON-объектом: {"kind":"follow_up|unclear","attribute":"general","query_rewrite":"...","confidence":0.0}. '
+    "Без markdown и текста вне JSON."
+)
+
 
 def _norm_rewrite_compare(s: str) -> str:
     x = (s or "").strip().lower().replace("ё", "е")
@@ -58,10 +114,20 @@ def _norm_rewrite_compare(s: str) -> str:
     return re.sub(r"\s+", " ", x).strip()
 
 
-def validated_retrieval_rewrite(q_user: str, model_out: str) -> tuple[str, str | None]:
+def validated_retrieval_rewrite(
+    q_user: str,
+    model_out: str,
+    *,
+    context_anchors: list[str] | None = None,
+) -> tuple[str, str | None]:
     """Вернуть (эффективная строка для доп. семантики, причина отказа или None).
 
     Эффективная строка никогда не бывает пустой при непустом q_user."""
+    from core.service_followup import (
+        rewrite_overlaps_attribute_synonyms,
+        rewrite_overlaps_context_anchors,
+    )
+
     u0 = (q_user or "").strip()
     w0 = (model_out or "").strip()
     if not u0:
@@ -74,7 +140,14 @@ def validated_retrieval_rewrite(q_user: str, model_out: str) -> tuple[str, str |
         if marker and marker in wl:
             return u0, "prompt_leak"
 
-    if QUERY_REWRITE_VALIDATE_OVERLAP and not _rewrite_overlaps_user_question(u0, w0):
+    if QUERY_REWRITE_VALIDATE_OVERLAP:
+        if _rewrite_overlaps_user_question(u0, w0):
+            return w0, None
+        if rewrite_overlaps_attribute_synonyms(u0, w0):
+            return w0, None
+        anchors = [a for a in (context_anchors or []) if str(a).strip()]
+        if anchors and rewrite_overlaps_context_anchors(w0, anchors):
+            return w0, None
         return u0, "no_overlap"
 
     return w0, None
@@ -110,6 +183,16 @@ def rewrite_query_for_retrieval(
     hist = list(st.get("hist") or [])
     if not hist:
         return q0
+
+    from core.rewrite_policy import rewrite_skip_reason
+    from core.turn_timing import set_flag, timed_stage
+
+    skip_reason = rewrite_skip_reason(session_id, q0, client_id=client_id)
+    if skip_reason:
+        set_flag("rewrite_enabled", False)
+        set_flag("rewrite_skipped_reason", skip_reason)
+        return q0
+    set_flag("rewrite_enabled", True)
 
     def _h2_title_for_doc(doc_id: str) -> str | None:
         if not doc_id:
@@ -169,16 +252,17 @@ def rewrite_query_for_retrieval(
         f"{q0}"
     )
     try:
-        resp = client.chat.completions.create(
-            model=QUERY_REWRITE_MODEL,
-            max_completion_tokens=200,
-            response_format={"type": "json_object"},
-            timeout=LLM_REQUEST_TIMEOUT_SEC,
-            messages=[
-                {"role": "system", "content": _REWRITE_SYSTEM},
-                {"role": "user", "content": user_block},
-            ],
-        )
+        with timed_stage("rewrite_ms"):
+            resp = chat_completions_create(
+                model=QUERY_REWRITE_MODEL,
+                max_completion_tokens=200,
+                response_format={"type": "json_object"},
+                timeout=LLM_REQUEST_TIMEOUT_SEC,
+                messages=[
+                    {"role": "system", "content": _REWRITE_SYSTEM},
+                    {"role": "user", "content": user_block},
+                ],
+            )
         log_llm_usage(
             logger, resp, call_type="retrieval_query_rewrite", model=QUERY_REWRITE_MODEL
         )
@@ -192,7 +276,19 @@ def rewrite_query_for_retrieval(
         out = str(sq).strip() if sq is not None else ""
         if not out or len(out) > 600:
             raise ValueError("rewrite_empty_or_long")
-        effective, reject_reason = validated_retrieval_rewrite(q0, out)
+        context_anchors = []
+        if last_service_id:
+            context_anchors.append(last_service_id)
+        if last_service_id:
+            stitle_for_val = _service_title_from_catalog(last_service_id)
+            if stitle_for_val:
+                context_anchors.append(stitle_for_val)
+        context_anchors.extend(topic_bits[:2])
+        effective, reject_reason = validated_retrieval_rewrite(
+            q0,
+            out,
+            context_anchors=context_anchors,
+        )
         if reject_reason:
             log_json(
                 logger,
@@ -263,12 +359,15 @@ def generate_facts_card_answer(
         return None
     from core.consult_nudge import consult_nudge_prompt_addon
 
-    system = _FACTS_CARD_SYSTEM + consult_nudge_prompt_addon(consult_nudge)  # type: ignore[arg-type]
+    system = _FACTS_CARD_SYSTEM + consult_nudge_prompt_addon(
+        consult_nudge,  # type: ignore[arg-type]
+        client_id=client_id,
+    )
     facts_block = "\n".join(f"- {f}" for f in facts)
     q_line = f"Вопрос пациента: {user_question}\n\n" if user_question else ""
     user_msg = f"{q_line}Услуга: {title}\n\nФакты:\n{facts_block}"
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=CHAT_MODEL,
             temperature=0.2,
             max_completion_tokens=300,
@@ -292,28 +391,7 @@ def generate_facts_card_answer(
     return None
 
 
-BASE_SYSTEM = (
-    "Ты — Надежда, консультант стоматологической клиники. "
-    "Ты не врач — ты хорошо знаешь клинику и помогаешь человеку спокойно разобраться в вопросе.\n\n"
-    "Отвечай простым, живым и понятным языком, без официоза, канцелярита и лишних медицинских терминов. "
-    "Не изображай чрезмерную заботу, не хвали вопрос пользователя и не комментируй сам факт обращения "
-    "фразами вроде «хорошо, что вы спросили» или «отлично, что интересуетесь».\n\n"
-    "Отвечай только по содержанию базы знаний и не придумывай факты. "
-    "Если в материале есть цифры, сроки, цены, гарантии, проценты или условия — "
-    "обязательно сохраняй их в ответе точно.\n\n"
-    "Отвечай коротко и по делу: не пересказывай весь материал подряд, "
-    "а отвечай именно на тот вопрос, который задал пользователь. "
-    "По умолчанию начинай сразу с сути ответа, без лишнего вступления.\n\n"
-    "Если информации в базе нет, честно скажи об этом без попытки выкрутиться и без выдумок. "
-    "В таком случае можно спокойно предложить обсудить вопрос на консультации.\n\n"
-    "Не дави, не уговаривай и не делай каждый ответ «продающим». "
-    "Если уместно, можно мягко упомянуть, что на консультации можно разобраться подробнее, "
-    "и она бесплатная.\n\n"
-    "Не заканчивай ответ предложением продолжить тему текстом "
-    "(«если хотите, могу ещё рассказать», «могу сравнить дальше», «могу продолжить») — "
-    "продолжение только через кнопки интерфейса, если они есть."
-)
-
+from core.llm_system_prompt import build_base_system
 # См. docs/WIDGET_ANSWER_FORMAT.md — контракт с виджетом.
 RESPONSE_FORMAT = (
     "\n\nФормат текста ответа (виджет чата, см. WIDGET_ANSWER_FORMAT):\n"
@@ -340,7 +418,10 @@ RESPONSE_FORMAT = (
 def _consult_nudge_addon(meta: dict) -> str:
     from core.consult_nudge import consult_nudge_prompt_addon
 
-    return consult_nudge_prompt_addon(meta.get("consult_nudge"))
+    return consult_nudge_prompt_addon(
+        meta.get("consult_nudge"),
+        client_id=meta.get("client_id"),
+    )
 
 
 GENERATOR_SINGLE_SOURCE_RULE = (
@@ -350,6 +431,50 @@ GENERATOR_SINGLE_SOURCE_RULE = (
     "Не используй историю диалога и любой контекст вне этого блока как источник фактов. "
     "Они нужны только для того, чтобы понять, о чем именно спрашивает пользователь "
     "и как лучше сформулировать ответ."
+)
+
+COMPOSER_TRUTH_STYLE_RULE = (
+    "Пиши ЖИВЫМ, естественным языком — перефразируй и вплетай куски в один связный ответ, "
+    "как говорил бы внимательный консультант. Это НЕ дословное цитирование.\n"
+    "НО: факты, цифры и конкретные утверждения — СТРОГО из источника (база знаний / карточки ниже):\n"
+    "- не выдумывай фактов, которых в источнике нет;\n"
+    "- не меняй числа (проценты, суммы, сроки, гарантии) — переноси их дословно "
+    "(99,8% остаётся 99,8%, а не «почти 100%»);\n"
+    "- не добавляй утверждений, которых в источнике нет, и не смягчай/не усиливай то, что есть.\n"
+    "Смысл источника доноси точно, слова — свои, живые.\n"
+    "Если в источнике «без боли, лёгкий дискомфорт» — донеси именно этот смысл своими словами."
+)
+
+COMPOSER_PACKET_RULE = (
+    "\n\n"
+    "Собери ОДИН связный ответ из разрешённых карточек ниже, В ПОРЯДКЕ их следования.\n"
+    f"{COMPOSER_TRUTH_STYLE_RULE}\n"
+    "ЦЕНОВОЙ ФАКТБЛОК (помечен ДОСЛОВНО) воспроизведи дословно: суммы, единицу, список «входит» — "
+    "не меняй, не округляй, не дописывай и не выкидывай пункты.\n"
+    "Вплетай естественно, без шва между темами. Приглашений и CTA не добавляй — их добавит интерфейс."
+)
+
+COMPOSER_FULLCTX_NO_KB_ANSWER_RULE = (
+    "Если в базе знаний нет ответа на вопрос пациента — не выдумывай и не отвечай из общих знаний. "
+    "Скажи об этом легко и по-человечески, без извинений и канцелярита: короткая честная фраза, "
+    "что такой детали в твоих материалах нет, и сразу — полезный следующий шаг. "
+    "Если в базе есть смежная информация, которая частично помогает — дай её "
+    "(\"точных цифр по этому у меня нет, но вот что важно знать...\"). "
+    "Заверши мыслью, что такие вещи быстрее всего уточнить у администратора или врача на консультации — "
+    "тёпло, без давления. Кнопки записи добавит интерфейс — не дублируй призыв текстом дважды.\n"
+)
+
+COMPOSER_FULLCTX_RULE = (
+    "\n\n"
+    + COMPOSER_FULLCTX_NO_KB_ANSWER_RULE
+    + "\n\n"
+    "Собери ОДИН связный ответ по вопросу пациента.\n"
+    "Медицинские и информационные факты — из базы знаний клиники ниже.\n"
+    f"{COMPOSER_TRUTH_STYLE_RULE}\n"
+    "Цены и промо — ТОЛЬКО из разрешённых карточек; "
+    "ценовой фактблок (помечен ДОСЛОВНО) воспроизведи дословно: суммы, единицу, список «входит» — "
+    "не меняй, не округляй, не дописывай и не выкидывай пункты.\n"
+    "Вплетай естественно, без шва между темами. Приглашений и CTA не добавляй — их добавит интерфейс."
 )
 
 EMPATHY_ADDON = (
@@ -502,8 +627,9 @@ def build_messages_for_gpt(
     allow_empathy = bool(EMPATHY_ON and meta.get("empathy_enabled"))
     first_in_topic = is_first_in_topic(session_id, doc_key)
     use_empathy = bool(allow_empathy and first_in_topic)
+    client_id = meta.get("client_id")
     system_prompt = (
-        BASE_SYSTEM
+        build_base_system(client_id)
         + RESPONSE_FORMAT
         + GENERATOR_SINGLE_SOURCE_RULE
         + (EMPATHY_ADDON if use_empathy else "")
@@ -574,7 +700,7 @@ def generate_answer_with_empathy(
         kwargs["response_format"] = {"type": "json_object"}
     kwargs["timeout"] = LLM_REQUEST_TIMEOUT_SEC
     try:
-        resp = client.chat.completions.create(**kwargs)
+        resp = chat_completions_create(**kwargs)
         log_llm_usage(logger, resp, call_type="chat_answer", model=CHAT_MODEL)
         raw = (resp.choices[0].message.content or "").strip()
         answer = raw
@@ -615,6 +741,271 @@ def generate_answer_with_empathy(
     return answer, profile
 
 
+def _format_composer_card_blocks(materialized_cards: list) -> str:
+    from contracts.answer_packet import MaterializedCard
+
+    blocks: list[str] = []
+    for idx, raw in enumerate(materialized_cards, start=1):
+        card = (
+            raw
+            if isinstance(raw, MaterializedCard)
+            else MaterializedCard.model_validate(raw)
+        )
+        aspect_bit = f", aspect={card.aspect}" if card.aspect else ""
+        mode = "ДОСЛОВНО" if card.verbatim else "пересказ с сохранением оговорок"
+        blocks.append(f"Карточка {idx} ({card.kind}{aspect_bit}) [{mode}]:\n{card.text}")
+    return "\n\n---\n\n".join(blocks)
+
+
+def build_messages_for_packet_composer(
+    user_q: str,
+    materialized_cards: list,
+    meta: dict,
+    session_id: str,
+) -> list[dict[str, str]]:
+    """Messages for packet composer (phase 3a); cards are MaterializedCard-like."""
+    client_id = meta.get("client_id")
+    system = (
+        build_base_system(client_id)
+        + RESPONSE_FORMAT
+        + COMPOSER_PACKET_RULE
+        + _consult_nudge_addon(meta)
+    )
+    if CHAT_JSON_MODE:
+        system += JSON_ANSWER_RULE
+    cards_blob = _format_composer_card_blocks(materialized_cards)
+    user_content = f"Вопрос пациента:\n{(user_q or '').strip()}\n\nРазрешённые карточки:\n{cards_blob}"
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def _composer_fullctx_empathy_hint(
+    *,
+    client_id: str | None,
+    aspects: list[str],
+    session_id: str,
+) -> tuple[str | None, bool, str | None]:
+    # Ленивые импорты: policy -> llm -> answer_planner образует цикл на верхнем уровне.
+    from core.answer_planner import answer_plan_from_ctx
+    from core.md_chunks import find_chunk_by_topic_aspect
+
+    plan = answer_plan_from_ctx()
+    plan_aspects = list(getattr(plan, "aspects", None) or aspects or [])
+    topic = str(getattr(plan, "topic", None) or "").strip() or None
+    primary_aspect = str(getattr(plan, "primary_aspect", None) or "").strip()
+    if primary_aspect == "overview":
+        primary_aspect = ""
+    if not primary_aspect:
+        for raw in plan_aspects:
+            cand = str(raw or "").strip()
+            if cand and cand != "overview":
+                primary_aspect = cand
+                break
+
+    # Дозатор — только для эмоциональных тем (боль/страх). Флажок empathy_enabled
+    # на прайсовых FAQ (наследие price_concern) сам по себе дозатор не включает.
+    if "pain" not in {str(a or "").strip() for a in plan_aspects}:
+        return None, False, None
+
+    chunk = find_chunk_by_topic_aspect(client_id, topic, primary_aspect)
+    if isinstance(chunk, dict) and chunk.get("empathy_enabled"):
+        doc_key = str(
+            chunk.get("doc_id") or chunk.get("doc") or chunk.get("file") or ""
+        ).strip() or f"aspect:pain:{topic or 'any'}"
+    else:
+        doc_key = f"aspect:pain:{topic or 'any'}"
+
+    first_in_topic = is_first_in_topic(session_id, doc_key)
+    if first_in_topic:
+        return COMPOSER_FULLCTX_EMPATHY_FIRST_TOUCH, True, doc_key
+    return COMPOSER_FULLCTX_EMPATHY_REPEAT_TOUCH, False, doc_key
+
+
+def build_messages_for_packet_composer_fullctx(
+    user_q: str,
+    knowledge_base: str,
+    aspects: list[str],
+    deterministic_cards: list,
+    meta: dict,
+    session_id: str,
+    dialog_history: str | None = None,
+    empathy_instruction: str | None = None,
+) -> list[dict[str, str]]:
+    """Messages for full-context composer — medical text from knowledge base, money from cards."""
+    client_id = meta.get("client_id")
+    kb_block = (
+        "\n\n[БАЗА ЗНАНИЙ]\n"
+        f"База знаний клиники (источник медицинского текста):\n{(knowledge_base or '').strip()}"
+    )
+    # Stable prefix for DashScope context cache: identity + rules + KB; per-turn addons after KB.
+    system = (
+        build_base_system(client_id)
+        + RESPONSE_FORMAT
+        + COMPOSER_FULLCTX_RULE
+        + kb_block
+        + _consult_nudge_addon(meta)
+    )
+    if CHAT_JSON_MODE:
+        system += JSON_ANSWER_RULE
+    aspect_line = ", ".join(str(a).strip() for a in (aspects or []) if str(a).strip())
+    cards_blob = _format_composer_card_blocks(deterministic_cards)
+    dialog_block = format_dialog_context_for_understanding(dialog_history or "")
+    parts: list[str] = []
+    if dialog_block:
+        parts.append(dialog_block.rstrip())
+    parts.extend(
+        [
+            f"Вопрос пациента:\n{(user_q or '').strip()}",
+            f"Ответь на аспекты: {aspect_line}",
+        ]
+    )
+    if (empathy_instruction or "").strip():
+        parts.append(str(empathy_instruction).strip())
+    if cards_blob.strip():
+        parts.append(
+            "Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n"
+            + cards_blob
+        )
+    else:
+        parts.append("Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n(нет)")
+    user_content = "\n\n".join(parts)
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def generate_answer_from_packet(
+    user_q: str,
+    materialized_cards: list,
+    meta: dict,
+    session_id: str,
+) -> tuple[str, dict]:
+    """Compose one answer from materialized packet cards (fail-open if disabled or empty)."""
+    if not COMPOSER_ON or not materialized_cards:
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    messages = build_messages_for_packet_composer(
+        user_q,
+        materialized_cards,
+        meta,
+        session_id,
+    )
+    kwargs: dict = dict(model=CHAT_MODEL, temperature=0.3, messages=messages)
+    if CHAT_JSON_MODE:
+        kwargs["response_format"] = {"type": "json_object"}
+    kwargs["timeout"] = LLM_REQUEST_TIMEOUT_SEC
+    try:
+        resp = chat_completions_create(**kwargs)
+        log_llm_usage(logger, resp, call_type="packet_composer", model=CHAT_MODEL)
+        raw = (resp.choices[0].message.content or "").strip()
+        answer = raw
+        if CHAT_JSON_MODE:
+            try:
+                obj = json.loads(raw)
+                if isinstance(obj, dict) and obj.get("answer"):
+                    answer = str(obj["answer"]).strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not (answer or "").strip():
+            answer = LLM_FALLBACK_ANSWER
+        log_json(
+            logger,
+            "packet_composer_generate",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            card_count=len(materialized_cards),
+            used_fallback=bool(answer == LLM_FALLBACK_ANSWER),
+        )
+        return answer, {"composer_used": True}
+    except Exception as e:
+        log_llm_error(logger, call_type="packet_composer", err=str(e), model=CHAT_MODEL)
+        log_json(
+            logger,
+            "packet_composer_failed",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            err=str(e)[:300],
+        )
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+
+
+def generate_answer_from_packet_fullctx(
+    user_q: str,
+    knowledge_base: str,
+    aspects: list[str],
+    deterministic_cards: list,
+    meta: dict,
+    session_id: str,
+) -> tuple[str, dict]:
+    """Compose answer from full md knowledge base + deterministic price/promo cards."""
+    if not COMPOSER_ON or not FULLCTX_ON:
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    if not (knowledge_base or "").strip():
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+    dialog_history = ""
+    if MEMORY_ON and session_id:
+        dialog_history = recent_dialog_history(session_id)
+    empathy_instruction, use_empathy, doc_key = _composer_fullctx_empathy_hint(
+        client_id=meta.get("client_id"),
+        aspects=aspects,
+        session_id=session_id,
+    )
+    messages = build_messages_for_packet_composer_fullctx(
+        user_q,
+        knowledge_base,
+        aspects,
+        deterministic_cards,
+        meta,
+        session_id,
+        dialog_history=dialog_history or None,
+        empathy_instruction=empathy_instruction,
+    )
+    kwargs: dict = dict(model=CHAT_MODEL, temperature=0.3, messages=messages)
+    if CHAT_JSON_MODE:
+        kwargs["response_format"] = {"type": "json_object"}
+    kwargs["timeout"] = LLM_REQUEST_TIMEOUT_SEC
+    try:
+        resp = chat_completions_create(**kwargs)
+        log_llm_usage(logger, resp, call_type="packet_composer_fullctx", model=CHAT_MODEL)
+        raw = (resp.choices[0].message.content or "").strip()
+        answer = raw
+        if CHAT_JSON_MODE:
+            try:
+                obj = json.loads(raw)
+                if isinstance(obj, dict) and obj.get("answer"):
+                    answer = str(obj["answer"]).strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if not (answer or "").strip():
+            answer = LLM_FALLBACK_ANSWER
+        log_json(
+            logger,
+            "packet_composer_fullctx_generate",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            aspect_count=len(aspects or []),
+            card_count=len(deterministic_cards or []),
+            kb_chars=len(knowledge_base or ""),
+            empathy_used=bool(use_empathy),
+            used_fallback=bool(answer == LLM_FALLBACK_ANSWER),
+        )
+        if doc_key:
+            update_topic_empathy(session_id, doc_key, use_empathy)
+        return answer, {"composer_used": True, "empathy_used": bool(use_empathy)}
+    except Exception as e:
+        log_llm_error(logger, call_type="packet_composer_fullctx", err=str(e), model=CHAT_MODEL)
+        log_json(
+            logger,
+            "packet_composer_fullctx_failed",
+            sid=session_id,
+            client_id=meta.get("client_id"),
+            err=str(e)[:300],
+        )
+        return LLM_FALLBACK_ANSWER, {"composer_used": False}
+
+
 def generate_answer_stream(user_q: str, sources: list[dict], meta: dict, session_id: str):
     """Generator для стриминга ответа.
 
@@ -651,7 +1042,7 @@ def generate_answer_stream(user_q: str, sources: list[dict], meta: dict, session
     stream_usage = None
     try:
         try:
-            stream = client.chat.completions.create(
+            stream = chat_completions_create(
                 model=CHAT_MODEL,
                 messages=messages,
                 stream=True,
@@ -659,16 +1050,22 @@ def generate_answer_stream(user_q: str, sources: list[dict], meta: dict, session
                 stream_options={"include_usage": True},
             )
         except TypeError:
-            stream = client.chat.completions.create(
+            stream = chat_completions_create(
                 model=CHAT_MODEL,
                 messages=messages,
                 stream=True,
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
             )
+        first_delta_marked = False
         for chunk in stream:
             if chunk.choices:
                 delta = chunk.choices[0].delta.content or ""
                 if delta:
+                    if not first_delta_marked:
+                        first_delta_marked = True
+                        from core.turn_timing import mark
+
+                        mark("chat_first_delta")
                     full_text += delta
                     yield ("delta", delta)
             u = getattr(chunk, "usage", None)
@@ -734,7 +1131,7 @@ def classify_lead_name_shape(
         return "invalid_name"
     payload = json.dumps({"candidate": c, "original": r}, ensure_ascii=False)
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=LEAD_NAME_CLASSIFY_MODEL,
             temperature=0,
             max_completion_tokens=60,
@@ -798,7 +1195,7 @@ def classify_booking_wants_appointment(
     if len(msg) < 2:
         return False
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=BOOKING_INTENT_LLM_MODEL,
             temperature=0,
             max_completion_tokens=40,
@@ -841,6 +1238,405 @@ def classify_booking_wants_appointment(
         return False
 
 
+_LEAD_TURN_GRAY_SYSTEM = (
+    "Ты классификатор реплики пациента на шаге записи в чате стоматологии "
+    "(бот спрашивает имя или телефон для записи).\n"
+    "Определи намерение реплики. НЕ извлекай имя и телефон — только класс намерения.\n"
+    "kind:\n"
+    "- meta_cancel — отказ от записи, передумал, не хочу (в т.ч. с разговорными вставками: "
+    "«Не, я передумал», «ну ладно, не буду»).\n"
+    "- meta_pause — хочет сначала задать вопрос, не заполняя слот.\n"
+    "- defer — нужно время подумать, не спешит, но не явный отказ.\n"
+    "- content — вопрос по лечению, боли, цене, адресу, услуге (не имя).\n"
+    "- unclear — непонятно / мусор / похоже на попытку имени, но сомнительно.\n"
+    "content_hint (только при kind=content): price | contacts | pain | generic.\n"
+    "confidence: 0.0–1.0.\n"
+    'Ответь одним JSON: {"kind":"...", "content_hint": null или "price|contacts|pain|generic", '
+    '"confidence": число}. Без markdown.'
+)
+
+
+def classify_lead_turn_gray_zone(
+    user_message: str,
+    *,
+    lead_step: str,
+    client_id: str | None,
+    sid: str | None,
+) -> dict | None:
+    """
+    Gray-zone LLM for LEAD_ACTIVE when deterministic rules did not match.
+    Returns parsed dict with kind/content_hint/confidence, or None on skip/failure.
+    """
+    from core.routing_loader import THRESHOLDS
+
+    if not LEAD_TURN_LLM_CLASSIFY_ON:
+        return None
+    msg = (user_message or "").strip()
+    if len(msg) < 2:
+        return None
+    step = (lead_step or "collecting_name").strip()
+    payload = json.dumps(
+        {"message": msg[:600], "lead_step": step},
+        ensure_ascii=False,
+    )
+    try:
+        resp = chat_completions_create(
+            model=LEAD_TURN_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=80,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _LEAD_TURN_GRAY_SYSTEM},
+                {"role": "user", "content": payload},
+            ],
+        )
+        log_llm_usage(
+            logger, resp, call_type="lead_turn_gray", model=LEAD_TURN_LLM_MODEL
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("lead_turn_gray_not_object")
+        kind = str(obj.get("kind") or "").strip().lower()
+        allowed = {"meta_cancel", "meta_pause", "defer", "content", "unclear"}
+        if kind not in allowed:
+            raise ValueError(f"lead_turn_gray_bad_kind:{kind!r}")
+        hint_raw = obj.get("content_hint")
+        hint = None
+        if hint_raw is not None and str(hint_raw).strip():
+            hint = str(hint_raw).strip().lower()
+            if hint not in {"price", "contacts", "pain", "generic"}:
+                hint = "generic"
+        conf_raw = obj.get("confidence")
+        try:
+            confidence = float(conf_raw)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        min_conf = float(THRESHOLDS.lead_turn.min_confidence)
+        if confidence < min_conf:
+            log_json(
+                logger,
+                "lead_turn_gray_low_confidence",
+                client_id=client_id,
+                sid=sid,
+                kind=kind,
+                confidence=confidence,
+                min_confidence=min_conf,
+            )
+            return None
+        log_json(
+            logger,
+            "lead_turn_gray",
+            client_id=client_id,
+            sid=sid,
+            kind=kind,
+            content_hint=hint,
+            confidence=confidence,
+            lead_step=step,
+        )
+        return {"kind": kind, "content_hint": hint, "confidence": confidence}
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="lead_turn_gray",
+            err=str(e),
+            model=LEAD_TURN_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "lead_turn_gray_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
+def classify_dialog_focus_gray_zone(
+    user_message: str,
+    *,
+    focus_service_id: str,
+    focus_label: str,
+    focus_topic: str | None,
+    client_id: str | None,
+    sid: str | None,
+) -> dict | None:
+    """
+    Gray-zone LLM for short dialog follow-ups.
+    Returns parsed dict with kind/attribute/query_rewrite/confidence, or None.
+    """
+    if not DIALOG_FOCUS_LLM_CLASSIFY_ON:
+        return None
+    msg = (user_message or "").strip()
+    service_id = (focus_service_id or "").strip()
+    label = (focus_label or service_id).strip()
+    if len(msg) < 2 or not service_id or not label:
+        return None
+    payload = json.dumps(
+        {
+            "message": msg[:600],
+            "focus_service_id": service_id,
+            "focus_label": label,
+            "focus_topic": (focus_topic or "").strip() or None,
+        },
+        ensure_ascii=False,
+    )
+    try:
+        resp = chat_completions_create(
+            model=DIALOG_FOCUS_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=120,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _DIALOG_FOCUS_GRAY_SYSTEM},
+                {"role": "user", "content": payload},
+            ],
+        )
+        log_llm_usage(
+            logger, resp, call_type="dialog_focus_gray", model=DIALOG_FOCUS_LLM_MODEL
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("dialog_focus_gray_not_object")
+        kind = str(obj.get("kind") or "").strip().lower()
+        if kind not in {"follow_up", "unclear"}:
+            raise ValueError(f"dialog_focus_gray_bad_kind:{kind!r}")
+        rewrite = str(obj.get("query_rewrite") or "").strip()
+        if len(rewrite) > 300:
+            rewrite = rewrite[:300].strip()
+        conf_raw = obj.get("confidence")
+        try:
+            confidence = float(conf_raw)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+        if kind != "follow_up":
+            log_json(
+                logger,
+                "dialog_focus_gray_unclear",
+                client_id=client_id,
+                sid=sid,
+                confidence=confidence,
+            )
+            return None
+        if confidence < 0.72 or not rewrite:
+            log_json(
+                logger,
+                "dialog_focus_gray_low_confidence",
+                client_id=client_id,
+                sid=sid,
+                confidence=confidence,
+                has_rewrite=bool(rewrite),
+            )
+            return None
+        log_json(
+            logger,
+            "dialog_focus_gray",
+            client_id=client_id,
+            sid=sid,
+            focus_service_id=service_id,
+            confidence=confidence,
+        )
+        return {
+            "kind": "follow_up",
+            "attribute": "general",
+            "query_rewrite": rewrite,
+            "confidence": confidence,
+        }
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="dialog_focus_gray",
+            err=str(e),
+            model=DIALOG_FOCUS_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "dialog_focus_gray_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
+_PATIENT_SITUATION_SYSTEM = (
+    "Ты семантический классификатор ситуации пациента в стоматологическом чате. "
+    "Ты НЕ отвечаешь пациенту и НЕ ставишь диагноз. Ты только заполняешь JSON-карточку смысла сообщения.\n"
+    "Поля:\n"
+    "- intent: choose_solution|restore|price|doctor|warranty|compare|unknown. "
+    "choose_solution = человек просит подобрать/посоветовать/порекомендовать вариант, говорит что не знает что выбрать, "
+    "спрашивает что лучше в его случае, как быть, что поставить. "
+    "restore = человек описывает желание восстановить зубы без просьбы выбрать. "
+    "Не ставь choose_solution для прямого запроса объяснить конкретную услугу: «что такое All-on-4», «расскажите про скуловую».\n"
+    "- problem: missing_teeth|bone_deficit|existing_implant|urgent|generic_implant_interest|unknown.\n"
+    "- extent: one_tooth|few_teeth|full_arch|unknown.\n"
+    "- jaw: upper|lower|both|unknown.\n"
+    "- modifiers: массив из: bone_deficit, extracted, existing_implant, urgent. Можно пустой.\n"
+    "- confidence: число 0..1.\n"
+    "Если явно нет всех зубов, вся челюсть, верхняя/нижняя челюсть или полный ряд — extent=full_arch. "
+    "Если мало/не хватает/тонкая кость, атрофия кости, синус-лифтинг или костная пластика — добавь bone_deficit. "
+    "Верни только JSON без markdown."
+)
+
+
+def classify_patient_situation_semantic(
+    user_message: str,
+    *,
+    client_id: str | None,
+    sid: str | None,
+) -> dict | None:
+    """LLM semantic patient-situation classifier. Returns parsed JSON or None."""
+    if not PATIENT_SITUATION_LLM_ON:
+        return None
+    msg = (user_message or "").strip()
+    if len(msg) < 4:
+        return None
+    try:
+        resp = chat_completions_create(
+            model=PATIENT_SITUATION_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=180,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _PATIENT_SITUATION_SYSTEM},
+                {"role": "user", "content": msg[:800]},
+            ],
+        )
+        log_llm_usage(
+            logger,
+            resp,
+            call_type="patient_situation_classify",
+            model=PATIENT_SITUATION_LLM_MODEL,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("patient_situation_not_object")
+        log_json(
+            logger,
+            "patient_situation_llm",
+            client_id=client_id,
+            sid=sid,
+            intent=str(obj.get("intent") or "")[:40],
+            problem=str(obj.get("problem") or "")[:40],
+            extent=str(obj.get("extent") or "")[:40],
+            jaw=str(obj.get("jaw") or "")[:40],
+            confidence=obj.get("confidence"),
+        )
+        return obj
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="patient_situation_classify",
+            err=str(e),
+            model=PATIENT_SITUATION_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "patient_situation_classify_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
+_ASPECT_PLANNER_SYSTEM = (
+    "Ты классификатор аспектов вопроса в стоматологическом чате. "
+    "Ты НЕ отвечаешь пациенту. Ты только выбираешь подмножество аспектов из фиксированного списка.\n"
+    "Допустимые аспекты:\n"
+    "- price — цена, стоимость, сколько стоит/выйдет/обойдётся\n"
+    "- payment — рассрочка, оплата по частям/этапам, кредит, когда платить\n"
+    "- warranty — гарантия на работу/имплант/коронку\n"
+    "- pain — больно ли, страшно, анестезия, обезболивание\n"
+    "- included — что входит под ключ, что отдельно\n"
+    "- duration — срок, длительность, сколько по времени, заживление, реабилитация\n"
+    "- comparison — сравнение вариантов (что лучше, 4 или 6)\n"
+    "- stages — этапы лечения, визиты, последовательность\n"
+    "- overview — общий вопрос без явного аспекта выше\n"
+    "Правила:\n"
+    "- Верни все аспекты, о которых спрашивают в одном сообщении.\n"
+    "- Не добавляй аспект, которого нет в вопросе.\n"
+    "- Если вопрос только про цену — aspects=[\"price\"].\n"
+    "- confidence: 0..1, насколько уверен в разметке.\n"
+    "Примеры:\n"
+    'Вопрос: «Сколько стоит All-on-4 и есть ли рассрочка?» → {"aspects":["price","payment"],"confidence":0.95}\n'
+    'Вопрос: «Сколько стоит all-on-4, это больно и долго ли заживает?» → '
+    '{"aspects":["price","pain","duration"],"confidence":0.93}\n'
+    "Верни только JSON без markdown."
+)
+
+
+def classify_question_aspects(
+    user_message: str,
+    *,
+    client_id: str | None,
+    sid: str | None,
+    context_hint: str | None = None,
+) -> dict | None:
+    """LLM aspect planner for composite questions. Returns parsed JSON or None."""
+    if not ASPECT_PLANNER_LLM_ON:
+        return None
+    msg = (user_message or "").strip()
+    if len(msg) < 8:
+        return None
+    user_payload = msg[:900]
+    if (context_hint or "").strip():
+        user_payload = f"{msg[:800]}\n\nКонтекст: {(context_hint or '').strip()[:200]}"
+    try:
+        resp = chat_completions_create(
+            model=ASPECT_PLANNER_LLM_MODEL,
+            temperature=0,
+            max_completion_tokens=160,
+            response_format={"type": "json_object"},
+            timeout=LLM_REQUEST_TIMEOUT_SEC,
+            messages=[
+                {"role": "system", "content": _ASPECT_PLANNER_SYSTEM},
+                {"role": "user", "content": user_payload},
+            ],
+        )
+        log_llm_usage(
+            logger,
+            resp,
+            call_type="aspect_planner_classify",
+            model=ASPECT_PLANNER_LLM_MODEL,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            raise ValueError("aspect_planner_not_object")
+        log_json(
+            logger,
+            "aspect_planner_llm",
+            client_id=client_id,
+            sid=sid,
+            aspects=obj.get("aspects"),
+            confidence=obj.get("confidence"),
+        )
+        return obj
+    except Exception as e:
+        log_llm_error(
+            logger,
+            call_type="aspect_planner_classify",
+            err=str(e),
+            model=ASPECT_PLANNER_LLM_MODEL,
+        )
+        log_json(
+            logger,
+            "aspect_planner_classify_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(e)[:300],
+        )
+        return None
+
+
 _PRICE_INTENT_SYSTEM = (
     "Ты классификатор ценового намерения в чате стоматологии. "
     "Нужно выбрать один label: "
@@ -864,7 +1660,7 @@ def classify_price_intent(user_message: str, *, client_id: str | None, sid: str)
     if continuation_only_phrase(msg):
         return "other"
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=PRICE_INTENT_LLM_MODEL,
             temperature=0,
             max_completion_tokens=50,
@@ -927,7 +1723,7 @@ def classify_safety(user_message: str, *, client_id: str | None, sid: str) -> di
     if len(msg) < 2:
         return {"label": "normal_sales_concern", "confidence": 0.0}
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=SAFETY_CLASSIFY_MODEL,
             temperature=0,
             max_completion_tokens=60,
@@ -993,7 +1789,7 @@ def classify_complaint_request(user_message: str, *, client_id: str | None, sid:
     if len(msg) < 2:
         return {"label": "normal", "confidence": 0.0}
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=COMPLAINT_CLASSIFY_MODEL,
             temperature=0,
             max_completion_tokens=60,
@@ -1130,7 +1926,7 @@ def classify_handoff_filter(user_message: str, *, client_id: str | None, sid: st
     return {"label": "sales_or_clinic_question", "reason": "default_allow", "confidence": 0.0}
 
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=CHAT_MODEL,
             temperature=0,
             max_completion_tokens=80,
@@ -1211,7 +2007,7 @@ def classify_intent(
     if len(msg) < 2:
         return "content"
     try:
-        resp = client.chat.completions.create(
+        resp = chat_completions_create(
             model=CHAT_MODEL,
             temperature=0,
             max_completion_tokens=50,

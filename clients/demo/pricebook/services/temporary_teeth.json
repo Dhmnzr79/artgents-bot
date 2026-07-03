@@ -1,0 +1,18 @@
+{
+  "service_id": "temporary_teeth",
+  "price_model": "simple",
+  "display_name": "Временная коронка на импланте",
+  "tags": ["implantation"],
+  "default_unit": "one_tooth",
+  "price": {
+    "price_type": "from",
+    "value": 18000,
+    "currency": "RUB",
+    "note": "Временный протез на период приживления; постоянная коронка — отдельно"
+  },
+  "variants": [],
+  "promo": null,
+  "fact_refs": ["free_implant_consult", "installment_12"],
+  "followups": [],
+  "cta_key": "price"
+}

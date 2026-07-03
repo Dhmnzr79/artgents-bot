@@ -1,0 +1,6 @@
+# clients/nikadent/lead_config.yaml — заполнить перед запуском
+delivery: email
+recipients:
+  - denis.today@yandex.ru
+subject_template: "Заявка с бота НикаДент"
+store_in_postgres: false

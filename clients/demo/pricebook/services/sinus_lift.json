@@ -1,0 +1,82 @@
+{
+  "service_id": "sinus_lift",
+  "price_model": "complex",
+  "display_name": "Синус-лифтинг",
+  "intro_text": "Стоимость зависит от объёма костного материала и способа доступа. Имплантация и коронка оплачиваются отдельно.",
+  "tags": [
+    "implantation"
+  ],
+  "default_unit": "one_site",
+  "price": null,
+  "variants": [
+    {
+      "offer_id": "sinus_lift.one_site.closed",
+      "brand": "closed",
+      "brand_label": "Закрытый синус-лифтинг",
+      "brand_group": null,
+      "unit": "one_site",
+      "total": 42000,
+      "currency": "RUB",
+      "recommended": true,
+      "payment_stages": [
+        {
+          "name": "Процедура под анестезией",
+          "amount": 42000
+        }
+      ],
+      "includes": [
+        "анестезия",
+        "костный материал",
+        "мембрана при необходимости",
+        "контрольный осмотр"
+      ],
+      "excludes": [
+        "имплант и коронка — отдельно",
+        "КТ — отдельно"
+      ]
+    },
+    {
+      "offer_id": "sinus_lift.one_site.open",
+      "brand": "open",
+      "brand_label": "Открытый синус-лифтинг",
+      "brand_group": null,
+      "unit": "one_site",
+      "total": 68000,
+      "currency": "RUB",
+      "recommended": false,
+      "payment_stages": [
+        {
+          "name": "Процедура под анестезией",
+          "amount": 68000
+        }
+      ],
+      "includes": [
+        "анестезия",
+        "костный материал",
+        "мембрана",
+        "контрольные осмотры"
+      ],
+      "excludes": [
+        "имплант и коронка — отдельно",
+        "КТ — отдельно"
+      ]
+    }
+  ],
+  "promo": null,
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": [
+    {
+      "label": "Что входит",
+      "action": "price_aspect",
+      "service_id": null,
+      "aspect": "includes",
+      "ref": null,
+      "detail_ref": null,
+      "group_id": null
+    }
+  ],
+  "cta_key": "price"
+}

@@ -25,7 +25,8 @@ def sid():
 def test_prompt_addon_not_patient_canned_text():
     exhausted = consult_nudge_prompt_addon("exhausted")
     assert "Записать вас?" not in exhausted
-    assert "консультаци" in exhausted.lower()
+    assert "рекламный хвост" in exhausted.lower()
+    assert "бесплатной консультации" in exhausted.lower()
 
 
 def test_streak_plan_on_third_turn(sid):

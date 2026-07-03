@@ -3,6 +3,7 @@ import os
 import re
 
 from config import default_cta_dict
+from core.numeric_fact_gate import apply_numeric_fact_gate
 from llm import generate_facts_card_answer
 from meta_loader import get_doc_path
 
@@ -87,10 +88,10 @@ def build_followups(
     return out
 
 
-def build_cta(meta: dict):
-    if meta.get("cta_text") and meta.get("cta_action"):
-        return {"text": meta["cta_text"], "action": meta["cta_action"]}
-    return None
+def build_cta(meta: dict, client_id: str | None = None):
+    from core.client_config_loader import lead_cta_dict_from_meta
+
+    return lead_cta_dict_from_meta(client_id, meta)
 
 
 def pick_relevant_offer(meta: dict):
@@ -131,6 +132,7 @@ def build_ask_response(
     profile: dict,
     client_id: str | None = None,
     topic_state: dict | None = None,
+    suppress_refs: list[str] | None = None,
 ) -> dict:
     """Единая структура успешного ответа /ask."""
     md_file = top.get("file")
@@ -150,8 +152,22 @@ def build_ask_response(
     )
     followups = fups_full
 
-    cta_btn = build_cta(meta)
+    cta_btn = build_cta(meta, client_id=client_id)
     quick_refs = dedup_refs_vs_cta(quick_refs, cta_btn)
+
+    if suppress_refs:
+        from core.price_answer_assembler import hide_navigated_quick_replies
+
+        suppress = {str(r).strip().lower() for r in suppress_refs if str(r).strip()}
+        if suppress:
+            quick_refs = hide_navigated_quick_replies(
+                quick_refs,
+                exclude_refs=suppress,
+            )
+            followups = hide_navigated_quick_replies(
+                followups,
+                exclude_refs=suppress,
+            )
 
     score = float(round(float(top.get("_score", 0.0)), 3))
 
@@ -163,6 +179,7 @@ def build_ask_response(
         "h3_id": h3_id,
         "score": score,
         "followups": followups,
+        "ui_source_family": "md_navigation",
         "is_overview": bool(is_overview),
         "cta_mode": meta.get("cta_mode"),
         "tags": meta_tags(meta),
@@ -174,6 +191,10 @@ def build_ask_response(
     }
     if client_id is not None:
         meta_out["client_id"] = client_id
+    if meta.get("doc_id"):
+        meta_out["doc_id"] = meta.get("doc_id")
+    if meta.get("matched_service_id"):
+        meta_out["matched_service_id"] = meta.get("matched_service_id")
 
     return {
         "answer": answer,
@@ -193,13 +214,20 @@ def normalize_policy_payload(payload: dict) -> dict:
         return payload
 
     meta = payload.setdefault("meta", {})
+    try:
+        from policy import infer_ui_source_family
+
+        family = infer_ui_source_family(payload)
+    except Exception:
+        family = str(meta.get("ui_source_family") or "md_navigation").strip().lower()
+
     followups = list(meta.get("followups") or [])
     if len(followups) > 2:
         dropped.append("followups_over_limit")
         meta["followups"] = followups[:2]
 
     refs = list(payload.get("quick_replies") or [])
-    if len(refs) > 1:
+    if family == "md_navigation" and len(refs) > 1:
         dropped.append("suggest_refs_over_limit")
         payload["quick_replies"] = refs[:1]
 
@@ -208,46 +236,25 @@ def normalize_policy_payload(payload: dict) -> dict:
     return payload
 
 
-def empty_question_response() -> dict:
-    return {
-        "answer": "Уточните вопрос.",
-        "quick_replies": [],
-        "cta": None,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {"error": "empty_question"},
-    }
+def empty_question_response(client_id: str | None = None) -> dict:
+    from core.client_config_loader import load_ui_bundle, ui_menu_to_payload
+
+    ui = load_ui_bundle(client_id)
+    return ui_menu_to_payload(ui.empty_question, sid="", client_id=client_id, extra_meta={"error": "empty_question"})
 
 
-def no_candidates_response() -> dict:
-    return {
-        "answer": (
-            "Не нашла ответа на этот вопрос. Попробуйте спросить иначе — или запишитесь на консультацию, "
-            "там разберём."
-        ),
-        "quick_replies": [],
-        "cta": None,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {"file": None},
-    }
+def no_candidates_response(client_id: str | None = None) -> dict:
+    from core.client_config_loader import load_ui_bundle, ui_menu_to_payload
+
+    ui = load_ui_bundle(client_id)
+    return ui_menu_to_payload(ui.no_candidates, sid="", client_id=client_id, extra_meta={"file": None})
 
 
-def offtopic_response() -> dict:
-    return {
-        "answer": (
-            "Я помогаю по вопросам клиники: услуги, цены, подготовка, сроки, запись и контакты. "
-            "Если хотите, подскажу по вашему вопросу в этом контексте."
-        ),
-        "quick_replies": [],
-        "cta": None,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {"offtopic": True},
-    }
+def offtopic_response(client_id: str | None = None) -> dict:
+    from core.client_config_loader import load_ui_bundle, ui_menu_to_payload
+
+    ui = load_ui_bundle(client_id)
+    return ui_menu_to_payload(ui.offtopic, sid="", client_id=client_id, extra_meta={"offtopic": True})
 
 
 def reset_session_response(sid: str) -> dict:
@@ -276,27 +283,24 @@ def internal_error_response() -> dict:
 
 def low_score_response(sid: str, client_id: str | None = None) -> dict:
     """Fallback при top similarity < порога; CTA из конфига (policy не снимает low_score)."""
-    meta_out: dict = {
-        "low_score": True,
-        "sid": sid,
-        "score": None,
-        "followups": [],
-        "file": None,
-    }
-    if client_id is not None:
-        meta_out["client_id"] = client_id
-    return {
-        "answer": (
-            "Не нашла точного ответа. Запишитесь на консультацию, она у нас бесплатная, "
-            "цена фиксируется в договоре без скрытых доплат, возможен налоговый вычет 13%."
-        ),
-        "quick_replies": [],
-        "cta": default_cta_dict(),
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": meta_out,
-    }
+    from core.client_config_loader import load_ui_bundle, ui_menu_to_payload
+
+    ui = load_ui_bundle(client_id)
+    payload = ui_menu_to_payload(
+        ui.low_score,
+        sid=sid,
+        client_id=client_id,
+        extra_meta={
+            "low_score": True,
+            "score": None,
+            "followups": [],
+            "file": None,
+            "ui_source_family": "guided_fallback",
+        },
+    )
+    if payload.get("cta") is None:
+        payload["cta"] = default_cta_dict()
+    return payload
 
 
 def _suggest_refs_at_most_one(service: dict | None) -> list:
@@ -401,6 +405,7 @@ def build_service_facts_card_payload(
         "match_score": round(float(match_score or 0.0), 4),
         "route_source": "catalog",
         "followups": [],
+        "ui_source_family": "md_navigation",
     }
     meta_out.update(consult_meta)
     return {
@@ -425,24 +430,219 @@ def build_price_lookup_payload(
     price_key: str | None,
     price_ref: str | None,
     price_item: dict | None,
+    question: str = "",
 ) -> dict:
+    from core.price_offers import build_price_answer_for_lookup
+    from core.price_answer_assembler import merge_price_quick_replies
+    from core.pricebook_loader import load_pricebook_service
+    from session import get_nav_refs_used
+
     title = str((service or {}).get("title") or service_id).strip()
+    answer, offer_meta = build_price_answer_for_lookup(
+        client_id=client_id,
+        service_id=service_id,
+        q=question,
+    )
     price_line = (
         format_price_answer_from_item(price_item, title_fallback=title)
         if isinstance(price_item, dict)
         else None
     )
-    if price_line:
-        answer = price_line
-    else:
-        answer = (
+    pb_entry = load_pricebook_service(client_id, service_id)
+    if not answer:
+        if price_line:
+            answer = price_line
+        else:
+            answer = (
+                "Точную стоимость лучше уточнить на консультации — "
+                "после осмотра назовут сумму по вашей ситуации."
+            )
+    used_refs = set(get_nav_refs_used(sid))
+    quick = (
+        merge_price_quick_replies(
+            pb_entry,
+            client_id,
+            exclude_refs=used_refs,
+        )
+        if pb_entry
+        else []
+    )
+    meta = {
+        "sid": sid,
+        "client_id": client_id,
+        "intent": "price_lookup",
+        "matched_service_id": service_id,
+        "match_score": round(float(match_score or 0.0), 4),
+        "route_source": route_source,
+        "price_key": price_key,
+        "price_ref": price_ref,
+        "fallback_reason": None if (answer and answer != (
             "Точную стоимость лучше уточнить на консультации — "
             "после осмотра назовут сумму по вашей ситуации."
-        )
-    quick = _suggest_refs_at_most_one(service)
+        )) else "price_not_found",
+        "followups": [],
+        "ui_source_family": "price_navigation",
+    }
+    meta.update(offer_meta)
+    gate_result = apply_numeric_fact_gate(
+        answer=answer or "",
+        route="price_lookup",
+        meta=meta,
+        client_id=client_id,
+        allowed_source_text=None,
+    )
+    answer = gate_result.answer
+    gate_meta = gate_result.meta_dict()
+    if gate_meta:
+        meta.update(gate_meta)
     return {
         "answer": answer,
         "quick_replies": quick,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }
+
+
+def build_price_aspect_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    service_id: str,
+    aspect: str,
+    match_score: float = 1.0,
+) -> dict | None:
+    from core.price_offers import build_price_answer_for_lookup
+    from core.price_answer_assembler import merge_price_quick_replies
+    from core.pricebook_loader import load_pricebook_service
+    from query_selector import match_service_from_catalog
+    from session import get_nav_refs_used
+
+    sid_eff = (service_id or "").strip()
+    aspect_eff = (aspect or "").strip().lower()
+    if not sid_eff or not aspect_eff:
+        return None
+
+    match = match_service_from_catalog(sid_eff.replace("_", " "), client_id=client_id)
+    service = match.get("service") if isinstance(match.get("service"), dict) else {}
+    if not service:
+        pb_entry = load_pricebook_service(client_id, sid_eff)
+        service = {"title": pb_entry.display_name if pb_entry else sid_eff}
+
+    answer, offer_meta = build_price_answer_for_lookup(
+        client_id=client_id,
+        service_id=sid_eff,
+        q="",
+        aspect=aspect_eff,
+    )
+    if not answer:
+        return None
+
+    pb_entry = load_pricebook_service(client_id, sid_eff)
+    active_ref = f"price:{sid_eff}/{aspect_eff}"
+    used_refs = set(get_nav_refs_used(sid))
+    quick = (
+        merge_price_quick_replies(
+            pb_entry,
+            client_id,
+            active_aspect=aspect_eff,
+            active_ref=active_ref,
+            exclude_refs=used_refs,
+        )
+        if pb_entry
+        else []
+    )
+    meta = {
+        "sid": sid,
+        "client_id": client_id,
+        "intent": "price_lookup",
+        "matched_service_id": sid_eff,
+        "match_score": round(float(match_score or 0.0), 4),
+        "route_source": "price_aspect",
+        "pricebook_aspect": aspect_eff,
+        "fallback_reason": None,
+        "followups": [],
+        "ui_source_family": "price_navigation",
+    }
+    meta.update(offer_meta)
+    gate_result = apply_numeric_fact_gate(
+        answer=answer or "",
+        route="price_lookup",
+        meta=meta,
+        client_id=client_id,
+        allowed_source_text=None,
+    )
+    answer = gate_result.answer
+    gate_meta = gate_result.meta_dict()
+    if gate_meta:
+        meta.update(gate_meta)
+    return {
+        "answer": answer,
+        "quick_replies": quick,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }
+
+
+def build_price_group_overview_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    group_id: str = "implantation",
+    match_score: float = 0.0,
+) -> dict | None:
+    from core.price_group_overview import build_group_overview_answer
+
+    answer, quick, overview_meta = build_group_overview_answer(client_id, group_id=group_id)
+    if not answer:
+        return None
+    meta = {
+        "sid": sid,
+        "client_id": client_id,
+        "intent": "price_lookup",
+        "matched_service_id": None,
+        "match_score": round(float(match_score or 0.0), 4),
+        "route_source": "pricebook_manifest",
+        "fallback_reason": "price_implant_overview",
+        "price_status": "group_overview",
+        "followups": [],
+        "ui_source_family": "price_navigation",
+    }
+    meta.update(overview_meta)
+    return {
+        "answer": answer,
+        "quick_replies": quick,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": meta,
+    }
+
+
+def build_price_unit_clarify_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    match_score: float = 0.0,
+    group_id: str = "implantation",
+) -> dict:
+    payload = build_price_group_overview_payload(
+        sid=sid,
+        client_id=client_id,
+        group_id=group_id,
+        match_score=match_score,
+    )
+    if payload:
+        return payload
+    return {
+        "answer": "Уточните, пожалуйста: какой протокол имплантации вас интересует?",
+        "quick_replies": [],
         "cta": None,
         "video": None,
         "situation": {"show": False, "mode": "normal"},
@@ -451,13 +651,13 @@ def build_price_lookup_payload(
             "sid": sid,
             "client_id": client_id,
             "intent": "price_lookup",
-            "matched_service_id": service_id,
+            "matched_service_id": None,
             "match_score": round(float(match_score or 0.0), 4),
-            "route_source": route_source,
-            "price_key": price_key,
-            "price_ref": price_ref,
-            "fallback_reason": None if price_line else "price_not_found",
+            "route_source": "price_offers",
+            "fallback_reason": "price_implant_overview",
+            "price_status": "group_overview",
             "followups": [],
+            "ui_source_family": "price_navigation",
         },
     }
 
@@ -493,6 +693,121 @@ def build_price_concern_payload(
             "price_ref": (service or {}).get("price_ref"),
             "fallback_reason": None,
             "followups": [],
+            "ui_source_family": "price_navigation",
+        },
+    }
+
+
+def build_price_resolution_payload(
+    *,
+    sid: str,
+    client_id: str | None,
+    intent: str,
+    resolution_reason: str,
+    service_id: str | None = None,
+    service: dict | None = None,
+    match_score: float = 0.0,
+    question: str = "",
+    route_source: str = "catalog",
+    price_key: str | None = None,
+    price_ref: str | None = None,
+) -> dict:
+    from core.catalog_resolution import fallback_reason_to_resolution, service_content_snippet
+    from core.clinic_policies_loader import (
+        build_service_not_offered_answer,
+        find_service_alternative_note,
+        service_alternative_quick_replies,
+    )
+
+    reason = fallback_reason_to_resolution(resolution_reason)
+    svc = service if isinstance(service, dict) else {}
+    sid_svc = str(service_id or "").strip()
+    title = str(svc.get("title") or sid_svc).strip()
+    score = round(float(match_score or 0.0), 4)
+    cid = (client_id or "").strip() or "default"
+    consult_tail = (
+        "Точную стоимость лучше уточнить на консультации — "
+        "после осмотра назовут сумму по вашей ситуации."
+    )
+
+    if find_service_alternative_note(question, cid):
+        answer = build_service_not_offered_answer(cid, question=question)
+        quick_replies = service_alternative_quick_replies(question, cid)
+        service_status = "not_offered"
+        price_status = "not_requested"
+        snippet_source = None
+        cta = None
+    elif reason == "matched_service_but_no_price" and sid_svc:
+        snippet, snippet_source = service_content_snippet(svc, client_id=client_id)
+        if snippet and snippet_source and snippet_source != "title_only":
+            answer = f"{snippet}\n\n{consult_tail}"
+        elif title:
+            answer = (
+                f"По услуге «{title}» точную стоимость назовут на консультации — "
+                "после осмотра посчитают сумму по вашей ситуации."
+            )
+            snippet_source = snippet_source or "title_only"
+        else:
+            answer = consult_tail
+            snippet_source = None
+        quick_replies = _suggest_refs_at_most_one(svc)
+        service_status = "found"
+        price_status = "not_available"
+        cta = default_cta_dict()
+    elif reason == "low_match_score" and title:
+        answer = (
+            f"Похоже, речь о «{title}». Уточните, пожалуйста, что именно вас интересует — "
+            "или запишитесь на консультацию, там всё посчитают."
+        )
+        quick_replies = []
+        service_status = "ambiguous"
+        price_status = "not_available"
+        snippet_source = None
+        cta = None
+    elif reason == "continuation_no_context":
+        answer = (
+            "О какой услуге стоимость? Напишите название или тему — "
+            "тогда смогу подсказать или направлю на консультацию."
+        )
+        quick_replies = []
+        service_status = "not_found"
+        price_status = "not_available"
+        snippet_source = None
+        cta = None
+    else:
+        answer = (
+            "Не вижу такую услугу в нашей базе. Напишите, пожалуйста, что именно вас интересует — "
+            "или запишитесь на консультацию, там всё посчитают."
+        )
+        quick_replies = []
+        service_status = "not_found"
+        price_status = "not_available"
+        snippet_source = None
+        cta = None
+
+    return {
+        "answer": answer,
+        "quick_replies": quick_replies,
+        "cta": cta,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": {
+            "sid": sid,
+            "client_id": client_id,
+            "intent": intent,
+            "matched_service_id": sid_svc or None,
+            "match_score": score,
+            "route_source": route_source,
+            "price_key": price_key,
+            "price_ref": price_ref,
+            "fallback_reason": reason,
+            "resolution_reason": reason,
+            "service_status": service_status,
+            "price_status": price_status,
+            "content_snippet_source": snippet_source,
+            "followups": [],
+            "ui_source_family": "price_navigation",
         },
     }
 
@@ -504,41 +819,17 @@ def build_price_clarify_payload(
     intent: str,
     fallback_reason: str,
     question: str = "",
+    service_id: str | None = None,
+    service: dict | None = None,
+    match_score: float = 0.0,
 ) -> dict:
-    from core.clinic_policies_loader import (
-        build_service_not_offered_answer,
-        find_service_alternative_note,
-        service_alternative_quick_replies,
+    return build_price_resolution_payload(
+        sid=sid,
+        client_id=client_id,
+        intent=intent,
+        resolution_reason=fallback_reason,
+        service_id=service_id,
+        service=service,
+        match_score=match_score,
+        question=question,
     )
-
-    cid = (client_id or "").strip() or "default"
-    if find_service_alternative_note(question, cid):
-        answer = build_service_not_offered_answer(cid, question=question)
-        quick_replies = service_alternative_quick_replies(question, cid)
-    else:
-        answer = (
-            "Не могу определить услугу для расчёта цены. "
-            "Напишите, пожалуйста, что именно вас интересует — "
-            "или запишитесь на консультацию, там всё посчитают."
-        )
-        quick_replies = []
-    return {
-        "answer": answer,
-        "quick_replies": quick_replies,
-        "cta": None,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {
-            "sid": sid,
-            "client_id": client_id,
-            "intent": intent,
-            "matched_service_id": None,
-            "match_score": 0.0,
-            "route_source": "catalog",
-            "price_key": None,
-            "price_ref": None,
-            "fallback_reason": fallback_reason,
-            "followups": [],
-        },
-    }

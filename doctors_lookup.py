@@ -11,9 +11,11 @@ from typing import Any, TypedDict
 import alias_lexical
 import yaml
 
+from config import KT_EXPLICIT_RE
+from core.attribute_followup import catalog_match_is_authoritative, is_vague_attribute_followup
+from core.client_config_loader import resolve_pack_client_id
+from core.client_runtime import client_md_dir
 from query_selector import match_service_from_catalog
-
-_MD_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "md")
 
 _NAMES_INDEX_LOCK = threading.Lock()
 _NAMES_INDEX: dict[str, tuple[float, frozenset[str]]] = {}
@@ -60,7 +62,7 @@ class DoctorListFact(TypedDict, total=False):
 
 
 def _safe_client_id(client_id: str | None) -> str:
-    return (client_id or "default").strip() or "default"
+    return resolve_pack_client_id(client_id)
 
 
 def _client_catalog_path(client_id: str | None) -> str:
@@ -259,17 +261,23 @@ def _doctor_list_fact(_path: str, fm: dict[str, Any], body: str, stem: str) -> D
     return fact
 
 
-def _iter_doctor_paths() -> list[str]:
+def _doctor_md_base(client_id: str | None) -> str:
+    pack = resolve_pack_client_id(client_id)
+    return client_md_dir(pack)
+
+
+def _iter_doctor_paths(*, client_id: str | None = None) -> list[str]:
+    md_base = _doctor_md_base(client_id)
     return sorted(
         p
-        for p in glob.glob(os.path.join(_MD_BASE, "doctors__doctor__*.md"))
+        for p in glob.glob(os.path.join(md_base, "doctors__doctor__*.md"))
         if os.path.basename(p).lower() != "doctors__doctor__overview.md"
     )
 
 
-def _doctor_paths_mtime_max() -> float:
+def _doctor_paths_mtime_max(*, client_id: str | None) -> float:
     m = 0.0
-    for p in _iter_doctor_paths():
+    for p in _iter_doctor_paths(client_id=client_id):
         try:
             m = max(m, os.path.getmtime(p))
         except OSError:
@@ -277,10 +285,10 @@ def _doctor_paths_mtime_max() -> float:
     return m
 
 
-def _collect_client_doctor_name_phrases() -> frozenset[str]:
+def _collect_client_doctor_name_phrases(*, client_id: str | None) -> frozenset[str]:
     """Подстроковые ключи из frontmatter + H1 активных врачей (нижний регистр, ё→е)."""
     phrases: set[str] = set()
-    for path in _iter_doctor_paths():
+    for path in _iter_doctor_paths(client_id=client_id):
         fm, body, stem = _read_md_split(path)
         if fm.get("active") is False:
             continue
@@ -296,12 +304,12 @@ def _collect_client_doctor_name_phrases() -> frozenset[str]:
 def cached_doctor_name_substrings(*, client_id: str | None) -> frozenset[str]:
     """Кэш по client_id и mtime md врачей."""
     cid = _safe_client_id(client_id)
-    mt = _doctor_paths_mtime_max()
+    mt = _doctor_paths_mtime_max(client_id=client_id)
     with _NAMES_INDEX_LOCK:
         hit = _NAMES_INDEX.get(cid)
         if hit is not None and hit[0] == mt:
             return hit[1]
-        phrases = _collect_client_doctor_name_phrases()
+        phrases = _collect_client_doctor_name_phrases(client_id=client_id)
         _NAMES_INDEX[cid] = (mt, phrases)
         return phrases
 
@@ -310,11 +318,11 @@ def _norm_ground_truth_text(text: str) -> str:
     return (text or "").strip().lower().replace("ё", "е")
 
 
-def _build_doctor_ground_truth_index() -> tuple[frozenset[str], frozenset[str]]:
+def _build_doctor_ground_truth_index(*, client_id: str | None) -> tuple[frozenset[str], frozenset[str]]:
     """Role phrases from position/aliases + specialty keys confirmed by doctor md."""
     role_phrases: set[str] = set()
     confirmed_kw: set[str] = set()
-    for path in _iter_doctor_paths():
+    for path in _iter_doctor_paths(client_id=client_id):
         fm, _body, _stem = _read_md_split(path)
         if fm.get("active") is False:
             continue
@@ -342,12 +350,12 @@ def cached_doctor_ground_truth_index(
 ) -> tuple[frozenset[str], frozenset[str]]:
     """(role_phrases, confirmed_specialty_keywords) cached by md mtime."""
     cid = _safe_client_id(client_id)
-    mt = _doctor_paths_mtime_max()
+    mt = _doctor_paths_mtime_max(client_id=client_id)
     with _GROUND_TRUTH_LOCK:
         hit = _GROUND_TRUTH_INDEX.get(cid)
         if hit is not None and hit[0] == mt:
             return hit[1], hit[2]
-        role_phrases, confirmed_kw = _build_doctor_ground_truth_index()
+        role_phrases, confirmed_kw = _build_doctor_ground_truth_index(client_id=client_id)
         _GROUND_TRUTH_INDEX[cid] = (mt, role_phrases, confirmed_kw)
         return role_phrases, confirmed_kw
 
@@ -392,10 +400,10 @@ def doctor_ground_truth_mention(text: str, *, client_id: str | None) -> bool:
     return False
 
 
-def load_all_doctors() -> list[DoctorPublic]:
+def load_all_doctors(*, client_id: str | None = None) -> list[DoctorPublic]:
     """Все активные записи докторских md (без overview)."""
     out: list[DoctorPublic] = []
-    for path in _iter_doctor_paths():
+    for path in _iter_doctor_paths(client_id=client_id):
         fm, body, stem = _read_md_split(path)
         if fm.get("active") is False:
             continue
@@ -408,7 +416,7 @@ def find_doctors_by_service(service_id: str, *, client_id: str) -> list[DoctorLi
     if not sid:
         return []
     found: list[DoctorListFact] = []
-    for path in _iter_doctor_paths():
+    for path in _iter_doctor_paths(client_id=client_id):
         fm, body, stem = _read_md_split(path)
         if fm.get("active") is False:
             continue
@@ -435,7 +443,7 @@ def find_doctors_by_topic(topic: str, *, client_id: str) -> list[DoctorListFact]
         return []
     found: list[DoctorListFact] = []
     seen: set[str] = set()
-    for path in _iter_doctor_paths():
+    for path in _iter_doctor_paths(client_id=client_id):
         fm, body, stem = _read_md_split(path)
         if fm.get("active") is False:
             continue
@@ -504,13 +512,13 @@ def doctor_list_fact_public_dict(f: DoctorListFact) -> dict[str, Any]:
     return out
 
 
-def build_doctors_list_llm_question(*, user_question: str) -> str:
+def build_doctors_list_llm_question(*, user_question: str, client_id: str | None = None) -> str:
     q0 = (user_question or "").strip()
     rules = (
         "Перечисли врачей, которые делают эту услугу. Для каждого укажи: полное имя, должность; "
         "если в данных есть experience_years — добавь кратко стаж в годах; "
         "затем одно короткое предложение про подход по полю specialty_brief.\n"
-        "Заверши приглашением на бесплатную консультацию.\n"
+        "Не добавляй отдельное приглашение на консультацию — его добавит отдельная policy.\n"
         "Используй ТОЛЬКО факты ниже, ничего не выдумывай. "
         "Если для врача нет experience_years в данных — не упоминай его стаж и не подставляй чужие числа; "
         "не используй слово «null»."
@@ -577,7 +585,7 @@ def doctor_intent_probe(q: str) -> bool:
         return True
 
     if re.search(
-        r"\b(?:кто|какой|какая|какие)\s+"
+        r"\b(?:кто|какой|какая|какие)\s+(?:у\s+вас\s+)?"
         r"(?:делает|делают|ставит|ставят|ведёт|ведет|ведут|принимает|принимают|"
         r"занимается|занимаются|лечит|лечают|работает|работают)\b",
         x,
@@ -591,7 +599,7 @@ def doctor_intent_probe(q: str) -> bool:
         return True
 
     if re.search(
-        r"\bкто\s+(?:занимается|делает|ведет|ведёт|ставит|лечит|принимает|работает)\s+",
+        r"\bкто\s+(?:у\s+вас\s+)?(?:занимается|занимаются|делает|делают|ведет|ведёт|ставит|ставят|лечит|лечают|принимает|принимают|работает|работают)\s+",
         x,
     ) and re.search(
         r"\b(?:имплант|протез|ортодонт|удален|коронк|винир|протезирован)",
@@ -638,7 +646,53 @@ def doctor_intent_probe(q: str) -> bool:
     return False
 
 
-def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
+def _doctor_lookup_result_for_facts(
+    by_svc: list[DoctorListFact],
+    *,
+    matched_service_id: str | None = None,
+    specialty: str | None = None,
+) -> dict[str, Any] | None:
+    by_svc = _dedupe_doctor_facts(by_svc)
+    n = len(by_svc)
+    if n == 0:
+        return None
+    if n == 1:
+        d0 = by_svc[0]
+        did = str(d0.get("doc_id") or "")
+        return {
+            "routing": "doc",
+            "doc_id": did,
+            "doctor_name": d0.get("name_full") or did,
+            "specialty": specialty,
+            "matched_service_id": matched_service_id,
+            "cards": [d0],
+        }
+    if 2 <= n <= 3:
+        return {
+            "routing": "cards",
+            "doc_id": None,
+            "doctor_name": "Несколько врачей",
+            "specialty": specialty,
+            "matched_service_id": matched_service_id,
+            "cards": by_svc,
+        }
+    return {
+        "routing": "overview",
+        "doc_id": _OVERVIEW_ID,
+        "doctor_name": "Наши врачи",
+        "specialty": specialty,
+        "matched_service_id": matched_service_id,
+        "matching_doctors_total": n,
+    }
+
+
+def doctors_lookup(
+    q: str,
+    *,
+    client_id: str,
+    session_service_id: str | None = None,
+    session_topic: str | None = None,
+) -> dict[str, Any] | None:
     """Результат для source_routing / app.
 
     routing:
@@ -651,7 +705,7 @@ def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
         return None
 
     q_lem = _lemma_set(q0)
-    paths = _iter_doctor_paths()
+    paths = _iter_doctor_paths(client_id=client_id)
     if not paths:
         return None
 
@@ -681,46 +735,43 @@ def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
             "cards": [d],
         }
 
-    intent = doctor_intent_probe(q0)
+    intent = doctor_intent_probe(q0) or is_vague_attribute_followup(q0, "doctor")
+    vague_doctor = is_vague_attribute_followup(q0, "doctor")
     if not intent:
         return None
+
+    if vague_doctor:
+        svc_hint = (session_service_id or "").strip()
+        if svc_hint:
+            hit = _doctor_lookup_result_for_facts(
+                find_doctors_by_service(svc_hint, client_id=client_id),
+                matched_service_id=svc_hint,
+            )
+            if hit:
+                return hit
+        topic_hint = (session_topic or "").strip()
+        if topic_hint:
+            hit = _doctor_lookup_result_for_facts(
+                find_doctors_by_topic(topic_hint, client_id=client_id),
+                specialty=topic_hint,
+            )
+            if hit:
+                return hit
 
     # --- 2) Услуга из каталога (уверенный матч)
     cat_match = match_service_from_catalog(q0, client_id=client_id)
     if cat_match.get("matched_service_id") and bool(cat_match.get("is_confident")):
-        sid = str(cat_match.get("matched_service_id") or "")
-        by_svc = find_doctors_by_service(sid, client_id=client_id)
-        by_svc = _dedupe_doctor_facts(by_svc)
-        n = len(by_svc)
-        if n == 1:
-            d0 = by_svc[0]
-            did = str(d0.get("doc_id") or "")
-            return {
-                "routing": "doc",
-                "doc_id": did,
-                "doctor_name": d0.get("name_full") or did,
-                "specialty": None,
-                "matched_service_id": sid,
-                "cards": [d0],
-            }
-        if 2 <= n <= 3:
-            return {
-                "routing": "cards",
-                "doc_id": None,
-                "doctor_name": "Несколько врачей",
-                "specialty": None,
-                "matched_service_id": sid,
-                "cards": by_svc,
-            }
-        if n >= 4:
-            return {
-                "routing": "overview",
-                "doc_id": _OVERVIEW_ID,
-                "doctor_name": "Наши врачи",
-                "specialty": None,
-                "matched_service_id": sid,
-                "matching_doctors_total": n,
-            }
+        if not (vague_doctor and not catalog_match_is_authoritative(cat_match, q0)):
+            sid = str(cat_match.get("matched_service_id") or "")
+            if sid == "tomography" and not KT_EXPLICIT_RE.search(q0):
+                sid = ""
+            if sid:
+                hit = _doctor_lookup_result_for_facts(
+                    find_doctors_by_service(sid, client_id=client_id),
+                    matched_service_id=sid,
+                )
+                if hit:
+                    return hit
 
     # --- 3) Ключевые слова специализации
     st = _specialty_topic_from_query(q0)
@@ -816,9 +867,15 @@ def doctors_lookup(q: str, *, client_id: str) -> dict[str, Any] | None:
 
 def _is_staff_implant_question(q_raw: str, q_lem: set[str]) -> bool:
     low = q_raw.lower()
-    if "врач" not in low and "доктор" not in low:
-        return False
     if not (q_lem & frozenset({"имплант", "имплантация", "имплантолог"})):
+        return False
+    norm = _norm_query(q_raw)
+    if re.search(
+        r"\bкто\s+(?:у\s+вас\s+)?(?:занимается|занимаются|делает|делают|ведет|ведёт|ставит|лечит)\b",
+        norm,
+    ):
+        return True
+    if "врач" not in low and "доктор" not in low and "специалист" not in low:
         return False
     return bool(re.search(r"\b(кто|какой|какие|чей)\b", low, flags=re.I))
 

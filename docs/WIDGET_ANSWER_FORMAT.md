@@ -36,7 +36,26 @@
 В контекст LLM комментарии aliases **не попадают** (см. `chunk_context_md_for_llm`).  
 Модель не обязана копировать `**` из источника — виджет их отрисует, если они есть в ответе.
 
-## Реализация
+## Answer slots (детерминированный хвост)
+
+После текста Generator бэкенд может дописать **1–3 абзаца** из YAML frontmatter (`clinic_note`, `consult_value`, `promo_note`). Это не списки и не заголовки — только связные абзацы через пустую строку, в том же markdown-поднаборе, что и основной ответ.
+
+Порядок в `answer`: суть → слоты → (опционально) price append → policy/CTA не меняют уже записанный текст.
+
+## Price tail (детерминированный хвост)
+
+На `price_lookup` бэкенд дописывает или отдаёт **целиком** детерминированный price-блок. Суммы **не** из LLM.
+
+| Путь | Когда | Источник |
+|------|-------|----------|
+| **PriceBook v2** | есть `pricebook/services/{service_id}.json` | `core/price_answer_assembler.py` — полный ответ + quick replies |
+| **Legacy append** | нет pricebook entry | `core/price_offers.py` → `generator_append_text` («Точные цены», этапы) |
+
+Может содержать маркированный список с `**суммами**` — разрешённый поднабор markdown.
+
+Telemetry в `meta`: `price_offers_applied`, `price_offer_ids`, `price_offer_unit` (см. `CURRENT_ARCHITECTURE.md` §6).
+
+---
 
 - Промпт: `RESPONSE_FORMAT` в `llm.py` (все ветки Generator, включая стрим).
 - Рендер: `static/widget/answer_format.js` + стили `.clinic-msg__body--rich` в `widget.css`.

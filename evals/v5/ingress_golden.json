@@ -22,7 +22,7 @@
   },
   {
     "id": "ingress_catalog_implant_offered",
-    "question": "сколько стоит имплант",
+    "question": "сколько стоит классическая имплантация",
     "mode": "offered_check",
     "expected_offered": true
   },

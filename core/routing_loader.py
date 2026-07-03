@@ -61,14 +61,51 @@ class RetrievalThresholds(BaseModel):
     alias_scope_guard_min: float = Field(..., ge=0.0, le=1.0)
 
 
+class RerankThresholds(BaseModel):
+    """LLM rerank gate (Retrieval 2.0 H3). score_min = retrieval.low_score_threshold."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    score_max: float = Field(..., ge=0.0, le=1.0)
+    score_gap_max: float = Field(..., ge=0.0, le=1.0)
+    top_k: int = Field(..., ge=2, le=8)
+    min_candidates: int = Field(..., ge=2, le=8)
+    skip_on_strong_alias_in_pool: bool = True
+
+
+class MetadataFirstThresholds(BaseModel):
+    """Metadata-First v1 retrieval boosts (see docs/METADATA_FIRST_V1.md)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    comparison_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
+    pricing_doc_type_boost: float = Field(..., ge=0.0, le=0.5)
+    service_topic_match_boost: float = Field(..., ge=0.0, le=0.5)
+    aspect_match_boost: float = Field(..., ge=0.0, le=0.5)
+    service_id_match_boost: float = Field(..., ge=0.0, le=0.5)
+    service_id_min_confidence: float = Field(..., ge=0.0, le=1.0)
+    metadata_soft_filter_enabled: bool = True
+    alias_boost_max_delta: float = Field(..., ge=0.0, le=0.5)
+    comparison_miss_exclude_comparison: bool = True
+    price_lookup_exclude_service_when_pricing_present: bool = True
+    alias_topic_guard_enabled: bool = True
+    soft_scope_enabled: bool = True
+
+
 class CatalogMatchThresholds(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     containment_min: float = Field(..., ge=0.0, le=1.0)
+    tie_score_margin: float = Field(..., ge=0.0, le=0.25)
+    typo_support_min: float = Field(..., ge=0.0, le=1.0)
+    lemma_weak_phrase_recall_min: float = Field(..., ge=0.0, le=1.0)
+    topic_tiebreak_boost: float = Field(..., ge=0.0, le=0.25)
+    topic_tiebreak_min_confidence: float = Field(..., ge=0.0, le=1.0)
 
 
 class AliasThresholds(BaseModel):
-    """PR #1.10 alias pipeline thresholds (see IMPLEMENTATION_PLAN PR #1.10)."""
+    """PR #1.10 alias pipeline thresholds (see core/routing.yaml)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -90,8 +127,55 @@ class AliasThresholds(BaseModel):
     embed_matrix_top_chunks: int = Field(..., ge=8, le=512)
 
 
+class LeadTurnThresholds(BaseModel):
+    """Gray-zone lead turn LLM classifier (see docs/CURRENT_ARCHITECTURE.md § Lead flow v2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_confidence: float = Field(..., ge=0.0, le=1.0)
+
+
+class FollowUpThresholds(BaseModel):
+    """Short follow-up rewrite + compatibility guard (PRODUCT_WORK_PLAN stage 4a)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_subject_turn_age: int = Field(..., ge=1, le=16)
+    min_compat_score: float = Field(..., ge=0.0, le=1.0)
+    doc_type_boost: float = Field(..., ge=0.0, le=0.25)
+
+
+class NumericFactGateThresholds(BaseModel):
+    """Deterministic ₽ / % / installment gate (PRODUCT_WORK_PLAN stage 5a)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_answer_chars_after_remove: int = Field(..., ge=0, le=2000)
+
+
+class FacetArbitrationThresholds(BaseModel):
+    """Aspect-aware catalog suppression in A5 arbiter (Retrieval 2.0)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    aspects: list[str] = Field(default_factory=lambda: ["pain"])
+    min_facet_score: float = Field(..., ge=0.0, le=1.0)
+
+
+class PatientSituationThresholds(BaseModel):
+    """Patient situation soft routing (see docs/TECH_DEBT.md § Patient situation)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_confidence_for_routing: float = Field(..., ge=0.0, le=1.0)
+    unit_match_boost: float = Field(..., ge=0.0, le=0.25)
+    unit_mismatch_penalty: float = Field(..., ge=0.0, le=0.25)
+    max_turn_age: int = Field(..., ge=0, le=20)
+
+
 class Thresholds(BaseModel):
-    """Validated representation of `core/routing.yaml` (see ARCHITECTURE V5.md §D2)."""
+    """Validated representation of `core/routing.yaml` (see docs/CURRENT_ARCHITECTURE.md)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -100,8 +184,15 @@ class Thresholds(BaseModel):
     arbiter: ArbiterThresholds
     verifier: VerifierThresholds
     retrieval: RetrievalThresholds
+    rerank: RerankThresholds
     catalog_match: CatalogMatchThresholds
     alias: AliasThresholds
+    metadata_first: MetadataFirstThresholds
+    lead_turn: LeadTurnThresholds
+    follow_up: FollowUpThresholds
+    numeric_fact_gate: NumericFactGateThresholds
+    facet_arbitration: FacetArbitrationThresholds
+    patient_situation: PatientSituationThresholds
 
 
 _LOCK = threading.Lock()

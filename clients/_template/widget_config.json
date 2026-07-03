@@ -1,0 +1,17 @@
+{
+  "pack_id": "REPLACE_CLIENT_ID",
+  "clientId": "REPLACE_CLIENT_ID",
+  "apiBase": "https://REPLACE_CLIENT_ID.bot.artgents.ru",
+  "allowed_origins": [
+    "https://REPLACE_CLIENT_ID.bot.artgents.ru",
+    "REPLACE_WITH_CLINIC_SITE_ORIGIN"
+  ],
+  "bot_name": null,
+  "online_label": "ИИ-консультант клиники. Онлайн 24/7",
+  "launcher_subtitle": null,
+  "launcher_cta_label": "Задать вопрос",
+  "demo_launcher": false,
+  "welcome_text": null,
+  "video_aspect": "horizontal",
+  "starter_prompts": []
+}

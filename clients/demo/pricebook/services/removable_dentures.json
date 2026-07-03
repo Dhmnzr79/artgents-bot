@@ -1,0 +1,53 @@
+{
+  "service_id": "removable_dentures",
+  "price_model": "complex",
+  "display_name": "Съёмное протезирование",
+  "intro_text": "Стоимость зависит от типа протеза — частичный или полный на одну челюсть.",
+  "tags": [],
+  "default_unit": "jaw",
+  "price": null,
+  "variants": [
+    {
+      "offer_id": "removable_dentures.jaw.partial",
+      "brand": "partial",
+      "brand_label": "Частичный съёмный протез",
+      "brand_group": null,
+      "unit": "jaw",
+      "total": 45000,
+      "currency": "RUB",
+      "recommended": true,
+      "payment_stages": [],
+      "includes": [
+        "осмотр и слепки",
+        "изготовление протеза",
+        "примерка и коррекция"
+      ],
+      "excludes": [
+        "имплантация — отдельно"
+      ]
+    },
+    {
+      "offer_id": "removable_dentures.jaw.full",
+      "brand": "full",
+      "brand_label": "Полный съёмный протез",
+      "brand_group": null,
+      "unit": "jaw",
+      "total": 65000,
+      "currency": "RUB",
+      "recommended": false,
+      "payment_stages": [],
+      "includes": [
+        "осмотр и слепки",
+        "изготовление протеза",
+        "примерка и коррекция"
+      ],
+      "excludes": [
+        "имплантация — отдельно"
+      ]
+    }
+  ],
+  "promo": null,
+  "fact_refs": ["installment_12"],
+  "followups": [],
+  "cta_key": "price"
+}

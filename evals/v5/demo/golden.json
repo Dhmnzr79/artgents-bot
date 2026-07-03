@@ -1,0 +1,470 @@
+{
+  "baseline": 14,
+  "description": "Demo Core Golden batch 1 (drafts/test.md §2.1): имплантация и этапы — 14 cases. Incremental; not in CI --suite all until stable.",
+  "sections": {
+    "2.1_implantation_steps": 14
+  },
+  "cases": [
+    {
+      "id": "golden_2_01_what_is_implantation",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 1,
+      "question": "Что такое имплантация зубов?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "implantation__info__methods_overview",
+      "answer_signals_any": [
+        "имплант",
+        "зуб",
+        "опор",
+        "корон"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_02_how_implantation_works",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 2,
+      "question": "Как проходит имплантация?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "implantation__info__steps",
+      "answer_signals_any": [
+        "этап",
+        "имплант",
+        "корон",
+        "диагност",
+        "прижив"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "stages"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_03_implantation_duration",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 3,
+      "question": "Сколько длится имплантация?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "implantation__faq__duration",
+      "answer_signals_any": [
+        "месяц",
+        "день",
+        "корон",
+        "прижив",
+        "срок"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "duration"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_04_single_implant_time",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 4,
+      "question": "Сколько по времени ставят один имплант?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "implantation__faq__duration",
+        "implantation__service__classic"
+      ],
+      "answer_signals_any": [
+        "минут",
+        "час",
+        "имплант",
+        "операц"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "duration"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_05_crown_after_implant",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 5,
+      "question": "Когда поставят коронку после импланта?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "implantation__faq__duration",
+        "implantation__info__aftercare",
+        "implantation__service__temporary_teeth"
+      ],
+      "answer_signals_any": [
+        "корон",
+        "прижив",
+        "месяц",
+        "постоянн"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "duration"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_06_why_not_permanent_crown_immediately",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 6,
+      "question": "Почему нельзя сразу поставить постоянную коронку?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "implantation__faq__tooth_one_day",
+        "comparison__classic_vs_one_stage",
+        "implantation__info__aftercare",
+        "implantation__service__temporary_teeth"
+      ],
+      "answer_signals_any": [
+        "прижив",
+        "временн",
+        "постоянн",
+        "корон"
+      ],
+      "forbidden_signals": [
+        "можно сразу постоянную коронку без ожидания"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "comparison"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_07_tooth_in_one_day",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 7,
+      "question": "Можно ли поставить зуб за один день?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "implantation__faq__tooth_one_day",
+        "implantation__service__one_stage"
+      ],
+      "answer_signals_any": [
+        "день",
+        "временн",
+        "корон",
+        "одномомент"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_08_extract_and_implant_same_day",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 8,
+      "question": "Можно удалить зуб и сразу поставить имплант?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "implantation__service__one_stage",
+        "comparison__classic_vs_one_stage",
+        "extraction__service__tooth_extraction"
+      ],
+      "answer_signals_any": [
+        "одномомент",
+        "удал",
+        "имплант",
+        "визит"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "comparison"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_09_implant_after_extraction_timing",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 9,
+      "question": "Через сколько после удаления можно ставить имплант?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "extraction__service__tooth_extraction",
+        "implantation__service__one_stage",
+        "comparison__classic_vs_one_stage",
+        "implantation__faq__duration"
+      ],
+      "answer_signals_any": [
+        "удал",
+        "имплант",
+        "сразу",
+        "месяц",
+        "этап"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "duration"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_10_missing_tooth_8_years",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 10,
+      "question": "Если зуба нет уже 8 лет, можно поставить имплант?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "implantation__info__bone_graft",
+        "implantation__service__classic"
+      ],
+      "answer_signals_any": [
+        "кост",
+        "имплант",
+        "кт",
+        "диагност",
+        "можно"
+      ],
+      "forbidden_signals": [
+        "нельзя ставить имплант никогда"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_11_consequences_no_implant",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 11,
+      "question": "Что будет, если не ставить имплант?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "implantation__faq__osseointegration",
+      "answer_signals_any": [
+        "кост",
+        "зуб",
+        "жев",
+        "сосед"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_12_ct_before_implantation",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 12,
+      "question": "Нужна ли КТ перед имплантацией?",
+      "expected_route": "catalog_facts",
+      "expected_service_id": "tomography",
+      "answer_signals_any": [
+        "кт",
+        "имплант",
+        "диагност",
+        "план",
+        "сним"
+      ],
+      "coverage_class": "STRONG",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "overview"
+        ],
+        "expected_service_id": "tomography"
+      }
+    },
+    {
+      "id": "golden_2_13_why_3d_planning",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 13,
+      "question": "Зачем 3D-планирование?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id_any": [
+        "clinic__info__technology",
+        "implantation__service__classic",
+        "implantation__faq__osseointegration",
+        "implantation__info__steps"
+      ],
+      "answer_signals_any": [
+        "3d",
+        "план",
+        "кт",
+        "точн",
+        "имплант"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "stages"
+        ]
+      }
+    },
+    {
+      "id": "golden_2_14_treatment_order",
+      "client_id": "demo",
+      "section": "2.1",
+      "golden_ref": 14,
+      "question": "Что сначала: КТ, удаление, лечение дёсен или имплантация?",
+      "expected_route_any": [
+        "retrieval_chunk",
+        "catalog_md_first"
+      ],
+      "expected_doc_id": "implantation__info__steps",
+      "answer_signals_any": [
+        "кт",
+        "диагност",
+        "этап",
+        "сначала",
+        "консультац"
+      ],
+      "coverage_class": "MEDIUM",
+      "composer_parity": {
+        "expected_answer_path": "composer",
+        "require_numeric_gate_pass": true,
+        "require_forbidden_claims_empty": true,
+        "expected_packet_aspects": [
+          "stages"
+        ],
+        "expected_service_id_any": [
+          "classic",
+          "one_stage"
+        ]
+      }
+    }
+  ]
+}

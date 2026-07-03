@@ -1,0 +1,29 @@
+{
+  "pack_id": "demo",
+  "clientId": "demo",
+  "apiBase": "https://demo.bot.artgents.ru",
+  "allowed_origins": [
+    "https://artgents.ru",
+    "https://www.artgents.ru",
+    "https://demo.bot.artgents.ru",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:9000",
+    "http://127.0.0.1:9000",
+    "http://localhost:9001",
+    "http://127.0.0.1:9001"
+  ],
+  "botName": "Надежда",
+  "onlineLabel": "ИИ-консультант клиники. Онлайн 24/7",
+  "launcherSubtitle": "Демо ИИ-консультанта клиники",
+  "launcherCtaLabel": "Посмотреть демо",
+  "launcherTeaser": false,
+  "demoLauncher": true,
+  "welcomeText": "Здравствуйте! Это демо ИИ-консультанта для стоматологии. Сейчас доступны часть тем — чтобы показать, как бот отвечает пациентам.\nМожно задать вопрос или выбрать тему ниже. Тест на вашем контенте — 2 недели бесплатно.",
+  "videoAspect": "horizontal",
+  "starterPrompts": [
+    { "label": "Я боюсь боли", "q": "Я боюсь боли" },
+    { "label": "Расскажите про all-on-4", "q": "Расскажите про all-on-4" },
+    { "label": "Посмотреть видео с врачом", "videoKey": "pain-doctor-explains" }
+  ]
+}

@@ -6,13 +6,119 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- OpenAI ---
+# --- LLM provider ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMB_MODEL = os.getenv("MODEL_EMBED", "text-embedding-3-large")
-CHAT_MODEL = os.getenv("MODEL_CHAT", "gpt-5.4-mini")
-QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or "gpt-5.4-nano"
-RERANK_MODEL = (os.getenv("MODEL_RERANK") or "").strip() or "gpt-5.4-mini"
-LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or CHAT_MODEL
+CHAT_API_KEY = (
+    (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip()
+    or OPENAI_API_KEY
+)
+CHAT_BASE_URL = (
+    (os.getenv("CHAT_BASE_URL") or os.getenv("DASHSCOPE_BASE_URL") or "").strip()
+    or None
+)
+QWEN_ENABLE_THINKING = os.getenv("QWEN_ENABLE_THINKING", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+
+# --- Models (Qwen pilot defaults; override via .env to revert to OpenAI) ---
+QWEN_PLUS_MODEL = "qwen3.7-plus"
+QWEN_FLASH_MODEL = "qwen3.6-flash"
+
+CHAT_MODEL = os.getenv("MODEL_CHAT", QWEN_PLUS_MODEL)
+
+
+def chat_provider_is_qwen() -> bool:
+    """True when chat client targets DashScope / MaaS Qwen (not OpenAI-native)."""
+    model = (os.getenv("MODEL_CHAT") or CHAT_MODEL or "").strip().lower()
+    base = (CHAT_BASE_URL or "").lower()
+    return (
+        "qwen" in model
+        or "dashscope" in base
+        or "aliyuncs" in base
+        or "maas." in base
+    )
+
+RESOLVER_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_PLUS_MODEL
+QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_FLASH_MODEL
+LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
+DIALOG_FOCUS_LLM_CLASSIFY_ON = os.getenv("DIALOG_FOCUS_LLM_CLASSIFY", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+DIALOG_FOCUS_LLM_MODEL = (os.getenv("DIALOG_FOCUS_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+
+# --- Patient situation semantic classifier ---
+PATIENT_SITUATION_LLM_ON = os.getenv("PATIENT_SITUATION_LLM_ON", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+PATIENT_SITUATION_LLM_MODEL = (
+    (os.getenv("PATIENT_SITUATION_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
+# --- Aspect planner LLM (composite questions; composer roadmap phase 1) ---
+ASPECT_PLANNER_LLM_ON = os.getenv("ASPECT_PLANNER_LLM_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+ASPECT_PLANNER_LLM_MODEL = (
+    (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
+# --- Answer packet assembler (composer roadmap phase 2) ---
+ANSWER_PACKET_ASSEMBLER_ON = os.getenv("ANSWER_PACKET_ASSEMBLER_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# --- Packet composer (composer roadmap phase 3) ---
+COMPOSER_ON = os.getenv("COMPOSER_ON", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# --- Full-context composer content (step 1: whole md base, not chunk refs) ---
+FULLCTX_ON = os.getenv("FULLCTX_ON", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# --- LLM service selection in composer price path (step 2) ---
+SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+SERVICE_SELECT_LLM_MODEL = (
+    (os.getenv("SERVICE_SELECT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
+# --- Single turn planner (full-context roadmap stage 4) ---
+TURN_PLANNER_ON = os.getenv("TURN_PLANNER_ON", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+TURN_PLANNER_LLM_MODEL = (
+    (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+)
+
+# --- Lead active-turn gray-zone classifier ---
+LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+LEAD_TURN_LLM_MODEL = (os.getenv("LEAD_TURN_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 
 # --- Намерение «записаться» (regex + при необходимости LLM) ---
 BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
@@ -20,17 +126,17 @@ BOOKING_INTENT_LLM_ON = os.getenv("BOOKING_INTENT_LLM_ON", "1").lower() in (
     "true",
     "yes",
 )
-BOOKING_INTENT_LLM_MODEL = (os.getenv("BOOKING_INTENT_LLM_MODEL") or "").strip() or "gpt-5.4-nano"
+BOOKING_INTENT_LLM_MODEL = (os.getenv("BOOKING_INTENT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 PRICE_INTENT_LLM_ON = os.getenv("PRICE_INTENT_LLM_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
-PRICE_INTENT_LLM_MODEL = (os.getenv("PRICE_INTENT_LLM_MODEL") or "").strip() or CHAT_MODEL
-SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or "gpt-5.4-nano"
+PRICE_INTENT_LLM_MODEL = (os.getenv("PRICE_INTENT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
+SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
 SAFETY_RED_CONFIDENCE_THRESHOLD = float(os.getenv("SAFETY_RED_CONFIDENCE_THRESHOLD", "0.8"))
-COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or "gpt-5.4-nano"
-INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or "gpt-5.4-nano"
+COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
+INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
 QUERY_REWRITE_ON = os.getenv("QUERY_REWRITE_ON", "1").lower() in ("1", "true", "yes")
 QUERY_REWRITE_MAX_MESSAGES = int(os.getenv("QUERY_REWRITE_MAX_MESSAGES", "10"))
 # Подстроки в ответе rewrite → отбросить (утечка инструкции / мусор). Разделитель |
@@ -59,19 +165,11 @@ ANTI_SPAM_BURST_MESSAGES = int(os.getenv("ANTI_SPAM_BURST_MESSAGES", "6"))
 
 # --- Paths ---
 DATA_DIR = os.getenv("DATA_DIR", "data")
-CORPUS_PATH = os.path.join(DATA_DIR, "corpus.jsonl")
-EMB_PATH = os.path.join(DATA_DIR, "embeddings.npy")
-ALIAS_ROWS_PATH = os.path.join(DATA_DIR, "alias_rows.jsonl")
-ALIAS_EMB_PATH = os.path.join(DATA_DIR, "alias_embeddings.npy")
 SQLITE_PATH = os.getenv("SQLITE_PATH", os.path.join(DATA_DIR, "bot.db"))
 
 # --- Retrieval / policy пороги ---
-LOW_SCORE_THRESHOLD = float(os.getenv("LOW_SCORE_THRESHOLD", "0.33"))
-BROAD_QUERY_MAX_WORDS = int(os.getenv("BROAD_QUERY_MAX_WORDS", "5"))
 
 # Алиас по корпусу: «сильный» — как раньше 0.82; «мягкий» — подстраховка у LOW_SCORE (не второй порог на клиента).
-ALIAS_STRONG_THRESHOLD = float(os.getenv("ALIAS_STRONG_THRESHOLD", "0.82"))
-ALIAS_SOFT_THRESHOLD = float(os.getenv("ALIAS_SOFT_THRESHOLD", "0.72"))
 
 
 # --- Ответ при низком score ---
@@ -97,17 +195,24 @@ BOOKING_INTENT_RE = re.compile(
 )
 
 # --- Multi-tenant (сейчас один клиент; неизвестный id → 403) ---
-DEFAULT_CLIENT_ID = os.getenv("DEFAULT_CLIENT_ID", "default").strip() or "default"
+DEFAULT_CLIENT_ID = os.getenv("DEFAULT_CLIENT_ID", "demo").strip() or "demo"
 _ac_raw = os.getenv("ALLOWED_CLIENTS", "").strip()
 if _ac_raw:
     ALLOWED_CLIENTS = frozenset(x.strip() for x in _ac_raw.split(",") if x.strip())
 else:
-    ALLOWED_CLIENTS = frozenset({DEFAULT_CLIENT_ID})
+    ALLOWED_CLIENTS = frozenset({DEFAULT_CLIENT_ID, "demo", "cesi", "nikadent"})
 
 # --- Детерминированный роутинг до LLM ---
 CONTACTS_RE = re.compile(
-    r"(адрес|где.*находитесь|как\s+(доехать|проехать)|время\s+работы|график|телефон|whatsapp|карта|расположение)",
-    re.I,
+    r"(адрес|"
+    r"где\s+(?:вы\s+|вас\s+)?находит|"
+    r"где.{0,40}клиник|"
+    r"как\s+(доехать|проехать)|"
+    r"время\s+работы|график|"
+    r"телефон|whatsapp|карта|расположение|"
+    r"метро|парковк|"
+    r"суббот|воскресен)",
+    re.I | re.U,
 )
 PRICES_RE = re.compile(
     r"(цена|стоимост|сколько\s+стоит|прайс|расценк|по\s+цене|сколько\s+будет|сколько\s+руб)",
@@ -122,6 +227,64 @@ PRICE_LOOKUP_RE = re.compile(
 PRICE_CONCERN_RE = re.compile(
     r"(дорог|почему\s+так\s+дорого|слишком\s+дорого|высокая\s+цена|не\s+потяну|не\s+по\s+карману|дешевле|снизить\s+стоимост)",
     re.I,
+)
+# Коммерческие/организационные вопросы — retrieval (payment_terms, warranty), не price_concern.
+COMMERCIAL_INFO_RE = re.compile(
+    r"(?:"
+    r"рассрочк|"
+    r"оплат\w*\s+по\s+(?:част|этап)|"
+    r"оплат\w*\s+потом|"
+    r"что\s+входит|"
+    r"входит\s+в\s+(?:акци|стоим|цен)|"
+    r"не\s+входит\s+в\s+(?:цен|стоим)|"
+    r"акци\w*\s+на\s+имплант|"
+    r"платн\w*\s+или\s+по\s+гарант|"
+    r"повторн\w+\s+(?:установк|имплант)|"
+    r"гаранти\w+\s+(?:на\s+)?(?:работ|имплант|повтор)|"
+    r"посчитать\s+цен\w*|"
+    r"(?:снимк|кт).*(?:посчитать|оценить|пример\w*).*(?:цен|стоим)|"
+    r"(?:посчитать|оценить|пример\w*).*(?:цен|стоим).*(?:снимк|кт)|"
+    r"под\s+ключ|"
+    r"отдельно\s+(?:абатмент|коронк|снимок)"
+    r")",
+    re.I,
+)
+CONSULTATION_QUERY_RE = re.compile(
+    r"(?:"
+    r"(?:сколько\s+стоит\s+)?консультац(?:ия|ии)?(?:\s+\w+)?"
+    r"|план\s+лечен"
+    r"|стоимость\s+консультац"
+    r")",
+    re.I,
+)
+COMPARISON_QUERY_RE = re.compile(
+    r"(?:"
+    r"(?:all[\s-]?on[\s-]?)?4\s+или\s+6|"
+    r"6\s+или\s+4|"
+    r"все\s+на\s+(?:четыр|4)\s+или\s+(?:шест|6)|"
+    r"чем\s+отличается\s+all|"
+    r"что\s+(?:лучше|выбрать)|"
+    r"лучше\s+(?:все\s+на|all-on|\d+\s+или\s+\d+|\d+\s+имплант)"
+    r")",
+    re.I,
+)
+STEPS_VISITS_QUERY_RE = re.compile(
+    r"(?:"
+    r"(?:сколько\s+)?(?:визит|приём|прием|этап)\w*.*(?:имплант|протез|челюст)|"
+    r"(?:полн\w+\s+)?протезирован\w+\s+челюст\w*\s+на\s+имплант"
+    r")",
+    re.I,
+)
+KT_EXPLICIT_RE = re.compile(r"\bкт\b|томограф|компьютерн", re.I | re.U)
+# Implant pain/fear intent (lead_interrupt, policy; ask_turn overlay removed E5) — см. ROUTING_MAP.md
+IMPLANT_PAIN_FAQ_IMPLANT_RE = re.compile(
+    r"(имплант|implant|all[\s-]?on|все\s+на\s+(?:четыр|4|шест|6))",
+    re.I | re.U,
+)
+IMPLANT_PAIN_FAQ_FEAR_RE = re.compile(
+    r"(больно|боюсь|страш|страх|анестез|наркоз|обезбол|седац|"
+    r"не\s+больно|во\s+сне|дискомфорт\s+при\s+имплант)",
+    re.I | re.U,
 )
 
 PRICE_SERVICE_MATCH_STRONG = float(os.getenv("PRICE_SERVICE_MATCH_STRONG", "0.62"))
@@ -168,11 +331,20 @@ def estimate_llm_usage_usd(
 
 
 if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY is not set in .env")
+    # CI lint/unit import config without calling OpenAI; eval job checks the secret explicitly.
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        OPENAI_API_KEY = "github-actions-placeholder"
+        CHAT_API_KEY = CHAT_API_KEY or OPENAI_API_KEY
+    else:
+        raise RuntimeError("OPENAI_API_KEY is not set in .env (required for chat LLM)")
+elif not CHAT_API_KEY:
+    CHAT_API_KEY = OPENAI_API_KEY
 
 
 def resolve_client_id(raw: str | None) -> str | None:
     cid = (raw or "").strip() or DEFAULT_CLIENT_ID
+    if cid == "default":
+        cid = "demo"
     return cid if cid in ALLOWED_CLIENTS else None
 
 

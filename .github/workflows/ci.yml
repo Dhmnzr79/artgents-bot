@@ -1,0 +1,75 @@
+# CI — content lint + deterministic unit tests (full-context architecture).
+# Живые eval'ы (product/risk/live-composer) в CI НЕ гоняются — они стоят токенов
+# и запускаются локально по протоколу ревью (docs/FULLCONTEXT_ROADMAP.md).
+# Secrets (Settings → Actions): DASHSCOPE_API_KEY — только для импорта llm-клиента;
+# LLM-вызовов в этом workflow нет (юниты мокают модель). OPENAI_API_KEY больше не нужен.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "fullctx**"
+      - "feature/**"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  content-lint-and-unit:
+    name: Content lint + unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Lint client md (all packs)
+        run: python scripts/lint_content.py --client all
+
+      - name: Lint pricebook (money invariants)
+        run: python scripts/lint_pricebook.py
+
+      - name: App import smoke
+        run: python -c "import app"
+
+      - name: Unit tests (deterministic, LLM mocked)
+        run: |
+          python -m pytest \
+            tests/test_turn_planner_llm.py \
+            tests/test_turn_planner_wiring.py \
+            tests/test_turn_plan_protocol_guard.py \
+            tests/test_composer_flow.py \
+            tests/test_composer_display_chunk.py \
+            tests/test_composer_parity_eval.py \
+            tests/test_composer_live_eval.py \
+            tests/test_md_chunks.py \
+            tests/test_knowledge_base.py \
+            tests/test_answer_packet_composer.py \
+            tests/test_answer_planner.py \
+            tests/test_contacts_intent.py \
+            tests/test_client_runtime.py \
+            tests/test_e2e_smoke_infer.py \
+            tests/test_source_routing_golden.py \
+            tests/test_aspect_metadata.py \
+            tests/test_price_offers.py \
+            tests/test_price_group_overview.py \
+            tests/test_price_ref_routing.py \
+            tests/test_pricebook_golden.py \
+            -q --tb=short

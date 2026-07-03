@@ -126,7 +126,7 @@ def _ensure_tables(conn) -> None:
             """
         )
 
-        # v5 trace-level logging schema (see `docs/ARCHITECTURE V5.md` §E1).
+        # v5 trace-level logging schema (see pg_sink tables / docs/DASHBOARD.md).
         # Phase 0: schema only (no runtime writes yet).
         cur.execute(
             """
@@ -180,6 +180,22 @@ def _ensure_tables(conn) -> None:
                 ADD COLUMN IF NOT EXISTS resolver_bypassed_env BOOLEAN NOT NULL DEFAULT false;
             """
         )
+
+
+def ensure_pg_schema_conn(conn) -> None:
+    """Create dashboard tables if missing (shared by bot sink and admin)."""
+    _ensure_tables(conn)
+
+
+def ensure_pg_schema(dsn: str, *, connect_timeout: int = 3) -> None:
+    """Connect once and ensure dashboard tables exist."""
+    target = (dsn or "").strip()
+    if not target:
+        return
+    import psycopg
+
+    with psycopg.connect(target, autocommit=True, connect_timeout=max(1, connect_timeout)) as conn:
+        ensure_pg_schema_conn(conn)
 
 
 def _insert_v5_turn_trace(conn, row: dict) -> None:
@@ -388,6 +404,12 @@ def init_pg_sink(logger) -> bool:
         t.start()
         _WORKER_STARTED = True
         _log("info", "pg_sink_starting", queue_max=max(100, _QUEUE_MAX))
+        try:
+            from pg_retention import start_observability_retention_worker
+
+            start_observability_retention_worker(logger, dsn=_DSN)
+        except Exception as e:
+            _log("warning", "observability_retention_start_failed", err=str(e)[:200])
         return True
 
 

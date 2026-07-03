@@ -58,7 +58,7 @@ from session import (
     set_last_aspect,
 )
 from core.lead_context import lead_interrupt_no_topic
-from core.md_chunks import get_chunk_by_ref
+from core.md_chunks import find_chunk_by_topic_aspect, get_chunk_by_ref
 from ux_builder import build_ask_response, normalize_policy_payload
 
 _APPLY_POLICY_PARAMS = inspect.signature(apply_response_policy).parameters
@@ -615,16 +615,41 @@ def _composer_display_chunk(
             return out
     sid = (matched_service_id or "").strip()
     if sid:
-        for guess in (
-            f"implantation__service__{sid}.md#korotko",
-            f"extraction__service__{sid}.md#korotko",
-            f"treatment__service__{sid}.md#korotko",
-        ):
-            ch = get_chunk_by_ref(guess, client_id=client_id)
-            if isinstance(ch, dict):
-                out = dict(ch)
-                out.setdefault("_score", 1.0)
-                return out
+        try:
+            from core.catalog_resolution import _md_korotko_ref
+            from core.service_selector_llm import _read_service_catalog
+
+            catalog = _read_service_catalog(client_id)
+            svc = catalog.get(sid)
+            md_entry_ref = (
+                str((svc or {}).get("md_entry_ref") or "") if isinstance(svc, dict) else ""
+            )
+            md_ref = _md_korotko_ref(md_entry_ref)
+            if md_ref:
+                ch = get_chunk_by_ref(md_ref, client_id=client_id)
+                if isinstance(ch, dict):
+                    out = dict(ch)
+                    out.setdefault("_score", 1.0)
+                    return out
+        except Exception:
+            pass
+    plan = answer_plan_from_ctx()
+    if plan is not None:
+        aspect = str(plan.primary_aspect or "").strip()
+        if aspect == "overview":
+            aspect = ""
+        if not aspect:
+            for raw in plan.aspects or []:
+                cand = str(raw or "").strip()
+                if cand and cand != "overview":
+                    aspect = cand
+                    break
+        topic = str(plan.topic or "").strip() or None
+        ch = find_chunk_by_topic_aspect(client_id, topic, aspect)
+        if isinstance(ch, dict):
+            out = dict(ch)
+            out.setdefault("_score", 1.0)
+            return out
     return {"file": "composer.md", "h3_id": None, "h2_id": None, "_score": 1.0}
 
 

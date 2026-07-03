@@ -128,12 +128,72 @@ def _build_chunk_items(md_path: str, *, client_id: str) -> list[dict]:
     return items
 
 
+def _preferred_display_chunk(items: tuple[dict, ...] | list[dict]) -> dict | None:
+    if not items:
+        return None
+    for ch in items:
+        h3_id = (ch.get("h3_id") or "").strip().lower()
+        if (not ch.get("h2_id") and not ch.get("h3_id")) or h3_id in {"overview", "korotko"}:
+            out = dict(ch)
+            out["_score"] = 1.0
+            return out
+    out = dict(items[0])
+    out["_score"] = 1.0
+    return out
+
+
 @lru_cache(maxsize=256)
 def _chunks_for_file(client_id: str, basename: str) -> tuple[dict, ...]:
     md_path = _resolve_md_path(basename, client_id=client_id)
     if not md_path:
         return ()
     return tuple(_build_chunk_items(md_path, client_id=client_id))
+
+
+@lru_cache(maxsize=64)
+def find_chunk_by_topic_aspect(
+    client_id: str | None,
+    topic: str | None,
+    aspect: str | None,
+) -> dict | None:
+    """Find a display chunk by md frontmatter metadata.
+
+    Exact (topic, aspect) wins. If no exact file matches, an aspect-only match is
+    allowed only when exactly one md file has that aspect.
+    """
+    aspect_norm = str(aspect or "").strip().lower()
+    if not aspect_norm:
+        return None
+    topic_norm = str(topic or "").strip().lower()
+    pack = resolve_pack_client_id(client_id)
+    md_root = client_md_dir(pack)
+    if not os.path.isdir(md_root):
+        return None
+
+    exact: list[tuple[str, tuple[dict, ...]]] = []
+    aspect_only: list[tuple[str, tuple[dict, ...]]] = []
+    for root, _, files in os.walk(md_root):
+        for name in sorted(f for f in files if f.endswith(".md")):
+            rel = os.path.relpath(os.path.join(root, name), md_root)
+            basename = os.path.basename(rel)
+            items = _chunks_for_file(pack, basename)
+            if not items:
+                continue
+            first = items[0]
+            item_aspect = str(first.get("aspect") or "").strip().lower()
+            if item_aspect != aspect_norm:
+                continue
+            item_topic = str(first.get("topic") or "").strip().lower()
+            if topic_norm and item_topic == topic_norm:
+                exact.append((basename, items))
+            aspect_only.append((basename, items))
+
+    if exact:
+        exact.sort(key=lambda pair: pair[0])
+        return _preferred_display_chunk(exact[0][1])
+    if len(aspect_only) == 1:
+        return _preferred_display_chunk(aspect_only[0][1])
+    return None
 
 
 def get_chunk_by_ref(ref: str, *, client_id: str | None = None) -> dict | None:
@@ -150,15 +210,7 @@ def get_chunk_by_ref(ref: str, *, client_id: str | None = None) -> dict | None:
     if not cands:
         return None
     if anchor_norm in ("overview", "korotko", ""):
-        for ch in cands:
-            h3_id = (ch.get("h3_id") or "").strip().lower()
-            if (not ch.get("h2_id") and not ch.get("h3_id")) or h3_id in {"overview", "korotko"}:
-                out = dict(ch)
-                out["_score"] = 1.0
-                return out
-        out = dict(cands[0])
-        out["_score"] = 1.0
-        return out
+        return _preferred_display_chunk(cands)
     for ch in cands:
         hid2 = ch.get("h2_id") or extract_id_from_heading(str(ch.get("h2") or ""))
         hid3 = ch.get("h3_id") or extract_id_from_heading(str(ch.get("h3") or ""))

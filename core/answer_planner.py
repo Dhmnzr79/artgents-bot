@@ -30,7 +30,7 @@ _PAYMENT_ASPECT_RE = re.compile(
 )
 _WARRANTY_ASPECT_RE = re.compile(r"гарант\w*", re.I | re.U)
 _PAIN_ASPECT_RE = re.compile(
-    r"(?:больно|боюсь|страш|страх|анестез|обезбол|безболезнен)",
+    r"(?:больно|боюсь|страш|страх|анестез|обезбол|безболезнен|седац|наркоз|во\s+сне)",
     re.I | re.U,
 )
 _INCLUDED_ASPECT_RE = re.compile(

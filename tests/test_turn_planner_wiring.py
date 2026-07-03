@@ -351,3 +351,27 @@ def test_detect_aspects_appends_comparison_to_turn_plan():
         )
 
     assert "comparison" in aspects
+
+
+def test_detect_aspects_anchors_pain_for_sedation():
+    """«во сне»/седация/наркоз — словарь обезболивания; ярлык pain блокирует промо."""
+    from core.answer_planner import detect_aspects
+    from core.turn_planner_llm import publish_turn_plan
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="content",
+                aspects=["overview"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=False,
+            )
+        )
+        aspects = detect_aspects("Можно имплантацию во сне?", decision=None)
+
+    assert "pain" in aspects

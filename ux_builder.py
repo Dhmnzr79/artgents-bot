@@ -103,7 +103,11 @@ def build_clarify_quick_replies(
     option_service_ids: list[str],
     *,
     client_id: str | None = None,
+    route: str = "",
 ) -> list[dict[str, str]]:
+    # Ценовое намерение → кнопки ведут в прайс-флоу (price:<service_id>),
+    # иначе клик отдаёт контентную md-карточку без цен.
+    price_mode = str(route or "").strip().lower() in ("price_lookup", "price_concern")
     catalog = active_service_catalog(client_id)
     replies: list[dict[str, str]] = []
     for raw_id in option_service_ids or []:
@@ -112,7 +116,7 @@ def build_clarify_quick_replies(
         if not isinstance(entry, dict):
             continue
         label = str(entry.get("title") or service_id).strip()
-        ref = service_ref(entry)
+        ref = f"price:{service_id}" if price_mode else service_ref(entry)
         if label and ref:
             replies.append({"label": label, "ref": ref})
     return replies
@@ -125,8 +129,11 @@ def build_clarify_payload(
     sid: str,
     client_id: str | None = None,
     reask_count: int = 0,
+    route: str = "",
 ) -> dict:
-    quick_replies = build_clarify_quick_replies(option_service_ids, client_id=client_id)
+    quick_replies = build_clarify_quick_replies(
+        option_service_ids, client_id=client_id, route=route
+    )
     return {
         "answer": str(question or "").strip(),
         "quick_replies": quick_replies,

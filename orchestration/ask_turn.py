@@ -140,6 +140,7 @@ def _pending_clarify_turn_result(
             sid=sid,
             client_id=client_id,
             reask_count=int(updated.get("reask_count") or 1),
+            route=str(updated.get("route") or pending.get("route") or ""),
         ),
         service_doc_id=None,
         service_track_user=True,

@@ -291,6 +291,7 @@ def set_pending_clarify(
     question: str,
     option_service_ids: list[str],
     reask_count: int = 0,
+    route: str = "",
 ) -> None:
     q = str(question or "").strip()
     ids = [str(x or "").strip() for x in (option_service_ids or []) if str(x or "").strip()]
@@ -304,6 +305,7 @@ def set_pending_clarify(
             "option_service_ids": ids,
             "asked_at_turn": int(st.get("session_turn_count") or 0),
             "reask_count": int(reask_count or 0),
+            "route": str(route or "").strip(),
         }
         _persist_unlocked(session_id, st)
 

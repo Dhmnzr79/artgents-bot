@@ -223,6 +223,15 @@ def try_composer_overlay(
                 if str(x or "").strip()
             ]
             if question and option_service_ids:
+                clarify_route = str(getattr(turn_plan, "route", None) or "").strip()
+                from session import set_pending_clarify
+
+                set_pending_clarify(
+                    sid,
+                    question=question,
+                    option_service_ids=option_service_ids,
+                    route=clarify_route,
+                )
                 return AskOrchestrationResult(
                     kind="service_reply",
                     q=q,
@@ -233,6 +242,7 @@ def try_composer_overlay(
                         option_service_ids=option_service_ids,
                         sid=sid,
                         client_id=client_id,
+                        route=clarify_route,
                     ),
                     service_doc_id=None,
                     service_track_user=True,

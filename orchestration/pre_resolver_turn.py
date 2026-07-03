@@ -273,6 +273,8 @@ def run_pre_resolver_turn(
                         for sid_opt, entry in catalog.items()
                         if sid_opt in option_ids and isinstance(entry, dict)
                     }
+                    # Кнопки ценового clarify несут price:<service_id> — тоже выбор.
+                    option_refs |= {f"price:{sid_opt}" for sid_opt in option_ids}
                     if ref_eff in option_refs:
                         clear_pending_clarify(sid)
                 except Exception:

@@ -24,6 +24,16 @@ def test_knowledge_base_excludes_doctors_and_service_markup():
     assert "cta_key:" not in kb
 
 
+def test_knowledge_base_includes_clinic_limitations_from_yaml():
+    kb = assemble_client_knowledge_base("demo")
+    low = kb.lower()
+    assert "## Ограничения клиники (чего мы НЕ делаем)" in kb
+    assert "детскую стоматологию" in low
+    assert "не ведём" in low
+    assert "омс" in low
+    assert "базальную" in low
+
+
 def test_knowledge_base_document_headers():
     kb = assemble_client_knowledge_base("demo")
     assert "## implantation__faq__pain —" in kb

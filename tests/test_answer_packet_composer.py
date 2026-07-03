@@ -258,6 +258,8 @@ def test_build_messages_for_packet_composer_fullctx_structure():
     assert "Ответь на аспекты: price, pain" in user
     assert "ДОСЛОВНО" in user
     assert deterministic[0].text in user
+    assert "Если в базе знаний нет ответа" in system
+    assert "не отвечай из общих знаний" in system
 
 
 def test_fullctx_composer_kb_before_per_turn_addons(monkeypatch):

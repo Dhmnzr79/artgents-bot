@@ -7,6 +7,7 @@ import os
 import re
 
 from core.client_runtime import client_md_dir
+from core.clinic_policies_loader import load_clinic_policies
 
 _FM_RE = re.compile(r"^---\s*\n.*?\n---\s*\n?", re.DOTALL)
 _DOC_ID_RE = re.compile(r"^doc_id:\s*(.+)$", re.MULTILINE)
@@ -63,6 +64,25 @@ def _document_header(basename: str, text: str, cleaned_body: str) -> str:
     return f"## {doc_id}"
 
 
+def _clinic_limitations_section(client_id: str) -> str:
+    bundle = load_clinic_policies(client_id)
+    if bundle is None:
+        return ""
+    texts: list[str] = []
+    for policy in bundle.policies:
+        answer = str(policy.answer or "").strip()
+        if answer:
+            texts.append(answer)
+    for alt in bundle.service_alternatives:
+        note = str(alt.note or "").strip()
+        if note:
+            texts.append(note)
+    if not texts:
+        return ""
+    body = "\n\n".join(f"- {text}" for text in texts)
+    return f"## Ограничения клиники (чего мы НЕ делаем)\n\n{body}"
+
+
 def assemble_client_knowledge_base(client_id: str | None) -> str:
     """All client md (except doctors/pricing) as one readable block; cached per pack id."""
     from core.client_config_loader import resolve_pack_client_id
@@ -83,6 +103,10 @@ def assemble_client_knowledge_base(client_id: str | None) -> str:
         if cleaned:
             header = _document_header(os.path.basename(path), raw, cleaned)
             parts.append(f"{header}\n\n{cleaned}")
+
+    limitations = _clinic_limitations_section(pack)
+    if limitations:
+        parts.append(limitations)
 
     blob = "\n\n---\n\n".join(parts)
     _KB_CACHE[pack] = blob

@@ -460,34 +460,6 @@ def validate_smoke_case(
             coverage_class=cov,
         )
 
-    slots_meta = meta.get("answer_slots") if isinstance(meta.get("answer_slots"), dict) else {}
-    appended_slots = [
-        str(x).strip()
-        for x in (slots_meta.get("appended") or [])
-        if isinstance(x, str) and str(x).strip()
-    ]
-    expected_answer_slots = str_list_field(row, "expected_answer_slots")
-    if expected_answer_slots:
-        got_norm = {norm(x) for x in appended_slots}
-        missing_slots = [x for x in expected_answer_slots if norm(x) not in got_norm]
-        if missing_slots:
-            return CaseResult(
-                case_id=case_id,
-                status="FAIL",
-                reason=f"expected_answer_slots missing: {missing_slots!r} got={appended_slots!r}",
-                coverage_class=cov,
-            )
-    forbidden_answer_slots = str_list_field(row, "forbidden_answer_slots")
-    if forbidden_answer_slots:
-        hit = [x for x in forbidden_answer_slots if norm(x) in {norm(s) for s in appended_slots}]
-        if hit:
-            return CaseResult(
-                case_id=case_id,
-                status="FAIL",
-                reason=f"forbidden_answer_slots hit: {hit!r}",
-                coverage_class=cov,
-            )
-
     expected_plan_aspects = str_list_field(row, "expected_plan_aspects")
     if expected_plan_aspects:
         got_aspects = plan_aspects(meta)

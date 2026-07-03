@@ -23,13 +23,11 @@ from core.answer_packet import assemble_answer_packet
 from core.answer_packet_materialize import materialize_cards
 from core.answer_packet_snapshot import build_and_publish_answer_packet, publish_answer_packet
 from core.answer_planner import _real_aspect_count, answer_plan_from_ctx
-from core.answer_slots import assemble_answer_slots, doc_meta_has_consult_value, merge_deterministic_appends
 from core.md_clean import strip_alias_comments
 from core.numeric_fact_gate import apply_numeric_fact_gate
 from core.stream_answer_text import AnswerFormatContext, StreamTextAccumulator, format_answer_for_display
 
 import session as session_mod
-from contracts.answer_slots import AnswerSlotsTelemetry
 from llm import (
     generate_answer_from_packet,
     generate_answer_stream,
@@ -52,7 +50,6 @@ from session import (
     mem_add_user,
     mem_get,
     pop_deferred_ref,
-    record_answer_slots_shown,
     set_cta_shown,
     set_current_doc,
     set_last_aspect,
@@ -74,8 +71,6 @@ def _planned_consult_nudge_for_chunk(
     client_id: str | None = None,
 ) -> str | None:
     if is_lead_context(mem_get(sid)):
-        return None
-    if doc_meta_has_consult_value(meta, h3_id=chunk.get("h3_id")):
         return None
     exhausted = topic_exhausted_after_this_chunk(
         meta,
@@ -310,7 +305,7 @@ def _append_doctor_consult_bridge(
     }
 
 
-def _apply_answer_slots_and_price_append(
+def _apply_answer_plan_append(
     *,
     answer: str,
     meta: dict,
@@ -323,10 +318,8 @@ def _apply_answer_slots_and_price_append(
     lead_context: bool,
     price_offer_meta: dict | None = None,
     matched_service_id: str | None = None,
-    skip_answer_slots_reason: str | None = None,
-) -> tuple[str, dict | None, str, dict | None]:
-    """Append clinic/consult/promo slots, planner append, then price tail."""
-    tstate = get_topic_state(sid, doc_id) if doc_id else {}
+) -> tuple[str, str, dict | None]:
+    """Append deterministic planner tail, including price/payment/warranty pieces."""
     plan = answer_plan_from_ctx()
     svc_id = str(matched_service_id or meta.get("matched_service_id") or "").strip() or None
     plan_append, plan_apply_meta = apply_answer_plan_append(
@@ -342,33 +335,8 @@ def _apply_answer_slots_and_price_append(
         answer,
         plan_apply_meta.get("applied") or [],
     )
-    if skip_answer_slots_reason:
-        slots_text = ""
-        telemetry = AnswerSlotsTelemetry()
-        telemetry.suppressed["answer_slots"] = skip_answer_slots_reason
-    else:
-        slots_text, telemetry = assemble_answer_slots(
-            meta=meta,
-            h3_id=chunk.get("h3_id"),
-            q=q,
-            route=route,
-            topic_state=tstate,
-            lead_context=lead_context,
-        )
-    combined_append = merge_deterministic_appends(
-        slots_text=slots_text,
-        generator_append_text=plan_append,
-    )
+    combined_append = plan_append or ""
     answer = _append_generator_append_text(answer, combined_append or None)
-    if doc_id and telemetry.appended:
-        next_turn = int(tstate.get("doc_turn_count") or 0) + 1
-        record_answer_slots_shown(
-            sid,
-            doc_id,
-            slot_keys=list(telemetry.appended),
-            turn=next_turn,
-        )
-    slot_meta = telemetry.model_dump() if telemetry.appended or telemetry.suppressed else None
     plan_meta: dict[str, Any] | None = None
     if plan is not None:
         if plan.primary_aspect:
@@ -391,7 +359,7 @@ def _apply_answer_slots_and_price_append(
         }
         if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
             plan_meta["answer_plan_apply"] = plan_apply_meta
-    return answer, slot_meta, combined_append, plan_meta
+    return answer, combined_append, plan_meta
 
 
 def _apply_numeric_fact_gate(
@@ -587,7 +555,6 @@ def _packet_composer_generation(
             "answer_plan": plan.model_dump(),
             "answer_packet": packet.model_dump(),
         },
-        "slot_meta": None,
     }
 
 
@@ -957,11 +924,10 @@ def respond_from_chunk(
         client_id=client_id,
     )
     if composer_hit is not None:
-        slot_meta = composer_hit.get("slot_meta")
         deterministic_append = str(composer_hit.get("deterministic_append") or "")
         plan_meta = composer_hit.get("plan_meta")
     else:
-        answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
+        answer, deterministic_append, plan_meta = _apply_answer_plan_append(
             answer=answer,
             meta=meta,
             chunk=chunk,
@@ -973,7 +939,6 @@ def respond_from_chunk(
             lead_context=lead_context,
             price_offer_meta=price_offer_meta,
             matched_service_id=sid_svc or None,
-            skip_answer_slots_reason="doctor_consult_bridge" if doctor_bridge_meta else None,
         )
     answer, numeric_gate_meta = _apply_numeric_fact_gate(
         answer=answer,
@@ -1032,8 +997,6 @@ def respond_from_chunk(
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
     _apply_patient_playbook_ui(payload, route)
-    if slot_meta:
-        payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if plan_meta:
         payload.setdefault("meta", {}).update(plan_meta)
     if numeric_gate_meta:
@@ -1251,7 +1214,7 @@ def respond_from_chunk_stream(
         route=route,
         client_id=client_id,
     )
-    answer, slot_meta, deterministic_append, plan_meta = _apply_answer_slots_and_price_append(
+    answer, deterministic_append, plan_meta = _apply_answer_plan_append(
         answer=answer_base,
         meta=meta,
         chunk=chunk,
@@ -1263,7 +1226,6 @@ def respond_from_chunk_stream(
         lead_context=lead_context,
         price_offer_meta=price_offer_meta,
         matched_service_id=sid_svc or None,
-        skip_answer_slots_reason="doctor_consult_bridge" if doctor_bridge_meta else None,
     )
     answer, numeric_gate_meta = _apply_numeric_fact_gate(
         answer=answer,
@@ -1321,8 +1283,6 @@ def respond_from_chunk_stream(
     if route == "price_concern":
         payload.setdefault("meta", {})["intent"] = "price_concern"
     _apply_patient_playbook_ui(payload, route)
-    if slot_meta:
-        payload.setdefault("meta", {})["answer_slots"] = slot_meta
     if plan_meta:
         payload.setdefault("meta", {}).update(plan_meta)
     if numeric_gate_meta:

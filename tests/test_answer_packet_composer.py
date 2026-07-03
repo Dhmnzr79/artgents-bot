@@ -282,6 +282,146 @@ def test_fullctx_composer_kb_before_per_turn_addons(monkeypatch):
     assert system.index("[БАЗА ЗНАНИЙ]") < system.index("PER_TURN_NUDGE_MARKER")
 
 
+def test_fullctx_composer_first_touch_pain_empathy_in_user_prompt(monkeypatch):
+    from core.knowledge_base import assemble_client_knowledge_base
+    from session import mem_reset
+
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+    monkeypatch.setattr(
+        "core.answer_planner.answer_plan_from_ctx",
+        lambda: AnswerPlan(aspects=["pain"], primary_aspect="pain", topic="implantation"),
+    )
+    sid = "fullctx-empathy-first"
+    mem_reset(sid)
+    captured: dict = {}
+
+    def _fake_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+
+        class _Msg:
+            content = json.dumps({"answer": "ok"})
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    answer, meta = generate_answer_from_packet_fullctx(
+        "Больно ли ставить имплант?",
+        assemble_client_knowledge_base("demo"),
+        ["pain"],
+        [],
+        {"client_id": "demo"},
+        sid,
+    )
+
+    assert answer == "ok"
+    assert meta.get("empathy_used") is True
+    assert "первое касание чувствительной темы" in captured["messages"][1]["content"]
+    assert "первое касание чувствительной темы" not in captured["messages"][0]["content"]
+
+
+def test_fullctx_composer_repeat_pain_empathy_suppressed(monkeypatch):
+    from core.knowledge_base import assemble_client_knowledge_base
+    from session import mem_reset
+
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+    monkeypatch.setattr(
+        "core.answer_planner.answer_plan_from_ctx",
+        lambda: AnswerPlan(aspects=["pain"], primary_aspect="pain", topic="implantation"),
+    )
+    sid = "fullctx-empathy-repeat"
+    mem_reset(sid)
+    captured: dict = {}
+
+    def _fake_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+
+        class _Msg:
+            content = json.dumps({"answer": "ok"})
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    kb = assemble_client_knowledge_base("demo")
+    for q in ("Больно ли ставить имплант?", "А после будет болеть?"):
+        answer, meta = generate_answer_from_packet_fullctx(
+            q,
+            kb,
+            ["pain"],
+            [],
+            {"client_id": "demo"},
+            sid,
+        )
+        assert answer == "ok"
+
+    user = captured["messages"][1]["content"]
+    system = captured["messages"][0]["content"]
+    assert meta.get("empathy_used") is False
+    assert "без вступительных фраз сочувствия" in user
+    assert "без вступительных фраз сочувствия" not in system
+
+
+def test_fullctx_composer_price_has_no_empathy_hint(monkeypatch):
+    from core.knowledge_base import assemble_client_knowledge_base
+    from session import mem_reset
+
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+    monkeypatch.setattr(
+        "core.answer_planner.answer_plan_from_ctx",
+        lambda: AnswerPlan(aspects=["price"], primary_aspect="price", topic="implantation"),
+    )
+    sid = "fullctx-empathy-price"
+    mem_reset(sid)
+    captured: dict = {}
+
+    def _fake_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+
+        class _Msg:
+            content = json.dumps({"answer": "ok"})
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    answer, meta = generate_answer_from_packet_fullctx(
+        "Сколько стоит имплантация?",
+        assemble_client_knowledge_base("demo"),
+        ["price"],
+        [],
+        {"client_id": "demo"},
+        sid,
+    )
+
+    user = captured["messages"][1]["content"]
+    system = captured["messages"][0]["content"]
+    assert answer == "ok"
+    assert meta.get("empathy_used") is False
+    assert "первое касание чувствительной темы" not in user
+    assert "без вступительных фраз сочувствия" not in user
+    assert "первое касание чувствительной темы" not in system
+    assert "без вступительных фраз сочувствия" not in system
+
+
 def test_fullctx_composer_includes_dialog_history_in_user_message():
     from core.knowledge_base import assemble_client_knowledge_base
 

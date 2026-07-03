@@ -388,7 +388,6 @@ def get_topic_state(session_id: str, doc_id: str) -> dict:
         "suggest_ref_used": bool(topic.get("suggest_ref_used", False)),
         "refs_deferred": list(topic.get("refs_deferred") or []),
         "cta_shown": bool(topic.get("cta_shown", False)),
-        "slots_last_turn": dict(topic.get("slots_last_turn") or {}),
     }
 
 
@@ -403,7 +402,6 @@ def _upsert_topic_state(st: dict, doc_id: str, patch: dict) -> None:
         "suggest_ref_used": False,
         "refs_deferred": [],
         "cta_shown": False,
-        "slots_last_turn": {},
     }
     cur.update(patch or {})
     ts[doc_id] = cur
@@ -654,27 +652,6 @@ def mark_suggest_ref_used(session_id: str, doc_id: str, used: bool = True) -> No
     with _lock:
         st = mem_get(session_id)
         _upsert_topic_state(st, doc_id, {"suggest_ref_used": bool(used)})
-        _persist_unlocked(session_id, st)
-
-
-def record_answer_slots_shown(
-    session_id: str,
-    doc_id: str,
-    *,
-    slot_keys: list[str],
-    turn: int,
-) -> None:
-    if not doc_id or not slot_keys:
-        return
-    with _lock:
-        st = mem_get(session_id)
-        cur = get_topic_state(session_id, doc_id)
-        slots_last = dict(cur.get("slots_last_turn") or {})
-        for key in slot_keys:
-            k = str(key or "").strip()
-            if k:
-                slots_last[k] = int(turn)
-        _upsert_topic_state(st, doc_id, {"slots_last_turn": slots_last})
         _persist_unlocked(session_id, st)
 
 

@@ -57,6 +57,14 @@ client = chat_client
 
 logger = get_logger("bot")
 
+COMPOSER_FULLCTX_EMPATHY_FIRST_TOUCH = (
+    "Это первое касание чувствительной темы в диалоге: начни с одной короткой "
+    "человеческой фразы, снижающей напряжение, затем сразу суть."
+)
+COMPOSER_FULLCTX_EMPATHY_REPEAT_TOUCH = (
+    "Тема уже обсуждалась — без вступительных фраз сочувствия, сразу по существу."
+)
+
 
 def _qwen_disable_thinking(*, model: str, kwargs: dict) -> dict:
     """DashScope Qwen only: thinking adds latency; off by default (QWEN_ENABLE_THINKING=0)."""
@@ -773,6 +781,48 @@ def build_messages_for_packet_composer(
     ]
 
 
+def _composer_fullctx_empathy_hint(
+    *,
+    client_id: str | None,
+    aspects: list[str],
+    session_id: str,
+) -> tuple[str | None, bool, str | None]:
+    # Ленивые импорты: policy -> llm -> answer_planner образует цикл на верхнем уровне.
+    from core.answer_planner import answer_plan_from_ctx
+    from core.md_chunks import find_chunk_by_topic_aspect
+
+    plan = answer_plan_from_ctx()
+    plan_aspects = list(getattr(plan, "aspects", None) or aspects or [])
+    topic = str(getattr(plan, "topic", None) or "").strip() or None
+    primary_aspect = str(getattr(plan, "primary_aspect", None) or "").strip()
+    if primary_aspect == "overview":
+        primary_aspect = ""
+    if not primary_aspect:
+        for raw in plan_aspects:
+            cand = str(raw or "").strip()
+            if cand and cand != "overview":
+                primary_aspect = cand
+                break
+
+    # Дозатор — только для эмоциональных тем (боль/страх). Флажок empathy_enabled
+    # на прайсовых FAQ (наследие price_concern) сам по себе дозатор не включает.
+    if "pain" not in {str(a or "").strip() for a in plan_aspects}:
+        return None, False, None
+
+    chunk = find_chunk_by_topic_aspect(client_id, topic, primary_aspect)
+    if isinstance(chunk, dict) and chunk.get("empathy_enabled"):
+        doc_key = str(
+            chunk.get("doc_id") or chunk.get("doc") or chunk.get("file") or ""
+        ).strip() or f"aspect:pain:{topic or 'any'}"
+    else:
+        doc_key = f"aspect:pain:{topic or 'any'}"
+
+    first_in_topic = is_first_in_topic(session_id, doc_key)
+    if first_in_topic:
+        return COMPOSER_FULLCTX_EMPATHY_FIRST_TOUCH, True, doc_key
+    return COMPOSER_FULLCTX_EMPATHY_REPEAT_TOUCH, False, doc_key
+
+
 def build_messages_for_packet_composer_fullctx(
     user_q: str,
     knowledge_base: str,
@@ -781,6 +831,7 @@ def build_messages_for_packet_composer_fullctx(
     meta: dict,
     session_id: str,
     dialog_history: str | None = None,
+    empathy_instruction: str | None = None,
 ) -> list[dict[str, str]]:
     """Messages for full-context composer — medical text from knowledge base, money from cards."""
     client_id = meta.get("client_id")
@@ -810,6 +861,8 @@ def build_messages_for_packet_composer_fullctx(
             f"Ответь на аспекты: {aspect_line}",
         ]
     )
+    if (empathy_instruction or "").strip():
+        parts.append(str(empathy_instruction).strip())
     if cards_blob.strip():
         parts.append(
             "Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n"
@@ -894,6 +947,11 @@ def generate_answer_from_packet_fullctx(
     dialog_history = ""
     if MEMORY_ON and session_id:
         dialog_history = recent_dialog_history(session_id)
+    empathy_instruction, use_empathy, doc_key = _composer_fullctx_empathy_hint(
+        client_id=meta.get("client_id"),
+        aspects=aspects,
+        session_id=session_id,
+    )
     messages = build_messages_for_packet_composer_fullctx(
         user_q,
         knowledge_base,
@@ -902,6 +960,7 @@ def generate_answer_from_packet_fullctx(
         meta,
         session_id,
         dialog_history=dialog_history or None,
+        empathy_instruction=empathy_instruction,
     )
     kwargs: dict = dict(model=CHAT_MODEL, temperature=0.3, messages=messages)
     if CHAT_JSON_MODE:
@@ -929,9 +988,12 @@ def generate_answer_from_packet_fullctx(
             aspect_count=len(aspects or []),
             card_count=len(deterministic_cards or []),
             kb_chars=len(knowledge_base or ""),
+            empathy_used=bool(use_empathy),
             used_fallback=bool(answer == LLM_FALLBACK_ANSWER),
         )
-        return answer, {"composer_used": True}
+        if doc_key:
+            update_topic_empathy(session_id, doc_key, use_empathy)
+        return answer, {"composer_used": True, "empathy_used": bool(use_empathy)}
     except Exception as e:
         log_llm_error(logger, call_type="packet_composer_fullctx", err=str(e), model=CHAT_MODEL)
         log_json(

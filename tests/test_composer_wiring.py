@@ -65,7 +65,7 @@ def _respond(
 
     def _slots(**_k):
         calls["slots"] += 1
-        return _k["answer"], None, "", None
+        return _k["answer"], "", None
 
     real_numeric = mocks.get("numeric_gate_real", True)
     from chunk_responder import _apply_numeric_fact_gate as _real_numeric_gate
@@ -78,7 +78,7 @@ def _respond(
 
     monkeypatch.setattr("chunk_responder.generate_answer_with_empathy", _empathy)
     monkeypatch.setattr("chunk_responder.generate_answer_from_packet", _composer)
-    monkeypatch.setattr("chunk_responder._apply_answer_slots_and_price_append", _slots)
+    monkeypatch.setattr("chunk_responder._apply_answer_plan_append", _slots)
     monkeypatch.setattr("chunk_responder._apply_numeric_fact_gate", _numeric)
     monkeypatch.setattr(
         "chunk_responder._apply_response_policy_compat",

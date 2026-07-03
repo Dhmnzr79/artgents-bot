@@ -67,16 +67,61 @@ def _implantation_tagged_service_ids(client_id: str | None) -> frozenset[str]:
     return frozenset(out)
 
 
-def _apply_protocol_choice_guard(plan: TurnPlan, *, q: str, client_id: str | None) -> TurnPlan:
+def _session_focus_service_id(sid: str | None) -> str | None:
+    """Текущий фокус диалога из сессии (last_subject с age-гардом) — детерминированное
+    подтверждение контекста, не зависящее от того, заполнила ли модель followup_of."""
+    if not (sid or "").strip():
+        return None
+    try:
+        from core.dialog_focus import _focus_from_last_subject
+        from session import mem_get
+
+        focus, _age = _focus_from_last_subject(mem_get(sid))
+        if focus:
+            return str(focus.get("service_id") or "").strip() or None
+    except Exception:
+        return None
+    return None
+
+
+def _apply_focus_followup_enrichment(plan: TurnPlan, *, q: str, sid: str | None) -> TurnPlan:
+    """Детерминированное разрешение смутного follow-up («кто делает?», «а сколько
+    стоит?») по фокусу сессии, когда модель не заполнила service_id/followup_of.
+    Зеркало protocol-guard: гард понижает недоказанное, обогащение поднимает
+    доказанное кодом (last_subject + age-гард + боевой детектор attribute_followup)."""
+    if plan.service_id or plan.followup_of:
+        return plan
+    focus = _session_focus_service_id(sid)
+    if not focus:
+        return plan
+    from core.attribute_followup import is_vague_attribute_followup_any
+
+    if not is_vague_attribute_followup_any(q):
+        return plan
+    log_json(
+        logger,
+        "turn_plan_focus_followup_enriched",
+        sid=sid,
+        service_id=focus,
+    )
+    return plan.model_copy(update={"service_id": focus, "followup_of": focus})
+
+
+def _apply_protocol_choice_guard(
+    plan: TurnPlan, *, q: str, client_id: str | None, sid: str | None = None
+) -> TurnPlan:
     """Не решать имплант-протокол за пациента (детерминированно, поверх LLM).
 
     Услуга имплант-группы в плане остаётся только если пациент сам назвал
-    протокол, продолжает предыдущий фокус (followup_of) или речь про коронку
-    на уже установленный имплант. Иначе service_id → None: пациент получит
-    обзор вариантов / ответ из базы, а не навязанный протокол.
+    протокол, продолжает предыдущий фокус (followup_of от модели ИЛИ фокус
+    сессии — детерминированный) или речь про коронку на уже установленный
+    имплант. Иначе service_id → None: пациент получит обзор вариантов /
+    ответ из базы, а не навязанный протокол.
     """
     svc = str(plan.service_id or "").strip()
     if not svc or plan.followup_of:
+        return plan
+    if svc == (_session_focus_service_id(sid) or ""):
         return plan
     if svc not in _implantation_tagged_service_ids(client_id):
         return plan
@@ -322,7 +367,8 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
         )
         if plan is None:
             raise ValueError("turn_plan_invalid")
-        plan = _apply_protocol_choice_guard(plan, q=msg, client_id=client_id)
+        plan = _apply_protocol_choice_guard(plan, q=msg, client_id=client_id, sid=sid)
+        plan = _apply_focus_followup_enrichment(plan, q=msg, sid=sid)
         log_json(
             logger,
             "turn_planner_llm",

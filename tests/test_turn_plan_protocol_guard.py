@@ -58,3 +58,54 @@ def test_guard_keeps_followup_context() -> None:
 def test_guard_ignores_non_implant_services() -> None:
     out = _apply_protocol_choice_guard(_plan("veneers"), q="сколько стоят виниры?", client_id="demo")
     assert out.service_id == "veneers"
+
+
+def test_guard_keeps_session_focus_service() -> None:
+    """Follow-up без followup_of от модели: фокус сессии — детерминированное подтверждение."""
+    from session import mem_reset, set_last_subject
+
+    sid = "guard-session-focus"
+    mem_reset(sid)
+    set_last_subject(sid, service_id="classic", topic="implantation", label="Классическая")
+    out = _apply_protocol_choice_guard(
+        _plan("classic"), q="а кто делает?", client_id="demo", sid=sid
+    )
+    assert out.service_id == "classic"
+
+
+def test_guard_downgrades_when_focus_differs() -> None:
+    from session import mem_reset, set_last_subject
+
+    sid = "guard-session-focus-differs"
+    mem_reset(sid)
+    set_last_subject(sid, service_id="veneers", topic="prosthetics", label="Виниры")
+    out = _apply_protocol_choice_guard(
+        _plan("all_on_4"), q="есть рассрочка на имплантацию?", client_id="demo", sid=sid
+    )
+    assert out.service_id is None
+
+
+def test_focus_enrichment_resolves_vague_followup() -> None:
+    from core.turn_planner_llm import _apply_focus_followup_enrichment
+    from session import mem_reset, set_last_subject
+
+    sid = "enrich-vague-doc"
+    mem_reset(sid)
+    set_last_subject(sid, service_id="classic", topic="implantation", label="Классическая")
+    out = _apply_focus_followup_enrichment(_plan(None), q="а кто делает?", sid=sid)
+    assert out.service_id == "classic"
+    assert out.followup_of == "classic"
+
+
+def test_focus_enrichment_skips_topic_change() -> None:
+    from core.turn_planner_llm import _apply_focus_followup_enrichment
+    from session import mem_reset, set_last_subject
+
+    sid = "enrich-topic-change"
+    mem_reset(sid)
+    set_last_subject(sid, service_id="classic", topic="implantation", label="Классическая")
+    out = _apply_focus_followup_enrichment(
+        _plan(None), q="а виниры сколько стоят?", sid=sid
+    )
+    assert out.service_id is None
+    assert out.followup_of is None

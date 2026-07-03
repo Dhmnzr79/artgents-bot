@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 
 ContentSnippetSource = Literal["korotko", "facts", "title_only"]
 

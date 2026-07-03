@@ -17,7 +17,6 @@ from config import (
     COMPLAINT_CLASSIFY_MODEL,
     DIALOG_FOCUS_LLM_CLASSIFY_ON,
     DIALOG_FOCUS_LLM_MODEL,
-    EMBED_API_KEY,
     EMPATHY_ON,
     LEAD_NAME_CLASSIFY_MODEL,
     LEAD_TURN_LLM_CLASSIFY_ON,
@@ -54,7 +53,6 @@ _chat_client_kwargs: dict = {"api_key": CHAT_API_KEY}
 if CHAT_BASE_URL:
     _chat_client_kwargs["base_url"] = CHAT_BASE_URL
 chat_client = OpenAI(**_chat_client_kwargs)
-embed_client = OpenAI(api_key=EMBED_API_KEY)
 client = chat_client
 
 logger = get_logger("bot")

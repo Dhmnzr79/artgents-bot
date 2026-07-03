@@ -7,7 +7,6 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 from collections import deque
-import numpy as np
 
 from flask import (
     Flask,
@@ -34,12 +33,6 @@ from lead_service import handle_lead
 from core.observability_pii import observability_turn_preview, observability_user_texts
 from logging_setup import LOG_FILE, emit_bot_event, get_logger, make_request_context, log_json, redact_text
 from chunk_responder import respond_from_chunk, respond_from_chunk_stream, respond_from_composer
-from retriever import (
-    alias_debug_score_for_chunk,
-    best_alias_hit_in_corpus,
-    normalize_retrieval_query,
-    retrieve,
-)
 from session import (
     bind_client_id,
     get_topic_state,
@@ -792,40 +785,7 @@ def dbg():
         return jsonify({"error": "not_found"}), 404
     if request.headers.get("X-Debug-Token") != DEBUG_TOKEN:
         return jsonify({"error": "unauthorized"}), 401
-    q = request.args.get("q", "")
-    client_id = resolve_request_client_id(request.args.get("client_id"), host=request.host)
-    if client_id is None:
-        return jsonify({"error": "unknown_client"}), 403
-    q_raw = (q or "").strip()
-    q_use = normalize_retrieval_query(q_raw) or q_raw
-    c = retrieve(q_raw, topk=5, client_id=client_id)
-    alias_selected, alias_score = best_alias_hit_in_corpus(
-        q_use,
-        client_id=client_id,
-        strong_threshold=float(THRESHOLDS.alias.strong_effective_min),
-    )
-    for x in c:
-        dbg = alias_debug_score_for_chunk(q_use, x, client_id=client_id)
-        x["alias_score"] = dbg.get("alias_effective")
-        x["alias_debug"] = dbg
-        x.pop("text", None)
-    alias_summary = None
-    if isinstance(alias_selected, dict):
-        alias_summary = {
-            "file": alias_selected.get("file"),
-            "h2_id": alias_selected.get("h2_id"),
-            "h3_id": alias_selected.get("h3_id"),
-            "score": alias_selected.get("_score"),
-        }
-    return jsonify(
-        {
-            "q": q,
-            "client_id": client_id,
-            "alias_score": round(float(alias_score or 0.0), 4),
-            "alias_selected": alias_summary,
-            "candidates": c,
-        }
-    )
+    return jsonify({"error": "retrieval_removed", "message": "Embed search debug endpoint is retired."}), 410
 
 
 @app.get("/api/video-catalog")

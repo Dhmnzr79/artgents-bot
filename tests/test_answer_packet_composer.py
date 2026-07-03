@@ -12,7 +12,7 @@ from llm import (
     generate_answer_from_packet,
     generate_answer_from_packet_fullctx,
 )
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 
 
 def test_materialize_composite_price_pain_order_and_facts():

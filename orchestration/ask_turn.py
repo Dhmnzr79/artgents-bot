@@ -23,16 +23,43 @@ from core.price_offers import is_crown_inclusion_content_query
 from orchestration.composer_flow import try_composer_overlay
 from orchestration.patient_playbook_flow import try_patient_options_overview
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
-from orchestration.retrieval_flow import run_content_arbiter_path, run_selection_fallback
 from policy import contacts_intent
 from core.answer_planner import build_answer_plan, publish_answer_plan
 from core.answer_packet_snapshot import build_and_publish_answer_packet
 from core.md_chunks import CONTACTS_CHUNK_REF, get_chunk_by_ref
 from query_selector import select_price_service_route
-from retriever import normalize_retrieval_query
+from query_selector import normalize_retrieval_query
 from source_routing import route_source, slim_source_route_payload
+from llm import LLM_FALLBACK_ANSWER
 
 logger = get_logger("bot")
+
+
+def _composer_fail_open_result(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    decision_frame: dict | None,
+) -> AskOrchestrationResult:
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload={
+            "answer": LLM_FALLBACK_ANSWER,
+            "meta": {
+                "intent": "content",
+                "answer_path": "composer_fallback",
+                "fallback_reason": "composer_unavailable",
+            },
+        },
+        service_doc_id=None,
+        service_track_user=True,
+        service_route="composer_fallback",
+        decision_frame=decision_frame,
+    )
 
 
 def orchestrate_routing_after_resolver(
@@ -51,7 +78,7 @@ def orchestrate_routing_after_resolver(
     apply_response_policy: Callable[..., dict],
 ) -> AskOrchestrationResult:
     """
-    Post-Resolver routing: contacts overlay → A3 source_routing → price fallback → content/retrieval.
+    Post-Resolver routing: contacts overlay → A3 source_routing → price fallback → composer/fallback.
     Extracted from app._orchestrate_ask_turn (Phase 3c).
     """
     decision_frame = decision_dump(decision)
@@ -211,31 +238,16 @@ def orchestrate_routing_after_resolver(
             return price_fb
 
     if intent == "content" or md_catalog_priority_ref:
-        return run_content_arbiter_path(
+        return _composer_fail_open_result(
             q=q,
             sid=sid,
             client_id=client_id,
-            intent=intent,
-            decision=decision,
             decision_frame=decision_frame,
-            scope_topic_candidate=scope_topic_candidate,
-            resolver_bypassed_env=resolver_bypassed_env,
-            md_catalog_priority_ref=md_catalog_priority_ref,
-            md_catalog_priority_sid=md_catalog_priority_sid,
-            md_catalog_priority_score=md_catalog_priority_score,
-            md_catalog_priority_match_method=md_catalog_priority_match_method,
-            data=data,
-            client_txt=client_txt,
-            service_payload=service_payload,
-            lead_flow_from_result=lead_flow_from_result,
-            apply_response_policy=apply_response_policy,
         )
 
-    return run_selection_fallback(
+    return _composer_fail_open_result(
         q=q,
         sid=sid,
         client_id=client_id,
         decision_frame=decision_frame,
-        scope_topic_candidate=scope_topic_candidate,
-        apply_response_policy=apply_response_policy,
     )

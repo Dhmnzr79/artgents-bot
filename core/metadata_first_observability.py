@@ -6,8 +6,6 @@ from typing import Any
 
 from flask import request
 
-from retriever import chunk_doc_type
-
 # Retrieval 2.0 H1–H3.1: unified pool + rerank observability slice.
 RETRIEVAL_POOL_CTX_KEYS: tuple[str, ...] = (
     "pool_sources",
@@ -97,6 +95,26 @@ def should_expose_metadata_first_in_response() -> bool:
         "true",
         "yes",
     }
+
+
+def chunk_doc_type(ch: dict | None) -> str | None:
+    if not isinstance(ch, dict):
+        return None
+    meta = ch.get("meta") if isinstance(ch.get("meta"), dict) else {}
+    for key in ("doc_type", "type"):
+        val = str(ch.get(key) or meta.get(key) or "").strip()
+        if val:
+            return val
+    file_name = os.path.basename(str(ch.get("file") or ""))
+    if file_name.startswith("comparison__"):
+        return "comparison"
+    if "__service__" in file_name:
+        return "service"
+    if "__faq__" in file_name:
+        return "faq"
+    if "__info__" in file_name:
+        return "info"
+    return None
 
 
 def retrieval_pool_turn_details(ctx: dict[str, Any] | None = None) -> dict[str, Any]:

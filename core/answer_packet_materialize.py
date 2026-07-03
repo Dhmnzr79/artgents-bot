@@ -6,7 +6,7 @@ from contracts.answer_packet import AnswerPacketSnapshot, MaterializedCard, Pack
 from contracts.answer_plan import AspectKind
 from core.price_offers import format_rub, get_price_offers, offers_from_service_entry
 from core.pricebook_loader import load_pricebook_service, load_pricing_facts
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 
 _ASPECT_PRIORITY: tuple[AspectKind, ...] = (
     "price",

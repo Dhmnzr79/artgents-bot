@@ -58,7 +58,7 @@ from session import (
     set_last_aspect,
 )
 from core.lead_context import lead_interrupt_no_topic
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 from ux_builder import build_ask_response, normalize_policy_payload
 
 _APPLY_POLICY_PARAMS = inspect.signature(apply_response_policy).parameters

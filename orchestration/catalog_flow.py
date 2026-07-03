@@ -10,7 +10,7 @@ from contracts.source_route_result import SourceRouteResult
 from doctors_lookup import build_doctors_list_llm_question, build_synthetic_doctors_list_chunk
 from logging_setup import emit_bot_event, get_logger, log_json
 from orchestration.helpers import ru_doctor_count_word, service_price_line_for_content
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 from session import set_last_catalog_service
 from ux_builder import build_service_facts_card_payload
 

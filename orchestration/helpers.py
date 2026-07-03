@@ -16,7 +16,6 @@ from core.metadata_first_observability import (
 )
 from core.routing_loader import THRESHOLDS
 from query_selector import compute_retrieval_scope_with_conflict_guard
-from retriever import chunk_info
 from ux_builder import format_price_answer_from_item
 
 logger = get_logger("bot")
@@ -130,8 +129,6 @@ def apply_metadata_first_after_content_route(
     alias_candidate: dict | None,
 ) -> None:
     """Merge §7 telemetry into request.ctx after content arbiter / retrieval."""
-    from arbiter import canonical_ref, ref_from_chunk
-
     record_decision_frame_ctx(decision)
     dbg = dict(retrieval_debug_meta) if isinstance(retrieval_debug_meta, dict) else {}
     if isinstance(alias_candidate, dict) and hasattr(request, "ctx"):
@@ -163,6 +160,36 @@ def apply_metadata_first_after_content_route(
         selected_chunk=selected_chunk,
         selected_route=selected_route,
     )
+
+
+def canonical_ref(ref: str) -> str:
+    r = (ref or "").strip()
+    if not r:
+        return ""
+    return r.removesuffix("#korotko")
+
+
+def ref_from_chunk(ch: dict | None) -> str:
+    if not isinstance(ch, dict):
+        return ""
+    file_name = os.path.basename(str(ch.get("file") or "")).strip()
+    h3 = str(ch.get("h3_id") or "").strip()
+    h2 = str(ch.get("h2_id") or "").strip()
+    anchor = h3 or h2 or "korotko"
+    return f"{file_name}#{anchor}" if file_name else ""
+
+
+def chunk_info(ch: dict | None, score=None) -> dict | None:
+    if not isinstance(ch, dict):
+        return None
+    out = {
+        "file": ch.get("file"),
+        "h2_id": ch.get("h2_id"),
+        "h3_id": ch.get("h3_id"),
+    }
+    if score is not None:
+        out["score"] = round(float(score), 4)
+    return out
 
 
 def guided_menu_payload(sid: str, client_id: str | None) -> dict:

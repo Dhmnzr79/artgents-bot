@@ -7,7 +7,7 @@ from typing import Any
 from contracts.answer_plan import AnswerPlan, PlanAppendKind
 from core.answer_planner import payment_terms_ref, warranty_terms_ref
 from core.price_offers import build_price_append_for_lookup
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 
 _PAYMENT_STAGE_MARKERS = (
     "оплата по этапам",

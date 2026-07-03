@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contracts.ask_orchestration import AskOrchestrationResult
 from orchestration.helpers import decision_dump
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 
 
 def build_service_payload(

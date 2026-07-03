@@ -6,9 +6,7 @@ import logging
 import os
 import sys
 
-import numpy as np
-
-from core.client_runtime import client_pack_dir, corpus_paths, list_buildable_client_ids
+from core.client_runtime import client_md_dir, client_pack_dir, list_buildable_client_ids
 from core.pricebook_loader import pricebook_services_dir
 from logging_setup import log_json
 
@@ -32,13 +30,28 @@ def run_startup_check(logger: logging.Logger) -> None:
         logger.error("startup_check_failed: no client packs with md/")
         sys.exit(1)
 
-    total_chunks = 0
+    total_md_files = 0
     for cid in client_ids:
-        paths = corpus_paths(cid)
-        emb_path = paths["embeddings"]
-        corpus_path = paths["corpus"]
+        md_dir = client_md_dir(cid)
         catalog_path = os.path.join(client_pack_dir(cid), "service_catalog.json")
         prices_path = os.path.join(client_pack_dir(cid), "prices.json")
+
+        if not os.path.isdir(md_dir):
+            logger.error("startup_check_failed: md dir missing for %s: %s", cid, md_dir)
+            sys.exit(1)
+        try:
+            md_files = [
+                name
+                for name in os.listdir(md_dir)
+                if name.lower().endswith(".md") and os.path.isfile(os.path.join(md_dir, name))
+            ]
+        except Exception as e:
+            logger.error("startup_check_failed: cannot read md dir for %s: %s", cid, e)
+            sys.exit(1)
+        if not md_files:
+            logger.error("startup_check_failed: empty md dir for %s: %s", cid, md_dir)
+            sys.exit(1)
+        total_md_files += len(md_files)
 
         if not os.path.isfile(catalog_path):
             logger.error("startup_check_failed: service_catalog missing for %s: %s", cid, catalog_path)
@@ -72,30 +85,4 @@ def run_startup_check(logger: logging.Logger) -> None:
                 logger.error("startup_check_failed: invalid prices for %s: %s", cid, e)
                 sys.exit(1)
 
-        if not os.path.isfile(emb_path):
-            logger.error("startup_check_failed: embeddings missing for %s: %s", cid, emb_path)
-            sys.exit(1)
-        try:
-            arr = np.load(emb_path)
-            if not isinstance(arr, np.ndarray):
-                logger.error("startup_check_failed: embeddings not ndarray for %s", cid)
-                sys.exit(1)
-        except Exception as e:
-            logger.error("startup_check_failed: cannot read embeddings %s: %s", emb_path, e)
-            sys.exit(1)
-
-        if not os.path.isfile(corpus_path):
-            logger.error("startup_check_failed: corpus missing for %s: %s", cid, corpus_path)
-            sys.exit(1)
-        try:
-            with open(corpus_path, "r", encoding="utf-8") as f:
-                chunks = sum(1 for line in f if line.strip())
-        except Exception as e:
-            logger.error("startup_check_failed: cannot read corpus %s: %s", corpus_path, e)
-            sys.exit(1)
-        if chunks == 0:
-            logger.error("startup_check_failed: empty corpus for %s: %s", cid, corpus_path)
-            sys.exit(1)
-        total_chunks += chunks
-
-    log_json(logger, "startup_check_ok", clients=client_ids, chunks=total_chunks)
+    log_json(logger, "startup_check_ok", clients=client_ids, md_files=total_md_files)

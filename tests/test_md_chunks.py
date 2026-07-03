@@ -22,11 +22,3 @@ def test_pain_faq_korotko_ref():
 def test_invalid_ref_returns_none():
     assert get_chunk_by_ref("", client_id="demo") is None
     assert get_chunk_by_ref("no-such-doc.md#korotko", client_id="demo") is None
-
-
-def test_retriever_reexports_md_chunks():
-    from retriever import get_chunk_by_ref as legacy_get
-
-    direct = get_chunk_by_ref(CONTACTS_CHUNK_REF, client_id="demo")
-    via_retriever = legacy_get(CONTACTS_CHUNK_REF, client_id="demo")
-    assert via_retriever == direct

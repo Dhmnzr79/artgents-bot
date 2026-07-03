@@ -34,7 +34,7 @@ from orchestration.route_guards import (
 from core.price_ref_routing import orchestrate_price_widget_ref
 from core.promo_overview import build_promo_overview_payload, is_direct_promo_question
 from policy import continuation_only_phrase, continuation_without_context
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 from session import (
     get_topic_state,
     is_active_lead_flow,

@@ -7,7 +7,7 @@ from flask import request
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.source_route_result import SourceRouteResult
 from logging_setup import get_logger, log_json
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 from session import set_last_catalog_service
 from core.price_offers import (
     build_price_answer_for_lookup,

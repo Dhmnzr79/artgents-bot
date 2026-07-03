@@ -30,22 +30,6 @@ def sqlite_path_for_client(client_id: str | None) -> str:
     return os.path.join(per_client_data_dir(client_id), "bot.db")
 
 
-def corpus_paths(client_id: str | None) -> dict[str, str]:
-    """Artifact paths for retrieval index of one client pack."""
-    data_dir = per_client_data_dir(client_id)
-    return {
-        "corpus": os.path.join(data_dir, "corpus.jsonl"),
-        "embeddings": os.path.join(data_dir, "embeddings.npy"),
-        "alias_rows": os.path.join(data_dir, "alias_rows.jsonl"),
-        "alias_embeddings": os.path.join(data_dir, "alias_embeddings.npy"),
-    }
-
-
-def effective_corpus_client_id(client_id: str | None) -> str:
-    """Logical pack id used for retrieval / corpus row tag (no cross-client fallback)."""
-    return resolve_pack_client_id(client_id)
-
-
 def list_buildable_client_ids() -> list[str]:
     """Client pack directories with ``md/`` (excludes ``_template``)."""
     clients_root = os.path.join(_REPO_ROOT, "clients")

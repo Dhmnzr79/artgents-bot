@@ -7,7 +7,7 @@ import pytest
 from flask import Flask
 
 from contracts.answer_plan import AnswerPlan
-from retriever import get_chunk_by_ref
+from core.md_chunks import get_chunk_by_ref
 from session import mem_reset
 
 _app = Flask(__name__)

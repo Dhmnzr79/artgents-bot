@@ -6,9 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- LLM providers (chat vs embeddings may use different APIs) ---
+# --- LLM provider ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBED_API_KEY = (os.getenv("EMBED_API_KEY") or "").strip() or OPENAI_API_KEY
 CHAT_API_KEY = (
     (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip()
     or OPENAI_API_KEY
@@ -28,7 +27,6 @@ QWEN_ENABLE_THINKING = os.getenv("QWEN_ENABLE_THINKING", "0").lower() in (
 QWEN_PLUS_MODEL = "qwen3.7-plus"
 QWEN_FLASH_MODEL = "qwen3.6-flash"
 
-EMB_MODEL = os.getenv("MODEL_EMBED", "text-embedding-3-large")
 CHAT_MODEL = os.getenv("MODEL_CHAT", QWEN_PLUS_MODEL)
 
 
@@ -45,7 +43,6 @@ def chat_provider_is_qwen() -> bool:
 
 RESOLVER_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_PLUS_MODEL
 QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_FLASH_MODEL
-RERANK_MODEL = (os.getenv("MODEL_RERANK") or "").strip() or QWEN_FLASH_MODEL
 LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
 DIALOG_FOCUS_LLM_CLASSIFY_ON = os.getenv("DIALOG_FOCUS_LLM_CLASSIFY", "1").lower() in (
     "1",
@@ -82,21 +79,21 @@ ANSWER_PACKET_ASSEMBLER_ON = os.getenv("ANSWER_PACKET_ASSEMBLER_ON", "0").lower(
 )
 
 # --- Packet composer (composer roadmap phase 3) ---
-COMPOSER_ON = os.getenv("COMPOSER_ON", "0").lower() in (
+COMPOSER_ON = os.getenv("COMPOSER_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
 
 # --- Full-context composer content (step 1: whole md base, not chunk refs) ---
-FULLCTX_ON = os.getenv("FULLCTX_ON", "0").lower() in (
+FULLCTX_ON = os.getenv("FULLCTX_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
 
 # --- LLM service selection in composer price path (step 2) ---
-SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "0").lower() in (
+SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "1").lower() in (
     "1",
     "true",
     "yes",
@@ -106,7 +103,7 @@ SERVICE_SELECT_LLM_MODEL = (
 )
 
 # --- Single turn planner (full-context roadmap stage 4) ---
-TURN_PLANNER_ON = os.getenv("TURN_PLANNER_ON", "0").lower() in (
+TURN_PLANNER_ON = os.getenv("TURN_PLANNER_ON", "1").lower() in (
     "1",
     "true",
     "yes",
@@ -168,19 +165,11 @@ ANTI_SPAM_BURST_MESSAGES = int(os.getenv("ANTI_SPAM_BURST_MESSAGES", "6"))
 
 # --- Paths ---
 DATA_DIR = os.getenv("DATA_DIR", "data")
-CORPUS_PATH = os.path.join(DATA_DIR, "corpus.jsonl")
-EMB_PATH = os.path.join(DATA_DIR, "embeddings.npy")
-ALIAS_ROWS_PATH = os.path.join(DATA_DIR, "alias_rows.jsonl")
-ALIAS_EMB_PATH = os.path.join(DATA_DIR, "alias_embeddings.npy")
 SQLITE_PATH = os.getenv("SQLITE_PATH", os.path.join(DATA_DIR, "bot.db"))
 
 # --- Retrieval / policy пороги ---
-LOW_SCORE_THRESHOLD = float(os.getenv("LOW_SCORE_THRESHOLD", "0.33"))
-BROAD_QUERY_MAX_WORDS = int(os.getenv("BROAD_QUERY_MAX_WORDS", "5"))
 
 # Алиас по корпусу: «сильный» — как раньше 0.82; «мягкий» — подстраховка у LOW_SCORE (не второй порог на клиента).
-ALIAS_STRONG_THRESHOLD = float(os.getenv("ALIAS_STRONG_THRESHOLD", "0.82"))
-ALIAS_SOFT_THRESHOLD = float(os.getenv("ALIAS_SOFT_THRESHOLD", "0.72"))
 
 
 # --- Ответ при низком score ---
@@ -345,12 +334,9 @@ if not OPENAI_API_KEY:
     # CI lint/unit import config without calling OpenAI; eval job checks the secret explicitly.
     if os.getenv("GITHUB_ACTIONS") == "true":
         OPENAI_API_KEY = "github-actions-placeholder"
-        EMBED_API_KEY = EMBED_API_KEY or OPENAI_API_KEY
         CHAT_API_KEY = CHAT_API_KEY or OPENAI_API_KEY
     else:
-        raise RuntimeError("OPENAI_API_KEY is not set in .env (required for embeddings)")
-elif not EMBED_API_KEY:
-    EMBED_API_KEY = OPENAI_API_KEY
+        raise RuntimeError("OPENAI_API_KEY is not set in .env (required for chat LLM)")
 elif not CHAT_API_KEY:
     CHAT_API_KEY = OPENAI_API_KEY
 

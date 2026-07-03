@@ -2,38 +2,23 @@
 import json
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from config import (
     COMMERCIAL_INFO_RE,
     CONSULTATION_QUERY_RE,
     KT_EXPLICIT_RE,
-    LOW_SCORE_THRESHOLD,
-    QUERY_REWRITE_ON,
     DEFAULT_CLIENT_ID,
     PRICE_CONCERN_RE,
     PRICE_LOOKUP_RE,
     PRICE_SERVICE_MATCH_STRONG,
 )
-from core.candidate_builder import (
-    apply_metadata_candidate_boosts,
-    chunk_ref_short,
-    effective_scope_topic_for_retrieval,
-    finalize_selection_selected_by,
-    infer_selected_source,
-    merge_alias_into_candidate_pool,
-    metadata_context_from_decision,
-    resolve_alias_for_turn,
-)
 from core.catalog_match import resolve_catalog_match
 from core.client_config_loader import resolve_pack_client_id
-from core.follow_up_rewrite import follow_up_turn_meta, get_follow_up_turn_ctx
-from core.retrieval_rerank import maybe_rerank_top
 from core.routing_loader import THRESHOLDS
 from core.price_scope import PriceScopeResult, detect_price_scope, scope_catalog_excludes, scope_implant_topic
-from core.patient_situation import detect_patient_situation, patient_situation_from_ctx
-from core.patient_situation_routing import merge_price_scope, unit_bias_for_situation
+from core.patient_situation import patient_situation_from_ctx
+from core.patient_situation_routing import merge_price_scope
 from core.patient_situation_session import resolve_patient_situation_for_turn
 from core.price_offers import is_crown_inclusion_content_query, is_generic_implant_price_query
 from core.price_followup import (
@@ -44,26 +29,19 @@ from core.price_followup import (
 from contracts.dialog_focus import DialogFocusDecision
 from core.dialog_focus import dialog_focus_for_turn
 from core.pricebook_loader import load_pricebook_service
-from core.turn_timing import timed_stage
-from llm import classify_price_intent, rewrite_query_for_retrieval
+from llm import classify_price_intent
 from session import mem_get
 from policy import (
-    contacts_intent,
     continuation_only_phrase,
-    pick_contacts_chunk,
-    pick_prices_chunk,
-    price_intent,
     session_has_continuation_context,
 )
-from retriever import (
-    broad_query_detect,
-    chunk_info,
-    is_point_literal_query,
-    merge_retrieval_candidates,
-    normalize_retrieval_query,
-    prefer_overview_if_broad,
-    retrieve,
-)
+
+
+def normalize_retrieval_query(q: str) -> str:
+    """Legacy public normalizer kept for callers after embed retrieval removal."""
+    text = (q or "").strip().lower().replace("ё", "е")
+    text = re.sub(r"[^\w\s\-]", " ", text, flags=re.U)
+    return re.sub(r"\s+", " ", text, flags=re.U).strip()
 
 def _service_in_pricebook(
     client_id: str | None,
@@ -135,278 +113,11 @@ def select_chunk_for_question(
     scope_topic: str | None = None,
     decision: Any | None = None,
 ) -> dict:
-    """Return selection result for /ask.
-
-    mode:
-      - no_candidates
-      - low_score
-      - chunk
-    """
-    q_user = (q or "").strip()
-
-    fu_ctx = get_follow_up_turn_ctx(q_user, sid=sid, client_id=client_id)
-    follow_up_mode = bool(fu_ctx and fu_ctx.follow_up_mode)
-
-    # Интенты и алиасы — только по исходному вопросу пациента (не по rewrite).
-    q_policy = normalize_retrieval_query(q_user) or q_user
-
-    meta_ctx = metadata_context_from_decision(decision, q=q_policy)
-    eff_scope = effective_scope_topic_for_retrieval(
-        scope_topic, meta_ctx, follow_up_mode=follow_up_mode
-    )
-
-    tel_p: dict[str, Any] = {}
-    tel_s: dict[str, Any] = {}
-    with timed_stage("retrieval_block_ms"):
-        if follow_up_mode and fu_ctx is not None:
-            q_rewrite_eff = fu_ctx.rewritten_query
-            primary = retrieve(
-                q_rewrite_eff,
-                topk=8,
-                client_id=client_id,
-                scope_topic=eff_scope,
-                telemetry=tel_p,
-            )
-        else:
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                primary_future = pool.submit(
-                    retrieve,
-                    q_user,
-                    topk=8,
-                    client_id=client_id,
-                    scope_topic=eff_scope,
-                    telemetry=tel_p,
-                )
-                rewrite_future = None
-                if sid and QUERY_REWRITE_ON:
-                    rewrite_future = pool.submit(
-                        rewrite_query_for_retrieval,
-                        sid,
-                        q_user,
-                        client_id=client_id,
-                    )
-                primary = primary_future.result()
-                q_rewrite_eff = (
-                    rewrite_future.result() if rewrite_future is not None else q_user
-                )
-
-    nu = (normalize_retrieval_query(q_user) or q_user).strip().lower()
-    nr = (normalize_retrieval_query(q_rewrite_eff) or q_rewrite_eff).strip().lower()
-
-    nr_meta = normalize_retrieval_query(q_rewrite_eff) or q_rewrite_eff
-    base_meta = {
-        "query_user_raw": q_user[:200],
-        "query_rewrite_effective": q_rewrite_eff[:200],
-        "query_normalized_user": q_policy[:200],
-        "query_normalized_rewrite": nr_meta[:200],
-        "rewrite_applied": bool(q_rewrite_eff.strip().lower() != q_user.strip().lower()),
-        **follow_up_turn_meta(fu_ctx),
-    }
-    secondary: list = []
-    if nr != nu:
-        secondary = retrieve(
-            q_rewrite_eff,
-            topk=8,
-            client_id=client_id,
-            silent=True,
-            scope_topic=eff_scope,
-            telemetry=tel_s,
-        )
-    widen_fb = bool(tel_p.get("scope_widen_fallback")) or bool(tel_s.get("scope_widen_fallback"))
-
-    # Defaults so early returns (e.g. no_candidates) can call _dm() before alias resolution runs.
-    alias_leader: dict | None = None
-    alias_score = 0.0
-    alias_diag: dict[str, Any] = {}
-    boost_tel: dict[str, Any] = {}
-
-    def _dm(extra: dict) -> dict:
-        tel = {
-            k: v
-            for k, v in alias_diag.items()
-            if k.startswith("alias_") or k.startswith("old_")
-        }
-        return {
-            **base_meta,
-            **boost_tel,
-            **extra,
-            **tel,
-            "scope_widen_fallback": widen_fb,
-            "retrieval_scope_topic_effective": eff_scope,
-        }
-
-    def _selection_telemetry(chunk: dict | None, *, selected_by: str, **extra: Any) -> dict[str, Any]:
-        sb = finalize_selection_selected_by(chunk, selected_by=selected_by)
-        out = {
-            "selected_by": sb,
-            "selected_source": infer_selected_source(chunk, selected_by=selected_by),
-            "pool_winner_ref": chunk_ref_short(chunk) if isinstance(chunk, dict) else None,
-            **extra,
-        }
-        if "alias_fallback_used" not in out:
-            out["alias_fallback_used"] = sb == "soft_alias_assist" or out.get("selected_source") == "alias_fallback"
-        return out
-
-    cands = merge_retrieval_candidates(primary, secondary)[:8]
-    cands = prefer_overview_if_broad(cands, broad_query_detect(q_policy))
-    top_semantic_raw: float | None = None
-    if cands:
-        top_semantic_raw = float(cands[0].get("_score") or 0.0)
-        cands, boost_tel = apply_metadata_candidate_boosts(
-            cands,
-            ctx=meta_ctx,
-            client_id=client_id,
-            patient_scope_bias=unit_bias_for_situation(
-                _patient_situation_for_turn(q_policy, sid=sid, client_id=client_id)[0]
-            ),
-        )
-        boost_tel["top_semantic_raw"] = round(top_semantic_raw, 4)
-    if not cands:
-        return {
-            "mode": "no_candidates",
-            "debug_meta": _dm({"top_score": None, **boost_tel}),
-        }
-
-    is_contacts = contacts_intent(q_policy)
-    is_price = price_intent(q_policy)
-    alias_leader, alias_score, alias_diag = resolve_alias_for_turn(
-        q_policy,
-        ctx=meta_ctx,
-        client_id=client_id,
-        top_semantic_score=top_semantic_raw,
-        follow_up_mode=follow_up_mode,
-    )
-    cands, pool_tel = merge_alias_into_candidate_pool(
-        cands,
-        alias_leader=alias_leader,
-        alias_score=alias_score,
-    )
-    boost_tel.update(pool_tel)
-
-    tier = str(alias_diag.get("alias_decision") or "")
-    sim_raw = float(alias_diag.get("alias_similarity") or 0.0)
-    ath = THRESHOLDS.alias
-    alias_strong = bool(
-        alias_leader
-        and alias_score >= float(ath.strong_effective_min)
-        and (
-            tier in ("exact", "near_exact")
-            or (
-                tier == "embed_high"
-                and sim_raw >= float(ath.embedding_strong_cosine_min)
-            )
-            or (
-                tier == "rescue"
-                and sim_raw >= float(ath.embedding_strong_cosine_min)
-            )
-        )
-    )
-
-    top_score = float(cands[0].get("_score") or 0.0)
-    allow_low = alias_strong or (is_contacts and pick_contacts_chunk(cands)) or (
-        is_price and pick_prices_chunk(cands)
-    )
-    if top_score < LOW_SCORE_THRESHOLD and not allow_low:
-        if alias_leader and alias_score >= float(THRESHOLDS.alias.soft_assist_min):
-            soft = dict(alias_leader)
-            soft["_alias_score"] = round(alias_score, 4)
-            soft["_score"] = round(float(alias_score), 4)
-            soft["_pool_sources"] = ["alias"]
-            return {
-                "mode": "chunk",
-                "chunk": soft,
-                "rerank_applied": False,
-                "debug_meta": _dm(
-                    _selection_telemetry(
-                        soft,
-                        selected_by="soft_alias_assist",
-                        alias_fallback_used=True,
-                        top_score=round(top_score, 4),
-                        threshold=LOW_SCORE_THRESHOLD,
-                        alias_score=round(float(alias_score or 0.0), 4),
-                        is_contacts=bool(is_contacts),
-                        is_price=bool(is_price),
-                    )
-                ),
-            }
-        top_cinfo = chunk_info(cands[0], cands[0].get("_score")) if cands else None
-        return {
-            "mode": "low_score",
-            "debug_meta": _dm(
-                {
-                    "top_score": round(top_score, 4),
-                    "threshold": LOW_SCORE_THRESHOLD,
-                    "alias_score": round(float(alias_score or 0.0), 4),
-                    "is_contacts": bool(is_contacts),
-                    "is_price": bool(is_price),
-                    "top_candidate": top_cinfo,
-                }
-            ),
-        }
-
-    if is_contacts:
-        picked = pick_contacts_chunk(cands)
-        if picked is not None:
-            return {
-                "mode": "chunk",
-                "chunk": picked,
-                "rerank_applied": False,
-                "debug_meta": _dm(
-                    _selection_telemetry(
-                        picked,
-                        selected_by="contacts",
-                        top_score=round(top_score, 4),
-                        alias_score=round(float(alias_score or 0.0), 4),
-                    )
-                ),
-            }
-
-    if is_price:
-        picked = pick_prices_chunk(cands)
-        if picked is not None:
-            return {
-                "mode": "chunk",
-                "chunk": picked,
-                "rerank_applied": False,
-                "debug_meta": _dm(
-                    _selection_telemetry(
-                        picked,
-                        selected_by="price",
-                        top_score=round(top_score, 4),
-                        alias_score=round(float(alias_score or 0.0), 4),
-                    )
-                ),
-            }
-
-    top = cands[0]
-    score_gap = (
-        abs(float(cands[0].get("_score") or 0.0) - float(cands[1].get("_score") or 0.0))
-        if len(cands) >= 2
-        else 1.0
-    )
-    top, rerank_tel = maybe_rerank_top(
-        q_user,
-        cands,
-        point_literal=is_point_literal_query(q_policy),
-        alias_strong=alias_strong,
-        alias_decision=tier,
-    )
-    rerank_applied = bool(rerank_tel.get("rerank_applied"))
-
+    """Embed retrieval is removed in full-context 3.4; content uses composer."""
+    _ = (q, client_id, sid, scope_topic, decision)
     return {
-        "mode": "chunk",
-        "chunk": top,
-        "rerank_applied": rerank_applied,
-        "debug_meta": _dm(
-            _selection_telemetry(
-                top,
-                selected_by="semantic",
-                top_score=round(top_score, 4),
-                score_gap=round(float(score_gap), 4),
-                alias_score=round(float(alias_score or 0.0), 4),
-                **rerank_tel,
-            )
-        ),
+        "mode": "no_candidates",
+        "debug_meta": {"retrieval_removed": True},
     }
 
 
@@ -519,11 +230,7 @@ def compute_retrieval_scope_with_conflict_guard(
     client_id: str | None,
     decision: Any | None = None,
 ) -> tuple[str | None, str]:
-    """Вернуть эффективный topic scope для retrieval и причину гарда.
-
-    Порядок: containment catalog (как в A3) блокирует scope; затем сильный alias.
-    ``guard_reason``: ``catalog_match`` | ``alias_hit`` | ``none``.
-    """
+    """Legacy no-op after embed retrieval removal."""
     raw = (scope_topic_candidate or "").strip().lower()
     if not raw or raw == "unknown":
         return None, "none"
@@ -532,19 +239,7 @@ def compute_retrieval_scope_with_conflict_guard(
     match = match_service_from_catalog(q0, client_id=client_id)
     if match.get("containment_eligible"):
         return None, "catalog_match"
-
-    q_pol = normalize_retrieval_query(q0) or q0
-    meta_ctx = metadata_context_from_decision(decision, q=q_pol)
-    _leader, alias_sc, _alias_diag = resolve_alias_for_turn(
-        q_pol,
-        ctx=meta_ctx,
-        client_id=client_id,
-        top_semantic_score=None,
-    )
-    alias_val = float(alias_sc or 0.0)
-    if alias_val >= float(THRESHOLDS.alias.scope_guard_min):
-        return None, "alias_hit"
-
+    _ = decision
     return raw, "none"
 
 

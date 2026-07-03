@@ -15,9 +15,24 @@ from config import (
 )
 from core.video_catalog_loader import resolve_video_payload
 from llm import classify_booking_wants_appointment
-from retriever import chunk_doc_type
 from session import is_lead_context
 from dialog_offer import sanitize_ungrounded_continuation_invites
+
+
+def chunk_doc_type(ch: dict | None) -> str | None:
+    if not isinstance(ch, dict):
+        return None
+    meta = ch.get("meta") if isinstance(ch.get("meta"), dict) else {}
+    for source in (meta, ch):
+        val = source.get("doc_type") if isinstance(source, dict) else None
+        if val:
+            return str(val)
+    file_name = str(ch.get("file") or "").lower()
+    if "__contacts" in file_name or "contacts" in file_name:
+        return "contacts"
+    if "__pricing" in file_name or "pricing" in file_name or "prices" in file_name:
+        return "pricing"
+    return None
 
 
 def contacts_intent(q: str) -> bool:

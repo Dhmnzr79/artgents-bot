@@ -43,6 +43,24 @@ def service_ref(entry: dict[str, Any]) -> str:
     return _md_korotko_ref(ref)
 
 
+def clarify_allowed_option_ids(client_id: str | None) -> list[str]:
+    """Услуги, пригодные быть кнопкой clarify: активны и с резолвящимся md-ref."""
+    catalog = active_service_catalog(client_id)
+    return [sid for sid, entry in catalog.items() if service_ref(entry)]
+
+
+def build_clarify_allow_instruction(client_id: str | None) -> str:
+    """Инструкция-разрешение + список валидных service_id (композер каталог не видит)."""
+    catalog = active_service_catalog(client_id)
+    rows = [
+        f"{sid} ({str(entry.get('title') or sid).strip()})"
+        for sid, entry in catalog.items()
+        if service_ref(entry)
+    ]
+    ids_line = "; ".join(rows)
+    return f"{CLARIFY_ALLOW_INSTRUCTION}\nДопустимые service_id для option_service_ids: {ids_line}."
+
+
 def validate_clarify_payload(raw: Any, *, client_id: str | None) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
@@ -60,10 +78,10 @@ def validate_clarify_payload(raw: Any, *, client_id: str | None) -> dict[str, An
         if not sid or sid in seen:
             continue
         entry = catalog.get(sid)
-        if not isinstance(entry, dict):
-            return None
-        if not service_ref(entry):
-            return None
+        # Терпимость: неизвестный/нерезолвящийся id пропускаем, валидные оставляем —
+        # один выдуманный вариант не должен браковать весь вопрос.
+        if not isinstance(entry, dict) or not service_ref(entry):
+            continue
         seen.add(sid)
         option_ids.append(sid)
     if not (2 <= len(option_ids) <= 4):

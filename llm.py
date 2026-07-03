@@ -875,9 +875,9 @@ def build_messages_for_packet_composer_fullctx(
     else:
         parts.append("Разрешённые карточки (деньги/промо — вставь как есть / только отсюда):\n(нет)")
     if allow_clarify:
-        from core.clarify_state import CLARIFY_ALLOW_INSTRUCTION
+        from core.clarify_state import build_clarify_allow_instruction
 
-        parts.append(CLARIFY_ALLOW_INSTRUCTION)
+        parts.append(build_clarify_allow_instruction(client_id))
     user_content = "\n\n".join(parts)
     return [
         {"role": "system", "content": system},
@@ -913,6 +913,16 @@ def _parse_packet_composer_fullctx_json(raw: str, *, client_id: str | None) -> t
 
         clarify = validate_clarify_payload(obj.get("clarify"), client_id=client_id)
         if clarify is None:
+            raw_clarify = obj.get("clarify")
+            log_json(
+                logger,
+                "packet_composer_fullctx_clarify_rejected",
+                raw_option_ids=(
+                    [str(x)[:60] for x in (raw_clarify.get("option_service_ids") or raw_clarify.get("option_ids") or [])][:6]
+                    if isinstance(raw_clarify, dict)
+                    else None
+                ),
+            )
             raise ValueError("packet_composer_fullctx_invalid_clarify")
         return str(clarify["question"]).strip(), {"clarify": clarify}
     raise ValueError("packet_composer_fullctx_missing_answer")

@@ -1,5 +1,8 @@
-# CI — content lint, unit tests, demo product evals (v5 architecture).
-# Secrets (Settings → Actions): OPENAI_API_KEY (embeddings), DASHSCOPE_API_KEY (Qwen chat).
+# CI — content lint + deterministic unit tests (full-context architecture).
+# Живые eval'ы (product/risk/live-composer) в CI НЕ гоняются — они стоят токенов
+# и запускаются локально по протоколу ревью (docs/FULLCONTEXT_ROADMAP.md).
+# Secrets (Settings → Actions): DASHSCOPE_API_KEY — только для импорта llm-клиента;
+# LLM-вызовов в этом workflow нет (юниты мокают модель). OPENAI_API_KEY больше не нужен.
 
 name: CI
 
@@ -8,7 +11,7 @@ on:
     branches:
       - main
       - master
-      - multiclient
+      - "fullctx**"
       - "feature/**"
   pull_request:
   workflow_dispatch:
@@ -23,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,155 +40,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
 
-      - name: Check OPENAI_API_KEY (config import)
-        run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "::error::OPENAI_API_KEY secret required (config.py loads on lint import)."
-            exit 1
-          fi
-
       - name: Lint client md (all packs)
         run: python scripts/lint_content.py --client all
 
-      - name: Unit tests (routing, pricebook, metadata-first helpers)
+      - name: Lint pricebook (money invariants)
+        run: python scripts/lint_pricebook.py
+
+      - name: App import smoke
+        run: python -c "import app"
+
+      - name: Unit tests (deterministic, LLM mocked)
         run: |
           python -m pytest \
-            tests/test_metadata_first_eval_helpers.py \
-            tests/test_metadata_first_scope.py \
-            tests/test_metadata_first_observability.py \
-            tests/test_finalize_metadata_first_hook.py \
+            tests/test_turn_planner_llm.py \
+            tests/test_turn_planner_wiring.py \
+            tests/test_turn_plan_protocol_guard.py \
+            tests/test_composer_flow.py \
+            tests/test_composer_display_chunk.py \
+            tests/test_composer_parity_eval.py \
+            tests/test_composer_live_eval.py \
+            tests/test_md_chunks.py \
+            tests/test_knowledge_base.py \
+            tests/test_answer_packet_composer.py \
+            tests/test_answer_planner.py \
+            tests/test_contacts_intent.py \
+            tests/test_client_runtime.py \
             tests/test_e2e_smoke_infer.py \
-            tests/test_candidate_builder.py \
+            tests/test_source_routing_golden.py \
             tests/test_aspect_metadata.py \
             tests/test_price_offers.py \
             tests/test_price_group_overview.py \
             tests/test_price_ref_routing.py \
-            tests/test_source_routing_golden.py \
+            tests/test_pricebook_golden.py \
             -q --tb=short
-
-      - name: Alias collision report (non-blocking inventory)
-        run: python scripts/alias_collision_report.py --client all
-
-  demo-deterministic-eval:
-    name: Demo deterministic (ingress + price offers)
-    runs-on: ubuntu-latest
-    needs: content-lint-and-unit
-    timeout-minutes: 10
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-      CHAT_BASE_URL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Ingress + policy layer eval
-        run: python evals/v5/run_layer_eval.py --layer ingress
-
-      - name: Check LLM secrets (price offers hits /ask + retrieval)
-        run: |
-          if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
-            echo "::error::Add OPENAI_API_KEY — embeddings for retrieval in /ask evals."
-            exit 1
-          fi
-          if [ -z "$DASHSCOPE_API_KEY" ]; then
-            echo "::error::Add DASHSCOPE_API_KEY — Qwen chat (qwen3.7-plus). Without it: model_not_found in CI."
-            exit 1
-          fi
-
-      - name: Price offers golden (in-proc)
-        env:
-          E2E_USE_TEST_CLIENT: "1"
-          PRICE_OFFERS_EVAL_CLIENT: "demo"
-        run: python evals/v5/run_price_offers_eval.py --client demo
-
-  demo-product-eval:
-    name: Demo product eval (smoke + risk)
-    runs-on: ubuntu-latest
-    needs: content-lint-and-unit
-    timeout-minutes: 60
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-      CHAT_BASE_URL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Check LLM secrets (OpenAI embed + Qwen chat)
-        run: |
-          if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
-            echo "::error::Add OPENAI_API_KEY — embeddings for retrieval in /ask evals."
-            exit 1
-          fi
-          if [ -z "$DASHSCOPE_API_KEY" ]; then
-            echo "::error::Add DASHSCOPE_API_KEY — Qwen chat (qwen3.7-plus). Without it: model_not_found in CI."
-            exit 1
-          fi
-
-      - name: Run demo smoke + risk regression
-        env:
-          E2E_USE_TEST_CLIENT: "1"
-          DEMO_EVAL_CLIENT: "demo"
-          PYTHONUNBUFFERED: "1"
-        run: python evals/v5/run_demo_eval.py --client demo --suite product
-
-  metadata-first-eval:
-    name: Metadata-first eval (multiclient, optional)
-    runs-on: ubuntu-latest
-    needs: content-lint-and-unit
-    if: github.ref == 'refs/heads/multiclient' || github.base_ref == 'multiclient'
-    continue-on-error: true
-    timeout-minutes: 45
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-      CHAT_BASE_URL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Check LLM secrets (OpenAI embed + Qwen chat)
-        run: |
-          if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "github-actions-placeholder" ]; then
-            echo "::error::Add OPENAI_API_KEY — embeddings for retrieval in /ask evals."
-            exit 1
-          fi
-          if [ -z "$DASHSCOPE_API_KEY" ]; then
-            echo "::error::Add DASHSCOPE_API_KEY — Qwen chat (qwen3.7-plus). Without it: model_not_found in CI."
-            exit 1
-          fi
-
-      - name: Run metadata-first golden + smoke
-        env:
-          E2E_USE_TEST_CLIENT: "1"
-          MF_EVAL_CLIENT: "demo"
-          PYTHONUNBUFFERED: "1"
-        run: python evals/v5/run_metadata_first_eval.py --suite all --client demo

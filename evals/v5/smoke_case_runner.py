@@ -14,7 +14,13 @@ import urllib.error
 import urllib.request
 
 
-from composer_parity import should_skip_legacy_retrieval_checks, validate_composer_parity
+try:
+    from composer_parity import should_skip_legacy_retrieval_checks, validate_composer_parity
+except ModuleNotFoundError:  # imported as evals.v5.smoke_case_runner (pytest from repo root)
+    from evals.v5.composer_parity import (
+        should_skip_legacy_retrieval_checks,
+        validate_composer_parity,
+    )
 
 
 @dataclass(frozen=True)

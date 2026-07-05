@@ -53,6 +53,7 @@ def orchestrate_price_widget_ref(
             client_id=client_id,
             group_id="implantation",
             match_score=1.0,
+            q=q,
         )
         if not payload:
             return None

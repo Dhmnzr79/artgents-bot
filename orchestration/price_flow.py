@@ -329,6 +329,7 @@ def try_a3_price_route(
                     client_id=client_id,
                     match_score=float(pr_cl.get("match_score") or 0.0),
                     group_id=str(pr_cl.get("group_id") or "implantation"),
+                    q=q,
                 )
                 log_json(logger, "price_route", **payload.get("meta") or {})
                 return AskOrchestrationResult(
@@ -371,6 +372,7 @@ def price_lookup_intent_fallback(
             client_id=client_id,
             match_score=float(price_route.get("match_score") or 0.0),
             group_id=str(price_route.get("group_id") or "implantation"),
+            q=q,
         )
         log_json(logger, "price_route", **payload.get("meta") or {})
         return AskOrchestrationResult(

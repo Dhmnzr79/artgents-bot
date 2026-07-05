@@ -595,10 +595,16 @@ def build_price_group_overview_payload(
     client_id: str | None,
     group_id: str = "implantation",
     match_score: float = 0.0,
+    q: str | None = None,
 ) -> dict | None:
     from core.price_group_overview import build_group_overview_answer
 
-    answer, quick, overview_meta = build_group_overview_answer(client_id, group_id=group_id)
+    answer, quick, overview_meta = build_group_overview_answer(
+        client_id,
+        group_id=group_id,
+        patient_q=q,
+        session_id=sid,
+    )
     if not answer:
         return None
     meta = {
@@ -631,12 +637,14 @@ def build_price_unit_clarify_payload(
     client_id: str | None,
     match_score: float = 0.0,
     group_id: str = "implantation",
+    q: str | None = None,
 ) -> dict:
     payload = build_price_group_overview_payload(
         sid=sid,
         client_id=client_id,
         group_id=group_id,
         match_score=match_score,
+        q=q,
     )
     if payload:
         return payload

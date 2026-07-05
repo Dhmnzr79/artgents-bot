@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+import core.price_group_overview as price_group_overview
 from core.price_group_overview import build_group_overview_answer
 from query_selector import select_price_service_route
 
@@ -33,6 +34,101 @@ def test_group_overview_answer_shape(question):
     assert "86 500" in answer
     assert "протокол" in answer.lower()
     assert len(quick) >= 3
+    assert meta.get("pricebook_group_id") == "implantation"
+
+
+def test_group_overview_living_flag_off_keeps_static_answer(monkeypatch):
+    def _boom(*_args, **_kwargs):
+        raise AssertionError("composer must not be called when flag is off")
+
+    monkeypatch.setattr(price_group_overview, "LIVING_OVERVIEW_ON", False)
+    monkeypatch.setattr(price_group_overview, "_generate_living_overview_answer", _boom)
+
+    answer, quick, meta = build_group_overview_answer(
+        "demo",
+        patient_q="Сколько стоит имплантация?",
+        session_id="living-off",
+    )
+
+    assert answer
+    assert answer.startswith("Стоимость имплантации зависит от выбранного протокола.")
+    assert answer.endswith("Выберите протокол ниже или уточните вопрос.")
+    assert ["price:classic", "price:one_stage", "price:all_on_4"] == [
+        r["ref"] for r in quick[:3]
+    ]
+    assert "76 200" in answer
+    assert "86 500" in answer
+    assert "318 000" in answer
+    assert meta.get("pricebook_group_id") == "implantation"
+
+
+def test_group_overview_living_intro_keeps_prices_and_buttons(monkeypatch):
+    calls = {}
+
+    def _composer(user_q, knowledge_base, aspects, deterministic_cards, meta, session_id):
+        calls["user_q"] = user_q
+        calls["knowledge_base"] = knowledge_base
+        calls["aspects"] = aspects
+        calls["deterministic_cards"] = deterministic_cards
+        calls["meta"] = meta
+        calls["session_id"] = session_id
+        return (
+            "Понимаю, хочется сразу сориентироваться по имплантации.\n\n"
+            "Ниже оставила варианты, можно выбрать подходящий или уточнить вопрос.",
+            {"composer_used": True},
+        )
+
+    monkeypatch.setattr(price_group_overview, "LIVING_OVERVIEW_ON", True)
+    monkeypatch.setattr(price_group_overview, "_generate_living_overview_answer", _composer)
+
+    static_answer, static_quick, _ = build_group_overview_answer("demo")
+    answer, quick, meta = build_group_overview_answer(
+        "demo",
+        patient_q="Сколько примерно стоит имплантация?",
+        session_id="living-on",
+    )
+
+    assert answer
+    assert answer.startswith("Понимаю, хочется сразу сориентироваться по имплантации.")
+    assert answer.endswith("Ниже оставила варианты, можно выбрать подходящий или уточнить вопрос.")
+    assert "Стоимость имплантации зависит от выбранного протокола." not in answer
+    expected_prices = ["76 200", "86 500", "318 000", "398 000", "42 000"]
+    for expected in expected_prices:
+        assert expected in answer
+    assert [answer.index(expected) for expected in expected_prices] == sorted(
+        answer.index(expected) for expected in expected_prices
+    )
+    assert [static_answer.index(expected) for expected in expected_prices] == sorted(
+        static_answer.index(expected) for expected in expected_prices
+    )
+    assert quick == static_quick
+    assert meta.get("pricebook_group_id") == "implantation"
+    assert calls["user_q"] == "Сколько примерно стоит имплантация?"
+    assert "Детерминированная карточка цен" in calls["knowledge_base"]
+    assert calls["aspects"] == ["price"]
+    assert calls["deterministic_cards"] == []
+    assert calls["meta"]["composer_surface"] == "living_overview_frame"
+    assert calls["session_id"] == "living-on"
+
+
+def test_group_overview_living_composer_exception_fail_opens(monkeypatch):
+    def _composer(*_args, **_kwargs):
+        raise RuntimeError("composer unavailable")
+
+    monkeypatch.setattr(price_group_overview, "LIVING_OVERVIEW_ON", True)
+    monkeypatch.setattr(price_group_overview, "_generate_living_overview_answer", _composer)
+
+    answer, quick, meta = build_group_overview_answer(
+        "demo",
+        patient_q="Сколько стоит имплантация?",
+        session_id="living-error",
+    )
+
+    assert answer
+    assert answer.startswith("Стоимость имплантации зависит от выбранного протокола.")
+    assert answer.endswith("Выберите протокол ниже или уточните вопрос.")
+    assert [r["ref"] for r in quick[:3]] == ["price:classic", "price:one_stage", "price:all_on_4"]
+    assert "318 000" in answer
     assert meta.get("pricebook_group_id") == "implantation"
 
 

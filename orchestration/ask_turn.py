@@ -21,7 +21,10 @@ from core.patient_situation_session import (
 from core.dialog_focus import record_dialog_focus_ctx
 from core.price_offers import is_crown_inclusion_content_query
 from orchestration.composer_flow import try_composer_overlay
-from orchestration.patient_playbook_flow import try_patient_options_overview
+from orchestration.patient_playbook_flow import (
+    try_patient_options_overview,
+    try_patient_options_price_overview,
+)
 from orchestration.price_flow import price_lookup_intent_fallback, try_a3_price_route
 from policy import contacts_intent
 from core.answer_planner import build_answer_plan, publish_answer_plan
@@ -170,6 +173,18 @@ def orchestrate_routing_after_resolver(
             )
             if playbook_result is not None:
                 return playbook_result
+
+        playbook_price_result = try_patient_options_price_overview(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            intent=intent,
+            decision=decision,
+            situation=situation,
+            decision_frame=decision_frame,
+        )
+        if playbook_price_result is not None:
+            return playbook_price_result
 
         doc_result = try_a3_doctor_route(
             q=q,

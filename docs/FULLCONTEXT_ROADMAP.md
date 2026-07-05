@@ -186,6 +186,8 @@
 **5.5d — Живые вступления вместо хардкода.**
 - Убрать статичные `overview_prompt` и «Выберите протокол ниже» → бриф → композер. Кнопки/цены/порядок пришпилены; живёт только текст. (Вынести вперёд как самый дешёвый первый коммит.)
 
+**Статус 5.5 (2026-07-05):** сделано — 5.5d (живые вступления) ✓ · `core/service_node.py` ✓ · `core/answer_lens.py` (линзы услуги) ✓ · `situation_view` ✓ · **первый вайринг «цена за ситуацию»** (`SITUATION_PRICE_ON`) ✓ · 5.5e (живой intro ситуационной цены на общий `core/living_frame.py`) ✓. Read-only карта (узел → линза услуги → линза ситуации) собрана; цена по ВСЕМ ситуациям плейбука подключена и оживлена, проверено вживую в виджете. Далее — **5.5a-2** (снос регекс-routing, ниже). 5.5a-1 (конвергенция manifest) НЕ делается — см. уточнение в 5.5a-2. Контент-ре-вайринг «что подойдёт» на карту — отложен (работает на легаси, переписывать рискованно без выгоды).
+
 **Чистка / удаление легаси (ОБЯЗАТЕЛЬНО; по графу вызовов, НЕ по списку файлов; только после паритета на eval и когда новый путь = дефолт):**
 
 | Что убрать | Чем заменено | Предусловие |
@@ -198,6 +200,20 @@
 | Хардкод `overview_prompt` / «Выберите протокол ниже» (`price_group_overview.py`) | живой бриф (5.5d) | 5.5d |
 
 **НЕ удалять (несущее):** `get_chunk_by_ref`/`core/md_chunks` (не RAG), pricebook loader, `service_catalog.json`, md-база, numeric gate, детерминированная цена, playbook `answer_style` (`avoid_single_winner`, `avoid_medical_promise`, `mention_consult_ct`). Перед каждым удалением — grep импортёров + import-smoke (`python -c "import app"`) + eval (правило Этапа 3.4).
+
+**5.5a-2 — Снос регекс-routing цен → планировщик (конвергенция; строго по паритету).**
+
+**Уточнение цели (2026-07-05):** «два источника правды» — это НЕ manifest-группы vs плейбук. Они данные, частично пересекаются, но отвечают на РАЗНЫЕ вопросы (manifest — «сколько имплантация» как категория; плейбук — «нет зуба, что подойдёт» как ситуация) и **остаются**. Реальный багаж — **регекс-слой routing цен**: `query_selector.select_price_service_route` берёт scope/группу/протокол через `detect_price_scope` (`core/price_scope.py`) + имплант-регексы `core/patient_scope_cues.py` + `is_*_price_query`. Это **дублирует** то, что плановый вызов уже отдаёт (`patient_situation`, `scope`, `service_id`, `brand_filter`), хрупко и блокирует вертикали. Значит цель уборки — **регексы, не данные** (строка таблицы выше про «дубль-группы manifest» — отменяется, manifest остаётся).
+
+**Порядок (нельзя удалять до паритета):**
+1. **planner-routing за флагом `PRICE_ROUTING_FROM_PLANNER`.** В `select_price_service_route` scope/group_id/protocol/brand берутся из планировщика (`turn_plan_from_ctx`); `detect_price_scope` — только fail-open (планировщика нет / флаг off). Флаг off = байт-в-байт.
+2. **паритет-харнесс:** на наборе ценовых запросов решения planner-routing == регекс-routing (эталон — существующие `test_price_scope_router.py` / `test_price_offers.py` + live-набор). Расхождение → чиним подсказку планировщика или фиксируем как осознанное улучшение (T5). Это гейт включения.
+3. **флип дефолта** `PRICE_ROUTING_FROM_PLANNER=1`, полный прогон без выставления флага.
+4. **снос по графу вызовов:** `core/price_scope.py`, имплант-регексы `core/patient_scope_cues.py`, `is_generic_implant_price_query`/`is_full_jaw_*`/`is_upper_jaw_*`/`is_one_stage_*`, `resolve_implant_group_overview`, `should_offer_unit_clarify`, defer-хелперы `orchestration/composer_flow.py`. Перед каждым — grep импортёров + `import app` + eval; их тесты переписать на planner-routing, смысл не ослаблять.
+
+**Инвариант:** D1 сохраняется — «сколько имплантация» → обзор протоколов, просто решение принимает планировщик, не регекс. Manifest-рендер (`build_group_overview_answer`) не трогаем.
+
+**Коммиты (по шагам):** `feat: price routing from turn planner (PRICE_ROUTING_FROM_PLANNER, parity fail-open)` → `test: price routing parity harness (planner vs regex)` → `chore: default price routing to planner` → `refactor: retire price_scope regexes and implant price-query cues (by call-graph)`.
 
 **Файлы:** новые `core/service_node.py`, `core/answer_lens.py`; `patient_playbook.yaml` (спина); `orchestration/ask_turn.py`, `orchestration/composer_flow.py`, `orchestration/price_flow.py` (маршрут через линзу); `session.py` (situation-focus); `core/turn_planner_llm.py` (вид вопроса `exists|select|describe|price`, если ещё не выводится); `llm.py`/`core/price_group_overview.py` (живой бриф).
 

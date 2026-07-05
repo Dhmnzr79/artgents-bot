@@ -1,17 +1,12 @@
 """PriceBook group overview (S3) from manifest.json."""
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from config import LIVING_OVERVIEW_ON
-from logging_setup import get_logger, log_json
+from core.living_frame import compose_living_frame
 from core.price_offers import format_rub, min_offer_total
 from core.pricebook_loader import load_pricebook_manifest
-
-logger = get_logger("bot")
-
-_NUMERIC_OR_MONEY_RX = re.compile(r"[\d%₽]|руб\.?", re.I | re.U)
 
 
 def _static_group_overview_closer(group_id: str) -> str:
@@ -20,111 +15,6 @@ def _static_group_overview_closer(group_id: str) -> str:
     if group_id == "implantation":
         return "Выберите протокол ниже или уточните вопрос."
     return "Выберите вариант ниже или уточните вопрос."
-
-
-def _strip_frame_label(text: str) -> str:
-    return re.sub(
-        r"^\s*(?:[-*]\s*)?(?:intro|closer|вступление|подводка|финал)\s*[:—-]\s*",
-        "",
-        str(text or "").strip(),
-        flags=re.I | re.U,
-    ).strip()
-
-
-def _split_living_overview_frame(raw: str) -> tuple[str, str] | None:
-    text = (raw or "").strip()
-    if not text:
-        return None
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n+", text) if p.strip()]
-    if len(paragraphs) < 2:
-        paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
-    if len(paragraphs) < 2:
-        return None
-    intro = _strip_frame_label(paragraphs[0])
-    closer = _strip_frame_label(paragraphs[-1])
-    if not intro or not closer:
-        return None
-    if _NUMERIC_OR_MONEY_RX.search(intro) or _NUMERIC_OR_MONEY_RX.search(closer):
-        return None
-    return intro, closer
-
-
-def _generate_living_overview_answer(*args, **kwargs):
-    from llm import generate_answer_from_packet_fullctx
-
-    return generate_answer_from_packet_fullctx(*args, **kwargs)
-
-
-def _compose_living_overview_frame(
-    *,
-    client_id: str | None,
-    group_id: str,
-    patient_q: str | None,
-    price_card: str,
-    session_id: str | None,
-) -> tuple[str, str] | None:
-    if not LIVING_OVERVIEW_ON:
-        return None
-    q = (patient_q or "").strip()
-    if not q or not price_card.strip():
-        return None
-
-    brief = (
-        "Задача: написать только живое обрамление для детерминированной карточки цен.\n"
-        "Верни ровно две короткие строки, каждая отдельным абзацем:\n"
-        "INTRO: тёпло признай вопрос пациента и подведи к вариантам ниже.\n"
-        "CLOSER: мягко предложи выбрать протокол/вариант ниже или уточнить вопрос.\n"
-        "Не переписывай карточку цен и не называй никаких цифр, процентов, рублей или сумм. "
-        "Цифры будут вставлены отдельно детерминированным блоком.\n\n"
-        "Детерминированная карточка цен, только как факт для понимания порядка вариантов:\n"
-        f"{price_card}"
-    )
-    meta = {
-        "client_id": client_id,
-        "pricebook_group_id": group_id,
-        "composer_surface": "living_overview_frame",
-    }
-    try:
-        answer, profile = _generate_living_overview_answer(
-            q,
-            brief,
-            ["price"],
-            [],
-            meta,
-            session_id or "",
-        )
-    except Exception as exc:
-        log_json(
-            logger,
-            "living_overview_composer_failed",
-            client_id=client_id,
-            sid=session_id,
-            group_id=group_id,
-            err=str(exc)[:300],
-        )
-        return None
-    if not isinstance(profile, dict) or not profile.get("composer_used"):
-        log_json(
-            logger,
-            "living_overview_composer_fail_open",
-            client_id=client_id,
-            sid=session_id,
-            group_id=group_id,
-            reason="composer_not_used",
-        )
-        return None
-    frame = _split_living_overview_frame(answer)
-    if frame is None:
-        log_json(
-            logger,
-            "living_overview_composer_fail_open",
-            client_id=client_id,
-            sid=session_id,
-            group_id=group_id,
-            reason="empty_or_unsafe_frame",
-        )
-        return None
-    return frame
 
 
 def group_overview_quick_replies(
@@ -183,12 +73,12 @@ def build_group_overview_answer(
     if price_lines:
         section = "**По протоколам:**" if group_id == "implantation" else "**All-on-4 и All-on-6:**"
         price_card = "\n".join([section, *price_lines])
-        living_frame = _compose_living_overview_frame(
+        living_frame = compose_living_frame(
             client_id=client_id,
-            group_id=group_id,
             patient_q=patient_q,
-            price_card=price_card,
+            deterministic_card=price_card,
             session_id=session_id,
+            enabled=LIVING_OVERVIEW_ON,
         )
         if living_frame is not None:
             intro, closer = living_frame

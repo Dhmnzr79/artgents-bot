@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import SITUATION_PRICE_ON
+from config import LIVING_OVERVIEW_ON, SITUATION_PRICE_ON
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.patient_situation import PatientSituationResult
 from core import answer_lens
+from core.living_frame import compose_living_frame
 from core.patient_playbook import (
     build_patient_options_llm_question,
     build_synthetic_patient_options_chunk,
@@ -42,10 +43,55 @@ def _build_situation_price_answer(
     hero_title: str,
     hero_price: int,
 ) -> str:
+    anchor = _situation_price_anchor(hero_title=hero_title, hero_price=hero_price)
     return (
         "По вашей ситуации обычно сравнивают несколько вариантов лечения.\n\n"
-        f"Ориентир по первому варианту — от **{format_rub(hero_price)}** ({hero_title}).\n\n"
+        f"{anchor}\n\n"
         "Ниже можно выбрать вариант и посмотреть цену подробнее; точный план врач подтвердит на консультации."
+    )
+
+
+def _situation_price_anchor(*, hero_title: str, hero_price: int) -> str:
+    return f"Ориентир по первому варианту — от **{format_rub(hero_price)}** ({hero_title})."
+
+
+def _situation_price_card(view: answer_lens.SituationView, *, hero_price: int) -> str:
+    lines = ["Варианты в порядке плейбука:"]
+    for idx, item in enumerate(view.items):
+        if idx == 0:
+            lines.append(
+                f"- {item.node.title} — от {format_rub(hero_price)} (герой, якорь ответа)"
+            )
+        else:
+            lines.append(f"- {item.node.title}")
+    return "\n".join(lines)
+
+
+def _build_living_situation_price_answer(
+    *,
+    client_id: str,
+    q: str,
+    sid: str,
+    view: answer_lens.SituationView,
+    hero_title: str,
+    hero_price: int,
+) -> str:
+    frame = compose_living_frame(
+        client_id=client_id,
+        patient_q=q,
+        deterministic_card=_situation_price_card(view, hero_price=hero_price),
+        session_id=sid,
+        enabled=LIVING_OVERVIEW_ON,
+    )
+    if frame is None:
+        return _build_situation_price_answer(hero_title=hero_title, hero_price=hero_price)
+    intro, closer = frame
+    return "\n\n".join(
+        [
+            intro,
+            _situation_price_anchor(hero_title=hero_title, hero_price=hero_price),
+            closer,
+        ]
     )
 
 
@@ -80,7 +126,11 @@ def try_patient_options_price_overview(
 
         quick = _situation_price_quick_replies(view)
         payload = {
-            "answer": _build_situation_price_answer(
+            "answer": _build_living_situation_price_answer(
+                client_id=client_id,
+                q=q,
+                sid=sid,
+                view=view,
                 hero_title=hero.node.title,
                 hero_price=hero_price,
             ),

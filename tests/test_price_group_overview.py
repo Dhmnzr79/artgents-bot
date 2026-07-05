@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+import core.living_frame as living_frame
 import core.price_group_overview as price_group_overview
 from core.price_group_overview import build_group_overview_answer
 from query_selector import select_price_service_route
@@ -42,7 +43,7 @@ def test_group_overview_living_flag_off_keeps_static_answer(monkeypatch):
         raise AssertionError("composer must not be called when flag is off")
 
     monkeypatch.setattr(price_group_overview, "LIVING_OVERVIEW_ON", False)
-    monkeypatch.setattr(price_group_overview, "_generate_living_overview_answer", _boom)
+    monkeypatch.setattr(living_frame, "_generate_frame_answer", _boom)
 
     answer, quick, meta = build_group_overview_answer(
         "demo",
@@ -79,7 +80,7 @@ def test_group_overview_living_intro_keeps_prices_and_buttons(monkeypatch):
         )
 
     monkeypatch.setattr(price_group_overview, "LIVING_OVERVIEW_ON", True)
-    monkeypatch.setattr(price_group_overview, "_generate_living_overview_answer", _composer)
+    monkeypatch.setattr(living_frame, "_generate_frame_answer", _composer)
 
     static_answer, static_quick, _ = build_group_overview_answer("demo")
     answer, quick, meta = build_group_overview_answer(
@@ -116,7 +117,7 @@ def test_group_overview_living_composer_exception_fail_opens(monkeypatch):
         raise RuntimeError("composer unavailable")
 
     monkeypatch.setattr(price_group_overview, "LIVING_OVERVIEW_ON", True)
-    monkeypatch.setattr(price_group_overview, "_generate_living_overview_answer", _composer)
+    monkeypatch.setattr(living_frame, "_generate_frame_answer", _composer)
 
     answer, quick, meta = build_group_overview_answer(
         "demo",

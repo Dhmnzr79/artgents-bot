@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from contracts.patient_playbook import PatientOption, PatientOptionsResult
 from contracts.patient_situation import PatientSituationCues, PatientSituationResult
+from core import living_frame
 from orchestration import patient_playbook_flow
 
 
@@ -67,6 +68,7 @@ def _try_route(*, intent: str = "price_lookup", decision_route: str = "price_loo
 
 def test_situation_price_overview_flag_on_returns_hero_price_and_buttons(monkeypatch):
     monkeypatch.setattr(patient_playbook_flow, "SITUATION_PRICE_ON", True)
+    monkeypatch.setattr(patient_playbook_flow, "LIVING_OVERVIEW_ON", False)
     monkeypatch.setattr(
         patient_playbook_flow,
         "select_patient_options",
@@ -80,6 +82,7 @@ def test_situation_price_overview_flag_on_returns_hero_price_and_buttons(monkeyp
     assert result.service_route == "situation_price_overview"
     payload = result.service_payload or {}
     answer = payload.get("answer") or ""
+    assert answer.startswith("По вашей ситуации обычно сравнивают несколько вариантов лечения.")
     assert "318 000" in answer
     assert "All-on-4" in answer
     assert answer.count("₽") == 1
@@ -90,6 +93,65 @@ def test_situation_price_overview_flag_on_returns_hero_price_and_buttons(monkeyp
         "price:all_on_6",
         "price:removable_dentures",
     ]
+
+
+def test_situation_price_overview_living_frame_keeps_anchor_and_buttons(monkeypatch):
+    def _composer(*_args, **_kwargs):
+        return (
+            "Понимаю, что хочется быстро сориентироваться по цене всей челюсти.\n\n"
+            "Ниже можно открыть варианты и спокойно сравнить детали.",
+            {"composer_used": True},
+        )
+
+    monkeypatch.setattr(patient_playbook_flow, "SITUATION_PRICE_ON", True)
+    monkeypatch.setattr(patient_playbook_flow, "LIVING_OVERVIEW_ON", True)
+    monkeypatch.setattr(living_frame, "_generate_frame_answer", _composer)
+    monkeypatch.setattr(
+        patient_playbook_flow,
+        "select_patient_options",
+        lambda *_args, **_kwargs: _options_result(),
+    )
+
+    result = _try_route()
+
+    assert result is not None
+    payload = result.service_payload or {}
+    answer = payload.get("answer") or ""
+    assert answer.startswith("Понимаю, что хочется быстро сориентироваться по цене всей челюсти.")
+    assert answer.endswith("Ниже можно открыть варианты и спокойно сравнить детали.")
+    assert "318 000" in answer
+    assert "All-on-4" in answer
+    assert answer.count("₽") == 1
+    assert "368 000" not in answer
+    assert "428 000" not in answer
+    assert [item["ref"] for item in payload.get("quick_replies") or []] == [
+        "price:all_on_4",
+        "price:all_on_6",
+        "price:removable_dentures",
+    ]
+
+
+def test_situation_price_overview_living_frame_exception_fail_opens(monkeypatch):
+    def _composer(*_args, **_kwargs):
+        raise RuntimeError("composer unavailable")
+
+    monkeypatch.setattr(patient_playbook_flow, "SITUATION_PRICE_ON", True)
+    monkeypatch.setattr(patient_playbook_flow, "LIVING_OVERVIEW_ON", True)
+    monkeypatch.setattr(living_frame, "_generate_frame_answer", _composer)
+    monkeypatch.setattr(
+        patient_playbook_flow,
+        "select_patient_options",
+        lambda *_args, **_kwargs: _options_result(),
+    )
+
+    result = _try_route()
+
+    assert result is not None
+    answer = (result.service_payload or {}).get("answer") or ""
+    assert answer.startswith("По вашей ситуации обычно сравнивают несколько вариантов лечения.")
+    assert "318 000" in answer
+    assert "368 000" not in answer
+    assert "428 000" not in answer
 
 
 def test_situation_price_overview_flag_off_returns_none(monkeypatch):

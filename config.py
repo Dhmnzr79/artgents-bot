@@ -116,6 +116,13 @@ SERVICE_SELECT_LLM_MODEL = (
     (os.getenv("SERVICE_SELECT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
+# --- Price scope routing source (5.5a-2; fail-open to regex when off/missing/error) ---
+PRICE_ROUTING_FROM_PLANNER = os.getenv("PRICE_ROUTING_FROM_PLANNER", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Single turn planner (full-context roadmap stage 4) ---
 TURN_PLANNER_ON = os.getenv("TURN_PLANNER_ON", "1").lower() in (
     "1",

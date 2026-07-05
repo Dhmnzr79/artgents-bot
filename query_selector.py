@@ -11,7 +11,6 @@ from config import (
     DEFAULT_CLIENT_ID,
     PRICE_CONCERN_RE,
     PRICE_LOOKUP_RE,
-    PRICE_ROUTING_FROM_PLANNER,
     PRICE_SERVICE_MATCH_STRONG,
 )
 from core.catalog_match import resolve_catalog_match
@@ -416,21 +415,6 @@ def _try_price_session_route(
     }
 
 
-def _price_scope_for_route(q: str, *, client_id: str | None) -> PriceScopeResult:
-    if not PRICE_ROUTING_FROM_PLANNER:
-        return detect_price_scope(q, client_id=client_id)
-    try:
-        from core.price_scope_planner import price_scope_from_plan
-        from core.turn_planner_llm import turn_plan_from_ctx
-
-        plan = turn_plan_from_ctx()
-        if plan is not None:
-            return price_scope_from_plan(plan, client_id)
-    except Exception:
-        pass
-    return detect_price_scope(q, client_id=client_id)
-
-
 def select_price_service_route(
     q: str, *, client_id: str | None, sid: str | None = None, intent_override: str | None = None
 ) -> dict:
@@ -447,7 +431,7 @@ def select_price_service_route(
         return {"mode": "other", "intent": "other"}
 
     scope = (
-        _price_scope_for_route(q, client_id=client_id)
+        detect_price_scope(q, client_id=client_id)
         if intent == "price_lookup"
         else PriceScopeResult.none()
     )

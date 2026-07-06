@@ -1,318 +1,152 @@
 # Карта маршрутизации
 
-**Статус:** Phase 3 — карта синхронизирована с runtime (2026-06).  
-**Парный документ:** `CURRENT_ARCHITECTURE.md`.  
-**Долг / следующие этапы:** `TECH_DEBT.md` → «Routing cleanup».
-
-Цель: один документ «куда уходит вопрос» без чтения всего `app.py` и `orchestration/`.
+**Статус:** синхронизировано с post-RAG runtime.  
+**Обновлено:** 2026-07-06.  
+**Парный документ:** `CURRENT_ARCHITECTURE.md`.
 
 ---
 
-## Целевой pipeline (куда идём)
+## 1. Целевой порядок `/ask`
 
-```
-вопрос
-→ guards (ingress, noise, duplicate, anti-spam)
-→ flow_handlers (lead, situation, ref, «да» по pending)
-→ continuation guards (короткое без контекста / #korotko)
-→ Resolver (+ legacy safety-net)
-→ contacts overlay (regex, до A3)
-→ A3 source_routing (doctor / catalog / price)
-→ price_flow (PriceBook assembler или legacy price_ref + append) / content retrieval: pool → rerank → arbiter
-→ chunk_responder: LLM → answer slots + price tail → policy → session → JSON
+```text
+request
+→ pre-resolver guards / flow handlers
+→ resolver + source routing
+→ ask_turn hard routes
+→ composer / deterministic service reply
+→ finalize_turn
 ```
 
-**Phase 4 (позже):** после A3 и до retrieval — `guide_router` (только при `features.yaml` → `guide_router.enabled: true`). См. раздел «Roadmap» внизу.
+Фактический порядок post-resolver в `orchestration/ask_turn.py`:
+
+1. contacts overlay;
+2. patient playbook overview для content-ситуаций;
+3. situation price overview;
+4. doctor route;
+5. composer overlay;
+6. catalog facts;
+7. price flow;
+8. composer fallback.
 
 ---
 
-## Фактический порядок проверок (`_orchestrate_ask_turn`)
+## 2. Pre-resolver
 
-| # | Условие | Orchestration route (`chunk_route` / `service_route`) | Модуль |
-|---|---------|---------------------|--------|
-| 0 | unknown `client_id` | HTTP 403 | `app.py` |
-| 0a | `/reset`, `/новая` | reset session | `session.mem_reset` |
-| 0b | rate limit | `rate_limited` | `pre_resolver_turn` / `route_guards` |
-| 1 | obvious noise (без active lead) | `ingress_obvious_noise` | `pre_resolver_turn` → `ingress_gate` |
-| 2 | ingress gate (не skip) | `ingress_*` | `ingress_gate.classify_ingress` |
-| 3 | `cta_action`, situation, **explicit booking (regex)**, lead pending | `lead_flow` | `flow_handlers` (`explicit_booking_intent`) |
-| 4 | active lead resume | `lead_flow` | `flow_handlers.resume_active_lead_flow` |
-| 5 | duplicate question | `duplicate_short_circuit` | `pre_resolver_turn` |
-| 6 | message burst / soft redirect | `booking_flow` | `pre_resolver_turn` |
-| 7 | `ref` в теле | `retrieval_chunk` | `pre_resolver_turn` → `retriever.get_chunk_by_ref` |
-| 8 | пустой вопрос | `error` | `pre_resolver_turn` |
-| 9 | короткое продолжение без контекста | `continuation_clarify` | `pre_resolver_turn` |
-| 10 | `continuation_only_phrase` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `pre_resolver_turn` |
-| 11 | `_is_short_contextual` + `current_doc_id` | `retrieval_chunk` (`#korotko`) | `pre_resolver_turn` |
-| 12 | Resolver (или legacy при `RESOLVER_OFF=1`) | задаёт `effective_intent` | `resolver_turn` → `resolver` |
-| 13 | contacts regex overlay | `contacts_chunk` | `ask_turn` + `pick_contacts_chunk` |
-| 14 | A3 `route_source` | см. таблицу A3 ниже | `source_routing` |
-| 15 | fallback `price_lookup` (если intent) | `price_lookup` | `price_flow` / `select_price_service_route` |
-| 15a | content + `patient_playbook` + choose/overview cues | `patient_options_overview` | `patient_playbook.yaml` → synthetic chunk + LLM (приоритеты/roles, не готовый copy) |
-| 16 | content: Resolver `unknown` + clarify | `guided` | `retrieval_flow` |
-| 17 | content: candidates + arbiter | `retrieval_chunk` / `catalog_*` / `guided` / fallbacks | `retrieval_flow`, `content_arbiter` (2+ кандидата → LLM arbiter) |
+| Случай | Route | Где |
+|---|---|---|
+| reset command | reset session | `session.mem_reset` |
+| rate limit / duplicate / burst | service reply | `orchestration/pre_resolver_turn.py` |
+| obvious noise / offtopic | ingress route | `ingress_gate.py` |
+| lead refs and pending lead | `lead_flow` | `flow_handlers.py` |
+| explicit booking | `lead_flow` | `flow_handlers.explicit_booking_intent` |
+| ref in body | direct chunk/service reply | `orchestration/pre_resolver_turn.py` + `core/md_chunks.py` |
+| short continuation without context | `continuation_clarify` | pre-resolver guards |
 
-**Ingress skip:** есть `ref`, active lead, `situation_pending` или **`pending_lead_offer`** — ingress gate не вызывается (`pre_resolver_turn`).
-
-**Booking:** pre-Resolver lead только по regex (`BOOKING_INTENT_RE`). `booking_intent()` + LLM в `policy.py` — для CTA, не для lead gate. UX и turn-classifier в active lead — **`CURRENT_ARCHITECTURE.md` § Lead flow v2** (целевое; runtime — `TECH_DEBT.md` → Lead flow v2).
+`get_chunk_by_ref` is a direct md resolver, not search.
 
 ---
 
-## A3 `source_routing` → итоговый route
+## 3. Resolver and planner
 
-| `SourceRouteResult.source` | Условие | Orchestration route | ref / service_id |
-|----------------------------|---------|--------------|------------------|
-| `doctor` + cards | ≥2 врача | `doctors_list` | synthetic chunk |
-| `doctor` + doc/overview | один ref | `retrieval_chunk` | `doctors__*.md#korotko` |
-| `catalog_facts` | content + facts в catalog | `catalog_facts` | `service_id` из catalog |
-| `catalog_md` | content + `md_entry_ref` | приоритет в A4/A5 → часто `catalog_md_first` или `retrieval_chunk` | `*.md#korotko` |
-| `price_card` / `price_ref` | price match | `price_lookup` | **PriceBook** entry → assembler (demo); иначе `price_ref` md + LLM + legacy append (`price_offers` / `prices`) |
-| `price_concern` | catalog `concern_ref` / session / **default** | `price_concern` | см. ниже |
-| `price_lookup_clarify` | услуга не найдена / ambiguous / нет контекста | `price_lookup` | resolution payload |
-| `price_unavailable` | услуга найдена, цены нет | `price_unavailable` | korotko snippet + консультация |
-| `none` | нет match | → ветка 15–17 | — |
+`resolver.py` returns `DecisionFrame`. `core/turn_planner_llm.py` may add a one-turn plan:
 
-**`price_concern` — порядок ref (`source_routing.py`):**
+- `route`;
+- `aspects`;
+- `service_id`;
+- `followup_of`;
+- `patient_situation`;
+- `brand_filter`.
 
-1. Каталог сматчился (containment) **и** у услуги есть `concern_ref` → этот ref.
-2. Иначе session context с `concern_ref`.
-3. Иначе **`concern_default`**: `implantation__faq__cost.md#korotko` (`DEFAULT_PRICE_CONCERN_REF`).
-
-**Известный пробел:** каталог сматчился, но `concern_ref` пуст (протезные услуги) → шаг 3 даёт имплантационный cost-FAQ. См. `TECH_DEBT.md`.
+Planner does not replace price-scope regex routing. The cancelled 5.5a-2 experiment proved that method-price questions such as “сколько имплантация” need deterministic dental price-scope routing.
 
 ---
 
-## Intent → ветка
+## 4. ask_turn hard routes
 
-| Intent / сигнал | Источник | Примечание |
-|-----------------|----------|------------|
-| contacts | regex overlay в `ask_turn.py` | не через Resolver; retrieve full corpus |
-| price_lookup | A3 или `select_price_service_route` | **PriceBook v2** при наличии `pricebook/services/{id}.json`; иначе legacy append + pricing md (`price_ref`) |
-| price_concern | A3 `concern_ref` / `concern_default` | без матча услуги → default cost FAQ |
-| doctor | A3 `doctors_lookup` | cards / overview / doc ref |
-| catalog facts | A3 `catalog_facts` | facts card без MD |
-| catalog md | A3 → A4/A5 | приоритетный ref |
-| content | RAG + unified pool + rerank (+ arbiter) | topic scope опционально (`routing.yaml`); см. § Retrieval 2.0 |
-| unknown + clarify | Resolver | `guided` menu, не retrieval |
-
----
-
-## Content retrieval (Retrieval 2.0)
-
-После A3 `content` / catalog fallback → `query_selector` + `retrieval_flow`:
-
-```
-embed search → metadata boosts / soft filter → merge_alias_into_candidate_pool
-→ maybe_rerank_top (core/retrieval_rerank.py) → winner ref
-→ content_arbiter (2+ distinct ref)
-```
-
-| Этап | Где | Примечание |
-|------|-----|------------|
-| Pool merge | `core/candidate_builder.py` | Alias и embed в одном пуле; `selected_source` |
-| Rerank gate | `core/retrieval_rerank.py` | Пороги `routing.yaml` → `rerank`; skip при strong alias (H3.1) |
-| Arbiter | `content_arbiter.py` | LLM выбор ref; alias channel dedup (H2) |
-| Telemetry | `metadata_first_observability.py` | `meta.metadata_first.retrieval_pool` при `E2E_USE_TEST_CLIENT=1` |
-
-Детали: `CURRENT_ARCHITECTURE.md` §4.5.
+| Order | Condition | Result |
+|---|---|---|
+| 1 | contacts intent | contacts chunk |
+| 2 | content situation with playbook options | `patient_options_overview` |
+| 3 | price intent + patient situation + `SITUATION_PRICE_ON=1` | `situation_price_overview` |
+| 4 | doctor source route | doctors list or doctor ref |
+| 5 | composer can answer | composer service reply |
+| 6 | catalog facts source route | deterministic facts reply |
+| 7 | price lookup / concern | price flow |
+| 8 | content fallback | composer fallback |
 
 ---
 
-## Legacy vs Resolver (Phase 2)
+## 5. Price routing
 
-| Область | Основной путь | Legacy / overlay | Когда legacy срабатывает | План Phase 3 |
-|---------|---------------|------------------|--------------------------|--------------|
-| Intent (price/content) | `resolver.resolve_with_fallback()` → `DecisionFrame.route_intent` | `llm.classify_intent` | `confidence.intent` < порога в `routing.yaml` → safety-net перезаписывает `route_intent` | evals → сузить до edge cases |
-| Topic scope | `DecisionFrame.service_topic` | safety-net: topic → `unknown` | `confidence.topic` < порога | оставить guard, не дублировать в app |
-| query_mode | `DecisionFrame.query_mode` | safety-net → `specific` | `confidence.query_mode` < порога | влияет на scope guard (comparison/process) |
-| Полный bypass | — | `classify_intent` only | `RESOLVER_OFF=1` (+ shadow resolver в логах) | только debug / A/B |
-| Contacts | regex `contacts_intent()` в `ask_turn.py` | Resolver не должен давать contacts | overlay **после** Resolver, **до** A3 | оставить в `ask_turn` |
-| Catalog routing | `source_routing.route_source` (A3) | `query_selector.select_catalog_content_route` | **DEPRECATED**, не вызывается из `/ask` | не расширять |
-| Ingress / offtopic | `ingress_gate.classify_ingress` | `llm.classify_handoff_filter` | **DEPRECATED** | не расширять |
-| Price match | A3 + `select_price_service_route` | дублирующий fallback в app (ветка 15) | если A3 не вернул price, но `effective_intent=price_lookup` | вынести в `price_flow.py` (Phase 3) |
-| Короткое «да» | `pending_lead_offer`, `situation_pending` | — | только lead/situation | Phase 4: `pending_followup_ref` |
-| Продолжение темы | `current_doc_id` + `#korotko` | — | нет guide pending | Phase 4: guide clarification slots |
+Price routing is deterministic and intentionally still uses dental regex scope helpers.
 
-**Правило:** новый код не вызывает DEPRECATED из `DEPRECATED.md`. Legacy safety-net не «чинит» поля LLM эвристиками по ключевым словам запроса — только пороги из `core/routing.yaml`.
+| Query shape | Typical route |
+|---|---|
+| “сколько имплантация” | group overview from pricebook manifest |
+| “сколько all-on-4” | specific protocol |
+| “сколько один имплант” | one-tooth scope |
+| “нет всех зубов сколько” | situation price overview when flag is on |
+| “почему дорого” | price concern |
+| widget `price:{service_id}` | deterministic service price |
+
+Inline money comes only from pricebook/price views. Composer may write framing text, but not prices.
 
 ---
 
-## Примеры: вопрос → route → ref / service_id
+## 6. Content routing
 
-| Вопрос | expected route (smoke) | ref / source | service_id (типично) |
-|--------|------------------------|--------------|----------------------|
-| Телефон клиники | `contacts_chunk` | `clinic__info__contacts.md` (retrieve pick) | — |
-| Хочу записаться | `lead_flow` | flow template (regex) | — |
-| Я хочу удалить зуб и поставить имплант | `catalog_md_first` / `retrieval_chunk` | content, **не** lead | `smoke_cross_topic_extract_and_implant` |
-| Болит зуб, можете принять сегодня? | `expected_route_any` | не regex-lead; ingress/content | `smoke_booking_edge_pain_today` |
-| Сколько стоит имплантация? | `price_lookup` | unit clarify (или `price_ref` + offers при уточнении) | ambiguous unit → mini-summary |
-| Сколько стоит один имплант под ключ? | `price_lookup` | PriceBook `classic` (demo) — assembler, без pricing-md | `classic` |
-| Почему так дорого? | `price_concern` | `implantation__faq__cost.md#korotko` | `concern_default` |
-| Почему протезирование такое дорогое? | `price_concern` | сейчас тот же default cost FAQ | баг: нет `concern_ref` у протезных услуг |
-| Какие врачи делают имплантацию? | `doctors_list` или `retrieval_chunk` | doctors cards / overview md | — |
-| Как проходит имплантация? | `retrieval_chunk` | `implantation__*.md` | — |
-| Чем имплантация лучше протезирования? | `retrieval_chunk` (сейчас) | RAG chunk | Resolver: `query_mode=comparison` |
-| Какая погода сегодня? | `ingress_hard_stop_non_target` | ingress payload | — |
-| «да» без pending | `bare_affirmative` | flow_handlers | — |
-| «да» с `pending_lead_offer` | `lead_flow` | flow_handlers | — |
-| «короче» при `current_doc_id` | `retrieval_chunk` | `{doc_id}#korotko` | — |
+Content answers go through the full-context composer.
 
-> Сравнительные вопросы (последняя строка с comparison) **сейчас** идут в RAG. Phase 4: при включённом `guide_router` — отдельный route `guide_*`.
+The composer receives:
+
+- current question and dialog context;
+- whole client md knowledge base;
+- deterministic answer packet/cards when applicable;
+- service/catalog/price context prepared by code.
+
+Direct md refs are still used for exact snippets and materialized cards. There is no separate vector search layer in the current runtime.
 
 ---
 
-## Три уровня «route» (не путать)
+## 7. Patient situation routes
 
-| Уровень | Где живёт | Назначение |
-|---------|-----------|------------|
-| **Orchestration route** | `AskOrchestrationResult.chunk_route` / `.service_route` в `app.py`; для chunk-ответов дублируется в **`meta.orch_route`** (`chunk_responder.py`) | внутренняя развилка пайплайна |
-| **Smoke route** | `_infer_route_from_response()` в `evals/v5/run_e2e_smoke.py` | контракт `expected_route` в `e2e_smoke.json` — **не** читает `meta.route` |
-| **Telemetry route** | PG/JSONL `turn_complete` → `details.route` через `orchestration/finalize_turn.py` | observability, не контракт smoke |
+| Situation path | Trigger | Output |
+|---|---|---|
+| `patient_options_overview` | content intent + playbook options | living answer over ordered clinic options |
+| `situation_price_overview` | price intent + playbook options + flag | hero price inline + option buttons |
 
-### Как smoke выводит route (`run_e2e_smoke.py`)
+Data source:
 
-Порядок (первое совпадение):
-
-1. **`meta.service_route`** — orchestration route из `_service_reply` / pre-Resolver service paths (Phase 3a)
-2. **`meta.orch_route`** — любое непустое значение как есть (Phase 3 ✓)
-3. `meta.ingress_route` (≠ `normal`) → `ingress_{route}`
-3. `meta.handoff_filter` → `handoff_filter`
-4. `meta.lead_flow` или `meta.booking_intent` → `lead_flow`
-5. `meta.low_score` → `low_score_fallback`
-6. `meta.error == rate_limited` → `rate_limited`
-7. `meta.intent` ∈ `{price_lookup, price_concern, offtopic, catalog_facts}` → как intent
-8. `meta.file == clinic__info__contacts.md` → `contacts_chunk`
-9. `__pricing__` в `meta.file` → `price_lookup`
-10. любой другой непустой `meta.file` → `retrieval_chunk`
-11. непустые `quick_replies` → `guided`
-12. иначе → `""` (FAIL, если в кейсе задан `expected_route`)
-
-**Важно:** многие orchestration-маршруты из `app.py` smoke **не различает** и сводит к более грубым меткам. Примеры:
-
-| Orchestration (`service_route` / `chunk_route`) | Что увидит smoke |
-|-------------------------------------------------|------------------|
-| `continuation_clarify`, `bare_affirmative`, `lead_offer_declined` | как в orchestration (**через `meta.service_route`**, Phase 3a) |
-| `catalog_md_first` | через `meta.orch_route` (Phase 3 ✓) |
-| `retrieval_no_candidates` | часто `guided` (quick_replies) или `""` |
-| `duplicate_short_circuit`, `booking_flow` | через `meta.service_route` (Phase 3a) |
-| chunk с `orch_route=retrieval_chunk` | `retrieval_chunk` (шаг 10) |
+- `core/patient_situation.py` detects semantic situation;
+- `core/patient_playbook.py` selects ordered options;
+- `core/answer_lens.py` projects options to service nodes;
+- `core/service_node.py` loads catalog + pricebook view.
 
 ---
 
-## Значения smoke route (`expected_route`)
+## 8. Smoke route labels
 
-Используются в `evals/v5/e2e_smoke.json` — сравниваются с результатом `_infer_route_from_response()`, **не** с полем `meta.route` (его в JSON ответа `/ask` нет).
+Common route labels used by tests/evals:
 
-| Smoke route | Как распознаётся | Примеры case id |
-|-------------|------------------|-----------------|
-| `continuation_clarify` | `meta.service_route` | `smoke_continuation_phrase_no_context` («подробнее» без контекста) |
-| `bare_affirmative` | `meta.service_route` | `smoke_bare_yes_no_pending` («Да» без pending — **не** continuation) |
-| `lead_offer_declined` | `meta.service_route` | `smoke_pending_lead_offer_no` |
-| `contacts_chunk` | `orch_route` или `meta.file=clinic__info__contacts.md` | `smoke_contacts_phone` |
-| `lead_flow` | `meta.lead_flow` / `meta.booking_intent` | `smoke_booking_want` |
-| `price_lookup` | `orch_route`, `meta.intent`, или `__pricing__` в file | `smoke_price_classic` |
-| `price_concern` | `orch_route` или `meta.intent` | `smoke_price_concern_expensive` |
-| `retrieval_chunk` | `meta.orch_route` или `meta.file` (content md) | `smoke_content_impl_process_with_doctor_word` |
-| `catalog_md_first` | `meta.orch_route` (catalog md priority path) | `smoke_cross_topic_extraction` |
-| `doctors_list` | `meta.orch_route=doctors_list` | `smoke_doctors_who_classic_implant` (`expected_route_any`) |
-| `catalog_facts` | `meta.intent=catalog_facts` | *(пока нет отдельного smoke-кейса)* |
-| `guided` | `quick_replies` без file | `smoke_noise_unclear_short` |
-| `ingress_*` | `meta.ingress_route` | `smoke_handoff_weather` → `ingress_hard_stop_non_target` |
-| `low_score_fallback` | `meta.low_score` | *(пока нет отдельного smoke-кейса)* |
+| Label | Meaning |
+|---|---|
+| `contacts_chunk` | contacts answer |
+| `lead_flow` | lead collection/booking path |
+| `price_lookup` | deterministic price path |
+| `price_concern` | cost concern answer |
+| `patient_options_overview` | situation options content |
+| `situation_price_overview` | situation price overview |
+| `doctors_list` | doctor cards |
+| `catalog_facts` | service facts without md narrative |
+| `composer` / `composer_fallback` | full-context content answer |
+| `guided` | clarify/menu fallback |
 
-Runner: `python evals/v5/run_e2e_smoke.py` (см. `evals/v5/README.md`).
-
-**Phase 3 (долг):** прокинуть `service_route` для `duplicate_short_circuit` / `booking_flow` или добавить отдельный smoke helper.
+Route inference in evals is a test helper, not the source of runtime truth.
 
 ---
 
-## Evals — привязка к маршрутам
+## 9. Open TODOs
 
-| Файл | Что проверяет | Запуск |
-|------|---------------|--------|
-| `evals/v5/e2e_smoke.json` | end-to-end `/ask`, inferred smoke route, must_contain | `python evals/v5/run_e2e_smoke.py` |
-| `evals/v5/implant_golden.json` | implant battery (28), route + content | `python evals/v5/run_implant_eval.py` |
-| `evals/v5/answer_slots_golden.json` | slots telemetry + текст | `python evals/v5/run_answer_slots_eval.py` |
-| `evals/v5/price_offers_golden.json` | price append + `meta.price_offers_*` | `python evals/v5/run_price_offers_eval.py` |
-| `evals/v5/resolver_golden.json` | `DecisionFrame` (intent, topic, query_mode) | `python evals/v5/run_layer_eval.py --layer resolver` |
-| `evals/v5/arbiter_golden.json` | выбор ref при 2+ кандидатах | `--layer arbiter` |
-| `evals/v5/ingress_golden.json` | ingress gate | `--layer ingress` |
-| `evals/v5/gate_golden.json` | gate layer | `--layer gate` |
+> TODO(review): keep this map synced when content “what fits” is rewired from legacy playbook flow onto `SituationView` rendering.
 
-**Smoke ↔ route (выборка — id из `e2e_smoke.json`):**
-
-| case id | expected_route |
-|---------|----------------|
-| `smoke_contacts_phone` | `contacts_chunk` |
-| `smoke_booking_want` | `lead_flow` |
-| `smoke_cross_topic_extract_and_implant` | `catalog_md_first` |
-| `smoke_booking_edge_pain_today` | `expected_route_any` (не обязательно lead) |
-| `smoke_price_classic` | `price_lookup` |
-| `smoke_price_concern_general_no_service` | `price_concern` |
-| `smoke_content_impl_process_with_doctor_word` | `retrieval_chunk` |
-| `smoke_doctors_who_classic_implant` | `doctors_list` \| `retrieval_chunk` (`expected_route_any`) |
-| `smoke_cross_topic_ortho_comparison` | `retrieval_chunk` |
-| `smoke_handoff_weather` | `ingress_hard_stop_non_target` |
-| `smoke_noise_unclear_short` | `guided` |
-| `smoke_ingress_pediatric` | `ingress_service_not_offered` |
-| `smoke_continuation_phrase_no_context` | `continuation_clarify` |
-| `smoke_bare_yes_no_pending` | `bare_affirmative` |
-| `smoke_pending_lead_offer_yes` | `lead_flow` (`session_seed`) |
-| `smoke_cesi_contacts_address` | `contacts_chunk` (`client_id=cesi`) |
-| `smoke_nikadent_contacts_address` | `contacts_chunk` (`client_id=nikadent`) |
-| `smoke_comparison_implant_vs_bridge` | `retrieval_chunk` |
-
-Per-case **`client_id`** в `e2e_smoke.json` (default `demo`); фильтр: `--client cesi` или `E2E_SMOKE_CLIENT=nikadent`.
-
-**`session_seed`** в кейсе (только с `E2E_USE_TEST_CLIENT=1`): после `mem_reset(sid)` задаёт флаги (напр. `pending_lead_offer`). Каждый кейс — уникальный `sid` (`smoke_{case_id}_{ts}_{run_tag}`).
-
-Baseline smoke: **55** кейсов в `e2e_smoke.json`. Known failures — массив `known_v4_failures` в том же файле.
-
----
-
-## Env / флаги
-
-| Переменная | Эффект |
-|------------|--------|
-| `RESOLVER_OFF=1` | Только `classify_intent`; Resolver в shadow (`V5_RESOLVER_SHADOW_ON`) |
-| `V5_RESOLVER_SHADOW_ON` | fire-and-forget shadow Resolver при bypass |
-| `MODEL_CHAT` | Generator (default `qwen3.7-plus`) |
-| `MODEL_ARBITER` | Arbiter (default `qwen3.7-plus`) |
-| `MODEL_RESOLVER` | Resolver (default `qwen3.7-plus`) |
-| Остальные классификаторы | default `qwen3.6-flash` — см. `config.py` |
-| `DASHSCOPE_API_KEY` / `CHAT_BASE_URL` | Chat + классификаторы (Qwen) |
-| `OPENAI_API_KEY` / `MODEL_EMBED` | Embeddings (OpenAI) |
-| Пороги confidence | `core/routing.yaml` → `THRESHOLDS` |
-
-Per-client: `clients/{id}/features.yaml` — `guide_router.enabled` (Phase 4, сейчас `false` везде).
-
----
-
-## Patient situation — примеры (Slice 3)
-
-| Вопрос / контекст | `patient_situation` | Ожидаемое направление |
-|-------------------|---------------------|------------------------|
-| «Нет одного зуба, что лучше?» | `one_tooth_missing` | content: comparison/FAQ; **не** All-on-4 |
-| «Сколько стоит… нет одного зуба?» | `one_tooth_missing` + price intent | `classic` / one_tooth; jaw blocked |
-| content one-tooth → «А сколько стоит?» | session carry | `classic`, не All-on-4 (без `last_subject`) |
-| «Нет зубов вообще» / «какие варианты восстановить челюсть» | `full_arch_missing` + choose/overview | `patient_options_overview` (playbook: All-on-4/6, съёмный, …); **не** один случайный service doc |
-| full-jaw content → «А что по ценам?» | session carry | `group_overview` / `full_jaw` |
-| «Имплант стоит, сколько коронка?» | `existing_implant_prosthetic_stage` | `implant_supported_prosthetics` |
-| «Мало кости, что делать?» | `bone_deficit_or_grafting` | comparison bone graft; без цены classic surgery |
-| «Удалить и сразу имплант?» | `extraction_then_implant` | `one_stage` / stages content |
-
-Пороги: `core/routing.yaml` → `patient_situation`. Детали: `CURRENT_ARCHITECTURE.md` § Patient situation router.
-
----
-
-## Roadmap routing cleanup
-
-| Phase | Задача | Статус |
-|-------|--------|--------|
-| **2** | Карта маршрутов (этот документ): legacy vs Resolver, примеры, evals | **done** |
-| **3** | Smoke расширение; вынос оркестрации из `app.py` (`orchestration/`); legacy cleanup | **done** |
-| **4** | `pending_followup_ref` / clarification slots; первый `guide_router` + golden | next |
-
-**Не делать в одном PR:** вынос `app.py` + смена routing + guide_router.
-
-**Не добавлять guide_router в pipeline до Phase 4** — отдельная ветка после hard routes и стабильного smoke.
+> TODO(review): if `core/claim_gate.py` is deleted in code, remove remaining roadmap references to that cleanup item.

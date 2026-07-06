@@ -1,56 +1,36 @@
 # Документация
 
-Только **архитектура бота** и **фактический runtime**. Контент demo, гайды для ИИ/редактора, продуктовые планы и ops-чеклисты — вне `docs/` (черновики в `drafts/`, client pack в `clients/{id}/`).
-
-Корень репо: `DEPRECATED.md`, `contracts/`, `core/routing.yaml`.
-
-**Правило:** код и `CURRENT_ARCHITECTURE.md` не расходятся — правим вместе в одном PR.
-
-**Scope активной работы:** контент и eval-golden под продукт — **только `clients/demo/`** + общий код. Пакеты **`cesi`** и **`nikadent`** не трогать.
+Документы в `docs/` описывают текущий runtime и живые рабочие контракты. Исторические roadmaps, которые уже отработали или были поглощены `FULLCONTEXT_ROADMAP.md`, удаляются из папки; при необходимости их можно поднять из git history.
 
 ---
 
-## Архитектура и runtime
+## Канон runtime
 
-| Документ | Зачем |
-|----------|--------|
-| **`CURRENT_ARCHITECTURE.md`** | Пайплайн `/ask`, модули, Resolver, retrieval 2.0, slots, price, observability |
-| **`MULTICLIENT.md`** | Client pack, домены, VPS, локальный запуск, prod-критерии |
-| **`TECH_DEBT.md`** | Открытый долг и следующие шаги |
+| Документ | Для чего |
+|---|---|
+| `CURRENT_ARCHITECTURE.md` | текущая архитектура `/ask`, composer, price, Stage 5.5 |
+| `ROUTING_MAP.md` | порядок маршрутов и route labels |
+| `MULTICLIENT.md` | client packs, sessions, domains, provider model |
+| `TECH_DEBT.md` | открытый долг и закрытые решения |
+| `FULLCONTEXT_ROADMAP.md` | живой roadmap full-context ядра |
 
-## Маршрутизация
-
-| Документ | Зачем |
-|----------|--------|
-| **`ROUTING_MAP.md`** | Куда уходит вопрос (ingress → Resolver → A3 → retrieval / price / lead) |
+---
 
 ## Подсистемы
 
-| Документ | Зачем |
-|----------|--------|
-| **`PRICEBOOK_V2.md`** | Целевая и фактическая модель цен (demo на PriceBook; legacy fallback) |
-| **`WIDGET_ANSWER_FORMAT.md`** | Контракт текста ответа для виджета |
-| **`DASHBOARD.md`** | Admin, Postgres, события, cost |
+| Документ | Для чего |
+|---|---|
+| `PRICEBOOK_V2.md` | модель и сценарии PriceBook |
+| `WIDGET_ANSWER_FORMAT.md` | формат ответа для виджета |
+| `DASHBOARD.md` | admin dashboard, events, Postgres |
+| `MARKETING_EDITING_GUIDE.md` | как править marketing copy/config |
 
 ---
 
-## Cursor (обязательно)
+## Правила
 
-1. `README.md` → `CURRENT_ARCHITECTURE.md` → `MULTICLIENT.md` → `TECH_DEBT.md`
-2. UI виджета: `WIDGET_ANSWER_FORMAT.md`
-3. VPS / prod: `MULTICLIENT.md` §8
-4. Admin / PG: `DASHBOARD.md`
-5. Маршруты: `ROUTING_MAP.md`
-
----
-
-## Evals (проверка runtime)
-
-**CI:** `run_demo_eval.py --suite product`, `run_price_offers_eval.py`, `run_layer_eval.py --layer ingress`, unit routing/pricebook.
-
-| Набор | Runner |
-|-------|--------|
-| Product (smoke+risk) | `python evals/v5/run_demo_eval.py --suite product --client demo` |
-| Golden (14) | `python evals/v5/run_demo_eval.py --suite golden --client demo` |
-
-Детали: `evals/v5/README.md`, `CURRENT_ARCHITECTURE.md` § eval.
+- Если код и docs расходятся, сверяться с кодом и править docs в том же PR.
+- Не описывать RAG/search как runtime: content-путь после Stage 3.4 — full-context composer.
+- `core/md_chunks.py` и `get_chunk_by_ref` — это прямой ref resolver, не RAG.
+- Цены, бренды, порядок и кнопки — deterministic; LLM пишет только текстовое обрамление там, где это явно включено.
+- Активная продуктовая работа по умолчанию идёт по `clients/demo/`; другие packs трогать только по задаче владельца.

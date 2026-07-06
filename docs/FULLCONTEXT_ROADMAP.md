@@ -2,7 +2,7 @@
 
 **Статус:** ядро full-context собрано и проверено на demo; впереди — эксплуатационные правки, объединение путей и уборка легаси. Инкорпорирует внешний аудит (2026-07).
 **Прогресс (2026-07-03):** Этап 1 ✓ (кэш: cached_tokens 0→17024) · Этап 2 ✓ (история) · 3.0–3.3 ✓ (parity, wiring, контакты, md_chunks) · 3.1c ✓ · **Этап 4 ✓ принят** (плановый вызов: flags-on smoke 24/24, risk 28/29 + r17 закрыт якорем с unit-доказательством, live 16/16; бывшие KNOWN зелёные). **3.4 ✓ принят (2026-07-03):** RAG-стек удалён (−10.6k строк), OpenAI-зависимость исчезла, дефолты флагов ON, композер — единственный content-путь; прогон БЕЗ флагов: product 24/24, risk 29/29, live 16/16. Следующие: остаток 3.1b (display chunk, ограничения клиники в KB, слоты), этап 5 (clarify), 6 (вертикали → pack), 7 (маркетинг-воронка), 8 (гигиена).
-**Связано:** `CURRENT_ARCHITECTURE.md`, `COMPOSER_ROADMAP.md` (Фазы 0–3), `COMPOSER_LIVE_EVAL.md`, `TECH_DEBT.md`.
+**Связано:** `CURRENT_ARCHITECTURE.md`, `ROUTING_MAP.md`, `TECH_DEBT.md`.
 
 ---
 
@@ -17,7 +17,7 @@
 
 - Один этап = один коммит/PR. Флаги по умолчанию OFF; старый путь не удалять до паритета на eval.
 - **Ветки создаёт владелец** — не запускать `git checkout -b`.
-- Тесты по §5 `COMPOSER_ROADMAP.md` (T1–T5): ассертить **структуру/путь**, не слова ответа; LLM мокать; golden не ослаблять.
+- Тесты для composer/full-context шагов: ассертить **структуру/путь**, не слова ответа; LLM мокать; golden не ослаблять.
 - **Live-eval гонять В ФОРГРАУНДЕ со всеми флагами** (иначе env не пробросится в фон):
   bash: `export FULLCTX_ON=1 COMPOSER_ON=1 SERVICE_SELECT_LLM_ON=1 ASPECT_PLANNER_LLM_ON=1 E2E_USE_TEST_CLIENT=1 PYTHONIOENCODING=utf-8`
   PowerShell: `$env:FULLCTX_ON="1"; $env:COMPOSER_ON="1"; $env:SERVICE_SELECT_LLM_ON="1"; $env:ASPECT_PLANNER_LLM_ON="1"; $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"`
@@ -113,7 +113,7 @@
 
 **3.2 — Контакты снять с embed-поиска.** Контактный путь сейчас зовёт `retrieve(q, topk=24)` + `pick_contacts_chunk` (`ask_turn.py:80`) — это embed-поиск на маршруте, который мы «оставляем как есть». Перевести на прямой `get_chunk_by_ref("clinic__info__contacts.md#korotko")` **до** удаления embed-поиска.
 
-**3.3 — Разделить embed-поиск и резолв ref→чанк.** Удаляется только **embed-поиск**: `retrieve`, rerank, alias-матрицы/`.npy`, arbiter. **`get_chunk_by_ref` — НЕ RAG и остаётся:** его используют ~15 выживающих мест (контакты-fallback `ask_turn.py:83`, price flow `price_flow.py:89/183/288`, **материализация карточек самого композера** `answer_packet_materialize.py:45`, payment/warranty appends `answer_plan_apply.py`, lead redirect `lead_flow.py:58`, continuation `pre_resolver_turn.py`, catalog_flow). Вынести `get_chunk_by_ref` в тонкий `core/md_chunks.py`, парсящий `clients/{id}/md/` напрямую — тогда `corpus.jsonl` и `build_index.py` тоже можно убрать, а правки md подхватываются без пересборки индекса.
+**3.3 — Разделить embed-поиск и резолв ref→чанк.** Удаляется только **embed-поиск**: `retrieve`, rerank, alias-матрицы/`.npy`, arbiter. **`get_chunk_by_ref` — НЕ RAG и остаётся:** его используют ~15 выживающих мест (контакты-fallback `ask_turn.py:83`, price flow `price_flow.py:89/183/288`, **материализация карточек самого композера** `answer_packet_materialize.py:45`, payment/warranty appends `answer_plan_apply.py`, lead redirect `lead_flow.py:58`, continuation `pre_resolver_turn.py`, catalog_flow). Вынести `get_chunk_by_ref` в тонкий `core/md_chunks.py`, парсящий `clients/{id}/md/` напрямую — тогда старые индексные артефакты тоже можно убрать, а правки md подхватываются без пересборки индекса.
 
 **3.4-0 — Сначала дефолты флагов ON (часть 3.5, переносится сюда).** Нельзя удалять легаси-путь, пока он дефолтный: `FULLCTX_ON`, `COMPOSER_ON`, `SERVICE_SELECT_LLM_ON`, `TURN_PLANNER_ON` → default "1" (env-переключатель в "0" остаётся как kill-switch). После — полный прогон уже БЕЗ выставления флагов (новые дефолты = прежний flags-on результат).
 
@@ -150,7 +150,7 @@
 
 ### Этап 5 — Clarify как structured output композера (не state machine)
 
-**Проблема:** Фаза 4 (`COMPOSER_ROADMAP.md`) спроектировала отдельную state machine с bucket-классификатором — избыточно для full-context.
+**Проблема:** старый composer roadmap спроектировал отдельную state machine с bucket-классификатором — избыточно для full-context.
 
 **Что делать:**
 - Композер (или плановый вызов из этапа 4) возвращает либо `answer`, либо `clarify { question, option_ids }`. Кнопки — по-прежнему из каталога (инвариант I3). State — крошечный: помнить, что задан вопрос-выбор + набор опций (переиспользовать паттерн lead-flow).
@@ -281,7 +281,7 @@
 
 ### Этап 8 — Гигиена и надёжность (можно параллельно)
 
-- **`data/cesi/bot.db` в git** — SQLite сессий, **потенциально телефоны лидов**. СНАЧАЛА посмотреть, что внутри; если PII — вынуть из истории git, не только `.gitignore`. Так же embeddings `.npy` (умрут с RAG), `eval_*_last.txt` из корня.
+- **`data/cesi/bot.db` в git** — SQLite сессий, **потенциально телефоны лидов**. СНАЧАЛА посмотреть, что внутри; если PII — вынуть из истории git, не только `.gitignore`. Так же старые бинарные артефакты индекса (умрут с RAG), `eval_*_last.txt` из корня.
 - **Логировать fail-open:** `except Exception: return None` в `composer_flow.py:160` и `_defer_group_price_via_price_route` — добавить `log_json` в каждый except (иначе падения композера в проде невидимы).
 - **Удалить мёртвый `core/claim_gate.py`** + ссылки в `run_composer_live_eval.py` (блок-лист снесён, файл остался).
 - **`_KB_CACHE` инвалидация по mtime** папки `clients/{id}/md/` (иначе правка md не видна до рестарта).

@@ -106,6 +106,13 @@ SITUATION_PRICE_ON = os.getenv("SITUATION_PRICE_ON", "0").lower() in (
     "yes",
 )
 
+# --- Composer clarify state (full-context roadmap stage 5) ---
+CLARIFY_STATE_ON = os.getenv("CLARIFY_STATE_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- LLM service selection in composer price path (step 2) ---
 SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "1").lower() in (
     "1",

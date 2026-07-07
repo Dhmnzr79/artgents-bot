@@ -5,6 +5,7 @@ from typing import Any
 
 from flask import request
 
+from config import CLARIFY_STATE_ON
 from contracts.ask_orchestration import AskOrchestrationResult
 from logging_setup import emit_bot_event, get_logger
 from orchestration.catalog_flow import (
@@ -34,6 +35,13 @@ from query_selector import select_price_service_route
 from query_selector import normalize_retrieval_query
 from source_routing import route_source, slim_source_route_payload
 from llm import LLM_FALLBACK_ANSWER
+from session import (
+    clear_pending_clarify,
+    get_pending_clarify,
+    increment_pending_clarify_reask,
+    pending_clarify_age,
+)
+from ux_builder import build_clarify_payload
 
 logger = get_logger("bot")
 
@@ -61,6 +69,85 @@ def _composer_fail_open_result(
         service_doc_id=None,
         service_track_user=True,
         service_route="composer_fallback",
+        decision_frame=decision_frame,
+    )
+
+
+def _pending_clarify_turn_result(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    intent: str,
+    decision_frame: dict | None,
+) -> AskOrchestrationResult | None:
+    if not CLARIFY_STATE_ON or not (q or "").strip():
+        return None
+    pending = get_pending_clarify(sid)
+    if not isinstance(pending, dict):
+        return None
+    from session import mem_get
+
+    st = mem_get(sid)
+    if pending_clarify_age(st) > 2:
+        clear_pending_clarify(sid)
+        return None
+    option_ids = {
+        str(x or "").strip()
+        for x in list(pending.get("option_service_ids") or [])
+        if str(x or "").strip()
+    }
+    if not option_ids:
+        clear_pending_clarify(sid)
+        return None
+    try:
+        from core.turn_planner_llm import turn_plan_from_ctx
+
+        plan = turn_plan_from_ctx()
+    except Exception:
+        plan = None
+    selected = str(getattr(plan, "service_id", None) or "").strip() if plan is not None else ""
+    if selected in option_ids:
+        clear_pending_clarify(sid)
+        return None
+    if intent == "contacts" or (selected and selected not in option_ids):
+        clear_pending_clarify(sid)
+        return None
+    # Легитимный новый вопрос (есть реальные аспекты или ценовой маршрут) —
+    # не перехватываем переспросом: отвечаем по существу, pending снимаем.
+    plan_route = str(getattr(plan, "route", None) or "").strip() if plan is not None else ""
+    plan_aspects = list(getattr(plan, "aspects", None) or []) if plan is not None else []
+    has_real_aspect = any(str(a or "").strip() not in ("", "overview") for a in plan_aspects)
+    if has_real_aspect or plan_route in ("price_lookup", "price_concern"):
+        clear_pending_clarify(sid)
+        return None
+    reask_count = int(pending.get("reask_count") or 0)
+    if reask_count >= 1:
+        clear_pending_clarify(sid)
+        return None
+    updated = increment_pending_clarify_reask(sid) or pending
+    question = str(updated.get("question") or pending.get("question") or "").strip()
+    option_service_ids = [
+        str(x or "").strip()
+        for x in list(updated.get("option_service_ids") or pending.get("option_service_ids") or [])
+        if str(x or "").strip()
+    ]
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload=build_clarify_payload(
+            question=question,
+            option_service_ids=option_service_ids,
+            sid=sid,
+            client_id=client_id,
+            reask_count=int(updated.get("reask_count") or 1),
+            route=str(updated.get("route") or pending.get("route") or ""),
+        ),
+        service_doc_id=None,
+        service_track_user=True,
+        service_route="composer_clarify_reask",
         decision_frame=decision_frame,
     )
 
@@ -103,6 +190,16 @@ def orchestrate_routing_after_resolver(
         request.ctx["retrieval_scope_topic"] = None
         request.ctx["retrieval_scope_guard_reason"] = "none"
         request.ctx["effective_intent"] = "contacts"
+
+    pending_clarify_result = _pending_clarify_turn_result(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        intent=intent,
+        decision_frame=decision_frame,
+    )
+    if pending_clarify_result is not None:
+        return pending_clarify_result
 
     if intent == "contacts":
         picked = get_chunk_by_ref(CONTACTS_CHUNK_REF, client_id=client_id)

@@ -490,6 +490,204 @@ def test_generate_fullctx_loads_history_before_current_turn(monkeypatch):
     assert user.count(current) == 1
 
 
+def test_fullctx_composer_clarify_payload_and_prompt_gate(monkeypatch):
+    import pytest
+
+    from contracts.turn_plan import TurnPlan
+    from core.clarify_state import CLARIFY_ALLOW_INSTRUCTION
+    from core.turn_planner_llm import publish_turn_plan
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    monkeypatch.setattr("llm.CLARIFY_STATE_ON", True)
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+    captured: dict = {}
+
+    def _fake_create(**kwargs):
+        captured["messages"] = kwargs["messages"]
+
+        class _Msg:
+            content = json.dumps(
+                {
+                    "clarify": {
+                        "question": "Уточню: коронка на свой зуб или на имплант?",
+                        "option_service_ids": [
+                            "zirconia_crowns",
+                            "implant_supported_prosthetics",
+                        ],
+                    }
+                },
+                ensure_ascii=False,
+            )
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="price_lookup",
+                aspects=["price"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=True,
+            )
+        )
+        answer, meta = generate_answer_from_packet_fullctx(
+            "Сколько стоит коронка?",
+            "База знаний про коронки.",
+            ["price"],
+            [],
+            {"client_id": "demo"},
+            "clarify-composer-valid",
+        )
+
+    assert answer == "Уточню: коронка на свой зуб или на имплант?"
+    assert meta.get("composer_used") is True
+    assert meta.get("clarify") == {
+        "question": "Уточню: коронка на свой зуб или на имплант?",
+        "option_service_ids": ["zirconia_crowns", "implant_supported_prosthetics"],
+    }
+    assert CLARIFY_ALLOW_INSTRUCTION in captured["messages"][1]["content"]
+    assert CLARIFY_ALLOW_INSTRUCTION not in captured["messages"][0]["content"]
+
+
+def test_fullctx_composer_invalid_clarify_fail_open(monkeypatch):
+    import pytest
+
+    from contracts.turn_plan import TurnPlan
+    from core.turn_planner_llm import publish_turn_plan
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    monkeypatch.setattr("llm.CLARIFY_STATE_ON", True)
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+
+    def _fake_create(**_kwargs):
+        class _Msg:
+            content = json.dumps(
+                {
+                    "clarify": {
+                        "question": "Что уточнить?",
+                        "option_service_ids": ["not_in_catalog", "zirconia_crowns"],
+                    }
+                },
+                ensure_ascii=False,
+            )
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="price_lookup",
+                aspects=["price"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=True,
+            )
+        )
+        _answer, meta = generate_answer_from_packet_fullctx(
+            "Сколько стоит коронка?",
+            "База знаний про коронки.",
+            ["price"],
+            [],
+            {"client_id": "demo"},
+            "clarify-composer-invalid",
+        )
+
+    assert meta.get("composer_used") is False
+
+
+def test_fullctx_composer_flags_off_no_clarify_branch(monkeypatch):
+    import pytest
+
+    from contracts.turn_plan import TurnPlan
+    from core.clarify_state import CLARIFY_ALLOW_INSTRUCTION
+    from core.turn_planner_llm import publish_turn_plan
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    monkeypatch.setattr("llm.CLARIFY_STATE_ON", False)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="price_lookup",
+                aspects=["price"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=True,
+            )
+        )
+        messages = build_messages_for_packet_composer_fullctx(
+            "болит зуб, сколько будет стоить лечение?",
+            "База знаний.",
+            ["price"],
+            [],
+            {"client_id": "demo"},
+            "clarify-flags-off",
+        )
+
+    assert CLARIFY_ALLOW_INSTRUCTION not in messages[0]["content"]
+    assert CLARIFY_ALLOW_INSTRUCTION not in messages[1]["content"]
+
+
+def test_fullctx_composer_diagnostic_pair_gets_user_gate_only(monkeypatch):
+    import pytest
+
+    from contracts.turn_plan import TurnPlan
+    from core.clarify_state import CLARIFY_ALLOW_INSTRUCTION
+    from core.turn_planner_llm import publish_turn_plan
+
+    app = pytest.importorskip("flask").Flask(__name__)
+    monkeypatch.setattr("llm.CLARIFY_STATE_ON", True)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        publish_turn_plan(
+            TurnPlan(
+                route="price_lookup",
+                aspects=["price", "pain"],
+                service_id=None,
+                followup_of=None,
+                needs_clarify=True,
+            )
+        )
+        messages = build_messages_for_packet_composer_fullctx(
+            "болит зуб, сколько будет стоить лечение?",
+            "База знаний про кариес и пульпит.",
+            ["price", "pain"],
+            [],
+            {"client_id": "demo"},
+            "clarify-diagnostic-pair",
+        )
+
+    assert CLARIFY_ALLOW_INSTRUCTION in messages[1]["content"]
+    assert CLARIFY_ALLOW_INSTRUCTION not in messages[0]["content"]
+
+
 def test_fullctx_composer_system_prompt_base_as_source_of_truth():
     from core.knowledge_base import assemble_client_knowledge_base
 

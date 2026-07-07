@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from config import COMPOSER_ON, FULLCTX_ON, SERVICE_SELECT_LLM_ON
+from config import CLARIFY_STATE_ON, COMPOSER_ON, FULLCTX_ON, SERVICE_SELECT_LLM_ON
 from contracts.answer_packet import MaterializedCard
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.answer_plan import AnswerPlan
@@ -18,6 +18,7 @@ from core.service_selector_llm import classify_service
 from core.turn_planner_llm import turn_plan_from_ctx
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
 from logging_setup import get_logger, log_json
+from ux_builder import build_clarify_payload
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
 _JAW_GROUP_PATIENT_SCOPES = frozenset({"full_jaw", "upper_jaw"})
@@ -149,7 +150,18 @@ def try_composer_overlay(
             # Только чистый price требует услугу (цена = карточка из pricebook);
             # included без услуги композер отвечает из базы (what_included FAQ).
             if "price" in aspects and service_id_override is None:
-                return None
+                # needs_clarify уступает defer только там, где у прайса НЕТ
+                # детерминированного группового ответа (обзор имплант-протоколов
+                # для «сколько стоит имплантация?» неприкосновенен — D1).
+                clarify_may_ask = (
+                    CLARIFY_STATE_ON
+                    and bool(turn_plan.needs_clarify)
+                    and not _defer_group_price_via_price_route(
+                        q=q, client_id=client_id, sid=sid
+                    )
+                )
+                if not clarify_may_ask:
+                    return None
 
         if has_price_aspect and _composer_should_defer_jaw_scope_price(q):
             return None
@@ -212,6 +224,41 @@ def try_composer_overlay(
         if not profile.get("composer_used"):
             return None
         publish_answer_packet(packet)
+        clarify = profile.get("clarify")
+        if isinstance(clarify, dict):
+            question = str(clarify.get("question") or answer or "").strip()
+            option_service_ids = [
+                str(x or "").strip()
+                for x in list(clarify.get("option_service_ids") or [])
+                if str(x or "").strip()
+            ]
+            if question and option_service_ids:
+                clarify_route = str(getattr(turn_plan, "route", None) or "").strip()
+                from session import set_pending_clarify
+
+                set_pending_clarify(
+                    sid,
+                    question=question,
+                    option_service_ids=option_service_ids,
+                    route=clarify_route,
+                )
+                return AskOrchestrationResult(
+                    kind="service_reply",
+                    q=q,
+                    sid=sid,
+                    client_id=client_id,
+                    service_payload=build_clarify_payload(
+                        question=question,
+                        option_service_ids=option_service_ids,
+                        sid=sid,
+                        client_id=client_id,
+                        route=clarify_route,
+                    ),
+                    service_doc_id=None,
+                    service_track_user=True,
+                    service_route="composer_clarify",
+                    decision_frame=decision_frame,
+                )
         return AskOrchestrationResult(
             kind="composer",
             q=q,

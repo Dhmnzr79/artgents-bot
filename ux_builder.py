@@ -3,6 +3,7 @@ import os
 import re
 
 from config import default_cta_dict
+from core.clarify_state import active_service_catalog, service_ref
 from core.numeric_fact_gate import apply_numeric_fact_gate
 from llm import generate_facts_card_answer
 from meta_loader import get_doc_path
@@ -96,6 +97,61 @@ def build_cta(meta: dict, client_id: str | None = None):
 
 def pick_relevant_offer(meta: dict):
     return None
+
+
+def build_clarify_quick_replies(
+    option_service_ids: list[str],
+    *,
+    client_id: str | None = None,
+    route: str = "",
+) -> list[dict[str, str]]:
+    # Ценовое намерение → кнопки ведут в прайс-флоу (price:<service_id>),
+    # иначе клик отдаёт контентную md-карточку без цен.
+    price_mode = str(route or "").strip().lower() in ("price_lookup", "price_concern")
+    catalog = active_service_catalog(client_id)
+    replies: list[dict[str, str]] = []
+    for raw_id in option_service_ids or []:
+        service_id = str(raw_id or "").strip()
+        entry = catalog.get(service_id)
+        if not isinstance(entry, dict):
+            continue
+        label = str(entry.get("title") or service_id).strip()
+        ref = f"price:{service_id}" if price_mode else service_ref(entry)
+        if label and ref:
+            replies.append({"label": label, "ref": ref})
+    return replies
+
+
+def build_clarify_payload(
+    *,
+    question: str,
+    option_service_ids: list[str],
+    sid: str,
+    client_id: str | None = None,
+    reask_count: int = 0,
+    route: str = "",
+) -> dict:
+    quick_replies = build_clarify_quick_replies(
+        option_service_ids, client_id=client_id, route=route
+    )
+    return {
+        "answer": str(question or "").strip(),
+        "quick_replies": quick_replies,
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": {
+            "sid": sid,
+            "client_id": client_id,
+            "answer_path": "clarify",
+            "clarify": {
+                "question": str(question or "").strip(),
+                "option_service_ids": list(option_service_ids or []),
+                "reask_count": int(reask_count or 0),
+            },
+        },
+    }
 
 
 def dedup_refs_vs_cta(quick_refs: list, cta_btn: dict | None) -> list:

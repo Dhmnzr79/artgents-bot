@@ -118,6 +118,49 @@ def test_plan_turn_followup_price_uses_history(monkeypatch):
     assert user.count("а сколько стоит?") == 1
 
 
+def test_plan_turn_includes_pending_clarify_context(monkeypatch):
+    from core.clarify_state import TURN_PLANNER_PENDING_CLARIFY_INSTRUCTION
+    from session import mem_reset, set_pending_clarify
+
+    sid = "turn-planner-pending-clarify"
+    mem_reset(sid)
+    set_pending_clarify(
+        sid,
+        question="Уточню: коронка на свой зуб или на имплант?",
+        option_service_ids=["zirconia_crowns", "implant_supported_prosthetics"],
+    )
+    monkeypatch.setattr("core.turn_planner_llm.CLARIFY_STATE_ON", True)
+    monkeypatch.setattr("core.turn_planner_llm.build_compact_service_catalog", lambda _cid: [
+        {"service_id": "zirconia_crowns", "title": "Коронки из диоксида циркония", "about": "на свой зуб"},
+        {"service_id": "implant_supported_prosthetics", "title": "Протезирование на имплантах", "about": "на имплант"},
+    ])
+    monkeypatch.setattr(
+        "core.turn_planner_llm._allowed_pricebook_filters",
+        lambda _cid: (frozenset(), frozenset()),
+    )
+    captured = _mock_llm(
+        monkeypatch,
+        {
+            "route": "price_lookup",
+            "aspects": ["price"],
+            "service_id": "implant_supported_prosthetics",
+            "followup_of": None,
+            "needs_clarify": False,
+            "patient_situation": None,
+            "brand_filter": None,
+        },
+    )
+
+    plan = plan_turn("на имплант", sid, "demo")
+
+    assert plan is not None
+    assert plan.service_id == "implant_supported_prosthetics"
+    user = captured["messages"][1]["content"]
+    assert TURN_PLANNER_PENDING_CLARIFY_INSTRUCTION.split("{question}", 1)[0] in user
+    assert "zirconia_crowns" in user
+    assert "implant_supported_prosthetics" in user
+
+
 def test_plan_turn_topic_switch_after_focus_splits_followup_and_service(monkeypatch):
     from session import mem_add_bot, mem_add_user, mem_reset
 

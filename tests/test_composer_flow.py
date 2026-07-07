@@ -549,6 +549,83 @@ def test_composer_should_defer_group_price_helpers():
     assert _composer_should_defer_group_price("q", {"mode": "matched"}) is False
 
 
+def test_defer_group_price_exception_logs_fail_open(monkeypatch):
+    from orchestration.composer_flow import _defer_group_price_via_price_route
+
+    calls: list[dict[str, Any]] = []
+
+    def _route(*_a, **_k):
+        raise RuntimeError("route exploded")
+
+    def _log(_logger, message, **fields):
+        calls.append({"message": message, **fields})
+
+    monkeypatch.setattr("query_selector.select_price_service_route", _route)
+    monkeypatch.setattr("orchestration.composer_flow.log_json", _log)
+
+    assert (
+        _defer_group_price_via_price_route(q="q", client_id="demo", sid="sid-1")
+        is False
+    )
+    assert calls == [
+        {
+            "message": "composer_defer_group_price_failed",
+            "client_id": "demo",
+            "sid": "sid-1",
+            "err": "route exploded",
+        }
+    ]
+
+
+def test_composer_overlay_exception_logs_fail_open(monkeypatch):
+    from orchestration.composer_flow import try_composer_overlay
+
+    calls: list[dict[str, Any]] = []
+
+    def _packet(*_a, **_k):
+        raise RuntimeError("packet exploded")
+
+    def _log(_logger, message, **fields):
+        calls.append({"message": message, **fields})
+
+    monkeypatch.setattr("orchestration.composer_flow.COMPOSER_ON", True)
+    monkeypatch.setattr("orchestration.composer_flow.FULLCTX_ON", False)
+    monkeypatch.setattr("orchestration.composer_flow.SERVICE_SELECT_LLM_ON", False)
+    monkeypatch.setattr(
+        "orchestration.composer_flow._defer_group_price_via_price_route",
+        lambda **_k: False,
+    )
+    monkeypatch.setattr("orchestration.composer_flow.assemble_answer_packet", _packet)
+    monkeypatch.setattr("orchestration.composer_flow.log_json", _log)
+
+    plan = AnswerPlan(
+        aspects=["price", "pain"],
+        primary_aspect="price",
+        service_id="all_on_4",
+        topic="implantation",
+        append=["price_offer"],
+    )
+    result = try_composer_overlay(
+        q="q",
+        sid="sid-2",
+        client_id="demo",
+        intent="price_lookup",
+        plan=plan,
+        sr=_sr(service_id="all_on_4"),
+        decision=None,
+        decision_frame={},
+    )
+    assert result is None
+    assert calls == [
+        {
+            "message": "composer_overlay_failed",
+            "client_id": "demo",
+            "sid": "sid-2",
+            "err": "packet exploded",
+        }
+    ]
+
+
 def test_telemetry_answer_path_for_chunk_route():
     from chunk_responder import _telemetry_answer_path_for_chunk
 

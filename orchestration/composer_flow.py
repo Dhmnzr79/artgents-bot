@@ -17,9 +17,12 @@ from core.knowledge_base import assemble_client_knowledge_base
 from core.service_selector_llm import classify_service
 from core.turn_planner_llm import turn_plan_from_ctx
 from llm import generate_answer_from_packet, generate_answer_from_packet_fullctx
+from logging_setup import get_logger, log_json
 
 _GROUP_PRICE_DEFER_MODES = frozenset({"group_overview", "unit_clarify", "clarify"})
 _JAW_GROUP_PATIENT_SCOPES = frozenset({"full_jaw", "upper_jaw"})
+
+logger = get_logger("bot")
 
 
 def _query_names_specific_implant_protocol(q: str) -> bool:
@@ -55,7 +58,14 @@ def _defer_group_price_via_price_route(
             intent_override="price_lookup",
         )
         return _composer_should_defer_group_price(q, pr)
-    except Exception:
+    except Exception as exc:
+        log_json(
+            logger,
+            "composer_defer_group_price_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(exc)[:300],
+        )
         return False
 
 
@@ -214,5 +224,12 @@ def try_composer_overlay(
             decision_frame=decision_frame,
             composer_primary_chunk_ref=primary_chunk_ref,
         )
-    except Exception:
+    except Exception as exc:
+        log_json(
+            logger,
+            "composer_overlay_failed",
+            client_id=client_id,
+            sid=sid,
+            err=str(exc)[:300],
+        )
         return None

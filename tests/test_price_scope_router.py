@@ -4,40 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from core.price_scope import PriceScopeResult, detect_price_scope
+from core.price_scope import detect_price_scope
+from price_query_cases import (
+    FULL_JAW_CASES,
+    GENERIC_CASES,
+    JAW_FORBIDDEN,
+    ONE_TOOTH_CASES,
+    SPECIFIC_CASES,
+    UPPER_JAW_CASES,
+)
 from query_selector import select_price_service_route
-
-ONE_TOOTH_CASES = [
-    "А сколько будет стоить имплантация если нет одного зуба?",
-    "Сколько стоит имплантация если нет одного зуба?",
-    "Нет одного зуба, сколько стоит имплант?",
-    "Сколько стоит восстановить один зуб имплантом?",
-    "Сколько стоит поставить один имплант?",
-]
-
-GENERIC_CASES = [
-    "Сколько стоит имплантация?",
-    "Сколько стоит имплантация зуба?",
-]
-
-FULL_JAW_CASES = [
-    "Сколько стоит имплантация всей челюсти?",
-    "Сколько стоит вставить все зубы под ключ?",
-    "Сколько стоит восстановить всю челюсть?",
-]
-
-SPECIFIC_CASES = [
-    ("Сколько стоит All-on-4?", "all_on_4"),
-    ("Сколько стоит All-on-6?", "all_on_6"),
-    ("Сколько стоит скуловая имплантация?", "zygomatic_implants"),
-    ("Сколько стоят птеригоидные импланты?", "pterygoid_implants"),
-    (
-        "Удалить зуб и сразу поставить имплант — сколько стоит?",
-        "one_stage",
-    ),
-]
-
-JAW_FORBIDDEN = frozenset({"all_on_4", "all_on_6", "zygomatic_implants"})
 
 
 @pytest.mark.parametrize("question", ONE_TOOTH_CASES)
@@ -76,8 +52,8 @@ def test_full_jaw_scope_and_overview(question: str):
     assert route.get("group_id") == "full_jaw"
 
 
-def test_upper_jaw_scope():
-    question = "Сколько стоит имплантация всей верхней челюсти?"
+@pytest.mark.parametrize("question", UPPER_JAW_CASES)
+def test_upper_jaw_scope(question: str):
     scope = detect_price_scope(question, client_id="demo")
     assert scope.kind == "upper_jaw"
     assert scope.group_id == "upper_jaw"

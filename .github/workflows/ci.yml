@@ -13,6 +13,7 @@ on:
       - master
       - "fullctx**"
       - "feature/**"
+      - "feat/**"
   pull_request:
   workflow_dispatch:
 
@@ -70,6 +71,8 @@ jobs:
             tests/test_aspect_metadata.py \
             tests/test_price_offers.py \
             tests/test_price_group_overview.py \
+            tests/test_price_scope_router.py \
+            tests/test_price_layer_parity.py \
             tests/test_price_ref_routing.py \
             tests/test_pricebook_golden.py \
             -q --tb=short

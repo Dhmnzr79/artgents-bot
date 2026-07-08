@@ -1,0 +1,145 @@
+"""Price gate: symptom-only price questions → pinned consult invitation (demo/medzone)."""
+from __future__ import annotations
+
+from typing import Any
+
+from contracts.ask_orchestration import AskOrchestrationResult
+from core.client_config_loader import load_ui_bundle, price_symptom_consult_enabled
+from core.explicit_service import explicit_service_mentioned
+from core.patient_scope_cues import has_price_intent
+from logging_setup import get_logger, log_json
+from query_selector import (
+    _dialog_focus_allows_price_session_context,
+    _dialog_focus_for_price_route,
+    catalog_service_session_context,
+    match_service_from_catalog,
+    price_lookup_allows_session_context,
+)
+from ux_builder import build_price_symptom_consult_details_payload, build_price_symptom_consult_payload
+
+logger = get_logger("bot")
+
+CONSULT_SYMPTOM_DETAILS_REF = "consult:symptom_price_details"
+
+
+def price_query_has_session_focus(
+    *,
+    q: str,
+    sid: str | None,
+    client_id: str | None,
+) -> bool:
+    ctx = catalog_service_session_context(sid, client_id)
+    if not ctx:
+        return False
+    match = match_service_from_catalog(q, client_id=client_id)
+    focus = _dialog_focus_for_price_route(q, sid=sid, client_id=client_id)
+    return bool(
+        price_lookup_allows_session_context(q, match, ctx)
+        or _dialog_focus_allows_price_session_context(focus, ctx)
+    )
+
+
+def should_gate_price_to_consult(
+    *,
+    q: str,
+    sid: str | None,
+    client_id: str | None,
+    price_route: dict[str, Any] | None = None,
+) -> bool:
+    if not price_symptom_consult_enabled(client_id):
+        return False
+    if not has_price_intent(q):
+        return False
+    if price_route is not None:
+        intent = str(price_route.get("intent") or "")
+        if intent != "price_lookup":
+            return False
+        mode = str(price_route.get("mode") or "")
+        if mode in {"group_overview", "unit_clarify", "other"}:
+            return False
+    if explicit_service_mentioned(q, client_id) is not None:
+        return False
+    if price_query_has_session_focus(q=q, sid=sid, client_id=client_id):
+        return False
+    return True
+
+
+def build_price_symptom_consult_orchestration(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    decision_frame: dict[str, Any] | None,
+    price_route: dict[str, Any] | None = None,
+) -> AskOrchestrationResult:
+    payload = build_price_symptom_consult_payload(sid=sid, client_id=client_id)
+    log_json(
+        logger,
+        "price_symptom_consult",
+        client_id=client_id,
+        sid=sid,
+        price_mode=str((price_route or {}).get("mode") or ""),
+        matched_service_id=(price_route or {}).get("matched_service_id"),
+    )
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload=payload,
+        service_doc_id=None,
+        service_track_user=True,
+        service_route="price_symptom_consult",
+        decision_frame=decision_frame,
+    )
+
+
+def try_price_symptom_consult_orchestration(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    decision_frame: dict[str, Any] | None,
+    price_route: dict[str, Any] | None = None,
+) -> AskOrchestrationResult | None:
+    if not should_gate_price_to_consult(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        price_route=price_route,
+    ):
+        return None
+    return build_price_symptom_consult_orchestration(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        decision_frame=decision_frame,
+        price_route=price_route,
+    )
+
+
+def orchestrate_consult_symptom_ref(
+    ref: str,
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    decision_frame: dict[str, Any] | None = None,
+) -> AskOrchestrationResult | None:
+    if (ref or "").strip() != CONSULT_SYMPTOM_DETAILS_REF:
+        return None
+    if not price_symptom_consult_enabled(client_id):
+        return None
+    _ = load_ui_bundle(client_id)
+    payload = build_price_symptom_consult_details_payload(sid=sid, client_id=client_id)
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload=payload,
+        service_doc_id=None,
+        service_track_user=True,
+        service_route="price_symptom_consult",
+        decision_frame=decision_frame,
+    )

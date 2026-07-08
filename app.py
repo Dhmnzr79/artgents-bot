@@ -132,6 +132,8 @@ def _stamp_service_answer_path(payload: dict, route: str | None) -> None:
     r = (route or "").strip().lower()
     if r in {"price_lookup", "price_concern"}:
         payload.setdefault("meta", {})["answer_path"] = "price"
+    elif r == "price_symptom_consult":
+        payload.setdefault("meta", {})["answer_path"] = "price_symptom_consult"
 
 
 def _service_reply(

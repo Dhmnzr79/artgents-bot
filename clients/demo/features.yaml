@@ -18,6 +18,9 @@ consult_nudge:
 situation:
   enabled: true
 
+price_symptom_consult:
+  enabled: false
+
 messaging:
   free_consultation: true
 

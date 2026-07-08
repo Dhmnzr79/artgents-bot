@@ -189,6 +189,20 @@ def try_composer_overlay(
                 or str(getattr(sr, "service_id", None) or plan.service_id or "").strip()
                 or None
             )
+
+        if has_price_aspect and not service_id:
+            from core.price_symptom_consult import try_price_symptom_consult_orchestration
+
+            consult = try_price_symptom_consult_orchestration(
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                decision_frame=decision_frame,
+                price_route={"intent": "price_lookup", "mode": "matched"},
+            )
+            if consult is not None:
+                return consult
+
         primary_chunk_ref = str(getattr(sr, "ref", None) or "").strip() or None
         route_hint = str(intent or "content").strip() or "content"
         gate_meta: dict[str, Any] = dict(meta) if isinstance(meta, dict) else {}

@@ -33,7 +33,19 @@ def _service_reply_from_price_route(
     decision_frame: dict[str, Any] | None,
     service_route: str,
 ) -> AskOrchestrationResult:
+    from core.price_symptom_consult import try_price_symptom_consult_orchestration
+
     intent = str(price_route.get("intent") or "price_lookup")
+    if intent == "price_lookup" and str(price_route.get("mode") or "") == "clarify":
+        gated = try_price_symptom_consult_orchestration(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            decision_frame=decision_frame,
+            price_route=price_route,
+        )
+        if gated is not None:
+            return gated
     request.ctx["effective_intent"] = intent
     service_id = str(price_route.get("matched_service_id") or "") or None
     service = price_route.get("service") if isinstance(price_route.get("service"), dict) else {}
@@ -75,6 +87,17 @@ def price_matched_from_route(
     decision,
     decision_frame: dict[str, Any] | None,
 ) -> AskOrchestrationResult:
+    from core.price_symptom_consult import try_price_symptom_consult_orchestration
+
+    gated = try_price_symptom_consult_orchestration(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        decision_frame=decision_frame,
+        price_route=price_route,
+    )
+    if gated is not None:
+        return gated
     intent = str(price_route.get("intent") or "other")
     request.ctx["effective_intent"] = str(intent)
     service = price_route.get("service") or {}

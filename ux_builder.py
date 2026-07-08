@@ -762,6 +762,62 @@ def build_price_concern_payload(
     }
 
 
+def build_price_symptom_consult_payload(*, sid: str, client_id: str | None) -> dict:
+    from core.client_config_loader import load_price_symptom_consult_copy
+    from core.price_symptom_consult import CONSULT_SYMPTOM_DETAILS_REF
+    from flow_handlers import LEAD_BOOKING_REF
+
+    copy = load_price_symptom_consult_copy(client_id)
+    return {
+        "answer": copy.core_answer,
+        "quick_replies": [
+            {"label": copy.book_label, "ref": LEAD_BOOKING_REF},
+            {"label": copy.details_label, "ref": CONSULT_SYMPTOM_DETAILS_REF},
+        ],
+        "cta": {"text": copy.book_label, "action": "lead"},
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": {
+            "sid": sid,
+            "client_id": client_id,
+            "intent": "price_lookup",
+            "matched_service_id": None,
+            "route_source": "price_symptom_consult",
+            "fallback_reason": "symptom_price_no_explicit_service",
+            "followups": [],
+            "ui_source_family": "price_symptom_consult",
+            "answer_path": "price_symptom_consult",
+        },
+    }
+
+
+def build_price_symptom_consult_details_payload(*, sid: str, client_id: str | None) -> dict:
+    from core.client_config_loader import load_price_symptom_consult_copy
+    from flow_handlers import LEAD_BOOKING_REF
+
+    copy = load_price_symptom_consult_copy(client_id)
+    return {
+        "answer": copy.details_answer,
+        "quick_replies": [{"label": copy.book_label, "ref": LEAD_BOOKING_REF}],
+        "cta": {"text": copy.book_label, "action": "lead"},
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": {
+            "sid": sid,
+            "client_id": client_id,
+            "intent": "price_lookup",
+            "matched_service_id": None,
+            "route_source": "price_symptom_consult",
+            "fallback_reason": "symptom_price_consult_details",
+            "followups": [],
+            "ui_source_family": "price_symptom_consult",
+            "answer_path": "price_symptom_consult",
+        },
+    }
+
+
 def build_price_resolution_payload(
     *,
     sid: str,

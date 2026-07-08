@@ -34,6 +34,7 @@ from orchestration.route_guards import (
 )
 from core.price_ref_routing import orchestrate_price_widget_ref
 from core.promo_overview import build_promo_overview_payload, is_direct_promo_question
+from core.price_symptom_consult import orchestrate_consult_symptom_ref
 from policy import continuation_only_phrase, continuation_without_context
 from core.md_chunks import get_chunk_by_ref
 from session import (
@@ -288,6 +289,15 @@ def run_pre_resolver_turn(
         )
         if price_from_ref is not None:
             return price_from_ref
+        consult_from_ref = orchestrate_consult_symptom_ref(
+            ref,
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            decision_frame=decision_frame,
+        )
+        if consult_from_ref is not None:
+            return consult_from_ref
         ch = get_chunk_by_ref(ref, client_id=client_id)
         if ch:
             return AskOrchestrationResult(

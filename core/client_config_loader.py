@@ -443,6 +443,14 @@ def consult_nudge_enabled(client_id: str | None) -> bool:
     return feature_flag(client_id, "consult_nudge", "enabled", default=True)
 
 
+def price_symptom_consult_enabled(client_id: str | None) -> bool:
+    from config import PRICE_SYMPTOM_CONSULT_ON
+
+    if not PRICE_SYMPTOM_CONSULT_ON:
+        return False
+    return feature_flag(client_id, "price_symptom_consult", "enabled", default=False)
+
+
 def situation_enabled(client_id: str | None) -> bool:
     return feature_flag(client_id, "situation", "enabled", default=True)
 
@@ -499,6 +507,40 @@ def _parse_menu(raw: Any, *, default_answer: str) -> UiMenu:
         quick_replies=_parse_quick_replies(raw.get("quick_replies")),
         cta_text=cta_text,
         cta_action=cta_action,
+    )
+
+
+@dataclass(frozen=True)
+class PriceSymptomConsultCopy:
+    core_answer: str
+    details_answer: str
+    book_label: str
+    details_label: str
+
+
+_DEFAULT_PRICE_SYMPTOM_CORE = (
+    "Чтобы назвать точную цену, нужен осмотр — по описанию не определить. "
+    "Консультация у нашего врача — бесплатно, поможем с налоговым вычетом. "
+    "Записать вас?"
+)
+_DEFAULT_PRICE_SYMPTOM_DETAILS = (
+    "Осмотр, КТ при необходимости, точный план и фиксированная цена. "
+    "~30 минут, ни к чему не обязывает."
+)
+
+
+def load_price_symptom_consult_copy(client_id: str | None) -> PriceSymptomConsultCopy:
+    ui = load_ui_raw(client_id)
+    block = ui.get("price_symptom_consult") if isinstance(ui.get("price_symptom_consult"), dict) else {}
+    return PriceSymptomConsultCopy(
+        core_answer=str(block.get("core_answer") or _DEFAULT_PRICE_SYMPTOM_CORE).strip()
+        or _DEFAULT_PRICE_SYMPTOM_CORE,
+        details_answer=str(block.get("details_answer") or _DEFAULT_PRICE_SYMPTOM_DETAILS).strip()
+        or _DEFAULT_PRICE_SYMPTOM_DETAILS,
+        book_label=str(block.get("book_label") or "Записаться на бесплатную консультацию").strip()
+        or "Записаться на бесплатную консультацию",
+        details_label=str(block.get("details_label") or "Что будет на консультации").strip()
+        or "Что будет на консультации",
     )
 
 

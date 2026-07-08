@@ -190,6 +190,36 @@
       "expected_amounts": [],
       "expected_mentions": ["кариес", "пульпит"],
       "forbidden_substrings": ["кариес или пульпит?", "у вас кариес или пульпит"]
+    },
+    {
+      "id": "G1",
+      "group": "G",
+      "question": "шатается зуб, сколько стоит?",
+      "client_id": "demo",
+      "expected_path": "price_symptom_consult",
+      "expected_aspects": ["price"],
+      "expected_amounts": [],
+      "requires_price_symptom_consult": true
+    },
+    {
+      "id": "G2",
+      "group": "G",
+      "question": "болит зуб, сколько лечение?",
+      "client_id": "demo",
+      "expected_path": "price",
+      "expected_aspects": ["price"],
+      "expected_amounts": [],
+      "requires_price_symptom_consult": true
+    },
+    {
+      "id": "G3",
+      "group": "G",
+      "question": "Сколько стоит all-on-4?",
+      "client_id": "demo",
+      "expected_path": "composer",
+      "expected_aspects": ["price"],
+      "expected_amounts": [318000, 368000, 428000],
+      "requires_price_symptom_consult": true
     }
   ]
 }

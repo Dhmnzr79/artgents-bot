@@ -11,6 +11,7 @@ LeadTurnKind = Literal[
     "meta_cancel",
     "meta_resume",
     "content",
+    "booking_date",
     "defer",
     "unclear",
 ]

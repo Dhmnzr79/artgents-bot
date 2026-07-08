@@ -81,6 +81,7 @@ def _fresh_defaults() -> dict:
         "lead_return_doc_id": "",
         "lead_interrupt_kind": "",
         "lead_paused_answer_count": 0,
+        "lead_preferred_datetime": "",
         "booking_intent_ever": False,
         "anti_spam_redirect_shown": False,
         "lead_pending_name": "",
@@ -776,6 +777,17 @@ def set_situation_note(session_id: str, note: str) -> None:
         _persist_unlocked(session_id, st)
 
 
+def set_lead_preferred_datetime(session_id: str, preference: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_preferred_datetime"] = (preference or "").strip()
+        _persist_unlocked(session_id, st)
+
+
+def get_lead_preferred_datetime(session_id: str) -> str:
+    return (mem_get(session_id).get("lead_preferred_datetime") or "").strip()
+
+
 def set_lead_intent(session_id: str, intent: str) -> None:
     with _lock:
         st = mem_get(session_id)
@@ -1001,6 +1013,7 @@ def clear_lead_pii(session_id: str) -> None:
         prof.pop("phone", None)
         st["profile"] = prof
         st["situation_note"] = ""
+        st["lead_preferred_datetime"] = ""
         st["lead_pending_name"] = ""
         st["lead_resume_step"] = ""
         st["lead_return_doc_id"] = ""

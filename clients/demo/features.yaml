@@ -21,6 +21,9 @@ situation:
 price_symptom_consult:
   enabled: false
 
+booking_date_defer:
+  enabled: false
+
 messaging:
   free_consultation: true
 

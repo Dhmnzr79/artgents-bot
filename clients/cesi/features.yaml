@@ -23,3 +23,6 @@ messaging:
 
 ingress:
   strict: true
+
+booking_date_defer:
+  enabled: false

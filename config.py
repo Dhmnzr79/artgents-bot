@@ -113,6 +113,13 @@ PRICE_SYMPTOM_CONSULT_ON = os.getenv("PRICE_SYMPTOM_CONSULT_ON", "0").lower() in
     "yes",
 )
 
+# --- Lead booking date defer (no slot confirmation without schedule; default off) ---
+BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Composer clarify state (full-context roadmap stage 5) ---
 CLARIFY_STATE_ON = os.getenv("CLARIFY_STATE_ON", "0").lower() in (
     "1",

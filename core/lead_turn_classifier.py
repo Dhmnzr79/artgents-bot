@@ -13,6 +13,7 @@ from lead_interrupt import (
     parse_lead_defer,
     parse_lead_meta_pause,
 )
+from core.booking_date_defer import should_defer_booking_date_confirmation
 from name_gate import accept_lead_name
 from policy import PRICE_CONCERN_RE, contacts_intent, price_intent
 from session import extract_phone, normalize_phone
@@ -91,6 +92,9 @@ def classify_lead_active_turn(
 
     if parse_lead_defer(s) or (PRICE_CONCERN_RE.search(s) and not price_intent(s)):
         return LeadTurnDecision(kind="defer", confidence=0.85)
+
+    if should_defer_booking_date_confirmation(q=s, client_id=client_id, resume_step=step, sid=sid):
+        return LeadTurnDecision(kind="booking_date", confidence=1.0)
 
     content = _classify_content(s, resume_step=step)
     if content is not None:

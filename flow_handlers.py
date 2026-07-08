@@ -2,6 +2,7 @@
 
 import os
 
+from core.booking_date_defer import try_booking_date_defer_at_entry, try_booking_date_defer_flow_result
 from core.lead_context import bind_lead_context_turn
 from core.lead_turn_classifier import classify_lead_active_turn, interrupt_kind_for_content_hint
 from lead_interrupt import LEAD_CANCEL_REF, LEAD_PAUSE_REF, LEAD_RESUME_REF, parse_lead_cancel
@@ -14,6 +15,7 @@ from session import (
     extract_phone,
     get_lead_paused_answer_count,
     get_lead_pending_name,
+    get_lead_preferred_datetime,
     get_lead_resume_step,
     increment_lead_paused_answer_count,
     is_active_lead_flow,
@@ -27,6 +29,7 @@ from session import (
     resume_lead_from_pause,
     set_lead_intent,
     set_lead_pending_name,
+    set_lead_preferred_datetime,
     set_situation_note,
     set_situation_pending,
     update_profile,
@@ -172,6 +175,68 @@ def _lead_pause_prompt_result(
     }
 
 
+def _begin_lead_collecting_name(
+    *,
+    q: str,
+    sid: str,
+    client_id: str | None,
+    txt: dict,
+    service_payload,
+    cta_key: str | None = None,
+    data: dict | None = None,
+    booking_intent_flag: bool = False,
+) -> dict:
+    entry_defer = try_booking_date_defer_at_entry(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        txt=txt,
+        service_payload=service_payload,
+        store_preference=set_lead_preferred_datetime,
+        set_lead_intent=set_lead_intent,
+    )
+    if entry_defer is not None:
+        mark_booking_intent_ever(sid)
+        return entry_defer
+
+    mark_booking_intent_ever(sid)
+    set_lead_intent(sid, "collecting_name")
+    payload = service_payload(
+        _lead_entry_name_prompt(client_id, txt, data, cta_key=cta_key),
+        sid,
+        client_id,
+        lead_flow=True,
+        lead_step="name",
+        booking_intent_flag=booking_intent_flag,
+    )
+    return {
+        "payload": payload,
+        "doc_id": None,
+    }
+
+
+def _booking_date_defer_result(
+    *,
+    q: str,
+    sid: str,
+    client_id: str | None,
+    txt: dict,
+    service_payload,
+    resume_step: str,
+) -> dict:
+    result = try_booking_date_defer_flow_result(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        txt=txt,
+        service_payload=service_payload,
+        resume_step=resume_step,
+        store_preference=set_lead_preferred_datetime,
+    )
+    assert result is not None
+    return result
+
+
 def _lead_defer_result(
     *,
     sid: str,
@@ -245,7 +310,7 @@ def _try_lead_step_controls(
 ) -> tuple[str, dict | None]:
     """
     Returns (action, flow_result).
-    action: proceed | cancelled | paused_pipeline | paused_prompt | defer | unclear
+    action: proceed | cancelled | paused_pipeline | paused_prompt | defer | booking_date | unclear
     """
     decision = classify_lead_active_turn(q, ref=ref, st=st, sid=sid, client_id=client_id)
     if decision.kind == "meta_cancel":
@@ -269,6 +334,16 @@ def _try_lead_step_controls(
     if decision.kind == "defer":
         return "defer", _lead_defer_result(
             sid=sid, client_id=client_id, txt=txt, service_payload=service_payload
+        )
+    if decision.kind == "booking_date":
+        step = (st.get("lead_intent") or "collecting_name").strip()
+        return "booking_date", _booking_date_defer_result(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            txt=txt,
+            service_payload=service_payload,
+            resume_step=step,
         )
     if decision.kind == "unclear":
         step = (st.get("lead_intent") or "collecting_name").strip()
@@ -392,6 +467,19 @@ def _handle_paused_lead_turn(
             if payload is not None:
                 return {"payload": payload, "doc_id": None}
 
+    resume_step = get_lead_resume_step(sid) or "collecting_name"
+    deferred = try_booking_date_defer_flow_result(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        txt=txt,
+        service_payload=service_payload,
+        resume_step=resume_step,
+        store_preference=set_lead_preferred_datetime,
+    )
+    if deferred is not None:
+        return deferred
+
     bind_lead_context_turn(interrupt_no_topic=True, interrupt_kind="generic")
     return None
 
@@ -417,7 +505,7 @@ def _handle_active_lead_turn(
         txt=txt,
         service_payload=service_payload,
     )
-    if action in {"cancelled", "paused_prompt", "defer", "unclear"}:
+    if action in {"cancelled", "paused_prompt", "defer", "booking_date", "unclear"}:
         return result
     if action == "paused_pipeline":
         return None
@@ -490,7 +578,7 @@ def _handle_lead_name_confirm(
         txt=txt,
         service_payload=service_payload,
     )
-    if action in {"cancelled", "paused_prompt", "defer", "unclear"}:
+    if action in {"cancelled", "paused_prompt", "defer", "booking_date", "unclear"}:
         return result
     if action == "paused_pipeline":
         return None
@@ -591,6 +679,13 @@ def _lead_flow_payload(
         update_profile(sid, phone=phone)
         st2 = mem_get(sid)
         prof = st2.get("profile") or {}
+        situation_note = (st2.get("situation_note") or "").strip()
+        preferred = get_lead_preferred_datetime(sid)
+        if preferred:
+            pref_line = f"Желаемая дата/время: {preferred}"
+            situation_note = (
+                f"{situation_note}\n{pref_line}".strip() if situation_note else pref_line
+            )
         lead_payload, lead_status = handle_lead(
             {
                 "name": (prof.get("name") or "").strip(),
@@ -598,7 +693,7 @@ def _lead_flow_payload(
                 "intent": "lead",
                 "sid": sid,
                 "client_id": client_id,
-                "situation_note": (st2.get("situation_note") or "").strip(),
+                "situation_note": situation_note,
             }
         )
         if lead_status != 200:
@@ -714,20 +809,14 @@ def handle_flows(
         }
 
     if (data.get("ref") or "").strip() == LEAD_BOOKING_REF:
-        mark_booking_intent_ever(sid)
-        set_lead_intent(sid, "collecting_name")
-        return {
-            "payload": service_payload(
-                _lead_entry_name_prompt(
-                    client_id, txt, cta_key=LEAD_BOOKING_CTA_KEY
-                ),
-                sid,
-                client_id,
-                lead_flow=True,
-                lead_step="name",
-            ),
-            "doc_id": None,
-        }
+        return _begin_lead_collecting_name(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            txt=txt,
+            service_payload=service_payload,
+            cta_key=LEAD_BOOKING_CTA_KEY,
+        )
 
     if st.get("lead_intent") == "confirming_name":
         return _handle_lead_name_confirm(
@@ -741,41 +830,30 @@ def handle_flows(
 
     if q and explicit_booking_intent(q) and not is_active_lead_flow(st):
         clear_pending_lead_offer(sid)
-        mark_booking_intent_ever(sid)
-        set_lead_intent(sid, "collecting_name")
-        return {
-            "payload": service_payload(
-                _lead_entry_name_prompt(
-                    client_id, txt, cta_key=LEAD_BOOKING_CTA_KEY
-                ),
-                sid,
-                client_id,
-                lead_flow=True,
-                lead_step="name",
-                booking_intent_flag=True,
-            ),
-            "doc_id": None,
-        }
+        return _begin_lead_collecting_name(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            txt=txt,
+            service_payload=service_payload,
+            cta_key=LEAD_BOOKING_CTA_KEY,
+            booking_intent_flag=True,
+        )
 
     pending_lead = bool(st.get("pending_lead_offer"))
     if pending_lead and q:
         if parse_lead_offer_yes(q):
             clear_pending_lead_offer(sid)
-            mark_booking_intent_ever(sid)
-            set_lead_intent(sid, "collecting_name")
-            return {
-                "payload": service_payload(
-                    _lead_entry_name_prompt(
-                        client_id, txt, cta_key=LEAD_BOOKING_CTA_KEY
-                    ),
-                    sid,
-                    client_id,
-                    lead_flow=True,
-                    lead_step="name",
-                ),
-                "doc_id": None,
-                "service_route": "lead_flow",
-            }
+            result = _begin_lead_collecting_name(
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                txt=txt,
+                service_payload=service_payload,
+                cta_key=LEAD_BOOKING_CTA_KEY,
+            )
+            result["service_route"] = "lead_flow"
+            return result
         if parse_lead_offer_no(q):
             clear_pending_lead_offer(sid)
             return {
@@ -866,18 +944,14 @@ def handle_flows(
         }
 
     if data.get("cta_action") == "lead":
-        mark_booking_intent_ever(sid)
-        set_lead_intent(sid, "collecting_name")
-        return {
-            "payload": service_payload(
-                _lead_entry_name_prompt(client_id, txt, data),
-                sid,
-                client_id,
-                lead_flow=True,
-                lead_step="name",
-            ),
-            "doc_id": None,
-        }
+        return _begin_lead_collecting_name(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            txt=txt,
+            service_payload=service_payload,
+            data=data,
+        )
 
     if data.get("situation_action") == "start" or data.get("action") == "situation":
         if not situation_enabled(client_id):

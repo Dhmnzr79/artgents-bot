@@ -39,6 +39,8 @@ _TONE_KEY_MAP: tuple[tuple[str, str], ...] = (
     (("lead", "ask_question_prompt"), "lead_ask_question_prompt"),
     (("lead", "unclear_retry"), "lead_unclear_retry"),
     (("lead", "defer_exit"), "lead_defer_exit"),
+    (("lead", "booking_date_defer"), "lead_booking_date_defer"),
+    (("lead", "booking_date_defer_phone"), "lead_booking_date_defer_phone"),
     (("lead", "offer_declined"), "lead_offer_declined"),
     (("situation", "prompt"), "situation_prompt"),
     (("situation", "retry_short"), "situation_retry_short"),
@@ -97,6 +99,12 @@ _FALLBACK_TXT: dict[str, str] = {
     ),
     "lead_defer_exit": (
         "Хорошо, без спешки. Когда будете готовы — нажмите «Записаться» или напишите."
+    ),
+    "lead_booking_date_defer": (
+        "Приняла запрос — по дате с вами свяжется и уточнит администратор."
+    ),
+    "lead_booking_date_defer_phone": (
+        "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами."
     ),
     "bare_affirmative_fallback": "Напишите, пожалуйста, ваш вопрос — так будет проще подсказать.",
     "followup_choose_topic": "Могу рассказать про этапы или про сроки — что выбрать?",
@@ -449,6 +457,14 @@ def price_symptom_consult_enabled(client_id: str | None) -> bool:
     if not PRICE_SYMPTOM_CONSULT_ON:
         return False
     return feature_flag(client_id, "price_symptom_consult", "enabled", default=False)
+
+
+def booking_date_defer_enabled(client_id: str | None) -> bool:
+    from config import BOOKING_DATE_DEFER_ON
+
+    if not BOOKING_DATE_DEFER_ON:
+        return False
+    return feature_flag(client_id, "booking_date_defer", "enabled", default=False)
 
 
 def situation_enabled(client_id: str | None) -> bool:

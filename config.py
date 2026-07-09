@@ -121,9 +121,9 @@ BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
 )
 
 # --- Strict service match for price: no explicitly-named service -> honest defer, never a fuzzy price ---
-# Default OFF: strict's focus check honors only catalog-service focus, not patient-situation focus,
-# so it wrongly defers on situation→"а сколько?" follow-ups (ps03). Flip only after that gap is fixed.
-PRICE_STRICT_SERVICE_ON = os.getenv("PRICE_STRICT_SERVICE_ON", "0").lower() in (
+# Default ON (env "0" = kill-switch). Situation-focus gap fixed: shared price_query_has_session_focus
+# now honors patient-situation focus, so ps03-class follow-ups get the per-unit price, not a defer.
+PRICE_STRICT_SERVICE_ON = os.getenv("PRICE_STRICT_SERVICE_ON", "1").lower() in (
     "1",
     "true",
     "yes",

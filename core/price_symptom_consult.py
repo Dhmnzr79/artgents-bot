@@ -29,14 +29,29 @@ def price_query_has_session_focus(
     client_id: str | None,
 ) -> bool:
     ctx = catalog_service_session_context(sid, client_id)
-    if not ctx:
-        return False
-    match = match_service_from_catalog(q, client_id=client_id)
-    focus = _dialog_focus_for_price_route(q, sid=sid, client_id=client_id)
-    return bool(
-        price_lookup_allows_session_context(q, match, ctx)
-        or _dialog_focus_allows_price_session_context(focus, ctx)
+    if ctx:
+        match = match_service_from_catalog(q, client_id=client_id)
+        focus = _dialog_focus_for_price_route(q, sid=sid, client_id=client_id)
+        if price_lookup_allows_session_context(q, match, ctx) or (
+            _dialog_focus_allows_price_session_context(focus, ctx)
+        ):
+            return True
+
+    from core.patient_situation_routing import price_scope_from_situation
+    from core.patient_situation_session import resolve_patient_situation_for_turn
+    from core.price_scope import detect_price_scope
+
+    situation, meta = resolve_patient_situation_for_turn(
+        q, sid=sid, client_id=client_id
     )
+    supplemented = price_scope_from_situation(
+        situation,
+        client_id=client_id,
+        vague_price_carry=bool(meta.get("patient_situation_carried")),
+    )
+    if supplemented is None:
+        return False
+    return detect_price_scope(q, client_id=client_id).kind == "none"
 
 
 def should_gate_price_to_consult(

@@ -110,6 +110,17 @@ def price_matched_from_route(
     )
     if strict is not None:
         return strict
+    from core.price_brand_money import try_brand_money_orchestration
+
+    brand_money = try_brand_money_orchestration(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        price_route=price_route,
+        decision_frame=decision_frame,
+    )
+    if brand_money is not None:
+        return brand_money
     intent = str(price_route.get("intent") or "other")
     request.ctx["effective_intent"] = str(intent)
     service = price_route.get("service") or {}
@@ -319,6 +330,17 @@ def try_a3_price_route(
                 decision=decision,
                 decision_frame=decision_frame,
             )
+    if sr.source == "price_concern":
+        from core.price_brand_money import try_brand_money_early
+
+        brand_money = try_brand_money_early(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            decision_frame=decision_frame,
+        )
+        if brand_money is not None:
+            return brand_money
     if sr.source == "price_concern" and sr.ref:
         ch = get_chunk_by_ref(sr.ref, client_id=client_id)
         if ch:

@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from config import PRICE_LOOKUP_RE
+from config import PRICE_CONCERN_RE, PRICE_LOOKUP_RE
 from contracts.price_brand_aliases import PriceBrandAliasesFile
 from contracts.price_offer import PriceOffer, PriceOfferUnit, PriceOffersFile
 from contracts.pricebook import PricebookServiceEntry
@@ -48,6 +48,12 @@ _ALIAS_MTIME: dict[str, float] = {}
 
 def format_rub(amount: int) -> str:
     return f"{int(amount):,}".replace(",", " ") + " ₽"
+
+
+def _brand_filter_on() -> bool:
+    from config import BRAND_FILTER_ON
+
+    return bool(BRAND_FILTER_ON)
 
 
 def price_offers_path(client_id: str | None) -> str:
@@ -129,6 +135,69 @@ def detect_brand_in_query(q: str, *, client_id: str | None = None) -> str | None
         if alias in text:
             return brand
     return None
+
+
+_BRAND_GROUP_QUERY_RX: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"корейск", re.I | re.U), "korean"),
+    (re.compile(r"немецк|герман", re.I | re.U), "german"),
+    (re.compile(r"швейцар", re.I | re.U), "swiss"),
+)
+
+
+def literal_brand_group_in_query(q: str) -> str | None:
+    text = (q or "").strip()
+    if not text:
+        return None
+    for rx, group in _BRAND_GROUP_QUERY_RX:
+        if rx.search(text):
+            return group
+    return None
+
+
+def literal_brand_in_query(q: str, *, client_id: str | None = None) -> tuple[str | None, str | None]:
+    """Brand/group only when literally named in patient text (aliases + geo groups)."""
+    brand = detect_brand_in_query(q, client_id=client_id)
+    brand_group = literal_brand_group_in_query(q)
+    return brand, brand_group
+
+
+def has_literal_brand_in_query(q: str, *, client_id: str | None = None) -> bool:
+    brand, group = literal_brand_in_query(q, client_id=client_id)
+    return bool(brand or group)
+
+
+BUDGET_SIGNAL_RE = re.compile(
+    r"(?:"
+    r"деш[её]в\w*|"
+    r"подеш[её]в\w*|"
+    r"бюджет\w*|"
+    r"попроще\s+по\s+цен\w*|"
+    r"сам\w+\s+доступн\w*|"
+    r"доступн\w+\s+имплант"
+    r")",
+    re.I | re.U,
+)
+
+
+def has_budget_signal(q: str) -> bool:
+    text = (q or "").strip()
+    if not text:
+        return False
+    return bool(PRICE_CONCERN_RE.search(text) or BUDGET_SIGNAL_RE.search(text))
+
+
+def canonical_brand_name(raw: str, *, client_id: str | None = None) -> str | None:
+    """Map conversational alias or partial brand token to canonical pricebook brand."""
+    text = (raw or "").strip().lower()
+    if not text:
+        return None
+    for alias, brand in load_brand_alias_rules(client_id):
+        if alias == text:
+            return brand
+    for alias, brand in load_brand_alias_rules(client_id):
+        if brand.lower() == text:
+            return brand
+    return detect_brand_in_query(text, client_id=client_id)
 
 
 def is_generic_implant_price_query(q: str) -> bool:
@@ -423,12 +492,21 @@ def build_price_answer_for_lookup(
     brand = detect_brand_in_query(q, client_id=client_id)
     planner_brand = None
     planner_brand_group = None
-    try:
-        from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
+    if _brand_filter_on():
+        try:
+            literal_brand, literal_group = literal_brand_in_query(q, client_id=client_id)
+            if has_budget_signal(q) and not (literal_brand or literal_group):
+                planner_brand = None
+                planner_brand_group = None
+            else:
+                from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
 
-        planner_brand, planner_brand_group = turn_plan_brand_filter_from_ctx()
-    except Exception:
-        pass
+                planner_brand, planner_brand_group = turn_plan_brand_filter_from_ctx()
+                if literal_brand or literal_group:
+                    planner_brand = literal_brand or planner_brand
+                    planner_brand_group = literal_group or planner_brand_group
+        except Exception:
+            pass
     brand = planner_brand or brand
     unit = entry.default_unit or default_unit_for_service(sid)
     offers = get_price_offers(
@@ -466,12 +544,21 @@ def build_price_append_for_lookup(
     brand = detect_brand_in_query(q, client_id=client_id)
     planner_brand = None
     planner_brand_group = None
-    try:
-        from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
+    if _brand_filter_on():
+        try:
+            literal_brand, literal_group = literal_brand_in_query(q, client_id=client_id)
+            if has_budget_signal(q) and not (literal_brand or literal_group):
+                planner_brand = None
+                planner_brand_group = None
+            else:
+                from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
 
-        planner_brand, planner_brand_group = turn_plan_brand_filter_from_ctx()
-    except Exception:
-        pass
+                planner_brand, planner_brand_group = turn_plan_brand_filter_from_ctx()
+                if literal_brand or literal_group:
+                    planner_brand = literal_brand or planner_brand
+                    planner_brand_group = literal_group or planner_brand_group
+        except Exception:
+            pass
     brand = planner_brand or brand
     unit = default_unit_for_service(service_id)
     offers = get_price_offers(

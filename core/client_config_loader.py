@@ -151,6 +151,30 @@ def load_features(client_id: str | None) -> dict[str, Any]:
     return _cached_load(_FEATURES_CACHE, pack, "features.yaml")
 
 
+def brand_money_config(client_id: str | None) -> dict[str, Any]:
+    raw = load_features(client_id).get("brand_money")
+    return raw if isinstance(raw, dict) else {}
+
+
+def brand_money_budget_anchor_service_id(client_id: str | None) -> str | None:
+    sid = str(brand_money_config(client_id).get("budget_anchor_service_id") or "").strip()
+    return sid or None
+
+
+def brand_money_budget_anchor_fact_ids(client_id: str | None) -> tuple[str, ...]:
+    raw = brand_money_config(client_id).get("budget_anchor_fact_ids")
+    if isinstance(raw, list):
+        ids = tuple(str(x).strip() for x in raw if str(x).strip())
+        if ids:
+            return ids
+    return (
+        "installment_12",
+        "tax_deduction",
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
+
+
 def load_tone_raw(client_id: str | None) -> dict[str, Any]:
     pack = resolve_pack_client_id(client_id)
     return _cached_load(_TONE_CACHE, pack, "tone.yaml")

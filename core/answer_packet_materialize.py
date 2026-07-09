@@ -68,6 +68,10 @@ def _unit_line(unit: str | None) -> str | None:
 
 def _planner_brand_filter() -> tuple[str | None, str | None]:
     try:
+        from config import BRAND_FILTER_ON
+
+        if not BRAND_FILTER_ON:
+            return None, None
         from core.turn_planner_llm import turn_plan_brand_filter_from_ctx
 
         return turn_plan_brand_filter_from_ctx()

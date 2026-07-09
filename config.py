@@ -120,6 +120,13 @@ BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
     "yes",
 )
 
+# --- Brand filter + budget anchor on implant price path (money-path marketing; default OFF) ---
+BRAND_FILTER_ON = os.getenv("BRAND_FILTER_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Strict service match for price: no explicitly-named service -> honest defer, never a fuzzy price ---
 # Default ON (env "0" = kill-switch). Situation-focus gap fixed: shared price_query_has_session_focus
 # now honors patient-situation focus, so ps03-class follow-ups get the per-unit price, not a defer.

@@ -30,6 +30,10 @@ messaging:
 ingress:
   strict: true
 
+# Budget anchor service for BRAND_FILTER_ON (demo: classic one-tooth brands)
+brand_money:
+  budget_anchor_service_id: classic
+
 # Stage 5a: deterministic numeric fact safety (demo only until eval green)
 verifier_gate:
   numeric_fact:

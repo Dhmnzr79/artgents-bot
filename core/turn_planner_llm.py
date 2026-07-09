@@ -55,7 +55,9 @@ _SYSTEM = (
     "НЕ ставь needs_clarify, если различие определяет врач (диагноз, состояние кости) "
     "или если в диалоге уже ясно, о чём речь.\n"
     "patient_situation: один enum kind ситуации пациента или null.\n"
-    "brand_filter: null или объект {brand_group, brand}; используй только явно запрошенный бренд/группу.\n"
+    "brand_filter: null или объект {brand_group, brand}; только если пациент ЯВНО назвал бренд "
+    "или группу (Nobel, Impro, корейские, немецкие). НЕ выводи brand_filter из «дешевле», "
+    "«подешевле», «бюджет», «доступные» — это не бренд.\n"
     "Не добавляй query_rewrite и любые другие поля. Верни только JSON без markdown."
 )
 
@@ -244,6 +246,7 @@ def _validate_plan(
     allowed_service_ids: frozenset[str],
     allowed_brand_groups: frozenset[str],
     allowed_brands: frozenset[str],
+    client_id: str | None = None,
 ) -> TurnPlan | None:
     plan = TurnPlan.model_validate(raw)
     plan = plan.model_copy(update={"aspects": order_plan_aspects(list(plan.aspects))})
@@ -253,7 +256,20 @@ def _validate_plan(
             raise ValueError(f"turn_plan_{field}_not_in_catalog")
     if plan.brand_filter is not None:
         group = str(plan.brand_filter.brand_group or "").strip().lower()
-        brand = str(plan.brand_filter.brand or "").strip().lower()
+        brand_raw = str(plan.brand_filter.brand or "").strip()
+        brand = brand_raw.lower()
+        if brand_raw:
+            from core.price_offers import canonical_brand_name
+
+            canon = canonical_brand_name(brand_raw, client_id=client_id)
+            if canon:
+                brand_raw = canon
+                brand = canon.strip().lower()
+                plan = plan.model_copy(
+                    update={
+                        "brand_filter": plan.brand_filter.model_copy(update={"brand": canon}),
+                    }
+                )
         if group and group not in allowed_brand_groups:
             raise ValueError("turn_plan_brand_group_not_in_pricebook")
         if brand and brand not in allowed_brands:
@@ -418,6 +434,7 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
             allowed_service_ids=allowed_ids,
             allowed_brand_groups=allowed_groups,
             allowed_brands=allowed_brands,
+            client_id=client_id,
         )
         if plan is None:
             raise ValueError("turn_plan_invalid")

@@ -5,6 +5,12 @@ import pytest
 from contracts.turn_plan import TurnPlan
 
 
+@pytest.fixture
+def brand_on(monkeypatch):
+    monkeypatch.setenv("BRAND_FILTER_ON", "1")
+    monkeypatch.setattr("config.BRAND_FILTER_ON", True)
+
+
 def test_patient_situation_uses_turn_plan_before_regex():
     from core.patient_situation_session import resolve_patient_situation_for_turn
     from core.turn_planner_llm import publish_turn_plan
@@ -37,7 +43,7 @@ def test_patient_situation_uses_turn_plan_before_regex():
     assert meta["patient_situation_source"] == "turn_planner"
 
 
-def test_price_fact_block_filters_by_turn_plan_brand_group():
+def test_price_fact_block_filters_by_turn_plan_brand_group(brand_on):
     from core.answer_packet_materialize import render_price_fact_block
     from core.turn_planner_llm import publish_turn_plan
 
@@ -65,7 +71,7 @@ def test_price_fact_block_filters_by_turn_plan_brand_group():
     assert "76 200" in text
 
 
-def test_price_answer_lookup_filters_by_turn_plan_brand_group():
+def test_price_answer_lookup_filters_by_turn_plan_brand_group(brand_on):
     from core.price_offers import build_price_answer_for_lookup
     from core.turn_planner_llm import publish_turn_plan
 
@@ -93,7 +99,5 @@ def test_price_answer_lookup_filters_by_turn_plan_brand_group():
     assert answer is not None
     assert "Implantium" in answer
     assert "76 200" in answer
-    # T1: фильтр проверяем по структуре (какие офферы разрешены), а не по словам —
-    # факты из базы (гарантия «на Impro и Nobel — пожизненная») остаются дословно.
     assert meta["price_offer_ids"] == ["classic.one_tooth.implantium"]
     assert meta["price_offer_brand_group_filter"] == "korean"

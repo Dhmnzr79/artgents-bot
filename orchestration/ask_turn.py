@@ -293,6 +293,17 @@ def orchestrate_routing_after_resolver(
         if doc_result is not None:
             return doc_result
 
+        from core.price_brand_money import try_brand_money_early
+
+        brand_money_result = try_brand_money_early(
+            q=q,
+            sid=sid,
+            client_id=client_id,
+            decision_frame=decision_frame,
+        )
+        if brand_money_result is not None:
+            return brand_money_result
+
         composer_result = try_composer_overlay(
             q=q,
             sid=sid,

@@ -468,6 +468,16 @@ def select_price_service_route(
         )
 
     group_id = scope.group_id if intent == "price_lookup" else None
+    if intent == "price_lookup" and group_id and client_id:
+        from core.clinic_policies_loader import find_service_alternative
+
+        if find_service_alternative(q, client_id):
+            return {
+                "mode": "clarify",
+                "intent": intent,
+                "fallback_reason": "service_not_offered",
+                **match,
+            }
     if intent == "price_lookup" and group_id:
         overview_match = (
             match_catalog_for_implant_group_overview(q, client_id=client_id)

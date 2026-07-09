@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from core.clinic_policies_loader import find_service_alternative
 from core.price_scope import detect_price_scope
+from contracts.patient_situation import PatientSituationResult
 from price_query_cases import (
     FULL_JAW_CASES,
     GENERIC_CASES,
@@ -14,6 +16,22 @@ from price_query_cases import (
     UPPER_JAW_CASES,
 )
 from query_selector import select_price_service_route
+from ux_builder import build_price_resolution_payload
+
+
+@pytest.fixture(autouse=True)
+def _no_patient_situation_llm(monkeypatch):
+    """Price router tests are deterministic — no patient_situation LLM."""
+    empty_situation = PatientSituationResult(
+        kind="unknown",
+        confidence=0.0,
+        source="rule_based",
+        patient_scope="unknown",
+    )
+    monkeypatch.setattr(
+        "query_selector._patient_situation_for_turn",
+        lambda *a, **k: (empty_situation, False),
+    )
 
 
 @pytest.mark.parametrize("question", ONE_TOOTH_CASES)
@@ -97,3 +115,46 @@ def test_incident_one_missing_tooth_not_all_on_4():
     body_sid = "incident-one-tooth"
     # price should be one-tooth range, not jaw 318k — checked via service id
     assert route.get("matched_service_id") != "all_on_4"
+
+
+def test_basal_implantation_price_service_alternative_defer():
+    q = "Сколько стоит базальная имплантация?"
+    assert find_service_alternative(q, "demo") is not None
+    route = select_price_service_route(
+        q, client_id="demo", sid="svc-alt-basal", intent_override="price_lookup"
+    )
+    assert route.get("mode") == "clarify"
+    assert route.get("fallback_reason") == "service_not_offered"
+    assert route.get("mode") != "group_overview"
+    payload = build_price_resolution_payload(
+        sid="svc-alt-basal",
+        client_id="demo",
+        intent="price_lookup",
+        resolution_reason=str(route.get("fallback_reason") or ""),
+        service_id=str(route.get("matched_service_id") or "") or None,
+        service=route.get("service") or {},
+        match_score=float(route.get("match_score") or 0.0),
+        question=q,
+    )
+    assert "базальн" in payload.get("answer", "").lower()
+    assert payload.get("meta", {}).get("service_status") == "not_offered"
+
+
+def test_generic_implantation_stays_group_overview_d1():
+    q = "Сколько стоит имплантация?"
+    assert find_service_alternative(q, "demo") is None
+    route = select_price_service_route(
+        q, client_id="demo", sid="svc-alt-generic", intent_override="price_lookup"
+    )
+    assert route.get("mode") == "group_overview"
+    assert route.get("group_id") == "implantation"
+
+
+def test_classic_implantation_not_service_alternative():
+    q = "Сколько стоит классическая имплантация?"
+    assert find_service_alternative(q, "demo") is None
+    route = select_price_service_route(
+        q, client_id="demo", sid="svc-alt-classic", intent_override="price_lookup"
+    )
+    assert route.get("mode") != "clarify" or route.get("fallback_reason") != "service_not_offered"
+    assert route.get("matched_service_id") == "classic"

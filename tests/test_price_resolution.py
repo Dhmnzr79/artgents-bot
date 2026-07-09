@@ -70,7 +70,8 @@ def test_service_not_found_text():
         question="Сколько стоит услуга xyz-нет-в-каталоге?",
     )
     answer = payload.get("answer") or ""
-    assert "не вижу такую услугу" in answer.lower()
+    assert "администратор" in answer.lower()
+    assert "в базе" not in answer.lower()
     meta = payload.get("meta") or {}
     assert meta.get("service_status") == "not_found"
 

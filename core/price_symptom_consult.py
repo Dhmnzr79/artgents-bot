@@ -143,3 +143,73 @@ def orchestrate_consult_symptom_ref(
         service_route="price_symptom_consult",
         decision_frame=decision_frame,
     )
+
+
+def should_defer_price_strict_service(
+    *,
+    q: str,
+    sid: str | None,
+    client_id: str | None,
+    price_route: dict[str, Any] | None = None,
+) -> bool:
+    """True for a price question where NO service is explicitly named -> never quote a fuzzy price."""
+    from config import PRICE_STRICT_SERVICE_ON
+
+    if not PRICE_STRICT_SERVICE_ON:
+        return False
+    if not has_price_intent(q):
+        return False
+    if price_route is not None:
+        intent = str(price_route.get("intent") or "")
+        if intent not in ("price_lookup", "price_concern"):
+            return False
+        mode = str(price_route.get("mode") or "")
+        if mode in {"group_overview", "unit_clarify", "clarify", "other", "unavailable"}:
+            return False
+    if explicit_service_mentioned(q, client_id) is not None:
+        return False
+    if price_query_has_session_focus(q=q, sid=sid, client_id=client_id):
+        return False
+    return True
+
+
+def try_price_strict_service_defer(
+    *,
+    q: str,
+    sid: str,
+    client_id: str,
+    decision_frame: dict[str, Any] | None,
+    price_route: dict[str, Any] | None = None,
+) -> AskOrchestrationResult | None:
+    """Price question with no explicitly-named service -> honest defer (policy or stub), never a fuzzy price."""
+    if not should_defer_price_strict_service(
+        q=q, sid=sid, client_id=client_id, price_route=price_route
+    ):
+        return None
+    from ux_builder import build_price_resolution_payload
+
+    payload = build_price_resolution_payload(
+        sid=sid,
+        client_id=client_id,
+        intent="price_lookup",
+        resolution_reason="service_not_found",
+        question=q,
+    )
+    log_json(
+        logger,
+        "price_strict_service_defer",
+        client_id=client_id,
+        sid=sid,
+        fuzzy_service=(price_route or {}).get("matched_service_id"),
+    )
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        service_payload=payload,
+        service_doc_id=None,
+        service_track_user=True,
+        service_route="price_strict_service_defer",
+        decision_frame=decision_frame,
+    )

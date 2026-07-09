@@ -87,7 +87,10 @@ def price_matched_from_route(
     decision,
     decision_frame: dict[str, Any] | None,
 ) -> AskOrchestrationResult:
-    from core.price_symptom_consult import try_price_symptom_consult_orchestration
+    from core.price_symptom_consult import (
+        try_price_strict_service_defer,
+        try_price_symptom_consult_orchestration,
+    )
 
     gated = try_price_symptom_consult_orchestration(
         q=q,
@@ -98,6 +101,15 @@ def price_matched_from_route(
     )
     if gated is not None:
         return gated
+    strict = try_price_strict_service_defer(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        decision_frame=decision_frame,
+        price_route=price_route,
+    )
+    if strict is not None:
+        return strict
     intent = str(price_route.get("intent") or "other")
     request.ctx["effective_intent"] = str(intent)
     service = price_route.get("service") or {}

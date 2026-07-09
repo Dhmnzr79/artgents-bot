@@ -896,14 +896,14 @@ def build_price_resolution_payload(
         cta = None
     else:
         answer = (
-            "Не вижу такую услугу в нашей базе. Напишите, пожалуйста, что именно вас интересует — "
-            "или запишитесь на консультацию, там всё посчитают."
+            "К сожалению, точной информации по этой услуге у меня нет. "
+            "Подскажет администратор — оставьте, пожалуйста, контакты, он свяжется и всё уточнит."
         )
         quick_replies = []
         service_status = "not_found"
         price_status = "not_available"
         snippet_source = None
-        cta = None
+        cta = default_cta_dict()
 
     return {
         "answer": answer,

@@ -206,10 +206,10 @@
       "group": "G",
       "question": "болит зуб, сколько лечение?",
       "client_id": "demo",
-      "expected_path": "price",
+      "expected_path": "composer",
       "expected_aspects": ["price"],
       "expected_amounts": [],
-      "requires_price_symptom_consult": true
+      "known_gap": "двусмысленное «сколько лечение» (не ценовой intent) -> composer-контент про срок лечения; поведение одобрено владельцем"
     },
     {
       "id": "G3",

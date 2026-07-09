@@ -106,21 +106,23 @@ SITUATION_PRICE_ON = os.getenv("SITUATION_PRICE_ON", "0").lower() in (
     "yes",
 )
 
-# --- Symptom-only price → consult gate (medzone; default off) ---
-PRICE_SYMPTOM_CONSULT_ON = os.getenv("PRICE_SYMPTOM_CONSULT_ON", "0").lower() in (
+# --- Symptom-only price → consult gate (medzone; default on, env "0" = kill-switch) ---
+PRICE_SYMPTOM_CONSULT_ON = os.getenv("PRICE_SYMPTOM_CONSULT_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
 
-# --- Lead booking date defer (no slot confirmation without schedule; default off) ---
-BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "0").lower() in (
+# --- Lead booking date defer (no slot confirmation without schedule; default on, env "0" = kill-switch) ---
+BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
     "1",
     "true",
     "yes",
 )
 
-# --- Strict service match for price: no explicitly-named service -> honest defer, never a fuzzy price (default off) ---
+# --- Strict service match for price: no explicitly-named service -> honest defer, never a fuzzy price ---
+# Default OFF: strict's focus check honors only catalog-service focus, not patient-situation focus,
+# so it wrongly defers on situation→"а сколько?" follow-ups (ps03). Flip only after that gap is fixed.
 PRICE_STRICT_SERVICE_ON = os.getenv("PRICE_STRICT_SERVICE_ON", "0").lower() in (
     "1",
     "true",

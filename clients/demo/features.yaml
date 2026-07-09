@@ -19,10 +19,10 @@ situation:
   enabled: true
 
 price_symptom_consult:
-  enabled: false
+  enabled: true
 
 booking_date_defer:
-  enabled: false
+  enabled: true
 
 messaging:
   free_consultation: true

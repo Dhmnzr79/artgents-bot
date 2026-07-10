@@ -1,7 +1,7 @@
 # Текущая архитектура бота
 
 **Статус:** фактический runtime после Stage 3.4 и Stage 5.5.  
-**Обновлено:** 2026-07-06.  
+**Обновлено:** 2026-07-10.  
 **Связано:** `ROUTING_MAP.md`, `MULTICLIENT.md`, `PRICEBOOK_V2.md`, `TECH_DEBT.md`.
 
 ---
@@ -36,8 +36,10 @@ clients/{id}/
   widget_config.json
   brand.yaml
   tone.yaml
+  ui.yaml
   features.yaml
   lead_config.yaml
+  price_brand_aliases.json
 
 data/{id}/
   bot.db
@@ -63,10 +65,13 @@ ingress/pre-resolver guards
 2. patient playbook overview для content-ситуаций;
 3. situation price overview за `SITUATION_PRICE_ON`;
 4. doctor route;
-5. composer overlay;
-6. catalog facts;
-7. price flow;
-8. fail-open composer fallback.
+5. brand/budget early path за `BRAND_FILTER_ON` (`core/price_brand_money.try_brand_money_early`);
+6. composer overlay;
+7. catalog facts;
+8. price flow;
+9. fail-open composer fallback.
+
+Composer overlay: при `FULLCTX_ON=1` (дефолт) — без гейта «≥2 аспекта»; при `FULLCTX_ON=0` — только составные аспекты (`composer_flow.py`).
 
 Детали маршрутов — `ROUTING_MAP.md`.
 
@@ -95,6 +100,7 @@ ingress/pre-resolver guards
 | `core/patient_playbook.py` | situation → ordered clinic options |
 | `core/service_node.py` | read-only service view: catalog + pricebook |
 | `core/answer_lens.py` | describe/price/situation projections |
+| `core/price_brand_money.py` | brand filter + budget anchor на price path (`BRAND_FILTER_ON`) |
 | `core/living_frame.py` | live intro/closer вокруг пришпиленных facts |
 | `session.py` | per-client SQLite session |
 
@@ -152,8 +158,10 @@ Chat/classifier модели идут через Qwen/DashScope (`DASHSCOPE_API_
 
 | Флаг | Назначение |
 |---|---|
-| `FULLCTX_ON` / composer defaults | full-context composer path |
+| `FULLCTX_ON` / `COMPOSER_ON` / `TURN_PLANNER_ON` | full-context composer (дефолт **ON**, env `"0"` = kill-switch) |
 | `SERVICE_SELECT_LLM_ON` | LLM service selection for composer price aspects |
+| `PRICE_STRICT_SERVICE_ON` / `PRICE_SYMPTOM_CONSULT_ON` | ценовые гварды (дефолт **ON**) |
+| `BRAND_FILTER_ON` | brand filter + budget anchor (дефолт OFF) |
 | `LIVING_OVERVIEW_ON` | live intro/closer для overview frames |
 | `SITUATION_PRICE_ON` | situation price overview |
 

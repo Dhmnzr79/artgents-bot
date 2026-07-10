@@ -13,7 +13,7 @@
     "installment_12": {
       "id": "installment_12",
       "kind": "payment",
-      "text_fact": "Доступна рассрочка от клиники до 12 месяцев.",
+      "text_fact": "Доступна рассрочка на имплантацию и протезирование до 12 месяцев.",
       "render_mode": "strict",
       "detail_ref": "clinic__info__payment_terms.md#korotko",
       "followup_label": "Условия оплаты",
@@ -22,7 +22,7 @@
     "free_implant_consult": {
       "id": "free_implant_consult",
       "kind": "promo",
-      "text_fact": "Сейчас по этому протоколу можно пройти бесплатную консультацию имплантолога. На ней врач по КТ проверит, подойдёт ли выбранный протокол или лучше рассмотреть другой вариант.",
+      "text_fact": "Сейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
       "render_mode": "natural",
       "detail_ref": "clinic__info__consultation.md#korotko",
       "followup_label": "Что будет на консультации",
@@ -50,39 +50,12 @@
     "professional_whitening_discount": {
       "id": "professional_whitening_discount",
       "kind": "promo",
-      "text_fact": "Сейчас на профессиональное отбеливание действует скидка 10% до 15 июля.",
+      "text_fact": "Сейчас на профессиональное отбеливание действует скидка 10% до 15 августа.",
       "render_mode": "strict",
       "detail_ref": null,
       "followup_label": null,
       "usable_in": ["price_answer"],
-      "active_until": "2026-07-15"
-    },
-    "all_on_installment": {
-      "id": "all_on_installment",
-      "kind": "payment",
-      "text_fact": "Рассрочка от клиники до 12 месяцев, первый взнос от 30% после подписания договора.",
-      "render_mode": "strict",
-      "detail_ref": "clinic__info__payment_terms.md#korotko",
-      "followup_label": "Условия оплаты",
-      "usable_in": ["price_answer", "commercial_answer"]
-    },
-    "all_on_same_day_discount": {
-      "id": "all_on_same_day_discount",
-      "kind": "promo",
-      "text_fact": "При полной оплате в день консультации — скидка до 10% на пакет All-on.",
-      "render_mode": "strict",
-      "detail_ref": null,
-      "followup_label": null,
-      "usable_in": ["price_answer", "commercial_answer"]
-    },
-    "all_on_6_installment": {
-      "id": "all_on_6_installment",
-      "kind": "payment",
-      "text_fact": "Рассрочка в клинике до 18 месяцев, первый взнос от 25%.",
-      "render_mode": "strict",
-      "detail_ref": "clinic__info__payment_terms.md#korotko",
-      "followup_label": "Условия оплаты",
-      "usable_in": ["price_answer", "commercial_answer"]
+      "active_until": "2026-08-15"
     }
   }
 }

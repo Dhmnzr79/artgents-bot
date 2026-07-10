@@ -1,7 +1,7 @@
 # Карта маршрутизации
 
 **Статус:** синхронизировано с post-RAG runtime.  
-**Обновлено:** 2026-07-06.  
+**Обновлено:** 2026-07-10.  
 **Парный документ:** `CURRENT_ARCHITECTURE.md`.
 
 ---
@@ -23,10 +23,11 @@ request
 2. patient playbook overview для content-ситуаций;
 3. situation price overview;
 4. doctor route;
-5. composer overlay;
-6. catalog facts;
-7. price flow;
-8. composer fallback.
+5. brand/budget early (`try_brand_money_early`, `BRAND_FILTER_ON`);
+6. composer overlay;
+7. catalog facts;
+8. price flow;
+9. composer fallback.
 
 ---
 
@@ -69,10 +70,11 @@ Planner does not replace price-scope regex routing. The cancelled 5.5a-2 experim
 | 2 | content situation with playbook options | `patient_options_overview` |
 | 3 | price intent + patient situation + `SITUATION_PRICE_ON=1` | `situation_price_overview` |
 | 4 | doctor source route | doctors list or doctor ref |
-| 5 | composer can answer | composer service reply |
-| 6 | catalog facts source route | deterministic facts reply |
-| 7 | price lookup / concern | price flow |
-| 8 | content fallback | composer fallback |
+| 5 | `BRAND_FILTER_ON` + brand/budget query | `price_brand_money` early reply |
+| 6 | composer can answer | composer service reply |
+| 7 | catalog facts source route | deterministic facts reply |
+| 8 | price lookup / concern | price flow |
+| 9 | content fallback | composer fallback |
 
 ---
 

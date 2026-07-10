@@ -56,6 +56,6 @@ def test_service_specific_discount_filters_promos():
 
     assert payload is not None
     applied = payload["meta"]["marketing_promos_applied"]
-    assert "all_on_same_day_discount" in applied
+    assert "implant_same_day_discount" in applied
     assert "professional_whitening_discount" not in applied
     assert "free_implant_consult" not in applied

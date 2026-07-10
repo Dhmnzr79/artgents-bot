@@ -55,7 +55,9 @@ Materialized views, `llm_calls`, ротация истории.
 
 - `kind = "bot_event"`, `event_type`, `schema_version`, `ts`, `request_id`, `sid`, **`client_id`**, `path`, `status`, `details`.
 
-События: `user_turn_completed`, `bot_reply_completed`, `turn_complete`, `lead_submitted`, `llm_usage`, `llm_error`, `retrieval_selected`, `retrieval_fallback`, `cta_shown`.
+События: `user_turn_completed`, `bot_reply_completed`, `turn_complete`, `lead_submitted`, `llm_usage`, `llm_error`, `retrieval_selected`, `cta_shown`.
+
+`retrieval_selected` — observability выбора чанка/ref (`orchestration/helpers.py`, `log_selection`). Это не embed-RAG. Событие `retrieval_fallback` снято вместе с RAG.
 
 ---
 

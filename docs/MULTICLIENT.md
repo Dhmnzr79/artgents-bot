@@ -1,7 +1,7 @@
 # Мультиклиентность
 
 **Статус:** фактическая схема client packs после удаления RAG.  
-**Обновлено:** 2026-07-06.  
+**Обновлено:** 2026-07-10.  
 **Runtime:** `CURRENT_ARCHITECTURE.md`.
 
 ---
@@ -31,6 +31,7 @@ clients/{id}/
   widget_config.json        # тексты/allowed_origins виджета
   brand.yaml                # цвета, логотипы, аватар
   tone.yaml                 # тон и тексты lead/situation
+  ui.yaml                   # меню, fallback, price_symptom_consult
   features.yaml             # включённые подсистемы
   lead_config.yaml          # доставка заявок
 
@@ -56,6 +57,7 @@ data/{id}/
 | `widget_config.json` | тексты виджета и `allowed_origins` |
 | `brand.yaml` | визуальная тема виджета |
 | `tone.yaml` | тон ответа и служебные тексты |
+| `ui.yaml` | guided menu, fallback, price_symptom_consult |
 
 ---
 

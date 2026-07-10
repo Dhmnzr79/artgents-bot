@@ -47,7 +47,7 @@
     }
   ],
   "promo": null,
-  "fact_refs": ["installment_12"],
+  "fact_refs": ["free_implant_consult", "installment_12"],
   "followups": [],
   "cta_key": "price"
 }

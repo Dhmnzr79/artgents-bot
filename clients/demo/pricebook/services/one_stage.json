@@ -103,6 +103,7 @@
   "fact_refs": [
     "free_implant_consult",
     "implant_warranty",
+    "installment_12",
     "implant_same_day_discount"
   ],
   "followups": [

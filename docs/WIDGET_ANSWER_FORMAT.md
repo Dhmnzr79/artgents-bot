@@ -36,11 +36,13 @@
 В контекст LLM комментарии aliases **не попадают** (см. `chunk_context_md_for_llm`).  
 Модель не обязана копировать `**` из источника — виджет их отрисует, если они есть в ответе.
 
-## Answer slots (детерминированный хвост)
+## Маркетинг и промо (composer path)
 
-После текста Generator бэкенд может дописать **1–3 абзаца** из YAML frontmatter (`clinic_note`, `consult_value`, `promo_note`). Это не списки и не заголовки — только связные абзацы через пустую строку, в том же markdown-поднаборе, что и основной ответ.
+На `price_lookup` и в композер-пакете промо/платёжные факты приходят из **карточек пакета** (`fact_refs` → `facts.json`), не из frontmatter md.
 
-Порядок в `answer`: суть → слоты → (опционально) price append → policy/CTA не меняют уже записанный текст.
+Порядок в `answer`: суть (LLM) → детерминированные карточки price/promo/payment → policy/CTA не переписывают уже записанный текст.
+
+**Удалено с runtime:** answer slots из frontmatter (`clinic_note`, `consult_value`, `promo_note`) — не применяются на composer-пути. Маркетинговый смысл → `facts.json` + `marketing.yaml` (`MARKETING_EDITING_GUIDE.md`).
 
 ## Price tail (детерминированный хвост)
 
@@ -48,8 +50,8 @@
 
 | Путь | Когда | Источник |
 |------|-------|----------|
-| **PriceBook v2** | есть `pricebook/services/{service_id}.json` | `core/price_answer_assembler.py` — полный ответ + quick replies |
-| **Legacy append** | нет pricebook entry | `core/price_offers.py` → `generator_append_text` («Точные цены», этапы) |
+| **PriceBook v2** | есть `pricebook/services/{service_id}.json` (demo — всегда) | `core/price_answer_assembler.py` — полный ответ + quick replies |
+| **Legacy append** | нет pricebook entry (другие client packs) | `core/price_offers.py` → `generator_append_text` |
 
 Может содержать маркированный список с `**суммами**` — разрешённый поднабор markdown.
 

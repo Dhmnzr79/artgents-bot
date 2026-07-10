@@ -24,6 +24,7 @@
 | `WIDGET_ANSWER_FORMAT.md` | формат ответа для виджета |
 | `DASHBOARD.md` | admin dashboard, events, Postgres |
 | `MARKETING_EDITING_GUIDE.md` | как править marketing copy/config |
+| `DOCS_AUDIT.md` | снимок сверки docs vs код (2026-07-10) |
 
 ---
 

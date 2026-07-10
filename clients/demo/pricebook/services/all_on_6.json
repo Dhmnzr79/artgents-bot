@@ -104,8 +104,8 @@
   "fact_refs": [
     "free_implant_consult",
     "implant_warranty",
-    "all_on_6_installment",
-    "all_on_same_day_discount",
+    "installment_12",
+    "implant_same_day_discount",
     "tax_deduction"
   ],
   "followups": [

@@ -1,7 +1,8 @@
 # PriceBook v2 — спецификация (demo → multiclient)
 
-**Статус:** MVP runtime на demo (`pricebook_loader`, `price_answer_assembler`); legacy `price_offers` / `prices` — fallback для других pack.  
-**Scope:** пилот на `clients/demo/`; cesi/nikadent — после отмашки.  
+**Статус:** MVP runtime на demo (`pricebook_loader`, `price_answer_assembler`).  
+**Demo:** единственный источник сумм — `pricebook/services/*.json` (см. `clients/demo/pricebook/README.md`).  
+**Другие packs:** legacy `price_offers.json` / `prices.json` — fallback при отсутствии entry.  
 **Связь:** этап 3 (MVP offers) → **3.5 PriceBook v2** → этап 4 planner-lite → этап 5 verifier gate.
 
 **Парные документы:** `CURRENT_ARCHITECTURE.md` §6, `ROUTING_MAP.md`, `contracts/pricebook.py`, `TECH_DEBT.md` § PriceBook v2.
@@ -10,13 +11,7 @@
 
 ## 1. Зачем
 
-Сейчас цена живёт в **трёх местах**: `prices.json`, `price_offers.json`, `*__pricing__*.md` (+ слоты в frontmatter service-md). Отсюда:
-
-- дубли сумм (LLM из md + append из offers);
-- quick reply «Один зуб» → service md, не цена;
-- акции/вычет/рассрочка не склеиваются с price-ответом единообразно.
-
-**PriceBook v2** — одна **логическая** точка модерации на клиента: факты + суммы + кнопки. MD остаётся для экспертных ответов и длинных текстов, **не для ₽**.
+Раньше цена жила в нескольких местах (`prices.json`, `price_offers.json`, pricing-md). **На demo** это сведено в `pricebook/`. MD — для экспертных ответов, **не для ₽**.
 
 ---
 
@@ -51,12 +46,11 @@ clients/{id}/
   price_brand_aliases.json  # без изменений (MVP)
 ```
 
-**Миграция (без big bang):**
+**Миграция (demo — завершена; другие packs):**
 
-1. Оставить `price_offers.json` + `prices.json` — loader читает их как legacy.
-2. Добавить `pricebook/` на demo; runtime: если есть service file → PriceBook, иначе legacy.
-3. Убрать ₽ из `*__pricing__*.md`; `price_ref` → опционально `explain_ref` (md без цифр) или убрать LLM на offers-path.
-4. Слить `prices.json` в simple entries в pricebook.
+1. Legacy `price_offers.json` + `prices.json` — loader читает как fallback.
+2. Если есть `pricebook/services/{id}.json` → PriceBook, иначе legacy.
+3. ₽ не хранить в pricing-md; акции — в `facts.json` + `fact_refs`, не в поле `promo` на service file.
 
 ---
 
@@ -93,7 +87,7 @@ clients/{id}/
     "installment_12": {
       "id": "installment_12",
       "kind": "payment",
-      "text_fact": "Доступна рассрочка от клиники до 12 месяцев.",
+      "text_fact": "Доступна рассрочка на имплантацию и протезирование до 12 месяцев.",
       "render_mode": "strict",
       "detail_ref": "clinic__info__payment_terms.md#korotko",
       "usable_in": ["price_answer", "commercial_answer"]
@@ -101,15 +95,40 @@ clients/{id}/
     "free_implant_consult": {
       "id": "free_implant_consult",
       "kind": "promo",
-      "text_fact": "Бесплатная консультация имплантолога при записи на протокол.",
+      "text_fact": "Сейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
       "render_mode": "natural",
       "detail_ref": "clinic__info__consultation.md#korotko",
       "usable_in": ["price_answer"],
       "active_until": "2026-12-31"
+    },
+    "implant_same_day_discount": {
+      "id": "implant_same_day_discount",
+      "kind": "promo",
+      "text_fact": "При оплате в день обращения — скидка до 15% на имплантацию.",
+      "render_mode": "strict",
+      "usable_in": ["price_answer", "commercial_answer"]
+    },
+    "professional_whitening_discount": {
+      "id": "professional_whitening_discount",
+      "kind": "promo",
+      "text_fact": "Сейчас на профессиональное отбеливание действует скидка 10% до 15 августа.",
+      "render_mode": "strict",
+      "usable_in": ["price_answer"],
+      "active_until": "2026-08-15"
+    },
+    "implant_warranty": {
+      "id": "implant_warranty",
+      "kind": "warranty",
+      "text_fact": "Гарантия на работу врача — 1 год. На импланты Impro и Nobel — пожизненная, на Implantium — 5 лет.",
+      "render_mode": "strict",
+      "detail_ref": "clinic__info__warranty.md#korotko",
+      "usable_in": ["price_answer", "commercial_answer"]
     }
   }
 }
 ```
+
+Полный актуальный файл: `clients/demo/pricebook/facts.json`. Правила показа promo — `clients/demo/marketing.yaml` → `promo_rules`.
 
 **Runtime (целевой):**
 
@@ -154,21 +173,18 @@ clients/{id}/
   "price_model": "simple",
   "display_name": "Профессиональное отбеливание",
   "price": {
-    "price_type": "fixed",
-    "value": 15000,
+    "price_type": "from",
+    "value": 18000,
     "currency": "RUB",
-    "note": null
+    "note": "Точная стоимость зависит от выбранного протокола"
   },
-  "promo": {
-    "text": "Сейчас на эту процедуру скидка 10% до 15 июля.",
-    "active_until": "2026-07-15"
-  },
-  "fact_refs": [],
+  "promo": null,
+  "fact_refs": ["professional_whitening_discount"],
   "followups": []
 }
 ```
 
-*(demo: значения пример; синхронизировать с `prices.json` при миграции.)*
+Скидки и акции — через **`fact_refs` → `facts.json`**, не через поле `promo` на service file.
 
 ### 4.4 Simple + кнопка (`services/pulpitis.json`)
 
@@ -267,7 +283,7 @@ Planner (этап 4) выбирает **сценарий**; Assembler собир
 ### 6.1 Отбеливание (S1)
 
 **Q:** Сколько стоит отбеливание?  
-**A:** Живое intro (1–2 предложения) → «**18 000 ₽**» → fact_refs, например «Скидка 10% до 15 июля» / условия оплаты, если разрешены правилами маркетинга.  
+**A:** Живое intro (1–2 предложения) → «**от 18 000 ₽**» → `professional_whitening_discount` (10% до 15 августа), если разрешено `promo_rules`.  
 **must_not:** дубль суммы; «точную стоимость уточните» без данных.
 
 ### 6.2 Пульпит (S2)
@@ -328,7 +344,7 @@ Retrieval-вопрос «можно вычет?» → md/fact. Price-ответ 
 
 - название, tags, unit
 - variants (бренды, суммы, этапы, входит)
-- promo / fact_refs
+- `fact_refs` (не дублировать promo-текст в service `promo`)
 - кнопки
 
 **Shared** — только в `facts.json` (вычет, рассрочка). Для каждого fact явно выставить **`render_mode`**.
@@ -337,7 +353,7 @@ Retrieval-вопрос «можно вычет?» → md/fact. Price-ответ 
 
 | Тип | Пример | Режим |
 |-----|--------|--------|
-| Процент, сумма скидки, дата акции | 13%, до 15 июля | strict |
+| Процент, сумма скидки, дата акции | 13%, до 15 августа | strict |
 | Рассрока «до N месяцев» | 12 месяцев | strict |
 | Мягкий promo / консультация | бесплатная консультация | natural |
 
@@ -364,7 +380,7 @@ price_lookup
   → verifier gate (этап 5): любая ₽ ∈ PriceBook
 ```
 
-**Legacy path (до миграции):** `price_offers.json` + `price_flow` LLM+append — помечен TECH_DEBT.
+**Legacy path:** `price_offers.json` + append — только клиенты без pricebook entry (`TECH_DEBT.md`).
 
 ---
 
@@ -393,6 +409,7 @@ price_lookup
 
 ## 13. Открытые решения
 
-1. **Whitening 15k vs 18k** в demo — сверить с `prices.json` при миграции.
-2. **Скуловая имплантация** — добавить в group `full_jaw` или policy «не делаем».
-3. **LLM intro** — всегда или только complex; MVP complex-only.
+1. **Скуловая имплантация** — добавить в group `full_jaw` или policy «не делаем».
+2. **LLM intro** — всегда или только complex; MVP complex-only.
+
+**Закрыто:** цена отбеливания demo = **18 000 ₽** (`from`); акции demo сведены в `facts.json` (см. `MARKETING_EDITING_GUIDE.md`).

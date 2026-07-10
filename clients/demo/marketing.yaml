@@ -109,10 +109,15 @@ promo_rules:
       - all_on_4
       - all_on_6
       - classic
+      - clasp_dentures
+      - implant_supported_prosthetics
       - one_stage
       - pterygoid_implants
+      - removable_dentures
       - sinus_lift
       - temporary_teeth
+      - veneers
+      - zirconia_crowns
       - zygomatic_implants
     allowed_routes:
       - price_lookup
@@ -131,8 +136,13 @@ promo_rules:
     active_until: "2026-12-31"
     fact_ref: implant_same_day_discount
     allowed_service_ids:
+      - all_on_4
+      - all_on_6
       - classic
       - one_stage
+      - pterygoid_implants
+      - sinus_lift
+      - zygomatic_implants
     allowed_routes:
       - price_lookup
       - promo_overview
@@ -146,28 +156,10 @@ promo_rules:
 
   professional_whitening_discount:
     active: true
-    active_until: "2026-07-15"
+    active_until: "2026-08-15"
     fact_ref: professional_whitening_discount
     allowed_service_ids:
       - professional_whitening
-    allowed_routes:
-      - price_lookup
-      - promo_overview
-    allowed_aspects:
-      - overview
-    blocked_aspects:
-      - pain
-      - contraindications
-      - safety
-      - complications
-
-  all_on_same_day_discount:
-    active: true
-    active_until: "2026-12-31"
-    fact_ref: all_on_same_day_discount
-    allowed_service_ids:
-      - all_on_4
-      - all_on_6
     allowed_routes:
       - price_lookup
       - promo_overview

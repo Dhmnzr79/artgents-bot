@@ -1,7 +1,7 @@
 # Tech Debt
 
 **Статус:** открытый долг после post-RAG cleanup.  
-**Обновлено:** 2026-07-06.  
+**Обновлено:** 2026-07-10.  
 **Runtime:** `CURRENT_ARCHITECTURE.md`.
 
 ---
@@ -43,7 +43,8 @@
 | Superseded composer/dialog/marketing roadmaps | удалены из `docs/`; история остаётся в git |
 | Pre-resolver booking LLM | lead gate только по explicit booking regex/ref; policy LLM не перехватывает ход |
 | Dialog focus roadmap | реализован, отдельный roadmap удалён |
-| Marketing cleanup roadmap/audit | отработаны, отдельные docs удалены |
+| Marketing cleanup demo (2026-07) | акции сведены в `facts.json` + `promo_rules`; см. `MARKETING_EDITING_GUIDE.md` |
+| Whitening 15k vs 18k | demo: **18 000 ₽** `from` в pricebook |
 | Price-scope planner experiment 5.5a-2 | отменён; regex price-routing остаётся для dental bot |
 
 ---
@@ -56,7 +57,7 @@
 |---|---|
 | 1 | Simple service detail refs: “что входит” должно уметь открывать detail md без новой цены |
 | 2 | Brand group routing: “корейские импланты” должен попадать в `brand_group`, если это есть в данных |
-| 3 | Legacy price fallbacks: постепенно закрыть pricebook entries, чтобы суммы жили в одном месте |
+| 3 | Legacy price fallbacks — для cesi/nikadent; demo уже на чистом pricebook |
 | 4 | Catalog price refs: привести catalog к целевому `pricebook_id`, где нужно |
 | 5 | Pricebook lint: проверять resolvable followup/detail refs |
 | 6 | Product eval: не ослаблять golden при переходе на компактные deterministic replies |

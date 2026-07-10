@@ -120,8 +120,8 @@ BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
     "yes",
 )
 
-# --- Brand filter + budget anchor on implant price path (money-path marketing; default OFF) ---
-BRAND_FILTER_ON = os.getenv("BRAND_FILTER_ON", "0").lower() in (
+# --- Brand filter + budget anchor on implant price path (money-path marketing; default ON, env "0" = kill-switch) ---
+BRAND_FILTER_ON = os.getenv("BRAND_FILTER_ON", "1").lower() in (
     "1",
     "true",
     "yes",

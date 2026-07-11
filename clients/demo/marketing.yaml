@@ -1,11 +1,5 @@
 version: 1
 
-limits:
-  max_text_ingredients: 1
-  max_cta: 1
-  promo_cooldown_turns: 3
-  proof_cooldown_turns: 3
-
 blocked_aspects_for_promo:
   - pain
   - contraindications

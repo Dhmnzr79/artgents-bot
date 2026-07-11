@@ -905,6 +905,9 @@ def _composer_fullctx_clarify_allowed() -> bool:
 
 def _parse_packet_composer_fullctx_json(raw: str, *, client_id: str | None) -> tuple[str, dict]:
     obj = json.loads(raw)
+    if isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], dict):
+        log_json(logger, "packet_composer_fullctx_list_unwrapped", client_id=client_id)
+        obj = obj[0]
     if not isinstance(obj, dict):
         raise ValueError("packet_composer_fullctx_not_object")
     answer = str(obj.get("answer") or "").strip()

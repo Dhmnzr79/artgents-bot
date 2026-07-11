@@ -222,6 +222,55 @@ def test_fullctx_composer_messages_include_kb_aspects_and_price_card(monkeypatch
     assert "18 000" in user
 
 
+def test_fullctx_parse_list_wrap_g3_real_payload(monkeypatch):
+    """Repair: G3 flake payload [{\"answer\":...}] unwraps to composer answer."""
+    from llm import _parse_packet_composer_fullctx_json
+
+    answer_text = (
+        "Стоимость классической имплантации одного зуба зависит от выбранной системы:\n\n"
+        "Implantium (Южная Корея) — **76 200 ₽**\nImpro (Германия) — **85 200 ₽**\n"
+        "Nobel Biocare (Швейцария) — **101 200 ₽**\n\n"
+        "В эту сумму уже входят: сам имплант с документами, работа хирурга и анестезия, коронка на имплант."
+    )
+    raw = json.dumps([{"answer": answer_text}], ensure_ascii=False)
+    answer, extra = _parse_packet_composer_fullctx_json(raw, client_id="demo")
+    assert "76 200" in answer
+    assert "85 200" in answer
+    assert "101 200" in answer
+    assert extra == {}
+
+    def _fake_create(**kwargs):
+        class _Msg:
+            content = raw
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("llm.chat_completions_create", _fake_create)
+    monkeypatch.setattr("llm.COMPOSER_ON", True)
+    monkeypatch.setattr("llm.FULLCTX_ON", True)
+    monkeypatch.setattr("llm.CHAT_JSON_MODE", True)
+
+    from core.knowledge_base import assemble_client_knowledge_base
+
+    kb = assemble_client_knowledge_base("demo")
+    composed, meta = generate_answer_from_packet_fullctx(
+        "нет зуба, сколько стоит классическая имплантация?",
+        kb,
+        ["price"],
+        [],
+        {"client_id": "demo"},
+        "fullctx-list-wrap-test",
+    )
+    assert meta.get("composer_used") is True
+    assert composed == answer
+
+
 def test_build_messages_for_packet_composer_fullctx_structure():
     from core.knowledge_base import assemble_client_knowledge_base
 

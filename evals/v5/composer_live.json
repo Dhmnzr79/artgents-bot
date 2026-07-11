@@ -214,12 +214,11 @@
     {
       "id": "G3",
       "group": "G",
-      "question": "Сколько стоит all-on-4?",
+      "question": "нет зуба, сколько стоит классическая имплантация?",
       "client_id": "demo",
       "expected_path": "composer",
       "expected_aspects": ["price"],
-      "expected_amounts": [318000, 368000, 428000],
-      "requires_price_symptom_consult": true
+      "expected_amounts": [76200, 85200, 101200]
     },
     {
       "id": "H1",

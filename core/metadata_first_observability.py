@@ -69,6 +69,13 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 
+# Eval-net routing provenance: E2E test-hook only (not widget). Behavior-neutral read of ctx.
+_ROUTING_PROVENANCE_CTX_KEYS: tuple[str, ...] = (
+    "turn_planner_used",
+    "resolver_used",
+    "source_route_decision",
+)
+
 _MERGE_DEBUG_META_KEYS: tuple[str, ...] = (
     "candidate_pool_before",
     "candidate_pool_after",
@@ -126,12 +133,18 @@ def retrieval_pool_turn_details(ctx: dict[str, Any] | None = None) -> dict[str, 
     return {k: ctx[k] for k in RETRIEVAL_POOL_CTX_KEYS if k in ctx}
 
 
+def _routing_provenance_from_ctx(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Read-only slice of ctx routing provenance (no side effects)."""
+    return {k: ctx[k] for k in _ROUTING_PROVENANCE_CTX_KEYS if k in ctx}
+
+
 def metadata_first_turn_details() -> dict[str, Any]:
-    """Subset for turn_complete / retrieval events."""
+    """Subset for turn_complete / retrieval events (includes provenance for logs)."""
     if not hasattr(request, "ctx"):
         return {}
     ctx = request.ctx
     out = {k: ctx[k] for k in _METADATA_FIRST_TURN_KEYS if k in ctx}
+    out.update(_routing_provenance_from_ctx(ctx))
     pool = retrieval_pool_turn_details(ctx)
     if pool:
         out["retrieval_pool"] = pool
@@ -139,8 +152,20 @@ def metadata_first_turn_details() -> dict[str, Any]:
 
 
 def metadata_first_response_meta() -> dict[str, Any]:
-    """Subset of ctx fields for eval runner (`meta.metadata_first`)."""
-    return metadata_first_turn_details()
+    """Subset of ctx fields for eval runner (`meta.metadata_first`).
+
+    Routing provenance keys are attached only under E2E_USE_TEST_CLIENT=1 (test hook).
+    """
+    if not hasattr(request, "ctx"):
+        return {}
+    ctx = request.ctx
+    out = {k: ctx[k] for k in _METADATA_FIRST_TURN_KEYS if k in ctx}
+    pool = retrieval_pool_turn_details(ctx)
+    if pool:
+        out["retrieval_pool"] = pool
+    if should_expose_metadata_first_in_response():
+        out.update(_routing_provenance_from_ctx(ctx))
+    return out
 
 
 def record_decision_frame_ctx(decision: Any | None) -> None:

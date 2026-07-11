@@ -205,12 +205,125 @@ def infer_route_from_response(resp: dict[str, Any]) -> str:
     return ""
 
 
+def _routing_provenance_dict(row: dict[str, Any], key: str) -> dict[str, Any]:
+    raw = row.get(key)
+    return raw if isinstance(raw, dict) else {}
+
+
+# Baseline matrix: assert stable final route only (not flaky intermediate signals).
+_STABLE_BASELINE_PROVENANCE_FIELDS: tuple[str, ...] = (
+    "route_intent",
+    "source",
+    "answer_path",
+    "orch_route",
+)
+_DIAGNOSTIC_PROVENANCE_FIELDS: frozenset[str] = frozenset({"turn_planner_used", "resolver_used"})
+
+
+def extract_routing_provenance(resp: dict[str, Any]) -> dict[str, Any]:
+    """Decision provenance from /ask meta (requires E2E_USE_TEST_CLIENT=1 for full slice)."""
+    meta = resp.get("meta") if isinstance(resp.get("meta"), dict) else {}
+    mf = meta.get("metadata_first") if isinstance(meta.get("metadata_first"), dict) else {}
+    srd = mf.get("source_route_decision")
+    if not isinstance(srd, dict):
+        srd = (
+            meta.get("source_route_decision")
+            if isinstance(meta.get("source_route_decision"), dict)
+            else {}
+        )
+    source = str(srd.get("source") or "").strip().lower()
+    if not source:
+        family = str(meta.get("ui_source_family") or "").strip().lower()
+        if family == "trust":
+            source = "trust"
+    route_intent = str(mf.get("route_intent") or meta.get("intent") or "").strip().lower()
+    return {
+        "turn_planner_used": mf.get("turn_planner_used"),
+        "route_intent": route_intent,
+        "source": source,
+        "answer_path": str(meta.get("answer_path") or "").strip().lower(),
+        "orch_route": infer_route_from_response(resp),
+    }
+
+
+def _provenance_value_ok(*, field: str, got: Any, want: Any) -> bool:
+    if want is None:
+        return True
+    if field == "turn_planner_used":
+        return bool(got) == bool(want)
+    got_s = norm(str(got or ""))
+    if isinstance(want, list) and all(isinstance(x, str) for x in want):
+        return got_s in {norm(str(x)) for x in want if str(x).strip()}
+    return got_s == norm(str(want))
+
+
+def _provenance_fields_to_check(spec: dict[str, Any], *, baseline: bool) -> list[str]:
+    """Fields to assert. Baseline: stable route only; target: all except diagnostics."""
+    if baseline:
+        return [f for f in _STABLE_BASELINE_PROVENANCE_FIELDS if f in spec or f"{f}_any" in spec]
+    return [
+        f
+        for f in spec
+        if not f.endswith("_any") and f not in _DIAGNOSTIC_PROVENANCE_FIELDS
+    ]
+
+
+def validate_routing_provenance(
+    *,
+    row: dict[str, Any],
+    provenance: dict[str, Any],
+    baseline: bool = False,
+) -> str | None:
+    """Return fail reason or None.
+
+    baseline=True (routing_matrix): assert stable ``current`` provenance (final route).
+    ``turn_planner_used`` is diagnostic only — never pass/fail.
+    baseline=False: assert ``target`` provenance (P1 gate); diagnostics also skipped.
+    """
+    spec = _routing_provenance_dict(row, "current" if baseline else "target")
+    if not spec:
+        return None
+
+    for field in _provenance_fields_to_check(spec, baseline=baseline):
+        want = spec.get(field)
+        if want is None:
+            continue
+        got = provenance.get(field)
+        if not _provenance_value_ok(field=field, got=got, want=want):
+            label = "current" if baseline else "target"
+            return f"provenance.{label}.{field}: got={got!r} want={want!r}"
+
+    for field in ("route_intent", "source", "answer_path", "orch_route"):
+        if baseline and field not in _STABLE_BASELINE_PROVENANCE_FIELDS:
+            continue
+        want_any = spec.get(f"{field}_any")
+        if isinstance(want_any, list) and all(isinstance(x, str) for x in want_any):
+            got = provenance.get(field)
+            if norm(str(got or "")) not in {norm(str(x)) for x in want_any if str(x).strip()}:
+                label = "current" if baseline else "target"
+                return f"provenance.{label}.{field}: got={got!r} want_any={want_any!r}"
+
+    if baseline:
+        return None
+
+    forbidden = _routing_provenance_dict(row, "target_forbidden")
+    for field, forbidden_vals in forbidden.items():
+        if not isinstance(forbidden_vals, list):
+            continue
+        got = provenance.get(field)
+        if norm(str(got or "")) in {norm(str(x)) for x in forbidden_vals if str(x).strip()}:
+            return f"provenance_forbidden.{field}: got={got!r} forbidden={forbidden_vals!r}"
+
+    return None
+
+
 def validate_smoke_case(
     *,
     row: dict[str, Any],
     resp: dict[str, Any],
     answer: str,
     route: str,
+    routing_matrix: bool = False,
 ) -> CaseResult | None:
     """
     Return CaseResult on FAIL/SKIP, or None if all checks pass.
@@ -220,6 +333,18 @@ def validate_smoke_case(
 
     if row.get("skip"):
         return CaseResult(case_id=case_id, status="SKIP", reason="marked skip", coverage_class=cov)
+
+    provenance = extract_routing_provenance(resp)
+    prov_reason = validate_routing_provenance(
+        row=row, provenance=provenance, baseline=routing_matrix
+    )
+    if prov_reason:
+        return CaseResult(
+            case_id=case_id,
+            status="FAIL",
+            reason=prov_reason,
+            coverage_class=cov,
+        )
 
     if row.get("aspect_planner_llm_required"):
         if not (os.getenv("ASPECT_PLANNER_LLM_ON") or "").strip().lower() in {
@@ -265,6 +390,15 @@ def validate_smoke_case(
                 reason=f"route: got={route!r} want={expected_route!r}",
                 coverage_class=cov,
             )
+
+    forbidden_routes = str_list_field(row, "forbidden_routes")
+    if forbidden_routes and norm(route) in {norm(x) for x in forbidden_routes}:
+        return CaseResult(
+            case_id=case_id,
+            status="FAIL",
+            reason=f"forbidden route: got={route!r} forbidden={forbidden_routes!r}",
+            coverage_class=cov,
+        )
 
     parity_reason = validate_composer_parity(row=row, answer=answer, meta=meta)
     if parity_reason:
@@ -784,6 +918,7 @@ def run_smoke_suite(
     known_fail_ids: set[str] = set()
     if isinstance(known_raw, list):
         known_fail_ids = {str(x).strip() for x in known_raw if str(x).strip()}
+    routing_matrix = bool(spec.get("routing_matrix"))
 
     if expand_multiclient:
         cases = expand_cases([r for r in cases if isinstance(r, dict)])
@@ -867,7 +1002,9 @@ def run_smoke_suite(
 
         answer = str(resp.get("answer") or "")
         route = infer_route_from_response(resp)
-        fail = validate_smoke_case(row=row, resp=resp, answer=answer, route=route)
+        fail = validate_smoke_case(
+            row=row, resp=resp, answer=answer, route=route, routing_matrix=routing_matrix
+        )
         if fail is not None:
             if fail.status == "SKIP":
                 skipped += 1
@@ -910,6 +1047,8 @@ def run_smoke_suite(
     print_coverage_summary(results)
 
     if filter_ids is not None:
+        return 0 if errors == 0 and failed == 0 else (2 if errors > 0 else 1)
+    if routing_matrix:
         return 0 if errors == 0 and failed == 0 else (2 if errors > 0 else 1)
     if baseline is None:
         return 0 if errors == 0 else 2

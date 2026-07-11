@@ -96,14 +96,37 @@ def test_should_expose_metadata_first_gated_by_env(monkeypatch) -> None:
     assert should_expose_metadata_first_in_response() is True
 
 
-def test_metadata_first_response_meta_matches_turn_details() -> None:
+def test_routing_provenance_gated_in_response_meta(monkeypatch) -> None:
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
         from flask import request
 
-        request.ctx = {"fallback_used": True, "selected_doc_type": "comparison"}
-        assert metadata_first_response_meta()["fallback_used"] is True
-        assert metadata_first_response_meta()["selected_doc_type"] == "comparison"
+        request.ctx = {
+            "fallback_used": True,
+            "turn_planner_used": True,
+            "source_route_decision": {"source": "none"},
+        }
+        monkeypatch.delenv("E2E_USE_TEST_CLIENT", raising=False)
+        meta = metadata_first_response_meta()
+        assert "turn_planner_used" not in meta
+        assert "source_route_decision" not in meta
+        assert meta.get("fallback_used") is True
+
+        monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
+        meta_e2e = metadata_first_response_meta()
+        assert meta_e2e.get("turn_planner_used") is True
+        assert meta_e2e.get("source_route_decision") == {"source": "none"}
+
+
+def test_routing_provenance_in_turn_details_for_logs() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {"route_intent": "content", "turn_planner_used": False}
+        details = metadata_first_turn_details()
+        assert details.get("turn_planner_used") is False
+        assert details.get("route_intent") == "content"
 
 
 def test_retrieval_pool_turn_details_slice() -> None:

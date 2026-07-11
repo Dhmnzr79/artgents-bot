@@ -1,0 +1,212 @@
+{
+  "routing_matrix": true,
+  "baseline": null,
+  "description": "Eval-net emotion/fear. Assert: stable final route (route_intent, source, answer_path, orch_route) == current. turn_planner_used in current_diagnostic only (no pass/fail). target = P1 goal. Resnapshot: 2026-07-11 clean main, 3x stable.",
+  "cases": [
+    {
+      "id": "emotion_fear_pain",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Боюсь, что имплантация будет больно",
+      "coverage_class": "STRONG",
+      "current": {
+        "route_intent": "content",
+        "source": "none",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": true
+      },
+      "target": {
+        "route_intent": "content",
+        "source_any": ["catalog_md", "catalog_facts", "none"],
+        "answer_path": "composer"
+      },
+      "target_forbidden": {
+        "route_intent": ["price_concern", "price_lookup"],
+        "source": ["trust", "price_concern", "price_card", "price_ref"],
+        "orch_route": ["trust_chunk", "price_concern", "price_lookup"]
+      }
+    },
+    {
+      "id": "emotion_fear_whitening",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Страшно делать отбеливание, вдруг больно",
+      "coverage_class": "STRONG",
+      "current": {
+        "route_intent": "content",
+        "source": "catalog_facts",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": true
+      },
+      "target": {
+        "route_intent": "content",
+        "source_any": ["none", "catalog_md", "catalog_facts"],
+        "answer_path": "composer"
+      },
+      "target_forbidden": {
+        "route_intent": ["price_concern", "price_lookup"],
+        "source": ["trust", "price_concern"],
+        "orch_route": ["trust_chunk", "price_concern", "price_lookup"]
+      }
+    },
+    {
+      "id": "emotion_fear_duration",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Боюсь, что лечение займёт много времени",
+      "coverage_class": "STRONG",
+      "baseline_note": "flake fail-open turn_planner_used (нестабилен между прогонами) → цель стабилизации P0",
+      "current": {
+        "route_intent": "content",
+        "source": "none",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": true
+      },
+      "target": {
+        "route_intent": "content",
+        "source_any": ["none", "catalog_md", "catalog_facts"],
+        "answer_path": "composer"
+      },
+      "target_forbidden": {
+        "route_intent": ["price_concern", "price_lookup"],
+        "source": ["trust", "price_concern"],
+        "orch_route": ["trust_chunk", "price_concern", "price_lookup"]
+      }
+    },
+    {
+      "id": "emotion_fear_doctors",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Боюсь, что врачи неопытные",
+      "coverage_class": "STRONG",
+      "baseline_note": "flake fail-open turn_planner_used → цель стабилизации P0",
+      "current": {
+        "route_intent": "content",
+        "source": "none",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": false
+      },
+      "target": {
+        "route_intent": "content",
+        "source_any": ["doctor", "catalog_md", "catalog_facts", "none"],
+        "answer_path_any": ["composer", "single_source"]
+      },
+      "target_forbidden": {
+        "route_intent": ["price_concern", "price_lookup"],
+        "source": ["price_concern"],
+        "orch_route": ["price_concern", "price_lookup"]
+      }
+    },
+    {
+      "id": "emotion_fear_osseo_t8",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Боюсь, что имплант не приживётся",
+      "coverage_class": "STRONG",
+      "baseline_note": "flake fail-open turn_planner_used; стабильный баг маршрута price_concern → цель P0+P1",
+      "current": {
+        "route_intent": "price_concern",
+        "source": "price_concern",
+        "answer_path": "composer",
+        "orch_route": "price_concern"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": false
+      },
+      "target": {
+        "route_intent": "content",
+        "source_any": ["catalog_md", "catalog_facts", "none"],
+        "answer_path_any": ["composer", "single_source"]
+      },
+      "target_forbidden": {
+        "route_intent": ["price_concern", "price_lookup"],
+        "source": ["price_concern", "price_card", "price_ref"],
+        "orch_route": ["price_concern", "price_lookup", "trust_chunk"]
+      }
+    },
+    {
+      "id": "emotion_t7_medzone_personal",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "У меня пародонтоз, можно ли мне имплант?",
+      "coverage_class": "MEDIUM",
+      "baseline_note": "flake fail-open turn_planner_used → цель стабилизации P0",
+      "current": {
+        "route_intent": "content",
+        "source": "catalog_md",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": false
+      },
+      "target": {
+        "route_intent": "content",
+        "answer_path_any": ["composer", "single_source", "price_symptom_consult"]
+      },
+      "target_forbidden": {
+        "source": ["trust"],
+        "orch_route": ["trust_chunk", "trust_handoff"]
+      },
+      "answer_signals_any": ["консультац", "врач", "план", "КТ"]
+    },
+    {
+      "id": "emotion_rep_experience",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Врачи опытные?",
+      "coverage_class": "STRONG",
+      "current": {
+        "route_intent": "content",
+        "source": "none",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": true
+      },
+      "target": {
+        "route_intent": "content",
+        "source": "trust",
+        "answer_path": "single_source",
+        "orch_route": "trust_chunk"
+      },
+      "answer_signals_any": ["стаж", "опыт", "11", "19", "85"]
+    },
+    {
+      "id": "emotion_rep_reviews",
+      "group": "emotion",
+      "client_id": "demo",
+      "question": "Есть отзывы?",
+      "coverage_class": "STRONG",
+      "current": {
+        "route_intent": "content",
+        "source": "none",
+        "answer_path": "composer",
+        "orch_route": "content"
+      },
+      "current_diagnostic": {
+        "turn_planner_used": true
+      },
+      "target": {
+        "route_intent": "content",
+        "source": "trust",
+        "answer_path": "single_source",
+        "orch_route": "trust_chunk"
+      },
+      "answer_signals_any": ["отзыв", "оценк"]
+    }
+  ]
+}

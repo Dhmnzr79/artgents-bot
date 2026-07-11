@@ -15,10 +15,13 @@ _SUITES: dict[str, str] = {
     "smoke": "demo/smoke.json",
     "risk": "demo/risk.json",
     "golden": "demo/golden.json",
+    "emotion": "demo/emotion.json",
 }
 
 # Product CI runs smoke+risk only; golden grows incrementally (run --suite golden locally).
 _CI_SUITES = ("smoke", "risk")
+# Routing gate for strangler pilot (emotion P0/P1)
+_ROUTING_SUITES = ("emotion",)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -29,9 +32,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--suite",
-        choices=[*_SUITES.keys(), "all", "product"],
+        choices=[*_SUITES.keys(), "all", "product", "routing"],
         default="all",
-        help="smoke | risk | golden | product (smoke+risk) | all (default: all suites in file)",
+        help=(
+            "smoke | risk | golden | emotion | routing (=emotion) | "
+            "product (smoke+risk) | all (default: all suites in file)"
+        ),
     )
     ap.add_argument("--client", default=None, metavar="CLIENT_ID")
     ap.add_argument("--case-id", action="append", default=None, metavar="ID")
@@ -62,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if ns.suite == "product":
         suites = list(_CI_SUITES)
+    elif ns.suite == "routing":
+        suites = list(_ROUTING_SUITES)
     elif ns.suite == "all":
         suites = list(_SUITES.keys())
     else:

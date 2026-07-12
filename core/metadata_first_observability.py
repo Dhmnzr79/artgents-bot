@@ -66,6 +66,9 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     "aspect_planner_source",
     "aspect_planner_aspects",
     "answer_packet",
+    "turn_frame_shadow",
+    "turn_frame_shadow_status",
+    "turn_frame_shadow_reason",
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 

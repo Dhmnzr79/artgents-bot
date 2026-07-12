@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from core.metadata_first_observability import (
@@ -174,3 +176,93 @@ def test_patient_situation_clarify_telemetry_in_turn_details() -> None:
         assert details["patient_situation_should_clarify"] is True
         assert details["patient_situation_clarify_question"]
         assert details["patient_situation_clarification_reason"] == "vague_location"
+
+
+def test_turn_frame_shadow_keys_in_turn_details() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "route_intent": "content",
+            "turn_frame_shadow_status": "ok",
+            "turn_frame_shadow": {"intent": "content", "aspects": ["overview"], "primary_aspect": "overview"},
+        }
+        details = metadata_first_turn_details()
+        assert details["turn_frame_shadow_status"] == "ok"
+        assert details["turn_frame_shadow"]["intent"] == "content"
+        assert "turn_frame_shadow_reason" not in details
+
+
+def test_turn_frame_shadow_reason_in_turn_details_when_present() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "turn_frame_shadow_status": "not_available",
+            "turn_frame_shadow_reason": "turn_plan_missing",
+        }
+        details = metadata_first_turn_details()
+        assert details["turn_frame_shadow_status"] == "not_available"
+        assert details["turn_frame_shadow_reason"] == "turn_plan_missing"
+
+
+def test_turn_frame_shadow_keys_in_response_meta_slice(monkeypatch) -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {
+            "turn_frame_shadow_status": "ok",
+            "turn_frame_shadow": {"intent": "price_lookup", "aspects": ["price"], "primary_aspect": "price"},
+        }
+        monkeypatch.delenv("E2E_USE_TEST_CLIENT", raising=False)
+        meta = metadata_first_response_meta()
+        assert meta["turn_frame_shadow_status"] == "ok"
+        assert meta["turn_frame_shadow"]["intent"] == "price_lookup"
+
+
+def test_finalize_ask_includes_turn_frame_shadow_with_e2e_env(monkeypatch) -> None:
+    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        from orchestration.finalize_turn import finalize_ask
+
+        request.ctx = {
+            "turn_frame_shadow_status": "ok",
+            "turn_frame_shadow": {
+                "intent": "content",
+                "aspects": ["overview"],
+                "primary_aspect": "overview",
+            },
+        }
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask({"answer": "ответ", "meta": {}}, "sid", "q", route="retrieval_chunk")
+    mf = out["meta"].get("metadata_first")
+    assert isinstance(mf, dict)
+    assert mf.get("turn_frame_shadow_status") == "ok"
+    assert mf.get("turn_frame_shadow", {}).get("intent") == "content"
+
+
+def test_finalize_ask_omits_metadata_first_without_e2e_env(monkeypatch) -> None:
+    monkeypatch.delenv("E2E_USE_TEST_CLIENT", raising=False)
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        from orchestration.finalize_turn import finalize_ask
+
+        request.ctx = {
+            "turn_frame_shadow_status": "ok",
+            "turn_frame_shadow": {"intent": "content", "aspects": ["overview"], "primary_aspect": "overview"},
+        }
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask({"answer": "x", "meta": {}}, "sid", "q", route="retrieval_chunk")
+    assert "metadata_first" not in (out.get("meta") or {})

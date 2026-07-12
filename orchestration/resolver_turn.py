@@ -9,6 +9,7 @@ from flask import request
 
 from config import COMPARISON_QUERY_RE, TURN_PLANNER_ON
 from core.metadata_first_observability import record_decision_frame_ctx
+from core.turn_frame_shadow import mark_turn_frame_shadow_not_available, record_turn_frame_shadow
 from query_selector import commercial_info_query, consultation_info_query
 from core.routing_loader import THRESHOLDS
 from llm import classify_intent
@@ -86,8 +87,10 @@ def run_resolver_turn(
                 decision = decision.model_copy(update={"query_mode": "comparison"})
             request.ctx["effective_intent"] = str(intent)
             record_decision_frame_ctx(decision)
+            record_turn_frame_shadow(turn_plan=plan, decision_frame=decision)
         else:
             request.ctx["turn_planner_used"] = False
+            mark_turn_frame_shadow_not_available()
             log_json(
                 logger,
                 "turn_planner_fail_open_to_resolver",

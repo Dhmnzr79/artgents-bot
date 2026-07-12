@@ -73,6 +73,9 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
 _ROUTING_PROVENANCE_CTX_KEYS: tuple[str, ...] = (
     "turn_planner_used",
     "resolver_used",
+    "turn_planner_safe_default",
+    "turn_plan_emotion",
+    "turn_plan_aspects",
     "source_route_decision",
 )
 

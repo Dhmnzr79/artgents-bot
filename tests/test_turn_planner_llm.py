@@ -249,3 +249,64 @@ def test_plan_turn_validates_brand_filter(monkeypatch):
     assert plan is not None
     assert plan.brand_filter is not None
     assert plan.brand_filter.brand_group == "korean"
+
+
+def test_validate_plan_migrates_fear_from_patient_situation():
+    plan = _validate_plan(
+        {
+            "route": "content",
+            "aspects": ["pain"],
+            "service_id": None,
+            "followup_of": None,
+            "needs_clarify": False,
+            "patient_situation": "fear",
+            "emotion": None,
+            "brand_filter": None,
+        },
+        allowed_service_ids=frozenset(),
+        allowed_brand_groups=frozenset(),
+        allowed_brands=frozenset(),
+    )
+    assert plan is not None
+    assert plan.emotion == "fear"
+    assert plan.patient_situation is None
+
+
+def test_validate_plan_unknown_emotion_coerces_to_none():
+    plan = _validate_plan(
+        {
+            "route": "content",
+            "aspects": ["overview"],
+            "service_id": None,
+            "followup_of": None,
+            "needs_clarify": False,
+            "patient_situation": None,
+            "emotion": "panic",
+            "brand_filter": None,
+        },
+        allowed_service_ids=frozenset(),
+        allowed_brand_groups=frozenset(),
+        allowed_brands=frozenset(),
+    )
+    assert plan is not None
+    assert plan.emotion == "none"
+
+
+def test_turn_plan_to_decision_frame_infers_doctors_topic():
+    from core.turn_planner_llm import turn_plan_to_decision_frame
+
+    plan = TurnPlan(
+        route="content",
+        aspects=["overview"],
+        service_id=None,
+        followup_of=None,
+        needs_clarify=False,
+        emotion="fear",
+    )
+    decision = turn_plan_to_decision_frame(
+        plan,
+        client_id="demo",
+        q="Боюсь, что врачи неопытные",
+    )
+    assert decision.service_topic == "doctors"
+    assert decision.route_intent == "content"

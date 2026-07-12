@@ -1,7 +1,7 @@
 {
   "routing_matrix": true,
   "baseline": null,
-  "description": "Eval-net emotion/fear. Assert: stable final route (route_intent, source, answer_path, orch_route) == current. turn_planner_used in current_diagnostic only (no pass/fail). target = P1 goal. Resnapshot: 2026-07-11 clean main, 3x stable.",
+  "description": "Eval-net emotion/fear. Assert: stable final route (route_intent, source, answer_path, orch_route) == current. turn_planner_used in current_diagnostic only (no pass/fail). target = P1 goal achieved for fears. Resnapshot: 2026-07-11 P1.",
   "cases": [
     {
       "id": "emotion_fear_pain",
@@ -61,7 +61,6 @@
       "client_id": "demo",
       "question": "Боюсь, что лечение займёт много времени",
       "coverage_class": "STRONG",
-      "baseline_note": "flake fail-open turn_planner_used (нестабилен между прогонами) → цель стабилизации P0",
       "current": {
         "route_intent": "content",
         "source": "none",
@@ -88,7 +87,6 @@
       "client_id": "demo",
       "question": "Боюсь, что врачи неопытные",
       "coverage_class": "STRONG",
-      "baseline_note": "flake fail-open turn_planner_used → цель стабилизации P0",
       "current": {
         "route_intent": "content",
         "source": "none",
@@ -96,7 +94,7 @@
         "orch_route": "content"
       },
       "current_diagnostic": {
-        "turn_planner_used": false
+        "turn_planner_used": true
       },
       "target": {
         "route_intent": "content",
@@ -115,15 +113,14 @@
       "client_id": "demo",
       "question": "Боюсь, что имплант не приживётся",
       "coverage_class": "STRONG",
-      "baseline_note": "flake fail-open turn_planner_used; стабильный баг маршрута price_concern → цель P0+P1",
       "current": {
-        "route_intent": "price_concern",
-        "source": "price_concern",
+        "route_intent": "content",
+        "source": "none",
         "answer_path": "composer",
-        "orch_route": "price_concern"
+        "orch_route": "content"
       },
       "current_diagnostic": {
-        "turn_planner_used": false
+        "turn_planner_used": true
       },
       "target": {
         "route_intent": "content",
@@ -142,7 +139,6 @@
       "client_id": "demo",
       "question": "У меня пародонтоз, можно ли мне имплант?",
       "coverage_class": "MEDIUM",
-      "baseline_note": "flake fail-open turn_planner_used → цель стабилизации P0",
       "current": {
         "route_intent": "content",
         "source": "catalog_md",
@@ -150,7 +146,7 @@
         "orch_route": "content"
       },
       "current_diagnostic": {
-        "turn_planner_used": false
+        "turn_planner_used": true
       },
       "target": {
         "route_intent": "content",

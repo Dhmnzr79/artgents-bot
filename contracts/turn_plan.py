@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import RouteIntent
 from contracts.patient_situation import PatientSituationKind
+
+EmotionKind = Literal["none", "fear", "doubt"]
 
 
 class TurnBrandFilter(BaseModel):
@@ -41,4 +45,5 @@ class TurnPlan(BaseModel):
     followup_of: str | None = None
     needs_clarify: bool = False
     patient_situation: PatientSituationKind | None = None
+    emotion: EmotionKind | None = "none"
     brand_filter: TurnBrandFilter | None = None

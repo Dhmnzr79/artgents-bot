@@ -788,13 +788,19 @@ def build_messages_for_packet_composer(
 
 def _composer_fullctx_empathy_hint(
     *,
+    user_q: str,
     client_id: str | None,
     aspects: list[str],
     session_id: str,
 ) -> tuple[str | None, bool, str | None]:
     # Ленивые импорты: policy -> llm -> answer_planner образует цикл на верхнем уровне.
     from core.answer_planner import answer_plan_from_ctx
-    from core.md_chunks import find_chunk_by_topic_aspect
+    from core.emotion_policy import (
+        build_theme_reassurance_instruction,
+        is_emotion_reassurance_eligible,
+        reassurance_doc_key,
+    )
+    from core.turn_planner_llm import turn_plan_from_ctx
 
     plan = answer_plan_from_ctx()
     plan_aspects = list(getattr(plan, "aspects", None) or aspects or [])
@@ -808,24 +814,27 @@ def _composer_fullctx_empathy_hint(
             if cand and cand != "overview":
                 primary_aspect = cand
                 break
+    if not primary_aspect:
+        primary_aspect = "overview"
 
-    # Дозатор — только для эмоциональных тем (боль/страх). Флажок empathy_enabled
-    # на прайсовых FAQ (наследие price_concern) сам по себе дозатор не включает.
-    if "pain" not in {str(a or "").strip() for a in plan_aspects}:
+    turn_plan = turn_plan_from_ctx()
+    emotion = getattr(turn_plan, "emotion", None) if turn_plan is not None else None
+    if not is_emotion_reassurance_eligible(q=user_q, emotion=emotion):
         return None, False, None
 
-    chunk = find_chunk_by_topic_aspect(client_id, topic, primary_aspect)
-    if isinstance(chunk, dict) and chunk.get("empathy_enabled"):
-        doc_key = str(
-            chunk.get("doc_id") or chunk.get("doc") or chunk.get("file") or ""
-        ).strip() or f"aspect:pain:{topic or 'any'}"
-    else:
-        doc_key = f"aspect:pain:{topic or 'any'}"
+    emotion_kind = str(emotion or "fear").strip().lower()
+    if emotion_kind not in {"fear", "doubt"}:
+        return None, False, None
 
+    doc_key = reassurance_doc_key(topic=topic, aspect=primary_aspect)
     first_in_topic = is_first_in_topic(session_id, doc_key)
-    if first_in_topic:
-        return COMPOSER_FULLCTX_EMPATHY_FIRST_TOUCH, True, doc_key
-    return COMPOSER_FULLCTX_EMPATHY_REPEAT_TOUCH, False, doc_key
+    instruction = build_theme_reassurance_instruction(
+        topic=topic,
+        aspects=plan_aspects,
+        emotion=emotion_kind,  # type: ignore[arg-type]
+        first_touch=first_in_topic,
+    )
+    return instruction, first_in_topic, doc_key
 
 
 def build_messages_for_packet_composer_fullctx(
@@ -1006,6 +1015,7 @@ def generate_answer_from_packet_fullctx(
     if MEMORY_ON and session_id:
         dialog_history = recent_dialog_history(session_id)
     empathy_instruction, use_empathy, doc_key = _composer_fullctx_empathy_hint(
+        user_q=user_q,
         client_id=meta.get("client_id"),
         aspects=aspects,
         session_id=session_id,

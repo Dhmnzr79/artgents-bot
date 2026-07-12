@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import re
+from typing import Any, get_args
 
 from config import CLARIFY_STATE_ON, TURN_PLANNER_LLM_MODEL
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
-from contracts.turn_plan import TurnPlan
+from contracts.patient_situation import PatientSituationKind
+from contracts.turn_plan import EmotionKind, TurnPlan
 from contracts.answer_plan import AspectKind
 from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
 from core.service_selector_llm import build_compact_service_catalog, _read_service_catalog
@@ -33,7 +35,7 @@ _SYSTEM = (
     "Ты единый планировщик одного хода диалога для стоматологического чата. "
     "Ты НЕ отвечаешь пациенту и НЕ называешь цены. Ты только возвращаешь JSON-план.\n"
     "Поля JSON строго такие: route, aspects, service_id, followup_of, needs_clarify, "
-    "patient_situation, brand_filter.\n"
+    "patient_situation, emotion, brand_filter.\n"
     "route: content | price_lookup | price_concern | unknown.\n"
     "aspects: подмножество price, payment, warranty, pain, included, duration, comparison, stages, overview. "
     "comparison — когда пациент сравнивает варианты или спрашивает «X вместо Y», "
@@ -54,7 +56,13 @@ _SYSTEM = (
     "(разные услуги и цены) → service_id=null, needs_clarify=true. "
     "НЕ ставь needs_clarify, если различие определяет врач (диагноз, состояние кости) "
     "или если в диалоге уже ясно, о чём речь.\n"
-    "patient_situation: один enum kind ситуации пациента или null.\n"
+    "patient_situation: только клинический объём пациента (нет зуба, all-on-4, срочная боль…) "
+    "или null. НИКОГДА не клади сюда страх/тревогу/сомнение — для этого есть emotion.\n"
+    "emotion: none | fear | doubt — эмоциональная обёртка вопроса (страх, тревога, сомнение), "
+    "независимо от темы. fear — боюсь/страшно/переживаю; doubt — сомневаюсь/не уверен. "
+    "none — нейтральный информационный вопрос. Не определяй emotion по списку слов — по смыслу.\n"
+    "Для страха про врачей/опыт («боюсь, что врачи неопытные») — emotion=fear, aspects с упором "
+    "на опыт/врачей (overview/stages), не pain, если вопрос не про боль.\n"
     "brand_filter: null или объект {brand_group, brand}; только если пациент ЯВНО назвал бренд "
     "или группу (Nobel, Impro, корейские, немецкие). НЕ выводи brand_filter из «дешевле», "
     "«подешевле», «бюджет», «доступные» — это не бренд.\n"
@@ -240,6 +248,92 @@ def order_plan_aspects(aspects: list[AspectKind]) -> list[AspectKind]:
     return uniq
 
 
+_VALID_EMOTIONS: frozenset[str] = frozenset(get_args(EmotionKind))
+_VALID_PATIENT_SITUATIONS: frozenset[str] = frozenset(get_args(PatientSituationKind))
+_VALID_ROUTES: frozenset[str] = frozenset({"content", "price_lookup", "price_concern", "unknown"})
+_VALID_ASPECTS: frozenset[str] = frozenset(get_args(AspectKind))
+_EMOTION_LIKE_PATIENT_SITUATION: frozenset[str] = frozenset(
+    {"fear", "doubt", "anxiety", "worry", "stress", "panic", "страх", "тревога", "сомнен"}
+)
+
+
+def _coerce_emotion(raw: Any) -> EmotionKind:
+    if raw is None or str(raw).strip() == "":
+        return "none"
+    val = str(raw).strip().lower()
+    if val in _VALID_EMOTIONS:
+        return val  # type: ignore[return-value]
+    log_json(
+        logger,
+        "turn_plan_emotion_coerced",
+        raw=raw,
+        coerced="none",
+    )
+    return "none"
+
+
+def _coerce_patient_situation(
+    raw: Any,
+    *,
+    emotion_out: EmotionKind,
+) -> tuple[PatientSituationKind | None, EmotionKind]:
+    if raw is None or str(raw).strip() == "":
+        return None, emotion_out
+    val = str(raw).strip().lower()
+    if val in _EMOTION_LIKE_PATIENT_SITUATION:
+        migrated: EmotionKind = "doubt" if val in {"doubt", "сомнен"} else "fear"
+        log_json(
+            logger,
+            "turn_plan_patient_situation_emotion_migrated",
+            raw=raw,
+            migrated_emotion=migrated,
+        )
+        if emotion_out == "none":
+            emotion_out = migrated
+        return None, emotion_out
+    if val in _VALID_PATIENT_SITUATIONS:
+        return val, emotion_out  # type: ignore[return-value]
+    log_json(
+        logger,
+        "turn_plan_patient_situation_coerced",
+        raw=raw,
+        coerced=None,
+    )
+    return None, emotion_out
+
+
+def _sanitize_plan_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    """Coerce unknown planner fields without raising (P0 emotion axis)."""
+    out = dict(raw)
+    emotion = _coerce_emotion(out.get("emotion"))
+    patient_situation, emotion = _coerce_patient_situation(
+        out.get("patient_situation"),
+        emotion_out=emotion,
+    )
+    out["emotion"] = emotion
+    out["patient_situation"] = patient_situation
+
+    route = str(out.get("route") or "").strip().lower()
+    if route not in _VALID_ROUTES:
+        log_json(logger, "turn_plan_route_coerced", raw=route or None, coerced="content")
+        out["route"] = "content"
+    else:
+        out["route"] = route
+
+    aspects_raw = out.get("aspects")
+    aspects: list[str] = []
+    if isinstance(aspects_raw, list):
+        for item in aspects_raw:
+            a = str(item or "").strip().lower()
+            if a in _VALID_ASPECTS and a not in aspects:
+                aspects.append(a)
+    if not aspects:
+        log_json(logger, "turn_plan_aspects_coerced", raw=aspects_raw, coerced=["overview"])
+        aspects = ["overview"]
+    out["aspects"] = aspects
+    return out
+
+
 def _validate_plan(
     raw: dict[str, Any],
     *,
@@ -248,7 +342,8 @@ def _validate_plan(
     allowed_brands: frozenset[str],
     client_id: str | None = None,
 ) -> TurnPlan | None:
-    plan = TurnPlan.model_validate(raw)
+    sanitized = _sanitize_plan_raw(raw)
+    plan = TurnPlan.model_validate(sanitized)
     plan = plan.model_copy(update={"aspects": order_plan_aspects(list(plan.aspects))})
     for field in ("service_id", "followup_of"):
         value = str(getattr(plan, field) or "").strip()
@@ -277,38 +372,56 @@ def _validate_plan(
     return plan
 
 
-def _service_topic_for_plan(client_id: str | None, service_id: str | None) -> str:
+def _service_topic_for_plan(
+    client_id: str | None,
+    service_id: str | None,
+    *,
+    q: str | None = None,
+) -> str:
     sid = (service_id or "").strip()
-    if not sid:
-        return "unknown"
-    catalog = _read_service_catalog(client_id)
-    entry = catalog.get(sid) if isinstance(catalog, dict) else None
-    ref = ""
-    if isinstance(entry, dict):
-        ref = str(entry.get("md_entry_ref") or entry.get("price_ref") or "").strip().lower()
-    if ref.startswith("implantation__") or sid in {
-        "classic",
-        "one_stage",
-        "all_on_4",
-        "all_on_6",
-        "zygomatic_implants",
-        "pterygoid_implants",
-        "sinus_lift",
-        "implant_supported_prosthetics",
-    }:
-        return "implantation"
-    if ref.startswith("prosthetics__") or sid in {
-        "veneers",
-        "zirconia_crowns",
-        "removable_dentures",
-        "clasp_dentures",
-        "temporary_teeth",
-    }:
-        return "prosthetics"
-    if ref.startswith("clinic__"):
-        return "clinic"
-    if ref.startswith("doctors__"):
-        return "doctors"
+    if sid:
+        catalog = _read_service_catalog(client_id)
+        entry = catalog.get(sid) if isinstance(catalog, dict) else None
+        ref = ""
+        if isinstance(entry, dict):
+            ref = str(entry.get("md_entry_ref") or entry.get("price_ref") or "").strip().lower()
+        if ref.startswith("implantation__") or sid in {
+            "classic",
+            "one_stage",
+            "all_on_4",
+            "all_on_6",
+            "zygomatic_implants",
+            "pterygoid_implants",
+            "sinus_lift",
+            "implant_supported_prosthetics",
+        }:
+            return "implantation"
+        if ref.startswith("prosthetics__") or sid in {
+            "veneers",
+            "zirconia_crowns",
+            "removable_dentures",
+            "clasp_dentures",
+            "temporary_teeth",
+        }:
+            return "prosthetics"
+        if ref.startswith("clinic__"):
+            return "clinic"
+        if ref.startswith("doctors__"):
+            return "doctors"
+    text = (q or "").strip().lower()
+    if text:
+        if re.search(
+            r"(?:врач|доктор|опытн|неопытн|стаж|специалист)",
+            text,
+            flags=re.I | re.U,
+        ):
+            return "doctors"
+        if re.search(
+            r"(?:имплант|прижив|оссеоинтеграц)",
+            text,
+            flags=re.I | re.U,
+        ):
+            return "implantation"
     return "unknown"
 
 
@@ -323,10 +436,46 @@ def _query_mode_for_plan(plan: TurnPlan) -> str:
     return "specific"
 
 
-def turn_plan_to_decision_frame(plan: TurnPlan, *, client_id: str | None) -> DecisionFrame:
+def neutral_content_turn_plan() -> TurnPlan:
+    """Safe default when planner fails — content/overview, never price guess."""
+    return TurnPlan(
+        route="content",
+        aspects=["overview"],
+        service_id=None,
+        followup_of=None,
+        needs_clarify=False,
+        patient_situation=None,
+        emotion="none",
+        brand_filter=None,
+    )
+
+
+def neutral_content_decision_frame() -> DecisionFrame:
+    """Resolver-compatible safe default (content/composer path)."""
+    return DecisionFrame(
+        route_intent="content",
+        service_topic="unknown",
+        service_id=None,
+        query_mode="overview",
+        confidence=DecisionFrameConfidence(
+            intent=0.0,
+            topic=0.0,
+            service=0.0,
+            query_mode=0.0,
+        ),
+        needs_clarification=False,
+    )
+
+
+def turn_plan_to_decision_frame(
+    plan: TurnPlan,
+    *,
+    client_id: str | None,
+    q: str | None = None,
+) -> DecisionFrame:
     """Materialize a resolver-compatible frame so downstream guards stay unchanged."""
     service_id = str(plan.service_id or "").strip() or None
-    topic = _service_topic_for_plan(client_id, service_id)
+    topic = _service_topic_for_plan(client_id, service_id, q=q)
     service_conf = 0.9 if service_id else 0.0
     topic_conf = 0.85 if topic != "unknown" else 0.0
     return DecisionFrame(
@@ -357,6 +506,7 @@ def publish_turn_plan(plan: TurnPlan) -> None:
             request.ctx["turn_plan_followup_of"] = plan.followup_of
             request.ctx["turn_plan_needs_clarify"] = plan.needs_clarify
             request.ctx["turn_plan_patient_situation"] = plan.patient_situation
+            request.ctx["turn_plan_emotion"] = plan.emotion
             if plan.brand_filter is not None:
                 request.ctx["turn_plan_brand_filter"] = plan.brand_filter.model_dump()
     except Exception:
@@ -387,7 +537,11 @@ def turn_plan_brand_filter_from_ctx() -> tuple[str | None, str | None]:
 
 
 def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None:
-    """Plan one turn with one flash LLM call. Returns None for fail-open."""
+    """Plan one turn with one flash LLM call.
+
+    Returns None when planner fails or output is invalid; ``resolver_turn`` then
+    applies safe content default (P0), never resolver price guess.
+    """
     msg = (q or "").strip()
     if not msg:
         return None
@@ -451,6 +605,7 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
             followup_of=plan.followup_of,
             needs_clarify=plan.needs_clarify,
             patient_situation=plan.patient_situation,
+            emotion=plan.emotion,
             brand_filter=plan.brand_filter.model_dump() if plan.brand_filter else None,
         )
         return plan

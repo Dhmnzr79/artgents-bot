@@ -81,7 +81,8 @@ A0 не является задачей «сначала сделать legacy �
 ## Текущий strangler-checkpoint
 
 - **A1 завершён:** минимальный `TurnFrame` и чистый legacy-adapter существуют, но не подключены к runtime (`0761213`).
-- **A2 следующий:** построение `TurnFrame` на planner-turn только в shadow-observability. Ни одна продуктовая ветка не читает shadow-frame.
+- **A2 завершён:** `TurnFrame` строится на planner-turn только в shadow-observability; ни одна продуктовая ветка не читает shadow-frame (`3746d77`).
+- **A3 следующий:** read-only аудит шести frozen-сценариев — проверить значения, confidence и provenance до выбора первой оси для переноса ownership.
 - Переход ownership на `TurnFrame` разрешён только отдельными последующими задачами после проверки telemetry; сам факт появления frame в ctx не означает переключение архитектуры.
 
 ---

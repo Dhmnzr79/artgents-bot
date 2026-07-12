@@ -1,6 +1,6 @@
-# TASK — A2: подключить TurnFrame только в shadow-observability
+# TASK — A3: аудит реального TurnFrame shadow на frozen-сценариях
 
-Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** до реализации.
+Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** до выполнения.
 Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты ревью — `REVIEW_CHECKLIST.md`.
 Проектная опора — `docs/ARCH_TARGET_DESIGN.md` v4.
 
@@ -10,135 +10,143 @@
 
 - A0 frozen spec: commit `e852f4b`, hash `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
 - A0 harness: commit `a0e6926`.
-- A0 live baseline: `preservation = 3/6`, `smoke = 24/24`.
-- A1 governance: commit `631abc1`.
-- A1 contract + pure adapter: commit `0761213`.
-- Рабочее дерево перед A2 должно быть чистым.
+- Старый live baseline: `preservation = 3/6`, `smoke = 24/24`.
+- A1 TurnFrame contract: commit `0761213`.
+- A2 shadow observability: commit `3746d77`.
+- Рабочее дерево перед A3 должно быть чистым.
 
 ## Задача
 
-**Название:** A2 — построение `TurnFrame` на реальном planner-turn только для наблюдаемости.
+**Название:** A3 — read-only аудит `turn_frame_shadow` на шести frozen preservation-ходах.
 
-**Размер:** МАЛЕНЬКАЯ. Одно shadow-подключение, telemetry slice и unit/integration-тесты.
+**Размер:** МАЛЕНЬКАЯ. Один live-прогон, анализ сырого telemetry и один audit-документ. **Код и spec не менять.**
 
-**Цель:** на успешном пути текущего `TurnPlan` построить канонический `TurnFrame`, положить его снимок в `request.ctx` и включить в технический `turn_complete`/E2E telemetry. В A2 ни одно поле `TurnFrame` не используется для выбора ответа, источника, route, UI или policy.
+**Цель:** увидеть, что фактически записывает новый `TurnFrame` на реальном `/ask/stream` pipeline, отделить заполненность полей от их корректности и выбрать следующий архитектурный шаг по evidence, а не по предположению.
 
-Целевая форма A2:
-
-```text
-legacy TurnPlan + итоговый DecisionFrame
-                │
-                ├── прежний runtime без изменений
-                │
-                └── TurnFrame shadow snapshot → ctx/logs only
-```
-
-## Где подключать
-
-Подключение разрешено только в planner-success ветке `run_resolver_turn()`:
-
-1. `TurnPlan` уже получен.
-2. `DecisionFrame` уже получил существующие effective override (`content` для consultation/commercial и `comparison` для comparison query).
-3. Существующий `record_decision_frame_ctx(decision)` уже выполнен.
-4. После этого вызывается shadow-recorder с `plan` и итоговым `decision`.
-5. Возвращаемый `TurnFrame` не присваивается `decision`, `intent`, `scope_topic_candidate` и не передаётся downstream.
-
-Если planner не дал `TurnPlan` и ход ушёл в resolver/legacy fallback, telemetry должна честно получить:
-
-- `turn_frame_shadow_status = "not_available"`;
-- `turn_frame_shadow_reason = "turn_plan_missing"`.
-
-Не строить искусственный `TurnPlan` из resolver-результата в A2.
-
-## Shadow-recorder
-
-Новый маленький модуль должен:
-
-- вызывать существующий `build_turn_frame_from_legacy()`;
-- при успехе записывать в `request.ctx`:
-  - `turn_frame_shadow` — полный `model_dump()`;
-  - `turn_frame_shadow_status = "ok"`;
-  - удалять/не оставлять старый `turn_frame_shadow_reason`;
-- при отсутствии `TurnPlan` уметь явно отметить `not_available`;
-- при внутренней ошибке **не менять продуктовый ход и не бросать исключение наружу**, но записывать:
-  - `turn_frame_shadow_status = "degraded"`;
-  - `turn_frame_shadow_reason` — стабильный машинный код без текста вопроса и без exception message;
-  - отдельный структурированный log/event со status `degraded`;
-- возвращать `TurnFrame | None` только для unit-тестируемости; runtime не использует return value;
-- не принимать текст вопроса, answer, историю диалога или payload виджета;
-- не читать базу знаний, PriceBook, session state или network;
-- не вызывать LLM/resolver/classifier;
-- не содержать тематических веток.
-
-Полный `TurnFrame` не должен появляться в обычном widget payload. Он может попадать в ответ только через уже существующий E2E test-hook `E2E_USE_TEST_CLIENT=1` внутри `meta.metadata_first`.
-
-## Telemetry contract
-
-В `metadata_first_turn_details()` и E2E metadata slice должны быть доступны только три новых ключа:
-
-- `turn_frame_shadow`;
-- `turn_frame_shadow_status`;
-- `turn_frame_shadow_reason` — только когда есть причина.
-
-Не раскладывать оси `TurnFrame` ещё раз в десятки плоских ctx-полей. Не менять существующие telemetry keys.
+A3 не пытается сделать старый runtime зелёным. Результат `preservation = 3/6` допустим как известный baseline. Блокерами A3 являются нечестный/неполный telemetry run, отсутствие shadow snapshot, ошибки среды или попытка подогнать spec/report.
 
 ## Затрагиваемые файлы (allowlist)
 
-Исполнитель может менять **только**:
+Исполнитель может создать/изменить **только**:
 
-- `core/turn_frame_shadow.py` — новый recorder/marker;
-- `orchestration/resolver_turn.py` — одна точка shadow wiring и unavailable marker;
-- `core/metadata_first_observability.py` — только три telemetry keys;
-- `tests/test_turn_frame_shadow.py` — recorder + реальное wiring через `run_resolver_turn`;
-- `tests/test_metadata_first_observability.py` — только проверка нового telemetry slice.
+- `docs/TURN_FRAME_SHADOW_AUDIT_A3.md` — итоговый audit-документ.
 
-`TASK.md`, архитектурные документы, contracts, adapter A1, eval-spec, harness, runtime policies и существующие продуктовые тесты Исполнитель не меняет.
+Локальный сырой артефакт:
 
-## Явно НЕ делать
+- `eval_turn_frame_shadow_a3_last.txt` — обязателен, но остаётся gitignored и не коммитится.
 
-- Не использовать `TurnFrame` для изменения `intent`, `decision`, `scope_topic_candidate`, source selection или answer plan.
-- Не подключать `TurnFrame` к composer, evidence, verifier, UI, price или marketing.
-- Не менять `TurnPlan`, `DecisionFrame`, `TurnFrame` и A1 adapter.
-- Не чинить preservation cases `02`, `03`, `05`.
-- Не добавлять feature flag: A2 дешёвый и behavior-neutral; ошибки recorder уже изолированы.
-- Не добавлять новый LLM prompt/call, resolver, classifier, router или handler.
-- Не передавать в recorder вопрос пользователя ради inference.
-- Не логировать exception message, вопрос, ответ или историю.
-- Не добавлять silent `except: pass`: degraded должен быть виден.
-- Не менять существующие `smoke/risk/golden/emotion/preservation` ожидания.
-- Не добавлять skip/xfail/условный PASS.
+`TASK.md`, архитектурные документы, runtime, contracts, tests, eval runner, frozen spec и все существующие suite Исполнитель не меняет.
+
+## Обязательный live-прогон
+
+Использовать существующий suite без изменения spec:
+
+```powershell
+$env:E2E_USE_TEST_CLIENT="1"
+$env:PYTHONUTF8="1"
+$env:PYTHONIOENCODING="utf-8"
+python evals/v5/run_demo_eval.py --client demo --suite preservation 2>&1 | Tee-Object -FilePath eval_turn_frame_shadow_a3_last.txt
+$evalExit = $LASTEXITCODE
+"EVAL_EXIT_CODE=$evalExit" | Tee-Object -FilePath eval_turn_frame_shadow_a3_last.txt -Append
+Get-FileHash -Algorithm SHA256 eval_turn_frame_shadow_a3_last.txt
+```
+
+Exit code `1` допустим только из-за известных FAIL acceptance-кейсов. `errors`, timeout, skipped, transport failure или отсутствие одного из шести ходов — СТОП, а не повод объявить аудит готовым.
+
+Не запускать кейсы повторно выборочно ради более красивого результата. Если полный прогон пришлось повторить по технической причине, сохранить отдельный файл с новым именем и перечислить все попытки в audit-документе; не перезаписывать неудачную попытку молча.
+
+## Источник telemetry
+
+Для каждого кейса использовать `turn_complete.details.turn_frame_shadow` из непрерывного JSONL-вывода того же live-прогона. Дополнительно сверить:
+
+- `turn_frame_shadow_status`;
+- `turn_frame_shadow_reason`, если есть;
+- `request_id`, `sid`, `path`;
+- фактический preservation PASS/FAIL и reason из итоговой таблицы runner.
+
+Не собирать frame из разных событий/попыток. Не восстанавливать отсутствующие поля из ответа, вопроса или собственных догадок.
+
+## Что выписать по каждому из 6 кейсов
+
+В `docs/TURN_FRAME_SHADOW_AUDIT_A3.md` должна быть одна строка на кейс со следующими данными:
+
+- case id;
+- `/ask/stream` подтверждён;
+- preservation result `PASS/FAIL` и краткая фактическая причина;
+- shadow status/reason;
+- `intent`;
+- `topic`;
+- `aspects` и `primary_aspect`;
+- `emotion`;
+- `specificity`;
+- `patient_scope`;
+- `service_id`;
+- `follow_up` / `followup_of`;
+- `needs_clarification`;
+- request id или точная ссылка на строку сырого артефакта.
+
+Отдельной компактной таблицей показать для каждой смысловой оси:
+
+- значение;
+- confidence;
+- provenance;
+- оценку `correct | wrong | missing | default_only | not_applicable`.
+
+Если полей слишком много для одной широкой Markdown-таблицы, сделать по кейсу короткий блок и общую сводку по осям. Не исключать неудобные поля ради компактности.
+
+## Правила честной оценки
+
+- Заполненное поле не означает корректное поле.
+- `confidence > 0` не доказывает корректность.
+- `confidence = 0` не называть уверенным результатом.
+- `topic = None` с `missing_legacy_axis` → `missing`.
+- `emotion = none` с provenance `default` → `default_only`, а не распознанная эмоция.
+- Значение, унаследованное из legacy, получает оценку по смыслу кейса, а не автоматически `correct`.
+- Несовпадение с frozen target фиксируется как долг новой архитектуры; spec не менять.
+- Свободную формулировку ответа не оценивать дословно.
+- Один прогон из шести кейсов не доказывает статистическую стабильность и не разрешает перевод оси в authority без отдельной acceptance-сети.
+
+## Обязательная итоговая сводка
+
+Audit-документ должен ответить простыми словами:
+
+1. Во всех ли шести ходах создан shadow-frame?
+2. Были ли `degraded/not_available`?
+3. Какие оси выглядят корректными на этой выборке?
+4. Какие оси пустые, default-only или наследуют известную legacy-ошибку?
+5. Совпадает ли frame с фактической причиной FAIL cases `02/03/05`?
+6. Есть ли хоть одна ось, которую уже можно рассматривать кандидатом на следующий strangler-шаг?
+7. Какой **один** следующий маленький TASK рекомендуется и почему?
+
+Допустимый вывод: «ни одна ось пока не готова к authority; сначала нужен контракт/источник для topic». Нельзя обязательно выдумывать перенос, если telemetry этого не подтверждает.
+
+## Запрещено
+
+- Не менять runtime, shadow recorder, adapter, TurnFrame contract или telemetry wiring.
+- Не менять `preservation.json`, harness, вопросы, expected/forbidden поля или hash.
+- Не добавлять новый script/parser в репозиторий.
+- Не менять существующие tests и не писать тесты под наблюдаемый результат.
+- Не чинить cases `02`, `03`, `05`.
+- Не resnapshot'ить LLM-ответы.
+- Не выбирать лучший из нескольких прогонов и скрывать остальные.
+- Не называть A2 authority: frame остаётся shadow-only.
+- Не коммитить raw eval-файл.
 - Не создавать commit/ветку/stash без явной команды владельца.
-
-## Обязательные тесты
-
-1. Успешный recorder сохраняет `TurnFrame.model_dump()` и status `ok` в request ctx.
-2. Snapshot содержит field metadata из A1 adapter без повторного inference.
-3. `not_available` явно записывает reason `turn_plan_missing` и не создаёт frame.
-4. Ошибка builder изолирована: recorder возвращает `None`, status становится `degraded`, стабильный reason записан, исключение не выходит наружу.
-5. При degraded записывается структурированный event/log без вопроса и exception message.
-6. Recorder не принимает question/answer/history/payload параметры.
-7. Интеграционный тест `run_resolver_turn` с успешным `TurnPlan` доказывает наличие shadow snapshot в ctx.
-8. Интеграционный тест доказывает, что `ResolverTurnOutcome.intent` и `decision` остаются прежними и не заменяются `TurnFrame`.
-9. Planner-missing путь помечает shadow как `not_available` перед resolver/legacy continuation.
-10. `metadata_first_turn_details()` включает frame/status/reason.
-11. E2E metadata slice включает новые ключи через существующий test-hook; обычный `finalize_ask` без env не добавляет `meta.metadata_first` в widget payload.
-12. Frozen A0 hash не изменён.
-
-Узкие monkeypatch допустимы только для изоляции builder failure и внешнего planner/resolver в integration unit-тесте. Нельзя мокать утверждаемое ctx/telemetry поведение.
 
 ## Стоп-условия
 
 Исполнитель обязан остановиться и выдать `СТОП: требуется решение владельца/Архитектора`, если:
 
-- требуется файл вне allowlist;
-- для wiring нужно изменить сигнатуру или поведение `run_resolver_turn`;
-- downstream-код должен начать читать `turn_frame_shadow`;
-- существующий ответ/payload меняется без `E2E_USE_TEST_CLIENT=1`;
-- невозможно изолировать ошибку shadow-recorder без silent failure;
-- нужен вопрос пользователя или новый inference для заполнения frame;
-- существующие тесты требуют изменения;
-- frozen A0 spec/hash изменился;
-- есть незакоммиченный diff, не относящийся к A2.
+- изменился любой файл вне allowlist;
+- frozen hash не совпал;
+- получено меньше или больше шести уникальных preservation-ходов;
+- хотя бы один ход не прошёл через `/ask/stream`;
+- shadow-frame отсутствует либо status не `ok` хотя бы в одном planner-success ходе;
+- есть timeout/error/skipped/transport failure;
+- сырые JSONL-строки невозможно однозначно связать с case id;
+- для заполнения отчёта требуется догадаться о значении, которого нет в telemetry;
+- live run пришлось повторить, но предыдущий сырой артефакт утрачен;
+- требуется изменить код, spec или runner.
 
 Формат остановки:
 
@@ -150,42 +158,24 @@ legacy TurnPlan + итоговый DecisionFrame
 Какие файлы потребуются:
 ```
 
-## Контрольная точка
-
-1. Реализовать только allowlist.
-2. Показать diff тестов первым.
-3. Запустить все команды проверки.
-4. СТОП → checker → Архитектор.
-
-Не использовать shadow-frame downstream после зелёных тестов. Это будет отдельная задача после анализа telemetry.
-
-## Команды проверки
+## Проверки перед review
 
 ```powershell
-python -m pytest -q tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py
-python -m pytest -q tests/test_turn_frame_contract.py tests/test_turn_planner_llm.py tests/test_turn_planner_wiring.py tests/test_turn_plan_protocol_guard.py
-python -m pytest -q tests/test_contacts_routing.py tests/test_pricebook_golden.py tests/test_price_layer_parity.py
 git diff --check
 git status --short
+git diff --name-only
 git hash-object evals/v5/demo/preservation.json
+Get-FileHash -Algorithm SHA256 eval_turn_frame_shadow_a3_last.txt
 ```
 
-Live eval не требуется на A2: продуктовый output не меняется, а реальное wiring проверяется integration unit-тестом. Если обычный widget payload изменился, это нарушение задачи, а не повод resnapshot eval.
+Ожидание для tracked diff: только `docs/TURN_FRAME_SHADOW_AUDIT_A3.md`.
 
-## Критерии приёмки
+## Контрольная точка и приёмка
 
-- [ ] Изменены только allowlist-файлы.
-- [ ] Shadow строится только после итоговых existing decision overrides.
-- [ ] Runtime не читает результат `TurnFrame` для решений.
-- [ ] Успех, отсутствие и ошибка различимы как `ok/not_available/degraded`.
-- [ ] Ошибка shadow не ломает продуктовый ход и не скрыта.
-- [ ] В telemetry нет вопроса, ответа, истории или exception message.
-- [ ] Обычный widget payload не получил новых полей.
-- [ ] Нет новых LLM-вызовов, маршрутов, тематических веток и feature flags.
-- [ ] Existing tests не изменены и остаются зелёными.
-- [ ] Frozen A0 spec/hash не изменены.
-- [ ] Checker подтвердил границы, честность тестов и behavior-neutral wiring.
+1. Выполнить один полный live-прогон.
+2. Сохранить непрерывный сырой вывод и SHA256.
+3. Создать audit-документ без изменений кода/spec.
+4. Показать checker raw evidence, таблицу и tracked diff.
+5. СТОП → checker → Архитектор.
 
-## Готово, когда
-
-A2 готова после принятого checker-review и отдельного коммита allowlist. Следующий TASK определяется только после просмотра shadow telemetry; автоматически downstream на `TurnFrame` не переключать.
+A3 готова, когда все шесть ходов однозначно отражены в отчёте, оценки не путают наличие поля с корректностью, frozen hash сохранён и checker подтвердил происхождение каждой строки. Следующую реализационную задачу автоматически не начинать.

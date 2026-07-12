@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import RouteIntent
@@ -42,3 +42,19 @@ class TurnPlan(BaseModel):
     needs_clarify: bool = False
     patient_situation: PatientSituationKind | None = None
     brand_filter: TurnBrandFilter | None = None
+    topic: str | None = None
+    topic_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def _normalize_topic(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def _topic_confidence_invariant(self) -> "TurnPlan":
+        if self.topic is None and self.topic_confidence != 0.0:
+            raise ValueError("topic_confidence_requires_topic")
+        return self

@@ -249,3 +249,20 @@ def test_plan_turn_validates_brand_filter(monkeypatch):
     assert plan is not None
     assert plan.brand_filter is not None
     assert plan.brand_filter.brand_group == "korean"
+
+
+def test_turn_plan_model_accepts_legacy_planner_payload_without_topic():
+    plan = TurnPlan.model_validate(
+        {
+            "route": "price_lookup",
+            "aspects": ["price"],
+            "service_id": "all_on_4",
+            "followup_of": None,
+            "needs_clarify": False,
+            "patient_situation": None,
+            "brand_filter": None,
+        }
+    )
+
+    assert plan.topic is None
+    assert plan.topic_confidence == 0.0

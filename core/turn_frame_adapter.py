@@ -50,9 +50,26 @@ def build_turn_frame_from_legacy(
             confidence=decision_frame.confidence.intent,
             provenance="decision_frame.route_intent",
         )
+        specificity, specificity_meta = _specificity_from_query_mode(
+            decision_frame.query_mode,
+            query_mode_confidence=decision_frame.confidence.query_mode,
+        )
+    else:
+        intent = turn_plan.route
+        intent_meta = _meta(confidence=0.0, provenance="turn_plan.route")
+        specificity = "unknown"
+        specificity_meta = _missing_meta()
+
+    if turn_plan.topic:
+        topic: str | None = turn_plan.topic
+        topic_meta = _meta(
+            confidence=turn_plan.topic_confidence,
+            provenance="turn_plan.topic",
+        )
+    elif decision_frame is not None:
         topic_raw = decision_frame.service_topic
         if topic_raw and topic_raw != "unknown":
-            topic: str | None = str(topic_raw)
+            topic = str(topic_raw)
             topic_meta = _meta(
                 confidence=decision_frame.confidence.topic,
                 provenance="decision_frame.service_topic",
@@ -63,17 +80,9 @@ def build_turn_frame_from_legacy(
                 confidence=decision_frame.confidence.topic,
                 provenance="decision_frame.service_topic",
             )
-        specificity, specificity_meta = _specificity_from_query_mode(
-            decision_frame.query_mode,
-            query_mode_confidence=decision_frame.confidence.query_mode,
-        )
     else:
-        intent = turn_plan.route
-        intent_meta = _meta(confidence=0.0, provenance="turn_plan.route")
         topic = None
         topic_meta = _missing_meta()
-        specificity = "unknown"
-        specificity_meta = _missing_meta()
 
     if turn_plan.service_id is not None:
         service_id = turn_plan.service_id

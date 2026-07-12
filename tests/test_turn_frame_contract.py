@@ -125,10 +125,99 @@ def test_adapter_transfers_explicit_legacy_fields():
     frame = build_turn_frame_from_legacy(turn_plan=turn_plan, decision_frame=decision)
 
     assert frame.intent == "price_lookup"
+    assert frame.topic == "prosthetics"
+    assert frame.field_meta.topic.provenance == "decision_frame.service_topic"
     assert frame.aspects == ["price", "pain"]
     assert frame.service_id == "veneers"
     assert frame.followup_of == "veneers"
     assert frame.needs_clarification is True
+
+
+def test_adapter_prefers_native_topic_over_decision_frame():
+    turn_plan = TurnPlan(
+        route="content",
+        aspects=["overview"],
+        topic="whitening",
+        topic_confidence=0.85,
+    )
+    decision = _decision_frame(service_topic="implantation")
+
+    frame = build_turn_frame_from_legacy(turn_plan=turn_plan, decision_frame=decision)
+
+    assert frame.topic == "whitening"
+    assert frame.field_meta.topic.confidence == 0.85
+    assert frame.field_meta.topic.provenance == "turn_plan.topic"
+
+
+def test_turn_plan_topic_normalization_and_invariants():
+    plan = TurnPlan(
+        route="content",
+        aspects=["overview"],
+        topic="  ProSthetics  ",
+        topic_confidence=0.5,
+    )
+    assert plan.topic == "prosthetics"
+
+    empty = TurnPlan(route="content", aspects=["overview"], topic="   ")
+    assert empty.topic is None
+    assert empty.topic_confidence == 0.0
+
+    with pytest.raises(ValueError):
+        TurnPlan(
+            route="content",
+            aspects=["overview"],
+            topic_confidence=1.1,
+        )
+
+    with pytest.raises(ValueError, match="topic_confidence_requires_topic"):
+        TurnPlan(
+            route="content",
+            aspects=["overview"],
+            topic_confidence=0.3,
+        )
+
+
+def test_turn_plan_legacy_payload_without_topic_fields():
+    plan = TurnPlan.model_validate(
+        {
+            "route": "price_lookup",
+            "aspects": ["price"],
+            "service_id": "all_on_4",
+            "followup_of": None,
+            "needs_clarify": False,
+            "patient_situation": None,
+            "brand_filter": None,
+        }
+    )
+
+    assert plan.topic is None
+    assert plan.topic_confidence == 0.0
+
+
+def test_native_topic_does_not_change_other_adapter_axes():
+    turn_plan = TurnPlan(
+        route="price_lookup",
+        aspects=["price", "duration"],
+        service_id="classic",
+        followup_of="classic",
+        needs_clarify=True,
+        topic="treatment",
+        topic_confidence=0.7,
+    )
+    decision = _decision_frame(
+        route_intent="content",
+        service_topic="implantation",
+        query_mode="specific",
+    )
+
+    frame = build_turn_frame_from_legacy(turn_plan=turn_plan, decision_frame=decision)
+
+    assert frame.intent == "content"
+    assert frame.aspects == ["price", "duration"]
+    assert frame.service_id == "classic"
+    assert frame.followup_of == "classic"
+    assert frame.needs_clarification is True
+    assert frame.topic == "treatment"
 
 
 def test_adapter_does_not_invent_topic_without_legacy_topic():

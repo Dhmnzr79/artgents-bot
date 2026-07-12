@@ -16,6 +16,7 @@ _SUITES: dict[str, str] = {
     "risk": "demo/risk.json",
     "golden": "demo/golden.json",
     "emotion": "demo/emotion.json",
+    "preservation": "demo/preservation.json",
 }
 
 # Product CI runs smoke+risk only; golden grows incrementally (run --suite golden locally).
@@ -35,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=[*_SUITES.keys(), "all", "product", "routing"],
         default="all",
         help=(
-            "smoke | risk | golden | emotion | routing (=emotion) | "
+            "smoke | risk | golden | emotion | preservation | routing (=emotion) | "
             "product (smoke+risk) | all (default: all suites in file)"
         ),
     )

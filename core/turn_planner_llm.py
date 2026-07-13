@@ -7,8 +7,7 @@ from typing import Any
 
 from config import CLARIFY_STATE_ON, TURN_PLANNER_LLM_MODEL
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
-from contracts.planner_attempt import PlannerAttempt
-from contracts.turn_frame import TurnFrame, TurnFrameMeta
+from contracts.planner_attempt import PlannerAttempt, turn_frame_has_invalid_or_missing
 from contracts.turn_plan import TurnPlan
 from contracts.answer_plan import AspectKind
 from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
@@ -497,13 +496,6 @@ def _not_available_attempt() -> PlannerAttempt:
     )
 
 
-def _frame_has_invalid_or_missing(frame: TurnFrame) -> bool:
-    return any(
-        getattr(frame.field_meta, name).status in {"invalid", "missing"}
-        for name in TurnFrameMeta.model_fields
-    )
-
-
 def _log_turn_planner_failure(
     error: Exception,
     *,
@@ -645,7 +637,7 @@ def plan_turn_attempt(
         raise AssertionError("shadow_frame_missing_without_degraded")
     shadow_status = (
         "partial"
-        if legacy_plan is None or _frame_has_invalid_or_missing(shadow_frame)
+        if legacy_plan is None or turn_frame_has_invalid_or_missing(shadow_frame)
         else "ok"
     )
     return PlannerAttempt(

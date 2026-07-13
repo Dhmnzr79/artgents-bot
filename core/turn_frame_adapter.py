@@ -4,11 +4,20 @@ from __future__ import annotations
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import DecisionFrame, QueryMode, RouteIntent
-from contracts.turn_frame import FieldMeta, FieldStatus, SpecificityKind, TurnFrame, TurnFrameMeta
+from contracts.turn_frame import (
+    FieldMeta,
+    FieldStatus,
+    PatientScopeFrame,
+    PatientScopeFrameMeta,
+    SpecificityKind,
+    TurnFrame,
+    TurnFrameMeta,
+)
 from contracts.turn_plan import TurnPlan
 
 _MISSING = "missing_legacy_axis"
 _DEFAULT = "default"
+_SCHEMA_DEFAULT = "turn_plan.schema_default"
 
 
 def _meta(
@@ -26,6 +35,15 @@ def _missing_meta() -> FieldMeta:
 
 def _defaulted_meta(*, confidence: float, provenance: str) -> FieldMeta:
     return _meta(confidence=confidence, provenance=provenance, status="defaulted")
+
+
+def _default_patient_scope_meta() -> PatientScopeFrameMeta:
+    return PatientScopeFrameMeta(
+        extent=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
+        jaw=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
+        stage=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
+        modifiers=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
+    )
 
 
 def _specificity_from_query_mode(
@@ -127,18 +145,6 @@ def build_turn_frame_from_legacy(
         service_id = None
         service_meta = _missing_meta()
 
-    patient_raw = turn_plan.patient_situation
-    if patient_raw is not None and str(patient_raw) != "unknown":
-        patient_scope: str | None = str(patient_raw)
-        patient_meta = _meta(
-            confidence=0.0,
-            provenance="turn_plan.patient_situation",
-            status="valid",
-        )
-    else:
-        patient_scope = None
-        patient_meta = _missing_meta()
-
     followup_of = turn_plan.followup_of
     follow_up = bool(followup_of)
     followup_meta = (
@@ -154,7 +160,7 @@ def build_turn_frame_from_legacy(
         primary_aspect=resolved_primary,
         emotion="none",
         specificity=specificity,
-        patient_scope=patient_scope,
+        patient_scope=PatientScopeFrame(),
         service_id=service_id,
         follow_up=follow_up,
         followup_of=followup_of,
@@ -170,7 +176,7 @@ def build_turn_frame_from_legacy(
             ),
             emotion=_defaulted_meta(confidence=0.0, provenance=_DEFAULT),
             specificity=specificity_meta,
-            patient_scope=patient_meta,
+            patient_scope=_default_patient_scope_meta(),
             service_id=service_meta,
             follow_up=(
                 _meta(confidence=1.0, provenance="turn_plan.followup_of", status="valid")

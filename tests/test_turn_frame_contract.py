@@ -1,16 +1,35 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
+import contracts
 from contracts.decision_frame import DecisionFrame
-from contracts.turn_frame import FieldMeta, TurnFrame, TurnFrameMeta
+from contracts.turn_frame import (
+    FieldMeta,
+    PatientCareStage,
+    PatientExtent,
+    PatientJaw,
+    PatientScopeFrame,
+    PatientScopeFrameMeta,
+    PatientScopeModifier,
+    TurnFrame,
+    TurnFrameMeta,
+)
 from contracts.turn_plan import TurnPlan
 from core.turn_frame_adapter import build_turn_frame_from_legacy
 
 
-def _field_meta(**overrides: FieldMeta) -> TurnFrameMeta:
+def _patient_scope_meta(**overrides: FieldMeta) -> PatientScopeFrameMeta:
+    base = FieldMeta(confidence=1.0, provenance="test", status="valid")
+    defaults = {name: base for name in PatientScopeFrameMeta.model_fields}
+    defaults.update(overrides)
+    return PatientScopeFrameMeta(**defaults)
+
+
+def _field_meta(**overrides: FieldMeta | PatientScopeFrameMeta) -> TurnFrameMeta:
     base = FieldMeta(confidence=1.0, provenance="test", status="valid")
     defaults = {
         "intent": base,
@@ -19,7 +38,7 @@ def _field_meta(**overrides: FieldMeta) -> TurnFrameMeta:
         "primary_aspect": base,
         "emotion": FieldMeta(confidence=0.0, provenance="default", status="defaulted"),
         "specificity": base,
-        "patient_scope": base,
+        "patient_scope": _patient_scope_meta(),
         "service_id": base,
         "follow_up": base,
         "followup_of": base,
@@ -27,6 +46,17 @@ def _field_meta(**overrides: FieldMeta) -> TurnFrameMeta:
     }
     defaults.update(overrides)
     return TurnFrameMeta(**defaults)
+
+
+def _flatten_meta(meta: TurnFrameMeta) -> list[FieldMeta]:
+    out: list[FieldMeta] = []
+    for name in TurnFrameMeta.model_fields:
+        value = getattr(meta, name)
+        if name == "patient_scope":
+            out.extend(getattr(value, subfield) for subfield in PatientScopeFrameMeta.model_fields)
+        else:
+            out.append(value)
+    return out
 
 
 def _decision_frame(**overrides) -> DecisionFrame:
@@ -55,7 +85,7 @@ def test_valid_full_turn_frame_creates():
         primary_aspect="price",
         emotion="none",
         specificity="specific",
-        patient_scope="one_tooth",
+        patient_scope=PatientScopeFrame(extent="one_tooth"),
         service_id="classic",
         follow_up=True,
         followup_of="classic",
@@ -65,6 +95,126 @@ def test_valid_full_turn_frame_creates():
 
     assert frame.intent == "price_lookup"
     assert frame.primary_aspect == "price"
+    assert frame.patient_scope.extent == "one_tooth"
+
+
+def test_patient_scope_default_is_exact_all_unknown_dump():
+    assert PatientScopeFrame().model_dump() == {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": [],
+    }
+
+
+@pytest.mark.parametrize("value", get_args(PatientExtent))
+def test_patient_scope_accepts_each_extent(value: str):
+    assert PatientScopeFrame(extent=value).extent == value
+
+
+@pytest.mark.parametrize("value", get_args(PatientJaw))
+def test_patient_scope_accepts_each_jaw(value: str):
+    assert PatientScopeFrame(jaw=value).jaw == value
+
+
+@pytest.mark.parametrize("value", get_args(PatientCareStage))
+def test_patient_scope_accepts_each_stage(value: str):
+    assert PatientScopeFrame(stage=value).stage == value
+
+
+@pytest.mark.parametrize("value", get_args(PatientScopeModifier))
+def test_patient_scope_accepts_each_modifier(value: str):
+    assert PatientScopeFrame(modifiers=[value]).modifiers == [value]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("extent", "all_on_4"),
+        ("jaw", "right"),
+        ("stage", "urgent"),
+        ("modifiers", ["sinus_lift"]),
+    ],
+)
+def test_patient_scope_rejects_unknown_values(field: str, value):
+    with pytest.raises(ValueError):
+        PatientScopeFrame.model_validate({field: value})
+
+
+def test_patient_scope_rejects_extra_fields():
+    with pytest.raises(ValueError, match="extra_forbidden"):
+        PatientScopeFrame.model_validate({"diagnosis": "bone_deficit"})
+
+
+def test_patient_scope_modifiers_are_deduplicated_and_sorted():
+    frame = PatientScopeFrame(
+        modifiers=["reported_bone_deficit", "reported_bone_deficit"],
+    )
+    assert frame.modifiers == ["reported_bone_deficit"]
+    source = Path("contracts/turn_frame.py").read_text(encoding="utf-8")
+    assert "return sorted(set(value))" in source
+
+
+def test_contract_package_exports_patient_scope_symbols():
+    expected = {
+        "PatientExtent": PatientExtent,
+        "PatientJaw": PatientJaw,
+        "PatientCareStage": PatientCareStage,
+        "PatientScopeModifier": PatientScopeModifier,
+        "PatientScopeFrame": PatientScopeFrame,
+        "PatientScopeFrameMeta": PatientScopeFrameMeta,
+    }
+    for name, value in expected.items():
+        assert getattr(contracts, name) is value
+        assert name in contracts.__all__
+
+
+def test_patient_scope_meta_requires_four_fields_and_forbids_extra():
+    base = FieldMeta(confidence=0.0, provenance="test", status="defaulted")
+    with pytest.raises(ValueError, match="Field required"):
+        PatientScopeFrameMeta(extent=base, jaw=base, stage=base)
+    with pytest.raises(ValueError, match="extra_forbidden"):
+        PatientScopeFrameMeta(
+            extent=base,
+            jaw=base,
+            stage=base,
+            modifiers=base,
+            diagnosis=base,
+        )
+
+
+def test_turn_frame_rejects_legacy_scalar_patient_scope():
+    with pytest.raises(ValueError):
+        TurnFrame(
+            intent="content",
+            patient_scope="one_tooth",
+            field_meta=_field_meta(),
+        )
+
+
+def test_turn_frame_dump_contains_nested_patient_scope_value_and_meta():
+    frame = TurnFrame(
+        intent="content",
+        patient_scope=PatientScopeFrame(jaw="upper"),
+        field_meta=_field_meta(
+            patient_scope=_patient_scope_meta(
+                jaw=FieldMeta(confidence=0.0, provenance="test.jaw", status="valid"),
+            ),
+        ),
+    )
+    dumped = frame.model_dump()
+    assert dumped["patient_scope"] == {
+        "extent": "unknown",
+        "jaw": "upper",
+        "stage": "unknown",
+        "modifiers": [],
+    }
+    assert dumped["field_meta"]["patient_scope"]["jaw"] == {
+        "confidence": 0.0,
+        "provenance": "test.jaw",
+        "status": "valid",
+        "error": None,
+    }
 
 
 def test_unknown_field_rejected():
@@ -406,13 +556,20 @@ def test_adapter_legacy_metadata_status_table_with_decision_frame():
     assert meta.emotion.status == "defaulted"
     assert meta.emotion.provenance == "default"
     assert meta.specificity.status == "valid"
-    assert meta.patient_scope.status == "missing"
+    assert frame.patient_scope == PatientScopeFrame()
+    for patient_meta in meta.patient_scope.model_dump().values():
+        assert patient_meta == {
+            "confidence": 0.0,
+            "provenance": "turn_plan.schema_default",
+            "status": "defaulted",
+            "error": None,
+        }
     assert meta.service_id.status == "valid"
     assert meta.follow_up.status == "valid"
     assert meta.followup_of.status == "valid"
     assert meta.needs_clarification.status == "valid"
-    for name in TurnFrameMeta.model_fields:
-        assert getattr(meta, name).error is None
+    for field_meta in _flatten_meta(meta):
+        assert field_meta.error is None
 
 
 def test_adapter_legacy_metadata_status_table_without_decision_frame():
@@ -428,14 +585,19 @@ def test_adapter_legacy_metadata_status_table_without_decision_frame():
     assert meta.emotion.status == "defaulted"
     assert meta.emotion.provenance == "default"
     assert meta.specificity.status == "missing"
-    assert meta.patient_scope.status == "missing"
+    assert frame.patient_scope == PatientScopeFrame()
+    for patient_meta in meta.patient_scope.model_dump().values():
+        assert patient_meta["status"] == "defaulted"
+        assert patient_meta["provenance"] == "turn_plan.schema_default"
+        assert patient_meta["confidence"] == 0.0
+        assert patient_meta["error"] is None
     assert meta.service_id.status == "missing"
     assert meta.follow_up.status == "defaulted"
     assert meta.follow_up.provenance == "missing_legacy_axis"
     assert meta.followup_of.status == "missing"
     assert meta.needs_clarification.status == "valid"
-    for name in TurnFrameMeta.model_fields:
-        assert getattr(meta, name).error is None
+    for field_meta in _flatten_meta(meta):
+        assert field_meta.error is None
 
 
 def test_adapter_explicit_statuses_valid_defaulted_missing_only():
@@ -454,8 +616,8 @@ def test_adapter_explicit_statuses_valid_defaulted_missing_only():
     assert frame.field_meta.aspects.status == "valid"
     assert frame.field_meta.emotion.status == "defaulted"
     assert frame.field_meta.service_id.status == "missing"
-    for name in TurnFrameMeta.model_fields:
-        assert getattr(frame.field_meta, name).error is None
+    for field_meta in _flatten_meta(frame.field_meta):
+        assert field_meta.error is None
 
 
 def test_adapter_meta_helper_requires_explicit_status():
@@ -467,9 +629,8 @@ def test_adapter_meta_helper_requires_explicit_status():
 def test_adapter_never_marks_metadata_invalid():
     turn_plan = TurnPlan(route="price_lookup", aspects=["price"], followup_of=None)
     frame = build_turn_frame_from_legacy(turn_plan=turn_plan)
-    for name in TurnFrameMeta.model_fields:
-        meta = getattr(frame.field_meta, name)
-        assert meta.status != "invalid", name
+    for field_meta in _flatten_meta(frame.field_meta):
+        assert field_meta.status != "invalid"
 
 
 def test_adapter_has_no_thematic_exception_branches():
@@ -509,3 +670,32 @@ def test_adapter_does_not_mutate_legacy_inputs():
     assert frame.primary_aspect == "duration"
     assert turn_plan.model_dump() == turn_before
     assert decision.model_dump() == decision_before
+
+
+@pytest.mark.parametrize(
+    "patient_situation",
+    [None, "unknown", "one_tooth_missing", "urgent_problem"],
+)
+def test_adapter_does_not_extract_legacy_patient_situation(patient_situation):
+    frame = build_turn_frame_from_legacy(
+        turn_plan=TurnPlan(
+            route="content",
+            aspects=["overview"],
+            patient_situation=patient_situation,
+        ),
+    )
+
+    assert frame.patient_scope == PatientScopeFrame()
+    for field_meta in frame.field_meta.patient_scope.model_dump().values():
+        assert field_meta == {
+            "confidence": 0.0,
+            "provenance": "turn_plan.schema_default",
+            "status": "defaulted",
+            "error": None,
+        }
+
+
+def test_adapter_source_does_not_read_patient_situation_or_copy_kind_string():
+    source = Path("core/turn_frame_adapter.py").read_text(encoding="utf-8")
+    assert ".patient_situation" not in source
+    assert "turn_plan.patient_situation" not in source

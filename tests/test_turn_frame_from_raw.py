@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from contracts.turn_frame import PatientScopeFrame, PatientScopeFrameMeta
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 
 _TOPICS = frozenset({"clinic", "doctors", "implantation"})
@@ -389,19 +390,60 @@ def test_unknown_raw_fields_do_not_enter_frame_dump():
     }
 
 
-def test_only_deferred_axes_keep_not_migrated_provenance():
+def test_only_deferred_scalar_axes_keep_not_migrated_provenance():
     frame = _build(_valid_raw())
 
     for name in (
         "emotion",
         "specificity",
-        "patient_scope",
     ):
         meta = getattr(frame.field_meta, name)
         assert meta.status == "defaulted", name
         assert meta.provenance == "a7.not_migrated", name
         assert meta.confidence == 0.0, name
         assert meta.error is None, name
+
+
+def test_patient_scope_uses_nested_schema_defaults_without_extraction():
+    frame = _build(_valid_raw())
+
+    assert frame.patient_scope == PatientScopeFrame()
+    assert isinstance(frame.field_meta.patient_scope, PatientScopeFrameMeta)
+    for name in PatientScopeFrameMeta.model_fields:
+        meta = getattr(frame.field_meta.patient_scope, name)
+        assert meta.status == "defaulted", name
+        assert meta.provenance == "turn_plan.schema_default", name
+        assert meta.confidence == 0.0, name
+        assert meta.error is None, name
+
+
+@pytest.mark.parametrize(
+    "patient_situation",
+    [None, "unknown", "one_tooth_missing", "urgent_problem", {"secret": "kind"}, ["secret"]],
+)
+def test_raw_patient_situation_is_ignored_until_extraction(patient_situation):
+    raw = _valid_raw()
+    raw["patient_situation"] = patient_situation
+    before = copy.deepcopy(raw)
+
+    frame = _build(raw)
+
+    assert frame.patient_scope == PatientScopeFrame()
+    assert raw == before
+    assert "secret" not in str(frame.model_dump())
+
+
+def test_absent_and_explicit_raw_patient_situation_have_same_scope_dump():
+    absent = _build(_valid_raw())
+    explicit_raw = _valid_raw()
+    explicit_raw["patient_situation"] = "full_arch_missing"
+    explicit = _build(explicit_raw)
+
+    assert absent.patient_scope.model_dump() == explicit.patient_scope.model_dump()
+    assert (
+        absent.field_meta.patient_scope.model_dump()
+        == explicit.field_meta.patient_scope.model_dump()
+    )
 
 
 def test_builder_has_no_runtime_or_thematic_dependencies():

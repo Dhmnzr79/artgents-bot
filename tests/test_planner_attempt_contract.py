@@ -8,12 +8,22 @@ from typing import get_args
 
 import pytest
 
-from contracts.planner_attempt import PlannerAttempt, ShadowAttemptStatus
-from contracts.turn_frame import FieldErrorReason, FieldMeta, TurnFrame, TurnFrameMeta
+from contracts.planner_attempt import (
+    PlannerAttempt,
+    ShadowAttemptStatus,
+    turn_frame_has_invalid_or_missing,
+)
+from contracts.turn_frame import (
+    FieldErrorReason,
+    FieldMeta,
+    PatientScopeFrameMeta,
+    TurnFrame,
+    TurnFrameMeta,
+)
 from contracts.turn_plan import TurnPlan
 
 
-def test_field_error_reason_allowlist_includes_exact_a8_slice():
+def test_field_error_reason_allowlist_includes_exact_a9_contract():
     assert set(get_args(FieldErrorReason)) == {
         "aspects_empty",
         "aspects_invalid_type",
@@ -29,6 +39,14 @@ def test_field_error_reason_allowlist_includes_exact_a8_slice():
         "followup_of_not_allowed",
         "follow_up_unavailable",
         "needs_clarification_invalid_type",
+        "patient_extent_invalid_type",
+        "patient_extent_not_allowed",
+        "patient_jaw_invalid_type",
+        "patient_jaw_not_allowed",
+        "patient_stage_invalid_type",
+        "patient_stage_not_allowed",
+        "patient_modifiers_invalid_type",
+        "patient_modifier_not_allowed",
     }
 
 
@@ -47,7 +65,14 @@ def _meta(
     )
 
 
-def _frame_meta(**overrides: FieldMeta) -> TurnFrameMeta:
+def _scope_meta(**overrides: FieldMeta) -> PatientScopeFrameMeta:
+    base = _meta()
+    defaults = {name: base for name in PatientScopeFrameMeta.model_fields}
+    defaults.update(overrides)
+    return PatientScopeFrameMeta(**defaults)
+
+
+def _frame_meta(**overrides: FieldMeta | PatientScopeFrameMeta) -> TurnFrameMeta:
     base = _meta()
     defaults = {
         "intent": base,
@@ -56,7 +81,7 @@ def _frame_meta(**overrides: FieldMeta) -> TurnFrameMeta:
         "primary_aspect": base,
         "emotion": _meta(confidence=0.0, provenance="default", status="defaulted"),
         "specificity": base,
-        "patient_scope": base,
+        "patient_scope": _scope_meta(),
         "service_id": base,
         "follow_up": base,
         "followup_of": base,
@@ -161,7 +186,9 @@ def test_partial_with_legacy_valid_and_invalid_metadata():
 def test_partial_with_legacy_valid_and_only_missing_metadata():
     frame = _frame(
         field_meta=_frame_meta(
-            patient_scope=_meta(status="missing", confidence=0.0, provenance="missing_legacy_axis"),
+            patient_scope=_scope_meta(
+                extent=_meta(status="missing", confidence=0.0, provenance="missing_legacy_axis"),
+            ),
         ),
     )
     attempt = PlannerAttempt(
@@ -170,6 +197,74 @@ def test_partial_with_legacy_valid_and_only_missing_metadata():
         shadow_status="partial",
     )
     assert attempt.shadow_status == "partial"
+
+
+def test_recursive_helper_accepts_nested_all_valid():
+    assert turn_frame_has_invalid_or_missing(_frame()) is False
+
+
+def test_recursive_helper_accepts_nested_all_defaulted():
+    defaulted = _meta(
+        status="defaulted",
+        confidence=0.0,
+        provenance="turn_plan.schema_default",
+    )
+    frame = _frame(
+        field_meta=_frame_meta(
+            patient_scope=PatientScopeFrameMeta(
+                extent=defaulted,
+                jaw=defaulted,
+                stage=defaulted,
+                modifiers=defaulted,
+            ),
+        ),
+    )
+    assert turn_frame_has_invalid_or_missing(frame) is False
+    assert PlannerAttempt(
+        legacy_plan=_legacy_plan(),
+        shadow_frame=frame,
+        shadow_status="ok",
+    ).shadow_status == "ok"
+
+
+@pytest.mark.parametrize(
+    ("subfield", "status", "error"),
+    [
+        ("extent", "invalid", "patient_extent_not_allowed"),
+        ("jaw", "invalid", "patient_jaw_not_allowed"),
+        ("stage", "invalid", "patient_stage_not_allowed"),
+        ("modifiers", "invalid", "patient_modifier_not_allowed"),
+        ("extent", "missing", None),
+        ("jaw", "missing", None),
+        ("stage", "missing", None),
+        ("modifiers", "missing", None),
+    ],
+)
+def test_recursive_helper_detects_each_nested_invalid_or_missing(subfield, status, error):
+    issue = _meta(
+        status=status,
+        error=error,
+        confidence=0.0,
+        provenance="test.patient_scope",
+    )
+    frame = _frame(
+        field_meta=_frame_meta(
+            patient_scope=_scope_meta(**{subfield: issue}),
+        ),
+    )
+
+    assert turn_frame_has_invalid_or_missing(frame) is True
+    with pytest.raises(ValueError, match="ok_forbids_invalid_or_missing_metadata"):
+        PlannerAttempt(
+            legacy_plan=_legacy_plan(),
+            shadow_frame=frame,
+            shadow_status="ok",
+        )
+    assert PlannerAttempt(
+        legacy_plan=_legacy_plan(),
+        shadow_frame=frame,
+        shadow_status="partial",
+    ).shadow_status == "partial"
 
 
 def test_partial_with_legacy_valid_and_fully_valid_frame_rejected():
@@ -328,6 +423,16 @@ def test_planner_attempt_contract_has_no_runtime_imports():
     assert "app" not in imported
 
 
+def test_planner_uses_shared_recursive_helper_without_local_duplicate():
+    contract_source = Path("contracts/planner_attempt.py").read_text(encoding="utf-8")
+    planner_source = Path("core/turn_planner_llm.py").read_text(encoding="utf-8")
+
+    assert contract_source.count("def turn_frame_has_invalid_or_missing(") == 1
+    assert "turn_frame_has_invalid_or_missing" in planner_source
+    assert "def _frame_has_invalid_or_missing(" not in planner_source
+    assert "TurnFrameMeta.model_fields" not in planner_source
+
+
 def test_only_planner_and_shadow_recorder_import_planner_attempt():
     planner_source = Path("core/turn_planner_llm.py").read_text(encoding="utf-8")
     recorder_source = Path("core/turn_frame_shadow.py").read_text(encoding="utf-8")
@@ -353,4 +458,29 @@ def test_only_planner_and_shadow_recorder_import_planner_attempt():
             or ".shadow_status" in source
         ):
             offenders.append(str(path))
+    assert offenders == []
+
+
+def test_patient_scope_contract_has_no_product_consumers():
+    paths = [Path("app.py"), Path("llm.py")]
+    paths.extend(sorted(Path("core").rglob("*.py")))
+    paths.extend(sorted(Path("orchestration").rglob("*.py")))
+    allowed = {
+        "core/turn_frame_adapter.py",
+        "core/turn_frame_from_raw.py",
+    }
+    forbidden_reads = (
+        ".patient_scope.extent",
+        ".patient_scope.jaw",
+        ".patient_scope.stage",
+        ".patient_scope.modifiers",
+    )
+    offenders: list[str] = []
+    for path in paths:
+        relative = path.as_posix()
+        if relative in allowed:
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "PatientScopeFrame" in source or any(token in source for token in forbidden_reads):
+            offenders.append(relative)
     assert offenders == []

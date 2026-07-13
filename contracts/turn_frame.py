@@ -4,13 +4,18 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import RouteIntent
 
 EmotionKind = Literal["none", "fear", "doubt"]
 SpecificityKind = Literal["unknown", "general", "specific"]
+
+PatientExtent = Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
+PatientJaw = Literal["unknown", "upper", "lower", "both"]
+PatientCareStage = Literal["unknown", "extraction_context", "implant_placed"]
+PatientScopeModifier = Literal["reported_bone_deficit"]
 
 FieldStatus = Literal["valid", "defaulted", "missing", "invalid"]
 
@@ -29,7 +34,34 @@ FieldErrorReason = Literal[
     "followup_of_not_allowed",
     "follow_up_unavailable",
     "needs_clarification_invalid_type",
+    "patient_extent_invalid_type",
+    "patient_extent_not_allowed",
+    "patient_jaw_invalid_type",
+    "patient_jaw_not_allowed",
+    "patient_stage_invalid_type",
+    "patient_stage_not_allowed",
+    "patient_modifiers_invalid_type",
+    "patient_modifier_not_allowed",
 ]
+
+
+class PatientScopeFrame(BaseModel):
+    """Composable, unknown-safe patient situation scope (shadow-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    extent: PatientExtent = "unknown"
+    jaw: PatientJaw = "unknown"
+    stage: PatientCareStage = "unknown"
+    modifiers: list[PatientScopeModifier] = Field(default_factory=list)
+
+    @field_validator("modifiers", mode="after")
+    @classmethod
+    def _canonical_modifiers(
+        cls,
+        value: list[PatientScopeModifier],
+    ) -> list[PatientScopeModifier]:
+        return sorted(set(value))
 
 
 class FieldMeta(BaseModel):
@@ -52,6 +84,17 @@ class FieldMeta(BaseModel):
         return self
 
 
+class PatientScopeFrameMeta(BaseModel):
+    """Per-subfield metadata for composable patient scope."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    extent: FieldMeta
+    jaw: FieldMeta
+    stage: FieldMeta
+    modifiers: FieldMeta
+
+
 class TurnFrameMeta(BaseModel):
     """Per-field metadata for semantic TurnFrame axes."""
 
@@ -63,7 +106,7 @@ class TurnFrameMeta(BaseModel):
     primary_aspect: FieldMeta
     emotion: FieldMeta
     specificity: FieldMeta
-    patient_scope: FieldMeta
+    patient_scope: PatientScopeFrameMeta
     service_id: FieldMeta
     follow_up: FieldMeta
     followup_of: FieldMeta
@@ -81,7 +124,7 @@ class TurnFrame(BaseModel):
     primary_aspect: AspectKind | None = None
     emotion: EmotionKind = "none"
     specificity: SpecificityKind = "unknown"
-    patient_scope: str | None = None
+    patient_scope: PatientScopeFrame = Field(default_factory=PatientScopeFrame)
     service_id: str | None = None
     follow_up: bool = False
     followup_of: str | None = None

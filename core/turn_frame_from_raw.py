@@ -10,6 +10,8 @@ from contracts.turn_frame import (
     FieldErrorReason,
     FieldMeta,
     FieldStatus,
+    PatientScopeFrame,
+    PatientScopeFrameMeta,
     TurnFrame,
     TurnFrameMeta,
 )
@@ -48,6 +50,15 @@ def _not_migrated_meta() -> FieldMeta:
 
 def _schema_default_meta() -> FieldMeta:
     return _meta(provenance=_SCHEMA_DEFAULT, status="defaulted")
+
+
+def _default_patient_scope_meta() -> PatientScopeFrameMeta:
+    return PatientScopeFrameMeta(
+        extent=_schema_default_meta(),
+        jaw=_schema_default_meta(),
+        stage=_schema_default_meta(),
+        modifiers=_schema_default_meta(),
+    )
 
 
 def _intent_from_raw(raw: dict[str, Any]) -> tuple[RouteIntent, FieldMeta]:
@@ -270,7 +281,7 @@ def build_turn_frame_from_raw(
         primary_aspect=primary_aspect,
         emotion="none",
         specificity="unknown",
-        patient_scope=None,
+        patient_scope=PatientScopeFrame(),
         service_id=service_id,
         follow_up=follow_up,
         followup_of=followup_of,
@@ -282,7 +293,7 @@ def build_turn_frame_from_raw(
             primary_aspect=primary_meta,
             emotion=not_migrated(),
             specificity=not_migrated(),
-            patient_scope=not_migrated(),
+            patient_scope=_default_patient_scope_meta(),
             service_id=service_meta,
             follow_up=follow_up_meta,
             followup_of=followup_meta,

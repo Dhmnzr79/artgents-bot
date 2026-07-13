@@ -154,6 +154,19 @@ def test_record_turn_frame_shadow_snapshot_has_field_meta_from_adapter() -> None
         assert snapshot == expected.model_dump()
         assert snapshot["field_meta"]["emotion"]["provenance"] == "default"
         assert snapshot["field_meta"]["intent"]["provenance"] == "decision_frame.route_intent"
+        assert snapshot["patient_scope"] == {
+            "extent": "unknown",
+            "jaw": "unknown",
+            "stage": "unknown",
+            "modifiers": [],
+        }
+        for field_meta in snapshot["field_meta"]["patient_scope"].values():
+            assert field_meta == {
+                "confidence": 0.0,
+                "provenance": "turn_plan.schema_default",
+                "status": "defaulted",
+                "error": None,
+            }
 
 
 def test_mark_turn_frame_shadow_not_available() -> None:

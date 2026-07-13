@@ -768,6 +768,32 @@ def test_plan_turn_attempt_valid_payload_returns_ok(monkeypatch):
     assert attempt.shadow_frame.field_meta.needs_clarification.status == "valid"
 
 
+def test_plan_turn_attempt_known_patient_kind_stays_ok_without_scope_extraction(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["patient_situation"] = "one_tooth_missing"
+    _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Нет одного зуба", "attempt-scope-contract", "demo")
+
+    assert attempt.shadow_status == "ok"
+    assert attempt.legacy_plan is not None
+    assert attempt.legacy_plan.patient_situation == "one_tooth_missing"
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.patient_scope.model_dump() == {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": [],
+    }
+    for field_meta in attempt.shadow_frame.field_meta.patient_scope.model_dump().values():
+        assert field_meta == {
+            "confidence": 0.0,
+            "provenance": "turn_plan.schema_default",
+            "status": "defaulted",
+            "error": None,
+        }
+
+
 def test_plan_turn_attempt_missing_optional_raw_keys_uses_schema_defaults(monkeypatch):
     payload = _valid_attempt_payload()
     payload.pop("service_id")

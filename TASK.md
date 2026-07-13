@@ -1,206 +1,409 @@
-# TASK — A5: planner заполняет native topic (shadow-only)
+# TASK — A6: заморозить матрицу качества native topic
 
 Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** до реализации.
 Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты ревью — `REVIEW_CHECKLIST.md`.
-Опора — `docs/ARCH_TARGET_DESIGN.md` v4 и `docs/TURN_FRAME_SHADOW_AUDIT_A3.md`.
+Опора — `docs/ARCH_TARGET_DESIGN.md` v4, `docs/TURN_FRAME_SHADOW_AUDIT_A3.md` и A5 commit `8662300`.
 
 ---
 
-## Зафиксированная точка старта
+## 1. Зафиксированная точка старта
 
-- A0 frozen spec hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
+- A0 frozen preservation hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
 - A1 TurnFrame: `0761213`.
 - A2 shadow observability: `3746d77`.
 - A3 audit: `0cb8ca3`.
 - A4 client topic taxonomy + contract: `2757cae`.
-- До A5 `TurnPlan.topic` optional, но текущий planner prompt его не запрашивает.
-- Рабочее дерево перед A5 должно быть чистым.
+- A5 native topic в planner/shadow: `8662300`.
+- После A5 рабочее дерево должно быть чистым.
+- Native `topic` остаётся **shadow-only** и не имеет authority.
 
-## Задача
+## 2. Зачем нужен A6
 
-**Название:** A5 — текущий turn planner возвращает `topic/topic_confidence` из разрешённой taxonomy клиента; downstream остаётся legacy.
+A5 показал `topic=implantation` на пяти implant-кейсах. Этого недостаточно, чтобы считать ось качественной: выборка узкая и почти однотематическая.
 
-**Размер:** МАЛЕНЬКАЯ/СРЕДНЯЯ. Один существующий LLM prompt, field-level validation, unit-тесты и live proof. Новых LLM-вызовов нет.
+A6 сначала замораживает независимую матрицу по **всем девяти** темам demo-пакета и по неоднозначным вопросам. Вопросы и ожидаемые темы фиксируются **до live-прогона**, чтобы Исполнитель не мог подобрать их под фактические ответы LLM.
 
-**Цель:** заполнить native `TurnPlan.topic` на реальных planner-success ходах и увидеть его в A2 `TurnFrame` shadow. Поле не получает authority и не влияет на текущий `DecisionFrame`, routing, evidence, AnswerPlan, composer, UI или policy.
+На этом checkpoint мы создаём **только spec**. Runner, runtime, prompt, тесты и live-вызовы не меняются и не запускаются.
 
 ```text
 client MD frontmatter topics
-          ↓ allowed taxonomy in existing planner prompt
-same planner call → TurnPlan.topic/topic_confidence
           ↓
-TurnFrame shadow only
+frozen A6 matrix (этот checkpoint)
+          ↓ следующий отдельный checkpoint
+real existing plan_turn() → audit report
 
-legacy DecisionFrame/routing/evidence ← без изменений
+routing/evidence/composer/UI ← без изменений
 ```
 
-## Prompt contract
+## 3. Название и результат задачи
 
-Изменить только существующий turn-planner prompt:
+**A6 Spec — frozen native-topic quality matrix.**
 
-- добавить ровно два поля JSON: `topic`, `topic_confidence`;
-- `topic` — одно значение из списка разрешённых topics текущего client pack или `null`;
-- topic означает широкую предметную область вопроса, не aspect, subtopic, service id и не doc id;
-- `topic_confidence` — число `0..1`; при `topic=null` обязано быть `0.0`;
-- если вопрос неоднозначен — `topic=null`, confidence `0.0`; не угадывать;
-- список разрешённых topics передаётся динамически из `load_client_topic_taxonomy(client_id)` в user content;
-- не хардкодить темы в `_SYSTEM` или production-коде;
-- не добавлять новый prompt/call/classifier.
+Создать один файл:
 
-Старые поля и инструкции `route/aspects/service_id/followup_of/needs_clarify/patient_situation/brand_filter` не переписывать и не ослаблять. Допускаются только минимальные изменения списка полей и инструкция про topic.
+`evals/v5/demo/topic_shadow_matrix.json`
 
-## Field-level validation
+Результат этого checkpoint:
 
-Native topic пока необязателен и shadow-only. Ошибка только в topic-полях **не должна делать весь TurnPlan fail-open**, если остальные старые поля валидны.
+- 33 заранее заданных fresh-session вопроса;
+- 27 однозначных кейсов: по 3 на каждую тему;
+- 6 неоднозначных кейсов с `expected_topic: null`;
+- ожидания опираются на `topic` в frontmatter клиентских MD, а не на текущий вывод LLM;
+- нет observed/current результатов, confidence thresholds и разрешения на authority.
 
-Перед/внутри `_validate_plan()`:
+## 4. Семантика будущего прогона — зафиксировать в spec
 
-- использовать allowed taxonomy текущего client pack;
-- valid topic нормализовать и сохранить;
-- unknown topic → `topic=None`, `topic_confidence=0.0`;
-- non-string topic → `None/0.0`;
-- invalid/non-numeric/bool/out-of-range confidence → сохранить valid topic с confidence `0.0` либо обнулить оба поля; выбрать одно правило и зафиксировать тестом;
-- confidence без topic → `0.0`;
-- не мутировать исходный raw dict;
-- записать структурированный telemetry event/log `turn_plan_topic_sanitized` со стабильным машинным reason;
-- не писать raw topic value, вопрос, ответ или exception message в sanitization event;
-- ошибки старых обязательных полей продолжают работать по прежним правилам и могут отклонить весь plan.
+Spec должен явно содержать верхнеуровневые поля:
 
-Допустимые стабильные reasons должны быть ограничены маленьким набором, например:
-
-- `topic_not_allowed`;
-- `topic_invalid_type`;
-- `topic_confidence_invalid`;
-- `topic_confidence_without_topic`.
-
-Не добавлять общий `field_errors`-каркас в A5 — это будет отдельная задача. Здесь только локальная безопасная обработка двух новых shadow-полей.
-
-## Runtime firewall
-
-Обязательные инварианты:
-
-- `turn_plan_to_decision_frame()` продолжает вычислять legacy `service_topic` только прежним способом из `service_id`;
-- `DecisionFrame.service_topic/confidence.topic` не читают `TurnPlan.topic/topic_confidence`;
-- `_resolve_service_id`, AnswerPlan, evidence, composer и routing не читают native topic;
-- единственный downstream-потребитель native topic — существующий `core/turn_frame_adapter.py` → A2 shadow;
-- return/output planner по старым полям остаётся прежним;
-- `publish_turn_plan()` может хранить новые поля внутри уже существующего `turn_plan.model_dump()`, но не создавать новые управляющие ctx-флаги;
-- структурированный `turn_planner_llm` log должен включить topic/confidence для аудита.
-
-## Затрагиваемые файлы (allowlist)
-
-Исполнитель может менять **только**:
-
-- `core/turn_planner_llm.py` — taxonomy in prompt, topic validation/sanitization, audit log fields;
-- `tests/test_turn_planner_llm.py` — prompt/validation/backward compatibility/firewall tests;
-- `tests/test_turn_frame_shadow.py` — только доказательство, что valid native topic появляется в shadow с provenance `turn_plan.topic`;
-- `eval_turn_topic_a5_preservation_last.txt` — raw live artifact, gitignored;
-- `eval_turn_topic_a5_smoke_last.txt` — raw live artifact, gitignored.
-
-`TASK.md`, architecture, contracts, taxonomy loader, adapter, orchestration, eval spec/harness, client content/config и продуктовые tests Исполнитель не меняет.
-
-## Явно НЕ делать
-
-- Не менять `contracts/turn_plan.py`, `core/topic_taxonomy.py`, `core/turn_frame_adapter.py` и A2 recorder.
-- Не использовать native topic в `turn_plan_to_decision_frame()`.
-- Не менять routing/evidence/composer/AnswerPlan/UI/policy.
-- Не добавлять новый LLM call, feature flag, topic router или regex inference.
-- Не создавать hardcoded mapping service→topic или список тем.
-- Не выводить topic из filename/doc_id/service id после LLM; allowed list только валидирует output.
-- Не чинить preservation `02/03/05` через downstream topic.
-- Не менять frozen spec, harness или expected результаты.
-- Не resnapshot'ить ответы.
-- Не добавлять skip/xfail/условный PASS.
-- Не выбирать лучший из нескольких live-прогонов и не скрывать предыдущие.
-- Не создавать commit/ветку/stash без явной команды владельца.
-
-## Обязательные unit-тесты
-
-1. Existing planner user content содержит динамический список topics клиента.
-2. `_SYSTEM` не содержит hardcoded topic names.
-3. Mock LLM valid topic/confidence проходит в TurnPlan.
-4. Topic другого client pack / unknown topic безопасно обнуляется без потери валидных legacy-полей.
-5. Non-string topic безопасно обнуляется.
-6. Invalid confidence обрабатывается выбранным field-level правилом без fail-open всего plan.
-7. Confidence без topic становится `0.0`.
-8. Sanitization не мутирует raw dict.
-9. Sanitization event имеет только стабильный reason и не содержит raw/question/exception.
-10. Старый LLM payload без новых полей остаётся валиден.
-11. Unknown `service_id` и другие старые ошибки всё ещё отклоняют plan.
-12. `turn_plan_to_decision_frame()` игнорирует native topic даже при высокой confidence.
-13. Shadow snapshot использует native topic и provenance `turn_plan.topic`.
-14. Native topic не меняет intent/aspects/service/follow-up.
-15. Нет импортов/чтения native topic в routing/evidence/composer/AnswerPlan.
-16. Frozen A0 hash неизменен.
-
-## Live proof
-
-После зелёных unit-тестов выполнить один полный прогон каждой suite и сохранить сырой вывод:
-
-```powershell
-$env:E2E_USE_TEST_CLIENT="1"
-$env:PYTHONUTF8="1"
-$env:PYTHONIOENCODING="utf-8"
-python evals/v5/run_demo_eval.py --client demo --suite preservation 2>&1 | Tee-Object -FilePath eval_turn_topic_a5_preservation_last.txt
-$preservationExit = $LASTEXITCODE
-"EVAL_EXIT_CODE=$preservationExit" | Tee-Object -FilePath eval_turn_topic_a5_preservation_last.txt -Append
-
-python evals/v5/run_demo_eval.py --client demo --suite smoke 2>&1 | Tee-Object -FilePath eval_turn_topic_a5_smoke_last.txt
-$smokeExit = $LASTEXITCODE
-"EVAL_EXIT_CODE=$smokeExit" | Tee-Object -FilePath eval_turn_topic_a5_smoke_last.txt -Append
-
-Get-FileHash -Algorithm SHA256 eval_turn_topic_a5_preservation_last.txt
-Get-FileHash -Algorithm SHA256 eval_turn_topic_a5_smoke_last.txt
+```json
+{
+  "schema_version": 1,
+  "suite_id": "a6_topic_shadow_quality_matrix",
+  "client_id": "demo",
+  "execution_mode": "planner_direct_live",
+  "fresh_session_per_case": true,
+  "authority": "shadow_only",
+  "taxonomy_source": "clients/{client_id}/md/*.md frontmatter.topic",
+  "expected_taxonomy_ordered": [
+    "clinic",
+    "doctors",
+    "extraction",
+    "implantation",
+    "orthodontics",
+    "periodontology",
+    "prosthetics",
+    "treatment",
+    "whitening"
+  ],
+  "scoring_contract": {},
+  "cases": []
+}
 ```
 
-Не перезапускать отдельные кейсы ради результата. Технический повтор полного run сохранять отдельным именем и сообщать все попытки.
+`execution_mode: planner_direct_live` означает для следующего checkpoint:
 
-Live acceptance:
+- вызывать реальный существующий `plan_turn()`;
+- использовать тот же production prompt, тот же LLM-call и реальную taxonomy demo;
+- один вызов на один кейс;
+- без mock/stub и без полного `/ask` pipeline;
+- не оценивать route, evidence, текст ответа, UI или marketing;
+- contacts/ingress boundaries не должны исключать темы из выборки, потому что измеряется именно planner axis;
+- адаптер и downstream уже покрыты A4/A5 unit + A5 live firewall и не становятся предметом A6 spec.
 
-- smoke: `24/24`, errors=0, skipped=0;
-- preservation: existing green cases `01/04/06` остаются PASS; cases `02/03/05` могут оставаться target-red или улучшиться естественно, spec не менять;
-- errors/timeouts/skipped отсутствуют;
-- contacts остаётся boundary/not_applicable для TurnFrame;
-- planner-success preservation cases `02–06`: shadow status `ok`;
-- native topic для implant-вопросов `02–06` ожидается `implantation` с provenance `turn_plan.topic` и confidence из planner;
-- `turn_complete` legacy `service_topic`, decision и product route не должны быть переписаны native topic;
-- raw hashes и exit codes показать checker.
+## 5. Scoring contract
 
-Если хотя бы один старый green case регрессировал либо smoke не `24/24` — ❌, не менять spec и не объявлять это вариативностью без эскалации.
+В `scoring_contract` зафиксировать ровно такую семантику:
 
-## Команды unit/regression проверки
+```json
+{
+  "scored_field": "turn_plan.topic",
+  "confidence_field": "turn_plan.topic_confidence",
+  "match_rule": "exact_normalized_or_null",
+  "one_live_call_per_case": true,
+  "retry_failed_case": false,
+  "confidence_is_descriptive_only": true,
+  "confidence_pass_threshold": null,
+  "required_metrics": [
+    "overall_exact_match",
+    "per_topic_exact_match",
+    "ambiguous_null_exact_match",
+    "confusion_matrix",
+    "planner_unavailable_count",
+    "invalid_or_out_of_taxonomy_count",
+    "confidence_by_correctness_descriptive"
+  ],
+  "authority_decision_allowed": false
+}
+```
+
+Правила:
+
+- `expected_topic` сравнивается с нормализованным `TurnPlan.topic` точным равенством;
+- для ambiguous-кейсов правильное значение — только `null`;
+- любое значение вне frozen taxonomy считается ошибкой, а не новым классом;
+- `plan_turn() -> None`/exception/time-out учитывается как `planner_unavailable`, не как topic mismatch и не скрывается;
+- self-reported confidence только записывается; A6 не называет её калиброванной и не вводит порог;
+- отсутствие retry запрещает выбирать лучший ответ из нескольких запусков;
+- даже 33/33 не дают `topic` authority автоматически.
+
+## 6. Case schema
+
+Каждый элемент `cases` содержит **ровно**:
+
+```json
+{
+  "id": "topic_a6_...",
+  "case_kind": "grounded_single_topic | ambiguous_null",
+  "question": "...",
+  "expected_topic": "topic-or-null",
+  "source_doc_id": "doc-id-or-null",
+  "rationale": "короткое объяснение ожидания"
+}
+```
+
+Не добавлять в строки:
+
+- `observed_topic`, `current`, `actual`, `pass`;
+- expected route/service/aspect/doc answer;
+- confidence expectation или threshold;
+- альтернативный список допустимых тем;
+- regex/keyword gates;
+- тексты ожидаемых ответов бота.
+
+## 7. Frozen matrix — переписать в spec без изменения смысла
+
+Порядок кейсов обязателен.
+
+### 7.1 `clinic` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_01_clinic_payment` | `Какие способы оплаты есть в клинике?` | `clinic` | `clinic__info__payment_terms` |
+| `topic_a6_02_clinic_warranty` | `Какая гарантия действует в клинике?` | `clinic` | `clinic__info__warranty` |
+| `topic_a6_03_clinic_consultation` | `Как проходит консультация в клинике?` | `clinic` | `clinic__info__consultation` |
+
+### 7.2 `doctors` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_04_doctors_overview` | `Какие врачи работают в клинике?` | `doctors` | `doctors__doctor__overview` |
+| `topic_a6_05_doctors_named` | `Расскажите о докторе Волкове` | `doctors` | `doctors__doctor__volkov` |
+| `topic_a6_06_doctors_implants` | `Кто из врачей занимается имплантацией?` | `doctors` | `doctors__doctor__overview` |
+
+Кейс 06 намеренно содержит слово про имплантацию, но спрашивает **кто из врачей**. Ожидание `doctors` взято из doctor overview aliases, а не из текущего LLM.
+
+### 7.3 `extraction` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_07_extraction_process` | `Как проходит удаление зуба?` | `extraction` | `extraction__service__tooth_extraction` |
+| `topic_a6_08_extraction_pain` | `Больно ли удалять зуб?` | `extraction` | `extraction__service__tooth_extraction` |
+| `topic_a6_09_extraction_aftercare` | `Что делать после удаления зуба?` | `extraction` | `extraction__service__tooth_extraction` |
+
+### 7.4 `implantation` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_10_implantation_survival` | `Какая приживаемость имплантов?` | `implantation` | `implantation__faq__osseointegration` |
+| `topic_a6_11_implantation_comparison` | `All-on-4 или All-on-6 — чем отличаются?` | `implantation` | `comparison__all_on_4_vs_all_on_6` |
+| `topic_a6_12_implantation_pain` | `Больно ли устанавливать имплант?` | `implantation` | `implantation__faq__pain` |
+
+### 7.5 `orthodontics` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_13_orthodontics_overview` | `Что такое элайнеры?` | `orthodontics` | `orthodontics__service__aligners` |
+| `topic_a6_14_orthodontics_indications` | `Какие проблемы исправляют элайнеры?` | `orthodontics` | `orthodontics__service__aligners` |
+| `topic_a6_15_orthodontics_process` | `Как проходит лечение на элайнерах?` | `orthodontics` | `orthodontics__service__aligners` |
+
+### 7.6 `periodontology` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_16_periodontology_overview` | `Что такое пародонтит?` | `periodontology` | `periodontology__service__periodontitis` |
+| `topic_a6_17_periodontology_gums` | `Почему кровоточат дёсны?` | `periodontology` | `periodontology__service__periodontitis` |
+| `topic_a6_18_periodontology_save_teeth` | `Можно ли сохранить шатающиеся зубы?` | `periodontology` | `periodontology__service__periodontitis` |
+
+### 7.7 `prosthetics` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_19_prosthetics_veneers` | `Что такое виниры?` | `prosthetics` | `prosthetics__service__veneers` |
+| `topic_a6_20_prosthetics_removable` | `Какие бывают съёмные протезы?` | `prosthetics` | `prosthetics__service__removable_dentures` |
+| `topic_a6_21_prosthetics_zirconia` | `Что такое циркониевая коронка?` | `prosthetics` | `prosthetics__service__zirconia_crowns` |
+
+### 7.8 `treatment` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_22_treatment_caries` | `Как лечат кариес?` | `treatment` | `treatment__service__caries` |
+| `topic_a6_23_treatment_pulpitis` | `Что такое пульпит?` | `treatment` | `treatment__service__pulpitis` |
+| `topic_a6_24_treatment_overview` | `Как проходит лечение зубов?` | `treatment` | `treatment__service__teeth_treatment` |
+
+### 7.9 `whitening` — 3
+
+| id | question | expected_topic | source_doc_id |
+|---|---|---|---|
+| `topic_a6_25_whitening_overview` | `Что такое профессиональное отбеливание зубов?` | `whitening` | `whitening__service__teeth_whitening` |
+| `topic_a6_26_whitening_cleaning` | `Нужна ли чистка перед отбеливанием?` | `whitening` | `whitening__service__teeth_whitening` |
+| `topic_a6_27_whitening_safety` | `Безопасно ли отбеливание для эмали?` | `whitening` | `whitening__service__teeth_whitening` |
+
+### 7.10 Ambiguous fresh-session → `null` — 6
+
+| id | question | expected_topic | source_doc_id | rationale |
+|---|---|---|---|---|
+| `topic_a6_28_null_general_price` | `Сколько стоит лечение?` | `null` | `null` | Не названа услуга или предметная область. |
+| `topic_a6_29_null_choice` | `Что лучше выбрать?` | `null` | `null` | Нет вариантов и нет предыдущего контекста. |
+| `topic_a6_30_null_booking` | `Хочу записаться` | `null` | `null` | Намерение есть, предметная область не названа. |
+| `topic_a6_31_null_pain` | `Мне больно` | `null` | `null` | Не указано, где и с какой услугой связан вопрос. |
+| `topic_a6_32_null_more` | `Расскажите подробнее` | `null` | `null` | Fresh session, отсутствует объект follow-up. |
+| `topic_a6_33_null_options` | `Какие у вас есть варианты?` | `null` | `null` | Не указано, варианты чего нужны. |
+
+Для всех 27 grounded-кейсов `case_kind = "grounded_single_topic"`.
+Для кейсов 28–33 `case_kind = "ambiguous_null"`.
+
+`rationale` для grounded-кейсов должен кратко говорить: ожидаемая тема совпадает с frontmatter указанного source doc. Не копировать текст документа целиком.
+
+## 8. Источники истины
+
+Перед записью spec Исполнитель обязан read-only проверить:
+
+- `load_client_topic_taxonomy("demo")` возвращает ровно frozen список из 9 тем;
+- каждый `source_doc_id` существует в `clients/demo/md/*.md`;
+- frontmatter `topic` каждого source doc совпадает с `expected_topic`;
+- ambiguous-кейсы не получают искусственный source doc.
+
+Запрещено использовать как источник expected:
+
+- вывод A5 live;
+- текущий ответ `plan_turn()`;
+- legacy `DecisionFrame.service_topic`;
+- filename/doc_id inference вместо frontmatter;
+- собственное предположение Исполнителя, если оно расходится с таблицей TASK.
+
+Если таблица TASK противоречит frontmatter — **СТОП**, spec не исправлять самостоятельно, эскалировать Архитектору с `file:line`.
+
+## 9. Затрагиваемые файлы — строгий allowlist
+
+Исполнитель может создать **только**:
+
+- `evals/v5/demo/topic_shadow_matrix.json`.
+
+Исполнитель не меняет:
+
+- `TASK.md`;
+- `core/**`, `contracts/**`, `orchestration/**`;
+- `tests/**`;
+- `evals/v5/run_demo_eval.py`, `smoke_case_runner.py` и другие runners;
+- client MD/config/pricebook/policies;
+- `preservation.json`, smoke/risk/golden/emotion;
+- architecture/audit docs.
+
+Любой другой diff → ❌ и СТОП.
+
+## 10. Protected contracts
+
+Не менять:
+
+- `evals/v5/demo/preservation.json`;
+- A0 hash `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`;
+- вопросы, порядок, expected topics и source doc ids из раздела 7 этого TASK;
+- A5 runtime/tests.
+
+После spec review и отдельного commit новый `topic_shadow_matrix.json` также становится protected. Runner следующего checkpoint не сможет менять его ради зелёного результата.
+
+## 11. Явно НЕ делать
+
+- Не запускать LLM/live eval на spec checkpoint.
+- Не узнавать observed topic до freeze/commit spec.
+- Не добавлять runner/harness/validator/test.
+- Не менять planner prompt или sanitization.
+- Не давать topic влияние на route/evidence/composer/UI/policy.
+- Не добавлять retry, majority vote или выбор лучшего run.
+- Не вводить confidence threshold.
+- Не подменять ambiguous `null` наиболее вероятной темой.
+- Не ослаблять матрицу, если будущий live окажется красным.
+- Не создавать commit/branch/stash без команды владельца.
+
+## 12. Проверки spec checkpoint
+
+Выполнить:
 
 ```powershell
-python -m pytest -q tests/test_turn_planner_llm.py tests/test_turn_frame_shadow.py
-python -m pytest -q tests/test_turn_frame_contract.py tests/test_turn_planner_wiring.py tests/test_turn_plan_protocol_guard.py
-python -m pytest -q tests/test_contacts_routing.py tests/test_pricebook_golden.py tests/test_price_layer_parity.py
+python -m json.tool evals/v5/demo/topic_shadow_matrix.json > $null
 git diff --check
 git status --short
+git diff -- evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
 ```
 
-## Стоп-условия
+Дополнительно read-only проверить и показать в отчёте:
+
+- case count = 33;
+- unique ids = 33;
+- grounded count = 27;
+- ambiguous count = 6;
+- по каждой из 9 тем grounded count = 3;
+- expected topics входят в frozen taxonomy или равны `null`;
+- source doc/frontmatter match = 27/27;
+- unknown keys по case schema отсутствуют;
+- live/LLM calls = 0.
+
+Нельзя создавать отдельный validation script на этом checkpoint. Проверку допускается выполнить одноразовой read-only командой в терминале.
+
+## 13. Стоп-условия
 
 СТОП и эскалация, если:
 
-- требуется файл вне allowlist;
-- native topic нужно читать downstream для получения желаемого ответа;
-- изменение prompt регрессирует legacy route/aspects/service или старые green cases;
-- invalid topic валит весь otherwise-valid plan;
-- taxonomy пуста/не загружается;
-- LLM систематически возвращает темы вне allowed list;
-- live run имеет timeout/error/skipped;
-- smoke не 24/24;
-- frozen hash изменился;
-- есть посторонний diff.
+- рабочее дерево до начала не чистое;
+- нужен файл вне allowlist;
+- taxonomy demo не равна frozen списку из 9 тем;
+- source doc отсутствует или его frontmatter topic не совпадает;
+- вопрос/expected кажется спорным;
+- хочется сначала вызвать LLM, а потом записать expected;
+- хочется добавить альтернативные допустимые темы;
+- для проверки spec требуется менять runner/runtime/tests;
+- preservation hash изменился;
+- появился посторонний diff.
 
-## Контрольная точка и приёмка
+Формат эскалации:
 
-1. Реализация + unit/regression commands.
-2. Один preservation + один smoke live run.
-3. Показать diff тестов первым, changed-files, raw hashes и покейсный topic/provenance.
-4. СТОП → checker → Архитектор.
+```text
+СТОП: требуется решение Архитектора
+Факт:
+Файл/строка:
+Почему TASK нельзя выполнить дословно:
+Варианты без самостоятельного выбора:
+```
 
-A5 принят, когда topic честно заполняется из client taxonomy в shadow, битое optional поле не ломает legacy plan, downstream firewall доказан, smoke остаётся `24/24`, старые preservation green не регрессируют и frozen hash сохранён.
+## 14. Контрольные точки
 
-После A5 автоматически не давать topic authority и не чинить evidence. Следующий шаг определяется отдельным аудитом качества topic на более широкой тематической матрице.
+### Checkpoint 1 — Spec authoring
+
+Исполнитель:
+
+1. Проверяет clean baseline и hash.
+2. Создаёт только `topic_shadow_matrix.json`.
+3. Не запускает live/LLM.
+4. Показывает полный spec diff, counts и source/frontmatter verification.
+5. Делает СТОП без commit.
+
+### Checkpoint 2 — Spec review
+
+Checker независимо проверяет:
+
+- diff только одного allowlist-файла;
+- matrix дословно соответствует TASK;
+- expected взяты из source frontmatter;
+- ambiguous действительно fresh/no-context;
+- нет observed/current/resnapshot полей;
+- scoring contract не даёт authority и не калибрует confidence;
+- live не запускался;
+- preservation hash прежний.
+
+Вердикт: `✅ / ❌ / ❓`.
+
+### Checkpoint 3 — Freeze commit
+
+Только после `✅` владелец отдельно разрешает commit одного spec-файла. После commit — чистое дерево и СТОП.
+
+Harness/live/audit для A6 будут отдельным следующим `TASK.md`. Этот spec checkpoint их не начинает.
+
+## 15. Формат отчёта Исполнителя
+
+1. `git status --short` до начала.
+2. Полный changed-files.
+3. JSON parse result.
+4. Counts: total/unique/grounded/ambiguous/per-topic.
+5. Таблица `case id → expected topic → source doc → actual frontmatter topic`.
+6. Подтверждение `live_calls=0`.
+7. `git diff --check`.
+8. Preservation hash.
+9. Skipped/not run.
+10. Явный СТОП без commit.
+
+## 16. Критерий приёмки A6 Spec
+
+A6 Spec принят, когда один новый JSON-файл честно и заранее фиксирует 33 вопроса по всем 9 темам и ambiguous-null группе, каждое grounded expectation подтверждено client frontmatter, никаких observed результатов ещё нет, runtime/harness/tests не менялись, live не запускался, frozen preservation hash сохранён.
+
+Это **не** решение дать `topic` власть. Это измерительная линейка, которую нельзя переписать после того, как мы увидим результат.

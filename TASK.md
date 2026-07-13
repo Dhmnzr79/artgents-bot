@@ -420,6 +420,22 @@ Get-FileHash -Algorithm SHA256 eval_topic_shadow_a7_last.txt
 
 Все failed/skipped/xfail/not run, warnings и logging errors перечислить. Environment permission error не считать test pass; повтор разрешён только с workspace `--basetemp`, без изменения tests.
 
+### 15.1. Узкое baseline-исключение для product suite
+
+Решением владельца от 2026-07-13 зафиксировано: до начала A9 Contract в protected `patient_playbook` уже существуют ровно два воспроизводимых падения, не вызванных A9 diff:
+
+1. `tests/test_patient_playbook.py::test_extraction_then_implant_prefers_one_stage_then_classic` — current composable rules выбирают `one_tooth_restore`, тогда как старый assert ожидает `extraction_then_implant_restore`; конфликт существует с `90d4cc1` (`problem+extent` получает большую specificity, чем `kind` alone).
+2. `tests/test_patient_playbook.py::test_no_playbook_returns_none` — тест из `77eb0e6` подменяет только `load_patient_playbook`, но current runtime с `90d4cc1` сначала читает `load_patient_playbook_rules`, поэтому возвращает `full_arch_restore`.
+
+Это **не** общее разрешение на красные тесты и не изменение ожидаемого product behavior. Для A9 Contract product gate принимается только в одном из двух состояний:
+
+- `127 passed, 0 failed, 0 skipped`; или
+- `125 passed, 2 failed, 0 skipped`, где failed — ровно два test node id выше и причины совпадают с зафиксированным baseline.
+
+Любой другой fail, третий fail, skip/xfail, изменение assertion, изменение `core/patient_playbook.py`, `tests/test_patient_playbook.py`, `clients/demo/patient_playbook.yaml` или иных protected product-файлов → СТОП и `❌`/`❓`.
+
+В рамках A9 запрещено чинить, удалять, ослаблять или подменять эти два теста. Их исправление требует отдельного TASK и отдельного commit. Checker обязан перечислить исключение явно, а не назвать весь product suite зелёным.
+
 ## 16. Live / LLM
 
 На этом checkpoint запрещены:
@@ -443,8 +459,9 @@ Checker обязан:
 7. Проверить raw immutability/privacy и safe defaults.
 8. Source/AST review подтвердить product firewall.
 9. Самостоятельно запустить §15.
-10. Проверить protected hashes/raw и отсутствие live artifacts.
-11. Дать `✅/❌/❓` по двум слоям `REVIEW_CHECKLIST.md`.
+10. Проверить product result строго по §15.1 и доказать отсутствие diff в protected playbook/product-файлах.
+11. Проверить protected hashes/raw и отсутствие live artifacts.
+12. Дать `✅/❌/❓` по двум слоям `REVIEW_CHECKLIST.md`.
 
 ## 18. Стоп-условия
 
@@ -472,8 +489,8 @@ A9 Contract завершён, когда:
 5. Shared recursive helper сохраняет `PlannerAttempt` semantics.
 6. Оба shadow constructors дают all-unknown/defaulted scope и не извлекают scalar kind.
 7. Старый Kind-string copy удалён.
-8. Product contracts/behavior untouched и regression tests зелёные.
-9. Все §15 tests зелёные без skip/xfail.
+8. Product contracts/behavior untouched; regression tests зелёные; product suite либо зелёный, либо совпадает только с exact baseline-исключением §15.1.
+9. Все §15 tests зелёные без skip/xfail, кроме ровно двух pre-existing failures, разрешённых только по exact условиям §15.1.
 10. Frozen hashes/raw неизменны.
 11. Independent Cursor checker дал `✅`.
 12. Создан отдельный implementation commit и push только в `codex/stage-a`.

@@ -1,414 +1,251 @@
-# TASK — A7 Planner split: один raw → partial shadow + strict legacy
+# TASK — A7 Shadow wiring: partial TurnFrame только в observability
 
-Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** после принятого A7 Contract.
-Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты ревью — `REVIEW_CHECKLIST.md`.
-Архитектурная опора — `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md` и текущий код.
+Один активный `TASK.md` на один checkpoint. Файл подготовлен Архитектором после принятых A7 Contract и A7 Planner split.
+
+Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты review — `REVIEW_CHECKLIST.md`. Архитектурная опора — `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`.
 
 ---
 
 ## 1. Точка старта
 
-- A7 Design: `7f9cfe4`.
+- Ветка: `codex/stage-a`.
 - A7 Contract: `077bb0a`.
-- Рабочая ветка: `codex/stage-a`.
+- A7 Planner split: `a6318a8`.
 - A6 raw SHA256: `2EF96AB8660657501137B0A6880E7EA54594E02417197F031BE1BCE2D9D5A40A`.
 - Matrix hash: `dc356c9c738fb80a10cf0035508d7e8c8247979d`.
 - Preservation hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
-- Перед началом working tree должен быть чистым.
+- До реализации рабочее дерево должно быть чистым после отдельного governance-коммита этого `TASK.md`.
 
 ## 2. Цель
 
-Реализовать unit-only dual branch одного planner-вызова:
+Подключить уже существующий single-call `PlannerAttempt` к runtime:
 
 ```text
-один chat_completions_create()
-          ↓
-один parseable raw dict
-  ├─ pure field-level builder → TurnFrame
-  └─ существующая strict _validate_plan() → TurnPlan | None
-          ↓
-PlannerAttempt(legacy_plan, shadow_frame, shadow_status)
+plan_turn_attempt() — ровно один существующий planner LLM-call
+        │
+        ├─ legacy_plan ──► текущие decision/routing/evidence/composer/UI
+        │
+        └─ shadow_frame + shadow_status ──► request.ctx/logs/E2E telemetry only
 ```
 
-Существующий публичный контракт сохраняется:
+Главный кейс:
 
-```python
-plan_turn(q, sid, client_id) -> TurnPlan | None
+```text
+raw: topic="doctors", aspects=[]
+legacy_plan = None
+shadow_status = "partial"
+shadow_frame.topic = "doctors"
+
+product: прежний fail-open → resolve_with_fallback
+telemetry: partial frame сохранён, topic не потерян
 ```
 
-Он становится тонким wrapper:
+Этот checkpoint **не улучшает ответы** и **не передаёт authority** новому `TurnFrame`.
 
-```python
-return plan_turn_attempt(q, sid, client_id).legacy_plan
-```
+## 3. Неподвижные инварианты
 
-Никакой downstream-код в этом checkpoint не получает `PlannerAttempt`.
+1. На один ход выполняется ровно один `plan_turn_attempt()` и не более одного planner LLM-call.
+2. Runtime больше не вызывает рядом `plan_turn()` и `plan_turn_attempt()`.
+3. Product-ветка читает только `attempt.legacy_plan`.
+4. `legacy_plan is not None` сохраняет текущий planner-owned путь без смысловых изменений.
+5. `legacy_plan is None` сохраняет текущий `resolve_with_fallback` fail-open.
+6. `partial`, `not_available` и `degraded` не считаются успешным product-планом.
+7. `shadow_frame`, `shadow_status` и per-field metadata не участвуют в route, intent, decision, evidence, composer, policy, marketing, UI или answer.
+8. `TurnPlan.aspects min_length=1`, prompt, strict validation и guards не меняются.
+9. Нет второго LLM-call, retry, classifier, regex/if под семь A6 кейсов.
+10. Raw LLM JSON, question, answer, history и exception text не попадают в ctx/logs.
+11. Ошибка shadow serialization/telemetry не ломает product-ход.
+12. Widget без `E2E_USE_TEST_CLIENT=1` не получает нового payload.
 
-## 3. Главные инварианты
+## 4. Строгий allowlist реализации
 
-1. Ровно **один** LLM-call на один вызов `plan_turn()` или `plan_turn_attempt()`.
-2. Один и тот же raw dict читают обе ветки.
-3. Field-level builder не мутирует raw.
-4. Strict `_validate_plan()` не получает «исправленный» builder payload.
-5. `TurnPlan` и его eligibility не ослабляются.
-6. `plan_turn()` возвращает те же legacy results/fail-open, что до A7.
-7. Partial shadow не публикуется в ctx и не влияет на product.
-8. Нет второго classifier, retry или тематических веток.
+Исполнитель может менять только:
 
-## 4. Строгий allowlist
-
-Исполнитель может изменить только:
-
-1. `core/turn_frame_from_raw.py` — новый pure builder
-2. `core/turn_planner_llm.py`
-3. `tests/test_turn_frame_from_raw.py` — новый файл
-4. `tests/test_turn_planner_llm.py`
-5. `tests/test_planner_attempt_contract.py` — только миграция firewall-теста: planner разрешён, downstream запрещён
+1. `orchestration/resolver_turn.py`
+2. `core/turn_frame_shadow.py`
+3. `tests/test_turn_frame_shadow.py`
+4. `tests/test_metadata_first_observability.py` — только тесты публикации существующих shadow ctx keys
+5. `tests/test_turn_planner_wiring.py` — только runtime one-call/product-firewall проверки
 
 Любой другой diff → ❌ и СТОП.
 
 Особенно запрещено менять:
 
+- `TASK.md` после governance-коммита;
 - `contracts/**`;
+- `core/turn_planner_llm.py`;
+- `core/turn_frame_from_raw.py`;
 - `core/turn_frame_adapter.py`;
-- `core/turn_frame_shadow.py`;
-- `orchestration/**`;
-- `llm.py`, `app.py`;
-- `TASK.md`, design/audit docs;
+- `core/metadata_first_observability.py`;
+- другие `orchestration/**`;
+- `app.py`, `llm.py`, resolver/evidence/composer/policy/UI;
 - eval specs/harness/raw;
 - client content, pricebook, marketing;
-- продуктовые тесты вне allowlist.
+- старые product tests вне allowlist.
 
-## 5. Pure field-level builder
+## 5. Runtime wiring
 
-Создать `core/turn_frame_from_raw.py`.
+В `run_resolver_turn()`:
 
-Публичная функция:
-
-```python
-def build_turn_frame_from_raw(
-    raw: dict[str, Any],
-    *,
-    allowed_topics: frozenset[str],
-) -> TurnFrame:
-    ...
-```
-
-### 5.1 Чистота
-
-Builder:
-
-- не мутирует `raw`, включая nested values;
-- не логирует raw/exception/user text;
-- не читает question/history/session/client files;
-- не загружает taxonomy сам — получает `allowed_topics`;
-- не импортирует planner, resolver, Flask, app, LLM, evidence/composer;
-- не вызывает network/LLM;
-- не исправляет strict payload;
-- не содержит тематических if/regex.
-
-### 5.2 Intent/route
-
-Разрешённые значения берутся из `RouteIntent` contract, без локального dental hardcode.
-
-- valid route string → значение route, `status="valid"`, provenance `turn_plan.raw.route`;
-- missing/non-string/out-of-contract route → `intent="unknown"`, `status="invalid"`, error `route_invalid`;
-- confidence для route в этом slice `0.0` (LLM не возвращает route confidence).
-
-### 5.3 Topic/topic_confidence
-
-Semantics должны соответствовать A7 Design, не product sanitizer side effects:
-
-- allowed normalized string + confidence 0..1 → topic, `valid`, provenance `turn_plan.raw.topic`;
-- missing/null/blank topic при missing/null/0 confidence → `None`, `missing`, error `None`, confidence `0.0`;
-- non-string topic → `None`, `invalid`, `topic_invalid_type`;
-- topic вне `allowed_topics` → `None`, `invalid`, `topic_not_allowed`;
-- invalid/non-number/bool/out-of-range confidence → `None`, `invalid`, `topic_confidence_invalid`;
-- positive confidence без topic также маппится в `topic_confidence_invalid` (не расширять frozen error allowlist);
-- не сохранять неизвестное raw topic value в frame/error/log.
-
-Не выводить topic из service_id, filename, doc_id, question, regex или legacy `DecisionFrame`.
-
-### 5.4 Aspects
-
-Allowed values получают из `AspectKind`, не из отдельного hardcoded dental списка.
-
-- valid non-empty list разрешённых строк → list в исходном порядке, `valid`;
-- `[]` → `[]`, `invalid`, `aspects_empty`;
-- missing/non-list → `[]`, `invalid`, `aspects_invalid_type`;
-- хотя бы один unknown/non-string element → `[]`, `invalid`, `aspect_not_allowed`;
-- не удалять неизвестные элементы молча;
-- не подставлять `overview`;
-- provenance `turn_plan.raw.aspects`, confidence `0.0`.
-
-### 5.5 Primary aspect
-
-- только первый элемент valid non-empty aspects;
-- provenance `turn_plan.raw.aspects[0]`;
-- valid aspects → `status="valid"`;
-- empty/invalid aspects → `None`, `invalid`, `primary_aspect_unavailable`;
-- builder не принимает отдельный primary из raw.
-
-### 5.6 Остальные оси первого slice
-
-Они пока не валидируются из raw и получают безопасные значения со статусом `defaulted`, чтобы не создавать ложный `missing`:
-
-| axis | value | provenance |
-|------|-------|------------|
-| emotion | `none` | `a7.not_migrated` |
-| specificity | `unknown` | `a7.not_migrated` |
-| patient_scope | `None` | `a7.not_migrated` |
-| service_id | `None` | `a7.not_migrated` |
-| follow_up | `False` | `a7.not_migrated` |
-| followup_of | `None` | `a7.not_migrated` |
-| needs_clarification | `False` | `a7.not_migrated` |
-
-Для всех: confidence `0.0`, error `None`.
-
-`defaulted` здесь честно означает: axis не мигрирована и не используется. Нельзя переносить эти значения в product.
-
-## 6. Planner attempt API
-
-В `core/turn_planner_llm.py` добавить:
+1. Импортировать `plan_turn_attempt`, а не вызывать старый wrapper `plan_turn`.
+2. Выполнить один вызов:
 
 ```python
-def plan_turn_attempt(
-    q: str,
-    sid: str | None,
-    client_id: str | None,
-) -> PlannerAttempt:
-    ...
+attempt = plan_turn_attempt(q, sid, client_id)
+plan = attempt.legacy_plan
 ```
 
-### 6.1 До parseable dict
+3. Вся существующая product-логика ниже ветвится только по локальному `plan`.
+4. `turn_plan_to_decision_frame`, `publish_turn_plan`, overrides, `intent`, `turn_planner_used`, `resolver_used`, `scope_topic_candidate` получают только legacy данные как сегодня.
+5. Записать shadow outcome через изолированный recorder. Его return value нигде не использовать.
+6. При `partial + legacy_plan=None` обязательно вызвать старый resolver и одновременно сохранить partial shadow в ctx.
+7. При `degraded + legacy_plan!=None` сохранить planner-owned product path; shadow status остаётся degraded.
 
-- empty question → `not_available` без LLM-call;
-- empty service catalog → `not_available` без LLM-call;
-- LLM/network/JSON parse/non-object failure → существующий fail-open logging + `not_available`;
-- не класть exception/raw в `PlannerAttempt`.
+Запрещено читать `attempt.shadow_frame.topic/intent/aspects/...` для product-решений.
 
-### 6.2 После parseable dict
+## 6. Shadow recorder
 
-Обе ветки выполняются независимо:
-
-1. `build_turn_frame_from_raw(obj, allowed_topics=...)`.
-2. Существующая `_validate_plan(obj, ...)` + существующие protocol/focus guards.
-
-Builder failure:
-
-- не мешает strict branch;
-- `shadow_frame=None`;
-- итог `degraded`;
-- valid legacy plan сохраняется и возвращается wrapper;
-- не логировать exception text/raw как field error.
-
-Strict failure:
-
-- сохраняет существующий `turn_planner_failed`/fail-open semantics;
-- не уничтожает успешно собранный frame;
-- frame + `legacy_plan=None` → `partial`.
-
-Обе ветки успешны:
-
-- frame без `invalid/missing` → `ok`;
-- frame с `invalid/missing` → `partial`, даже если legacy plan valid;
-- guards/enrichment применяются только к `legacy_plan`, как сегодня;
-- shadow frame остаётся описанием raw, не post-guard product decision.
-
-### 6.3 Logging compatibility
-
-- `log_llm_usage` ровно один раз на реальный call;
-- legacy success event `turn_planner_llm` сохраняется при valid plan;
-- legacy failure logging сохраняется при strict failure;
-- не добавлять raw JSON/question/history в новые events;
-- новый attempt не публикуется через `publish_turn_plan()`.
-
-## 7. Backward-compatible wrapper
-
-`plan_turn()`:
-
-- сохраняет сигнатуру;
-- сам не вызывает LLM кроме вызова `plan_turn_attempt()`;
-- возвращает только `.legacy_plan`;
-- не читает `.shadow_frame` для решений;
-- existing callers/tests получают прежний `TurnPlan | None`.
-
-Запрещено делать так:
+Добавить в `core/turn_frame_shadow.py` attempt-aware recorder с узкой сигнатурой без question/answer/history/raw:
 
 ```python
-plan_turn_attempt(...)
-plan_turn(...)  # второй LLM-call
+record_planner_attempt_shadow(*, attempt: PlannerAttempt) -> TurnFrame | None
 ```
 
-Один публичный вызов = один attempt = максимум один call.
+Семантика:
 
-## 8. Обязательные тесты pure builder
+| attempt status | ctx status | ctx frame | stable reason |
+|---|---|---|---|
+| `ok` | `ok` | serialized `shadow_frame` | отсутствует |
+| `partial` | `partial` | serialized `shadow_frame` | отсутствует; причины в FieldMeta |
+| `not_available` | `not_available` | отсутствует | `turn_plan_missing` |
+| `degraded` | `degraded` | отсутствует | `turn_frame_build_failed` |
 
-Новый `tests/test_turn_frame_from_raw.py`:
+Дополнительно:
 
-1. valid full slice → correct intent/topic/aspects/primary + statuses/provenance.
-2. A6 blocker `topic=doctors`, `aspects=[]` → topic valid, aspects/primary invalid с точными errors.
-3. aspects missing/non-list/unknown/non-string.
-4. route missing/non-string/unknown.
-5. topic missing/null/blank с zero confidence.
-6. topic invalid type/outside taxonomy.
-7. confidence bool/non-number/out-of-range/positive without topic.
-8. raw dict и nested values не мутируются.
-9. unknown raw fields не попадают в frame.
-10. model dump не содержит question/answer/history/raw/exception.
-11. non-migrated axes имеют только `defaulted`, provenance `a7.not_migrated`.
-12. source/AST firewall: нет planner/Flask/LLM/session/resolver/network imports и thematic tokens.
+- добавить `SHADOW_STATUS_PARTIAL = "partial"`;
+- serialization failure превращается в `degraded/turn_frame_build_failed`;
+- ctx degraded выставляется до best-effort event;
+- failure `emit_bot_event` поглощается, потому что primary observability уже в ctx;
+- exception text нигде не сохраняется;
+- старый `record_turn_frame_shadow(turn_plan, decision_frame)` можно оставить для compatibility/unit history, но runtime после A7 его не вызывает;
+- не перестраивать raw shadow из `DecisionFrame`: source of truth — `attempt.shadow_frame`.
 
-Не мокать production builder в его functional tests.
+## 7. Metadata/E2E
 
-## 9. Обязательные тесты planner split
+Существующие ключи уже входят в metadata-first slice:
 
-В `tests/test_turn_planner_llm.py` добавить/усилить:
+- `turn_frame_shadow`
+- `turn_frame_shadow_status`
+- `turn_frame_shadow_reason`
 
-1. valid payload → `PlannerAttempt(legacy_plan, shadow_frame, ok)`.
-2. A6 aspects=[] + valid topic → legacy None, shadow partial, topic сохранён.
-3. invalid topic + otherwise valid legacy → legacy semantics unchanged, shadow partial/topic invalid.
-4. malformed JSON → not_available.
-5. non-object JSON → not_available.
-6. builder exception + valid strict plan → degraded + legacy plan сохранён.
-7. builder exception + strict failure → degraded + legacy None.
-8. strict exception + valid frame → partial.
-9. empty question/catalog → not_available и 0 LLM calls.
-10. `plan_turn()` вызывает LLM ровно один раз.
-11. `plan_turn_attempt()` вызывает LLM ровно один раз.
-12. wrapper result равен attempt legacy semantics для одинакового mocked response.
-13. raw не мутируется между ветками; strict branch получает исходные values.
-14. protocol guard/focus enrichment по-прежнему применяются только к legacy plan.
-15. existing bad-json/fail-open tests сохраняются, не переписываются под новый status.
-16. telemetry не получает raw/question/history/exception от builder.
-17. downstream modules не импортируют/не читают `PlannerAttempt.shadow_frame`.
+Production-файл `core/metadata_first_observability.py` менять запрещено.
 
-В `tests/test_planner_attempt_contract.py` разрешено изменить только прежний
-`test_runtime_modules_do_not_import_planner_attempt`: `core/turn_planner_llm.py`
-теперь является ожидаемым единственным runtime import для создания attempt,
-но `core/turn_frame_shadow.py`, resolver, orchestration, app/llm и прочий
-downstream по-прежнему обязаны не импортировать `PlannerAttempt` и не читать
-`shadow_frame`.
+Нужно тестами подтвердить:
 
-LLM в unit tests только fake/mocked. Реальных вызовов быть не должно.
+- partial frame присутствует в protected E2E metadata path;
+- status/error FieldMeta сериализуются;
+- без `E2E_USE_TEST_CLIENT` widget/final response не расширяется по сравнению с текущим механизмом;
+- raw/question/exception отсутствуют.
 
-## 10. Product firewall
+## 8. Обязательные тесты
 
-Доказать diff/AST/grep:
+Сначала reviewer смотрит diff тестов.
 
-- `orchestration/**` без изменений;
-- `core/turn_frame_shadow.py` без изменений;
-- resolver/composer/evidence/policy/UI не импортируют `PlannerAttempt`;
-- `turn_plan_to_decision_frame()` не читает native `shadow_frame`;
-- `publish_turn_plan()` получает только valid `TurnPlan`;
-- `TurnPlan` contract без изменений;
-- widget response без изменений.
+### 8.1 Recorder
 
-## 11. Запрещённые решения
+1. `ok` сохраняет точный `shadow_frame.model_dump()`.
+2. `partial` сохраняет frame, status=`partial`, очищает stale reason.
+3. `not_available` очищает frame, пишет stable reason.
+4. `degraded` очищает frame, пишет stable reason.
+5. `model_dump()` failure → degraded, не выходит наружу.
+6. `emit_bot_event()` failure не ломает recorder/product.
+7. Сигнатура не принимает q/question/answer/history/raw/payload.
 
-Нельзя:
+### 8.2 Runtime/product firewall
 
-- второй LLM-call;
-- retry;
-- prompt changes ради `aspects`;
-- `aspects=["overview"]` fallback;
-- ослаблять strict validation;
-- строить topic-only side channel;
-- мутировать raw;
-- передавать sanitized builder dict в `_validate_plan`;
-- использовать partial frame downstream;
-- логировать raw/user text/exception в field errors;
-- расширять FieldErrorReason;
-- добавлять новые runtime flags;
-- тематические branches для doctors/extraction/A6 ids;
-- менять frozen specs/hash;
-- запускать live/LLM.
+8. `run_resolver_turn()` вызывает `plan_turn_attempt` ровно один раз и не вызывает `plan_turn`.
+9. `ok + legacy plan` даёт тот же decision/intent/product ctx, что до wiring.
+10. `partial + legacy None` вызывает `resolve_with_fallback`, но ctx содержит partial topic/status/errors.
+11. Partial topic не переписывает fallback `decision.service_topic`, intent или `scope_topic_candidate`.
+12. `degraded + valid legacy` не уничтожает planner-owned product path.
+13. `not_available` сохраняет прежний fail-open.
+14. Product код не использует return value recorder.
+15. AST/source firewall: кроме recorder/metadata tests downstream не читает `attempt.shadow_frame` и `attempt.shadow_status` для решений.
 
-## 12. Acceptance criteria
+### 8.3 Regression
 
-A7 Planner split принят, если:
+16. Existing shadow/metadata tests обновлены только под намеренную смену source: legacy adapter snapshot → attempt raw snapshot.
+17. Planner/contract/product tests не ослаблены.
+18. Нет skip/xfail/assert True/условного PASS.
 
-- allowlist соблюдён;
-- pure builder покрыт functional negative tests;
-- один raw идёт в две независимые ветки;
-- raw immutable;
-- strict branch unchanged;
-- wrapper backward compatible;
-- exactly one LLM-call;
-- A6 blocker даёт partial frame, но wrapper `None`;
-- builder failure не ломает legacy success;
-- strict failure не уничтожает frame;
-- no downstream wiring/authority;
-- старые planner/shadow/product suites зелёные;
-- 0 skip/xfail;
-- hashes неизменны;
-- live/LLM не запускались.
+## 9. Команды проверки
 
-## 13. Команды проверки
-
-Исполнитель запускает:
+Исполнитель и checker независимо запускают через `.venv/codex312`:
 
 ```powershell
-python -m pytest -q tests/test_turn_frame_from_raw.py tests/test_turn_planner_llm.py
-python -m pytest -q tests/test_turn_frame_contract.py tests/test_planner_attempt_contract.py
-python -m pytest -q tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py tests/test_turn_planner_wiring.py tests/test_turn_plan_protocol_guard.py
-python -m pytest -q tests/test_contacts_routing.py tests/test_pricebook_golden.py tests/test_price_layer_parity.py
-python -m py_compile core/turn_frame_from_raw.py core/turn_planner_llm.py
+.venv\codex312\Scripts\python.exe -m pytest -q `
+  tests/test_turn_frame_shadow.py `
+  tests/test_metadata_first_observability.py `
+  tests/test_turn_planner_wiring.py
+
+.venv\codex312\Scripts\python.exe -m pytest -q `
+  tests/test_turn_frame_from_raw.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_turn_frame_contract.py `
+  tests/test_planner_attempt_contract.py `
+  tests/test_turn_plan_protocol_guard.py
+
+.venv\codex312\Scripts\python.exe -m pytest -q `
+  tests/test_contacts_routing.py `
+  tests/test_pricebook_golden.py `
+  tests/test_price_layer_parity.py
+
+.venv\codex312\Scripts\python.exe -m py_compile `
+  orchestration/resolver_turn.py `
+  core/turn_frame_shadow.py
+
 git diff --check
-git diff -- contracts core/turn_frame_adapter.py core/turn_frame_shadow.py orchestration llm.py app.py
+git diff --name-only
+git diff -- `
+  contracts core/turn_planner_llm.py core/turn_frame_from_raw.py `
+  evals/v5/demo/topic_shadow_matrix.json evals/v5/demo/preservation.json
 git hash-object evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
-Get-FileHash -Algorithm SHA256 eval_topic_shadow_a6_last.txt
-git status --short
 ```
 
-В команде protected diff допустим только allowlist-файл `core/turn_planner_llm.py`; отдельно показать, что все остальные protected paths пусты.
+Допустимый production diff внутри `core/**` — только `core/turn_frame_shadow.py`; отдельный разрешённый runtime diff — `orchestration/resolver_turn.py`.
 
-## 14. Checker policy
+Live/LLM/eval **не запускать**.
 
-Этот checkpoint меняет planner и поэтому требует **Cursor checker до implementation commit**.
+## 10. Checker review
 
-Исполнитель после своих тестов:
+Checker обязан:
 
-1. не stage/commit;
-2. готовит `drafts/checker_request.md`;
-3. владелец запускает `.cursor/agents/checker.md`;
-4. checker пишет `drafts/checker_last.md`;
-5. только после `✅` и повторной проверки разрешён commit.
+1. Начать с diff тестов.
+2. Показать полный changed-files и сверить allowlist.
+3. Самостоятельно выполнить команды §9.
+4. Проверить exactly-one attempt call и отсутствие соседнего `plan_turn()`.
+5. Сравнить legacy product ветки до/после по diff и тестам.
+6. Проверить partial fail-open, degraded-with-legacy и telemetry isolation.
+7. Проверить отсутствие raw/question/exception leaks.
+8. Перечислить failed/skipped/not run/warnings.
+9. Дать вердикт `✅`, `❌` или `❓` с `file:line` для нарушений.
 
-Checker обязательно проверяет exactly-one-call, raw immutability, fail-open compatibility и product firewall.
+До checker `✅` implementation commit и push не создавать.
 
-## 15. Stop conditions
+## 11. Стоп-условия
 
-СТОП, если:
+Немедленный СТОП и эскалация, если:
 
-- требуется файл вне allowlist;
-- plan_turn legacy semantics меняются;
-- невозможно изолировать builder failure;
-- нужен новый error reason;
-- strict branch получает modified raw;
-- нужен runtime wiring;
-- старый planner test требует ослабления;
-- появляется реальный LLM-call;
-- frozen hash изменён;
-- найден unrelated WIP.
+- нужен файл вне allowlist;
+- для wiring требуется второй planner/LLM call;
+- partial frame нужен product-коду;
+- меняется legacy decision/intent/resolver eligibility;
+- требуется ослабить `TurnPlan` или переписать prompt;
+- recorder failure выходит в product runtime;
+- тест можно сделать зелёным только изменением frozen spec/product expectation;
+- live/LLM кажется необходимым для этого checkpoint.
 
-## 16. Отчёт Исполнителя
+## 12. Definition of Done
 
-1. Diff тестов — первым.
-2. Changed-files.
-3. Builder semantics table.
-4. Planner attempt state table.
-5. Exactly-one-call evidence.
-6. Raw immutability evidence.
-7. Legacy/fail-open compatibility.
-8. Product firewall.
-9. Все команды §13: passed/failed/skipped/warnings.
-10. Not run/logging errors.
-11. Frozen hashes/raw SHA256.
-12. Нарушения/сомнения `file:line`.
-13. Commit не создан до checker.
-
-## 17. Definition of Done
-
-A7 Planner split завершён, когда один существующий LLM-call создаёт `PlannerAttempt` с независимыми partial shadow и strict legacy branches; `plan_turn()` остаётся backward-compatible product wrapper, partial frame ещё нигде не публикуется и не влияет на ответы.
+A7 Shadow wiring завершён, когда runtime один раз получает `PlannerAttempt`, использует только `legacy_plan` для продукта, сохраняет `shadow_frame/status` только в observability, partial `topic` переживает strict failure другого поля, старый fail-open остаётся неизменным, все unit/regression тесты зелёные, checker дал `✅`, создан отдельный commit и push только в `codex/stage-a`.

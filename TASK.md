@@ -1,434 +1,464 @@
-# TASK — A7 Design: field-level planner outcome без смены product ownership
+# TASK — A7 Contract: partial-capable TurnFrame и PlannerAttempt
 
-Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** после A6 Audit.
+Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** после принятого A7 Design.
 Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты ревью — `REVIEW_CHECKLIST.md`.
-Опора — `docs/ARCH_TARGET_DESIGN.md`, `docs/TOPIC_SHADOW_AUDIT_A6.md` и текущий runtime-код.
+Архитектурная опора — `docs/ARCH_TARGET_DESIGN.md`, `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md` и текущий код.
 
 ---
 
 ## 1. Зафиксированная точка старта
 
-- A5 native topic shadow: `8662300`.
-- A6 frozen matrix: `cd562fe`.
-- A6 harness: `952c50a`.
-- A6 audit: `4a6c867`.
+- A7 Design governance: `f2bceab`.
+- A7 Design: `7f9cfe4`.
 - A6 raw SHA256: `2EF96AB8660657501137B0A6880E7EA54594E02417197F031BE1BCE2D9D5A40A`.
 - Matrix hash: `dc356c9c738fb80a10cf0035508d7e8c8247979d`.
 - Preservation hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
-- Рабочее дерево tracked должно быть чистым.
+- Перед началом tracked working tree должен быть чистым.
 
-A6 доказал coupling: семь payload были отклонены целиком из-за `aspects=[]`, поэтому валидность `topic` нельзя было измерить независимо от unrelated legacy field.
-
-## 2. Задача
-
-Создать один архитектурный design-contract:
-
-- `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`.
-
-На этом checkpoint **нет реализации**. Документ должен заранее зафиксировать безопасную форму следующего strangler-шага:
+Принятый design фиксирует один будущий planner attempt с двумя ветками:
 
 ```text
-один raw JSON от существующего planner LLM
-              ↓
-field-level validation → partial TurnFrame shadow
-              ↓ параллельно
-strict legacy TurnPlan eligibility → текущий product path
+один raw JSON
+  ├─ field-level builder → partial TurnFrame shadow
+  └─ strict TurnPlan validation → current product path
 ```
 
-Ключевой закон:
+Этот TASK реализует **только модели данных и их совместимость с существующим legacy→TurnFrame adapter**. Он не получает raw JSON и не подключает dual-branch к runtime.
 
-> Валидное поле нового TurnFrame не уничтожается ошибкой другого поля, но текущий strict `TurnPlan` и его влияние на продукт не ослабляются.
+## 2. Цель checkpoint
 
-## 3. Что именно решает A7
+Создать честный контракт, в котором:
 
-Сейчас pipeline all-or-nothing:
+1. `FieldMeta` явно хранит `status` и стабильный `error`.
+2. `TurnFrame` может представить частичный результат:
+   - `aspects=[]` допустим;
+   - `primary_aspect=None` допустим;
+   - заданный `primary_aspect` обязан входить в `aspects`.
+3. Новый `PlannerAttempt` различает:
+   - `ok`;
+   - `partial`;
+   - `not_available`;
+   - `degraded`.
+4. Строгий legacy `TurnPlan` не меняется.
+5. Существующий adapter продолжает строить те же semantic values, но заполняет новые metadata честно.
+6. Никакой runtime wiring, planner split или product authority в этом checkpoint нет.
 
-```text
-raw JSON → TurnPlan.model_validate()
-                  ├─ success → DecisionFrame + shadow
-                  └─ any field error → None → resolver; shadow unavailable
-```
+## 3. Не цель
 
-Target A7:
+На этом этапе **не** делать:
 
-```text
-raw JSON ─┬→ per-field normalized TurnFrame shadow
-          │      topic может быть valid
-          │      aspects может быть invalid: aspects_empty
-          │
-          └→ тот же strict TurnPlan.model_validate()
-                 success → текущий planner product path
-                 failure → тот же resolver/fail-open product path
-```
+- извлечение partial frame из raw LLM JSON;
+- `plan_turn_attempt()`;
+- изменение `plan_turn()`;
+- изменение prompt или LLM response handling;
+- wiring в `resolver_turn.py` / `turn_frame_shadow.py`;
+- новый статус в runtime ctx;
+- использование partial frame для route/decision/evidence/composer/policy/UI;
+- live/LLM/eval прогоны;
+- новый A6 raw;
+- исправление семи A6 unavailable-кейсов;
+- перенос product ownership со strict `TurnPlan`.
 
-То есть A7 разделяет **наблюдаемость** и **legacy eligibility**, но не переключает ownership.
+## 4. Строгий allowlist
 
-## 4. Затрагиваемые файлы — строгий allowlist
+Исполнитель может изменить только:
 
-Исполнитель может создать только:
-
-- `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`.
-
-Исполнитель не меняет:
-
-- `TASK.md`;
-- `docs/ARCH_TARGET_DESIGN.md`;
-- `docs/TOPIC_SHADOW_AUDIT_A6.md`;
-- `contracts/**`, `core/**`, `orchestration/**`;
-- tests/evals/spec/harness;
-- client content/config;
-- raw artifacts.
+1. `contracts/turn_frame.py`
+2. `contracts/planner_attempt.py` — новый файл
+3. `contracts/__init__.py`
+4. `core/turn_frame_adapter.py`
+5. `tests/test_turn_frame_contract.py`
+6. `tests/test_planner_attempt_contract.py` — новый файл
 
 Любой другой diff → ❌ и СТОП.
 
-## 5. Решение, которое document обязан зафиксировать
+Особенно запрещено менять:
 
-Исполнитель не выбирает архитектурный вариант. Зафиксировать решение ниже.
+- `contracts/turn_plan.py`;
+- `core/turn_planner_llm.py`;
+- `core/turn_frame_shadow.py`;
+- `orchestration/**`;
+- `llm.py`, `app.py`;
+- `TASK.md` и архитектурные документы;
+- frozen eval specs/harness;
+- продуктовые тесты вне allowlist;
+- client content / pricebook / marketing.
 
-### 5.1 Один semantic contract — partial-capable `TurnFrame`
+`core/turn_frame_adapter.py` в allowlist только для совместимости с обязательными `FieldMeta.status/error`. Его сигнатура, источники semantic values и отсутствие thematic inference должны сохраниться.
 
-Не создавать тематический `TopicObservation`, `TopicPlan`, `DoctorsPlan` или второй topic-classifier.
+## 5. Контракт FieldMeta
 
-`TurnFrame` остаётся единым semantic contract, но становится способным честно представлять частично валидный результат:
+### 5.1 Типы
 
-- `aspects` может быть пустым в **shadow frame**;
-- `primary_aspect` может быть `None`;
-- если `primary_aspect` не `None`, он обязан входить в `aspects`;
-- если `aspects=[]`, `primary_aspect=None`;
-- отсутствие/ошибка одной оси фиксируется per-field, а не ломает весь frame;
-- partial frame не может использоваться downstream без отдельного authority/gate.
+В `contracts/turn_frame.py` добавить публичные aliases:
 
-Это изменение касается будущего TurnFrame shadow contract. Строгий legacy `TurnPlan.aspects = Field(min_length=1)` остаётся без изменений.
+```python
+FieldStatus = Literal["valid", "defaulted", "missing", "invalid"]
 
-### 5.2 Field status/error — внутри общей metadata-модели
-
-Design должен выбрать один source of truth внутри `FieldMeta`, расширив концепцию:
-
-```text
-confidence: 0..1
-provenance: stable source
-status: valid | defaulted | missing | invalid
-error: stable reason | null
+FieldErrorReason = Literal[
+    "aspects_empty",
+    "aspects_invalid_type",
+    "aspect_not_allowed",
+    "primary_aspect_unavailable",
+    "topic_not_allowed",
+    "topic_invalid_type",
+    "topic_confidence_invalid",
+    "route_invalid",
+]
 ```
 
-Не хранить одновременно независимые расходящиеся копии `FieldMeta.error` и top-level `field_errors`.
+`FieldMeta`:
 
-Термин `field_errors` в architecture означает агрегированное представление всех `FieldMeta(status=invalid)`, но source of truth — metadata конкретной оси. Если будущему telemetry нужен плоский `field_errors`, он **детерминированно выводится** из meta и не становится вторым состоянием.
-
-### 5.3 Operational envelope — не новый semantic router
-
-Один LLM-call должен возвращать внутренний execution outcome с двумя результатами:
-
-```text
-PlannerAttempt
-  legacy_plan: TurnPlan | None
-  shadow_frame: TurnFrame | None
-  shadow_status: ok | partial | not_available | degraded
+```python
+confidence: float  # required, 0..1
+provenance: str    # required, non-empty
+status: FieldStatus  # required; без неявного default
+error: FieldErrorReason | None = None
 ```
 
-`PlannerAttempt` — технический envelope одного вызова, не новая классификация и не продуктовый маршрут.
+### 5.2 Инвариант status/error
 
-Семантика:
+- `status="invalid"` требует `error is not None`.
+- Любой `status != "invalid"` требует `error is None`.
+- Неизвестный status/error и extra fields отклоняются.
+- Не использовать raw exception text или raw user/LLM value как error.
 
-- `ok`: strict legacy plan валиден, shadow frame собран без invalid fields;
-- `partial`: JSON object получен, frame собран, одна или несколько осей invalid/missing; legacy plan может быть `None`;
-- `not_available`: LLM не дал parseable JSON object / вызов недоступен;
-- `degraded`: внутренняя ошибка field-level builder/serialization; product ход не падает.
+`error` — маленький frozen allowlist первого A7 slice. Расширение возможно только отдельной архитектурной задачей.
 
-Нельзя маркировать `partial` как `ok`.
+### 5.3 Один source of truth
 
-### 5.4 Backward-compatible public seam
+Не добавлять `field_errors` в `TurnFrame`, `TurnFrameMeta` или `PlannerAttempt`.
 
-Design фиксирует безопасный migration seam:
+Если позже telemetry потребуется flat list ошибок, она должна детерминированно выводиться из `TurnFrameMeta`. В этом checkpoint такой telemetry helper не нужен.
 
-- новая внутренняя функция условно `plan_turn_attempt(...) -> PlannerAttempt` делает **единственный** LLM-call;
-- существующий `plan_turn(...) -> TurnPlan | None` остаётся совместимым wrapper и возвращает только `attempt.legacy_plan`;
-- runtime wiring будущего этапа может вызвать attempt-функцию один раз, использовать `legacy_plan` ровно как сейчас и отправить `shadow_frame` только в observability;
-- запрещено вызывать сначала `plan_turn`, затем отдельный attempt — это было бы два LLM-call;
-- точные имена могут быть уточнены в implementation TASK, но семантика wrapper/envelope обязательна.
+## 6. Partial-capable TurnFrame
 
-### 5.5 Две независимые ветки из одного raw object
+Изменить только structural contract:
 
-После `json.loads()` одного LLM response:
-
-1. Field-level builder читает raw dict и строит partial-capable shadow `TurnFrame`.
-2. Strict legacy validator строит текущий `TurnPlan` или возвращает `None` по прежним правилам.
-
-Обе ветки получают одну immutable/copy-on-read структуру. Ни одна не мутирует raw для другой.
-
-Field-level builder не имеет права «чинить» raw перед strict legacy validation.
-
-## 6. Required field-level semantics
-
-Design должен задать общие правила, не только topic-specific patch.
-
-### 6.1 Topic
-
-- использовать A5 taxonomy и normalization;
-- valid allowed string → value + confidence + provenance `turn_plan.raw.topic`, status `valid`;
-- missing/null + confidence 0 → `None`, status `missing`;
-- unknown/non-string/invalid confidence → безопасное `None/0`, status `invalid`, stable reason;
-- не выводить topic из service_id/doc_id/filename/regex;
-- native topic остаётся shadow-only.
-
-### 6.2 Aspects
-
-- raw list из разрешённых `AspectKind`;
-- valid non-empty list → status `valid`;
-- `[]` → value `[]`, status `invalid`, error `aspects_empty`;
-- non-list → `[]`, `invalid`, `aspects_invalid_type`;
-- неизвестный элемент → не молча удалять; status `invalid`, stable `aspect_not_allowed`;
-- не подставлять `overview` автоматически;
-- не выводить aspect из question regex в field-level builder.
-
-### 6.3 Primary aspect
-
-- берётся только из валидного ordered `aspects[0]` на первом implementation slice;
-- при invalid/empty aspects → `None`, status `invalid` или `missing` с stable reason `primary_aspect_unavailable`;
-- не выбирать primary отдельным classifier/regex.
-
-### 6.4 Intent и остальные оси
-
-Design должен описать общий паттерн для всех полей, но A7 implementation не обязан мигрировать все оси одним большим diff.
-
-Для будущих slices:
-
-- route/intent: invalid → `unknown` + field error;
-- service_id: valid только по client catalog, иначе field error;
-- followup_of: valid только по catalog/context contract;
-- needs_clarify: strict bool, invalid → default false + field error;
-- patient_situation/brand_filter: field-level validation без обрушения frame;
-- emotion/specificity/patient_scope могут оставаться current default/missing provenance до своих задач.
-
-Документ обязан разделить **общий target mechanism** и **минимальный первый implementation slice**.
-
-## 7. Минимальный первый implementation slice — зафиксировать
-
-После design review отдельный кодовый TASK должен быть ограничен:
-
-1. Partial-capable TurnFrame contract + FieldMeta status/error.
-2. Internal `PlannerAttempt` envelope.
-3. Field-level extraction только достаточная для A6 blocker:
-   - topic/topic_confidence;
-   - aspects;
-   - primary_aspect;
-   - route/intent настолько, чтобы сформировать frame с `unknown` при ошибке.
-4. Strict legacy `TurnPlan` validation без изменений.
-5. Shadow observability получает `partial` frame.
-6. Product продолжает использовать только `legacy_plan`.
-
-Не включать в первый slice:
-
-- ResponseSpec;
-- evidence assembly;
-- medzone/marketing;
-- перенос route/aspects ownership;
-- удаление resolver;
-- полный рефактор всех TurnPlan полей;
-- новый A6 live run.
-
-## 8. Критический продуктовый инвариант
-
-Для raw payload с:
-
-```json
-{
-  "route": "content",
-  "aspects": [],
-  "topic": "doctors",
-  "topic_confidence": 0.95
-}
+```python
+aspects: list[AspectKind] = Field(default_factory=list)
+primary_aspect: AspectKind | None = None
 ```
 
-Target первого slice:
+Инварианты:
 
-```text
-PlannerAttempt.legacy_plan = None
-PlannerAttempt.shadow_status = partial
-PlannerAttempt.shadow_frame.topic = doctors
-topic meta = valid
-shadow_frame.aspects = []
-aspects meta = invalid / aspects_empty
-shadow_frame.primary_aspect = None
-primary meta = invalid / primary_aspect_unavailable
+- `aspects=[]` + `primary_aspect=None` → valid model.
+- Непустой `aspects` + `primary_aspect=None` → valid partial model.
+- Если `primary_aspect is not None`, он обязан входить в `aspects`.
+- `aspects=[]` + non-null `primary_aspect` отклоняется тем же общим инвариантом.
+- Не расширять `AspectKind`.
+- Не менять `RouteIntent`, emotion/specificity или остальные semantic axes.
+- `extra="forbid"` сохраняется.
+
+Важно: допустимость partial `TurnFrame` **не** означает допустимость partial `TurnPlan` и не даёт product authority.
+
+## 7. PlannerAttempt contract
+
+Создать `contracts/planner_attempt.py`.
+
+Публичные типы:
+
+```python
+ShadowAttemptStatus = Literal["ok", "partial", "not_available", "degraded"]
+
+class PlannerAttempt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    legacy_plan: TurnPlan | None
+    shadow_frame: TurnFrame | None
+    shadow_status: ShadowAttemptStatus
 ```
 
-Но product orchestration должна сделать ровно то же, что сейчас при `plan_turn() -> None`:
+Не добавлять raw payload, question, answer, history, exception, retry count, route result или UI state.
 
-- `turn_planner_used=false` для legacy ownership;
-- resolver/fail-open path остаётся текущим;
-- route/decision/evidence/composer/UI/answer не читают partial frame;
-- partial frame виден только ctx/logs/E2E observability.
+### 7.1 Structural status invariants
 
-Это главный acceptance invariant будущей реализации.
+`PlannerAttempt` обязан валидировать:
 
-## 9. Telemetry/privacy contract
+#### `ok`
 
-Design обязан зафиксировать:
+- `legacy_plan is not None`;
+- `shadow_frame is not None`;
+- в `shadow_frame.field_meta` нет `invalid` или `missing`;
+- `defaulted` допустим.
 
-- shadow status `partial` различим от `ok/not_available/degraded`;
-- per-field stable errors без exception text;
-- допустимые reasons — маленький allowlist;
-- не логировать raw LLM JSON;
-- не логировать question/answer/history в field-error event;
-- не логировать неизвестное raw topic/aspect value;
-- full partial TurnFrame допустим только в текущем защищённом ctx/E2E telemetry path по правилам A2;
-- widget payload без `E2E_USE_TEST_CLIENT` не меняется;
-- telemetry sink failure не ломает product ход.
+#### `partial`
 
-## 10. Запрещённые решения
+- `shadow_frame is not None`;
+- и выполняется хотя бы одно:
+  - `legacy_plan is None`;
+  - хотя бы одна ось frame имеет status `invalid` или `missing`.
+- `partial` с valid legacy plan и полностью valid/defaulted frame отклоняется: это `ok`.
 
-Документ должен явно отклонить:
+#### `not_available`
 
-1. Убрать `min_length=1` из legacy `TurnPlan` без eligibility guard.
-2. Подставлять `aspects=["overview"]` ради валидности.
-3. Переписать prompt так, чтобы LLM всегда выдумывал aspect.
-4. Делать второй LLM-call/topic classifier.
-5. Retry только для `aspects=[]`.
-6. Сохранять raw LLM JSON в ctx/logs.
-7. Создать topic-specific side channel вместо общего TurnFrame mechanism.
-8. Использовать partial frame в routing/evidence/composer.
-9. Считать `partial` успешным legacy plan.
-10. Исправлять семь A6 кейсов тематическими if/regex.
+- `legacy_plan is None`;
+- `shadow_frame is None`.
 
-## 11. Alternatives section
+#### `degraded`
 
-Кратко сравнить и отклонить:
+- `shadow_frame is None`;
+- `legacy_plan` может быть `None` или valid `TurnPlan`, потому что shadow builder/serialization может сломаться независимо от strict branch.
 
-| вариант | почему не выбран |
-|---|---|
-| Loosen legacy TurnPlan | меняет eligibility и product path |
-| Force overview in prompt | подгоняет unrelated field и скрывает ошибку |
-| Topic-only telemetry hook | создаёт side channel, не решает field-level target |
-| Second classifier/call | повышает latency/cost и создаёт второй источник истины |
-| Retry | нарушает one-call contract и скрывает planner degraded rate |
-| Общий partial TurnFrame + strict legacy branch | **выбран**: один semantic contract, product ownership сохраняется |
+Это только contract invariant. В этом checkpoint нет функции, которая классифицирует raw outcome.
 
-## 12. Future implementation acceptance map
+## 8. Экспорт контрактов
 
-Design должен перечислить будущие обязательные тесты, не писать их сейчас:
+В `contracts/__init__.py` экспортировать:
 
-- valid full payload → legacy plan + `ok` shadow;
-- valid topic + aspects=[] → legacy None + `partial` shadow;
-- topic invalid + legacy fields valid → legacy semantics прежние, topic field invalid в shadow;
-- malformed/non-object JSON → `not_available`, не partial;
-- builder/model_dump error → `degraded`, product не падает;
-- telemetry emit failure не ломает ход;
-- wrapper `plan_turn` backward compatible;
-- runtime делает один LLM call;
-- raw dict не мутируется;
-- stable field errors без leaks;
-- current seven fail-open product routes/answers не меняются;
-- existing planner/shadow/contacts/price tests зелёные;
-- smoke/preservation frozen hashes сохранены;
-- widget без E2E не меняется;
-- AST/firewall: partial frame не читается downstream.
+- `FieldStatus`;
+- `FieldErrorReason`;
+- `ShadowAttemptStatus`;
+- `PlannerAttempt`;
+- существующие `FieldMeta`, `TurnFrameMeta`, `TurnFrame` сохранить.
 
-## 13. Migration checkpoints
+Не создавать import cycle. `planner_attempt.py` может импортировать `TurnFrame` и `TurnPlan`; `turn_frame.py` не должен импортировать `PlannerAttempt`.
 
-Документ должен предложить последовательность:
+## 9. Совместимость legacy adapter
 
-1. **A7 Design** — текущий doc-only checkpoint.
-2. **A7 Contract** — TurnFrame/FieldMeta/PlannerAttempt models + unit tests, без runtime wiring.
-3. **A7 Planner split** — один raw → partial frame + strict legacy plan, unit-only.
-4. **A7 Shadow wiring** — orchestration использует legacy plan как сейчас, partial только telemetry.
-5. **A7 Regression/live proof** — проверить семь путей и smoke/preservation без смены product output.
-6. **A7 Topic re-audit** — только отдельный frozen run с новым именем; первый A6 raw сохраняется.
+`core/turn_frame_adapter.py` остаётся чистой функцией:
 
-Каждый пункт — отдельный `TASK.md`/review/commit. Не объединять всё в один diff.
+- принимает только `TurnPlan`, optional `DecisionFrame`, optional explicit `primary_aspect`;
+- не читает question/answer/history/raw JSON/taxonomy/client content/session;
+- не вызывает LLM/resolver/network;
+- не импортирует `PlannerAttempt`;
+- не строит partial frame из invalid raw;
+- не меняет semantic values и provenance относительно A1–A5.
 
-## 14. Что design НЕ разрешает после принятия
+Обновить только создание `FieldMeta`:
 
-Принятие design-doc:
+- явно передавать status;
+- обычное явно полученное значение → `valid`;
+- безопасное системное значение (`emotion="none"`, false follow-up default) → `defaulted`;
+- отсутствующая legacy axis → `missing`;
+- strict legacy adapter не должен создавать `invalid`, потому что получает уже валидный `TurnPlan`.
 
-- не разрешает менять код автоматически;
-- не разрешает topic authority;
-- не закрывает A6 sample;
-- не разрешает повтор live;
-- не делает TurnFrame product source of truth;
-- не разрешает удалять legacy router/resolver;
-- не начинает marketing stage.
+Минимальная семантика для существующих путей:
 
-## 15. Raw/frozen evidence
+| axis/source | status |
+|-------------|--------|
+| intent из `DecisionFrame` или `TurnPlan` | `valid` |
+| native topic присутствует | `valid` |
+| topic из non-unknown `DecisionFrame.service_topic` | `valid` |
+| topic отсутствует/unknown | `missing` |
+| aspects из strict TurnPlan | `valid` |
+| primary aspect из explicit param или aspects[0] | `valid` |
+| emotion=`none` из hard default | `defaulted` |
+| specificity из query_mode | `valid` |
+| specificity=`unknown` без decision | `missing` |
+| service_id/patient_scope/followup_of отсутствуют | `missing` |
+| follow_up=true из followup_of | `valid` |
+| follow_up=false при отсутствующем followup_of | `defaulted` |
+| needs_clarification из strict plan boolean | `valid` |
 
-В design привести только минимальные подтверждения из A6 Audit:
+`error=None` для всех metadata legacy adapter.
 
-- 26 scoreable / 7 unavailable;
-- 0 mismatches среди scoreable;
-- все 7 unavailable связаны с `aspects=[]` strict validation;
-- doctors coverage 0/3;
-- ссылки на `docs/TOPIC_SHADOW_AUDIT_A6.md`, не дублировать весь raw audit;
-- original raw/hash остаются неизменными.
+## 10. Обязательные тесты
 
-Не добавлять новые claims о topic отклонённых payload.
+Сначала показать diff тестов.
 
-## 16. Проверки design checkpoint
+### 10.1 FieldMeta
+
+Проверить:
+
+1. Все четыре status принимаются при корректном error invariant.
+2. `status` обязателен — старый constructor без status красный.
+3. `invalid` без error отклоняется.
+4. `valid/defaulted/missing` с error отклоняются.
+5. Unknown status отклоняется.
+6. Unknown error отклоняется.
+7. Confidence вне 0..1 отклоняется.
+8. Пустой provenance отклоняется.
+9. Extra field отклоняется.
+
+### 10.2 TurnFrame
+
+Проверить:
+
+1. Existing full frame продолжает создаваться.
+2. `aspects=[]`, `primary_aspect=None` создаётся.
+3. Non-empty aspects, `primary_aspect=None` создаётся.
+4. Non-null primary в aspects создаётся.
+5. Non-null primary вне aspects отклоняется.
+6. Empty aspects + non-null primary отклоняется.
+7. Serialization сохраняет `status` и `error` каждой оси.
+8. Unknown top-level/meta field отклоняется.
+
+Старый тест `test_empty_aspects_rejected` не удалять молча: переписать в явный positive partial-contract test и добавить отдельный negative test для non-null primary.
+
+### 10.3 PlannerAttempt
+
+Новый `tests/test_planner_attempt_contract.py` должен проверить:
+
+1. `ok` с valid legacy plan + frame без invalid/missing.
+2. `ok` без legacy plan отклоняется.
+3. `ok` без frame отклоняется.
+4. `ok` с invalid/missing metadata отклоняется.
+5. `partial` с legacy None + frame принимается.
+6. `partial` с legacy valid + invalid/missing metadata принимается.
+7. `partial` с legacy valid + полностью valid/defaulted frame отклоняется.
+8. `partial` без frame отклоняется.
+9. `not_available` с обоими None принимается.
+10. `not_available` с legacy plan или frame отклоняется.
+11. `degraded` без frame принимается и с legacy None, и с legacy plan.
+12. `degraded` с frame отклоняется.
+13. Extra field / unknown status отклоняются.
+14. Worked example `topic=doctors`, `aspects=[]`:
+    - legacy None;
+    - partial;
+    - topic meta valid;
+    - aspects invalid / `aspects_empty`;
+    - primary invalid / `primary_aspect_unavailable`.
+15. Model dump не содержит raw/question/answer/history/exception.
+
+### 10.4 Legacy compatibility/firewall
+
+Проверить:
+
+1. `TurnPlan(aspects=[])` по-прежнему отклоняется.
+2. Adapter semantic values до/после не изменены.
+3. Adapter явно выставляет valid/defaulted/missing и никогда invalid.
+4. Adapter signature не получила raw/question/answer/history/client/taxonomy.
+5. `PlannerAttempt` не импортируется из runtime modules.
+6. `contracts/planner_attempt.py` не импортирует Flask/app/orchestration/LLM/resolver.
+7. Не появилось тематических веток для doctors/extraction/A6 case ids.
+
+Source/AST scans допустимы только как дополнительный firewall, не вместо functional tests.
+
+## 11. Запрещённые способы сделать тесты зелёными
+
+Нельзя:
+
+- ослаблять или удалять unrelated assertions;
+- добавлять skip/xfail/conditional PASS;
+- менять `TurnPlan.aspects min_length=1`;
+- давать `FieldMeta.status` неявный default ради старых constructors;
+- разрешать arbitrary error string;
+- хранить error одновременно в двух независимых местах;
+- считать missing axis valid;
+- маркировать legacy adapter metadata invalid;
+- менять semantic output adapter;
+- импортировать partial contract в resolver/composer/evidence;
+- добавлять runtime flag;
+- подгонять branches под семь вопросов A6;
+- обновлять frozen spec/hash;
+- запускать live несколько раз.
+
+## 12. Acceptance criteria
+
+A7 Contract принимается только если:
+
+- changed files ровно из allowlist;
+- `TurnPlan` diff пуст;
+- runtime wiring diff пуст;
+- `FieldMeta.status` required;
+- status/error invariant строгий;
+- error — typed allowlist;
+- TurnFrame partial-capable;
+- primary invariant сохранён;
+- PlannerAttempt имеет ровно три поля и четыре статуса;
+- status invariants покрыты негативными тестами;
+- legacy adapter semantics сохранены;
+- partial contract не получает authority;
+- все обязательные тесты зелёные без skip;
+- frozen hashes совпадают;
+- raw не менялся;
+- live/LLM не запускались.
+
+## 13. Команды проверки
+
+Исполнитель запускает:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 eval_topic_shadow_a6_last.txt
+python -m pytest -q tests/test_turn_frame_contract.py tests/test_planner_attempt_contract.py
+python -m pytest -q tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py
+python -m pytest -q tests/test_turn_planner_llm.py tests/test_turn_planner_wiring.py tests/test_turn_plan_protocol_guard.py
+python -m pytest -q tests/test_contacts_routing.py tests/test_pricebook_golden.py tests/test_price_layer_parity.py
+python -m py_compile contracts/turn_frame.py contracts/planner_attempt.py core/turn_frame_adapter.py
 git diff --check
-git status --short
-git diff -- docs/ARCH_TARGET_DESIGN.md docs/TOPIC_SHADOW_AUDIT_A6.md contracts core orchestration tests evals
+git diff -- contracts/turn_plan.py core/turn_planner_llm.py core/turn_frame_shadow.py orchestration
 git hash-object evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
+Get-FileHash -Algorithm SHA256 eval_topic_shadow_a6_last.txt
+git status --short
 ```
 
-Read-only проверить:
+Нужно явно перечислить:
 
-- changed only design-doc;
-- выбранный вариант однозначен;
-- strict legacy TurnPlan остаётся строгим;
-- partial TurnFrame не получает authority;
-- один LLM-call;
-- семь product paths сохраняются;
-- нет topic-specific workaround;
-- migration разбита на отдельные checkpoints;
-- raw/frozen hashes прежние.
+- passed/failed/skipped;
+- warnings и logging errors;
+- всё, что не запускалось;
+- полный changed-files;
+- отсутствие live/LLM;
+- hashes.
 
-Live/unit тесты не запускать: код не меняется, повторный LLM запрещён.
+## 14. Stop conditions
 
-## 17. Стоп-условия
-
-СТОП, если:
+СТОП и эскалация Архитектору, если:
 
 - нужен файл вне allowlist;
-- для design требуется менять код;
-- хочется ослабить legacy TurnPlan;
-- невозможно сохранить current product path при partial shadow;
-- предлагается новый LLM-call/retry/classifier;
-- предлагается raw JSON telemetry;
-- partial frame нужно читать downstream;
-- raw/hash изменился;
-- появился посторонний diff.
+- без изменения `TurnPlan` тесты не проходят;
+- adapter нельзя мигрировать без смены semantic values;
+- `PlannerAttempt` требует runtime import;
+- status semantics неоднозначны;
+- хочется добавить default для `FieldMeta.status`;
+- появляется второй error source;
+- product/runtime начинает читать partial frame;
+- frozen hash изменился;
+- обнаружен unrelated WIP.
 
-## 18. Контрольные точки
+При сомнении не расширять scope самостоятельно.
 
-### Checkpoint 1 — Design authoring
+## 15. Checkpoints
 
-Исполнитель создаёт только `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`, сверяет current code/read-only и делает СТОП без commit.
+### Checkpoint 1 — Implementation
 
-### Checkpoint 2 — Design review
+Исполнитель:
 
-Checker независимо проверяет выбранную dual-branch архитектуру, backward compatibility, отсутствие второго semantic contract/topic side channel, product firewall и migration boundaries.
+1. показывает pre-status;
+2. показывает diff тестов первым;
+3. реализует только allowlist;
+4. запускает команды §13;
+5. показывает полный отчёт;
+6. не создаёт commit;
+7. СТОП.
 
-Вердикт: `✅ / ❌ / ❓`.
+### Checkpoint 2 — Independent checker
 
-### Checkpoint 3 — Design commit
+Checker независимо проверяет:
 
-Только после `✅` владелец разрешает commit одного design-doc.
+- тесты первыми;
+- status/error truthfulness;
+- PlannerAttempt invariants;
+- TurnPlan unchanged;
+- adapter compatibility;
+- firewall;
+- hashes и skipped/not run;
+- вердикт `✅ / ❌ / ❓`.
 
-## 19. Формат отчёта Исполнителя
+### Checkpoint 3 — Commit
 
-1. Changed-files.
-2. Карта разделов design.
-3. Current→target data flow.
-4. Выбранный вариант и rejected alternatives.
-5. Product invariants.
-6. Future acceptance tests/checkpoints.
-7. Raw/matrix/preservation hashes.
-8. Skipped/not run.
-9. СТОП без commit.
+Только после `✅` владельца:
 
-## 20. Критерий приёмки A7 Design
+- stage ровно allowlist-файлы с реальным diff;
+- отдельный commit A7 Contract;
+- clean tree;
+- следующий этап не начинать.
 
-A7 Design принят, когда один новый документ однозначно задаёт single-call dual-branch strangler: partial-capable `TurnFrame` с per-field status/error для shadow и неизменный strict `TurnPlan` для текущего product ownership; `aspects=[]` больше не уничтожает наблюдаемость других валидных осей, но по-прежнему не переводит ход на planner-owned route; implementation разбита на отдельные безопасные checkpoints.
+## 16. Формат отчёта Исполнителя
+
+1. Diff тестов — первым.
+2. Полный changed-files.
+3. Production diff по моделям и adapter.
+4. Таблица status/error invariants.
+5. Таблица PlannerAttempt status invariants.
+6. Доказательство TurnPlan/runtime unchanged.
+7. Результаты всех команд §13.
+8. Skipped/not run/warnings/logging errors.
+9. Frozen hashes и raw SHA256.
+10. Нарушения или сомнения `file:line`.
+11. Commit не создан.
+
+## 17. Definition of Done
+
+A7 Contract завершён, когда partial-capable `TurnFrame`, обязательный per-field `FieldMeta.status/error` и строгий `PlannerAttempt` существуют как изолированные модели с честными негативными тестами; legacy `TurnPlan` остаётся строгим, legacy adapter сохраняет semantic values и product/runtime ещё не знает о новом attempt envelope.

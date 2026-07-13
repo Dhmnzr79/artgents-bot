@@ -63,6 +63,7 @@ return plan_turn_attempt(q, sid, client_id).legacy_plan
 2. `core/turn_planner_llm.py`
 3. `tests/test_turn_frame_from_raw.py` — новый файл
 4. `tests/test_turn_planner_llm.py`
+5. `tests/test_planner_attempt_contract.py` — только миграция firewall-теста: planner разрешён, downstream запрещён
 
 Любой другой diff → ❌ и СТОП.
 
@@ -281,6 +282,13 @@ plan_turn(...)  # второй LLM-call
 15. existing bad-json/fail-open tests сохраняются, не переписываются под новый status.
 16. telemetry не получает raw/question/history/exception от builder.
 17. downstream modules не импортируют/не читают `PlannerAttempt.shadow_frame`.
+
+В `tests/test_planner_attempt_contract.py` разрешено изменить только прежний
+`test_runtime_modules_do_not_import_planner_attempt`: `core/turn_planner_llm.py`
+теперь является ожидаемым единственным runtime import для создания attempt,
+но `core/turn_frame_shadow.py`, resolver, orchestration, app/llm и прочий
+downstream по-прежнему обязаны не импортировать `PlannerAttempt` и не читать
+`shadow_frame`.
 
 LLM в unit tests только fake/mocked. Реальных вызовов быть не должно.
 

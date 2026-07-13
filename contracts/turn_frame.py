@@ -23,6 +23,12 @@ FieldErrorReason = Literal[
     "topic_invalid_type",
     "topic_confidence_invalid",
     "route_invalid",
+    "service_id_invalid_type",
+    "service_id_not_allowed",
+    "followup_of_invalid_type",
+    "followup_of_not_allowed",
+    "follow_up_unavailable",
+    "needs_clarification_invalid_type",
 ]
 
 

@@ -4,12 +4,32 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
 from contracts.planner_attempt import PlannerAttempt, ShadowAttemptStatus
 from contracts.turn_frame import FieldErrorReason, FieldMeta, TurnFrame, TurnFrameMeta
 from contracts.turn_plan import TurnPlan
+
+
+def test_field_error_reason_allowlist_includes_exact_a8_slice():
+    assert set(get_args(FieldErrorReason)) == {
+        "aspects_empty",
+        "aspects_invalid_type",
+        "aspect_not_allowed",
+        "primary_aspect_unavailable",
+        "topic_not_allowed",
+        "topic_invalid_type",
+        "topic_confidence_invalid",
+        "route_invalid",
+        "service_id_invalid_type",
+        "service_id_not_allowed",
+        "followup_of_invalid_type",
+        "followup_of_not_allowed",
+        "follow_up_unavailable",
+        "needs_clarification_invalid_type",
+    }
 
 
 def _meta(

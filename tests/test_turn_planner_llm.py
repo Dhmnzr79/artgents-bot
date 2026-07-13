@@ -762,6 +762,76 @@ def test_plan_turn_attempt_valid_payload_returns_ok(monkeypatch):
     assert attempt.legacy_plan is not None
     assert attempt.shadow_frame is not None
     assert attempt.shadow_frame.topic == "implantation"
+    assert attempt.shadow_frame.field_meta.service_id.status == "valid"
+    assert attempt.shadow_frame.field_meta.followup_of.status == "valid"
+    assert attempt.shadow_frame.field_meta.follow_up.status == "valid"
+    assert attempt.shadow_frame.field_meta.needs_clarification.status == "valid"
+
+
+def test_plan_turn_attempt_missing_optional_raw_keys_uses_schema_defaults(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload.pop("service_id")
+    payload.pop("followup_of")
+    payload.pop("needs_clarify")
+    _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Общий вопрос", "attempt-defaults", "demo")
+
+    assert attempt.shadow_status == "ok"
+    assert attempt.legacy_plan is not None
+    assert attempt.shadow_frame is not None
+    for name in ("service_id", "followup_of", "follow_up", "needs_clarification"):
+        meta = getattr(attempt.shadow_frame.field_meta, name)
+        assert meta.status == "defaulted", name
+        assert meta.provenance == "turn_plan.schema_default", name
+        assert meta.error is None, name
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value", "meta_field", "expected_error"),
+    [
+        ("service_id", "other-client-service", "service_id", "service_id_not_allowed"),
+        ("followup_of", "other-client-service", "followup_of", "followup_of_not_allowed"),
+    ],
+)
+def test_unknown_catalog_field_keeps_other_shadow_axes_and_strict_failure(
+    monkeypatch,
+    field,
+    bad_value,
+    meta_field,
+    expected_error,
+):
+    payload = _valid_attempt_payload()
+    payload[field] = bad_value
+    _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Общий вопрос", f"attempt-bad-{field}", "demo")
+
+    assert attempt.shadow_status == "partial"
+    assert attempt.legacy_plan is None
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.topic == "implantation"
+    assert attempt.shadow_frame.aspects == ["overview"]
+    assert getattr(attempt.shadow_frame.field_meta, meta_field).error == expected_error
+    assert bad_value not in str(attempt.shadow_frame.model_dump())
+
+
+def test_non_bool_clarify_is_invalid_only_in_shadow_strict_coercion_unchanged(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["needs_clarify"] = 1
+    _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Общий вопрос", "attempt-clarify-coercion", "demo")
+
+    assert attempt.shadow_status == "partial"
+    assert attempt.legacy_plan is not None
+    assert attempt.legacy_plan.needs_clarify is True
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.needs_clarification is False
+    assert (
+        attempt.shadow_frame.field_meta.needs_clarification.error
+        == "needs_clarification_invalid_type"
+    )
 
 
 def test_plan_turn_wrapper_returns_attempt_legacy_plan(monkeypatch):
@@ -1008,9 +1078,14 @@ def test_raw_values_are_unchanged_between_shadow_and_strict_branches(monkeypatch
     _prepare_attempt(monkeypatch, payload)
     snapshots: dict[str, dict] = {}
 
-    def _builder(raw, *, allowed_topics):
+    def _builder(raw, *, allowed_topics, allowed_service_ids):
         snapshots["builder_before"] = json.loads(json.dumps(raw))
-        frame = _real_build_turn_frame_from_raw(raw, allowed_topics=allowed_topics)
+        snapshots["allowed_service_ids"] = allowed_service_ids
+        frame = _real_build_turn_frame_from_raw(
+            raw,
+            allowed_topics=allowed_topics,
+            allowed_service_ids=allowed_service_ids,
+        )
         snapshots["builder_after"] = json.loads(json.dumps(raw))
         return frame
 
@@ -1027,6 +1102,7 @@ def test_raw_values_are_unchanged_between_shadow_and_strict_branches(monkeypatch
     assert snapshots["builder_before"] == payload
     assert snapshots["builder_after"] == payload
     assert snapshots["strict"] == payload
+    assert snapshots["allowed_service_ids"] == frozenset({"all_on_4"})
 
 
 def test_protocol_guard_changes_only_legacy_plan(monkeypatch):
@@ -1047,7 +1123,8 @@ def test_protocol_guard_changes_only_legacy_plan(monkeypatch):
     assert attempt.legacy_plan.service_id == "all_on_4"
     assert attempt.shadow_frame is not None
     assert attempt.shadow_frame.service_id is None
-    assert attempt.shadow_frame.field_meta.service_id.status == "defaulted"
+    assert attempt.shadow_frame.field_meta.service_id.status == "valid"
+    assert attempt.shadow_frame.field_meta.service_id.provenance == "turn_plan.raw.service_id"
 
 
 def test_partial_shadow_is_not_read_by_downstream_modules():

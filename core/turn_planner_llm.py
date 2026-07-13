@@ -582,7 +582,11 @@ def plan_turn_attempt(
     shadow_frame: TurnFrame | None
     shadow_degraded = False
     try:
-        shadow_frame = build_turn_frame_from_raw(obj, allowed_topics=allowed_topics)
+        shadow_frame = build_turn_frame_from_raw(
+            obj,
+            allowed_topics=allowed_topics,
+            allowed_service_ids=allowed_ids,
+        )
     except Exception:
         shadow_frame = None
         shadow_degraded = True

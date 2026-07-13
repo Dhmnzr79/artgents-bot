@@ -7,12 +7,15 @@ from pathlib import Path
 
 import pytest
 
+from contracts.planner_attempt import PlannerAttempt
 from contracts.turn_plan import TurnPlan
+from core.turn_frame_from_raw import build_turn_frame_from_raw as _real_build_turn_frame_from_raw
 from core.turn_planner_llm import (
     _SYSTEM,
     _sanitize_topic_fields,
     _validate_plan,
     plan_turn,
+    plan_turn_attempt,
     turn_plan_to_decision_frame,
 )
 
@@ -717,3 +720,342 @@ def test_downstream_modules_do_not_read_turn_plan_topic():
         if hits:
             offenders[str(path)] = hits
     assert offenders == {}
+
+
+def _prepare_attempt(monkeypatch, payload):
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_compact_service_catalog",
+        lambda _cid: _planner_catalog(),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm._allowed_pricebook_filters",
+        lambda _cid: _planner_filters(),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.load_client_topic_taxonomy",
+        lambda _cid: _DEMO_TOPICS,
+    )
+    return _mock_llm(monkeypatch, payload)
+
+
+def _valid_attempt_payload() -> dict:
+    return {
+        "route": "content",
+        "aspects": ["overview"],
+        "service_id": None,
+        "followup_of": None,
+        "needs_clarify": False,
+        "patient_situation": None,
+        "brand_filter": None,
+        "topic": "implantation",
+        "topic_confidence": 0.9,
+    }
+
+
+def test_plan_turn_attempt_valid_payload_returns_ok(monkeypatch):
+    _prepare_attempt(monkeypatch, _valid_attempt_payload())
+
+    attempt = plan_turn_attempt("Расскажите про имплантацию", "attempt-ok", "demo")
+
+    assert isinstance(attempt, PlannerAttempt)
+    assert attempt.shadow_status == "ok"
+    assert attempt.legacy_plan is not None
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.topic == "implantation"
+
+
+def test_plan_turn_wrapper_returns_attempt_legacy_plan(monkeypatch):
+    payload = _valid_attempt_payload()
+    _prepare_attempt(monkeypatch, payload)
+    attempt = plan_turn_attempt("Расскажите про имплантацию", "attempt-wrapper", "demo")
+
+    _prepare_attempt(monkeypatch, payload)
+    plan = plan_turn("Расскажите про имплантацию", "attempt-wrapper", "demo")
+
+    assert plan == attempt.legacy_plan
+
+
+def test_plan_turn_attempt_empty_aspects_keeps_topic_in_partial_frame(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["topic"] = "doctors"
+    payload["topic_confidence"] = 0.95
+    payload["aspects"] = []
+    _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Кто занимается лечением?", "attempt-partial", "demo")
+
+    assert attempt.shadow_status == "partial"
+    assert attempt.legacy_plan is None
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.topic == "doctors"
+    assert attempt.shadow_frame.field_meta.topic.status == "valid"
+    assert attempt.shadow_frame.field_meta.aspects.error == "aspects_empty"
+    assert attempt.shadow_frame.field_meta.primary_aspect.error == "primary_aspect_unavailable"
+
+
+def test_plan_turn_wrapper_keeps_a6_empty_aspects_fail_open(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["topic"] = "doctors"
+    payload["topic_confidence"] = 0.95
+    payload["aspects"] = []
+    _prepare_attempt(monkeypatch, payload)
+
+    plan = plan_turn("Кто занимается лечением?", "wrapper-a6-fail-open", "demo")
+
+    assert plan is None
+
+
+def test_plan_turn_attempt_invalid_topic_preserves_valid_legacy_semantics(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["topic"] = "other-client-secret-topic"
+    _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Общий вопрос", "attempt-topic-invalid", "demo")
+
+    assert attempt.shadow_status == "partial"
+    assert attempt.legacy_plan is not None
+    assert attempt.legacy_plan.route == "content"
+    assert attempt.legacy_plan.aspects == ["overview"]
+    assert attempt.legacy_plan.topic is None
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.topic is None
+    assert attempt.shadow_frame.field_meta.topic.error == "topic_not_allowed"
+    assert "other-client-secret-topic" not in str(attempt.shadow_frame.model_dump())
+
+
+def test_plan_turn_attempt_bad_json_is_not_available(monkeypatch):
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_compact_service_catalog",
+        lambda _cid: _planner_catalog(),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm._allowed_pricebook_filters",
+        lambda _cid: _planner_filters(),
+    )
+
+    def _bad(**_kwargs):
+        class _Msg:
+            content = "not json"
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("core.turn_planner_llm.chat_completions_create", _bad)
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-bad-json", "demo")
+
+    assert attempt.shadow_status == "not_available"
+    assert attempt.legacy_plan is None
+    assert attempt.shadow_frame is None
+
+
+def test_plan_turn_attempt_non_object_json_is_not_available(monkeypatch):
+    _prepare_attempt(monkeypatch, ["content", "overview"])
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-list-json", "demo")
+
+    assert attempt.shadow_status == "not_available"
+    assert attempt.legacy_plan is None
+    assert attempt.shadow_frame is None
+
+
+def test_builder_failure_does_not_destroy_valid_legacy_plan(monkeypatch):
+    events: list[dict] = []
+    _prepare_attempt(monkeypatch, _valid_attempt_payload())
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_turn_frame_from_raw",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("secret question and exception text")
+        ),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.log_json",
+        lambda _logger, event, **fields: events.append({"event": event, **fields}),
+    )
+
+    attempt = plan_turn_attempt("Пациентский секрет", "attempt-builder-fail", "demo")
+
+    assert attempt.shadow_status == "degraded"
+    assert attempt.shadow_frame is None
+    assert attempt.legacy_plan is not None
+    degraded = [event for event in events if event["event"] == "turn_planner_shadow_degraded"]
+    assert degraded == [
+        {
+            "event": "turn_planner_shadow_degraded",
+            "client_id": "demo",
+            "sid": "attempt-builder-fail",
+            "reason": "turn_frame_build_failed",
+        }
+    ]
+    assert "secret question" not in json.dumps(events, ensure_ascii=False)
+
+
+def test_builder_failure_and_strict_failure_returns_degraded(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["aspects"] = []
+    _prepare_attempt(monkeypatch, payload)
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_turn_frame_from_raw",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("builder failed")),
+    )
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-both-fail", "demo")
+
+    assert attempt.shadow_status == "degraded"
+    assert attempt.shadow_frame is None
+    assert attempt.legacy_plan is None
+
+
+def test_builder_failure_survives_shadow_telemetry_failure(monkeypatch):
+    _prepare_attempt(monkeypatch, _valid_attempt_payload())
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_turn_frame_from_raw",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("builder failed")),
+    )
+
+    def _log_json(_logger, event, **_fields):
+        if event == "turn_planner_shadow_degraded":
+            raise RuntimeError("telemetry failed")
+
+    monkeypatch.setattr("core.turn_planner_llm.log_json", _log_json)
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-telemetry-fail", "demo")
+
+    assert attempt.shadow_status == "degraded"
+    assert attempt.shadow_frame is None
+    assert attempt.legacy_plan is not None
+
+
+def test_strict_failure_does_not_destroy_valid_shadow_frame(monkeypatch):
+    _prepare_attempt(monkeypatch, _valid_attempt_payload())
+    monkeypatch.setattr(
+        "core.turn_planner_llm._validate_plan",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("strict failed")),
+    )
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-strict-fail", "demo")
+
+    assert attempt.shadow_status == "partial"
+    assert attempt.legacy_plan is None
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.topic == "implantation"
+
+
+def test_empty_question_and_empty_catalog_make_no_llm_calls(monkeypatch):
+    calls = {"count": 0}
+
+    def _counted(**_kwargs):
+        calls["count"] += 1
+        raise AssertionError("LLM must not be called")
+
+    monkeypatch.setattr("core.turn_planner_llm.chat_completions_create", _counted)
+    assert plan_turn_attempt("   ", "attempt-empty", "demo").shadow_status == "not_available"
+
+    monkeypatch.setattr("core.turn_planner_llm.build_compact_service_catalog", lambda _cid: [])
+    assert plan_turn_attempt("Вопрос", "attempt-no-catalog", "demo").shadow_status == "not_available"
+    assert calls["count"] == 0
+
+
+@pytest.mark.parametrize("entrypoint", ["attempt", "wrapper"])
+def test_planner_entrypoint_makes_exactly_one_llm_call(monkeypatch, entrypoint):
+    calls = {"count": 0}
+    payload = _valid_attempt_payload()
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_compact_service_catalog",
+        lambda _cid: _planner_catalog(),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm._allowed_pricebook_filters",
+        lambda _cid: _planner_filters(),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.load_client_topic_taxonomy",
+        lambda _cid: _DEMO_TOPICS,
+    )
+
+    def _counted(**_kwargs):
+        calls["count"] += 1
+
+        class _Msg:
+            content = json.dumps(payload)
+
+        class _Choice:
+            message = _Msg()
+
+        class _Resp:
+            choices = [_Choice()]
+
+        return _Resp()
+
+    monkeypatch.setattr("core.turn_planner_llm.chat_completions_create", _counted)
+
+    if entrypoint == "attempt":
+        result = plan_turn_attempt("Вопрос", "attempt-one-call", "demo")
+        assert result.legacy_plan is not None
+    else:
+        result = plan_turn("Вопрос", "wrapper-one-call", "demo")
+        assert result is not None
+    assert calls["count"] == 1
+
+
+def test_raw_values_are_unchanged_between_shadow_and_strict_branches(monkeypatch):
+    payload = _valid_attempt_payload()
+    _prepare_attempt(monkeypatch, payload)
+    snapshots: dict[str, dict] = {}
+
+    def _builder(raw, *, allowed_topics):
+        snapshots["builder_before"] = json.loads(json.dumps(raw))
+        frame = _real_build_turn_frame_from_raw(raw, allowed_topics=allowed_topics)
+        snapshots["builder_after"] = json.loads(json.dumps(raw))
+        return frame
+
+    def _strict(raw, **kwargs):
+        snapshots["strict"] = json.loads(json.dumps(raw))
+        return _validate_plan(raw, **kwargs)
+
+    monkeypatch.setattr("core.turn_planner_llm.build_turn_frame_from_raw", _builder)
+    monkeypatch.setattr("core.turn_planner_llm._validate_plan", _strict)
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-immutable", "demo")
+
+    assert attempt.legacy_plan is not None
+    assert snapshots["builder_before"] == payload
+    assert snapshots["builder_after"] == payload
+    assert snapshots["strict"] == payload
+
+
+def test_protocol_guard_changes_only_legacy_plan(monkeypatch):
+    payload = _valid_attempt_payload()
+    _prepare_attempt(monkeypatch, payload)
+    calls = {"count": 0}
+
+    def _guard(plan, **_kwargs):
+        calls["count"] += 1
+        return plan.model_copy(update={"service_id": "all_on_4"})
+
+    monkeypatch.setattr("core.turn_planner_llm._apply_protocol_choice_guard", _guard)
+
+    attempt = plan_turn_attempt("Вопрос", "attempt-guard", "demo")
+
+    assert calls["count"] == 1
+    assert attempt.legacy_plan is not None
+    assert attempt.legacy_plan.service_id == "all_on_4"
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.service_id is None
+    assert attempt.shadow_frame.field_meta.service_id.status == "defaulted"
+
+
+def test_partial_shadow_is_not_read_by_downstream_modules():
+    paths = [Path("app.py"), Path("llm.py"), Path("core/turn_frame_shadow.py")]
+    paths.extend(sorted(Path("orchestration").rglob("*.py")))
+    offenders: list[str] = []
+    for path in paths:
+        source = path.read_text(encoding="utf-8")
+        if "PlannerAttempt" in source or ".shadow_frame" in source:
+            offenders.append(str(path))
+    assert offenders == []

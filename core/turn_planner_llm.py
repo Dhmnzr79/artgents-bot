@@ -7,10 +7,13 @@ from typing import Any
 
 from config import CLARIFY_STATE_ON, TURN_PLANNER_LLM_MODEL
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
+from contracts.planner_attempt import PlannerAttempt
+from contracts.turn_frame import TurnFrame, TurnFrameMeta
 from contracts.turn_plan import TurnPlan
 from contracts.answer_plan import AspectKind
 from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
 from core.service_selector_llm import build_compact_service_catalog, _read_service_catalog
+from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.topic_taxonomy import load_client_topic_taxonomy
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
@@ -486,14 +489,54 @@ def turn_plan_brand_filter_from_ctx() -> tuple[str | None, str | None]:
     return brand, brand_group
 
 
-def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None:
-    """Plan one turn with one flash LLM call. Returns None for fail-open."""
+def _not_available_attempt() -> PlannerAttempt:
+    return PlannerAttempt(
+        legacy_plan=None,
+        shadow_frame=None,
+        shadow_status="not_available",
+    )
+
+
+def _frame_has_invalid_or_missing(frame: TurnFrame) -> bool:
+    return any(
+        getattr(frame.field_meta, name).status in {"invalid", "missing"}
+        for name in TurnFrameMeta.model_fields
+    )
+
+
+def _log_turn_planner_failure(
+    error: Exception,
+    *,
+    client_id: str | None,
+    sid: str | None,
+) -> None:
+    log_llm_error(
+        logger,
+        call_type="turn_planner_plan",
+        err=str(error),
+        model=TURN_PLANNER_LLM_MODEL,
+    )
+    log_json(
+        logger,
+        "turn_planner_failed",
+        client_id=client_id,
+        sid=sid,
+        err=str(error)[:300],
+    )
+
+
+def plan_turn_attempt(
+    q: str,
+    sid: str | None,
+    client_id: str | None,
+) -> PlannerAttempt:
+    """Run one planner call and retain independent shadow and strict outcomes."""
     msg = (q or "").strip()
     if not msg:
-        return None
+        return _not_available_attempt()
     rows = build_compact_service_catalog(client_id)
     if not rows:
-        return None
+        return _not_available_attempt()
     allowed_ids = frozenset(r["service_id"] for r in rows)
     allowed_groups, allowed_brands = _allowed_pricebook_filters(client_id)
     allowed_topics = _resolve_allowed_topics(client_id, sid=sid)
@@ -532,6 +575,30 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
         obj = json.loads(raw_text)
         if not isinstance(obj, dict):
             raise ValueError("turn_plan_not_object")
+    except Exception as error:
+        _log_turn_planner_failure(error, client_id=client_id, sid=sid)
+        return _not_available_attempt()
+
+    shadow_frame: TurnFrame | None
+    shadow_degraded = False
+    try:
+        shadow_frame = build_turn_frame_from_raw(obj, allowed_topics=allowed_topics)
+    except Exception:
+        shadow_frame = None
+        shadow_degraded = True
+        try:
+            log_json(
+                logger,
+                "turn_planner_shadow_degraded",
+                client_id=client_id,
+                sid=sid,
+                reason="turn_frame_build_failed",
+            )
+        except Exception:
+            pass
+
+    legacy_plan: TurnPlan | None = None
+    try:
         plan = _validate_plan(
             obj,
             allowed_service_ids=allowed_ids,
@@ -560,19 +627,30 @@ def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None
             topic=plan.topic,
             topic_confidence=plan.topic_confidence,
         )
-        return plan
-    except Exception as e:
-        log_llm_error(
-            logger,
-            call_type="turn_planner_plan",
-            err=str(e),
-            model=TURN_PLANNER_LLM_MODEL,
+        legacy_plan = plan
+    except Exception as error:
+        _log_turn_planner_failure(error, client_id=client_id, sid=sid)
+
+    if shadow_degraded:
+        return PlannerAttempt(
+            legacy_plan=legacy_plan,
+            shadow_frame=None,
+            shadow_status="degraded",
         )
-        log_json(
-            logger,
-            "turn_planner_failed",
-            client_id=client_id,
-            sid=sid,
-            err=str(e)[:300],
-        )
-        return None
+    if shadow_frame is None:  # pragma: no cover - guarded by shadow_degraded
+        raise AssertionError("shadow_frame_missing_without_degraded")
+    shadow_status = (
+        "partial"
+        if legacy_plan is None or _frame_has_invalid_or_missing(shadow_frame)
+        else "ok"
+    )
+    return PlannerAttempt(
+        legacy_plan=legacy_plan,
+        shadow_frame=shadow_frame,
+        shadow_status=shadow_status,
+    )
+
+
+def plan_turn(q: str, sid: str | None, client_id: str | None) -> TurnPlan | None:
+    """Backward-compatible product wrapper over one planner attempt."""
+    return plan_turn_attempt(q, sid, client_id).legacy_plan

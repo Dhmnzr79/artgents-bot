@@ -308,11 +308,18 @@ def test_planner_attempt_contract_has_no_runtime_imports():
     assert "app" not in imported
 
 
-def test_runtime_modules_do_not_import_planner_attempt():
-    for rel in (
-        "core/turn_frame_shadow.py",
-        "orchestration/resolver_turn.py",
-        "core/turn_planner_llm.py",
-    ):
-        source = Path(rel).read_text(encoding="utf-8")
-        assert "planner_attempt" not in source
+def test_only_planner_imports_planner_attempt_not_downstream_modules():
+    planner_source = Path("core/turn_planner_llm.py").read_text(encoding="utf-8")
+    assert "from contracts.planner_attempt import PlannerAttempt" in planner_source
+
+    paths = [Path("app.py"), Path("llm.py")]
+    paths.extend(sorted(Path("core").rglob("*.py")))
+    paths.extend(sorted(Path("orchestration").rglob("*.py")))
+    offenders: list[str] = []
+    for path in paths:
+        if path.as_posix() == "core/turn_planner_llm.py":
+            continue
+        source = path.read_text(encoding="utf-8")
+        if "planner_attempt" in source or "PlannerAttempt" in source or ".shadow_frame" in source:
+            offenders.append(str(path))
+    assert offenders == []

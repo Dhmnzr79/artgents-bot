@@ -9,7 +9,7 @@ from flask import request
 
 from config import COMPARISON_QUERY_RE, TURN_PLANNER_ON
 from core.metadata_first_observability import record_decision_frame_ctx
-from core.turn_frame_shadow import mark_turn_frame_shadow_not_available, record_turn_frame_shadow
+from core.turn_frame_shadow import record_planner_attempt_shadow
 from query_selector import commercial_info_query, consultation_info_query
 from core.routing_loader import THRESHOLDS
 from llm import classify_intent
@@ -50,9 +50,15 @@ def run_resolver_turn(
     intent: str
 
     if TURN_PLANNER_ON and not resolver_bypassed_env:
-        from core.turn_planner_llm import plan_turn, publish_turn_plan, turn_plan_to_decision_frame
+        from core.turn_planner_llm import (
+            plan_turn_attempt,
+            publish_turn_plan,
+            turn_plan_to_decision_frame,
+        )
 
-        plan = plan_turn(q, sid, client_id)
+        attempt = plan_turn_attempt(q, sid, client_id)
+        plan = attempt.legacy_plan
+        record_planner_attempt_shadow(attempt=attempt)
         if plan is not None:
             decision = turn_plan_to_decision_frame(plan, client_id=client_id)
             publish_turn_plan(plan)
@@ -87,10 +93,8 @@ def run_resolver_turn(
                 decision = decision.model_copy(update={"query_mode": "comparison"})
             request.ctx["effective_intent"] = str(intent)
             record_decision_frame_ctx(decision)
-            record_turn_frame_shadow(turn_plan=plan, decision_frame=decision)
         else:
             request.ctx["turn_planner_used"] = False
-            mark_turn_frame_shadow_not_available()
             log_json(
                 logger,
                 "turn_planner_fail_open_to_resolver",

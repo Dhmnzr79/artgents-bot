@@ -7,6 +7,7 @@ from typing import Any
 from flask import request
 
 from contracts.decision_frame import DecisionFrame
+from contracts.planner_attempt import PlannerAttempt
 from contracts.turn_frame import TurnFrame
 from contracts.turn_plan import TurnPlan
 from core.turn_frame_adapter import build_turn_frame_from_legacy
@@ -15,6 +16,7 @@ from logging_setup import emit_bot_event, get_logger
 logger = get_logger("bot")
 
 SHADOW_STATUS_OK = "ok"
+SHADOW_STATUS_PARTIAL = "partial"
 SHADOW_STATUS_NOT_AVAILABLE = "not_available"
 SHADOW_STATUS_DEGRADED = "degraded"
 
@@ -40,6 +42,57 @@ def mark_turn_frame_shadow_not_available() -> None:
     ctx[_CTX_STATUS] = SHADOW_STATUS_NOT_AVAILABLE
     ctx[_CTX_REASON] = SHADOW_REASON_TURN_PLAN_MISSING
     ctx.pop(_CTX_SHADOW, None)
+
+
+def _mark_turn_frame_shadow_degraded(ctx: dict[str, Any]) -> None:
+    """Record a stable degraded outcome before best-effort event emission."""
+    ctx[_CTX_STATUS] = SHADOW_STATUS_DEGRADED
+    ctx[_CTX_REASON] = SHADOW_REASON_BUILD_FAILED
+    ctx.pop(_CTX_SHADOW, None)
+    try:
+        emit_bot_event(
+            logger,
+            "turn_frame_shadow",
+            status=SHADOW_STATUS_DEGRADED,
+            details={
+                "turn_frame_shadow_status": SHADOW_STATUS_DEGRADED,
+                "turn_frame_shadow_reason": SHADOW_REASON_BUILD_FAILED,
+            },
+        )
+    except Exception:
+        pass
+
+
+def record_planner_attempt_shadow(
+    *,
+    attempt: PlannerAttempt,
+) -> TurnFrame | None:
+    """Store the field-level attempt frame in ctx without affecting product flow."""
+    ctx = _ctx()
+    if ctx is None:
+        return None
+
+    if attempt.shadow_status == SHADOW_STATUS_NOT_AVAILABLE:
+        mark_turn_frame_shadow_not_available()
+        return None
+    if attempt.shadow_status == SHADOW_STATUS_DEGRADED:
+        _mark_turn_frame_shadow_degraded(ctx)
+        return None
+
+    frame = attempt.shadow_frame
+    if frame is None:
+        _mark_turn_frame_shadow_degraded(ctx)
+        return None
+    try:
+        snapshot = frame.model_dump()
+    except Exception:
+        _mark_turn_frame_shadow_degraded(ctx)
+        return None
+
+    ctx[_CTX_SHADOW] = snapshot
+    ctx[_CTX_STATUS] = attempt.shadow_status
+    ctx.pop(_CTX_REASON, None)
+    return frame
 
 
 def record_turn_frame_shadow(

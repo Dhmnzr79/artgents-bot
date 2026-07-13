@@ -6,15 +6,20 @@ from unittest.mock import patch
 import pytest
 
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
+from contracts.planner_attempt import PlannerAttempt
+from contracts.turn_frame import TurnFrame
 from contracts.turn_plan import TurnPlan
 from core.turn_frame_adapter import build_turn_frame_from_legacy
+from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.turn_frame_shadow import (
     SHADOW_REASON_BUILD_FAILED,
     SHADOW_REASON_TURN_PLAN_MISSING,
     SHADOW_STATUS_DEGRADED,
     SHADOW_STATUS_NOT_AVAILABLE,
     SHADOW_STATUS_OK,
+    SHADOW_STATUS_PARTIAL,
     mark_turn_frame_shadow_not_available,
+    record_planner_attempt_shadow,
     record_turn_frame_shadow,
 )
 from orchestration.resolver_turn import run_resolver_turn
@@ -48,6 +53,38 @@ def _turn_plan(**overrides) -> TurnPlan:
     }
     payload.update(overrides)
     return TurnPlan.model_validate(payload)
+
+
+def _raw_shadow_frame(**overrides) -> TurnFrame:
+    payload = {
+        "route": "price_lookup",
+        "aspects": ["price"],
+        "topic": "implantation",
+        "topic_confidence": 0.9,
+    }
+    payload.update(overrides)
+    return build_turn_frame_from_raw(payload, allowed_topics=frozenset({"doctors", "implantation"}))
+
+
+def _ok_attempt(turn_plan: TurnPlan | None = None) -> PlannerAttempt:
+    return PlannerAttempt(
+        legacy_plan=turn_plan or _turn_plan(),
+        shadow_frame=_raw_shadow_frame(),
+        shadow_status="ok",
+    )
+
+
+def _partial_doctors_attempt() -> PlannerAttempt:
+    return PlannerAttempt(
+        legacy_plan=None,
+        shadow_frame=_raw_shadow_frame(
+            route="content",
+            topic="doctors",
+            topic_confidence=0.95,
+            aspects=[],
+        ),
+        shadow_status="partial",
+    )
 
 
 def test_record_turn_frame_shadow_ok_writes_dump_and_status() -> None:
@@ -94,6 +131,118 @@ def test_mark_turn_frame_shadow_not_available() -> None:
         assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_NOT_AVAILABLE
         assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_TURN_PLAN_MISSING
         assert "turn_frame_shadow" not in request.ctx
+
+
+def test_record_planner_attempt_shadow_ok_writes_exact_raw_frame() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt = _ok_attempt()
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {"turn_frame_shadow_reason": "stale"}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is attempt.shadow_frame
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_OK
+        assert request.ctx["turn_frame_shadow"] == attempt.shadow_frame.model_dump()
+        assert "turn_frame_shadow_reason" not in request.ctx
+
+
+def test_record_planner_attempt_shadow_partial_preserves_valid_topic() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt = _partial_doctors_attempt()
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {"turn_frame_shadow_reason": "stale"}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is attempt.shadow_frame
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_PARTIAL
+        assert request.ctx["turn_frame_shadow"]["topic"] == "doctors"
+        assert request.ctx["turn_frame_shadow"]["field_meta"]["topic"]["status"] == "valid"
+        assert request.ctx["turn_frame_shadow"]["field_meta"]["aspects"]["error"] == "aspects_empty"
+        assert "turn_frame_shadow_reason" not in request.ctx
+
+
+def test_record_planner_attempt_shadow_not_available_clears_stale_frame() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt = PlannerAttempt(
+        legacy_plan=None,
+        shadow_frame=None,
+        shadow_status="not_available",
+    )
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {"turn_frame_shadow": {"topic": "stale"}}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is None
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_NOT_AVAILABLE
+        assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_TURN_PLAN_MISSING
+        assert "turn_frame_shadow" not in request.ctx
+
+
+def test_record_planner_attempt_shadow_degraded_preserves_stable_reason() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt = PlannerAttempt(
+        legacy_plan=_turn_plan(),
+        shadow_frame=None,
+        shadow_status="degraded",
+    )
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {"turn_frame_shadow": {"topic": "stale"}}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is None
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_DEGRADED
+        assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_BUILD_FAILED
+        assert "turn_frame_shadow" not in request.ctx
+
+
+def test_record_planner_attempt_shadow_model_dump_failure_is_degraded(monkeypatch) -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt = _ok_attempt()
+
+    def _dump_boom(_self):
+        raise RuntimeError("secret serialization exception and question")
+
+    monkeypatch.setattr(TurnFrame, "model_dump", _dump_boom)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is None
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_DEGRADED
+        assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_BUILD_FAILED
+        assert "secret serialization" not in str(request.ctx)
+
+
+def test_record_planner_attempt_shadow_survives_event_failure(monkeypatch) -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt = PlannerAttempt(
+        legacy_plan=_turn_plan(),
+        shadow_frame=None,
+        shadow_status="degraded",
+    )
+    monkeypatch.setattr(
+        "core.turn_frame_shadow.emit_bot_event",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("sink failed")),
+    )
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is None
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_DEGRADED
+        assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_BUILD_FAILED
 
 
 def test_record_turn_frame_shadow_degraded_isolates_builder_failure(monkeypatch) -> None:
@@ -157,7 +306,11 @@ def test_record_turn_frame_shadow_degraded_emits_structured_event_without_leaks(
 
 def test_shadow_recorder_signatures_exclude_question_like_params() -> None:
     forbidden = {"question", "answer", "history", "payload", "q"}
-    for fn in (record_turn_frame_shadow, mark_turn_frame_shadow_not_available):
+    for fn in (
+        record_turn_frame_shadow,
+        record_planner_attempt_shadow,
+        mark_turn_frame_shadow_not_available,
+    ):
         params = set(inspect.signature(fn).parameters)
         assert params.isdisjoint(forbidden)
 
@@ -165,8 +318,9 @@ def test_shadow_recorder_signatures_exclude_question_like_params() -> None:
 def test_run_resolver_turn_planner_success_records_shadow(monkeypatch) -> None:
     app = pytest.importorskip("flask").Flask(__name__)
     turn_plan = _turn_plan()
+    attempt = _ok_attempt(turn_plan)
     monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
-    monkeypatch.setattr("core.turn_planner_llm.plan_turn", lambda *_a, **_k: turn_plan)
+    monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", lambda *_a, **_k: attempt)
     monkeypatch.setattr("core.turn_planner_llm.publish_turn_plan", lambda _p: None)
     with app.test_request_context("/"):
         from flask import request
@@ -181,8 +335,7 @@ def test_run_resolver_turn_planner_success_records_shadow(monkeypatch) -> None:
         )
 
         assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_OK
-        assert isinstance(request.ctx.get("turn_frame_shadow"), dict)
-        assert request.ctx["turn_frame_shadow"]["service_id"] == "all_on_4"
+        assert request.ctx["turn_frame_shadow"] == attempt.shadow_frame.model_dump()
 
 
 def test_run_resolver_turn_does_not_replace_decision_or_intent(monkeypatch) -> None:
@@ -190,9 +343,10 @@ def test_run_resolver_turn_does_not_replace_decision_or_intent(monkeypatch) -> N
     from core.turn_planner_llm import turn_plan_to_decision_frame
 
     turn_plan = _turn_plan()
+    attempt = _ok_attempt(turn_plan)
     expected_decision = turn_plan_to_decision_frame(turn_plan, client_id="demo")
     monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
-    monkeypatch.setattr("core.turn_planner_llm.plan_turn", lambda *_a, **_k: turn_plan)
+    monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", lambda *_a, **_k: attempt)
     monkeypatch.setattr("core.turn_planner_llm.publish_turn_plan", lambda _p: None)
     with app.test_request_context("/"):
         from flask import request
@@ -221,7 +375,14 @@ def test_run_resolver_turn_planner_missing_marks_not_available_before_resolver(m
         return fallback_decision, [], "content"
 
     monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
-    monkeypatch.setattr("core.turn_planner_llm.plan_turn", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "core.turn_planner_llm.plan_turn_attempt",
+        lambda *_a, **_k: PlannerAttempt(
+            legacy_plan=None,
+            shadow_frame=None,
+            shadow_status="not_available",
+        ),
+    )
     monkeypatch.setattr(
         "orchestration.resolver_turn.resolve_with_fallback",
         _resolve_with_fallback,
@@ -244,7 +405,103 @@ def test_run_resolver_turn_planner_missing_marks_not_available_before_resolver(m
         assert resolver_calls == ["called"]
 
 
-def test_run_resolver_turn_comparison_override_reflected_in_shadow(monkeypatch) -> None:
+def test_run_resolver_turn_partial_shadow_keeps_legacy_fail_open(monkeypatch) -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    attempt_calls: list[tuple[str, str, str]] = []
+    resolver_calls: list[str] = []
+    attempt = _partial_doctors_attempt()
+    fallback_decision = _decision(
+        route_intent="content",
+        service_topic="prosthetics",
+        service_id="veneers",
+        query_mode="overview",
+    )
+
+    def _attempt(q, sid, client_id):
+        attempt_calls.append((q, sid, client_id))
+        return attempt
+
+    def _resolve_with_fallback(**_kwargs):
+        resolver_calls.append("called")
+        return fallback_decision, [], "content"
+
+    monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
+    monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", _attempt)
+    monkeypatch.setattr(
+        "core.turn_planner_llm.plan_turn",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("legacy wrapper called")),
+    )
+    monkeypatch.setattr(
+        "orchestration.resolver_turn.resolve_with_fallback",
+        _resolve_with_fallback,
+    )
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        outcome = run_resolver_turn(
+            q="Кто занимается лечением?",
+            sid="shadow-partial-fail-open",
+            client_id="demo",
+            st={"hist": []},
+            enqueue_resolver_trace=lambda **_k: None,
+        )
+
+        assert attempt_calls == [("Кто занимается лечением?", "shadow-partial-fail-open", "demo")]
+        assert resolver_calls == ["called"]
+        assert request.ctx["turn_planner_used"] is False
+        assert request.ctx["resolver_used"] is True
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_PARTIAL
+        assert request.ctx["turn_frame_shadow"]["topic"] == "doctors"
+        assert request.ctx["turn_frame_shadow"]["field_meta"]["aspects"]["error"] == "aspects_empty"
+        assert outcome.decision.service_topic == "prosthetics"
+        assert outcome.intent == "content"
+        assert outcome.scope_topic_candidate != "doctors"
+
+
+def test_run_resolver_turn_degraded_shadow_keeps_valid_legacy_product_path(monkeypatch) -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    turn_plan = _turn_plan()
+    attempt = PlannerAttempt(
+        legacy_plan=turn_plan,
+        shadow_frame=None,
+        shadow_status="degraded",
+    )
+    monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
+    monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", lambda *_a, **_k: attempt)
+    monkeypatch.setattr("core.turn_planner_llm.publish_turn_plan", lambda _p: None)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        outcome = run_resolver_turn(
+            q="сколько стоит all-on-4?",
+            sid="shadow-degraded-valid-legacy",
+            client_id="demo",
+            st={},
+            enqueue_resolver_trace=lambda **_k: None,
+        )
+
+        assert outcome.intent == "price_lookup"
+        assert outcome.decision.service_id == "all_on_4"
+        assert request.ctx["turn_planner_used"] is True
+        assert request.ctx["resolver_used"] is False
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_DEGRADED
+        assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_BUILD_FAILED
+        assert "turn_frame_shadow" not in request.ctx
+
+
+def test_run_resolver_turn_source_uses_attempt_once_and_only_legacy_for_product() -> None:
+    source = inspect.getsource(run_resolver_turn)
+    assert source.count("plan_turn_attempt(q, sid, client_id)") == 1
+    assert "plan_turn(q, sid, client_id)" not in source
+    assert "plan = attempt.legacy_plan" in source
+    assert "attempt.shadow_frame" not in source
+    assert "attempt.shadow_status" not in source
+    assert "record_planner_attempt_shadow(attempt=attempt)" in source
+
+
+def test_run_resolver_turn_comparison_override_does_not_rebuild_raw_shadow(monkeypatch) -> None:
     app = pytest.importorskip("flask").Flask(__name__)
     from core.turn_planner_llm import turn_plan_to_decision_frame
 
@@ -253,13 +510,10 @@ def test_run_resolver_turn_comparison_override_reflected_in_shadow(monkeypatch) 
     assert pre_override_decision.query_mode != "comparison"
 
     comparison_question = "что лучше all-on-4 или 6?"
-    expected_shadow = build_turn_frame_from_legacy(
-        turn_plan=turn_plan,
-        decision_frame=pre_override_decision.model_copy(update={"query_mode": "comparison"}),
-    )
+    attempt = _ok_attempt(turn_plan)
 
     monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
-    monkeypatch.setattr("core.turn_planner_llm.plan_turn", lambda *_a, **_k: turn_plan)
+    monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", lambda *_a, **_k: attempt)
     monkeypatch.setattr("core.turn_planner_llm.publish_turn_plan", lambda _p: None)
     with app.test_request_context("/"):
         from flask import request
@@ -275,8 +529,8 @@ def test_run_resolver_turn_comparison_override_reflected_in_shadow(monkeypatch) 
 
         assert outcome.decision.query_mode == "comparison"
         assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_OK
-        assert request.ctx["turn_frame_shadow"] == expected_shadow.model_dump()
-        assert request.ctx["turn_frame_shadow"]["specificity"] == "general"
+        assert request.ctx["turn_frame_shadow"] == attempt.shadow_frame.model_dump()
+        assert request.ctx["turn_frame_shadow"]["specificity"] == "unknown"
 
 
 def test_record_turn_frame_shadow_degraded_on_model_dump_failure(monkeypatch) -> None:

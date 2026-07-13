@@ -249,6 +249,50 @@ def test_finalize_ask_includes_turn_frame_shadow_with_e2e_env(monkeypatch) -> No
     assert mf.get("turn_frame_shadow", {}).get("intent") == "content"
 
 
+def test_finalize_ask_includes_partial_shadow_field_errors_only_in_e2e_meta(monkeypatch) -> None:
+    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
+    app = pytest.importorskip("flask").Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        from orchestration.finalize_turn import finalize_ask
+
+        request.ctx = {
+            "turn_frame_shadow_status": "partial",
+            "turn_frame_shadow": {
+                "intent": "content",
+                "topic": "doctors",
+                "aspects": [],
+                "primary_aspect": None,
+                "field_meta": {
+                    "topic": {
+                        "confidence": 0.95,
+                        "provenance": "turn_plan.raw.topic",
+                        "status": "valid",
+                        "error": None,
+                    },
+                    "aspects": {
+                        "confidence": 0.0,
+                        "provenance": "turn_plan.raw.aspects",
+                        "status": "invalid",
+                        "error": "aspects_empty",
+                    },
+                },
+            },
+        }
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask({"answer": "ответ", "meta": {}}, "sid", "q", route="retrieval_chunk")
+
+    mf = out["meta"].get("metadata_first")
+    assert mf["turn_frame_shadow_status"] == "partial"
+    assert mf["turn_frame_shadow"]["topic"] == "doctors"
+    assert mf["turn_frame_shadow"]["field_meta"]["aspects"]["error"] == "aspects_empty"
+    assert "question" not in str(mf).lower()
+    assert "exception" not in str(mf).lower()
+
+
 def test_finalize_ask_omits_metadata_first_without_e2e_env(monkeypatch) -> None:
     monkeypatch.delenv("E2E_USE_TEST_CLIENT", raising=False)
     app = pytest.importorskip("flask").Flask(__name__)

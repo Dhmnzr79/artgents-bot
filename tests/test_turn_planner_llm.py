@@ -1051,7 +1051,11 @@ def test_protocol_guard_changes_only_legacy_plan(monkeypatch):
 
 
 def test_partial_shadow_is_not_read_by_downstream_modules():
-    paths = [Path("app.py"), Path("llm.py"), Path("core/turn_frame_shadow.py")]
+    recorder = Path("core/turn_frame_shadow.py").read_text(encoding="utf-8")
+    assert "PlannerAttempt" in recorder
+    assert "attempt.shadow_frame" in recorder
+
+    paths = [Path("app.py"), Path("llm.py")]
     paths.extend(sorted(Path("orchestration").rglob("*.py")))
     offenders: list[str] = []
     for path in paths:

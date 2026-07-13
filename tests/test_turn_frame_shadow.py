@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -82,6 +84,40 @@ def _partial_doctors_attempt() -> PlannerAttempt:
             topic="doctors",
             topic_confidence=0.95,
             aspects=[],
+        ),
+        shadow_status="partial",
+    )
+
+
+_A6_FAIL_OPEN_CASE_IDS = (
+    "topic_a6_04_doctors_overview",
+    "topic_a6_05_doctors_named",
+    "topic_a6_06_doctors_implants",
+    "topic_a6_09_extraction_aftercare",
+    "topic_a6_28_null_general_price",
+    "topic_a6_30_null_booking",
+    "topic_a6_31_null_pain",
+)
+
+
+def _frozen_a6_case(case_id: str) -> dict:
+    spec = json.loads(
+        Path("evals/v5/demo/topic_shadow_matrix.json").read_text(encoding="utf-8")
+    )
+    return next(case for case in spec["cases"] if case["id"] == case_id)
+
+
+def _partial_attempt_for_topic(topic: str | None) -> PlannerAttempt:
+    return PlannerAttempt(
+        legacy_plan=None,
+        shadow_frame=build_turn_frame_from_raw(
+            {
+                "route": "content",
+                "aspects": [],
+                "topic": topic,
+                "topic_confidence": 0.95 if topic is not None else 0.0,
+            },
+            allowed_topics=frozenset({"doctors", "extraction"}),
         ),
         shadow_status="partial",
     )
@@ -457,6 +493,71 @@ def test_run_resolver_turn_partial_shadow_keeps_legacy_fail_open(monkeypatch) ->
         assert outcome.decision.service_topic == "prosthetics"
         assert outcome.intent == "content"
         assert outcome.scope_topic_candidate != "doctors"
+
+
+@pytest.mark.parametrize("case_id", _A6_FAIL_OPEN_CASE_IDS)
+def test_frozen_a6_partial_paths_keep_product_fallback(monkeypatch, case_id: str) -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    case = _frozen_a6_case(case_id)
+    question = case["question"]
+    expected_topic = case["expected_topic"]
+    attempt = _partial_attempt_for_topic(expected_topic)
+    attempt_calls: list[tuple[str, str | None, str | None]] = []
+    fallback_calls: list[dict] = []
+    fallback_decision = _decision(
+        route_intent="content",
+        service_topic="prosthetics",
+        service_id="veneers",
+        query_mode="overview",
+    )
+
+    def _attempt(q, sid, client_id):
+        attempt_calls.append((q, sid, client_id))
+        return attempt
+
+    def _fallback(**kwargs):
+        fallback_calls.append(kwargs)
+        return fallback_decision, [], "fallback-content"
+
+    monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
+    monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", _attempt)
+    monkeypatch.setattr(
+        "core.turn_planner_llm.plan_turn",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("legacy wrapper called")),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.publish_turn_plan",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("partial plan published")),
+    )
+    monkeypatch.setattr("orchestration.resolver_turn.resolve_with_fallback", _fallback)
+
+    sid = f"a7-regression-{case_id}"
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        outcome = run_resolver_turn(
+            q=question,
+            sid=sid,
+            client_id="demo",
+            st={"hist": []},
+            enqueue_resolver_trace=lambda **_k: None,
+        )
+
+        assert attempt_calls == [(question, sid, "demo")]
+        assert len(fallback_calls) == 1
+        assert fallback_calls[0]["question"] == question
+        assert request.ctx["turn_planner_used"] is False
+        assert request.ctx["resolver_used"] is True
+        assert request.ctx["legacy_intent"] == "fallback-content"
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_PARTIAL
+        assert request.ctx["turn_frame_shadow"]["topic"] == expected_topic
+        assert request.ctx["turn_frame_shadow"]["field_meta"]["aspects"]["error"] == "aspects_empty"
+        assert outcome.decision.model_dump() == fallback_decision.model_dump()
+        assert outcome.decision.service_topic == "prosthetics"
+        assert outcome.intent == "content"
+        if expected_topic is not None:
+            assert outcome.scope_topic_candidate != expected_topic
 
 
 def test_run_resolver_turn_degraded_shadow_keeps_valid_legacy_product_path(monkeypatch) -> None:

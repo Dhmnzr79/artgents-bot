@@ -12,14 +12,38 @@ from contracts.decision_frame import RouteIntent
 EmotionKind = Literal["none", "fear", "doubt"]
 SpecificityKind = Literal["unknown", "general", "specific"]
 
+FieldStatus = Literal["valid", "defaulted", "missing", "invalid"]
+
+FieldErrorReason = Literal[
+    "aspects_empty",
+    "aspects_invalid_type",
+    "aspect_not_allowed",
+    "primary_aspect_unavailable",
+    "topic_not_allowed",
+    "topic_invalid_type",
+    "topic_confidence_invalid",
+    "route_invalid",
+]
+
 
 class FieldMeta(BaseModel):
-    """Shared confidence/provenance metadata for one TurnFrame axis."""
+    """Shared confidence/provenance/status metadata for one TurnFrame axis."""
 
     model_config = ConfigDict(extra="forbid")
 
     confidence: float = Field(..., ge=0.0, le=1.0)
     provenance: str = Field(..., min_length=1)
+    status: FieldStatus
+    error: FieldErrorReason | None = None
+
+    @model_validator(mode="after")
+    def _status_error_invariant(self) -> "FieldMeta":
+        if self.status == "invalid":
+            if self.error is None:
+                raise ValueError("invalid_requires_error")
+        elif self.error is not None:
+            raise ValueError("non_invalid_forbids_error")
+        return self
 
 
 class TurnFrameMeta(BaseModel):
@@ -47,8 +71,8 @@ class TurnFrame(BaseModel):
 
     intent: RouteIntent
     topic: str | None = None
-    aspects: list[AspectKind] = Field(min_length=1)
-    primary_aspect: AspectKind
+    aspects: list[AspectKind] = Field(default_factory=list)
+    primary_aspect: AspectKind | None = None
     emotion: EmotionKind = "none"
     specificity: SpecificityKind = "unknown"
     patient_scope: str | None = None
@@ -60,6 +84,8 @@ class TurnFrame(BaseModel):
 
     @model_validator(mode="after")
     def _primary_aspect_in_aspects(self) -> "TurnFrame":
+        if self.primary_aspect is None:
+            return self
         if self.primary_aspect not in self.aspects:
             raise ValueError("primary_aspect_not_in_aspects")
         return self

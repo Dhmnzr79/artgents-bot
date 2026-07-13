@@ -4,19 +4,28 @@ from __future__ import annotations
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import DecisionFrame, QueryMode, RouteIntent
-from contracts.turn_frame import FieldMeta, SpecificityKind, TurnFrame, TurnFrameMeta
+from contracts.turn_frame import FieldMeta, FieldStatus, SpecificityKind, TurnFrame, TurnFrameMeta
 from contracts.turn_plan import TurnPlan
 
 _MISSING = "missing_legacy_axis"
 _DEFAULT = "default"
 
 
-def _meta(*, confidence: float, provenance: str) -> FieldMeta:
-    return FieldMeta(confidence=confidence, provenance=provenance)
+def _meta(
+    *,
+    confidence: float,
+    provenance: str,
+    status: FieldStatus,
+) -> FieldMeta:
+    return FieldMeta(confidence=confidence, provenance=provenance, status=status)
 
 
 def _missing_meta() -> FieldMeta:
-    return _meta(confidence=0.0, provenance=_MISSING)
+    return _meta(confidence=0.0, provenance=_MISSING, status="missing")
+
+
+def _defaulted_meta(*, confidence: float, provenance: str) -> FieldMeta:
+    return _meta(confidence=confidence, provenance=provenance, status="defaulted")
 
 
 def _specificity_from_query_mode(
@@ -25,9 +34,17 @@ def _specificity_from_query_mode(
     query_mode_confidence: float,
 ) -> tuple[SpecificityKind, FieldMeta]:
     if query_mode == "specific":
-        return "specific", _meta(confidence=query_mode_confidence, provenance="decision_frame.query_mode")
+        return "specific", _meta(
+            confidence=query_mode_confidence,
+            provenance="decision_frame.query_mode",
+            status="valid",
+        )
     if query_mode in {"overview", "comparison", "process"}:
-        return "general", _meta(confidence=query_mode_confidence, provenance="decision_frame.query_mode")
+        return "general", _meta(
+            confidence=query_mode_confidence,
+            provenance="decision_frame.query_mode",
+            status="valid",
+        )
     return "unknown", _missing_meta()
 
 
@@ -49,6 +66,7 @@ def build_turn_frame_from_legacy(
         intent_meta = _meta(
             confidence=decision_frame.confidence.intent,
             provenance="decision_frame.route_intent",
+            status="valid",
         )
         specificity, specificity_meta = _specificity_from_query_mode(
             decision_frame.query_mode,
@@ -56,7 +74,11 @@ def build_turn_frame_from_legacy(
         )
     else:
         intent = turn_plan.route
-        intent_meta = _meta(confidence=0.0, provenance="turn_plan.route")
+        intent_meta = _meta(
+            confidence=0.0,
+            provenance="turn_plan.route",
+            status="valid",
+        )
         specificity = "unknown"
         specificity_meta = _missing_meta()
 
@@ -65,6 +87,7 @@ def build_turn_frame_from_legacy(
         topic_meta = _meta(
             confidence=turn_plan.topic_confidence,
             provenance="turn_plan.topic",
+            status="valid",
         )
     elif decision_frame is not None:
         topic_raw = decision_frame.service_topic
@@ -73,12 +96,14 @@ def build_turn_frame_from_legacy(
             topic_meta = _meta(
                 confidence=decision_frame.confidence.topic,
                 provenance="decision_frame.service_topic",
+                status="valid",
             )
         else:
             topic = None
             topic_meta = _meta(
                 confidence=decision_frame.confidence.topic,
                 provenance="decision_frame.service_topic",
+                status="missing",
             )
     else:
         topic = None
@@ -86,12 +111,17 @@ def build_turn_frame_from_legacy(
 
     if turn_plan.service_id is not None:
         service_id = turn_plan.service_id
-        service_meta = _meta(confidence=0.0, provenance="turn_plan.service_id")
+        service_meta = _meta(
+            confidence=0.0,
+            provenance="turn_plan.service_id",
+            status="valid",
+        )
     elif decision_frame is not None and decision_frame.service_id is not None:
         service_id = decision_frame.service_id
         service_meta = _meta(
             confidence=decision_frame.confidence.service,
             provenance="decision_frame.service_id",
+            status="valid",
         )
     else:
         service_id = None
@@ -100,7 +130,11 @@ def build_turn_frame_from_legacy(
     patient_raw = turn_plan.patient_situation
     if patient_raw is not None and str(patient_raw) != "unknown":
         patient_scope: str | None = str(patient_raw)
-        patient_meta = _meta(confidence=0.0, provenance="turn_plan.patient_situation")
+        patient_meta = _meta(
+            confidence=0.0,
+            provenance="turn_plan.patient_situation",
+            status="valid",
+        )
     else:
         patient_scope = None
         patient_meta = _missing_meta()
@@ -108,7 +142,7 @@ def build_turn_frame_from_legacy(
     followup_of = turn_plan.followup_of
     follow_up = bool(followup_of)
     followup_meta = (
-        _meta(confidence=1.0, provenance="turn_plan.followup_of")
+        _meta(confidence=1.0, provenance="turn_plan.followup_of", status="valid")
         if followup_of
         else _missing_meta()
     )
@@ -128,20 +162,26 @@ def build_turn_frame_from_legacy(
         field_meta=TurnFrameMeta(
             intent=intent_meta,
             topic=topic_meta,
-            aspects=_meta(confidence=0.0, provenance="turn_plan.aspects"),
-            primary_aspect=_meta(confidence=0.0, provenance=primary_provenance),
-            emotion=_meta(confidence=0.0, provenance=_DEFAULT),
+            aspects=_meta(confidence=0.0, provenance="turn_plan.aspects", status="valid"),
+            primary_aspect=_meta(
+                confidence=0.0,
+                provenance=primary_provenance,
+                status="valid",
+            ),
+            emotion=_defaulted_meta(confidence=0.0, provenance=_DEFAULT),
             specificity=specificity_meta,
             patient_scope=patient_meta,
             service_id=service_meta,
-            follow_up=_meta(
-                confidence=1.0 if follow_up else 0.0,
-                provenance="turn_plan.followup_of" if follow_up else _MISSING,
+            follow_up=(
+                _meta(confidence=1.0, provenance="turn_plan.followup_of", status="valid")
+                if follow_up
+                else _defaulted_meta(confidence=0.0, provenance=_MISSING)
             ),
             followup_of=followup_meta,
             needs_clarification=_meta(
                 confidence=0.0,
                 provenance="turn_plan.needs_clarify",
+                status="valid",
             ),
         ),
     )

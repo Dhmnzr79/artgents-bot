@@ -1,29 +1,31 @@
-# TASK — A9 Raw extraction: loss-aware scalar patient-situation bridge
+# TASK — A9 Shadow wiring proof: nested patient scope only in observability
 
-Один активный `TASK.md` на один checkpoint. Этот checkpoint реализует **только pure bridge** из current scalar `patient_situation` одного raw planner payload в уже принятый nested `TurnFrame.patient_scope`.
+Один активный `TASK.md` на один checkpoint. Этот checkpoint **не добавляет новое runtime wiring**: A7 уже передаёт весь `PlannerAttempt.shadow_frame` через generic recorder в `request.ctx`, turn details и protected E2E metadata.
 
-Mapping не меняет strict `TurnPlan`, product behavior, prompt, число LLM-вызовов или authority.
+После A9 Raw extraction нужно test-only доказать, что nested `patient_scope` проходит по существующему каналу целиком и при этом не влияет на product behavior.
 
 Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`.
 
 Архитектурные источники:
 
-- `docs/ARCH_TARGET_DESIGN.md` — target и product boundaries;
 - `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md` — single-call dual branch;
-- `docs/PATIENT_SCOPE_DESIGN_A9.md` §8–§15 — exact scope contract, bridge и migration;
-- commit `2a34b6c` — принятый A9 Contract;
-- commit `fa0e556` — exact product baseline exception.
+- `docs/PATIENT_SCOPE_DESIGN_A9.md` §12–§15 — product firewall и shadow wiring;
+- `0cc9042` — принятый A9 Raw extraction;
+- `620657d` — существующий A7 attempt-aware shadow wiring;
+- `fa0e556` — exact product baseline exception.
 
 ---
 
 ## 1. Точка старта
 
 - Ветка: `codex/stage-a`.
-- HEAD: `2a34b6c feat: add A9 patient scope contract`.
-- Рабочее дерево до governance diff обязано быть чистым.
-- A9 Design и Contract приняты independent checker.
-- Current raw builder создаёт nested all-unknown/defaulted scope и намеренно игнорирует scalar `patient_situation`.
-- Product продолжает использовать strict `PlannerAttempt.legacy_plan` и legacy `PatientSituationResult`.
+- HEAD: `0cc9042 feat: extract A9 patient scope shadow fields`.
+- Рабочее дерево до governance diff чистое.
+- `plan_turn_attempt()` уже строит nested shadow scope из того же raw payload.
+- `run_resolver_turn()` уже вызывает `record_planner_attempt_shadow(attempt=attempt)` до product branch.
+- Recorder уже сохраняет `frame.model_dump()` без schema-specific фильтрации.
+- `core/metadata_first_observability.py` уже включает `turn_frame_shadow/status/reason` в turn details и protected response metadata.
+- Без `E2E_USE_TEST_CLIENT=1` final response/widget не получает metadata-first payload.
 
 Frozen integrity:
 
@@ -33,315 +35,220 @@ topic matrix = dc356c9c738fb80a10cf0035508d7e8c8247979d
 A7 raw SHA256 = EC009EF2157189A40FDDE6B819883D40678D6289F92EEB0CD74FD0AD9A294DDA
 ```
 
-## 2. Проблема checkpoint
+## 2. Цель
 
-После A9 Contract shadow schema готова, но current raw builder всегда возвращает:
+Добавить только tests, которые независимо доказывают путь:
 
-```json
-{
-  "extent": "unknown",
-  "jaw": "unknown",
-  "stage": "unknown",
-  "modifiers": []
-}
+```text
+one raw planner call
+  -> PlannerAttempt.shadow_frame.patient_scope
+  -> record_planner_attempt_shadow()
+  -> request.ctx["turn_frame_shadow"]
+  -> metadata_first_turn_details()
+  -> protected E2E response meta only
+
+PlannerAttempt.legacy_plan
+  -> прежний product path без чтения nested scope
 ```
-
-Даже когда **тот же** raw planner payload уже содержит валидный scalar kind, например `one_tooth_missing` или `existing_implant_prosthetic_stage`, lossless часть этого сигнала не видна в nested shadow.
-
-Нужно добавить детерминированный loss-aware bridge из `docs/PATIENT_SCOPE_DESIGN_A9.md` §9, не превращая scalar kind в product authority и не угадывая отсутствующие части.
-
-## 3. Цель
-
-Внутри `core/turn_frame_from_raw.py` добавить pure extraction, которая:
-
-1. читает только `raw.get("patient_situation")`;
-2. переносит только exact allowlist mapping из §5;
-3. возвращает `PatientScopeFrame` + `PatientScopeFrameMeta`;
-4. для заполненного subfield ставит `status="valid"`, confidence `0.0`, exact stable provenance;
-5. для незаполненного subfield сохраняет schema default;
-6. не мутирует raw;
-7. не меняет strict legacy validation и product branch.
 
 Главный инвариант:
 
-> Bridge может сохранить известную часть scalar kind, но не имеет права достроить jaw, extent, stage, modifier, услугу, диагноз или протокол, которых kind не гарантирует.
+> Nested patient scope можно наблюдать и измерять, но ни одно его value/meta не участвует в route, decision, evidence, price, playbook, composer, UI или session.
+
+## 3. Почему production diff не нужен
+
+Current generic code уже выполняет target:
+
+1. `core.turn_frame_shadow.record_planner_attempt_shadow()` сериализует полный `TurnFrame.model_dump()`.
+2. `orchestration.resolver_turn.run_resolver_turn()` использует только `attempt.legacy_plan` для product и отдельно вызывает recorder.
+3. `_METADATA_FIRST_TURN_KEYS` уже содержит полный `turn_frame_shadow`, status и reason.
+4. `finalize_ask()` прикладывает metadata-first к response только под existing E2E gate.
+
+Поэтому production allowlist пуст. Запрещено менять production ради cosmetic refactor, нового alias/key, duplicate patient-scope telemetry или специального nested serializer.
+
+Если test невозможно написать без production change — СТОП и `❓`; исполнитель не расширяет scope самостоятельно.
 
 ## 4. Что checkpoint НЕ делает
 
-1. Не меняет `_SYSTEM` и planner prompt.
-2. Не просит LLM возвращать nested `patient_scope`.
-3. Не добавляет второй LLM-call, retry, classifier или detector.
-4. Не читает question, answer, history, session, cues или legacy `PatientSituationResult`.
-5. Не запускает `detect_patient_situation()` и patient-situation LLM.
-6. Не меняет `TurnPlan`, `PatientSituationKind`, `PatientSituationResult` или A9 contract literals.
-7. Не repair-ит raw перед `TurnPlan.model_validate()`.
-8. Не передаёт nested scope в resolver/routing/evidence/price/playbook/composer/UI/marketing/booking/contacts/medzone/session.
-9. Не добавляет `patient_scope_v2`, side channel, container status или второй error store.
-10. Не реализует direct nested planner output.
-11. Не реализует shadow wiring checkpoint, frozen matrix, live/audit, authority или legacy retirement.
-12. Не чинит preservation target-red 02/03/05.
-13. Не чинит два pre-existing playbook-теста из §15.1.
+1. Не меняет contracts/models/errors/mapping.
+2. Не меняет raw builder, planner, recorder, resolver или metadata-first production code.
+3. Не добавляет отдельные ctx keys вроде `patient_scope_shadow`.
+4. Не копирует nested scope в existing legacy `patient_scope` telemetry key.
+5. Не меняет prompt/LLM-call/retry/classifier/detector.
+6. Не подключает scope к product consumers.
+7. Не добавляет direct nested planner output.
+8. Не добавляет session carry/effective scope.
+9. Не создаёт frozen matrix и не запускает live/audit.
+10. Не передаёт authority и не удаляет legacy.
+11. Не чинит preservation target-red или playbook baseline failures.
 
-## 5. Exact bridge mapping
+## 5. Exact observability contract
 
-Mapping должен быть data-driven constant/table без question regex и тематических веток вне pure bridge.
+### 5.1 Recorder / ctx
 
-| raw `patient_situation` | extent | jaw | stage | modifiers |
-|---|---|---|---|---|
-| `one_tooth_missing` | `one_tooth` | default | default | default |
-| `few_teeth_missing` | `few_teeth` | default | default | default |
-| `full_arch_missing` | `full_arch` | default | default | default |
-| `upper_jaw_missing_or_complex` | default | `upper` | default | default |
-| `existing_implant_prosthetic_stage` | default | default | `implant_placed` | default |
-| `extraction_then_implant` | default | default | `extraction_context` | default |
-| `bone_deficit_or_grafting` | default | default | default | `["reported_bone_deficit"]` |
-| `urgent_problem` | default | default | default | default |
-| `generic_implant_interest` | default | default | default | default |
-| `unknown` | default | default | default | default |
-| null / absent | default | default | default | default |
-
-Здесь `default` означает value `unknown` или `[]` и metadata schema default, а не `valid unknown`.
-
-Запрещённые выводы:
+Для `ok` attempt с mapped scope recorder обязан сохранить exact `attempt.shadow_frame.model_dump()`:
 
 ```text
-full_arch -> jaw=both
-upper -> extent=full_arch
-one_tooth -> service_id=classic
-full_arch -> service_id=all_on_4/all_on_6
-reported_bone_deficit -> service_id=sinus_lift
-extraction_context -> one-stage protocol
-urgent_problem -> scope value
-generic_implant_interest -> scope value
+request.ctx.turn_frame_shadow_status = ok
+request.ctx.turn_frame_shadow.patient_scope = nested value
+request.ctx.turn_frame_shadow.field_meta.patient_scope = nested metadata
+turn_frame_shadow_reason отсутствует
 ```
 
-## 6. Metadata semantics
-
-### 6.1 Mapped subfield
-
-Каждый mapped subfield:
+Для `partial` из-за unrelated axis (например `aspects=[]`) mapped patient scope не теряется:
 
 ```text
-confidence = 0.0
-status = valid
-error = null
+turn_frame_shadow_status = partial
+patient_scope mapped subfield = valid
+unmapped subfields = defaulted
+aspects error = aspects_empty
 ```
 
-Exact provenance:
+Partial status не делает scope product-valid/authoritative; это только telemetry.
+
+### 5.2 Turn details/log path
+
+`metadata_first_turn_details()` должен возвращать тот же nested snapshot без flattening, rename или потери metadata. Этот slice используется существующим turn-complete/log path; новый success-event и отдельный log payload не добавляются.
+
+### 5.3 Protected E2E response meta
+
+При `E2E_USE_TEST_CLIENT=1` `finalize_ask()` должен сохранить nested value/meta внутри:
 
 ```text
-extent    = turn_plan.patient_situation.extent
-jaw       = turn_plan.patient_situation.jaw
-stage     = turn_plan.patient_situation.stage
-modifiers = turn_plan.patient_situation.modifiers
+response.meta.metadata_first.turn_frame_shadow
 ```
 
-Confidence 0.0 обязательна: deterministic mapping не является уверенностью распознавания пользовательской фразы.
+Без флага final response не содержит `metadata_first` и nested scope не появляется в widget payload.
 
-### 6.2 Unmapped/default subfield
+### 5.4 Privacy
+
+Ни ctx snapshot, ни turn details, ни E2E meta не содержат:
+
+- raw `patient_situation` source value сверх mapped safe enum values;
+- question/answer/history/session;
+- exception text;
+- arbitrary malformed scalar;
+- duplicate raw JSON.
+
+## 6. Product firewall
+
+Tests обязаны доказать:
+
+1. `run_resolver_turn()` ветвится только по `attempt.legacy_plan`.
+2. `partial + legacy_plan=None` вызывает прежний `resolve_with_fallback`.
+3. Mapped scope не переписывает fallback:
+   - `decision.route_intent`;
+   - `decision.service_topic`;
+   - `decision.service_id`;
+   - `intent`;
+   - `scope_topic_candidate`.
+4. `ok + legacy_plan` сохраняет planner-owned product path как сегодня.
+5. Recorder return value не используется product runtime.
+6. Никакой product module не читает:
 
 ```text
-value = unknown / []
-confidence = 0.0
-provenance = turn_plan.schema_default
-status = defaulted
-error = null
+attempt.shadow_frame.patient_scope
+turn_frame_shadow["patient_scope"]
+.patient_scope.extent/.jaw/.stage/.modifiers
 ```
 
-Known kind заполняет только lossless subfield. Пустой `modifiers` у остальных kinds не означает доказанное отсутствие modifiers и остаётся `defaulted`.
+7. `PatientSituationResult`/playbook/price/session consumers unchanged.
 
-### 6.3 Malformed scalar boundary
+## 7. Strict allowlist
 
-Current source — один scalar kind, а A9 errors относятся к независимым target subfields. Поэтому на этом bridge checkpoint:
+Разрешены только test-файлы:
 
-- non-string scalar;
-- arbitrary out-of-allowlist string;
-- list/dict/bool/number;
+1. `tests/test_turn_frame_shadow.py`
+2. `tests/test_metadata_first_observability.py`
+3. `tests/test_turn_planner_wiring.py` — только если требуется отдельный AST/product-firewall assert; не менять product expectations.
 
-не должны искусственно превращаться в четыре nested errors. Scope остаётся all-unknown/defaulted; strict `TurnPlan.model_validate()` по-прежнему отклоняет malformed `patient_situation`, поэтому `legacy_plan=None` и attempt остаётся `partial` через существующую dual-branch семантику.
+Production allowlist пуст.
 
-Запрещено:
-
-- fan-out одного scalar error на extent/jaw/stage/modifiers;
-- использование raw value в error/provenance/telemetry;
-- generic `patient_scope_invalid`;
-- трактовать malformed dict как future direct nested output.
-
-Exact 8 A9 error literals остаются в contract для будущего **явного per-subfield source**. Этот checkpoint не обязан создавать их, потому что scalar kind не сообщает независимые raw subfields.
-
-Если checker считает эту семантику противоречащей принятому A9 Design — `❓` до implementation, не изобретать другую mapping/error policy в коде.
-
-## 7. Pure implementation boundary
-
-Допустима private pure функция в `core/turn_frame_from_raw.py`, например:
-
-```python
-def _patient_scope_from_raw(
-    raw: dict[str, Any],
-) -> tuple[PatientScopeFrame, PatientScopeFrameMeta]:
-    ...
-```
-
-Требования:
-
-- вход не мутируется;
-- функция не вызывает I/O, config, client pack, pricebook, session, Flask, network или LLM;
-- mapping constant immutable;
-- возвращаемые lists/models не разделяют mutable state между вызовами;
-- raw value не попадает в dump, provenance или exception;
-- результаты deterministic для одинакового raw;
-- existing extraction остальных axes не меняется.
-
-`build_turn_frame_from_raw()` вызывает bridge ровно один раз и подставляет его value/meta в существующий `TurnFrame`.
-
-## 8. Strict legacy branch и PlannerAttempt
-
-Нельзя менять:
-
-- `TurnPlan.model_validate()`;
-- `TurnPlan.aspects min_length=1`;
-- `_validate_plan()`;
-- enrichment/guards;
-- `plan_turn()` wrapper;
-- `turn_plan_to_decision_frame()`;
-- product fallback.
-
-Ожидаемые случаи:
-
-1. Valid raw + known scalar kind:
-   - `legacy_plan` валиден как сегодня;
-   - shadow nested subfield заполнен;
-   - shadow status остаётся `ok`, потому что mapped/defaulted metadata не invalid/missing.
-2. Valid raw + null/unknown/generic/urgent:
-   - legacy behavior прежний;
-   - nested scope all-defaulted;
-   - attempt status определяется остальными axes как сегодня.
-3. Malformed scalar:
-   - shadow scope all-defaulted;
-   - strict legacy plan отклонён;
-   - attempt `partial`, не `ok` и не `not_available`;
-   - валидные topic/aspects/intent/service axes в shadow не стираются.
-
-## 9. Product firewall
-
-После checkpoint product продолжает читать только `PlannerAttempt.legacy_plan`.
-
-Запрещены imports/reads `shadow_frame.patient_scope`, `PatientScopeFrame` или bridge из:
-
-- `orchestration/**` для решений;
-- resolver/routing/decision conversion;
-- evidence/source selection;
-- price scope/offers/pricebook;
-- patient playbook/detector/session;
-- composer/answer/UI;
-- marketing/promo/booking/contacts/medzone.
-
-`core/turn_frame_shadow.py` и existing metadata/E2E serializer могут сериализовать весь TurnFrame без schema-specific product logic; менять их на extraction checkpoint не требуется.
-
-## 10. Allowlist production
-
-Разрешён ровно один production-файл:
-
-1. `core/turn_frame_from_raw.py`
-
-Любой другой production-файл → СТОП и эскалация.
-
-Особенно protected:
+Особенно запрещены:
 
 - `contracts/**`;
-- `core/turn_planner_llm.py`;
-- `core/turn_frame_adapter.py`;
-- `core/turn_frame_shadow.py`;
+- `core/**`;
 - `orchestration/**`;
-- `core/patient_situation*.py`;
-- `core/patient_playbook.py`;
-- composer/price/evidence/session/UI.
+- `app.py`, `llm.py`;
+- patient-situation/playbook/price/evidence/composer/session/UI;
+- eval specs/harness/client content/docs;
+- `TASK.md` после governance commit.
 
-## 11. Allowlist tests
+Новый test-файл не создавать. Existing tests/asserts не ослаблять и не удалять.
 
-Разрешены только:
+## 8. Обязательные tests
 
-1. `tests/test_turn_frame_from_raw.py`
-2. `tests/test_turn_planner_llm.py`
-3. `tests/test_planner_attempt_contract.py` — только если нужен integration invariant для malformed scalar/partial; без изменения contract models.
+### 8.1 Recorder
 
-Новый test-файл не создавать. Existing asserts не ослаблять и не удалять; contract-checkpoint tests «scalar ignored» заменить более точными extraction cases, сохранив immutability/privacy/default проверки.
+1. `ok` attempt с `one_tooth_missing` сохраняет exact nested extent value/meta.
+2. `ok` attempt с `bone_deficit_or_grafting` сохраняет exact modifier value/meta.
+3. Unmapped nested fields остаются exact schema-default metadata.
+4. Recorder snapshot строго равен `attempt.shadow_frame.model_dump()`.
+5. Stale reason очищается.
 
-Любой иной test-файл → СТОП.
+### 8.2 Partial/runtime
 
-## 12. Обязательные tests
+6. Partial attempt с mapped scope + invalid unrelated aspects сохраняет оба факта независимо.
+7. `run_resolver_turn()` вызывает recorder ровно один раз.
+8. Partial mapped scope остаётся в ctx, а product вызывает `resolve_with_fallback`.
+9. Fallback decision/intent/service_topic/service_id/scope_topic_candidate не меняются mapped scope.
+10. Ни recorder result, ни snapshot не читаются для product decision.
 
-### 12.1 Exact mapping
+### 8.3 Metadata/E2E
 
-1. Parameterized test всех 10 allowlist kinds + null + absent.
-2. Ровно семь mapped outcomes соответствуют таблице §5.
-3. `urgent_problem`, `generic_implant_interest`, `unknown`, null, absent → exact all-defaulted dump.
-4. Каждая mapped axis имеет exact provenance/status/confidence/error.
-5. Каждая unmapped axis остаётся exact schema default.
-6. `modifiers` создаётся новым list без shared mutable state.
+11. `metadata_first_turn_details()` сохраняет exact nested value/meta.
+12. `metadata_first_response_meta()` сохраняет nested snapshot как existing internal slice.
+13. `finalize_ask()` под E2E flag содержит exact nested scope/meta.
+14. `finalize_ask()` без E2E flag не содержит `metadata_first`.
+15. Partial nested snapshot также доступен под E2E, без превращения status в ok.
 
-### 12.2 Loss-awareness
+### 8.4 Privacy/firewall
 
-7. `full_arch_missing` не заполняет jaw.
-8. `upper_jaw_missing_or_complex` не заполняет extent/modifier.
-9. `one_tooth_missing` не меняет service_id.
-10. `bone_deficit_or_grafting` не меняет service_id/intent/aspects.
-11. `extraction_then_implant` не утверждает protocol/extent.
-12. generic/urgent не становятся scope.
+16. Malformed raw secret/question/history/exception отсутствуют во всех наблюдаемых payload.
+17. Source/AST scan не находит product reads nested scope/ctx shadow patient scope.
+18. Production diff пуст.
+19. No skip/xfail/assert True/conditional PASS.
+20. Frozen hashes/raw unchanged; live artifacts не создаются.
 
-### 12.3 Malformed/privacy
+## 9. Test construction rules
 
-13. Parameterized malformed scalar: int, bool, list, dict, arbitrary string.
-14. Для malformed scope/meta exact all-defaulted; нет synthetic nested invalid.
-15. Raw object и вложенные mutable values не мутируются.
-16. Raw value/question/answer/history/exception не попадают в frame dump или stable metadata.
-17. Malformed scalar не стирает valid topic/aspects/intent/service shadow axes.
+- Использовать real `build_turn_frame_from_raw()` для создания mapped nested frame.
+- Использовать real `record_planner_attempt_shadow()` для ctx snapshot.
+- Допустим mock planner attempt и fallback только для изоляции runtime ветвления.
+- Нельзя вручную собрать упрощённый dict вместо real frame там, где проверяется schema preservation.
+- Для `finalize_ask()` допустим existing patch pattern `mem_get/record_last_bot_payload/emit_bot_event`.
+- AST/source test дополняет functional tests, а не заменяет их.
 
-### 12.4 Attempt integration
+## 10. Protected product baseline
 
-18. `plan_turn_attempt()` с valid known scalar делает один planner call, сохраняет strict `legacy_plan.patient_situation` и mapped nested shadow.
-19. Такой attempt остаётся `ok` при валидных остальных axes.
-20. Malformed scalar даёт `legacy_plan=None`, nested all-defaulted и `status="partial"`; не вызывает второй call/retry.
-21. Valid topic/aspects остаются в partial shadow при malformed patient scalar.
-22. `plan_turn()` backward-compatible wrapper возвращает только legacy plan/None как сегодня.
+Product files/tests не меняются. Regression product gate остаётся:
 
-### 12.5 Firewall/source
+- `127 passed, 0 failed, 0 skipped`; или
+- `125 passed, exact 2 failed, 0 skipped`:
+  1. `test_extraction_then_implant_prefers_one_stage_then_classic`;
+  2. `test_no_playbook_returns_none`.
 
-23. Source/AST test: bridge не читает question/history/session/cues и не импортирует detector/LLM.
-24. Source/AST test: product modules не импортируют bridge и не читают `shadow_frame.patient_scope`.
-25. `core/turn_planner_llm.py`, contracts, adapter, orchestration и protected product files имеют zero diff.
-26. Frozen hashes/raw unchanged.
+Любой иной fail, reason drift, skip/xfail или product diff → СТОП. Suite при baseline exception не называть зелёным.
 
-## 13. Protected artifacts
-
-Не менять:
-
-- `evals/v5/demo/preservation.json`;
-- `evals/v5/demo/topic_shadow_matrix.json`;
-- A6/A7/A8 raw artifacts;
-- A9 Design/Contract docs;
-- client content/pricebook/playbook YAML;
-- eval harnesses/specs.
-
-## 14. Обязательные команды implementation checkpoint
+## 11. Обязательные команды implementation checkpoint
 
 ```powershell
 .venv\codex312\Scripts\python.exe -m pytest -q `
-  --basetemp=.pytest_cache/a9_raw_core `
-  tests/test_turn_frame_from_raw.py `
-  tests/test_turn_planner_llm.py `
-  tests/test_planner_attempt_contract.py
-
-.venv\codex312\Scripts\python.exe -m pytest -q `
-  --basetemp=.pytest_cache/a9_raw_contract_regression `
-  tests/test_turn_frame_contract.py `
+  --basetemp=.pytest_cache/a9_shadow_wiring `
   tests/test_turn_frame_shadow.py `
   tests/test_metadata_first_observability.py `
-  tests/test_turn_planner_wiring.py `
+  tests/test_turn_planner_wiring.py
+
+.venv\codex312\Scripts\python.exe -m pytest -q `
+  --basetemp=.pytest_cache/a9_shadow_contract_regression `
+  tests/test_turn_frame_from_raw.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_turn_frame_contract.py `
+  tests/test_planner_attempt_contract.py `
   tests/test_turn_plan_protocol_guard.py
 
 .venv\codex312\Scripts\python.exe -m pytest -q `
-  --basetemp=.pytest_cache/a9_raw_product `
+  --basetemp=.pytest_cache/a9_shadow_product `
   tests/test_patient_situation.py `
   tests/test_patient_situation_session.py `
   tests/test_patient_situation_routing.py `
@@ -350,7 +257,7 @@ def _patient_scope_from_raw(
   tests/test_price_scope_router.py
 
 .venv\codex312\Scripts\python.exe -m pytest -q `
-  --basetemp=.pytest_cache/a9_raw_regression `
+  --basetemp=.pytest_cache/a9_shadow_regression `
   tests/test_contacts_routing.py `
   tests/test_pricebook_golden.py `
   tests/test_price_layer_parity.py `
@@ -358,92 +265,62 @@ def _patient_scope_from_raw(
   tests/test_topic_shadow_attempt_eval_contract.py `
   tests/test_topic_shadow_eval_contract.py
 
-.venv\codex312\Scripts\python.exe -m py_compile core/turn_frame_from_raw.py
-
 git diff --check
 git status --short
-git diff -- contracts core/turn_planner_llm.py core/turn_frame_adapter.py core/turn_frame_shadow.py orchestration
+git diff --name-only
+git diff -- contracts core orchestration app.py llm.py
 git diff -- evals/v5/demo/preservation.json evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
 git hash-object evals/v5/demo/topic_shadow_matrix.json
 Get-FileHash -Algorithm SHA256 eval_topic_shadow_a7_last.txt
 ```
 
-Для production boundary команда `git diff -- contracts core/turn_planner_llm.py ...` должна показывать только allowlist `core/turn_frame_from_raw.py`; checker обязан сверить полный `git diff --name-only` отдельно.
+Все failed/skipped/xfail/not run, warnings и logging errors перечислить. Live/LLM не запускать.
 
-Все failed/skipped/xfail/not run, warnings и logging errors перечислить.
-
-### 14.1 Exact pre-existing product baseline exception
-
-Product gate принимается только как:
-
-- `127 passed, 0 failed, 0 skipped`; или
-- `125 passed, 2 failed, 0 skipped`, где failed ровно:
-  1. `tests/test_patient_playbook.py::test_extraction_then_implant_prefers_one_stage_then_classic`;
-  2. `tests/test_patient_playbook.py::test_no_playbook_returns_none`.
-
-Причины должны совпадать с `fa0e556` / предыдущим checker review. Любой иной/третий fail, skip/xfail, assertion drift или diff playbook/product files → СТОП. Не называть suite зелёным при baseline exception.
-
-## 15. Live / LLM
-
-Запрещены:
-
-- live eval;
-- прямой real-LLM вызов;
-- новый raw artifact;
-- retry/resnapshot;
-- изменение `.env`/flags.
-
-Fake planner/unit integration допустимы. Shadow wiring, matrix и live — следующие отдельные checkpoints.
-
-## 16. Checker review
+## 12. Checker review
 
 Checker обязан:
 
-1. Начать с diff allowlist test-файлов.
-2. Проверить полный changed-files: один production + до трёх tests.
-3. Сверить mapping element-by-element с A9 Design §9.
-4. Проверить exact mapped/default metadata.
-5. Проверить, что mapping loss-aware и не выводит service/protocol/diagnosis/urgency.
-6. Отдельно оценить malformed scalar policy §6.3 на соответствие принятому Design; при противоречии дать `❓`, не менять код.
-7. Доказать raw immutability/privacy и отсутствие shared mutable state.
-8. Доказать strict legacy/product parity и single-call behavior.
-9. Source/AST review подтвердить product firewall.
-10. Самостоятельно запустить §14.
-11. Проверить product baseline строго по §14.1.
-12. Проверить frozen hashes/raw и отсутствие live artifacts.
-13. Дать `✅/❌/❓` по двум слоям `REVIEW_CHECKLIST.md`.
+1. Начать с полного diff allowlist tests.
+2. Проверить, что production diff действительно пуст.
+3. Подтвердить, что generic wiring уже существовало до checkpoint и tests не маскируют runtime gap.
+4. Проверить real-frame construction и exact nested serialization.
+5. Проверить partial/fallback product parity.
+6. Проверить E2E gate и отсутствие widget payload без flag.
+7. Проверить privacy/no-leak и AST firewall.
+8. Самостоятельно выполнить §11.
+9. Проверить product baseline строго по §10.
+10. Проверить frozen hashes/raw и отсутствие live artifacts.
+11. Дать `✅/❌/❓` по двум слоям `REVIEW_CHECKLIST.md`.
 
-## 17. Стоп-условия
+## 13. Стоп-условия
 
 СТОП и эскалация, если:
 
-- нужен production/test-файл вне allowlist;
-- mapping требует question/history/session/cues/detector;
-- хочется заполнить больше, чем гарантирует таблица §5;
-- нужен новый error literal или fan-out scalar error;
-- требуется менять prompt/TurnPlan/contracts/planner/orchestration;
-- nested scope нужен product consumer;
-- хочется реализовать direct nested output;
-- для зелёного нужен skip/xfail/resnapshot/assert weakening;
+- нужен production diff;
+- generic recorder теряет nested value/meta;
+- turn details/E2E flatten или удаляют nested fields;
+- mapped scope нужен product decision;
+- требуется новый ctx/meta key;
+- нужен prompt/LLM/retry/detector/session change;
+- тесты требуют product expectation change;
+- для зелёного нужен skip/xfail/assert weakening;
 - появляется новый product fail;
-- нужен live для contract-решения.
+- требуется live для wiring proof.
 
-## 18. Definition of Done
+## 14. Definition of Done
 
-A9 Raw extraction завершён, когда:
+A9 Shadow wiring proof завершён, когда:
 
-1. Изменены только `core/turn_frame_from_raw.py` и до трёх allowlist tests.
-2. Все exact mappings §5 реализованы без дополнительных inference.
-3. Mapped/default metadata соответствует §6.
-4. Malformed scalar policy independently принята checker.
-5. Raw immutable; privacy/no-leak tests зелёные.
-6. Strict legacy plan и product path unchanged.
-7. Planner остаётся single-call; valid known kind сохраняет `ok`, malformed даёт honest `partial`.
-8. Product firewall подтверждён source/AST и zero protected diff.
-9. Все §14 gates удовлетворены с учётом exact §14.1 baseline exception.
-10. Frozen hashes/raw unchanged; live не запускался.
-11. Independent Cursor checker дал `✅`.
-12. Governance и implementation созданы отдельными commits и push только в `codex/stage-a`.
+1. Изменены только до трёх allowlist test-файлов; production diff пуст.
+2. Real mapped nested scope проходит recorder → ctx → turn details → protected E2E без потерь.
+3. Partial status и unrelated field error сохраняются независимо от valid scope subfield.
+4. Product fallback/planner path не читает и не меняется из-за scope.
+5. Без E2E flag widget/final response не расширен.
+6. Privacy/no-leak и AST firewall подтверждены.
+7. Все §11 gates удовлетворены с учётом exact product baseline exception.
+8. Frozen hashes/raw unchanged; live/LLM не запускались.
+9. Independent Cursor checker дал `✅`.
+10. Governance и test-only implementation созданы отдельными commits и push только в `codex/stage-a`.
 
-После этого — СТОП. A9 Shadow wiring, matrix, live, authority и retirement не начинать без нового `TASK.md`.
+После этого — СТОП. A9 Frozen quality matrix, live/audit, authority и legacy retirement не начинать без нового `TASK.md`.

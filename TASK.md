@@ -66,6 +66,7 @@ telemetry: partial frame сохранён, topic не потерян
 3. `tests/test_turn_frame_shadow.py`
 4. `tests/test_metadata_first_observability.py` — только тесты публикации существующих shadow ctx keys
 5. `tests/test_turn_planner_wiring.py` — только runtime one-call/product-firewall проверки
+6. `tests/test_planner_attempt_contract.py` — только миграция AST-firewall: planner и shadow recorder разрешены, остальные downstream запрещены
 
 Любой другой diff → ❌ и СТОП.
 
@@ -171,6 +172,7 @@ Production-файл `core/metadata_first_observability.py` менять запр
 13. `not_available` сохраняет прежний fail-open.
 14. Product код не использует return value recorder.
 15. AST/source firewall: кроме recorder/metadata tests downstream не читает `attempt.shadow_frame` и `attempt.shadow_status` для решений.
+    Contract firewall должен разрешать импорт `PlannerAttempt` только в `core/turn_planner_llm.py` и `core/turn_frame_shadow.py`; orchestration не импортирует модель напрямую.
 
 ### 8.3 Regression
 

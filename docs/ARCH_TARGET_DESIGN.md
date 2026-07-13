@@ -83,7 +83,8 @@ A0 не является задачей «сначала сделать legacy �
 - **A1 завершён:** минимальный `TurnFrame` и чистый legacy-adapter существуют, но не подключены к runtime (`0761213`).
 - **A2 завершён:** `TurnFrame` строится на planner-turn только в shadow-observability; ни одна продуктовая ветка не читает shadow-frame (`3746d77`).
 - **A3 завершён:** read-only аудит подтвердил planner-success coverage `5/5`, но `topic` missing в `4/5`; ни одна ось не готова к authority (`0cb8ca3`).
-- **A4 следующий:** client taxonomy из существующего MD frontmatter + optional native `TurnPlan.topic`, пока без изменения LLM prompt и без runtime authority.
+- **A4 завершён:** client taxonomy берётся из MD frontmatter; optional native `TurnPlan.topic` и shadow adapter готовы без runtime wiring (`2757cae`).
+- **A5 следующий:** существующий planner запрашивает и валидирует native topic, но downstream продолжает использовать legacy `DecisionFrame.service_topic`; обязателен smoke/preservation live proof.
 - Переход ownership на `TurnFrame` разрешён только отдельными последующими задачами после проверки telemetry; сам факт появления frame в ctx не означает переключение архитектуры.
 
 ---

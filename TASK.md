@@ -1,186 +1,206 @@
-# TASK — A4: client topic taxonomy + нативная ось контракта (без runtime wiring)
+# TASK — A5: planner заполняет native topic (shadow-only)
 
 Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** до реализации.
 Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты ревью — `REVIEW_CHECKLIST.md`.
-Проектная опора — `docs/ARCH_TARGET_DESIGN.md` v4 и `docs/TURN_FRAME_SHADOW_AUDIT_A3.md`.
+Опора — `docs/ARCH_TARGET_DESIGN.md` v4 и `docs/TURN_FRAME_SHADOW_AUDIT_A3.md`.
 
 ---
 
 ## Зафиксированная точка старта
 
 - A0 frozen spec hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
-- A1 TurnFrame contract: `0761213`.
+- A1 TurnFrame: `0761213`.
 - A2 shadow observability: `3746d77`.
 - A3 audit: `0cb8ca3`.
-- A3 вывод: `topic` missing в 4/5 planner-success frame; ни одна ось не готова к authority.
-- Рабочее дерево перед A4 должно быть чистым.
+- A4 client topic taxonomy + contract: `2757cae`.
+- До A5 `TurnPlan.topic` optional, но текущий planner prompt его не запрашивает.
+- Рабочее дерево перед A5 должно быть чистым.
 
 ## Задача
 
-**Название:** A4 — получить client-configurable taxonomy из существующего MD frontmatter и добавить optional native `topic` в `TurnPlan`/shadow adapter.
+**Название:** A5 — текущий turn planner возвращает `topic/topic_confidence` из разрешённой taxonomy клиента; downstream остаётся legacy.
 
-**Размер:** МАЛЕНЬКАЯ. Loader + backward-compatible contract + pure adapter + unit-тесты. **LLM prompt и runtime wiring не менять.**
+**Размер:** МАЛЕНЬКАЯ/СРЕДНЯЯ. Один существующий LLM prompt, field-level validation, unit-тесты и live proof. Новых LLM-вызовов нет.
 
-**Цель:** подготовить единственный нативный контракт topic без глобального dental enum и без второго конфигурационного справочника. Источник taxonomy — уже существующее поле `topic` в YAML frontmatter Markdown-документов конкретного client pack.
-
-После A4 текущий planner продолжает возвращать старый JSON без `topic`; значения по умолчанию сохраняют прежнее поведение. Реальное включение `topic` в output текущего planner будет отдельной задачей после review A4, потому что изменение LLM prompt может косвенно менять существующие `route/aspects/service_id`.
-
-## Архитектурное решение
+**Цель:** заполнить native `TurnPlan.topic` на реальных planner-success ходах и увидеть его в A2 `TurnFrame` shadow. Поле не получает authority и не влияет на текущий `DecisionFrame`, routing, evidence, AnswerPlan, composer, UI или policy.
 
 ```text
-clients/{client}/md/*.md frontmatter.topic
-                 │
-                 └── client topic taxonomy (read-only, cached)
+client MD frontmatter topics
+          ↓ allowed taxonomy in existing planner prompt
+same planner call → TurnPlan.topic/topic_confidence
+          ↓
+TurnFrame shadow only
 
-TurnPlan.topic? + TurnPlan.topic_confidence
-                 │
-                 └── pure adapter → TurnFrame.topic/field_meta (shadow only)
+legacy DecisionFrame/routing/evidence ← без изменений
 ```
 
-Не создавать `topics.json`, YAML-список, глобальный enum или hardcoded набор стоматологических тем в core.
+## Prompt contract
 
-## Topic taxonomy loader
+Изменить только существующий turn-planner prompt:
 
-Новый loader должен:
+- добавить ровно два поля JSON: `topic`, `topic_confidence`;
+- `topic` — одно значение из списка разрешённых topics текущего client pack или `null`;
+- topic означает широкую предметную область вопроса, не aspect, subtopic, service id и не doc id;
+- `topic_confidence` — число `0..1`; при `topic=null` обязано быть `0.0`;
+- если вопрос неоднозначен — `topic=null`, confidence `0.0`; не угадывать;
+- список разрешённых topics передаётся динамически из `load_client_topic_taxonomy(client_id)` в user content;
+- не хардкодить темы в `_SYSTEM` или production-коде;
+- не добавлять новый prompt/call/classifier.
 
-- читать `topic` из YAML frontmatter `.md` файлов только выбранного client pack;
-- использовать `client_md_dir()` / существующее разрешение client pack;
-- возвращать детерминированный неизменяемый набор нормализованных topic (`frozenset[str]`);
-- нормализовать trim + lowercase;
-- игнорировать пустое значение;
-- не выводить topic из имени файла, `doc_id`, текста/aliases или service id;
-- не читать тело документа для смыслового inference;
-- не содержать известных названий тем в production-коде;
-- быть cached по resolved client pack;
-- не смешивать taxonomy разных клиентов;
-- при malformed frontmatter не подменять данные догадкой; ошибка должна быть различима для вызывающего кода/теста, а не превращаться в выдуманный topic.
+Старые поля и инструкции `route/aspects/service_id/followup_of/needs_clarify/patient_situation/brand_filter` не переписывать и не ослаблять. Допускаются только минимальные изменения списка полей и инструкция про topic.
 
-Допустимо использовать уже установленную библиотеку frontmatter/YAML и существующие path helpers. Не импортировать private helper из content linter только ради переиспользования.
+## Field-level validation
 
-## Расширение TurnPlan
+Native topic пока необязателен и shadow-only. Ошибка только в topic-полях **не должна делать весь TurnPlan fail-open**, если остальные старые поля валидны.
 
-Добавить только два backward-compatible поля:
+Перед/внутри `_validate_plan()`:
 
-- `topic: str | None = None`;
-- `topic_confidence: float = 0.0`, диапазон `0..1`.
+- использовать allowed taxonomy текущего client pack;
+- valid topic нормализовать и сохранить;
+- unknown topic → `topic=None`, `topic_confidence=0.0`;
+- non-string topic → `None/0.0`;
+- invalid/non-numeric/bool/out-of-range confidence → сохранить valid topic с confidence `0.0` либо обнулить оба поля; выбрать одно правило и зафиксировать тестом;
+- confidence без topic → `0.0`;
+- не мутировать исходный raw dict;
+- записать структурированный telemetry event/log `turn_plan_topic_sanitized` со стабильным машинным reason;
+- не писать raw topic value, вопрос, ответ или exception message в sanitization event;
+- ошибки старых обязательных полей продолжают работать по прежним правилам и могут отклонить весь plan.
 
-Правила модели:
+Допустимые стабильные reasons должны быть ограничены маленьким набором, например:
 
-- `topic` — обычная строка, не `Literal`/enum;
-- значение нормализуется trim + lowercase; пустая строка становится `None`;
-- если `topic is None`, `topic_confidence` обязан быть `0.0`;
-- старый payload без обоих полей валиден и даёт `None/0.0`;
-- неизвестные extra fields по-прежнему запрещены;
-- модель сама не читает client config и не знает список допустимых тем.
+- `topic_not_allowed`;
+- `topic_invalid_type`;
+- `topic_confidence_invalid`;
+- `topic_confidence_without_topic`.
 
-В A4 не менять `_SYSTEM`, `plan_turn()`, `_validate_plan()` или JSON prompt. Валидация LLM topic против client taxonomy относится к следующей wiring-задаче.
+Не добавлять общий `field_errors`-каркас в A5 — это будет отдельная задача. Здесь только локальная безопасная обработка двух новых shadow-полей.
 
-## Pure adapter
+## Runtime firewall
 
-Обновить существующий `build_turn_frame_from_legacy()` только по правилу приоритета:
+Обязательные инварианты:
 
-1. Если `TurnPlan.topic` заполнен, `TurnFrame.topic` получает его, а metadata:
-   - confidence = `TurnPlan.topic_confidence`;
-   - provenance = `turn_plan.topic`.
-2. Иначе сохраняется текущий fallback из `DecisionFrame.service_topic`.
-3. Если оба источника отсутствуют/unknown, остаётся `None` с честной missing/legacy provenance.
-
-Adapter не загружает taxonomy, не валидирует client и не принимает вопрос. На вход ему приходит уже валидированный контракт. Не менять другие оси.
+- `turn_plan_to_decision_frame()` продолжает вычислять legacy `service_topic` только прежним способом из `service_id`;
+- `DecisionFrame.service_topic/confidence.topic` не читают `TurnPlan.topic/topic_confidence`;
+- `_resolve_service_id`, AnswerPlan, evidence, composer и routing не читают native topic;
+- единственный downstream-потребитель native topic — существующий `core/turn_frame_adapter.py` → A2 shadow;
+- return/output planner по старым полям остаётся прежним;
+- `publish_turn_plan()` может хранить новые поля внутри уже существующего `turn_plan.model_dump()`, но не создавать новые управляющие ctx-флаги;
+- структурированный `turn_planner_llm` log должен включить topic/confidence для аудита.
 
 ## Затрагиваемые файлы (allowlist)
 
 Исполнитель может менять **только**:
 
-- `core/topic_taxonomy.py` — новый client frontmatter loader;
-- `contracts/turn_plan.py` — только optional `topic/topic_confidence` и их локальные инварианты;
-- `core/turn_frame_adapter.py` — только приоритет native topic → legacy fallback;
-- `tests/test_topic_taxonomy.py` — loader/client isolation/no-hardcode tests;
-- `tests/test_turn_frame_contract.py` — native topic/fallback/backward compatibility;
-- `tests/test_turn_planner_llm.py` — только доказательство, что старый planner payload без topic остаётся валиден, если существующих тестов недостаточно.
+- `core/turn_planner_llm.py` — taxonomy in prompt, topic validation/sanitization, audit log fields;
+- `tests/test_turn_planner_llm.py` — prompt/validation/backward compatibility/firewall tests;
+- `tests/test_turn_frame_shadow.py` — только доказательство, что valid native topic появляется в shadow с provenance `turn_plan.topic`;
+- `eval_turn_topic_a5_preservation_last.txt` — raw live artifact, gitignored;
+- `eval_turn_topic_a5_smoke_last.txt` — raw live artifact, gitignored.
 
-`TASK.md`, архитектурные документы, client content/config, LLM prompt, orchestration, shadow recorder, telemetry, evals и продуктовые тесты Исполнитель не меняет.
+`TASK.md`, architecture, contracts, taxonomy loader, adapter, orchestration, eval spec/harness, client content/config и продуктовые tests Исполнитель не меняет.
 
 ## Явно НЕ делать
 
-- Не менять `_SYSTEM`, user prompt, `plan_turn()` и JSON, запрашиваемый у LLM.
-- Не добавлять новый LLM-вызов/topic classifier.
-- Не подключать topic к `DecisionFrame`, routing, evidence, composer, AnswerPlan, UI или policy.
-- Не менять `turn_plan_to_decision_frame()` — legacy runtime topic остаётся прежним.
-- Не добавлять topic в request ctx отдельным плоским полем; A2 shadow snapshot достаточно.
-- Не создавать новый topic config-файл.
-- Не выводить taxonomy из префиксов filename/doc_id/service id.
-- Не хардкодить `implantation`, `prosthetics`, `clinic` и другие темы в production loader/contract/adapter.
-- Не чинить preservation cases `02/03/05`.
-- Не менять frozen spec/harness и существующие expected.
-- Не переносить emotion-WIP.
+- Не менять `contracts/turn_plan.py`, `core/topic_taxonomy.py`, `core/turn_frame_adapter.py` и A2 recorder.
+- Не использовать native topic в `turn_plan_to_decision_frame()`.
+- Не менять routing/evidence/composer/AnswerPlan/UI/policy.
+- Не добавлять новый LLM call, feature flag, topic router или regex inference.
+- Не создавать hardcoded mapping service→topic или список тем.
+- Не выводить topic из filename/doc_id/service id после LLM; allowed list только валидирует output.
+- Не чинить preservation `02/03/05` через downstream topic.
+- Не менять frozen spec, harness или expected результаты.
+- Не resnapshot'ить ответы.
 - Не добавлять skip/xfail/условный PASS.
+- Не выбирать лучший из нескольких live-прогонов и не скрывать предыдущие.
 - Не создавать commit/ветку/stash без явной команды владельца.
 
-## Обязательные тесты
+## Обязательные unit-тесты
 
-1. Loader возвращает темы, фактически существующие во frontmatter demo client pack.
-2. Все возвращённые значения нормализованы, непустые и детерминированы.
-3. Loader не включает `doc_id`, subtopic или filename prefix как отдельную догадку.
-4. Cache привязан к resolved client pack.
-5. Production loader не содержит hardcoded известных topic names.
-6. Старый `TurnPlan` payload без новых полей остаётся валиден: `topic=None`, confidence `0.0`.
-7. Topic trim/lowercase нормализуется.
-8. Пустой topic становится `None`.
-9. Confidence вне `0..1` отклоняется.
-10. `topic=None` с confidence > 0 отклоняется.
-11. Adapter предпочитает native `TurnPlan.topic` и переносит точный confidence/provenance.
-12. При отсутствии native topic adapter сохраняет текущий `DecisionFrame.service_topic` fallback.
-13. Native topic не меняет intent/aspects/service/follow-up и не мутирует inputs.
-14. Нет импортов нового loader из orchestration/routing/evidence/composer.
-15. Frozen A0 hash не изменён.
+1. Existing planner user content содержит динамический список topics клиента.
+2. `_SYSTEM` не содержит hardcoded topic names.
+3. Mock LLM valid topic/confidence проходит в TurnPlan.
+4. Topic другого client pack / unknown topic безопасно обнуляется без потери валидных legacy-полей.
+5. Non-string topic безопасно обнуляется.
+6. Invalid confidence обрабатывается выбранным field-level правилом без fail-open всего plan.
+7. Confidence без topic становится `0.0`.
+8. Sanitization не мутирует raw dict.
+9. Sanitization event имеет только стабильный reason и не содержит raw/question/exception.
+10. Старый LLM payload без новых полей остаётся валиден.
+11. Unknown `service_id` и другие старые ошибки всё ещё отклоняют plan.
+12. `turn_plan_to_decision_frame()` игнорирует native topic даже при высокой confidence.
+13. Shadow snapshot использует native topic и provenance `turn_plan.topic`.
+14. Native topic не меняет intent/aspects/service/follow-up.
+15. Нет импортов/чтения native topic в routing/evidence/composer/AnswerPlan.
+16. Frozen A0 hash неизменен.
 
-Тесты не должны записывать временные client-файлы в репозиторий или менять `clients/demo`. Для проверки malformed/isolation допустим `tmp_path` и monkeypatch path resolver внутри unit loader test.
+## Live proof
 
-## Стоп-условия
-
-Исполнитель обязан остановиться и выдать `СТОП: требуется решение владельца/Архитектора`, если:
-
-- требуется файл вне allowlist;
-- без изменения LLM prompt невозможно выполнить именно A4 contract/loader scope;
-- предлагается второй taxonomy config вместо frontmatter source;
-- требуется hardcoded enum/list тем в production;
-- любое downstream-поведение начинает читать native topic;
-- старые planner payload/tests перестают работать;
-- для loader требуется парсить вопрос или содержание body;
-- существующие продуктовые тесты требуют изменения;
-- frozen hash изменился;
-- есть незакоммиченный diff, не относящийся к A4.
-
-Формат остановки:
-
-```text
-СТОП: требуется решение владельца/Архитектора
-Что обнаружено:
-Какие есть варианты:
-Риск каждого варианта:
-Какие файлы потребуются:
-```
-
-## Команды проверки
+После зелёных unit-тестов выполнить один полный прогон каждой suite и сохранить сырой вывод:
 
 ```powershell
-python -m pytest -q tests/test_topic_taxonomy.py tests/test_turn_frame_contract.py tests/test_turn_planner_llm.py
-python -m pytest -q tests/test_turn_frame_shadow.py tests/test_turn_planner_wiring.py tests/test_turn_plan_protocol_guard.py
+$env:E2E_USE_TEST_CLIENT="1"
+$env:PYTHONUTF8="1"
+$env:PYTHONIOENCODING="utf-8"
+python evals/v5/run_demo_eval.py --client demo --suite preservation 2>&1 | Tee-Object -FilePath eval_turn_topic_a5_preservation_last.txt
+$preservationExit = $LASTEXITCODE
+"EVAL_EXIT_CODE=$preservationExit" | Tee-Object -FilePath eval_turn_topic_a5_preservation_last.txt -Append
+
+python evals/v5/run_demo_eval.py --client demo --suite smoke 2>&1 | Tee-Object -FilePath eval_turn_topic_a5_smoke_last.txt
+$smokeExit = $LASTEXITCODE
+"EVAL_EXIT_CODE=$smokeExit" | Tee-Object -FilePath eval_turn_topic_a5_smoke_last.txt -Append
+
+Get-FileHash -Algorithm SHA256 eval_turn_topic_a5_preservation_last.txt
+Get-FileHash -Algorithm SHA256 eval_turn_topic_a5_smoke_last.txt
+```
+
+Не перезапускать отдельные кейсы ради результата. Технический повтор полного run сохранять отдельным именем и сообщать все попытки.
+
+Live acceptance:
+
+- smoke: `24/24`, errors=0, skipped=0;
+- preservation: existing green cases `01/04/06` остаются PASS; cases `02/03/05` могут оставаться target-red или улучшиться естественно, spec не менять;
+- errors/timeouts/skipped отсутствуют;
+- contacts остаётся boundary/not_applicable для TurnFrame;
+- planner-success preservation cases `02–06`: shadow status `ok`;
+- native topic для implant-вопросов `02–06` ожидается `implantation` с provenance `turn_plan.topic` и confidence из planner;
+- `turn_complete` legacy `service_topic`, decision и product route не должны быть переписаны native topic;
+- raw hashes и exit codes показать checker.
+
+Если хотя бы один старый green case регрессировал либо smoke не `24/24` — ❌, не менять spec и не объявлять это вариативностью без эскалации.
+
+## Команды unit/regression проверки
+
+```powershell
+python -m pytest -q tests/test_turn_planner_llm.py tests/test_turn_frame_shadow.py
+python -m pytest -q tests/test_turn_frame_contract.py tests/test_turn_planner_wiring.py tests/test_turn_plan_protocol_guard.py
 python -m pytest -q tests/test_contacts_routing.py tests/test_pricebook_golden.py tests/test_price_layer_parity.py
 git diff --check
 git status --short
 git hash-object evals/v5/demo/preservation.json
 ```
 
-Live eval в A4 не требуется: LLM prompt и runtime wiring намеренно не меняются. Если live output изменился, это нарушение границ.
+## Стоп-условия
 
-## Контрольная точка и критерии приёмки
+СТОП и эскалация, если:
 
-1. Реализовать только allowlist.
-2. Показать diff тестов первым.
-3. Запустить все команды проверки.
+- требуется файл вне allowlist;
+- native topic нужно читать downstream для получения желаемого ответа;
+- изменение prompt регрессирует legacy route/aspects/service или старые green cases;
+- invalid topic валит весь otherwise-valid plan;
+- taxonomy пуста/не загружается;
+- LLM систематически возвращает темы вне allowed list;
+- live run имеет timeout/error/skipped;
+- smoke не 24/24;
+- frozen hash изменился;
+- есть посторонний diff.
+
+## Контрольная точка и приёмка
+
+1. Реализация + unit/regression commands.
+2. Один preservation + один smoke live run.
+3. Показать diff тестов первым, changed-files, raw hashes и покейсный topic/provenance.
 4. СТОП → checker → Архитектор.
 
-A4 принят, когда taxonomy берётся только из client frontmatter, новые поля полностью backward-compatible, adapter меняет только shadow topic, runtime не импортирует/не читает native topic, все тесты зелёные и frozen hash сохранён.
+A5 принят, когда topic честно заполняется из client taxonomy в shadow, битое optional поле не ломает legacy plan, downstream firewall доказан, smoke остаётся `24/24`, старые preservation green не регрессируют и frozen hash сохранён.
 
-Следующая задача будет отдельно решать wiring native topic в существующий planner prompt + client validation. Автоматически её не начинать.
+После A5 автоматически не давать topic authority и не чинить evidence. Следующий шаг определяется отдельным аудитом качества topic на более широкой тематической матрице.

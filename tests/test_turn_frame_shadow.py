@@ -329,3 +329,49 @@ def test_record_turn_frame_shadow_degraded_survives_emit_bot_event_failure(monke
         assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_DEGRADED
         assert request.ctx["turn_frame_shadow_reason"] == SHADOW_REASON_BUILD_FAILED
         assert "turn_frame_shadow" not in request.ctx
+
+
+def test_record_turn_frame_shadow_uses_native_topic_provenance() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    turn_plan = _turn_plan(topic="implantation", topic_confidence=0.82)
+    decision = _decision(service_topic="prosthetics")
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        record_turn_frame_shadow(turn_plan=turn_plan, decision_frame=decision)
+
+        snapshot = request.ctx["turn_frame_shadow"]
+        assert snapshot["topic"] == "implantation"
+        assert snapshot["field_meta"]["topic"]["provenance"] == "turn_plan.topic"
+        assert snapshot["field_meta"]["topic"]["confidence"] == 0.82
+
+
+def test_native_topic_does_not_change_shadow_intent_or_service_axes() -> None:
+    app = pytest.importorskip("flask").Flask(__name__)
+    turn_plan = _turn_plan(
+        route="price_lookup",
+        aspects=["price", "duration"],
+        service_id="all_on_4",
+        followup_of="all_on_4",
+        topic="implantation",
+        topic_confidence=0.77,
+    )
+    decision = _decision(
+        route_intent="content",
+        service_topic="prosthetics",
+        service_id="veneers",
+        query_mode="overview",
+    )
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        record_turn_frame_shadow(turn_plan=turn_plan, decision_frame=decision)
+
+        snapshot = request.ctx["turn_frame_shadow"]
+        assert snapshot["intent"] == "content"
+        assert snapshot["aspects"] == ["price", "duration"]
+        assert snapshot["service_id"] == "all_on_4"
+        assert snapshot["followup_of"] == "all_on_4"
+        assert snapshot["topic"] == "implantation"

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from contracts.turn_frame import PatientScopeFrame, PatientScopeFrameMeta
-from core.turn_frame_from_raw import build_turn_frame_from_raw
+from core.turn_frame_from_raw import _PATIENT_SCOPE_BRIDGE, build_turn_frame_from_raw
 
 _TOPICS = frozenset({"clinic", "doctors", "implantation"})
 _SERVICE_IDS = frozenset({"all_on_4", "classic", "veneers"})
@@ -31,6 +31,33 @@ def _build(raw: dict):
         allowed_topics=_TOPICS,
         allowed_service_ids=_SERVICE_IDS,
     )
+
+
+_SCOPE_PROVENANCE = {
+    "extent": "turn_plan.patient_situation.extent",
+    "jaw": "turn_plan.patient_situation.jaw",
+    "stage": "turn_plan.patient_situation.stage",
+    "modifiers": "turn_plan.patient_situation.modifiers",
+}
+
+
+def _assert_patient_scope_meta(frame, mapped_fields: set[str]) -> None:
+    for name in PatientScopeFrameMeta.model_fields:
+        meta = getattr(frame.field_meta.patient_scope, name)
+        if name in mapped_fields:
+            assert meta.model_dump() == {
+                "confidence": 0.0,
+                "provenance": _SCOPE_PROVENANCE[name],
+                "status": "valid",
+                "error": None,
+            }
+        else:
+            assert meta.model_dump() == {
+                "confidence": 0.0,
+                "provenance": "turn_plan.schema_default",
+                "status": "defaulted",
+                "error": None,
+            }
 
 
 def test_valid_slice_builds_expected_values_and_metadata():
@@ -404,46 +431,143 @@ def test_only_deferred_scalar_axes_keep_not_migrated_provenance():
         assert meta.error is None, name
 
 
-def test_patient_scope_uses_nested_schema_defaults_without_extraction():
+def test_absent_patient_scope_uses_nested_schema_defaults():
     frame = _build(_valid_raw())
 
     assert frame.patient_scope == PatientScopeFrame()
     assert isinstance(frame.field_meta.patient_scope, PatientScopeFrameMeta)
-    for name in PatientScopeFrameMeta.model_fields:
-        meta = getattr(frame.field_meta.patient_scope, name)
-        assert meta.status == "defaulted", name
-        assert meta.provenance == "turn_plan.schema_default", name
-        assert meta.confidence == 0.0, name
-        assert meta.error is None, name
+    _assert_patient_scope_meta(frame, set())
 
 
 @pytest.mark.parametrize(
-    "patient_situation",
-    [None, "unknown", "one_tooth_missing", "urgent_problem", {"secret": "kind"}, ["secret"]],
+    ("patient_situation", "expected_scope", "mapped_fields"),
+    [
+        ("one_tooth_missing", {"extent": "one_tooth"}, {"extent"}),
+        ("few_teeth_missing", {"extent": "few_teeth"}, {"extent"}),
+        ("full_arch_missing", {"extent": "full_arch"}, {"extent"}),
+        ("upper_jaw_missing_or_complex", {"jaw": "upper"}, {"jaw"}),
+        (
+            "existing_implant_prosthetic_stage",
+            {"stage": "implant_placed"},
+            {"stage"},
+        ),
+        ("extraction_then_implant", {"stage": "extraction_context"}, {"stage"}),
+        (
+            "bone_deficit_or_grafting",
+            {"modifiers": ["reported_bone_deficit"]},
+            {"modifiers"},
+        ),
+        ("urgent_problem", {}, set()),
+        ("generic_implant_interest", {}, set()),
+        ("unknown", {}, set()),
+        (None, {}, set()),
+    ],
 )
-def test_raw_patient_situation_is_ignored_until_extraction(patient_situation):
+def test_scalar_patient_situation_uses_exact_loss_aware_bridge(
+    patient_situation,
+    expected_scope,
+    mapped_fields,
+):
     raw = _valid_raw()
     raw["patient_situation"] = patient_situation
     before = copy.deepcopy(raw)
 
     frame = _build(raw)
 
-    assert frame.patient_scope == PatientScopeFrame()
+    expected = {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": [],
+        **expected_scope,
+    }
+    assert frame.patient_scope.model_dump() == expected
+    _assert_patient_scope_meta(frame, mapped_fields)
     assert raw == before
-    assert "secret" not in str(frame.model_dump())
 
 
-def test_absent_and_explicit_raw_patient_situation_have_same_scope_dump():
+def test_noop_scalar_kinds_and_absent_have_same_scope_dump():
     absent = _build(_valid_raw())
-    explicit_raw = _valid_raw()
-    explicit_raw["patient_situation"] = "full_arch_missing"
-    explicit = _build(explicit_raw)
+    for kind in (None, "unknown", "urgent_problem", "generic_implant_interest"):
+        explicit_raw = _valid_raw()
+        explicit_raw["patient_situation"] = kind
+        explicit = _build(explicit_raw)
+        assert absent.patient_scope.model_dump() == explicit.patient_scope.model_dump()
+        assert (
+            absent.field_meta.patient_scope.model_dump()
+            == explicit.field_meta.patient_scope.model_dump()
+        )
 
-    assert absent.patient_scope.model_dump() == explicit.patient_scope.model_dump()
-    assert (
-        absent.field_meta.patient_scope.model_dump()
-        == explicit.field_meta.patient_scope.model_dump()
+
+@pytest.mark.parametrize(
+    "malformed",
+    [42, True, ["secret-list"], {"secret-dict": "kind"}, "secret-kind", " one_tooth_missing "],
+)
+def test_malformed_scalar_is_safe_default_without_synthetic_nested_errors(malformed):
+    raw = _valid_raw()
+    raw.update(
+        {
+            "patient_situation": malformed,
+            "question": "secret-question",
+            "answer": "secret-answer",
+            "history": ["secret-history"],
+        }
     )
+    before = copy.deepcopy(raw)
+
+    frame = _build(raw)
+    dumped = str(frame.model_dump())
+
+    assert frame.patient_scope == PatientScopeFrame()
+    _assert_patient_scope_meta(frame, set())
+    assert raw == before
+    for secret in (
+        "secret-list",
+        "secret-dict",
+        "secret-kind",
+        "secret-question",
+        "secret-answer",
+        "secret-history",
+    ):
+        assert secret not in dumped
+    assert frame.intent == "content"
+    assert frame.topic == "clinic"
+    assert frame.aspects == ["overview", "duration"]
+
+
+@pytest.mark.parametrize(
+    "patient_situation",
+    ["one_tooth_missing", "bone_deficit_or_grafting", "extraction_then_implant"],
+)
+def test_patient_scope_bridge_does_not_change_other_shadow_axes(patient_situation):
+    raw = _valid_raw()
+    raw["patient_situation"] = patient_situation
+    raw["service_id"] = "classic"
+
+    frame = _build(raw)
+
+    assert frame.intent == "content"
+    assert frame.topic == "clinic"
+    assert frame.aspects == ["overview", "duration"]
+    assert frame.primary_aspect == "overview"
+    assert frame.service_id == "classic"
+
+
+def test_patient_scope_bridge_has_no_shared_mutable_modifier_state():
+    raw = _valid_raw()
+    raw["patient_situation"] = "bone_deficit_or_grafting"
+
+    first = _build(raw)
+    second = _build(raw)
+    first.patient_scope.modifiers.clear()
+
+    assert first.patient_scope.modifiers == []
+    assert second.patient_scope.modifiers == ["reported_bone_deficit"]
+
+
+def test_patient_scope_bridge_mapping_is_immutable():
+    with pytest.raises(TypeError):
+        _PATIENT_SCOPE_BRIDGE["secret-kind"] = (None, None, None, ())
 
 
 def test_builder_has_no_runtime_or_thematic_dependencies():
@@ -474,5 +598,17 @@ def test_builder_has_no_runtime_or_thematic_dependencies():
     assert [name for name in imported if any(token in name for token in forbidden_import_tokens)] == []
 
     lower = source.lower()
-    thematic_tokens = ("doctors", "extraction", "implantation", "a6_04", "a6_05", "a6_06")
-    assert [token for token in thematic_tokens if token in lower] == []
+    forbidden_inference_tokens = (
+        "all_on_4",
+        "all_on_6",
+        "classic",
+        "sinus_lift",
+        "zygomatic",
+        "detect_patient_situation",
+        "recent_dialog_history",
+        "patient_situation_session",
+    )
+    assert [token for token in forbidden_inference_tokens if token in lower] == []
+    for forbidden_key in ("question", "answer", "history", "session", "cues"):
+        assert f'raw.get("{forbidden_key}")' not in source
+        assert f'raw["{forbidden_key}"]' not in source

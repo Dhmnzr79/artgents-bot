@@ -481,6 +481,10 @@ def test_patient_scope_contract_has_no_product_consumers():
         if relative in allowed:
             continue
         source = path.read_text(encoding="utf-8")
-        if "PatientScopeFrame" in source or any(token in source for token in forbidden_reads):
+        if (
+            "PatientScopeFrame" in source
+            or "_patient_scope_from_raw" in source
+            or any(token in source for token in forbidden_reads)
+        ):
             offenders.append(relative)
     assert offenders == []

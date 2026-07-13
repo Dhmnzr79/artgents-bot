@@ -38,6 +38,7 @@ def _mock_llm(monkeypatch, payload):
     captured: dict = {}
 
     def _fake(**kwargs):
+        captured["_call_count"] = captured.get("_call_count", 0) + 1
         captured.update(kwargs)
 
         class _Msg:
@@ -768,16 +769,50 @@ def test_plan_turn_attempt_valid_payload_returns_ok(monkeypatch):
     assert attempt.shadow_frame.field_meta.needs_clarification.status == "valid"
 
 
-def test_plan_turn_attempt_known_patient_kind_stays_ok_without_scope_extraction(monkeypatch):
+def test_plan_turn_attempt_known_patient_kind_stays_ok_with_mapped_scope(monkeypatch):
     payload = _valid_attempt_payload()
     payload["patient_situation"] = "one_tooth_missing"
-    _prepare_attempt(monkeypatch, payload)
+    captured = _prepare_attempt(monkeypatch, payload)
 
     attempt = plan_turn_attempt("Нет одного зуба", "attempt-scope-contract", "demo")
 
+    assert captured["_call_count"] == 1
     assert attempt.shadow_status == "ok"
     assert attempt.legacy_plan is not None
     assert attempt.legacy_plan.patient_situation == "one_tooth_missing"
+    assert attempt.shadow_frame is not None
+    assert attempt.shadow_frame.patient_scope.model_dump() == {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": [],
+    }
+    scope_meta = attempt.shadow_frame.field_meta.patient_scope.model_dump()
+    assert scope_meta["extent"] == {
+        "confidence": 0.0,
+        "provenance": "turn_plan.patient_situation.extent",
+        "status": "valid",
+        "error": None,
+    }
+    for name in ("jaw", "stage", "modifiers"):
+        assert scope_meta[name] == {
+            "confidence": 0.0,
+            "provenance": "turn_plan.schema_default",
+            "status": "defaulted",
+            "error": None,
+        }
+
+
+def test_plan_turn_attempt_malformed_patient_kind_is_partial_without_scope_leak(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["patient_situation"] = {"secret-kind": "one_tooth_missing"}
+    captured = _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Пациентский секрет", "attempt-scope-malformed", "demo")
+
+    assert captured["_call_count"] == 1
+    assert attempt.shadow_status == "partial"
+    assert attempt.legacy_plan is None
     assert attempt.shadow_frame is not None
     assert attempt.shadow_frame.patient_scope.model_dump() == {
         "extent": "unknown",
@@ -792,6 +827,9 @@ def test_plan_turn_attempt_known_patient_kind_stays_ok_without_scope_extraction(
             "status": "defaulted",
             "error": None,
         }
+    assert attempt.shadow_frame.topic == "implantation"
+    assert attempt.shadow_frame.aspects == ["overview"]
+    assert "secret-kind" not in str(attempt.shadow_frame.model_dump())
 
 
 def test_plan_turn_attempt_missing_optional_raw_keys_uses_schema_defaults(monkeypatch):

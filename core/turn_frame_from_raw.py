@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, cast, get_args
+from types import MappingProxyType
+from typing import Any, Mapping, cast, get_args
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import RouteIntent
@@ -10,8 +11,12 @@ from contracts.turn_frame import (
     FieldErrorReason,
     FieldMeta,
     FieldStatus,
+    PatientCareStage,
+    PatientExtent,
+    PatientJaw,
     PatientScopeFrame,
     PatientScopeFrameMeta,
+    PatientScopeModifier,
     TurnFrame,
     TurnFrameMeta,
 )
@@ -27,6 +32,30 @@ _RAW_NEEDS_CLARIFY = "turn_plan.raw.needs_clarify"
 _DERIVED_FOLLOWUP_OF = "derived.followup_of"
 _SCHEMA_DEFAULT = "turn_plan.schema_default"
 _NOT_MIGRATED = "a7.not_migrated"
+
+_PATIENT_EXTENT = "turn_plan.patient_situation.extent"
+_PATIENT_JAW = "turn_plan.patient_situation.jaw"
+_PATIENT_STAGE = "turn_plan.patient_situation.stage"
+_PATIENT_MODIFIERS = "turn_plan.patient_situation.modifiers"
+
+_PatientScopeBridge = tuple[
+    PatientExtent | None,
+    PatientJaw | None,
+    PatientCareStage | None,
+    tuple[PatientScopeModifier, ...],
+]
+
+_PATIENT_SCOPE_BRIDGE: Mapping[str, _PatientScopeBridge] = MappingProxyType(
+    {
+        "one_tooth_missing": ("one_tooth", None, None, ()),
+        "few_teeth_missing": ("few_teeth", None, None, ()),
+        "full_arch_missing": ("full_arch", None, None, ()),
+        "upper_jaw_missing_or_complex": (None, "upper", None, ()),
+        "existing_implant_prosthetic_stage": (None, None, "implant_placed", ()),
+        "extraction_then_implant": (None, None, "extraction_context", ()),
+        "bone_deficit_or_grafting": (None, None, None, ("reported_bone_deficit",)),
+    }
+)
 
 
 def _meta(
@@ -59,6 +88,47 @@ def _default_patient_scope_meta() -> PatientScopeFrameMeta:
         stage=_schema_default_meta(),
         modifiers=_schema_default_meta(),
     )
+
+
+def _patient_scope_from_raw(
+    raw: dict[str, Any],
+) -> tuple[PatientScopeFrame, PatientScopeFrameMeta]:
+    """Map only lossless parts of the current scalar patient-situation kind."""
+    raw_kind = raw.get("patient_situation")
+    bridge = _PATIENT_SCOPE_BRIDGE.get(raw_kind) if isinstance(raw_kind, str) else None
+    if bridge is None:
+        return PatientScopeFrame(), _default_patient_scope_meta()
+
+    extent, jaw, stage, modifiers = bridge
+    scope = PatientScopeFrame(
+        extent=extent or "unknown",
+        jaw=jaw or "unknown",
+        stage=stage or "unknown",
+        modifiers=list(modifiers),
+    )
+    meta = PatientScopeFrameMeta(
+        extent=(
+            _meta(provenance=_PATIENT_EXTENT, status="valid")
+            if extent is not None
+            else _schema_default_meta()
+        ),
+        jaw=(
+            _meta(provenance=_PATIENT_JAW, status="valid")
+            if jaw is not None
+            else _schema_default_meta()
+        ),
+        stage=(
+            _meta(provenance=_PATIENT_STAGE, status="valid")
+            if stage is not None
+            else _schema_default_meta()
+        ),
+        modifiers=(
+            _meta(provenance=_PATIENT_MODIFIERS, status="valid")
+            if modifiers
+            else _schema_default_meta()
+        ),
+    )
+    return scope, meta
 
 
 def _intent_from_raw(raw: dict[str, Any]) -> tuple[RouteIntent, FieldMeta]:
@@ -272,6 +342,7 @@ def build_turn_frame_from_raw(
         allowed_service_ids=allowed_service_ids,
     )
     needs_clarification, needs_clarification_meta = _needs_clarification_from_raw(raw)
+    patient_scope, patient_scope_meta = _patient_scope_from_raw(raw)
     not_migrated = _not_migrated_meta
 
     return TurnFrame(
@@ -281,7 +352,7 @@ def build_turn_frame_from_raw(
         primary_aspect=primary_aspect,
         emotion="none",
         specificity="unknown",
-        patient_scope=PatientScopeFrame(),
+        patient_scope=patient_scope,
         service_id=service_id,
         follow_up=follow_up,
         followup_of=followup_of,
@@ -293,7 +364,7 @@ def build_turn_frame_from_raw(
             primary_aspect=primary_meta,
             emotion=not_migrated(),
             specificity=not_migrated(),
-            patient_scope=_default_patient_scope_meta(),
+            patient_scope=patient_scope_meta,
             service_id=service_meta,
             follow_up=follow_up_meta,
             followup_of=followup_meta,

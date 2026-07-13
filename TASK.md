@@ -67,6 +67,7 @@ telemetry: partial frame сохранён, topic не потерян
 4. `tests/test_metadata_first_observability.py` — только тесты публикации существующих shadow ctx keys
 5. `tests/test_turn_planner_wiring.py` — только runtime one-call/product-firewall проверки
 6. `tests/test_planner_attempt_contract.py` — только миграция AST-firewall: planner и shadow recorder разрешены, остальные downstream запрещены
+7. `tests/test_turn_planner_llm.py` — только миграция существующего downstream firewall: `core/turn_frame_shadow.py` становится разрешённым telemetry consumer
 
 Любой другой diff → ❌ и СТОП.
 

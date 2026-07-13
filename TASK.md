@@ -1,325 +1,396 @@
-# TASK — A6 Live Proof: один frozen topic-matrix run
+# TASK — A6 Audit: зафиксировать неполный topic quality sample
 
-Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** до live-прогона.
+Один активный `TASK.md` на одну маленькую задачу. Файл подготовлен **Архитектором** после независимого raw review.
 Общий закон — `.cursor/rules/00-guardrails.mdc`. Инварианты ревью — `REVIEW_CHECKLIST.md`.
-Опора — frozen A6 spec и принятый A6 harness.
+Опора — frozen A6 matrix, принятый harness и единственный raw run.
 
 ---
 
 ## 1. Зафиксированная точка старта
 
 - A5 native topic shadow: `8662300`.
-- Frozen A6 matrix commit: `cd562fe`.
-- A6 harness governance: `b99f02d`.
-- A6 harness implementation: `952c50a`.
-- Matrix path: `evals/v5/demo/topic_shadow_matrix.json`.
-- Matrix git-blob hash: `dc356c9c738fb80a10cf0035508d7e8c8247979d`.
-- Preservation git-blob hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
-- Harness: `evals/v5/run_topic_shadow_eval.py`.
-- Рабочее дерево перед прогоном должно быть чистым.
+- Frozen A6 matrix: `cd562fe`.
+- A6 harness: `952c50a`.
+- A6 live governance: `307390d`.
+- Matrix hash: `dc356c9c738fb80a10cf0035508d7e8c8247979d`.
+- Preservation hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
+- Raw artifact: `eval_topic_shadow_a6_last.txt` (UTF-16, gitignored).
+- Raw SHA256: `2EF96AB8660657501137B0A6880E7EA54594E02417197F031BE1BCE2D9D5A40A`.
+- Attempts: `1`.
+- Independent checker verdict: `❓ — технически неполный quality sample`.
 
-`topic` остаётся **shadow-only**. Live Proof измеряет качество; не меняет runtime и не даёт authority.
+Рабочее дерево tracked должно быть чистым. Raw не удалять, не переименовывать и не перезаписывать.
 
 ## 2. Задача
 
-Выполнить **ровно один** полный запуск frozen 33-case matrix через принятый direct-planner harness и сохранить непрерывный raw console output.
+Создать один read-only audit-документ:
+
+- `docs/TOPIC_SHADOW_AUDIT_A6.md`.
+
+Документ должен честно зафиксировать:
+
+- целостность единственного run;
+- 26 scoreable exact matches;
+- 7 `planner_unavailable`;
+- отсутствие topic mismatches среди доступных планов;
+- невозможность оценить doctors целиком и часть extraction/ambiguous;
+- корневую техническую причину `aspects=[] → TurnPlan validation failure → plan_turn None`;
+- отсутствие оснований для confidence calibration и topic authority;
+- следующий архитектурный вопрос: field-level outcome/validation без изменения legacy product ownership.
+
+На этом этапе нельзя менять код, тесты, spec, harness или запускать LLM.
+
+## 3. Затрагиваемые файлы — строгий allowlist
+
+Исполнитель может создать только:
+
+- `docs/TOPIC_SHADOW_AUDIT_A6.md`.
+
+Исполнитель не меняет:
+
+- `TASK.md`;
+- `docs/ARCH_TARGET_DESIGN.md`;
+- `evals/v5/demo/topic_shadow_matrix.json`;
+- `evals/v5/demo/preservation.json`;
+- `evals/v5/run_topic_shadow_eval.py`;
+- `tests/test_topic_shadow_eval_contract.py`;
+- `core/**`, `contracts/**`, `orchestration/**`;
+- client content/config;
+- raw artifact.
+
+Любой другой diff → ❌ и СТОП.
+
+## 4. Источники истины
+
+Audit строится только из:
+
+1. `eval_topic_shadow_a6_last.txt` с frozen SHA256.
+2. `evals/v5/demo/topic_shadow_matrix.json` с frozen git-blob hash.
+3. `evals/v5/run_topic_shadow_eval.py` commit `952c50a` — только для описания semantics.
+4. `contracts/turn_plan.py` — только для ссылки на `aspects: Field(min_length=1)`.
+5. Независимого raw-review, но все его числа нужно повторно сверить с raw.
+
+Запрещено:
+
+- запускать planner/LLM снова;
+- использовать новый sample;
+- додумывать raw topic до Pydantic rejection;
+- считать `observed_topic=null` у unavailable фактическим LLM topic;
+- трактовать unavailable как mismatch или correct-null;
+- выводить причинность, которой raw не доказывает.
+
+## 5. Обязательная структура audit-документа
+
+### 5.1 Заголовок и статус
 
 ```text
-frozen matrix + frozen harness
-          ↓ один запуск без аргументов
-33 × real plan_turn(question, None, "demo")
-          ↓
-33 A6_CASE + 1 A6_SUMMARY + exit code
-          ↓
-raw artifact → независимый checker
+# Native topic quality audit — A6
+Статус: ❓ технически неполный quality sample
+Authority: запрещена
 ```
 
-На этом этапе:
+Сразу объяснить: run целый и честный, но не является полноценной оценкой всех 33 кейсов из-за семи unavailable планов.
 
-- код/spec/tests/docs не меняются;
-- один полный live run разрешён;
-- отдельные кейсы и повторный полный run запрещены;
-- результат не исправляется;
-- raw не коммитится;
-- audit-doc пока не создаётся.
+### 5.2 Provenance
 
-## 3. Разрешённый локальный артефакт
+Таблица:
 
-Разрешён только один новый gitignored-файл:
+- commits A5/spec/harness/live governance;
+- matrix path/hash;
+- raw path/SHA256/encoding/size;
+- attempts=1;
+- 33 `A6_CASE`, один `A6_SUMMARY`, `A6_EXIT_CODE=1`;
+- дата/временное окно только как наблюдаемый факт raw, без домыслов.
 
-- `eval_topic_shadow_a6_last.txt`.
+### 5.3 Методика
 
-Он должен содержать весь вывод одной команды от начала до конца и последнюю строку:
+Кратко и точно:
+
+- direct production `plan_turn(question, None, "demo")`;
+- frozen order;
+- один call/case, без retry;
+- exact normalized topic/null;
+- confidence descriptive only;
+- denominator frozen=33;
+- downstream `/ask`, routing, evidence, composer и UI не измерялись;
+- audit не оценивает качество ответов бота.
+
+### 5.4 Integrity
+
+Зафиксировать:
+
+- indices 1..33 и frozen order;
+- attempts=1;
+- raw hash совпал;
+- нет второго summary/index=1/retry artifact;
+- protected hashes и tracked tree не изменились.
+
+### 5.5 Главная сводка — разделить coverage и correctness
+
+Нельзя писать только «accuracy 78.8%» без объяснения.
+
+Обязательные показатели:
+
+| metric | value | допустимая интерпретация |
+|---|---:|---|
+| frozen total | 33 | полный denominator |
+| scoreable plans | 26 | coverage 26/33 = 78.79% |
+| unavailable | 7 | не получили валидный TurnPlan |
+| exact among scoreable | 26/26 | на доступной части mismatch не найден |
+| topic mismatch | 0 | не доказывает качество unavailable кейсов |
+| invalid/out-of-taxonomy | 0 | sanitizer/contract не выдали invalid result |
+| skipped | 0 | кейсы не исключались |
+
+Допустимо показать frozen overall `26/33`, но назвать его **exact coverage over frozen denominator**, а не чистой classifier accuracy: семь строк не были классифицированы harness как валидный plan.
+
+### 5.6 Per-topic coverage table
+
+Таблица для всех девяти тем и отдельной ambiguous-null группы:
+
+- expected total;
+- scoreable;
+- exact;
+- unavailable;
+- coverage rate;
+- exact rate among scoreable (`n/a`, если scoreable=0).
+
+Фактические значения:
+
+| group | total | scoreable | exact | unavailable |
+|---|---:|---:|---:|---:|
+| clinic | 3 | 3 | 3 | 0 |
+| doctors | 3 | 0 | 0 | 3 |
+| extraction | 3 | 2 | 2 | 1 |
+| implantation | 3 | 3 | 3 | 0 |
+| orthodontics | 3 | 3 | 3 | 0 |
+| periodontology | 3 | 3 | 3 | 0 |
+| prosthetics | 3 | 3 | 3 | 0 |
+| treatment | 3 | 3 | 3 | 0 |
+| whitening | 3 | 3 | 3 | 0 |
+| ambiguous null | 6 | 3 | 3 | 3 |
+
+Для doctors exact rate among scoreable = `n/a`, не `0%` и не `100%`.
+
+### 5.7 Seven unavailable cases
+
+Таблица всех семи:
+
+- index;
+- case id;
+- expected topic;
+- harness status/reason;
+- validation error field;
+- raw line reference(s).
+
+Список:
+
+- 04 `topic_a6_04_doctors_overview`;
+- 05 `topic_a6_05_doctors_named`;
+- 06 `topic_a6_06_doctors_implants`;
+- 09 `topic_a6_09_extraction_aftercare`;
+- 28 `topic_a6_28_null_general_price`;
+- 30 `topic_a6_30_null_booking`;
+- 31 `topic_a6_31_null_pain`.
+
+Для всех причина должна быть описана одинаково:
 
 ```text
-A6_EXIT_CODE=<0|1|2>
+LLM payload был отклонён TurnPlan validation из-за aspects=[];
+plan_turn вернул None;
+harness корректно записал planner_unavailable.
 ```
 
-Не создавать:
+Но обязательно добавить ограничение доказательства:
 
-- `_retry`, `_best`, `_fixed`, `_2`, `_final`;
-- отдельные case dumps;
-- обработанный/сокращённый log вместо raw;
-- JSON/CSV summary рядом;
-- audit markdown до checker review.
-
-## 4. Pre-run gate — без LLM
-
-До live-команды выполнить и показать:
-
-```powershell
-git status --short
-git log -1 --oneline
-git hash-object evals/v5/demo/topic_shadow_matrix.json
-git hash-object evals/v5/demo/preservation.json
-python -m pytest -q tests/test_topic_shadow_eval_contract.py
-python -m py_compile evals/v5/run_topic_shadow_eval.py
-Get-ChildItem -Force -File -Filter "eval_topic_shadow_a6*.txt" | Select-Object -ExpandProperty Name
+```text
+Raw не сохраняет валидированное значение topic из отклонённого payload,
+поэтому нельзя утверждать, был topic в этих семи ответах правильным,
+неправильным или null.
 ```
 
-Ожидается:
+Не вставлять exception traceback целиком. Достаточно стабильного сообщения `aspects: List should have at least 1 item` и raw line refs.
 
-- clean status;
-- HEAD содержит harness `952c50a` или более поздний governance commit без изменения harness;
-- оба hash совпадают;
-- harness unit = `34 passed`, skipped=0;
-- raw-файлов A6 до запуска нет.
+### 5.8 Confusion matrix — только ненулевые cells
 
-Если pre-run gate не совпал — **СТОП**, live не запускать.
+Перечислить фактические cells:
 
-## 5. Environment
+- clinic→clinic=3;
+- doctors→planner_unavailable=3;
+- extraction→extraction=2;
+- extraction→planner_unavailable=1;
+- implantation→implantation=3;
+- orthodontics→orthodontics=3;
+- periodontology→periodontology=3;
+- prosthetics→prosthetics=3;
+- treatment→treatment=3;
+- whitening→whitening=3;
+- null→null=3;
+- null→planner_unavailable=3.
 
-Запускать из корня репозитория в текущем чистом PowerShell-сеансе.
+Сумма=33. Unavailable не превращать в observed null.
 
-Перед командой задать только кодировку:
+### 5.9 Confidence — descriptive only
 
-```powershell
-$env:PYTHONUTF8="1"
-$env:PYTHONIOENCODING="utf-8"
+Зафиксировать:
+
+- correct bucket: count=26, min=0.0, max=1.0, mean=0.8692;
+- incorrect: empty;
+- invalid: empty;
+- три genuine null exact-match входят в correct с confidence=0.0;
+- unavailable не имеют confidence.
+
+Явно написать:
+
+- self-reported confidence не калибрована;
+- из n=26 нельзя выбирать threshold;
+- mean не является вероятностью правильности;
+- confidence не разрешает authority.
+
+### 5.10 Что доказано / не доказано
+
+**Доказано:**
+
+- harness и raw integrity;
+- 26 scoreable topic values exact на frozen expectations;
+- zero observed mismatches на scoreable subset;
+- семь all-or-nothing plan rejections связаны с `aspects=[]` validation;
+- topic всё ещё не влияет на product routing.
+
+**Не доказано:**
+
+- качество topic на doctors;
+- качество topic на четырёх остальных unavailable cases;
+- 100% accuracy на 33;
+- calibration;
+- качество product answers/evidence/UI;
+- готовность к authority.
+
+### 5.11 Архитектурный вывод
+
+Сформулировать без реализации:
+
+- A6 обнаружил coupling: scoreability native topic зависит от валидности unrelated legacy field `aspects`;
+- all-or-nothing `TurnPlan` мешает field-level наблюдаемости;
+- простое ослабление `aspects min_length` или prompt-hardcode `overview` **не рекомендуется**, потому что может перевести текущие fail-open кейсы на planner-owned product path и изменить ответы;
+- повтор A6 без архитектурного изменения не закрывает пробел и запрещён текущим one-run contract.
+
+### 5.12 Рекомендация следующего этапа
+
+Рекомендовать отдельный **A7 contract/design checkpoint**:
+
+```text
+Field-level planner outcome / field_errors, shadow-only:
+валидный topic может быть наблюдаем независимо от ошибки aspects,
+но legacy TurnPlan eligibility и текущий product fail-open сохраняются.
 ```
 
-Не переключать feature flags для улучшения результата. Direct harness не использует `/ask` и не требует `E2E_USE_TEST_CLIENT`.
+Обязательные границы рекомендации:
 
-Не менять model, timeout, prompt, API parameters или client.
+- один существующий LLM-call;
+- без нового topic classifier;
+- без разрешения topic authority;
+- без автоматического `aspects=["overview"]`;
+- без изменения `turn_plan_to_decision_frame`, route/evidence/composer/UI;
+- current seven product paths остаются прежними;
+- новый A6 rerun возможен только после отдельного spec/review решения и с сохранением первого raw.
 
-## 6. Единственная live-команда
+Не проектировать полный A7 API в audit-документе и не писать код.
 
-Выполнить ровно один раз:
+## 6. Raw line references
 
-```powershell
-python evals/v5/run_topic_shadow_eval.py 2>&1 |
-  Tee-Object -FilePath eval_topic_shadow_a6_last.txt
-$a6Exit = $LASTEXITCODE
-"A6_EXIT_CODE=$a6Exit" |
-  Tee-Object -FilePath eval_topic_shadow_a6_last.txt -Append
+Все ключевые факты должны иметь ссылки вида:
+
+```text
+raw L<line>
 ```
 
-После начала команды:
+Минимум:
 
-- не прерывать из-за первых FAIL;
-- не перезапускать отдельный case;
-- не запускать второй полный run;
-- не редактировать raw;
-- не менять spec/harness/tests;
-- дождаться всех 33 case results и summary, если процесс технически продолжает работать.
+- первые/последние `A6_CASE`;
+- `A6_SUMMARY`;
+- `A6_EXIT_CODE`;
+- каждый из семи validation errors и соответствующий `A6_CASE`;
+- при необходимости planner log, подтверждающий один call.
 
-## 7. Если run технически оборвался
+Line numbers считать по фактическому UTF-16 raw через read-only `Get-Content`. Hash raw должен остаться прежним после нумерации.
 
-Если PowerShell/процесс/машина/сеть оборвали run до `A6_SUMMARY`:
+## 7. Явно НЕ делать
 
-1. Сохранить неполный `eval_topic_shadow_a6_last.txt` как есть.
-2. Не удалять и не перезаписывать его.
-3. Не делать автоматический retry.
-4. Зафиксировать фактический exit/code и последний case index.
-5. СТОП → эскалация Архитектору.
+- Не запускать live/LLM повторно.
+- Не создавать второй raw.
+- Не менять/нормализовать encoding raw.
+- Не менять frozen spec/harness.
+- Не исправлять `aspects=[]`.
+- Не ослаблять `TurnPlan`/`TurnFrame`.
+- Не менять prompt.
+- Не объявлять 26/26 итогом всей матрицы.
+- Не считать unavailable mismatch или null-match.
+- Не давать topic authority.
+- Не создавать commit без команды владельца.
 
-Повтор возможен только отдельной явной командой владельца с новым именем артефакта. Лучший из нескольких run выбирать запрещено.
-
-## 8. Честная семантика результата
-
-### Topic mismatch допустим
-
-`FAIL: topic_mismatch` — полезный результат аудита. Он не блокирует честность raw и не является поводом менять frozen expected.
-
-### Technical error не скрывать
-
-Следующие результаты блокируют признание run полноценным quality sample:
-
-- `planner_unavailable_count > 0`;
-- `invalid_or_out_of_taxonomy_count > 0`;
-- `errors > 0`;
-- отсутствует хотя бы один case/summary;
-- harness/config exit `2`.
-
-При этом raw всё равно сохраняется. Автоматический retry запрещён; дальнейшее решение принимает Архитектор.
-
-### Exit codes
-
-- `0`: 33/33 exact match;
-- `1`: harness завершил matrix, есть mismatch и/или technical case error;
-- `2`: preflight/config failure.
-
-Exit `1` сам по себе не говорит, честный это mismatch или техническая проблема. Нужно читать `A6_SUMMARY`.
-
-## 9. Проверки raw после run — read-only
-
-Не создавая скрипт/файл и не меняя raw, проверить:
-
-- строк `A6_CASE ` = 33;
-- indices = 1..33 без дублей/пропусков;
-- case ids совпадают с frozen spec и идут в frozen порядке;
-- строк `A6_SUMMARY ` = 1;
-- `summary.total = 33`;
-- `passed + failed + errors = 33`;
-- `skipped = 0`;
-- сумма confusion matrix = 33;
-- per-topic содержит все 9 тем с total=3;
-- ambiguous total=6;
-- `authority_decision_allowed=false`;
-- последняя строка `A6_EXIT_CODE=...` согласуется с summary;
-- в raw нет второго набора `index=1`/второго summary.
-
-Одноразовая read-only команда/inline parser допустимы. Не сохранять обработанный результат в новый файл.
-
-## 10. Что показать в отчёте
-
-### 10.1 Raw integrity
-
-- полный путь и размер raw;
-- SHA256 raw после добавления `A6_EXIT_CODE`;
-- число `A6_CASE` и `A6_SUMMARY`;
-- first/last case id;
-- continuity/order check;
-- exit code.
-
-### 10.2 Quality metrics — переписать из raw без переоценки
-
-- overall matched/33 и rate;
-- passed/failed/errors/skipped;
-- per-topic matched/3 для всех 9 тем;
-- ambiguous-null matched/6;
-- `planner_unavailable_count`;
-- `invalid_or_out_of_taxonomy_count`;
-- только ненулевые confusion cells;
-- confidence buckets как descriptive values/mean, без слов о калибровке;
-- список каждого FAIL/ERROR: case id, expected, observed, confidence, stable reason.
-
-### 10.3 Инварианты
-
-- tracked `git status --short` после run;
-- hashes matrix/preservation после run;
-- подтверждение, что code/spec/tests не менялись;
-- список всех файлов `eval_topic_shadow_a6*.txt`;
-- количество live attempts = 1.
-
-## 11. Запрещённые интерпретации
-
-Даже если результат 33/33:
-
-- не писать, что confidence calibrated;
-- не объявлять topic authority-ready;
-- не подключать topic к routing/evidence/composer;
-- не менять TARGET architecture;
-- не переходить автоматически к удалению legacy route;
-- не исправлять продуктовые preservation FAIL этим run.
-
-Если результат красный:
-
-- не менять вопросы/expected/source docs;
-- не ослаблять exact match;
-- не объединять темы задним числом;
-- не добавлять aliases/hardcode prompt в рамках A6;
-- не запускать ещё раз «для проверки».
-
-A6 Live Proof отвечает только на вопрос: **как существующий native topic сработал на заранее замороженной матрице в одном честном run**.
-
-## 12. Затрагиваемые файлы
-
-Tracked changes не разрешены.
-
-Единственный разрешённый local artifact:
-
-- `eval_topic_shadow_a6_last.txt` — gitignored.
-
-Если `git status --short` после run показывает tracked/untracked не-gitignored файл — СТОП.
-
-## 13. Post-run команды
+## 8. Проверки
 
 ```powershell
 Get-FileHash -Algorithm SHA256 eval_topic_shadow_a6_last.txt
-Get-Item eval_topic_shadow_a6_last.txt | Select-Object FullName,Length,LastWriteTime
-Get-ChildItem -Force -File -Filter "eval_topic_shadow_a6*.txt" |
-  Select-Object Name,Length,LastWriteTime
-git status --short
 git diff --check
+git status --short
 git diff -- evals/v5/demo/topic_shadow_matrix.json evals/v5/demo/preservation.json evals/v5/run_topic_shadow_eval.py tests/test_topic_shadow_eval_contract.py
 git hash-object evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
 ```
 
-`git diff` по protected/harness должен быть пустым.
+Read-only проверить:
 
-## 14. Стоп-условия
+- все числа audit совпадают с raw;
+- line refs ведут на заявленные события;
+- availability и correctness не смешаны;
+- запрещённые claims отсутствуют;
+- изменён только audit-doc;
+- raw SHA256 прежний.
+
+Unit/live тесты не запускать: код не меняется, повторный LLM запрещён.
+
+## 9. Стоп-условия
 
 СТОП, если:
 
-- pre-run gate не прошёл;
-- raw уже существовал до запуска;
-- команда была запущена более одного раза;
-- процесс оборвался;
-- нет 33 cases или одного summary;
-- exit=2;
-- errors/unavailable/invalid > 0;
-- raw/summary расходятся;
-- hashes изменились;
-- появился tracked diff;
-- хочется исправить mismatch или повторить run.
+- raw hash не совпал;
+- нужен файл вне allowlist;
+- числа raw расходятся с TASK;
+- невозможно подтвердить line refs;
+- хочется повторить run;
+- для вывода нужно предположить topic отклонённого payload;
+- появился tracked diff вне audit-doc;
+- matrix/preservation hashes изменились.
 
-При mismatch с errors=0 run не повторять: показать честный результат checker.
+## 10. Контрольные точки
 
-## 15. Контрольные точки
+### Checkpoint 1 — Audit authoring
 
-### Checkpoint 1 — One live run
+Исполнитель создаёт только audit-doc, проводит read-only сверку и делает СТОП без commit.
 
-Исполнитель выполняет pre-run gate, один live run, read-only raw checks и СТОП без commit.
+### Checkpoint 2 — Audit review
 
-### Checkpoint 2 — Independent raw review
+Checker независимо проверяет doc↔raw, line refs, coverage/correctness semantics, запрещённые claims и границы A7 recommendation.
 
-Checker:
+Вердикт: `✅ / ❌ / ❓`.
 
-- не запускает live повторно;
-- проверяет raw hash/continuity;
-- независимо пересчитывает summary из 33 `A6_CASE`;
-- сверяет frozen expected/order;
-- проверяет отсутствие технических ошибок и повторов;
-- отделяет topic mismatches от harness failures;
-- не даёт authority.
+### Checkpoint 3 — Audit commit
 
-Вердикт:
+Только после `✅` владелец разрешает commit одного audit-doc.
 
-- `✅` — один полный технически чистый quality sample, даже если есть honest mismatches;
-- `❌` — raw/spec/harness подогнаны или нарушены границы;
-- `❓` — sample технически неполный, нужен отдельный выбор владельца о новом полном run.
+## 11. Формат отчёта Исполнителя
 
-### Checkpoint 3 — Audit document
+1. Changed-files.
+2. Raw SHA256 до/после.
+3. Разделы audit-документа.
+4. Таблица line refs семи unavailable.
+5. Coverage/correctness/per-topic/confusion verification.
+6. Запрещённые claims scan.
+7. Git/protected hashes.
+8. Skipped/not run.
+9. СТОП без commit.
 
-Только после raw review Архитектор подготовит отдельное задание на audit-doc. На текущем этапе audit-doc не создавать.
+## 12. Критерий приёмки A6 Audit
 
-## 16. Формат отчёта Исполнителя
-
-1. Pre-run gate.
-2. Live command и attempts=1.
-3. Raw path/size/SHA256/exit.
-4. Continuity/schema checks.
-5. Полные quality metrics.
-6. FAIL/ERROR cases.
-7. Confidence descriptive buckets.
-8. Post-run git/hashes.
-9. Skipped/not run.
-10. Явный СТОП без commit.
-
-## 17. Критерий приёмки A6 Live Proof
-
-Этап принят, когда один и только один непрерывный run содержит все 33 frozen cases и один summary, raw сохранён без редактирования, метрики независимо воспроизводимы, технических errors/unavailable/invalid нет, mismatches не скрыты и не перезапущены, protected hashes и tracked tree не изменились.
-
-Это измерение, а не переключение архитектуры.
+Audit принят, когда один новый документ byte-verifiably опирается на первый raw, отделяет 26/33 coverage от 26/26 correctness среди scoreable планов, не присваивает значения семи unavailable topic, фиксирует `aspects=[]` coupling без ремонта legacy, запрещает authority и формулирует A7 только как отдельный shadow-only field-level contract/design checkpoint.

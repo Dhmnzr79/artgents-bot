@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from flask import Flask
 
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
 from contracts.planner_attempt import PlannerAttempt
@@ -86,6 +87,35 @@ def _partial_doctors_attempt() -> PlannerAttempt:
             aspects=[],
         ),
         shadow_status="partial",
+    )
+
+
+def _patient_scope_attempt(
+    patient_situation: str,
+    *,
+    partial: bool = False,
+) -> PlannerAttempt:
+    aspects = [] if partial else ["overview"]
+    shadow_frame = _raw_shadow_frame(
+        route="content",
+        aspects=aspects,
+        topic="implantation",
+        topic_confidence=0.9,
+        patient_situation=patient_situation,
+    )
+    legacy_plan = None
+    if not partial:
+        legacy_plan = _turn_plan(
+            route="content",
+            aspects=["overview"],
+            service_id=None,
+            followup_of=None,
+            patient_situation=patient_situation,
+        )
+    return PlannerAttempt(
+        legacy_plan=legacy_plan,
+        shadow_frame=shadow_frame,
+        shadow_status="partial" if partial else "ok",
     )
 
 
@@ -194,6 +224,60 @@ def test_record_planner_attempt_shadow_ok_writes_exact_raw_frame() -> None:
         assert frame is attempt.shadow_frame
         assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_OK
         assert request.ctx["turn_frame_shadow"] == attempt.shadow_frame.model_dump()
+        assert "turn_frame_shadow_reason" not in request.ctx
+
+
+@pytest.mark.parametrize(
+    ("patient_situation", "scope_field", "expected_value", "expected_provenance"),
+    [
+        (
+            "one_tooth_missing",
+            "extent",
+            "one_tooth",
+            "turn_plan.patient_situation.extent",
+        ),
+        (
+            "bone_deficit_or_grafting",
+            "modifiers",
+            ["reported_bone_deficit"],
+            "turn_plan.patient_situation.modifiers",
+        ),
+    ],
+)
+def test_record_planner_attempt_shadow_preserves_a9_nested_scope(
+    patient_situation,
+    scope_field,
+    expected_value,
+    expected_provenance,
+) -> None:
+    app = Flask(__name__)
+    attempt = _patient_scope_attempt(patient_situation)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {"turn_frame_shadow_reason": "stale"}
+        frame = record_planner_attempt_shadow(attempt=attempt)
+
+        assert frame is attempt.shadow_frame
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_OK
+        assert request.ctx["turn_frame_shadow"] == attempt.shadow_frame.model_dump()
+        snapshot = request.ctx["turn_frame_shadow"]
+        assert snapshot["patient_scope"][scope_field] == expected_value
+        assert snapshot["field_meta"]["patient_scope"][scope_field] == {
+            "confidence": 0.0,
+            "provenance": expected_provenance,
+            "status": "valid",
+            "error": None,
+        }
+        for name, meta in snapshot["field_meta"]["patient_scope"].items():
+            if name == scope_field:
+                continue
+            assert meta == {
+                "confidence": 0.0,
+                "provenance": "turn_plan.schema_default",
+                "status": "defaulted",
+                "error": None,
+            }
         assert "turn_frame_shadow_reason" not in request.ctx
 
 
@@ -508,6 +592,64 @@ def test_run_resolver_turn_partial_shadow_keeps_legacy_fail_open(monkeypatch) ->
         assert outcome.scope_topic_candidate != "doctors"
 
 
+def test_a9_partial_scope_is_observable_but_does_not_change_product_fallback(
+    monkeypatch,
+) -> None:
+    app = Flask(__name__)
+    attempt = _patient_scope_attempt("one_tooth_missing", partial=True)
+    recorder_calls: list[PlannerAttempt] = []
+    fallback_calls: list[dict] = []
+    fallback_decision = _decision(
+        route_intent="content",
+        service_topic="prosthetics",
+        service_id="veneers",
+        query_mode="overview",
+    )
+
+    def _record(*, attempt):
+        recorder_calls.append(attempt)
+        return record_planner_attempt_shadow(attempt=attempt)
+
+    def _fallback(**kwargs):
+        fallback_calls.append(kwargs)
+        return fallback_decision, [], "fallback-content"
+
+    monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
+    monkeypatch.setattr(
+        "core.turn_planner_llm.plan_turn_attempt",
+        lambda *_args, **_kwargs: attempt,
+    )
+    monkeypatch.setattr("orchestration.resolver_turn.record_planner_attempt_shadow", _record)
+    monkeypatch.setattr("orchestration.resolver_turn.resolve_with_fallback", _fallback)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        outcome = run_resolver_turn(
+            q="Секретный вопрос пациента",
+            sid="a9-shadow-partial",
+            client_id="demo",
+            st={"hist": []},
+            enqueue_resolver_trace=lambda **_kwargs: None,
+        )
+
+        assert recorder_calls == [attempt]
+        assert len(fallback_calls) == 1
+        assert request.ctx["turn_planner_used"] is False
+        assert request.ctx["resolver_used"] is True
+        assert request.ctx["turn_frame_shadow_status"] == SHADOW_STATUS_PARTIAL
+        snapshot = request.ctx["turn_frame_shadow"]
+        assert snapshot["patient_scope"]["extent"] == "one_tooth"
+        assert snapshot["field_meta"]["patient_scope"]["extent"]["status"] == "valid"
+        assert snapshot["field_meta"]["aspects"]["error"] == "aspects_empty"
+        assert "Секретный вопрос" not in str(snapshot)
+        assert outcome.decision.model_dump() == fallback_decision.model_dump()
+        assert outcome.decision.service_topic == "prosthetics"
+        assert outcome.decision.service_id == "veneers"
+        assert outcome.intent == "content"
+        assert outcome.scope_topic_candidate == "prosthetics"
+
+
 @pytest.mark.parametrize("case_id", _A6_FAIL_OPEN_CASE_IDS)
 def test_frozen_a6_partial_paths_keep_product_fallback(monkeypatch, case_id: str) -> None:
     app = pytest.importorskip("flask").Flask(__name__)
@@ -613,6 +755,36 @@ def test_run_resolver_turn_source_uses_attempt_once_and_only_legacy_for_product(
     assert "attempt.shadow_frame" not in source
     assert "attempt.shadow_status" not in source
     assert "record_planner_attempt_shadow(attempt=attempt)" in source
+    assert "patient_scope" not in source
+
+
+def test_product_sources_do_not_read_a9_nested_shadow_scope() -> None:
+    paths = [Path("app.py"), Path("llm.py")]
+    paths.extend(sorted(Path("core").rglob("*.py")))
+    paths.extend(sorted(Path("orchestration").rglob("*.py")))
+    allowed = {
+        "core/turn_frame_adapter.py",
+        "core/turn_frame_from_raw.py",
+    }
+    forbidden = (
+        "shadow_frame.patient_scope",
+        '.patient_scope.extent',
+        '.patient_scope.jaw',
+        '.patient_scope.stage',
+        '.patient_scope.modifiers',
+        'turn_frame_shadow"]["patient_scope',
+        "turn_frame_shadow']['patient_scope",
+    )
+    offenders: dict[str, list[str]] = {}
+    for path in paths:
+        relative = path.as_posix()
+        if relative in allowed:
+            continue
+        source = path.read_text(encoding="utf-8")
+        hits = [token for token in forbidden if token in source]
+        if hits:
+            offenders[relative] = hits
+    assert offenders == {}
 
 
 def test_run_resolver_turn_comparison_override_does_not_rebuild_raw_shadow(monkeypatch) -> None:

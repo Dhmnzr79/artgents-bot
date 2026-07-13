@@ -3,7 +3,10 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from flask import Flask
 
+from contracts.planner_attempt import PlannerAttempt
+from contracts.turn_plan import TurnPlan
 from core.metadata_first_observability import (
     merge_retrieval_debug_meta,
     metadata_first_response_meta,
@@ -14,6 +17,40 @@ from core.metadata_first_observability import (
     should_expose_metadata_first_in_response,
     RETRIEVAL_POOL_CTX_KEYS,
 )
+from core.turn_frame_from_raw import build_turn_frame_from_raw
+from core.turn_frame_shadow import record_planner_attempt_shadow
+
+
+def _record_a9_scope(patient_situation: object, *, partial: bool = False):
+    from flask import request
+
+    if not hasattr(request, "ctx"):
+        request.ctx = {}
+    aspects = [] if partial else ["overview"]
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": aspects,
+            "topic": "implantation",
+            "topic_confidence": 0.9,
+            "patient_situation": patient_situation,
+        },
+        allowed_topics=frozenset({"implantation"}),
+    )
+    legacy_plan = None
+    if not partial:
+        legacy_plan = TurnPlan(
+            route="content",
+            aspects=["overview"],
+            patient_situation=patient_situation,
+        )
+    attempt = PlannerAttempt(
+        legacy_plan=legacy_plan,
+        shadow_frame=frame,
+        shadow_status="partial" if partial else "ok",
+    )
+    record_planner_attempt_shadow(attempt=attempt)
+    return frame
 
 
 def test_record_decision_frame_ctx_from_dict() -> None:
@@ -194,6 +231,28 @@ def test_turn_frame_shadow_keys_in_turn_details() -> None:
         assert "turn_frame_shadow_reason" not in details
 
 
+def test_a9_nested_scope_round_trips_through_turn_details_and_response_slice() -> None:
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        frame = _record_a9_scope("bone_deficit_or_grafting")
+
+        details = metadata_first_turn_details()
+        response_slice = metadata_first_response_meta()
+
+        assert details["turn_frame_shadow"] == frame.model_dump()
+        assert response_slice["turn_frame_shadow"] == frame.model_dump()
+        for payload in (details, response_slice):
+            shadow = payload["turn_frame_shadow"]
+            assert shadow["patient_scope"]["modifiers"] == ["reported_bone_deficit"]
+            assert shadow["field_meta"]["patient_scope"]["modifiers"] == {
+                "confidence": 0.0,
+                "provenance": "turn_plan.patient_situation.modifiers",
+                "status": "valid",
+                "error": None,
+            }
+            assert shadow["field_meta"]["patient_scope"]["extent"]["status"] == "defaulted"
+
+
 def test_turn_frame_shadow_reason_in_turn_details_when_present() -> None:
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
@@ -247,6 +306,104 @@ def test_finalize_ask_includes_turn_frame_shadow_with_e2e_env(monkeypatch) -> No
     assert isinstance(mf, dict)
     assert mf.get("turn_frame_shadow_status") == "ok"
     assert mf.get("turn_frame_shadow", {}).get("intent") == "content"
+
+
+def test_finalize_ask_e2e_preserves_real_a9_nested_scope(monkeypatch) -> None:
+    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        from orchestration.finalize_turn import finalize_ask
+
+        frame = _record_a9_scope("one_tooth_missing")
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask(
+                {"answer": "ответ", "meta": {}},
+                "sid",
+                "q",
+                route="retrieval_chunk",
+            )
+
+    shadow = out["meta"]["metadata_first"]["turn_frame_shadow"]
+    assert shadow == frame.model_dump()
+    assert shadow["patient_scope"]["extent"] == "one_tooth"
+    assert shadow["field_meta"]["patient_scope"]["extent"] == {
+        "confidence": 0.0,
+        "provenance": "turn_plan.patient_situation.extent",
+        "status": "valid",
+        "error": None,
+    }
+
+
+def test_a9_partial_nested_scope_and_unrelated_error_survive_e2e(monkeypatch) -> None:
+    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        from orchestration.finalize_turn import finalize_ask
+
+        frame = _record_a9_scope("one_tooth_missing", partial=True)
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask(
+                {"answer": "ответ", "meta": {}},
+                "sid",
+                "q",
+                route="retrieval_chunk",
+            )
+
+    metadata = out["meta"]["metadata_first"]
+    assert metadata["turn_frame_shadow_status"] == "partial"
+    shadow = metadata["turn_frame_shadow"]
+    assert shadow == frame.model_dump()
+    assert shadow["patient_scope"]["extent"] == "one_tooth"
+    assert shadow["field_meta"]["patient_scope"]["extent"]["status"] == "valid"
+    assert shadow["field_meta"]["aspects"]["error"] == "aspects_empty"
+
+
+def test_a9_shadow_observability_does_not_leak_malformed_raw_secrets() -> None:
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        raw = {
+            "route": "content",
+            "aspects": [],
+            "topic": "implantation",
+            "topic_confidence": 0.9,
+            "patient_situation": {"secret-kind": "secret-value"},
+            "question": "secret-question",
+            "history": ["secret-history"],
+            "exception": "secret-exception",
+        }
+        frame = build_turn_frame_from_raw(
+            raw,
+            allowed_topics=frozenset({"implantation"}),
+        )
+        record_planner_attempt_shadow(
+            attempt=PlannerAttempt(
+                legacy_plan=None,
+                shadow_frame=frame,
+                shadow_status="partial",
+            )
+        )
+        observed = {
+            "ctx": request.ctx,
+            "details": metadata_first_turn_details(),
+            "response_slice": metadata_first_response_meta(),
+        }
+
+    payload = str(observed)
+    for secret in (
+        "secret-kind",
+        "secret-value",
+        "secret-question",
+        "secret-history",
+        "secret-exception",
+    ):
+        assert secret not in payload
 
 
 def test_finalize_ask_includes_partial_shadow_field_errors_only_in_e2e_meta(monkeypatch) -> None:
@@ -310,3 +467,24 @@ def test_finalize_ask_omits_metadata_first_without_e2e_env(monkeypatch) -> None:
         ), patch("orchestration.finalize_turn.emit_bot_event"):
             out = finalize_ask({"answer": "x", "meta": {}}, "sid", "q", route="retrieval_chunk")
     assert "metadata_first" not in (out.get("meta") or {})
+
+
+def test_finalize_ask_omits_real_a9_nested_scope_without_e2e_env(monkeypatch) -> None:
+    monkeypatch.delenv("E2E_USE_TEST_CLIENT", raising=False)
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        from orchestration.finalize_turn import finalize_ask
+
+        _record_a9_scope("one_tooth_missing")
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask(
+                {"answer": "x", "meta": {}},
+                "sid",
+                "q",
+                route="retrieval_chunk",
+            )
+
+    assert "metadata_first" not in (out.get("meta") or {})
+    assert "patient_scope" not in str(out)

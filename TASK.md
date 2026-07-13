@@ -1,232 +1,259 @@
-# TASK — A7 Regression / Live Proof
+# TASK — A7 Topic re-audit: PlannerAttempt shadow quality
 
-Один активный `TASK.md` на один checkpoint. Подготовлен Архитектором после принятого A7 Shadow Wiring `620657d`.
+Один активный `TASK.md` на один checkpoint. Подготовлен после принятого A7 Regression / Live Proof `9dda450`.
 
-Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`. Архитектурная опора: `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`.
+Правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`. Архитектурные источники: `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`, `docs/TOPIC_SHADOW_AUDIT_A6.md`, `docs/A7_REGRESSION_LIVE_PROOF.md`.
 
 ---
 
 ## 1. Точка старта
 
 - Ветка: `codex/stage-a`.
-- A7 Planner split: `a6318a8`.
 - A7 Shadow wiring: `620657d`.
+- A7 Regression proof: `9dda450`.
+- A6 frozen runner: `evals/v5/run_topic_shadow_eval.py`.
 - A6 raw SHA256: `2EF96AB8660657501137B0A6880E7EA54594E02417197F031BE1BCE2D9D5A40A`.
 - Topic matrix hash: `dc356c9c738fb80a10cf0035508d7e8c8247979d`.
 - Preservation hash: `c2072ca74c2da73bf657d793195d2eb6c8ba7bd5`.
-- A5 post-hardening preservation raw SHA256: `BDDDA1E686214C33B4C2563A0271FF01F381C18DC89C67911AAB449D892A3290`.
-- A5 post-hardening smoke raw SHA256: `57F36CE829F7CC54842EB109DC928D63B7EE3534CC29ACCB08DE917F5A2ABEBA`.
-- Рабочее дерево до реализации чистое после отдельного governance-коммита этого файла.
+- A7 regression raw hashes:
+  - preservation `65E4046DDE4683CE8C6CCC92D89E8C1D7DD11B4FE03E5AC5EA702BCA8F506573`;
+  - smoke `34D0FDB8FAA4315BAB9CAA28867ED90EBFEC9CC767C1238E8ABA96A2D84C562E`.
 
 ## 2. Цель
 
-Доказать две разные вещи и не смешивать их:
+Повторить frozen 33-case topic matrix **один раз**, но измерить field-level shadow из `PlannerAttempt`:
 
-1. **Детерминированно:** семь A6 `aspects=[]` путей сохраняют прежний product fail-open, а partial frame остаётся только telemetry.
-2. **Одним live proof:** после runtime wiring не изменились frozen smoke/preservation результаты.
+```text
+one plan_turn_attempt(question, None, "demo")
+        ├─ shadow_frame.topic
+        ├─ shadow_frame.field_meta.topic
+        ├─ shadow_status
+        └─ legacy_plan availability (descriptive only)
+```
 
-Этот checkpoint не измеряет заново качество topic всей матрицы — это отдельный A7 Topic re-audit.
+Главный вопрос re-audit:
 
-## 3. Почему без нового live harness
+> Стали ли topic-поля scoreable в тех случаях, где strict legacy TurnPlan раньше целиком исчезал из-за unrelated `aspects=[]`?
 
-- Семь A6 case ids уже заморожены в `evals/v5/demo/topic_shadow_matrix.json`.
-- Product acceptance уже заморожен в `smoke.json` и `preservation.json`.
-- Новый harness/spec создал бы второй источник ожиданий и лишние LLM-вызовы.
-- Seven-path proof делается интеграционным test-client тестом с deterministic `PlannerAttempt`; smoke/preservation проверяются существующим runner без semantic changes.
+Это measurement-only checkpoint. Routing/evidence/composer/UI/authority не меняются.
+
+## 3. Frozen ground truth
+
+Не создавать новый spec и не менять:
+
+- `evals/v5/demo/topic_shadow_matrix.json`;
+- `evals/v5/demo/preservation.json`;
+- client frontmatter/content.
+
+Expected topic, questions, order, taxonomy и source-doc validation берутся из frozen A6 matrix. `shadow_frame.topic` является field-level представлением того же raw planner topic, поэтому ground truth применим; меняется только способность наблюдать поле при strict legacy failure.
 
 ## 4. Неподвижные инварианты
 
-1. Production-код не меняется.
-2. Frozen specs/harness не меняются.
-3. A6 raw и A5 raw не перезаписываются.
-4. Seven-path тест не вызывает LLM/network и не мокает проверяемый `run_resolver_turn`.
-5. Для каждого из семи кейсов `plan_turn_attempt` вызывается ровно один раз, `resolve_with_fallback` — ровно один раз.
-6. Partial topic/null остаётся в ctx, но product outcome берётся только из fallback `DecisionFrame`.
-7. Нет retry/resnapshot/подмены ожидаемого текущим output.
-8. Live: ровно один smoke run и один preservation run; failed case не перезапускать отдельно.
-9. Live raw сохраняется под новыми именами и не коммитится.
-10. Красный frozen preservation baseline не «чинить» и не считать новой регрессией, если вектор остался прежним.
+1. Ровно один `plan_turn_attempt()` на case, 33 calls total.
+2. Нет `plan_turn()`, второго LLM, retry, selective rerun или classifier.
+3. Один fresh call на каждый case в frozen order.
+4. Old A6 runner/tests/spec/raw не меняются.
+5. New runner не импортирует app/resolver/orchestration/HTTP/UI.
+6. Product runtime не запускается.
+7. Confidence descriptive only; threshold отсутствует.
+8. `authority_decision_allowed=false` независимо от результата.
+9. Exception/raw/question/answer/history не попадают в `A7_CASE` output.
+10. Ошибка одного case учитывается в denominator 33; run продолжается без retry.
+11. Config/hash/taxonomy/source error останавливает до LLM calls с exit 2.
+12. Любой FAIL/ERROR после measurement даёт exit 1; только 33 PASS дают exit 0.
 
-## 5. Seven frozen paths
+## 5. Строгий allowlist harness checkpoint
 
-Из `topic_shadow_matrix.json` использовать только:
+Разрешены только новые файлы:
 
-| id | expected topic |
-|---|---|
-| `topic_a6_04_doctors_overview` | `doctors` |
-| `topic_a6_05_doctors_named` | `doctors` |
-| `topic_a6_06_doctors_implants` | `doctors` |
-| `topic_a6_09_extraction_aftercare` | `extraction` |
-| `topic_a6_28_null_general_price` | `null` |
-| `topic_a6_30_null_booking` | `null` |
-| `topic_a6_31_null_pain` | `null` |
+1. `evals/v5/run_topic_shadow_attempt_eval.py`
+2. `tests/test_topic_shadow_attempt_eval_contract.py`
 
-Test обязан читать questions/topics из frozen JSON, а не дублировать их вручную.
+Любой modified tracked file → ❌ и СТОП.
 
-Для replay:
+Особенно запрещено менять production, contracts, orchestration, old A6 harness/tests, frozen specs, TASK после governance commit, docs/audits, raw.
+
+## 6. Reuse boundary
+
+Новый runner может импортировать read-only helpers из `evals.v5.run_topic_shadow_eval`:
+
+- frozen paths/hashes/taxonomy;
+- `HarnessConfigError`;
+- `load_and_validate_spec()`;
+- normalization/confidence helpers или `build_summary()` при сохранении семантики.
+
+Запрещено monkeypatch/менять A6 module state в production run. New summary обязан явно идентифицироваться как A7 attempt re-audit, даже если переиспользует A6 aggregation.
+
+## 7. Case result contract
+
+Каждая строка начинается `A7_CASE ` и содержит **ровно**:
 
 ```text
-raw aspects=[]
-legacy_plan=None
-shadow_status=partial
-fallback decision = отдельный product sentinel
+index
+case_id
+case_kind
+expected_topic
+observed_topic
+topic_confidence
+topic_field_status
+topic_field_error
+shadow_status
+legacy_plan_available
+status
+reason
 ```
 
-Проверить для каждого case:
+Никаких raw payload/question/exception fields.
 
-- один attempt call с exact question/client;
-- один resolver fallback;
-- `turn_planner_used=false`, `resolver_used=true`;
-- ctx `turn_frame_shadow_status=partial`;
-- ctx topic равен expected topic или `None`;
-- aspects error = `aspects_empty`;
-- product decision/intent/service topic/scope не берутся из shadow topic;
-- no publish/legacy wrapper call;
-- recorder return не участвует в outcome.
+## 8. Classification
 
-## 6. Строгий allowlist до live
+### Attempt unavailable
 
-Разрешён только:
+| condition | status | reason |
+|---|---|---|
+| call raises | ERROR | `planner_exception` |
+| `shadow_status=not_available` / no attempt shadow | ERROR | `planner_unavailable` |
+| `shadow_status=degraded` | ERROR | `shadow_degraded` |
 
-1. `tests/test_turn_frame_shadow.py` — один параметризованный seven-path regression test и узкие helpers.
+Exception text не выводится.
 
-Любой другой diff → ❌ и СТОП.
+### Topic field
 
-Особенно запрещено менять production, existing assertions, TASK после governance commit, specs/harness, client content, pricebook, marketing.
+| FieldMeta status | semantics |
+|---|---|
+| `valid` | observed topic должен быть в taxonomy; confidence 0..1; exact comparison |
+| `missing` | observed=None, confidence=0.0; scoreable null |
+| `invalid` | ERROR `invalid_or_out_of_taxonomy`; stable `topic_field_error` разрешён |
+| `defaulted` | ERROR `invalid_shadow_metadata` |
 
-## 7. Unit checkpoint
+Дополнительные inconsistent frame/meta значения → ERROR `invalid_shadow_metadata`.
 
-Команды исполнителя и checker:
+Exact observed==expected → PASS `exact_match`; валидное неравенство → FAIL `topic_mismatch`.
+
+`partial` сам по себе **не ошибка**: если topic FieldMeta valid/missing, поле scoreable.
+
+## 9. Summary contract
+
+Одна строка `A7_SUMMARY ` после 33 cases. Обязательные поля:
+
+- `measurement_id="a7_topic_shadow_attempt_reaudit"`;
+- existing A6 exact-match/per-topic/ambiguous/confusion/confidence metrics;
+- `total=33`, `passed`, `failed`, `errors`, `skipped=0`;
+- `scoreable_count = passed + failed`;
+- `shadow_status_counts` для `ok|partial|not_available|degraded`;
+- `topic_field_status_counts` для `valid|missing|invalid|defaulted|unavailable`;
+- `legacy_plan_available_count`;
+- `planner_unavailable_count`;
+- `invalid_or_out_of_taxonomy_count`;
+- `authority_decision_allowed=false`.
+
+Confusion sum = 33. Unavailable/degraded идут в technical unavailable column; invalid metadata — invalid column.
+
+## 10. Exit/CLI
+
+- no args only;
+- unknown arg → stderr stable config error, exit 2, calls=0;
+- preflight error → exit 2, calls=0;
+- 33 PASS → exit 0;
+- любой FAIL/ERROR → exit 1.
+
+## 11. Обязательные unit tests
+
+1. Old A6 harness/spec hashes unchanged.
+2. Production default symbol = `plan_turn_attempt`, не wrapper.
+3. Fake attempt called 33 times in frozen order.
+4. Exactly one call per case; no retry.
+5. A6 worked example `topic=doctors, aspects=[]`, partial + legacy None → scoreable PASS.
+6. Missing topic + confidence 0 → scoreable null.
+7. Partial topic mismatch → FAIL, не ERROR.
+8. Invalid topic metadata → ERROR.
+9. not_available/degraded/exception различимы.
+10. valid shadow + legacy None scoreable; legacy availability descriptive.
+11. Summary denominator/confusion/status counts exact.
+12. Output case keys ровно 12; no leaks.
+13. Config/hash/taxonomy/source failure до calls.
+14. Unknown CLI arg exit 2 до calls.
+15. No app/resolver/orchestration/http imports.
+16. No skip/xfail/assert True/conditional PASS.
+17. Negative tests возвращают конкретные reason strings.
+
+## 12. Harness commands
 
 ```powershell
+.venv\codex312\Scripts\python.exe -m pytest -q tests/test_topic_shadow_attempt_eval_contract.py
+.venv\codex312\Scripts\python.exe -m pytest -q tests/test_topic_shadow_eval_contract.py
 .venv\codex312\Scripts\python.exe -m pytest -q `
-  tests/test_turn_frame_shadow.py `
-  tests/test_metadata_first_observability.py `
-  tests/test_turn_planner_wiring.py
-
-.venv\codex312\Scripts\python.exe -m pytest -q `
-  tests/test_turn_frame_from_raw.py `
   tests/test_turn_planner_llm.py `
-  tests/test_turn_frame_contract.py `
-  tests/test_planner_attempt_contract.py `
-  tests/test_turn_plan_protocol_guard.py
-
-.venv\codex312\Scripts\python.exe -m pytest -q `
-  tests/test_contacts_routing.py `
-  tests/test_pricebook_golden.py `
-  tests/test_price_layer_parity.py
-
+  tests/test_turn_frame_from_raw.py `
+  tests/test_planner_attempt_contract.py
+.venv\codex312\Scripts\python.exe -m py_compile evals/v5/run_topic_shadow_attempt_eval.py
+.venv\codex312\Scripts\python.exe evals/v5/run_topic_shadow_attempt_eval.py --unexpected-argument
 git diff --check
-git diff --name-only
-git diff -- production protected paths
+git status --short
+git diff -- evals/v5/run_topic_shadow_eval.py tests/test_topic_shadow_eval_contract.py `
+  evals/v5/demo/topic_shadow_matrix.json evals/v5/demo/preservation.json
 git hash-object evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
 ```
 
-Live/LLM на unit checkpoint не запускать. После checker `✅` — отдельный test commit.
+Live/LLM не запускать до checker `✅` и отдельного harness commit/push.
 
-## 8. Live preflight
+## 13. Harness review/commit
 
-Перед первым live call:
+Checker начинает с test diff, проверяет functional negative cases и source firewall, сам запускает §12. При `✅` — отдельный commit двух новых файлов + push `codex/stage-a`.
+
+## 14. Live preflight
+
+Перед единственным run:
 
 - clean tree;
-- test commit является HEAD;
-- unit suites зелёные;
-- frozen hashes совпадают;
-- старые raw hashes совпадают;
-- новые файлы отсутствуют:
-  - `eval_a7_regression_preservation_last.txt`
-  - `eval_a7_regression_smoke_last.txt`
+- harness commit = HEAD;
+- unit commands зелёные;
+- frozen hashes/raw hashes совпадают;
+- `eval_topic_shadow_a7_last.txt` и любые `eval_topic_shadow_a7_*` отсутствуют;
+- `PYTHONIOENCODING=utf-8` для корректной Windows console serialization.
 
-Если любой gate не пройден → live не запускать.
+## 15. Единственный live run
 
-## 9. Единственные разрешённые live runs
+```text
+python evals/v5/run_topic_shadow_attempt_eval.py
+```
 
-Порядок:
+Полный stdout/stderr + `A7_EXIT_CODE` сохранить в `eval_topic_shadow_a7_last.txt`.
 
-1. preservation — один run;
-2. smoke — один run.
+Ровно один attempt. Retry/selective rerun запрещены независимо от результата.
 
-Оба через существующий `evals/v5/run_demo_eval.py`, `E2E_USE_TEST_CLIENT=1`, вывод целиком сохранить в новые raw-файлы вместе с exit code.
+## 16. Live interpretation
 
-Запрещено:
+Run технически полный, если:
 
-- retry;
-- selective case rerun;
-- исправлять код/spec между runs;
-- перезаписывать raw;
-- запускать A6 topic harness.
+- 33 `A7_CASE` + 1 `A7_SUMMARY` + exit;
+- indices/order exact;
+- totals/confusion=33;
+- skipped=0;
+- raw целый и hash зафиксирован.
 
-## 10. Frozen live acceptance
+Quality sample:
 
-### Preservation
+- `errors=0` → все 33 scoreable;
+- `errors>0` → технически неполный quality sample, но raw остаётся единственным честным результатом;
+- FAIL — честный mismatch, не technical error;
+- сравнить отдельно coverage (`scoreable/33`) и correctness (`PASS/scoreable`).
 
-Ожидается прежний frozen baseline, не 6/6:
+Никаких автоматических authority conclusions.
 
-| case | expected |
-|---|---|
-| 01 contacts | PASS |
-| 02 osseointegration | FAIL: прежний answer/evidence target-red |
-| 03 comparison | FAIL: прежний evidence target-red |
-| 04 classic price | PASS |
-| 05 All-on-4 price | FAIL: прежний quick-reply target-red |
-| 06 marketing absence | PASS |
+## 17. Audit doc
 
-Итого: `passed=3, failed=3, errors=0, skipped=0`, exit 1.
+После run разрешён только новый:
 
-Если кейс меняет статус или появляется новый reason/error → ❌ regression investigation, без retry.
+- `docs/TOPIC_SHADOW_REAUDIT_A7.md`
 
-### Smoke
+Он содержит raw integrity, independent metrics, A6↔A7 coverage/correctness comparison, per-topic, ambiguous, statuses, legacy availability, confidence descriptive, errors/mismatches, line refs, console/logging limitations, доказано/не доказано. Затем independent Cursor doc↔raw review, отдельный docs commit/push.
 
-Ожидается: `24/24 PASS`, `errors=0`, `skipped=0`, exit 0.
+## 18. Стоп-условия
 
-Любой FAIL/ERROR → ❌ regression investigation, без retry.
+СТОП, если нужен production/spec/old harness diff; второй call/retry; observed expectations после live; raw уже существует; run прерван; или partial предлагается подключить к product.
 
-## 11. Live audit document
+## 19. Definition of Done
 
-После единственных runs разрешено создать только:
-
-- `docs/A7_REGRESSION_LIVE_PROOF.md`
-
-Документ обязан содержать:
-
-- commit/branch/environment;
-- raw filenames, sizes, SHA256, attempts=1;
-- exact preservation per-case vector и reasons;
-- smoke summary;
-- сравнение с A5 baseline: unchanged/changed;
-- errors/skipped/timeouts/logging errors;
-- frozen hashes после run;
-- честное разделение unit replay и live proof;
-- утверждение, что topic quality/authority не оценивались;
-- line refs в raw;
-- следующий шаг только A7 Topic re-audit.
-
-Нельзя включать raw, question/history/answer dumps в git.
-
-## 12. Review/commit sequence
-
-1. Governance commit TASK — до работы.
-2. Seven-path test implementation.
-3. Cursor checker unit review.
-4. При `✅`: отдельный test commit + push `codex/stage-a`.
-5. Live preflight и два единственных runs.
-6. Audit doc, independent checker doc↔raw review.
-7. При `✅`: отдельный docs commit + push `codex/stage-a`.
-
-## 13. Стоп-условия
-
-СТОП, если:
-
-- нужен production/spec/harness diff;
-- seven-path replay требует тематического production workaround;
-- unit test вызывает реальный LLM;
-- live output отличается от frozen vector;
-- один из raw-файлов уже существует;
-- run прерван или неполон;
-- кажется нужным retry;
-- требуется менять acceptance после просмотра live.
-
-## 14. Definition of Done
-
-A7 Regression / Live Proof завершён, когда семь frozen fail-open paths детерминированно доказывают telemetry-only wiring, checker принял unit test, один preservation и один smoke live run воспроизводят frozen product baseline, два новых raw сохранены без перезаписи, audit точно отражает raw, checker принял audit, commits/push сделаны только в `codex/stage-a`.
+A7 Topic re-audit завершён, когда новый attempt-aware harness принят checker, один 33-case live run сохранён без retry, audit честно разделяет coverage/correctness и сравнивает A6 с A7 без authority claims, checker принял doc↔raw, commits/push выполнены только в `codex/stage-a`.

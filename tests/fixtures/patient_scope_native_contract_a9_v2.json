@@ -1,0 +1,347 @@
+{
+  "schema_version": "a9.patient_scope_native_contract.v2",
+  "purpose": "Frozen synthetic unit contract for future shadow-only native patient-scope extraction.",
+  "implementation_enabled": false,
+  "live_allowed": false,
+  "authority_decision_allowed": false,
+  "raw_contract": {
+    "legacy_keys": ["route", "aspects", "service_id", "followup_of", "needs_clarify", "patient_situation", "brand_filter", "topic", "topic_confidence"],
+    "shadow_sibling": "patient_scope",
+    "patient_scope_keys": ["extent", "jaw", "stage", "modifiers"],
+    "allowed_values": {
+      "extent": ["unknown", "one_tooth", "few_teeth", "full_arch"],
+      "jaw": ["unknown", "upper", "lower", "both"],
+      "stage": ["unknown", "extraction_context", "implant_placed"],
+      "modifiers": ["reported_bone_deficit"]
+    },
+    "safe_values": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+    "metadata_contract": {
+      "confidence": 0.0,
+      "container_present_provenance": "turn_plan.raw.patient_scope",
+      "container_absent_provenance": "turn_plan.schema_default",
+      "schema_default_provenance": "turn_plan.schema_default",
+      "native_field_provenance": {
+        "extent": "turn_plan.raw.patient_scope.extent",
+        "jaw": "turn_plan.raw.patient_scope.jaw",
+        "stage": "turn_plan.raw.patient_scope.stage",
+        "modifiers": "turn_plan.raw.patient_scope.modifiers"
+      },
+      "bridge_field_provenance": {
+        "extent": "turn_plan.patient_situation.extent",
+        "jaw": "turn_plan.patient_situation.jaw",
+        "stage": "turn_plan.patient_situation.stage",
+        "modifiers": "turn_plan.patient_situation.modifiers"
+      }
+    }
+  },
+  "projection_cases": [
+    {
+      "id": "projection_valid_native_valid_legacy",
+      "synthetic_planner_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "upper_jaw_missing_or_complex", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8,
+        "patient_scope": {"extent": "full_arch", "jaw": "upper", "stage": "unknown", "modifiers": ["reported_bone_deficit"]}
+      },
+      "expected_legacy_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "upper_jaw_missing_or_complex", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8
+      },
+      "expected_legacy_valid": true
+    },
+    {
+      "id": "projection_native_plus_unknown_top_level",
+      "synthetic_planner_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "one_tooth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8,
+        "patient_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+        "synthetic_unknown_top_level": "must_survive_projection"
+      },
+      "expected_legacy_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "one_tooth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8,
+        "synthetic_unknown_top_level": "must_survive_projection"
+      },
+      "expected_legacy_valid": false
+    },
+    {
+      "id": "projection_invalid_native_valid_legacy",
+      "synthetic_planner_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "one_tooth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8, "patient_scope": null
+      },
+      "expected_legacy_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "one_tooth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8
+      },
+      "expected_legacy_valid": true
+    },
+    {
+      "id": "projection_valid_native_invalid_legacy",
+      "synthetic_planner_object": {
+        "route": "content", "aspects": [], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "one_tooth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8,
+        "patient_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []}
+      },
+      "expected_legacy_object": {
+        "route": "content", "aspects": [], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "one_tooth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8
+      },
+      "expected_legacy_valid": false
+    },
+    {
+      "id": "projection_input_immutability",
+      "synthetic_planner_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "few_teeth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8,
+        "patient_scope": {"extent": "few_teeth", "jaw": "lower", "stage": "unknown", "modifiers": []}
+      },
+      "expected_legacy_object": {
+        "route": "content", "aspects": ["overview"], "service_id": null, "followup_of": null,
+        "needs_clarify": false, "patient_situation": "few_teeth_missing", "brand_filter": null,
+        "topic": "implantation", "topic_confidence": 0.8
+      },
+      "expected_legacy_valid": true
+    }
+  ],
+  "precedence_cases": [
+    {
+      "id": "precedence_absent_uses_bridge",
+      "synthetic_input": {"patient_situation": "one_tooth_missing"},
+      "expected_source": "scalar_bridge",
+      "expected_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "defaulted", "error": null, "provenance": "turn_plan.schema_default"},
+      "expected_field_status": {"extent": "valid", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "expected_field_provenance": {"extent": "turn_plan.patient_situation.extent", "jaw": "turn_plan.schema_default", "stage": "turn_plan.schema_default", "modifiers": "turn_plan.schema_default"},
+      "forbid_scalar_backfill": false
+    },
+    {
+      "id": "precedence_present_object_uses_native",
+      "synthetic_input": {"patient_situation": "one_tooth_missing", "patient_scope": {"extent": "full_arch", "jaw": "both", "stage": "unknown", "modifiers": []}},
+      "expected_source": "native",
+      "expected_scope": {"extent": "full_arch", "jaw": "both", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null, "provenance": "turn_plan.raw.patient_scope"},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_provenance": {"extent": "turn_plan.raw.patient_scope.extent", "jaw": "turn_plan.raw.patient_scope.jaw", "stage": "turn_plan.raw.patient_scope.stage", "modifiers": "turn_plan.raw.patient_scope.modifiers"},
+      "forbid_scalar_backfill": true
+    },
+    {
+      "id": "precedence_present_invalid_container_no_bridge",
+      "synthetic_input": {"patient_situation": "one_tooth_missing", "patient_scope": null},
+      "expected_source": "native_invalid_container",
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "invalid", "error": "patient_scope_invalid_type", "provenance": "turn_plan.raw.patient_scope"},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "expected_field_provenance": {"extent": "turn_plan.schema_default", "jaw": "turn_plan.schema_default", "stage": "turn_plan.schema_default", "modifiers": "turn_plan.schema_default"},
+      "forbid_scalar_backfill": true
+    },
+    {
+      "id": "precedence_present_invalid_member_no_backfill",
+      "synthetic_input": {"patient_situation": "one_tooth_missing", "patient_scope": {"extent": 42, "jaw": "upper", "stage": "unknown", "modifiers": []}},
+      "expected_source": "native",
+      "expected_scope": {"extent": "unknown", "jaw": "upper", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null, "provenance": "turn_plan.raw.patient_scope"},
+      "expected_field_status": {"extent": "invalid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_provenance": {"extent": "turn_plan.raw.patient_scope.extent", "jaw": "turn_plan.raw.patient_scope.jaw", "stage": "turn_plan.raw.patient_scope.stage", "modifiers": "turn_plan.raw.patient_scope.modifiers"},
+      "forbid_scalar_backfill": true
+    }
+  ],
+  "parser_cases": [
+    {
+      "id": "container_valid_object",
+      "raw_container": {"extent": "one_tooth", "jaw": "upper", "stage": "implant_placed", "modifiers": ["reported_bone_deficit"]},
+      "expected_scope": {"extent": "one_tooth", "jaw": "upper", "stage": "implant_placed", "modifiers": ["reported_bone_deficit"]},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "ok"
+    },
+    {
+      "id": "container_null_invalid_type", "raw_container": null,
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "invalid", "error": "patient_scope_invalid_type"},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "container_non_object_invalid_type", "raw_container": 42,
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "invalid", "error": "patient_scope_invalid_type"},
+      "expected_field_status": {"extent": "defaulted", "jaw": "defaulted", "stage": "defaulted", "modifiers": "defaulted"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "container_extra_field_preserves_neighbors",
+      "raw_container": {"extent": "few_teeth", "jaw": "lower", "stage": "extraction_context", "modifiers": [], "synthetic_extra": "must_not_serialize"},
+      "expected_scope": {"extent": "few_teeth", "jaw": "lower", "stage": "extraction_context", "modifiers": []},
+      "expected_container": {"status": "invalid", "error": "patient_scope_extra_field"},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "members_valid_composite",
+      "raw_container": {"extent": "full_arch", "jaw": "both", "stage": "implant_placed", "modifiers": ["reported_bone_deficit"]},
+      "expected_scope": {"extent": "full_arch", "jaw": "both", "stage": "implant_placed", "modifiers": ["reported_bone_deficit"]},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "ok"
+    },
+    {
+      "id": "members_explicit_unknown_empty",
+      "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "ok"
+    },
+    {
+      "id": "members_all_missing", "raw_container": {},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "missing", "jaw": "missing", "stage": "missing", "modifiers": "missing"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "extent_invalid_type", "raw_container": {"extent": 42, "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "invalid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": "patient_extent_invalid_type", "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "extent_not_allowed", "raw_container": {"extent": "synthetic_many_teeth", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "invalid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": "patient_extent_not_allowed", "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "jaw_invalid_type", "raw_container": {"extent": "unknown", "jaw": 42, "stage": "unknown", "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "invalid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": "patient_jaw_invalid_type", "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "jaw_not_allowed", "raw_container": {"extent": "unknown", "jaw": "synthetic_left", "stage": "unknown", "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "invalid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": "patient_jaw_not_allowed", "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "stage_invalid_type", "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": 42, "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "invalid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": "patient_stage_invalid_type", "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "stage_not_allowed", "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": "synthetic_healed", "modifiers": []},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "invalid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": "patient_stage_not_allowed", "modifiers": null},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "modifiers_invalid_type_non_list", "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": "reported_bone_deficit"},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "invalid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": "patient_modifiers_invalid_type"},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "modifiers_invalid_type_item", "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": [42]},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "invalid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": "patient_modifiers_invalid_type"},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "modifier_not_allowed", "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": ["reported_bone_deficit", "synthetic_unsupported"]},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "invalid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": "patient_modifier_not_allowed"},
+      "expected_shadow_status": "partial"
+    },
+    {
+      "id": "modifiers_duplicate_canonical", "raw_container": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": ["reported_bone_deficit", "reported_bone_deficit"]},
+      "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": ["reported_bone_deficit"]},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "valid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": null, "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "ok"
+    },
+    {
+      "id": "invalid_member_preserves_neighbors", "raw_container": {"extent": 42, "jaw": "upper", "stage": "implant_placed", "modifiers": ["reported_bone_deficit"]},
+      "expected_scope": {"extent": "unknown", "jaw": "upper", "stage": "implant_placed", "modifiers": ["reported_bone_deficit"]},
+      "expected_container": {"status": "valid", "error": null},
+      "expected_field_status": {"extent": "invalid", "jaw": "valid", "stage": "valid", "modifiers": "valid"},
+      "expected_field_error": {"extent": "patient_extent_invalid_type", "jaw": null, "stage": null, "modifiers": null},
+      "expected_shadow_status": "partial"
+    }
+  ],
+  "prompt_contract": {
+    "required_semantics": [
+      "object_with_exact_four_keys", "current_message_explicit_only", "unknown_or_empty_without_guess",
+      "history_referent_without_scope_carry", "legacy_patient_situation_separate",
+      "no_service_protocol_price_document_evidence_diagnosis_selection", "urgency_and_pain_outside_scope",
+      "reported_bone_is_context_not_confirmation", "json_only_no_extra_fields"
+    ],
+    "forbidden_semantics": [
+      "service_protocol_mapping", "diagnosis_inference", "old_scope_value_carry", "frozen_live_case_ids",
+      "exhaustive_phrase_classifier", "second_llm_call", "scope_retry"
+    ],
+    "examples": [
+      {"id": "meaning_one_tooth", "expected_scope": {"extent": "one_tooth", "jaw": "unknown", "stage": "unknown", "modifiers": []}},
+      {"id": "meaning_full_upper_reported_bone", "expected_scope": {"extent": "full_arch", "jaw": "upper", "stage": "unknown", "modifiers": ["reported_bone_deficit"]}},
+      {"id": "meaning_implant_placed", "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "implant_placed", "modifiers": []}},
+      {"id": "meaning_informational_no_patient_facts", "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []}},
+      {"id": "meaning_vague_followup_no_current_scope", "expected_scope": {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []}}
+    ]
+  },
+  "completion_size_sample": {
+    "classification": "representative_upper_size_not_worst_case",
+    "planner_object": {
+      "route": "price_concern",
+      "aspects": ["price", "payment", "warranty", "pain", "included", "duration", "comparison", "stages", "overview"],
+      "service_id": "synthetic_catalog_service_identifier",
+      "followup_of": "synthetic_catalog_service_identifier",
+      "needs_clarify": true,
+      "patient_situation": "upper_jaw_missing_or_complex",
+      "brand_filter": {"brand_group": "synthetic_brand_group", "brand": "synthetic_brand_identifier"},
+      "topic": "synthetic_allowed_topic_identifier",
+      "topic_confidence": 1.0,
+      "patient_scope": {"extent": "full_arch", "jaw": "lower", "stage": "extraction_context", "modifiers": ["reported_bone_deficit"]}
+    },
+    "without_patient_scope_utf8_bytes": 465,
+    "with_patient_scope_utf8_bytes": 585,
+    "native_sibling_delta_utf8_bytes": 120,
+    "tokenizer_exact_tokens": null,
+    "current_max_completion_tokens": 300,
+    "budget_verdict": "implementation_decision_required"
+  }
+}

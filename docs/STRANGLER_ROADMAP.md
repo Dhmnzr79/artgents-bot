@@ -22,8 +22,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Native Container Metadata Contract** (governance `375ac13`, completion — текущий commit) |
-| Следующий checkpoint | **A9 Native Raw Contract / Prompt Spec** |
+| Последний завершённый checkpoint | **A9 Native Raw Contract / Prompt Spec** (governance `405a6ac`, completion — текущий commit) |
+| Следующий checkpoint | **A9 Native Extraction Implementation** |
 | Что сейчас отвечает пациенту | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -189,7 +189,7 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] One-run audit (`10b4739`)
 - [x] Native extraction design (`16ced47`)
 - [x] Native container metadata contract (governance `375ac13`, contract/tests reviewed)
-- [ ] Native raw contract и prompt spec
+- [x] Native raw contract и prompt spec (governance `405a6ac`, frozen fixture/tests reviewed)
 - [ ] Native extraction implementation
 - [ ] Native shadow wiring/firewall proof
 - [ ] Manual-contact `not_applicable` taxonomy
@@ -214,24 +214,24 @@ A1–A9 не были целиком придуманы заранее как н
 
 После будущего подтверждения качества эта ось сможет помогать делать ответ релевантнее масштабу ситуации, но только через отдельное product/authority решение. Она не должна сама ставить диагноз или назначать лечение.
 
-Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](PATIENT_SCOPE_SHADOW_AUDIT_A9.md) и [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md).
+Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
 
 ## Следующий checkpoint
 
-### A9 Native Raw Contract / Prompt Spec
+### A9 Native Extraction Implementation
 
-Нужно заранее и отдельно зафиксировать:
+Нужно реализовать уже замороженные правила:
 
-- точную форму будущего `patient_scope` в едином JSON planner’а;
-- как из этого JSON безопасно отделять legacy product payload;
-- какие значения, пропуски и ошибки допустимы для четырёх scope-полей;
-- какие краткие правила будущий prompt должен объяснить модели.
+- добавить `patient_scope` в output-инструкцию единого planner call;
+- разобрать четыре поля независимо и безопасно;
+- удалить только shadow sibling перед strict legacy validation;
+- использовать scalar bridge только когда native sibling полностью отсутствует.
 
-Сначала это будет закреплено спецификацией и frozen unit fixtures. Сам native parser и изменение действующего prompt относятся к следующему implementation checkpoint.
+До кода новый TASK обязан отдельно решить, достаточно ли `max_completion_tokens=300`: frozen representative sample показал `465 → 585 UTF-8 bytes` (`+120`), но bytes не равны точным model tokens.
 
-**Как это скажется на боте:** прямого изменения ответа пока не будет. Мы заранее ставим технические «ограждения», чтобы будущий новый JSON не сломал проверенный legacy product path и чтобы плохое поле не уничтожало хорошие соседние данные.
+**Как это скажется на боте:** новый planner начнёт формировать более точную составную карточку ситуации параллельно с legacy-полем. Она останется shadow-only: пациентский ответ, цена, маршрут и UI не должны переключиться на неё.
 
-Checkpoint — docs/unit-fixture only: без изменения действующего prompt, runtime-ответов и без live/LLM. Этот roadmap сам по себе implementation не разрешает.
+Checkpoint будет code/unit-only. Live/LLM по-прежнему требует отдельного разрешения владельца. Этот roadmap сам по себе implementation не разрешает: сначала новый governance `TASK.md` и checker-review.
 
 ## Как поддерживать чекбоксы
 

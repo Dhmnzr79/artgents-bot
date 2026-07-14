@@ -14,6 +14,7 @@
 | `TECH_DEBT.md` | открытый долг и закрытые решения |
 | `FULLCONTEXT_ROADMAP.md` | живой roadmap full-context ядра |
 | `STRANGLER_ROADMAP.md` | канонический статус архитектурной миграции A1–A9, чекбоксы и влияние на продукт |
+| `PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md` | frozen A9 raw/projection/parser/prompt spec перед native implementation; shadow-only |
 
 ---
 

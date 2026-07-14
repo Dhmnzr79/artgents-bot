@@ -1,8 +1,8 @@
-# TASK — A9 Native Raw Contract / Prompt Spec
+# TASK — A9 Native Extraction Implementation
 
-Один активный `TASK.md` на один checkpoint. Цель — до native implementation заморозить точную форму будущего planner JSON, exact legacy projection, parser-state expectations и semantic requirements будущего prompt.
+Один активный `TASK.md` на один checkpoint. Реализовать approved/frozen A9 native patient-scope extraction в существующем едином planner call: compact prompt contract, exact one-key legacy projection и independent field parser с scalar bridge fallback только при absent sibling.
 
-Checkpoint docs/unit-fixture only. Production code, действующий `_SYSTEM`, raw builder, runtime и product behavior не меняются. Live/LLM запрещены.
+Checkpoint code/unit-only, shadow-only. Live/LLM, product authority и downstream wiring запрещены.
 
 Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`.
 
@@ -11,261 +11,268 @@ Checkpoint docs/unit-fixture only. Production code, действующий `_SYS
 ## 1. Baseline
 
 - branch `codex/stage-a`;
-- HEAD `28a8b24 feat: add A9 patient scope container metadata`;
+- HEAD `7425c77 test: freeze A9 native raw contract spec`;
 - `origin/codex/stage-a` на том же commit;
 - рабочее дерево до governance diff чистое;
 - approved design: `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` (`16ced47`);
-- container metadata contract завершён: governance `375ac13`, implementation `28a8b24`;
-- первый A9 raw immutable и не перезапускается без отдельного разрешения;
-- product firewall сохранён, patient-scope authority запрещена.
+- frozen v2 spec: `docs/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md`;
+- frozen machine fixture: `tests/fixtures/patient_scope_native_contract_a9_v2.json`;
+- container metadata contract завершён (`28a8b24`);
+- product firewall сохранён, patient-scope authority запрещена;
+- первый A9 raw immutable и не перезапускается.
 
-## 2. Deliverables и allowlist
+## 2. Completion-budget decision до code
+
+Default planner model: `qwen3.6-flash`. Локального model tokenizer в repository/runtime environment нет; exact token count не заявляется и live-подбор запрещён.
+
+Representative capacity evidence из frozen fixture:
+
+- representative full object без sibling: `465 UTF-8 bytes`;
+- с native sibling: `585 UTF-8 bytes`;
+- additive delta: `120 bytes`;
+- sample содержит все legacy fields и все 9 allowed aspects, но не объявляется общим worst-case;
+- synthetic service ID: 36 bytes, current demo maximum: 29;
+- synthetic brand group: 21 bytes, current demo maximum: 6;
+- synthetic brand: 26 bytes, current demo maximum: 13;
+- synthetic topic: 34 bytes, current demo maximum: 14;
+- native values — bounded enums/one-item modifier list.
+
+Отдельный derived compact current-demo reference, построенный из самых длинных **фактических** legacy/native enum и config values, занимает `530 UTF-8 bytes`. Он учитывает `existing_implant_prosthetic_stage`, `jaw=unknown`, все aspects и текущие longest demo catalog/topic/brand values. Это current-config reference, не bound на whitespace, произвольные будущие client strings или tokenizer output.
+
+Решение checkpoint: изменить private planner ceiling с `300` на `700 max_completion_tokens`.
+
+Обоснование policy:
+
+- cap `300` нельзя честно доказать достаточным без tokenizer;
+- frozen representative sample занимает 585 bytes, derived current-demo compact reference — 530 bytes;
+- `700` даёт консервативный capacity margin над обоими compact byte measurements, но **не является universal token/whitespace guarantee**;
+- prompt требует compact JSON и exact fields;
+- это ceiling, не второй call, не retry и не разрешение на free text;
+- arbitrary future client strings не bounded контрактом: unit guard обязан остановить drift current demo maxima за frozen synthetic catalog-field lengths, после чего нужен новый budget review;
+- tokenizer-exact tokens не известны; byte measurements не переименовываются в tokens.
+
+Canonical planner assumption/guard: для Qwen planner call thinking отключается явно через `extra_body={"enable_thinking": false}` независимо от global `QWEN_ENABLE_THINKING`. Для non-Qwen override Qwen-specific `extra_body` не передаётся. Unit tests обязаны проверить оба kwargs paths.
+
+Не менять model, temperature или timeout. Не поднимать cap выше `700` в этом checkpoint.
+
+## 3. Deliverables и allowlist
 
 После отдельного governance commit разрешено менять только:
 
-1. создать `docs/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md`;
-2. создать `tests/fixtures/patient_scope_native_contract_a9_v2.json`;
-3. создать `tests/test_patient_scope_native_contract_spec.py`;
-4. обновить `docs/README.md` — только добавить новый spec в канонический список A9;
-5. после independent spec review `✅` обновить `docs/STRANGLER_ROADMAP.md`:
-   - отметить `[x] Native raw contract и prompt spec`;
+### Production
+
+1. `core/turn_frame_from_raw.py`
+2. `core/turn_planner_llm.py`
+
+### Tests
+
+3. `tests/test_turn_frame_from_raw.py`
+4. `tests/test_turn_planner_llm.py`
+5. `tests/test_patient_scope_native_contract_spec.py`
+
+В spec-test разрешено только заменить финальный pre-implementation gate на post-implementation binding. Hardcoded manifests, declarative expectations, fixture paths, `465/585/120` evidence и frozen semantics не менять/не ослаблять.
+
+### Roadmap после checker ✅
+
+6. `docs/STRANGLER_ROADMAP.md` — только после independent code review `✅`:
+   - отметить `[x] Native extraction implementation`;
    - назвать последним завершённым этот checkpoint;
-   - назвать следующим `A9 Native Extraction Implementation`;
+   - назвать следующим `A9 Native Shadow Wiring / Firewall Proof`;
    - сохранить A9 parent `[ ]`, shadow-only и authority forbidden.
 
-`TASK.md` после governance commit не менять. Любой другой tracked/untracked file → `❌` и СТОП.
+Frozen spec doc/JSON, v1 matrix/harness/raw/audit и любой другой tracked/untracked file менять запрещено.
 
-## 3. Frozen raw contract
+## 4. Native parser contract
 
-Spec обязан зафиксировать flat planner object с прежними legacy fields и ровно одним новым top-level shadow sibling `patient_scope`.
+`core/turn_frame_from_raw.py`:
 
-`patient_scope` — object ровно с четырьмя обязательными keys:
+1. Проверять **presence**, а не truthiness:
+   - key `patient_scope` absent → существующий scalar bridge byte/semantics unchanged;
+   - key present → только native container, scalar не backfill’ит ни одного member.
+2. Не мутировать raw.
+3. Container:
+   - object только с allowed keys → `valid/None`;
+   - `null`/wrong type → `invalid/patient_scope_invalid_type`, safe frame, четыре child metas `defaulted`;
+   - unknown extra → `invalid/patient_scope_extra_field`, known members parse independently;
+   - object с missing/invalid member → container остаётся `valid`.
+4. Container provenance `turn_plan.raw.patient_scope`, confidence `0.0`.
+5. Member provenance `turn_plan.raw.patient_scope.<field>`, включая missing/invalid; invalid-container default children используют `turn_plan.schema_default`.
+6. Scalar bridge provenance `turn_plan.patient_situation.*` и current values/statuses не менять.
 
-- `extent`: `unknown | one_tooth | few_teeth | full_arch`;
-- `jaw`: `unknown | upper | lower | both`;
-- `stage`: `unknown | extraction_context | implant_placed`;
-- `modifiers`: list, допустимое значение элемента только `reported_bone_deficit`.
-
-`unknown`/`[]` означают явное незнание. `null` не означает all-unknown и является invalid container.
-
-`patient_situation` остаётся отдельным legacy product field. Одновременное присутствие scalar и nested output не означает merge/reconciliation и не создаёт второй LLM-call.
-
-## 4. Exact legacy projection contract
-
-Frozen fixtures обязаны доказать будущей implementation:
-
-1. Из original parsed dict удаляется только top-level key `patient_scope`.
-2. Все legacy values сохраняются без нормализации новым A9 seam.
-3. Любой второй unknown top-level key остаётся в projected dict и поэтому остаётся fatal для `TurnPlan(extra="forbid")`.
-4. Invalid nested scope не влияет на legacy eligibility.
-5. Invalid legacy field не уничтожает independently valid native scope.
-6. Original input после shadow/legacy branches остаётся deep-equal исходному.
-7. `patient_scope` не добавляется в `TurnPlan`, product ctx/dump или resolver input.
-
-Fixture хранит **synthetic governed planner object** и expected projected legacy object явно. Это schema fixture без пользовательского текста/PII и не копия live raw. Spec-test может вычислять только exact one-key projection для проверки самосогласованности fixture; production helper на этом checkpoint не создаётся.
-
-## 5. Source precedence и parser-state fixtures
-
-Schema version: `a9.patient_scope_native_contract.v2`.
-
-Exact container metadata table:
-
-| Raw state | Container meta | Child metas/source |
-|---|---|---|
-| sibling absent | `defaulted`, error `None`, provenance `turn_plan.schema_default` | текущий scalar bridge без изменений |
-| present object, только allowed keys | `valid`, error `None`, provenance `turn_plan.raw.patient_scope` | только native parser, без scalar backfill |
-| present `null`/wrong type | `invalid`, `patient_scope_invalid_type`, provenance `turn_plan.raw.patient_scope` | все четыре child metas `defaulted`, safe values; bridge не маскирует failure |
-| object с unknown nested extra | `invalid`, `patient_scope_extra_field`, provenance `turn_plan.raw.patient_scope` | known members parse independently; extra name/value не попадают в output metadata |
-| present object с missing/invalid member | container остаётся `valid`, error `None` | member остаётся missing/invalid; no scalar backfill |
-
-Confidence container всегда `0.0`.
-
-Known-member fixtures обязаны покрыть:
+Known members:
 
 - allowed value и explicit `unknown`/`[]` → `valid`;
-- missing member → safe value + `missing`;
-- wrong type → safe value + соответствующий `*_invalid_type`;
-- scalar outside allowlist → safe value + соответствующий `*_not_allowed`;
-- modifiers non-list/non-string item → `patient_modifiers_invalid_type`;
-- modifiers unsupported string → `patient_modifier_not_allowed`;
-- mixed valid+invalid modifiers → всё поле `invalid`, value `[]`; partial filtering запрещён;
-- modifiers duplicate allowed value → canonical unique sorted list;
-- invalid одного member не стирает valid neighbors.
+- missing → safe value + `missing`;
+- wrong type → safe value + matching `*_invalid_type`;
+- outside allowlist → safe value + matching `*_not_allowed`;
+- modifiers non-list или любой non-string item → whole field `[]/invalid/patient_modifiers_invalid_type`;
+- modifiers с unsupported string, включая mixed valid+unsupported → whole field `[]/invalid/patient_modifier_not_allowed`;
+- duplicate allowed modifiers → current model canonical unique sorted list;
+- invalid одного member сохраняет valid neighbors.
 
-Для present native container confidence всегда `0.0`, provenance контейнера `turn_plan.raw.patient_scope`, provenance members `turn_plan.raw.patient_scope.<field>`. Для absent сохраняются current scalar bridge values/provenance и `container=defaulted/turn_plan.schema_default`.
+Raw value/unknown extra name/value не включать в error, provenance или logs.
 
-Любой native container/member `missing` или `invalid` ожидает `shadow_status=partial`, не `degraded`. Product authority из fixture/spec запрещена.
+## 5. Exact legacy projection
 
-### 5.1 Hardcoded required-case manifest
+В `core/turn_planner_llm.py` добавить один pure private helper, который:
 
-Spec-test хранит этот manifest в test code независимо от JSON и требует exact ordered ID sets.
+```python
+return {key: value for key, value in raw.items() if key != "patient_scope"}
+```
 
-`projection_cases` — ровно 5:
+Только этот projected dict передаётся в current `_validate_plan()`.
 
-1. `projection_valid_native_valid_legacy`
-2. `projection_native_plus_unknown_top_level`
-3. `projection_invalid_native_valid_legacy`
-4. `projection_valid_native_invalid_legacy`
-5. `projection_input_immutability`
+Обязательно:
 
-`precedence_cases` — ровно 4:
+- original parsed `obj` остаётся неизменным и идёт в shadow builder;
+- удаляется только exact top-level `patient_scope`;
+- любой другой extra сохраняется и остаётся fatal;
+- invalid native не меняет valid legacy plan;
+- invalid legacy не уничтожает independently valid native frame;
+- `_sanitize_topic_fields`, catalog/brand guards, protocol guard, follow-up enrichment, logging и fail-open не изменяются;
+- `plan_turn()` возвращает только `legacy_plan` как раньше;
+- `patient_scope` не попадает в `TurnPlan`, product ctx/dump, resolver/composer.
 
-1. `precedence_absent_uses_bridge`
-2. `precedence_present_object_uses_native`
-3. `precedence_present_invalid_container_no_bridge`
-4. `precedence_present_invalid_member_no_backfill`
+## 6. Prompt implementation
 
-`parser_cases` — ровно 18:
+Добавить отдельную private константу `_PATIENT_SCOPE_PROMPT` и включить её в существующий `_SYSTEM`.
 
-1. `container_valid_object`
-2. `container_null_invalid_type`
-3. `container_non_object_invalid_type`
-4. `container_extra_field_preserves_neighbors`
-5. `members_valid_composite`
-6. `members_explicit_unknown_empty`
-7. `members_all_missing`
-8. `extent_invalid_type`
-9. `extent_not_allowed`
-10. `jaw_invalid_type`
-11. `jaw_not_allowed`
-12. `stage_invalid_type`
-13. `stage_not_allowed`
-14. `modifiers_invalid_type_non_list`
-15. `modifiers_invalid_type_item`
-16. `modifier_not_allowed`
-17. `modifiers_duplicate_canonical`
-18. `invalid_member_preserves_neighbors`
+Scope block обязан кратко требовать:
 
-`prompt_examples` — ровно 5 abstract meaning IDs, без user utterances:
+1. compact `patient_scope` object ровно с keys `extent`, `jaw`, `stage`, `modifiers`;
+2. exact enum/list values из frozen contract;
+3. только explicit facts текущего сообщения;
+4. absent fact → `unknown`/`[]`, no guess;
+5. history помогает referent, но не переносит old scope без current mention;
+6. legacy `patient_situation` возвращается отдельно;
+7. no service/protocol/price unit/document/evidence/diagnosis selection;
+8. urgency/pain outside scope;
+9. reported bone context не clinical confirmation;
+10. no extra scope fields.
 
-1. `meaning_one_tooth`
-2. `meaning_full_upper_reported_bone`
-3. `meaning_implant_placed`
-4. `meaning_informational_no_patient_facts`
-5. `meaning_vague_followup_no_current_scope`
+Scope block не содержит:
 
-## 6. Prompt semantic contract
+- frozen case IDs;
+- exhaustive phrase list;
+- All-on-4/All-on-6 или другие service mappings;
+- retry/second call/classifier;
+- instruction влиять на answer/routing/price/UI.
 
-На этом checkpoint `_SYSTEM` не меняется. Fixture/spec замораживает смысл, а не дословную русскую формулировку будущего prompt:
+Существующие legacy prompt rules не переписывать, кроме добавления sibling в exact field list и подключения scope block.
 
-1. Всегда вернуть object с четырьмя keys.
-2. Извлекать только явно сообщённые признаки текущего сообщения.
-3. Не сообщено → `unknown`/`[]`, не угадывать.
-4. History может разрешать referent, но не переносит старое scope-value без explicit current mention.
-5. `patient_situation` возвращается отдельно по legacy enum.
-6. Scope не выбирает service/protocol/price unit/document/evidence/diagnosis.
-7. Urgency и pain не входят в scope.
-8. `reported_bone_deficit` — сообщённый контекст, не клиническое подтверждение.
-9. Только JSON, без extra fields.
+## 7. Test binding к frozen fixture
 
-Минимальные semantic fixtures хранятся как abstract meaning IDs, не как тексты пациентов:
+### `tests/test_turn_frame_from_raw.py`
 
-- один отсутствующий зуб;
-- вся верхняя челюсть + сообщённая нехватка кости;
-- имплант уже установлен;
-- informational question без patient facts;
-- vague follow-up «а сколько стоит?» при старом session extent → all unknown/empty.
+- загрузить frozen v2 fixture;
+- прогнать exact 18 parser cases через production builder;
+- прогнать 4 precedence cases;
+- проверить values, container/member status/error/provenance, recursive partial signal, raw immutability и отсутствие extra leak;
+- сохранить все существующие scalar bridge tests unchanged.
 
-Запрещены frozen live case IDs, exhaustive phrase classifier и All-on-4/All-on-6/service mappings.
+### `tests/test_turn_planner_llm.py`
 
-## 7. Static completion-budget evidence
+- exact projection helper: пять frozen projection cases, input immutable;
+- native sibling + valid legacy → valid legacy plan;
+- second unknown top extra остаётся fatal;
+- invalid native + valid legacy → legacy plan valid, shadow partial;
+- invalid legacy + valid native → legacy none, native neighbors preserved;
+- one call/no retry;
+- Qwen call явно использует `extra_body.enable_thinking=false`; non-Qwen call не получает Qwen-specific body;
+- `_PATIENT_SCOPE_PROMPT` содержит required semantics и не содержит forbidden scope mappings;
+- captured call использует `max_completion_tokens=700`;
+- current demo catalog/topic/brand maxima не превышают frozen synthetic sample lengths;
+- independently derived compact current-demo longest-values object воспроизводимо равен `530 bytes`; это capacity evidence, не tokenizer/whitespace guarantee;
+- product wrapper/published `TurnPlan` не содержит `patient_scope`.
 
-Fixture содержит один **representative upper-size schema sample**: все legacy fields заполнены, перечислены все allowed aspects и выбраны длинные native enum values. Это не общий worst-case: catalog-derived strings зависят от клиента и не имеют length bound в `TurnPlan`.
+### `tests/test_patient_scope_native_contract_spec.py`
 
-Spec-test фиксирует compact JSON UTF-8 byte/character size и отдельно delta, добавленную sibling `patient_scope`, сравнением с тем же synthetic object без sibling.
+Только заменить gate «implementation ещё отсутствует» на binding:
 
-Документ обязан:
+- `_SYSTEM` включает scope block;
+- exact projection seam присутствует;
+- native builder читает sibling по presence;
+- frozen fixture/manifests/evidence остаются неизменны.
 
-- отделить статический размер JSON от tokenizer-exact token count;
-- не заявлять точный token count без локального tokenizer текущей модели;
-- зафиксировать verdict: этот representative byte/delta sample сам по себе **не доказывает** запас внутри `max_completion_tokens=300`;
-- потребовать от implementation TASK явного budget decision до code changes: сохранить `300` только с model-tokenizer/static evidence либо обосновать новый консервативный limit;
-- не подбирать лимит через live/LLM.
-
-На этом checkpoint runtime token limit не меняется.
-
-## 8. Contract-spec test
-
-`tests/test_patient_scope_native_contract_spec.py` проверяет только frozen spec/fixture:
-
-- exact top-level keys и schema version;
-- value allowlists совпадают с `contracts.turn_frame`;
-- legacy keys совпадают с `TurnPlan.model_fields`, а `patient_scope` остаётся sibling;
-- exact projection cases и preservation unknown extra;
-- exact hardcoded ordered manifest: `5 projection + 4 precedence + 18 parser + 5 prompt examples`, без missing/extra/duplicate IDs;
-- expected safe values/status/error/provenance проходят текущие value/meta contracts;
-- prompt semantic/forbidden requirements и пять examples присутствуют;
-- `_SYSTEM` и production source ещё не содержат native `patient_scope` implementation;
-- representative completion-size/native-delta measurement воспроизводим и не назван exact token count;
-- fixture разрешает только synthetic governed planner objects без пользовательского текста;
-- fixture не разрешает authority/live/product usage и не содержит копий live/v1 raw, вопросов/ответов, session IDs, PII или secrets.
-
-Тест не импортирует harness, не ходит в сеть и не вызывает LLM.
-
-## 9. Explicit non-goals / protected scope
+## 8. Product firewall / non-goals
 
 Запрещено:
 
-- менять `core/turn_planner_llm.py`, `core/turn_frame_from_raw.py` или любой production code;
-- менять `_SYSTEM`, `max_completion_tokens`, model/temperature/timeout;
-- реализовывать projection helper, native parser, source precedence или wiring;
-- менять `TurnPlan`, planner eligibility, retry/fail-open, resolver/composer/product payload;
+- менять contracts/value/error allowlists;
+- менять resolver/composer/routing/app/response metadata wiring;
+- передавать native scope в product decisions;
+- добавлять session carry/merge, question/history parser, detector или scalar reconciliation;
+- добавлять second call/retry/fallback classifier;
+- менять logging payload или логировать raw scope;
+- менять frozen spec JSON/doc, v1 matrix/harness/raw/audit;
 - запускать live/LLM;
-- менять v1 matrix/harness/raw/audit/design docs;
-- копировать live/v1 raw или добавлять вопросы/ответы/session IDs/PII/secrets в fixture; synthetic governed planner objects обязательны и разрешены;
-- закрывать native extraction implementation, A9 parent или authority checkbox.
+- менять authority;
+- закрывать wiring/firewall, harness v2, live, authority или A9 parent checkbox.
 
-Первый A9 raw SHA256 должен остаться:
-`478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`.
+## 9. Targeted tests
 
-A9 v1 matrix git blob должен остаться:
-`d459073bbf8767f7ff590ece2958f7aa8cb18b25`.
-
-## 10. Проверки
-
-После authoring:
+Primary implementation slice:
 
 ```powershell
-.\.venv\codex312\Scripts\python.exe -m pytest tests/test_patient_scope_native_contract_spec.py -q
-git diff --check
-git diff --name-only
-git diff -- core contracts orchestration app.py
-rg -n 'patient_scope' core/turn_planner_llm.py
-Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
-git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
+.\.venv\codex312\Scripts\python.exe -m pytest tests/test_turn_frame_from_raw.py tests/test_turn_planner_llm.py tests/test_patient_scope_native_contract_spec.py -q
 ```
 
-Full pytest не запускать: production code не меняется, новый isolated spec-test достаточен.
+Related shadow/product regressions:
+
+```powershell
+.\.venv\codex312\Scripts\python.exe -m pytest tests/test_turn_planner_wiring.py tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py -q
+```
+
+Full suite не обязателен при зелёных targeted slices и пустом downstream diff. Если targeted regression показывает широкий риск — СТОП и новая оценка scope.
+
+## 10. Static checks
+
+```powershell
+git diff --check
+git diff --name-only
+git diff -- contracts orchestration app.py
+rg -n "patient_scope" core/turn_planner_llm.py core/turn_frame_from_raw.py
+Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
+git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
+git hash-object tests/fixtures/patient_scope_native_contract_a9_v2.json
+```
+
+Protected baselines:
+
+- first A9 raw SHA256: `478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`;
+- v1 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`;
+- v2 fixture git blob: `c7458e4481489895320ea3de1dec1a81b8da5f50`.
 
 ## 11. Checkpoints
 
 ### Checkpoint 1 — governance review
 
-Independent checker проверяет TASK до spec authoring. После `✅` — отдельный commit/push только `TASK.md`.
+Independent checker проверяет TASK и budget decision до code. После `✅` — отдельный commit/push только `TASK.md`.
 
-### Checkpoint 2 — spec/fixture authoring
+### Checkpoint 2 — implementation
 
-Создать только allowlist doc/fixture/test и README entry. Выполнить один isolated pytest и static checks. Roadmap пока не менять, commit не делать.
+Изменить только allowlist production/tests. Выполнить targeted tests/static checks. Roadmap не менять, commit не делать.
 
-### Checkpoint 3 — independent spec review
+### Checkpoint 3 — independent code/runtime review
 
-Checker сверяет doc, fixture и test с approved design, проверяет полноту states, отсутствие скрытой implementation, firewall/privacy и честность completion-budget evidence.
+Checker сверяет diff с frozen fixture, test evidence, budget guard, one-call invariant, exact projection, privacy и product firewall.
 
 ### Checkpoint 4 — completion
 
-Только после checker `✅` обновить один roadmap checkbox/status, повторить static checks, затем один spec completion commit и push в `codex/stage-a`.
+Только после checker `✅` обновить один roadmap checkbox/status, повторить static checks, затем один implementation commit и push в `codex/stage-a`.
 
 ## 12. Definition of Done
 
-1. Exact raw sibling/value shape frozen в одном canonical spec и versioned fixture.
-2. Exact one-key legacy projection и preservation других extras frozen.
-3. Container/source precedence и все field parser states имеют expected value/meta/status/error.
-4. Prompt semantics заморожены без изменения `_SYSTEM`.
-5. Completion-budget decision основан на static evidence без ложного exact token claim.
-6. Isolated contract-spec pytest зелёный; full suite обоснованно не запускался.
-7. Production diff пуст, live/LLM не запускались.
-8. V1 raw/matrix hashes неизменны.
-9. Independent checker дал `✅` до roadmap update/commit.
-10. Roadmap закрывает только этот subcheckpoint; A9 parent открыт, authority forbidden.
+1. Все 18 parser + 4 precedence + 5 projection cases проходят production binding.
+2. Absent использует unchanged bridge; любой present container полностью владеет native scope.
+3. Exact one-key projection сохраняет strict legacy extras/eligibility.
+4. Prompt реализует frozen current-turn/unknown-safe semantics без product mappings.
+5. Один planner call, no retry; cap ровно `700`, Qwen thinking explicitly off, current-demo drift/reference guards зелёные без universal sufficiency claim.
+6. Legacy `TurnPlan`/product path не содержит `patient_scope`.
+7. Оба targeted pytest slices зелёные; full suite обоснованно не запускался.
+8. Production diff только в двух allowlist modules; downstream contracts/wiring untouched.
+9. Frozen v1/v2 artifacts и raw hashes неизменны; live/LLM не запускались.
+10. Independent checker дал `✅` до roadmap update/commit.
+11. Roadmap закрывает только native extraction implementation; A9 parent открыт, authority forbidden.
 
-После completion commit — СТОП. `A9 Native Extraction Implementation` начинается только с нового TASK и governance review.
+После completion commit — СТОП. `A9 Native Shadow Wiring / Firewall Proof` начинается только с нового TASK и governance review.

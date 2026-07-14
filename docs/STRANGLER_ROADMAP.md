@@ -22,8 +22,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Native Shadow Wiring / Firewall Proof** (governance `4162111`, completion — текущий commit) |
-| Следующий checkpoint | **A9 Manual-contact `not_applicable` Taxonomy** |
+| Последний завершённый checkpoint | **A9 Manual-contact `not_applicable` Taxonomy** (governance `083bdcd`, revision `0eb8566`, completion — текущий commit) |
+| Следующий checkpoint | **A9 Frozen Matrix/Harness v2 Review** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -192,7 +192,7 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] Native raw contract и prompt spec (governance `405a6ac`, frozen fixture/tests reviewed)
 - [x] Native extraction implementation (governance `e46a428`, implementation/tests reviewed)
 - [x] Native shadow wiring/firewall proof (governance `4162111`, runtime/tests reviewed)
-- [ ] Manual-contact `not_applicable` taxonomy
+- [x] Manual-contact `not_applicable` taxonomy (governance `083bdcd`, revision `0eb8566`, helper/tests reviewed)
 - [ ] Frozen matrix/harness v2 review
 - [ ] One-run live re-audit — только после отдельного разрешения владельца
 - [ ] Authority decision
@@ -218,19 +218,20 @@ A1–A9 не были целиком придуманы заранее как н
 
 ## Следующий checkpoint
 
-### A9 Manual-contact `not_applicable` Taxonomy
+### A9 Frozen Matrix/Harness v2 Review
 
-Нужно отдельно описать, как shadow measurement учитывает обращения, которые ранний hard/manual-contact path завершает до planner/TurnFrame:
+Нужно подготовить и независимо проверить новую frozen-версию матрицы и harness до любого live-прогона:
 
-- запись и передача контакта;
-- жалоба или обращение, которое сразу передаётся администратору;
-- другие manual-contact случаи, где patient scope объективно не измерялся.
+- встроить принятую manual-contact taxonomy в versioned harness v2;
+- заморозить новые native expectations и точные denominator/availability правила;
+- назначить новые schema/artifact names, не переписывая первый raw и v1 summary;
+- доказать unit/fake-run тестами порядок `transport → frame → runtime status → not_applicable → extraction error`.
 
-Native wiring/firewall proof завершён без production-изменений и без live/LLM. Реальный локальный путь `planner → resolver → shadow metadata` сохраняет native composite и его field metadata. A/B-проверка показала одинаковые product inputs с native sibling и без него; valid native не repair’ит invalid legacy, а invalid native не ломает valid legacy. Production-модули не читают новый nested scope.
+Manual-contact taxonomy завершена без runtime-изменений и без live/LLM. Pure eval helper помечает `not_applicable` только успешный exact `ingress_manual_contact` без shadow-frame. Любой другой route, runtime `not_available/degraded`, присутствующий или malformed frame остаётся в своём прежнем bucket. Historical v1 target-red tests и первый raw сохранены точными хэшами.
 
-**Как это скажется на боте:** следующий checkpoint не меняет ответы. Он сделает аналитику честнее: обращение, которое специально ушло напрямую администратору, не будет выглядеть как техническая ошибка или как «patient scope неизвестен». Оно будет явно помечено как неприменимое к этому измерению.
+**Как это скажется на боте:** ответы по-прежнему не изменятся. Мы подготовим честную измерительную линейку для следующей версии: передача обращения администратору не будет ошибочно портить статистику распознавания patient scope, а настоящие transport и malformed-frame ошибки не спрячутся в `not_applicable`.
 
-Checkpoint начинается с design/taxonomy governance и не разрешает live/LLM. Этот roadmap сам по себе следующую реализацию не разрешает: сначала новый `TASK.md` и checker-review.
+Checkpoint будет spec/harness/unit-only и не разрешает live/LLM. Этот roadmap сам по себе следующую реализацию не разрешает: сначала новый `TASK.md` и checker-review.
 
 ## Как поддерживать чекбоксы
 

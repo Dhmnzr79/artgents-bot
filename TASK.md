@@ -1,437 +1,410 @@
-# TASK — A9 Patient-scope shadow audit
+# TASK — A9 Native Patient-scope Extraction Design (shadow-only)
 
-Один активный TASK на один checkpoint. Создать один read-only audit-документ по принятому A9 raw. На этом checkpoint запрещены code/test/spec/harness changes, live/LLM и новая попытка измерения.
+Один активный `TASK.md` на один checkpoint. Этот checkpoint создаёт только архитектурный design-документ для native field-level extraction `patient_scope` из **того же** planner JSON. Код, tests/spec/harness, prompt, runtime и live/LLM на этом checkpoint запрещены.
 
-Audit должен отделить:
+Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`.
 
-1. целостность единственного run;
-2. deterministic bridge/field fixtures;
-3. live semantic quality current-turn shadow;
-4. отдельные legacy session boundaries;
-5. product behavior, которое этим harness не оценивалось.
+Главный исходный факт A9:
 
-Нельзя превращать правильные `unknown/defaulted` в доказательство распознавания положительных признаков пациента.
+```text
+Infrastructure integrity: accepted
+Live native positive exact: extent=0, jaw=0, stage=0, modifiers=0
+Composite exact: 0/9
+Product firewall: preserved
+Authority: forbidden
+```
+
+Design обязан закрыть архитектурную развилку до любой реализации. Он не должен объявлять качество зелёным, повторять первый A9 sample или передавать scope в product.
 
 ---
 
-## 1. Baseline и provenance
+## 1. Baseline и frozen provenance
 
-- branch `codex/stage-a`;
-- HEAD `9f9cbaf docs: define A9 one-run live proof`;
-- A9 design `9ee8c34 docs: design A9 composable patient scope`;
-- A9 contract `2a34b6c feat: add A9 patient scope contract`;
-- raw extraction/bridge `0cc9042 feat: extract A9 patient scope shadow fields`;
-- shadow wiring proof `33966e4 test: prove A9 patient scope shadow wiring`;
-- frozen matrix `15d2ae7 test: freeze A9 patient scope quality matrix`;
-- harness `3f11857 test: add A9 patient scope quality harness`;
-- live governance `9f9cbaf docs: define A9 one-run live proof`;
-- independent raw checker verdict: `✅` for integrity/calculation honesty, **not** quality green.
+- branch: `codex/stage-a`;
+- HEAD до governance diff: `10b4739 docs: audit A9 patient scope shadow quality`;
+- origin: `origin/codex/stage-a` на том же commit;
+- рабочее дерево до governance diff чистое;
+- A9 design: `9ee8c34 docs: design A9 composable patient scope`;
+- A9 contract: `2a34b6c feat: add A9 patient scope contract`;
+- A9 scalar bridge: `0cc9042 feat: extract A9 patient scope shadow fields`;
+- A9 wiring proof: `33966e4 test: prove A9 patient scope shadow wiring`;
+- A9 frozen matrix: `15d2ae7 test: freeze A9 patient scope quality matrix`;
+- A9 harness: `3f11857 test: add A9 patient scope quality harness`;
+- A9 audit: `10b4739 docs: audit A9 patient scope shadow quality`.
 
 Frozen artifacts:
 
 ```text
 A9 raw = eval_patient_scope_a9_last.txt
 A9 raw SHA256 = 478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21
-A9 raw size = 712294 bytes
-A9 raw encoding = strict UTF-8 without BOM
-A9 raw lines = 696
-A9 live attempts = 1
-A9 matrix hash = d459073bbf8767f7ff590ece2958f7aa8cb18b25
-topic matrix hash = dc356c9c738fb80a10cf0035508d7e8c8247979d
-preservation hash = c2072ca74c2da73bf657d793195d2eb6c8ba7bd5
+A9 raw attempts = 1, no retry
+A9 matrix git hash = d459073bbf8767f7ff590ece2958f7aa8cb18b25
+topic matrix git hash = dc356c9c738fb80a10cf0035508d7e8c8247979d
+preservation git hash = c2072ca74c2da73bf657d793195d2eb6c8ba7bd5
 A7 raw SHA256 = EC009EF2157189A40FDDE6B819883D40678D6289F92EEB0CD74FD0AD9A294DDA
 ```
 
-Raw gitignored, не staged. Не удалять, не переименовывать, не нормализовать и не перезаписывать.
+Первый A9 raw запрещено удалять, переименовывать, нормализовать, переписывать или перезапускать. Любой новый live/LLM требует отдельного frozen spec/harness review и явного разрешения владельца.
 
-## 2. Задача и allowlist
+## 2. Deliverable и allowlist
 
-Создать только:
+После отдельного governance commit создать ровно один новый файл:
 
 ```text
-docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md
+docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md
 ```
 
-Запрещено менять:
+Design checkpoint не меняет:
 
 - `TASK.md` после governance commit;
-- `docs/PATIENT_SCOPE_DESIGN_A9.md`, `docs/ARCH_TARGET_DESIGN.md`;
-- matrix/spec/harness/tests;
+- `docs/PATIENT_SCOPE_DESIGN_A9.md`, `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`, `docs/ARCH_TARGET_DESIGN.md`;
 - `contracts/**`, `core/**`, `orchestration/**`, `app.py`, `llm.py`, `session.py`;
-- client content/config;
+- `tests/**`, `evals/**`, frozen matrix/harness/targets;
+- `clients/**`, config, pricebook, policies;
 - raw artifacts.
 
-Любой второй changed tracked/untracked file → `❌` и СТОП.
+Любой второй changed tracked/untracked file на design authoring checkpoint → `❌` и СТОП.
 
-## 3. Источники истины
+## 3. Вопрос checkpoint
 
-Audit строится только из:
-
-1. frozen A9 raw с exact SHA256;
-2. `evals/v5/demo/patient_scope_shadow_matrix.json`;
-3. `evals/v5/run_patient_scope_shadow_eval.py` — только для frozen scoring semantics;
-4. `docs/PATIENT_SCOPE_DESIGN_A9.md` — только для target/current-turn/firewall semantics;
-5. committed contracts/bridge/shadow/session code — read-only code alignment;
-6. independent raw review, но все числа повторно сверяются с raw.
-
-Не использовать новый sample, ручной вызов planner, новый ответ LLM или предположение о скрытом payload.
-
-## 4. Обязательный статус документа
-
-В начале документа зафиксировать четыре независимых статуса:
+Нужно выбрать точный способ получить native nested `patient_scope`:
 
 ```text
-Raw integrity: ✅ accepted
-Measurement completeness: 49/49 result rows, 30/30 endpoint calls
-Live current-scope quality: ❌ not ready
-Authority: forbidden
+один существующий planner request
+  → один parseable JSON object
+  → strict legacy TurnPlan branch с прежней product eligibility
+  → независимый field-level PatientScopeFrame shadow branch
 ```
 
-Пояснить:
+Design обязан ответить:
 
-- checker `✅` означает честность/целостность raw и расчётов;
-- это не означает quality green;
-- два live current-scope результата не scoreable;
-- positive patient-scope signals в live subset не распознаны;
-- `patient_scope` остаётся shadow-only и не управляет product.
+1. Как выглядит exact raw JSON shape после добавления native scope.
+2. Как sibling `patient_scope` сосуществует с current scalar `patient_situation`.
+3. Как strict `TurnPlan(extra="forbid")` сохраняет прежние validators/fail-open, хотя shadow-only sibling не является полем product contract.
+4. Как builder материализует valid соседние subfields при missing/invalid другом subfield.
+5. Когда используется уже принятый scalar bridge, а когда native container имеет приоритет.
+6. Как hard/manual-contact path получает `not_applicable`, не fake frame и не transport error.
+7. Какие отдельные implementation/spec/live checkpoints потребуются после design.
 
-## 5. Provenance и методика
+## 4. Read-only code alignment
 
-Таблица provenance должна содержать:
+Design обязан сверить фактические file:line и data flow минимум для:
 
-- commits из §1;
-- raw path/hash/size/encoding/line count;
-- attempts=1, no retry;
-- matrix/harness hashes/commits;
-- 34 CASE + 10 TURN + 5 BOUNDARY + 1 SUMMARY + exit marker;
-- observed raw time window как факт логов;
-- `executed_live_calls=30`;
-- 30 unique `/ask/stream` request IDs, 25 session IDs;
-- 167 internal `llm_usage` events — это внутренние pipeline calls, не harness retry.
+- `core/turn_planner_llm.py`:
+  - `_SYSTEM` и exact current output fields;
+  - `max_completion_tokens=300`, one call, JSON object parsing;
+  - immutable parsed `obj` → `build_turn_frame_from_raw()` и `_validate_plan()`;
+  - current `_sanitize_topic_fields()` copy semantics;
+  - `TurnPlan.model_validate()`;
+  - `plan_turn_attempt()` status calculation;
+  - `plan_turn()` backward-compatible wrapper;
+- `contracts/turn_plan.py`:
+  - required `route`, `aspects(min_length=1)`;
+  - scalar `patient_situation`;
+  - `extra="forbid"`;
+- `core/turn_frame_from_raw.py`:
+  - current scalar bridge and provenance;
+  - current absence of native `raw["patient_scope"]` parsing;
+  - per-field builder pattern and no raw mutation;
+- `contracts/turn_frame.py`:
+  - exact A9 nested values, defaults, metadata and stable errors;
+- `contracts/planner_attempt.py`:
+  - nested invalid/missing → `partial`;
+  - `defaulted` не делает attempt partial;
+- `orchestration/resolver_turn.py`:
+  - product reads only `attempt.legacy_plan`;
+  - shadow recorder is telemetry-only;
+- `core/turn_frame_shadow.py` и `core/metadata_first_observability.py`:
+  - current status/reason and response metadata contract;
+- `orchestration/pre_resolver_turn.py`:
+  - ingress `manual_contact` short-circuit occurs before planner;
+- `evals/v5/demo/patient_scope_shadow_matrix.json`:
+  - frozen sibling `patient_scope` fixtures and target-red field isolation;
+- `evals/v5/run_patient_scope_shadow_eval.py`:
+  - current missing-frame fallback/taxonomy;
+- `docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md`:
+  - one raw JSON, dual branch, strict legacy/product firewall;
+- `docs/PATIENT_SCOPE_DESIGN_A9.md` и `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`:
+  - contract, measured gap, claims boundary.
 
-Методика:
+Claims о current behavior и выбранном seam должны иметь file:line. Design не копирует raw questions/answers/session IDs.
 
-- D1 bridge 10 и D2 field isolation 4 не вызывают endpoint;
-- L1 single 20 + L2 multi 10 = 30 full `/ask/stream` requests;
-- current shadow извлекается из `metadata_first.turn_frame_shadow`;
-- session boundary оценивается отдельно;
-- frozen order, no retry;
-- product answer/evidence/UI correctness не score'ились;
-- confidence не score'илась и не калибровалась.
+## 5. Неизменяемые target semantics
 
-## 6. Raw integrity
+Native output использует принятый nested contract без расширения clinical semantics:
 
-Зафиксировать:
+```json
+"patient_scope": {
+  "extent": "unknown | one_tooth | few_teeth | full_arch",
+  "jaw": "unknown | upper | lower | both",
+  "stage": "unknown | extraction_context | implant_placed",
+  "modifiers": ["reported_bone_deficit"]
+}
+```
 
-| check | fact |
-|---|---|
-| SHA256 | exact §1 |
-| strict UTF-8 | true |
-| BOM | absent |
-| lines | 696 |
-| CASE/TURN/BOUNDARY/SUMMARY | 34/10/5/1 |
-| exit marker | one, final line, `A9_SCOPE_EXIT_CODE=1` |
-| frozen order | exact |
-| attempts | 1 |
-| second raw/summary/index=1 | absent |
-| protected diff | empty |
+Законы:
 
-Raw line anchors minimum:
+- четыре subfields независимы;
+- explicit `unknown` — валидное значение, не ошибка;
+- absent, explicit unknown, invalid и defaulted различаются;
+- jaw не выводится из extent, protocol не выводится из scope;
+- urgency/pain, diagnosis, service choice и price group в scope не входят;
+- `reported_bone_deficit` — сообщённый пациентом context, не диагноз;
+- `full_arch != all_on_4`;
+- `upper != zygomatic_implants`;
+- `one_tooth != classic`;
+- `reported_bone_deficit != sinus_lift`;
+- session carry не смешивается с current-turn observation.
+
+Расширять allowlist values/modifiers в этом design запрещено. Если code evidence требует изменения принятого A9 contract — `❓ эскалация`, не тихая правка.
+
+## 6. Обязательная архитектурная развилка: raw shape и strict legacy isolation
+
+Frozen D2 fixtures уже используют top-level sibling `patient_scope`. Design обязан проверить его совместимость с `TurnPlan(extra="forbid")` и сравнить минимум:
+
+1. **Exact sibling + branch-local legacy projection** — shadow читает original raw; strict branch валидирует только прежние legacy keys, при этом любой другой неожиданный extra key остаётся fatal.
+2. **Добавить shadow field в `TurnPlan`** — оценить product-contract coupling, dump/log leakage и влияние invalid nested value на legacy eligibility.
+3. **Raw envelope с отдельным legacy object** — оценить изменение prompt/response shape, backward compatibility и число новых сущностей.
+4. **Repurpose scalar / second LLM / regex extraction** — объяснить, почему это нарушает accepted contract или single-source target.
+
+Design выбирает один вариант, показывает exact pseudocode/data flow и доказывает:
+
+- parsed raw object не мутируется;
+- shadow builder видит original native container;
+- значения pre-existing legacy fields не чинятся и не заменяются ради `TurnPlan`;
+- required fields, enum validators, `aspects min_length=1`, catalog/topic/brand guards и fail-open сохраняются;
+- кроме exact governed shadow sibling никакой extra key не маскируется;
+- invalid/missing native scope не уничтожает valid legacy plan;
+- invalid legacy field не уничтожает valid native scope shadow;
+- `patient_scope` не появляется в `TurnPlan.model_dump()`, decision frame или product ctx;
+- выбранный seam не является общим `extra="ignore"` и не ослабляет strict branch.
+
+Если это нельзя доказать без изменения frozen matrix или legacy eligibility — СТОП и `❓ эскалация`.
+
+## 7. Native-vs-bridge precedence
+
+Design обязан выбрать и зафиксировать exact precedence. Минимально допустимая target policy:
+
+- top-level `patient_scope` **absent** → existing scalar `patient_situation` bridge работает byte/behavior unchanged;
+- top-level `patient_scope` **present** → native container является единственным source для всех четырёх subfields этого frame;
+- native missing/invalid subfield не backfill'ится scalar bridge, иначе ошибка/неполнота будет скрыта;
+- scalar `patient_situation` продолжает обслуживать legacy product path независимо;
+- divergence scalar vs nested не разрешается в пользу product или shadow и не запускает retry;
+- bridge/native provenance не смешиваются.
+
+Design может выбрать другую policy только с доказательством, что она сохраняет D1 compatibility, D2 isolation и не создаёт второго semantic source of truth внутри одного scope frame.
+
+Обязательно определить semantics для:
+
+- container absent;
+- container `null`;
+- container wrong type;
+- unknown extra subfield;
+- each subfield absent;
+- explicit scalar `unknown`;
+- invalid scalar type/value;
+- modifiers wrong type, unknown item, duplicate item, mixed valid+invalid items.
+
+Unknown/invalid raw values не попадают в telemetry, error string или provenance.
+
+## 8. Field-level parsing и metadata
+
+Для каждого native subfield design фиксирует:
+
+- exact safe value после valid/missing/invalid;
+- `FieldMeta.status`;
+- stable `FieldMeta.error`;
+- provenance;
+- confidence;
+- влияние на `PlannerAttempt.shadow_status`.
+
+Initial native provenance должен быть отдельным от scalar bridge, например:
 
 ```text
-first CASE/index 1 = raw L646
-single ERROR live_17 = raw L676
-last CASE/index 34/live_20 = raw L679
-TURN rows = raw L680–L689
-BOUNDARY rows = raw L690–L694
-SUMMARY = raw L695
-EXIT = raw L696
+turn_plan.raw.patient_scope.extent
+turn_plan.raw.patient_scope.jaw
+turn_plan.raw.patient_scope.stage
+turn_plan.raw.patient_scope.modifiers
 ```
 
-Line refs считать read-only по фактическому UTF-8 raw. После нумерации SHA256 обязан совпасть.
+Confidence остаётся descriptive `0.0`: current raw не несёт per-subfield confidence. Нельзя вводить threshold или выдавать deterministic validation за model confidence.
 
-## 7. Четыре слоя результатов — не смешивать
+Frozen D2 semantics обязательны:
 
-### 7.1 D1 deterministic scalar bridge
+1. invalid jaw сохраняет valid extent;
+2. invalid extent сохраняет valid jaw+modifier;
+3. invalid modifier сохраняет valid stage;
+4. missing stage сохраняет valid composite neighbors и делает attempt `partial`.
 
-```text
-10 total / 10 PASS / 0 FAIL / 0 ERROR
-```
+Design обязан отдельно решить structural container/extra-key semantics. Запрещено молча игнорировать unknown nested keys. Если для честной модели нужен новый stable container error/status, это должно быть явно обосновано как contract follow-up, а не спрятано в implementation.
 
-Допустимый вывод: текущий mapping frozen legacy `patient_situation` scalar → nested `PatientScopeFrame` детерминированно совпадает с ожидаемыми 10 mappings.
+## 9. Prompt contract — design, не prompt implementation
 
-Недопустимый вывод: LLM распознаёт patient scope 10/10. D1 не вызывает LLM/endpoint.
+Design задаёт будущий prompt contract достаточно точно для review:
 
-### 7.2 D2 future field isolation
+- `patient_scope` возвращается на каждом planner response как object, а не как `null`;
+- all-unknown object допустим и предпочтительнее guessing;
+- извлекаются только явно сообщённые current-turn признаки;
+- history может помогать понять referent текущего вопроса, но native current scope не копирует session carry и не материализует старое значение без явного current-turn mention;
+- scalar `patient_situation` пока сохраняется для legacy product compatibility;
+- nested и scalar выводятся одним LLM-call, retry запрещён;
+- никаких case-ID, frozen question strings, phrase catalog или protocol mapping в prompt;
+- scope не выбирает treatment/service/price/evidence;
+- output-token budget/latency impact оценён; изменение `max_completion_tokens` не разрешается этим docs checkpoint и требует доказательства на implementation governance.
 
-```text
-4 total / 0 PASS / 4 FAIL / 0 ERROR
-all shadow_status=partial
-```
+Design должен привести несколько семантических examples, покрывающих composite, all-unknown, stage и reported context, но не превращать examples в exhaustive classifier.
 
-Это заранее frozen target-red fixtures для будущего nested raw extraction. Они доказывают текущий gap field isolation, но не product regression.
+## 10. Hard/manual-contact `not_applicable`
 
-Покейсно перечислить 4 IDs/reasons и raw refs.
+Audit доказал два `shadow_frame_missing` после pre-planner `manual_contact`; это не semantic mismatch и не доказанный transport failure.
 
-### 7.3 Live current-turn scope
+Design обязан:
 
-Объединить только single+multi turns:
+- показать exact short-circuit path до `plan_turn_attempt()`;
+- выбрать runtime-status или harness-derived semantics и объяснить ownership;
+- определить stable `not_applicable` status/reason только для доказанного pre-planner boundary;
+- не создавать fake/default `TurnFrame`;
+- не вызывать planner ради telemetry;
+- не менять manual-contact answer/payload/route;
+- не смешивать `not_applicable`, `not_available`, `degraded` и transport error;
+- определить denominator: frozen total сохраняется, `not_applicable` не входит в scoreable/current-scope exact;
+- не переписывать первый raw или его frozen summary задним числом.
 
-```text
-30 total
-7 PASS
-21 semantic FAIL
-2 ERROR / not scoreable current frame
-28 scoreable
-exact complete scope among scoreable = 7/28 = 25.00%
-exact complete scope over frozen live denominator = 7/30 = 23.33%
-```
+Если taxonomy требует runtime/harness change, это отдельный checkpoint после design.
 
-Все 7 PASS — negative/default cases, где frozen expected scope полностью `unknown/defaulted`:
+## 11. Product firewall и privacy
 
-- single 15 information;
-- single 16 generic price;
-- single 18 named service;
-- single 19 other dental;
-- multi 01 turn 2 vague price;
-- multi 02 turn 2 stale carry;
-- multi 03 turn 2 topic replacement.
+До отдельного authority checkpoint запрещены imports/reads native/nested scope из:
 
-Явно написать: эти PASS подтверждают safe non-inference, но не positive scope recognition.
+- `turn_plan_to_decision_frame()` и resolver/routing;
+- evidence/source selection;
+- price scope/offers/pricebook;
+- patient playbook;
+- composer/answer/UI;
+- marketing/promo;
+- booking/contacts/medzone;
+- session mutation/carry.
 
-### 7.4 Legacy/session boundaries
+Future acceptance должен доказать:
 
-```text
-5 total / 2 PASS / 3 FAIL / 0 ERROR
-```
+1. product branch читает только `legacy_plan`;
+2. `shadow_frame.patient_scope` публикуется только в existing ctx/log/E2E shadow channel;
+3. no second classifier/LLM/retry;
+4. current `PatientSituationResult` consumers unchanged;
+5. no scope → service/document/price mapping;
+6. no question/answer/history/sid/raw payload/unknown values/exception text in scope telemetry;
+7. answer, route, evidence, money, actions/buttons and deterministic payloads unchanged.
 
-Boundary denominator отдельный от 30 current-turn scope rows. Boundary PASS не превращается во второй scope PASS.
+## 12. Alternatives и trade-offs
 
-## 8. Group totals — frozen summary
+Кроме raw-shape вариантов design сравнивает:
 
-Таблица exact:
+- native-only vs absent-container scalar bridge fallback;
+- whole-container validation vs field-level parsing;
+- prompt always-object vs nullable container;
+- runtime `not_applicable` vs harness-derived classification;
+- mixed modifier handling;
+- handling of unknown nested extra keys.
 
-| group | total | PASS | FAIL | ERROR |
-|---|---:|---:|---:|---:|
-| bridge | 10 | 10 | 0 | 0 |
-| field isolation | 4 | 0 | 4 | 0 |
-| single turn | 20 | 4 | 14 | 2 |
-| multi turn | 10 | 3 | 7 | 0 |
-| boundaries | 5 | 2 | 3 | 0 |
+Для каждого: correctness, strict legacy eligibility, field isolation, observability honesty, privacy, latency/token cost, rollback и путь удаления scalar bridge.
 
-Нельзя сворачивать это в одну «accuracy» без слоя/denominator.
+Нельзя выбрать смесь без единого data flow и source precedence.
 
-## 9. Per-axis: frozen summary и live-positive recall
+## 13. Future checkpoints
 
-Сначала воспроизвести frozen summary по всем 44 scope rows:
+Design обязан разбить дальнейшую работу минимум так:
 
-| axis | scoreable | exact | unknown | defaulted | missing | invalid |
-|---|---:|---:|---:|---:|---:|---:|
-| extent | 42 | 25 | 39 | 39 | 0 | 0 |
-| jaw | 42 | 29 | 41 | 41 | 0 | 0 |
-| modifiers | 42 | 35 | 41 | 41 | 0 | 0 |
-| stage | 42 | 34 | 40 | 40 | 0 | 0 |
+1. **A9 Native Extraction Design** — этот doc-only checkpoint.
+2. **A9 Native raw contract/prompt spec** — protected fixtures/expected statuses до code; без live.
+3. **A9 Native extraction implementation** — one JSON, field-level builder, strict legacy isolation; unit-only.
+4. **A9 Native shadow wiring/firewall proof** — existing telemetry only; product parity/AST.
+5. **A9 `not_applicable` taxonomy** — runtime или harness seam согласно design; без fake frame.
+6. **A9 Frozen quality matrix/harness v2 review** — новый version/artifact name; первый matrix/raw неизменны.
+7. **A9 One-run live re-audit** — только после явного разрешения владельца; one attempt/no retry.
+8. **Authority decision** — отдельный checkpoint; может снова решить «not ready».
+9. **Legacy retirement** — только после принятого authority design.
 
-Но обязательно объяснить: эти totals смешивают D1, D2 и live и в основном вознаграждают expected `unknown/defaulted`. Они не являются native live recognition accuracy.
+Spec, implementation, wiring, taxonomy, live и authority нельзя объединять в один diff.
 
-Отдельно пересчитать **только 30 live rows**:
+## 14. Protected artifacts
 
-| axis | live scoreable | all-value exact | positive expected | positive available | positive exact |
-|---|---:|---:|---:|---:|---:|
-| extent | 28 | 15 | 13 | 13 | **0** |
-| jaw | 28 | 19 | 9 | 9 | **0** |
-| stage | 28 | 24 | 4 | 4 | **0** |
-| modifiers | 28 | 25 | 3 | 3 | **0** |
+На design checkpoint protected и read-only:
 
-`positive expected`:
+- `evals/v5/demo/patient_scope_shadow_matrix.json`, включая questions, raw payloads, expected scope/status/error, order и rationales;
+- `evals/v5/run_patient_scope_shadow_eval.py`;
+- `tests/test_patient_scope_shadow_eval_contract.py`;
+- `eval_patient_scope_a9_last.txt`;
+- topic/preservation matrices и A7 raw;
+- A9 contract/design/audit documents.
 
-- axis scalar не `unknown`;
-- modifiers list non-empty.
+Design может выявить future spec gap, но не меняет protected expectation. Спор с frozen target → `❓ эскалация`.
 
-Главный допустимый вывод: на frozen live subset current shadow не дал ни одного exact positive axis value. Высокие all-value exact counts происходят из negative/default matches.
+## 15. Запрещённые shortcuts и claims
 
-Не утверждать причинность «LLM не понял»: raw доказывает отсутствие materialized positive value в measured current shadow, а не внутреннее рассуждение модели.
+Запрещены:
 
-## 10. Composite
+- второй patient-situation classifier/LLM-call;
+- retry, majority vote или hidden repair;
+- `extra="ignore"` для legacy plan;
+- добавление nested field в product contract без анализа eligibility/leakage;
+- bridge backfill поверх present invalid/missing native field;
+- regex/keyword extraction или hardcode A9 cases;
+- inference protocol/service/diagnosis/urgency;
+- merge session carry в current frame;
+- fake all-unknown frame на manual-contact boundary;
+- rewrite/resnapshot первого raw;
+- claims `quality green`, `ready`, `calibrated`, `product fixed` или `LLM не понял`;
+- authority, route/evidence/composer/UI consumption.
 
-```text
-composite total=9
-composite exact=0
-```
+## 16. Read-only проверки design checkpoint
 
-Пояснить: ни один frozen scope с минимум двумя известными axes не совпал полностью в measured shadow. Это strongest evidence, что current native/composable scope пока не готов даже для shadow quality gate.
-
-## 11. Два не-scoreable current frames
-
-Exact cases:
-
-| case | result | result ref | pipeline ref |
-|---|---|---|---|
-| `patient_scope_a9_live_17_urgent_only` | ERROR `shadow_frame_missing`, shadow_status=`missing` | raw L676 | ingress `manual_contact`, raw L371 |
-| `patient_scope_a9_live_20_booking_complaint` | ERROR `shadow_frame_missing`, shadow_status=`missing` | raw L679 | ingress `manual_contact`, raw L418 |
-
-Обязательная семантика:
-
-- оба запроса прошли hard/manual-contact ingress path;
-- для соответствующих request IDs нет scoreable current shadow frame;
-- это не semantic mismatch и не correct-null;
-- raw не показывает network/HTTP exception; internal `level=ERROR` count = 0;
-- frozen summary помещает их в bucket с именем `transport_error` из-за текущего fallback mapping, но нельзя называть их фактическими transport failures;
-- audit должен зафиксировать taxonomy gap: future harness/status model должен отличать `not_applicable` hard boundary от transport failure.
-
-Не менять harness в этом checkpoint и не пересчитывать frozen summary задним числом.
-
-## 12. Semantic FAIL reasons
-
-Воспроизвести counts:
-
-```text
-15 scope_value_mismatch:extent
-5 scope_value_mismatch:jaw
-4 scope_value_mismatch:stage
-1 scope_value_mismatch:modifiers
-2 boundary_current_merge
-1 boundary_snapshot_mismatch
-2 shadow_frame_missing (ERROR, отдельно)
-```
-
-Покейсный список 14 single FAIL и 7 multi FAIL обязателен. Не вставлять question/raw answer в audit.
-
-## 13. Five boundaries
-
-Таблица с raw L690–L694:
-
-1. safe vague price — PASS exact; carried=true; snapshot `one_tooth_missing`;
-2. stale carry — PASS exact; carried=false; snapshot null;
-3. topic replacement — FAIL `boundary_snapshot_mismatch`; old snapshot `one_tooth_missing` остался наблюдаем;
-4. conflicting current — FAIL `boundary_current_merge`; snapshot `upper_jaw_missing_or_complex`;
-5. jaw arrives second — FAIL `boundary_current_merge`; snapshot null.
-
-Формулировать как наблюдаемое соответствие frozen boundary contract. Не выводить root cause без дополнительного доказательства.
-
-## 14. Planner/product firewall interpretation
-
-Зафиксировать:
-
-- full product endpoint был вызван, но harness score'ил shadow metadata/session boundary, не качество answer/evidence/UI;
-- `patient_scope`/partial shadow не управляет route, evidence, composer, UI;
-- product сохраняет legacy `patient_situation`/session path;
-- поэтому red shadow quality не означает автоматически плохой или отсутствующий ответ пользователю;
-- `product_parity_source=existing_regression_suites` — ссылка на ранее выполненные regressions, не live proof ответов;
-- audit не разрешает заменять legacy path новым scope.
-
-## 15. Что доказано / не доказано
-
-**Доказано:**
-
-- raw integrity и one-run discipline;
-- harness denominators/calculations;
-- scalar bridge 10/10;
-- nested field isolation пока target-red 0/4;
-- live safe non-inference на семи negative/default turns;
-- zero exact positive axis values на frozen live subset;
-- composite 0/9;
-- 2/5 frozen session boundaries выполняются;
-- два manual-contact requests не дали scoreable current shadow;
-- product firewall остаётся.
-
-**Не доказано:**
-
-- что ответы бота на 21 scope mismatch плохие;
-- что model internally не распознала ситуацию;
-- root cause каждого mismatch;
-- confidence calibration;
-- качество вне frozen matrix;
-- готовность patient scope к routing/evidence/composer/UI;
-- authority.
-
-## 16. Архитектурный вывод и следующий checkpoint
-
-Audit должен рекомендовать отдельный **A9 Native Patient-scope Extraction Design** checkpoint, не реализацию внутри audit.
-
-Цель будущего design:
-
-```text
-Один существующий planner JSON / один LLM-call;
-field-level nested patient_scope extraction в partial shadow;
-positive axes материализуются независимо;
-strict legacy TurnPlan eligibility и product fail-open не меняются.
-```
-
-Обязательные границы рекомендации:
-
-- shadow-only;
-- без второго classifier/LLM/retry;
-- не ослаблять legacy validators;
-- не hardcode'ить patient situations/cases;
-- не repair'ить raw перед strict legacy validation;
-- не merge'ить session carry в current frame;
-- не подключать scope к route/evidence/composer/UI;
-- hard/manual-contact boundary получить отдельную `not_applicable` semantics, не fake default frame;
-- сохранить первый A9 raw;
-- новый live только после отдельного spec/harness review и разрешения владельца.
-
-Не проектировать API/schema/prompt полностью в audit-документе. Не объявлять следующий этап A10 до закрытия решения по A9 gap.
-
-## 17. Privacy и запрещённые claims
-
-Audit не содержит:
-
-- questions/answers/history/sid/raw payload/exception text;
-- PII;
-- «quality green», «ready», «calibrated», threshold;
-- «LLM точно не понял»;
-- «product сломан»;
-- объединённую accuracy из D1+D2+live+boundaries;
-- recommendation включить scope в product;
-- обещание исправить все ответы.
-
-Raw result JSONL privacy scan = 0 forbidden hits; ordinary observability logs не копировать в audit кроме минимальных stable facts/line refs.
-
-## 18. Read-only проверки
+Live/LLM/pytest не запускать: diff docs-only.
 
 ```powershell
-Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
-git diff --check
 git status --short
-git diff -- evals/v5/demo/patient_scope_shadow_matrix.json evals/v5/run_patient_scope_shadow_eval.py tests/test_patient_scope_shadow_eval_contract.py
+git diff --check
+git diff --name-only
+git diff -- contracts core orchestration tests evals clients
+Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
 git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
 git hash-object evals/v5/demo/topic_shadow_matrix.json
 git hash-object evals/v5/demo/preservation.json
 Get-FileHash -Algorithm SHA256 eval_topic_shadow_a7_last.txt
 ```
 
-Read-only parser допустим. Unit/regression/live/LLM не запускать: код не меняется, второй sample запрещён.
+Checker обязан независимо сверить code claims/file:line, raw-shape feasibility, strict legacy isolation, D1/D2 compatibility, `not_applicable` semantics и запрещённые claims.
 
-## 19. Checkpoints
+## 17. Checkpoints
 
 ### Checkpoint 1 — governance review
 
-Checker проверяет этот TASK до audit authoring. После `✅` — отдельный commit только `TASK.md`.
+Checker проверяет этот TASK до design authoring. После `✅` — отдельный commit/push только `TASK.md`.
 
-### Checkpoint 2 — audit authoring
+### Checkpoint 2 — design authoring
 
-Создать только audit-doc, выполнить read-only сверку, без commit, СТОП.
+Создать только `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`, выполнить read-only проверки, без commit, СТОП.
 
-### Checkpoint 3 — independent doc↔raw review
+### Checkpoint 3 — independent design review
 
-Checker независимо проверяет line refs, все пересчёты, layer separation, manual-contact taxonomy и запрещённые claims. Verdict `✅/❓/❌`.
+Checker независимо проверяет design против code/audit/TASK. Verdict `✅/❓/❌`.
 
-### Checkpoint 4 — audit commit
+### Checkpoint 4 — design commit
 
-Только после `✅`: commit/push одного audit-doc.
+Только после `✅`: commit/push одного design-doc в `codex/stage-a`.
 
-## 20. Definition of Done
+## 18. Definition of Done
 
-1. Governance TASK принят отдельно.
-2. Audit diff = один allowlist document.
-3. Raw SHA/frozen hashes неизменны.
-4. Integrity, deterministic, live current scope и boundaries разделены.
-5. Live-positive exact=0 по всем четырём axes зафиксирован без ложной причинности.
-6. Два manual-contact missing frames не названы transport failures.
-7. Product firewall объяснён.
-8. Authority запрещена.
-9. Следующий шаг только отдельный shadow-only design.
-10. Independent checker `✅` до doc commit.
+1. Governance TASK принят и committed отдельно.
+2. Design diff = один allowlist document.
+3. Выбран один exact raw shape и source precedence.
+4. Strict legacy eligibility/fail-open сохранены без общего ослабления extra validation.
+5. Native per-field parsing покрывает present/absent/null/wrong/extra/invalid cases.
+6. D1 scalar bridge compatibility и D2 field isolation одновременно сохранены.
+7. Prompt остаётся one-call/current-turn/unknown-safe, без phrase catalog.
+8. Manual-contact missing frame получает честную future `not_applicable` semantics.
+9. Product firewall, UI/money/session parity и privacy определены.
+10. Первый A9 raw и frozen hashes неизменны; live не запускался.
+11. Authority явно forbidden.
+12. Independent checker дал `✅` до design commit.
 
-После governance review — СТОП. Audit-doc не начинать.
+После design commit — СТОП. Native extraction code/spec/live/authority не начинать без нового `TASK.md` и checker review.

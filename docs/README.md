@@ -13,6 +13,7 @@
 | `MULTICLIENT.md` | client packs, sessions, domains, provider model |
 | `TECH_DEBT.md` | открытый долг и закрытые решения |
 | `FULLCONTEXT_ROADMAP.md` | живой roadmap full-context ядра |
+| `STRANGLER_ROADMAP.md` | канонический статус архитектурной миграции A1–A9, чекбоксы и влияние на продукт |
 
 ---
 

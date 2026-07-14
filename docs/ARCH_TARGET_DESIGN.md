@@ -80,12 +80,15 @@ A0 не является задачей «сначала сделать legacy �
 
 ## Текущий strangler-checkpoint
 
-- **A1 завершён:** минимальный `TurnFrame` и чистый legacy-adapter существуют, но не подключены к runtime (`0761213`).
-- **A2 завершён:** `TurnFrame` строится на planner-turn только в shadow-observability; ни одна продуктовая ветка не читает shadow-frame (`3746d77`).
-- **A3 завершён:** read-only аудит подтвердил planner-success coverage `5/5`, но `topic` missing в `4/5`; ни одна ось не готова к authority (`0cb8ca3`).
-- **A4 завершён:** client taxonomy берётся из MD frontmatter; optional native `TurnPlan.topic` и shadow adapter готовы без runtime wiring (`2757cae`).
-- **A5 следующий:** существующий planner запрашивает и валидирует native topic, но downstream продолжает использовать legacy `DecisionFrame.service_topic`; обязателен smoke/preservation live proof.
-- Переход ownership на `TurnFrame` разрешён только отдельными последующими задачами после проверки telemetry; сам факт появления frame в ctx не означает переключение архитектуры.
+Канонический актуальный статус A-series, чекбоксы и объяснение влияния на ответы бота находятся в [`docs/STRANGLER_ROADMAP.md`](STRANGLER_ROADMAP.md).
+
+- **A1–A8 завершены как migration checkpoints.** Большинство изменений были shadow/measurement infrastructure и сами по себе не передавали product authority.
+- **A9 активен:** последний завершённый checkpoint — Native Patient-scope Extraction Design (`16ced47`).
+- Первый A9 audit принял infrastructure integrity, но native live-positive exact остаётся `0` по `extent/jaw/stage/modifiers`; composite exact `0/9`.
+- Product firewall сохранён: новый nested patient scope не управляет route/evidence/composer/UI. **Authority запрещена.**
+- Следующий checkpoint — **A9 Native Container Metadata Contract**; contract/unit-only, без prompt/runtime/live.
+
+Переход ownership на `TurnFrame` разрешён только отдельными последующими задачами после проверки telemetry; сам факт появления frame в ctx не означает переключение архитектуры.
 
 ---
 

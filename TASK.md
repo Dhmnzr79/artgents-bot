@@ -1,8 +1,8 @@
-# TASK — Marketing-facing A-series strangler roadmap
+# TASK — A9 Native Container Metadata Contract
 
-Один активный `TASK.md` на один checkpoint. Создать понятный владельцу/маркетологу канонический roadmap архитектурной миграции A1–A9 с чекбоксами, фактическим статусом и объяснением влияния каждого этапа на ответы бота.
+Один активный `TASK.md` на один checkpoint. Цель — добавить в shadow-контракт отдельную метаданную самого контейнера `patient_scope`, чтобы будущая native extraction могла отличать отсутствие контейнера от неверного типа и неизвестного вложенного ключа.
 
-Checkpoint только документационный. Код, tests/evals/harness, prompt, runtime, raw и live/LLM не меняются и не запускаются.
+Checkpoint contract/unit-only. Он **не** добавляет чтение native `patient_scope` из raw, не меняет planner prompt, product routing, ответы, цены, UI или authority. Live/LLM запрещены.
 
 Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`.
 
@@ -11,308 +11,173 @@ Checkpoint только документационный. Код, tests/evals/ha
 ## 1. Baseline
 
 - branch `codex/stage-a`;
-- HEAD `16ced47 docs: design A9 native patient scope extraction`;
+- HEAD `27114a8 docs: add A-series strangler roadmap`;
 - `origin/codex/stage-a` на том же commit;
 - рабочее дерево до governance diff чистое;
-- A9 product authority запрещена;
-- первый A9 raw immutable, rerun запрещён без отдельного разрешения.
+- approved design: `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` (`16ced47`);
+- первый A9 raw immutable и не перезапускается без отдельного разрешения;
+- product firewall сохранён, patient-scope authority запрещена.
 
-Проблема, которую исправляет checkpoint:
+Фактическая проблема:
 
-- `docs/ARCH_TARGET_DESIGN.md` остановился на строке «A5 следующий»;
-- `docs/FULLCONTEXT_ROADMAP.md` — широкий продуктовый roadmap этапов 1–8, а не A-series strangler migration;
-- единого актуального документа A1–A9 нет;
-- фактический статус сейчас приходится восстанавливать из git history, TASK и audit-docs.
+- `PatientScopeFrameMeta` сейчас описывает только четыре дочерних поля;
+- контракт пока не может отдельно показать, что весь будущий native-контейнер имел неверный тип или неизвестный extra key;
+- recursive `PlannerAttempt` уже обходит поля metadata-моделей динамически, но новый контейнерный статус должен быть доказан тестами;
+- все действующие producer-конструкторы должны одновременно получить безопасную defaulted metadata, иначе обязательное поле сломает построение shadow frame.
 
-## 2. Deliverables и allowlist
+## 2. Frozen design semantics
 
-После отдельного governance commit разрешено изменить только:
+Реализовать ровно решение из approved design:
 
-1. создать `docs/STRANGLER_ROADMAP.md`;
-2. обновить `docs/README.md` — добавить новый документ в канон;
-3. обновить только раздел `## Текущий strangler-checkpoint` в `docs/ARCH_TARGET_DESIGN.md` — убрать stale «A5 следующий», дать короткую актуальную сводку и ссылку на новый roadmap.
+1. `PatientScopeFrameMeta` получает обязательное поле `container: FieldMeta`; `extra="forbid"` сохраняется.
+2. `FieldErrorReason` получает только:
+   - `patient_scope_invalid_type`;
+   - `patient_scope_extra_field`.
+3. На этом checkpoint native sibling ещё не читается. Поэтому все существующие producers задают container metadata как:
+   - `confidence=0.0`;
+   - `provenance="turn_plan.schema_default"`;
+   - `status="defaulted"`;
+   - `error=None`.
+4. Existing `patient_scope` values и четыре child metadata (`extent`, `jaw`, `stage`, `modifiers`) не меняются.
+5. Recursive invalid/missing semantics автоматически распространяются на `container`:
+   - `defaulted` не делает attempt partial;
+   - `invalid` или `missing` запрещает `shadow_status="ok"` и допускает `partial` по существующему контракту.
+6. Полный `field_meta.patient_scope.model_dump()` получает новый additive key `container`. Byte-identical v1 serialization не обещается; frozen v1 artifacts не переписываются.
 
-`TASK.md` после governance commit не менять.
+## 3. Deliverables и allowlist
 
-Любой другой tracked/untracked file → `❌` и СТОП.
+После отдельного governance commit разрешено менять только:
 
-## 3. Для кого и каким языком
+### Contract и обязательные shadow constructors
 
-Главный читатель — владелец продукта/маркетолог, который отвечает за:
+1. `contracts/turn_frame.py`
+2. `core/turn_frame_adapter.py`
+3. `core/turn_frame_from_raw.py`
 
-- логику ответов;
-- продажи и конверсию;
-- точность цен/фактов;
-- понятность диалога;
-- отсутствие медицинских выдумок;
-- момент, когда новое понимание можно безопасно включать в product.
+В `core/*` разрешены только атомарные добавления defaulted `container` в существующие конструкторы `PatientScopeFrameMeta`. Новое raw parsing/wiring запрещено.
 
-Roadmap должен объяснять технические термины простыми словами. Допустимо оставить имена `TurnFrame`, shadow и authority, но рядом дать короткое человеческое определение.
+### Tests
 
-Не перегружать читателя file:line, внутренними class/function names или полными test matrices. Для доказательств дать компактные ссылки на source docs/commits.
+4. `tests/test_turn_frame_contract.py`
+5. `tests/test_planner_attempt_contract.py`
+6. `tests/test_turn_frame_from_raw.py`
+7. `tests/test_turn_planner_llm.py`
+8. `tests/test_turn_frame_shadow.py`
+9. `tests/test_metadata_first_observability.py`
 
-## 4. Семантика чекбоксов
+Test allowlist разрешает только additive expectations/coverage нового container metadata и доказательство неизменности существующих scope values/child metas/firewall. Нельзя ослаблять старые assertions.
 
-Roadmap обязан начать с legend:
+### Roadmap после checker ✅
 
-- `[x]` — checkpoint реально выполнен, reviewed и committed;
-- `[ ]` — checkpoint ещё не завершён;
-- завершённый measurement/audit может быть `[x]`, даже если он честно показал красное качество;
-- `[x]` не означает product authority или включение функции для пациента;
-- product authority отмечается отдельно: `shadow-only`, `forbidden`, `allowed/active`;
-- родитель A9 остаётся `[ ]`, пока его оставшиеся subcheckpoints не завершены или owner не закроет stage отдельным решением.
+10. `docs/STRANGLER_ROADMAP.md` — только в completion diff после code-review `✅`:
+    - отметить `[x] Native container metadata contract`;
+    - обновить последний завершённый и следующий checkpoint;
+    - сохранить A9 parent `[ ]`, shadow-only и authority forbidden.
 
-Нельзя ставить `[x]` по намерению, частичному diff или непроверенному live. Отдельно названный design-checkpoint получает `[x]` после review+commit, но не закрывает parent stage и не превращается в implementation/product checkbox.
+`TASK.md` после governance commit не менять. Любой другой tracked/untracked file → `❌` и СТОП.
 
-## 5. Обязательная структура roadmap
+## 4. Explicit non-goals
 
-### 5.1 Сначала — короткая панель статуса
+Запрещено:
 
-В начале документа показать:
+- изменять `_SYSTEM`, planner output schema или prompt;
+- читать `raw["patient_scope"]` / `raw.get("patient_scope")`;
+- реализовывать native field parser, projection или fallback selection;
+- менять `TurnPlan`, legacy validation, eligibility, retry/fail-open;
+- менять resolver/composer/product routing, response payload, prices, UI;
+- давать `patient_scope` право влиять на product answer;
+- добавлять session/history/question detectors или второй LLM-call;
+- менять eval matrix/harness/raw/audit/design docs;
+- запускать live/LLM или полный pytest без новой причины и отдельного согласования;
+- закрывать A9 parent, native extraction или authority checkbox.
 
-```text
-Текущий этап: A9 Native Patient-scope Extraction
-Последний завершённый checkpoint: A9 Native Extraction Design (16ced47)
-Следующий checkpoint: A9 Native Container Metadata Contract
-Product behavior: current legacy path unchanged
-Patient-scope authority: forbidden
-Live permission: required separately
+## 5. Product firewall
+
+Для маркетинга и логики ответов результат этого checkpoint такой:
+
+- бот получает более точный внутренний «индикатор исправности» будущего блока patient scope;
+- текущий механизм ответа пациенту не переключается и не читает этот индикатор;
+- текст ответа, факты, цены, рекомендации, CTA и UI остаются на legacy path;
+- новый metadata key — только shadow observability, не диагноз и не выбор лечения.
+
+## 6. Required tests
+
+Сначала минимальный contract slice:
+
+```powershell
+python -m pytest tests/test_turn_frame_contract.py tests/test_planner_attempt_contract.py tests/test_turn_frame_from_raw.py -q
 ```
 
-Формулировки можно улучшить, смысл менять нельзя.
+Затем только связанные shadow serialization regressions:
 
-### 5.2 Два разных roadmap
-
-Явно объяснить:
-
-- `FULLCONTEXT_ROADMAP.md` — широкий продуктовый план развития бота;
-- `STRANGLER_ROADMAP.md` — пошаговая замена внутреннего «мозга» A1–A9;
-- A-series формируется evidence-driven после audit, но каждый checkpoint фиксируется TASK и checker-review **до** реализации;
-- A1–A9 не были одним заранее frozen master-plan с первого дня;
-- будущий A10 не придумывать до отдельного архитектурного решения.
-
-### 5.3 A1–A9
-
-Для каждого A-пункта обязательны:
-
-1. checkbox и статус;
-2. «Что сделали» — 1–3 простых предложения;
-3. «Как это сказалось на работе бота»;
-4. «Что видит пациент»;
-5. authority/product status;
-6. evidence link/commit.
-
-Не писать, что shadow-only изменение улучшило реальный ответ, если product продолжал читать legacy path.
-
-## 6. Frozen статус A1–A9
-
-Roadmap обязан использовать эту фактическую карту.
-
-### `[x] A1 — минимальный TurnFrame`
-
-- Governance `631abc1`, implementation baseline `0761213`.
-- Создан будущий единый semantic frame и legacy adapter.
-- Не подключён к product decisions.
-- Маркетинговый эффект: прямого изменения ответов нет; появился фундамент, чтобы позднее убрать разрозненные классификаторы.
-
-### `[x] A2 — TurnFrame shadow observability`
-
-- Governance `5e8b63c`, runtime shadow `3746d77`.
-- Frame начал строиться параллельно и логироваться.
-- Product продолжил отвечать по legacy.
-- Эффект: можно измерять новое понимание без риска для пациентов.
-
-### `[x] A3 — первый shadow audit`
-
-- Governance `0486e87`, audit commit `0cb8ca3` / `docs/TURN_FRAME_SHADOW_AUDIT_A3.md`.
-- Audit: planner-success coverage `5/5`, topic missing `4/5`; authority не готова.
-- Эффект: не улучшение ответов, а честное обнаружение пробела topic.
-
-### `[x] A4 — client-configurable topic taxonomy`
-
-- Governance `de66ebc`, implementation `2757cae`.
-- Allowed topics перенесены в client content/frontmatter; optional native topic contract подготовлен.
-- Runtime product ownership не переключён.
-- Эффект: темы можно определять из конфигурации клиента, не зашивая их в код, но пациент ещё не видит новый путь.
-
-### `[x] A5 — native topic в shadow`
-
-- Governance `cfc438b`, implementation `8662300`.
-- Existing planner начал возвращать/валидировать native topic; downstream остался legacy.
-- Эффект: бот научился параллельно формировать более чистую тему для измерения; ответы пациенту не переключены.
-
-### `[x] A6 — frozen topic quality measurement`
-
-- Matrix/harness/live/audit завершены через `3f205f4` … `4a6c867`.
-- Первый sample технически неполный: `26/33` scoreable, семь потеряны из-за unrelated strict `aspects=[]`.
-- Checkpoint выполнен, quality green не объявлен.
-- Эффект: выяснили, почему topic-наблюдение — даже отдельно валидное поле — могло пропасть целиком из-за unrelated `aspects=[]`; качество topic в семи unavailable cases A6 не измерено, product не переключали.
-
-### `[x] A7 — field-level planner outcome и topic re-audit`
-
-- Design `7f9cfe4`, contract/split/wiring/regression/re-audit завершены; final audit `596e809`.
-- Один raw JSON разделён на partial shadow frame и strict legacy product branch.
-- Re-audit: topic scoreability `33/33` на frozen sample; это measurement result, не authority.
-- Эффект: ошибка одного поля больше не скрывает остальные понятные части; реальные ответы сохраняют прежний безопасный fallback.
-
-### `[x] A8 — service/follow-up/clarification shadow validation`
-
-- Governance `3a3b445`, implementation `38d29f3`.
-- Добавлена независимая shadow-валидация `service_id`, follow-up и clarification.
-- Prompt/product routing не менялись.
-- Эффект: диагностика стала точнее; пациентские ответы/цены/UI не изменились.
-
-### `[ ] A9 — composable patient scope`
-
-Родитель остаётся открытым. Обязательные subcheckboxes:
-
-- `[x]` original patient-scope design (`9ee8c34`);
-- `[x]` nested contract (`2a34b6c`);
-- `[x]` scalar bridge (`0cc9042`);
-- `[x]` shadow wiring/firewall proof (`33966e4`);
-- `[x]` frozen matrix (`15d2ae7`);
-- `[x]` harness (`3f11857`);
-- `[x]` one-run audit (`10b4739`);
-- `[x]` native extraction design (`16ced47`);
-- `[ ]` native container metadata contract;
-- `[ ]` native raw contract/prompt spec;
-- `[ ]` native extraction implementation;
-- `[ ]` native wiring/firewall proof;
-- `[ ]` manual-contact `not_applicable` taxonomy;
-- `[ ]` frozen matrix/harness v2 review;
-- `[ ]` one-run live re-audit — только после отдельного owner permission;
-- `[ ]` authority decision;
-- `[ ]` legacy retirement — только после принятой authority architecture.
-
-Обязательная честная сводка A9:
-
-- infrastructure integrity accepted;
-- first live-positive exact = `0` по extent/jaw/stage/modifiers;
-- composite exact `0/9`;
-- product firewall preserved;
-- patient-scope authority forbidden;
-- реальные ответы не оценивались этим scope harness и продолжали использовать legacy path.
-
-Маркетинговое объяснение: цель A9 — понимать независимо «один/несколько/вся челюсть», верх/низ, этап лечения и явно сообщённую нехватку кости, не превращая это в диагноз или автоматический выбор лечения. Пока это не включено в реальные ответы.
-
-## 7. Следующий checkpoint
-
-Roadmap обязан выделить отдельный блок:
-
-```text
-Следующий: A9 Native Container Metadata Contract
+```powershell
+python -m pytest tests/test_turn_planner_llm.py tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py -q
 ```
 
-Простое объяснение:
+Full suite не является обязательной для этого изолированного additive checkpoint. Если targeted regression обнаружит широкий риск, СТОП и новая оценка scope до дополнительных прогонов.
 
-- бот должен различать «поле отсутствует», «значение неизвестно», «модель вернула неверный формат»;
-- ошибка формата patient scope не должна ломать другие понятные поля и product answer;
-- это contract/unit-test checkpoint, без prompt/runtime/live и без изменения ответов пациенту.
+Обязательное покрытие:
 
-Не разрешать implementation этим roadmap.
+1. `PatientScopeFrameMeta` требует все пять metadata fields и запрещает extra.
+2. Exact `FieldErrorReason` allowlist содержит ровно два новых stable error.
+3. Dump содержит `container` с defaulted schema provenance в adapter/raw builder paths.
+4. Scalar bridge сохраняет прежние values и статусы/provenance четырёх child fields.
+5. Container `defaulted` совместим с `PlannerAttempt.shadow_status="ok"`.
+6. Container `invalid` и `missing` обнаруживаются recursive helper; `ok` отклоняется, `partial` принимается.
+7. Shadow/observability serialization сохраняет новый key без утечки raw.
 
-## 8. Правило поддержки чекбоксов
-
-Roadmap должен содержать maintenance policy:
-
-1. Новый checkbox добавляется в governance TASK до работы.
-2. `[x]` ставится только в completion commit checkpoint после checker `✅`.
-3. Если checkpoint завершил измерение с красным результатом, checkbox ставится, а quality/result пишется рядом честно.
-4. Design checkbox не закрывает implementation checkbox.
-5. Live checkbox не закрывается без immutable raw, audit и owner permission.
-6. Authority checkbox обновляется только отдельным product decision.
-7. `ARCH_TARGET_DESIGN.md` не дублирует подробный список, а ссылается на этот roadmap, чтобы снова не устареть.
-
-## 9. README и ARCH sync
-
-### `docs/README.md`
-
-В таблицу «Канон runtime» добавить:
-
-```text
-STRANGLER_ROADMAP.md | канонический статус архитектурной миграции A1–A9, чекбоксы и влияние на продукт
-```
-
-Не удалять `FULLCONTEXT_ROADMAP.md`; объяснить различие назначением строк.
-
-### `docs/ARCH_TARGET_DESIGN.md`
-
-Заменить только stale section `## Текущий strangler-checkpoint` на краткую сводку:
-
-- canonical live status → `docs/STRANGLER_ROADMAP.md`;
-- A1–A8 completed as migration checkpoints;
-- A9 active, latest completed `16ced47`;
-- native positive quality not ready;
-- product firewall preserved, authority forbidden;
-- следующий checkpoint — native container metadata contract.
-
-Не переписывать target architecture или «Кучу A/B» в этом checkpoint.
-
-## 10. Protected scope
-
-Запрещено менять:
-
-- code/contracts/tests/evals/clients/config;
-- `docs/FULLCONTEXT_ROADMAP.md`;
-- A1–A9 design/audit documents;
-- raw artifacts;
-- hashes/metrics/commits под красивую историю;
-- product authority statements.
-
-Нельзя заявлять:
-
-- что A1–A8 уже изменили ответы пациента, если checkpoint был shadow-only;
-- что A6 `26/33` или A7 `33/33` означают product accuracy;
-- что A9 ready;
-- что модель «не поняла» patient scope;
-- что A9 harness проверил тексты ответов/цены/UI;
-- что A10 уже определён.
-
-## 11. Проверки
-
-Pytest/live/LLM не запускать: diff docs-only.
+## 7. Static/read-only checks
 
 ```powershell
 git status --short
 git diff --check
 git diff --name-only
-git diff -- contracts core orchestration tests evals clients
-rg -n "A5 следующий" docs/ARCH_TARGET_DESIGN.md
+rg -n 'raw\.get\("patient_scope"\)|raw\["patient_scope"\]' core contracts
+rg -n 'patient_scope_invalid_type|patient_scope_extra_field|container' contracts core tests
 Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
 git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
 ```
 
-После authoring `rg "^(### |- )\[[ x]\]" docs/STRANGLER_ROADMAP.md` должен показывать все A1–A9 и A9 subcheckpoints.
+Frozen expected hashes:
 
-## 12. Checkpoints
+- first A9 raw SHA256: `478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`;
+- A9 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`.
+
+## 8. Checkpoints
 
 ### Checkpoint 1 — governance review
 
-Checker проверяет TASK до docs authoring. После `✅` — отдельный commit/push только `TASK.md`.
+Independent checker проверяет этот TASK до code changes: design fidelity, allowlist, test sufficiency, firewall и отсутствие скрытого native implementation. После `✅` — отдельный commit/push только `TASK.md`.
 
-### Checkpoint 2 — roadmap authoring
+### Checkpoint 2 — contract implementation
 
-Изменить только три allowlist docs, выполнить read-only проверки, без commit.
+Изменить только allowlist contract/constructors/tests. Выполнить targeted tests и static checks. Без roadmap checkbox и без commit.
 
-### Checkpoint 3 — independent review
+### Checkpoint 3 — independent code/runtime review
 
-Checker сверяет каждый checkbox/claim с git/docs, понятность для маркетолога, отсутствие ложного product impact и stale A5.
+Checker проверяет diff и результаты тестов, отдельно подтверждает:
 
-### Checkpoint 4 — docs commit
+- container metadata additive и required;
+- producers используют безопасный default;
+- recursive partial semantics доказана;
+- existing bridge/value/child metadata не изменены;
+- native raw parsing/prompt/product authority не появились;
+- protected hashes неизменны.
 
-Только после `✅`: commit/push трёх docs в `codex/stage-a`.
+### Checkpoint 4 — completion
 
-## 13. Definition of Done
+Только после checker `✅` обновить один roadmap checkbox/status, повторить diff/static checks, затем один implementation completion commit и push в `codex/stage-a`.
 
-1. Создан один канонический A-series roadmap.
-2. A1–A9 и A9 subcheckpoints имеют честные checkboxes.
-3. Под каждым A-пунктом есть понятное влияние на работу бота и видимое пациенту поведение.
-4. Shadow completion не выдан за product activation.
-5. A9 red quality/product firewall/authority отражены точно.
-6. Следующий checkpoint назван без запуска implementation.
-7. README ведёт на roadmap.
-8. ARCH больше не говорит «A5 следующий» и ссылается на канон.
-9. Protected files/raw/hashes unchanged; pytest/live/LLM не запускались.
-10. Independent checker дал `✅` до docs commit.
+## 9. Definition of Done
 
-После docs commit — СТОП. A9 contract/code/live не начинать без нового TASK и checker review.
+1. Новый обязательный `container: FieldMeta` есть в contract и во всех существующих producers.
+2. Добавлены ровно два approved container error reasons.
+3. Defaulted/invalid/missing recursive semantics доказаны unit tests.
+4. Existing scalar bridge values и четыре child metadata не изменились.
+5. Оба targeted pytest slice зелёные; full suite обоснованно не запускался.
+6. Prompt/native extraction/product routing/live не затронуты.
+7. Первый A9 raw и frozen matrix hashes неизменны.
+8. Independent checker дал `✅` до completion diff/commit.
+9. Roadmap отмечает только этот subcheckpoint; A9 parent остаётся open, authority forbidden.
+
+После completion commit — СТОП. Следующий checkpoint `A9 Native Raw Contract / Prompt Spec` начинается только с нового TASK и governance review.

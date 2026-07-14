@@ -794,7 +794,7 @@ def test_plan_turn_attempt_known_patient_kind_stays_ok_with_mapped_scope(monkeyp
         "status": "valid",
         "error": None,
     }
-    for name in ("jaw", "stage", "modifiers"):
+    for name in ("container", "jaw", "stage", "modifiers"):
         assert scope_meta[name] == {
             "confidence": 0.0,
             "provenance": "turn_plan.schema_default",

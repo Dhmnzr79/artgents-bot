@@ -47,6 +47,8 @@ def test_field_error_reason_allowlist_includes_exact_a9_contract():
         "patient_stage_not_allowed",
         "patient_modifiers_invalid_type",
         "patient_modifier_not_allowed",
+        "patient_scope_invalid_type",
+        "patient_scope_extra_field",
     }
 
 
@@ -212,6 +214,7 @@ def test_recursive_helper_accepts_nested_all_defaulted():
     frame = _frame(
         field_meta=_frame_meta(
             patient_scope=PatientScopeFrameMeta(
+                container=defaulted,
                 extent=defaulted,
                 jaw=defaulted,
                 stage=defaulted,
@@ -234,6 +237,9 @@ def test_recursive_helper_accepts_nested_all_defaulted():
         ("jaw", "invalid", "patient_jaw_not_allowed"),
         ("stage", "invalid", "patient_stage_not_allowed"),
         ("modifiers", "invalid", "patient_modifier_not_allowed"),
+        ("container", "invalid", "patient_scope_invalid_type"),
+        ("container", "invalid", "patient_scope_extra_field"),
+        ("container", "missing", None),
         ("extent", "missing", None),
         ("jaw", "missing", None),
         ("stage", "missing", None),

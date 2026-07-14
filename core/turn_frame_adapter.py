@@ -39,6 +39,7 @@ def _defaulted_meta(*, confidence: float, provenance: str) -> FieldMeta:
 
 def _default_patient_scope_meta() -> PatientScopeFrameMeta:
     return PatientScopeFrameMeta(
+        container=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
         extent=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
         jaw=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),
         stage=_defaulted_meta(confidence=0.0, provenance=_SCHEMA_DEFAULT),

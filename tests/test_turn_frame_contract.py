@@ -169,12 +169,13 @@ def test_contract_package_exports_patient_scope_symbols():
         assert name in contracts.__all__
 
 
-def test_patient_scope_meta_requires_four_fields_and_forbids_extra():
+def test_patient_scope_meta_requires_five_fields_and_forbids_extra():
     base = FieldMeta(confidence=0.0, provenance="test", status="defaulted")
     with pytest.raises(ValueError, match="Field required"):
-        PatientScopeFrameMeta(extent=base, jaw=base, stage=base)
+        PatientScopeFrameMeta(extent=base, jaw=base, stage=base, modifiers=base)
     with pytest.raises(ValueError, match="extra_forbidden"):
         PatientScopeFrameMeta(
+            container=base,
             extent=base,
             jaw=base,
             stage=base,
@@ -212,6 +213,12 @@ def test_turn_frame_dump_contains_nested_patient_scope_value_and_meta():
     assert dumped["field_meta"]["patient_scope"]["jaw"] == {
         "confidence": 0.0,
         "provenance": "test.jaw",
+        "status": "valid",
+        "error": None,
+    }
+    assert dumped["field_meta"]["patient_scope"]["container"] == {
+        "confidence": 1.0,
+        "provenance": "test",
         "status": "valid",
         "error": None,
     }

@@ -22,8 +22,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Native Extraction Design** (`16ced47`) |
-| Следующий checkpoint | **A9 Native Container Metadata Contract** |
+| Последний завершённый checkpoint | **A9 Native Container Metadata Contract** (governance `375ac13`, completion — текущий commit) |
+| Следующий checkpoint | **A9 Native Raw Contract / Prompt Spec** |
 | Что сейчас отвечает пациенту | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -188,7 +188,7 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] Quality harness (`3f11857`)
 - [x] One-run audit (`10b4739`)
 - [x] Native extraction design (`16ced47`)
-- [ ] Native container metadata contract
+- [x] Native container metadata contract (governance `375ac13`, contract/tests reviewed)
 - [ ] Native raw contract и prompt spec
 - [ ] Native extraction implementation
 - [ ] Native shadow wiring/firewall proof
@@ -218,18 +218,20 @@ A1–A9 не были целиком придуманы заранее как н
 
 ## Следующий checkpoint
 
-### A9 Native Container Metadata Contract
+### A9 Native Raw Contract / Prompt Spec
 
-Нужно научить систему различать:
+Нужно заранее и отдельно зафиксировать:
 
-- поле действительно отсутствует;
-- значение явно неизвестно;
-- модель вернула неверный формат;
-- внутри patient scope появился лишний неизвестный ключ.
+- точную форму будущего `patient_scope` в едином JSON planner’а;
+- как из этого JSON безопасно отделять legacy product payload;
+- какие значения, пропуски и ошибки допустимы для четырёх scope-полей;
+- какие краткие правила будущий prompt должен объяснить модели.
 
-Ошибка формата patient scope не должна уничтожать другие понятные поля и не должна ломать текущий product answer.
+Сначала это будет закреплено спецификацией и frozen unit fixtures. Сам native parser и изменение действующего prompt относятся к следующему implementation checkpoint.
 
-Это будет отдельный contract/unit-test checkpoint: без изменения prompt, runtime-ответов и без live/LLM. Этот roadmap сам по себе implementation не разрешает.
+**Как это скажется на боте:** прямого изменения ответа пока не будет. Мы заранее ставим технические «ограждения», чтобы будущий новый JSON не сломал проверенный legacy product path и чтобы плохое поле не уничтожало хорошие соседние данные.
+
+Checkpoint — docs/unit-fixture only: без изменения действующего prompt, runtime-ответов и без live/LLM. Этот roadmap сам по себе implementation не разрешает.
 
 ## Как поддерживать чекбоксы
 

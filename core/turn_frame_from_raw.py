@@ -83,6 +83,7 @@ def _schema_default_meta() -> FieldMeta:
 
 def _default_patient_scope_meta() -> PatientScopeFrameMeta:
     return PatientScopeFrameMeta(
+        container=_schema_default_meta(),
         extent=_schema_default_meta(),
         jaw=_schema_default_meta(),
         stage=_schema_default_meta(),
@@ -107,6 +108,7 @@ def _patient_scope_from_raw(
         modifiers=list(modifiers),
     )
     meta = PatientScopeFrameMeta(
+        container=_schema_default_meta(),
         extent=(
             _meta(provenance=_PATIENT_EXTENT, status="valid")
             if extent is not None

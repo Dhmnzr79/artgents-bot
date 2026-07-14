@@ -42,6 +42,8 @@ FieldErrorReason = Literal[
     "patient_stage_not_allowed",
     "patient_modifiers_invalid_type",
     "patient_modifier_not_allowed",
+    "patient_scope_invalid_type",
+    "patient_scope_extra_field",
 ]
 
 
@@ -89,6 +91,7 @@ class PatientScopeFrameMeta(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    container: FieldMeta
     extent: FieldMeta
     jaw: FieldMeta
     stage: FieldMeta

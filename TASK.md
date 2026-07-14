@@ -11,8 +11,11 @@ Checkpoint eval/unit-only, no live. Runtime/product, v1 harness/raw и patient-s
 ## 1. Baseline
 
 - branch `codex/stage-a`;
-- HEAD `5b004db test: prove A9 native shadow wiring firewall`;
-- HEAD совпадает с `origin/codex/stage-a`; working tree до governance edit был clean, текущий разрешённый diff — только `TASK.md`;
+- HEAD `083bdcd docs: define A9 manual contact taxonomy`;
+- HEAD совпадает с `origin/codex/stage-a`;
+- после первого governance были созданы два разрешённых WIP-файла: `evals/v5/patient_scope_availability_v2.py` и `tests/test_patient_scope_not_applicable_taxonomy.py`;
+- targeted run обнаружил governance contradiction в immutable historical v1 test, не helper regression; до этой revision WIP-файлы больше не менялись;
+- текущий разрешённый diff этой governance revision: `TASK.md` + два названных WIP-файла; любой другой diff запрещён;
 - выбранный design: `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`, §9 и §11.3;
 - observed audit gap: `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`, §10–11;
 - current v1 harness: `evals/v5/run_patient_scope_shadow_eval.py`;
@@ -21,6 +24,8 @@ Checkpoint eval/unit-only, no live. Runtime/product, v1 harness/raw и patient-s
 - live-positive exact первого raw остаётся `0` по `extent/jaw/stage/modifiers`, composite `0/9`;
 - product firewall сохранён, authority запрещена;
 - local demo, production-клиентов нет.
+
+Historical v1 note: `tests/test_patient_scope_shadow_eval_contract.py` был создан в `3f11857` как намеренно target-red contract и требует `field isolation = 0/4`. После native builder implementation `302a05e` production binding честно даёт `4/4`; поэтому этот immutable test module больше не является current semantic regression suite. Его нельзя менять, выбирать из него `-k`, skip/xfail или использовать его старые expected как текущий quality gate.
 
 Фактический data flow:
 
@@ -171,7 +176,7 @@ Helper обязан:
 12. question/answer/history/sid/raw/exception secrets не появляются в result/repr;
 13. source/AST imports не содержат runtime/product dependencies;
 14. production modules не импортируют новый eval helper;
-15. v1 harness/matrix/raw hashes unchanged.
+15. v1 harness/contract-test/matrix/raw hashes unchanged.
 
 Запрещены conditional PASS, skip/xfail, мок helper-а, подмена ожидаемого текущим output и чтение первого raw для генерации expected.
 
@@ -194,6 +199,7 @@ Protected hashes:
 - v1 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`;
 - native v2 fixture git blob: `c7458e4481489895320ea3de1dec1a81b8da5f50`;
 - v1 harness git blob: `2898ff1d56dba3319f4121158ba98e2879cdb579`.
+- historical v1 contract test git blob: `c2ed5f0655ab8e1dddda1a865ab95c50ffc797b3`.
 
 Новый helper использует suffix `v2`, но сам по себе не объявляет full harness v2 frozen/ready и не разрешает live.
 
@@ -216,13 +222,15 @@ Protected hashes:
 
 ## 10. Targeted tests
 
-Primary taxonomy + frozen v1 regression:
+Primary taxonomy slice:
 
 ```powershell
-.\.venv\codex312\Scripts\python.exe -m pytest tests/test_patient_scope_not_applicable_taxonomy.py tests/test_patient_scope_shadow_eval_contract.py -q
+.\.venv\codex312\Scripts\python.exe -m pytest tests/test_patient_scope_not_applicable_taxonomy.py -q
 ```
 
-Full suite не обязателен: два новых isolated eval/unit files, production и v1 artifacts immutable. Если test обнаруживает необходимость runtime/v1 change — СТОП и новая оценка scope.
+Historical `tests/test_patient_scope_shadow_eval_contract.py` намеренно не входит в command целиком: это frozen target-red evidence прежнего gap, а не current semantic regression после `302a05e`. Запрещено запускать его выборочно через `-k` ради зелёного отчёта; immutability доказывается exact blob/static check.
+
+Full suite не обязателен: два новых isolated eval/unit files, production и v1 artifacts immutable. Если taxonomy test обнаруживает необходимость runtime/v1 change — СТОП и новая оценка scope.
 
 ## 11. Static checks
 
@@ -234,6 +242,7 @@ git diff -- evals/v5/run_patient_scope_shadow_eval.py tests/test_patient_scope_s
 rg -n "patient_scope_availability_v2" app.py llm.py resolver.py session.py core contracts orchestration ingress_gate.py
 Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
 git hash-object evals/v5/run_patient_scope_shadow_eval.py
+git hash-object tests/test_patient_scope_shadow_eval_contract.py
 git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
 git hash-object tests/fixtures/patient_scope_native_contract_a9_v2.json
 ```
@@ -267,7 +276,7 @@ Checker начинает с test diff, сверяет exact positive/negative ca
 5. Helper pure/privacy-safe и не мутирует input.
 6. Runtime/product не импортирует helper и не меняется.
 7. V1 harness/matrix/tests/raw/summary/audit неизменны и имеют exact hashes.
-8. Targeted tests зелёные; full suite обоснованно не запускался.
+8. Taxonomy targeted tests зелёные; historical target-red v1 test module не объявляется current regression suite и защищён exact blob; full suite обоснованно не запускался.
 9. Live/LLM/widget не запускались; authority forbidden.
 10. Final checker дал `✅` до roadmap/commit.
 11. Roadmap закрывает только taxonomy и называет следующим frozen matrix/harness v2 review.

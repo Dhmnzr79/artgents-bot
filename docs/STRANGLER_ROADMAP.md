@@ -1,6 +1,6 @@
 # Архитектурная миграция A1–A9 — roadmap для владельца продукта
 
-Этот документ показывает, как мы постепенно заменяем внутреннее понимание вопроса пациента, не рискуя работающими ответами, ценами и воронкой.
+Этот документ показывает, как мы строим новое внутреннее понимание вопроса пациента в локальном demo. Production-клиентов пока нет: legacy используется временно как измерительный и контрольный контур, а не как продукт, который нужно сохранять ради действующих пользователей. Цель — проверенная новая архитектура, после чего ненужные legacy-ветви можно удалять.
 
 ## Как читать чекбоксы
 
@@ -22,9 +22,9 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Native Extraction Implementation** (governance `e46a428`, completion — текущий commit) |
-| Следующий checkpoint | **A9 Native Shadow Wiring / Firewall Proof** |
-| Что сейчас отвечает пациенту | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
+| Последний завершённый checkpoint | **A9 Native Shadow Wiring / Firewall Proof** (governance `4162111`, completion — текущий commit) |
+| Следующий checkpoint | **A9 Manual-contact `not_applicable` Taxonomy** |
+| Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -191,7 +191,7 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] Native container metadata contract (governance `375ac13`, contract/tests reviewed)
 - [x] Native raw contract и prompt spec (governance `405a6ac`, frozen fixture/tests reviewed)
 - [x] Native extraction implementation (governance `e46a428`, implementation/tests reviewed)
-- [ ] Native shadow wiring/firewall proof
+- [x] Native shadow wiring/firewall proof (governance `4162111`, runtime/tests reviewed)
 - [ ] Manual-contact `not_applicable` taxonomy
 - [ ] Frozen matrix/harness v2 review
 - [ ] One-run live re-audit — только после отдельного разрешения владельца
@@ -218,20 +218,19 @@ A1–A9 не были целиком придуманы заранее как н
 
 ## Следующий checkpoint
 
-### A9 Native Shadow Wiring / Firewall Proof
+### A9 Manual-contact `not_applicable` Taxonomy
 
-Нужно отдельно доказать на runtime-швах, что уже реализованный native `patient_scope`:
+Нужно отдельно описать, как shadow measurement учитывает обращения, которые ранний hard/manual-contact path завершает до planner/TurnFrame:
 
-- действительно доходит из единого planner call в shadow-frame;
-- не попадает в strict legacy plan;
-- не меняет routing, цену, evidence, composer, текст ответа или UI;
-- не получает authority даже при полностью валидном native scope.
+- запись и передача контакта;
+- жалоба или обращение, которое сразу передаётся администратору;
+- другие manual-contact случаи, где patient scope объективно не измерялся.
 
-Native extraction implementation уже завершён и проверен без live/LLM. Planner теперь умеет вернуть составную shadow-карточку из четырёх полей, а parser независимо и безопасно разбирает каждое поле. Перед strict legacy validation удаляется только новый shadow sibling; если sibling присутствует, старое scalar-значение не подмешивается.
+Native wiring/firewall proof завершён без production-изменений и без live/LLM. Реальный локальный путь `planner → resolver → shadow metadata` сохраняет native composite и его field metadata. A/B-проверка показала одинаковые product inputs с native sibling и без него; valid native не repair’ит invalid legacy, а invalid native не ломает valid legacy. Production-модули не читают новый nested scope.
 
-**Как это скажется на боте:** внутри появится более точная измерительная карточка масштаба ситуации пациента, но для пациента пока ничего не изменится. Следующий checkpoint нужен, чтобы ещё раз отдельно доказать: ответы, цены, маршруты и интерфейс по-прежнему принадлежат действующей логике, а новая карточка только наблюдается.
+**Как это скажется на боте:** следующий checkpoint не меняет ответы. Он сделает аналитику честнее: обращение, которое специально ушло напрямую администратору, не будет выглядеть как техническая ошибка или как «patient scope неизвестен». Оно будет явно помечено как неприменимое к этому измерению.
 
-Checkpoint будет code/runtime-proof без live/LLM. Live/LLM по-прежнему требует отдельного разрешения владельца. Этот roadmap сам по себе следующую реализацию не разрешает: сначала новый governance `TASK.md` и checker-review.
+Checkpoint начинается с design/taxonomy governance и не разрешает live/LLM. Этот roadmap сам по себе следующую реализацию не разрешает: сначала новый `TASK.md` и checker-review.
 
 ## Как поддерживать чекбоксы
 

@@ -53,6 +53,42 @@ def _record_a9_scope(patient_situation: object, *, partial: bool = False):
     return frame
 
 
+def _record_native_a9_scope(
+    patient_scope: object,
+    *,
+    shadow_status: str = "ok",
+    raw_extra: dict | None = None,
+):
+    from flask import request
+
+    if not hasattr(request, "ctx"):
+        request.ctx = {}
+    raw = {
+        "route": "content",
+        "aspects": ["overview"],
+        "topic": "implantation",
+        "topic_confidence": 0.9,
+        "patient_situation": "one_tooth_missing",
+        "patient_scope": patient_scope,
+    }
+    raw.update(raw_extra or {})
+    frame = build_turn_frame_from_raw(
+        raw,
+        allowed_topics=frozenset({"implantation"}),
+    )
+    attempt = PlannerAttempt(
+        legacy_plan=TurnPlan(
+            route="content",
+            aspects=["overview"],
+            patient_situation="one_tooth_missing",
+        ),
+        shadow_frame=frame,
+        shadow_status=shadow_status,
+    )
+    record_planner_attempt_shadow(attempt=attempt)
+    return frame
+
+
 def test_record_decision_frame_ctx_from_dict() -> None:
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
@@ -253,6 +289,53 @@ def test_a9_nested_scope_round_trips_through_turn_details_and_response_slice() -
             assert shadow["field_meta"]["patient_scope"]["extent"]["status"] == "defaulted"
 
 
+def test_native_a9_composite_round_trips_through_ctx_details_and_e2e_response(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
+    native_scope = {
+        "extent": "full_arch",
+        "jaw": "upper",
+        "stage": "implant_placed",
+        "modifiers": ["reported_bone_deficit"],
+    }
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+        from orchestration.finalize_turn import finalize_ask
+
+        frame = _record_native_a9_scope(native_scope)
+        details = metadata_first_turn_details()
+        response_slice = metadata_first_response_meta()
+        with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
+            "orchestration.finalize_turn.record_last_bot_payload"
+        ), patch("orchestration.finalize_turn.emit_bot_event"):
+            out = finalize_ask(
+                {"answer": "ответ", "meta": {}},
+                "sid",
+                "q",
+                route="retrieval_chunk",
+            )
+
+        assert request.ctx["turn_frame_shadow"] == frame.model_dump()
+
+    for payload in (
+        details,
+        response_slice,
+        out["meta"]["metadata_first"],
+    ):
+        shadow = payload["turn_frame_shadow"]
+        assert shadow == frame.model_dump()
+        assert shadow["patient_scope"] == native_scope
+        for field_name in ("extent", "jaw", "stage", "modifiers"):
+            assert shadow["field_meta"]["patient_scope"][field_name] == {
+                "confidence": 0.0,
+                "provenance": f"turn_plan.raw.patient_scope.{field_name}",
+                "status": "valid",
+                "error": None,
+            }
+
+
 def test_turn_frame_shadow_reason_in_turn_details_when_present() -> None:
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
@@ -406,6 +489,60 @@ def test_a9_shadow_observability_does_not_leak_malformed_raw_secrets() -> None:
         assert secret not in payload
 
 
+def test_native_a9_partial_scope_preserves_neighbors_without_raw_secret_leak() -> None:
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        frame = _record_native_a9_scope(
+            {
+                "extent": "few_teeth",
+                "jaw": "lower",
+                "stage": "extraction_context",
+                "modifiers": [],
+                "secret-native-key": "secret-native-value",
+            },
+            shadow_status="partial",
+            raw_extra={
+                "question": "secret-question",
+                "history": ["secret-history"],
+                "exception": "secret-exception",
+            },
+        )
+        observed = {
+            "ctx": request.ctx,
+            "details": metadata_first_turn_details(),
+            "response_slice": metadata_first_response_meta(),
+        }
+
+    assert observed["ctx"]["turn_frame_shadow_status"] == "partial"
+    shadow = observed["ctx"]["turn_frame_shadow"]
+    assert shadow == frame.model_dump()
+    assert shadow["patient_scope"] == {
+        "extent": "few_teeth",
+        "jaw": "lower",
+        "stage": "extraction_context",
+        "modifiers": [],
+    }
+    assert shadow["field_meta"]["patient_scope"]["container"]["status"] == "invalid"
+    assert (
+        shadow["field_meta"]["patient_scope"]["container"]["error"]
+        == "patient_scope_extra_field"
+    )
+    for field_name in ("extent", "jaw", "stage", "modifiers"):
+        assert shadow["field_meta"]["patient_scope"][field_name]["status"] == "valid"
+    serialized = str(observed)
+    for secret in (
+        "secret-native-key",
+        "secret-native-value",
+        "secret-question",
+        "secret-history",
+        "secret-exception",
+    ):
+        assert secret not in serialized
+
+
 def test_finalize_ask_includes_partial_shadow_field_errors_only_in_e2e_meta(monkeypatch) -> None:
     monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
     app = pytest.importorskip("flask").Flask(__name__)
@@ -475,7 +612,14 @@ def test_finalize_ask_omits_real_a9_nested_scope_without_e2e_env(monkeypatch) ->
     with app.test_request_context("/"):
         from orchestration.finalize_turn import finalize_ask
 
-        _record_a9_scope("one_tooth_missing")
+        _record_native_a9_scope(
+            {
+                "extent": "one_tooth",
+                "jaw": "unknown",
+                "stage": "unknown",
+                "modifiers": [],
+            }
+        )
         with patch("orchestration.finalize_turn.mem_get", return_value={"session_turn_count": 1}), patch(
             "orchestration.finalize_turn.record_last_bot_payload"
         ), patch("orchestration.finalize_turn.emit_bot_event"):

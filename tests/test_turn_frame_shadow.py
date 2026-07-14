@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import copy
 import inspect
 import json
 from pathlib import Path
@@ -117,6 +119,87 @@ def _patient_scope_attempt(
         shadow_frame=shadow_frame,
         shadow_status="partial" if partial else "ok",
     )
+
+
+def _native_planner_payload(**overrides) -> dict:
+    payload = {
+        "route": "content",
+        "aspects": ["overview"],
+        "service_id": "veneers",
+        "followup_of": None,
+        "needs_clarify": False,
+        "patient_situation": "one_tooth_missing",
+        "brand_filter": None,
+        "topic": "prosthetics",
+        "topic_confidence": 0.9,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _patch_real_planner_external_completion(monkeypatch, payloads: list[dict]):
+    queued = [copy.deepcopy(payload) for payload in payloads]
+    calls: list[dict] = []
+
+    def _create(**kwargs):
+        calls.append(copy.deepcopy(kwargs))
+        if not queued:
+            raise AssertionError("unexpected second planner completion")
+        payload = queued.pop(0)
+
+        class _Message:
+            content = json.dumps(payload, ensure_ascii=False)
+
+        class _Choice:
+            message = _Message()
+
+        class _Response:
+            choices = [_Choice()]
+
+        return _Response()
+
+    monkeypatch.setattr(
+        "core.turn_planner_llm.chat_client.chat.completions.create",
+        _create,
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.build_compact_service_catalog",
+        lambda _client_id: [
+            {
+                "service_id": "veneers",
+                "title": "Виниры",
+                "about": "эстетическая реставрация",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm._allowed_pricebook_filters",
+        lambda _client_id: (frozenset(), frozenset()),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.load_client_topic_taxonomy",
+        lambda _client_id: frozenset({"prosthetics"}),
+    )
+    monkeypatch.setattr("orchestration.resolver_turn.TURN_PLANNER_ON", True)
+    return calls, queued
+
+
+def _run_real_planner_resolver(app: Flask, *, sid: str):
+    from session import mem_reset
+
+    mem_reset(sid)
+    with app.test_request_context("/"):
+        from flask import request
+
+        request.ctx = {}
+        outcome = run_resolver_turn(
+            q="Расскажите о винирах",
+            sid=sid,
+            client_id="demo",
+            st={"hist": []},
+            enqueue_resolver_trace=lambda **_kwargs: None,
+        )
+        return outcome, copy.deepcopy(request.ctx)
 
 
 _A6_FAIL_OPEN_CASE_IDS = (
@@ -650,6 +733,165 @@ def test_a9_partial_scope_is_observable_but_does_not_change_product_fallback(
         assert outcome.scope_topic_candidate == "prosthetics"
 
 
+def test_native_scope_real_planner_wiring_is_product_equivalent_to_absent_control(
+    monkeypatch,
+) -> None:
+    control = _native_planner_payload()
+    native_scope = {
+        "extent": "full_arch",
+        "jaw": "both",
+        "stage": "implant_placed",
+        "modifiers": ["reported_bone_deficit"],
+    }
+    treatment = _native_planner_payload(patient_scope=native_scope)
+    calls, queued = _patch_real_planner_external_completion(
+        monkeypatch,
+        [control, treatment],
+    )
+    monkeypatch.setattr(
+        "orchestration.resolver_turn.resolve_with_fallback",
+        lambda **_kwargs: pytest.fail("valid legacy planner branch must not fall back"),
+    )
+
+    app = Flask(__name__)
+    control_outcome, control_ctx = _run_real_planner_resolver(app, sid="native-ab")
+    assert len(calls) == 1
+    treatment_outcome, treatment_ctx = _run_real_planner_resolver(app, sid="native-ab")
+
+    assert len(calls) == 2
+    assert queued == []
+    assert all(call["model"] for call in calls)
+    control_signature = {
+        "intent": control_outcome.intent,
+        "decision": control_outcome.decision.model_dump(),
+        "scope_topic_candidate": control_outcome.scope_topic_candidate,
+        "turn_plan": control_ctx["turn_plan"],
+    }
+    treatment_signature = {
+        "intent": treatment_outcome.intent,
+        "decision": treatment_outcome.decision.model_dump(),
+        "scope_topic_candidate": treatment_outcome.scope_topic_candidate,
+        "turn_plan": treatment_ctx["turn_plan"],
+    }
+    assert treatment_signature == control_signature
+    assert "patient_scope" not in treatment_ctx["turn_plan"]
+    assert treatment_ctx["turn_frame_shadow_status"] == SHADOW_STATUS_OK
+    shadow = treatment_ctx["turn_frame_shadow"]
+    assert shadow["patient_scope"] == native_scope
+    assert shadow["field_meta"]["patient_scope"]["container"] == {
+        "confidence": 0.0,
+        "provenance": "turn_plan.raw.patient_scope",
+        "status": "valid",
+        "error": None,
+    }
+    for field_name in ("extent", "jaw", "stage", "modifiers"):
+        assert shadow["field_meta"]["patient_scope"][field_name] == {
+            "confidence": 0.0,
+            "provenance": f"turn_plan.raw.patient_scope.{field_name}",
+            "status": "valid",
+            "error": None,
+        }
+    assert control_ctx["turn_plan_route"] == treatment_ctx["turn_plan_route"]
+    assert control_ctx["turn_plan_aspects"] == treatment_ctx["turn_plan_aspects"]
+    assert control_ctx["turn_plan_service_id"] == treatment_ctx["turn_plan_service_id"]
+    assert control_ctx["turn_plan_followup_of"] == treatment_ctx["turn_plan_followup_of"]
+    assert control_ctx["turn_plan_needs_clarify"] == treatment_ctx["turn_plan_needs_clarify"]
+
+
+def test_invalid_native_member_stays_partial_without_changing_valid_legacy_product(
+    monkeypatch,
+) -> None:
+    payload = _native_planner_payload(
+        patient_scope={
+            "extent": 42,
+            "jaw": "upper",
+            "stage": "implant_placed",
+            "modifiers": ["reported_bone_deficit"],
+        }
+    )
+    calls, queued = _patch_real_planner_external_completion(monkeypatch, [payload])
+    monkeypatch.setattr(
+        "orchestration.resolver_turn.resolve_with_fallback",
+        lambda **_kwargs: pytest.fail("invalid native sibling must not invalidate legacy"),
+    )
+
+    outcome, ctx = _run_real_planner_resolver(Flask(__name__), sid="native-invalid-member")
+
+    assert len(calls) == 1
+    assert queued == []
+    assert ctx["turn_planner_used"] is True
+    assert ctx["resolver_used"] is False
+    assert ctx["turn_frame_shadow_status"] == SHADOW_STATUS_PARTIAL
+    assert "patient_scope" not in ctx["turn_plan"]
+    expected_legacy = copy.deepcopy(payload)
+    expected_legacy.pop("patient_scope")
+    assert ctx["turn_plan"] == expected_legacy
+    assert outcome.decision.service_id == "veneers"
+    assert outcome.decision.model_dump()["route_intent"] == ctx["turn_plan"]["route"]
+    shadow = ctx["turn_frame_shadow"]
+    assert shadow["patient_scope"] == {
+        "extent": "unknown",
+        "jaw": "upper",
+        "stage": "implant_placed",
+        "modifiers": ["reported_bone_deficit"],
+    }
+    assert shadow["field_meta"]["patient_scope"]["extent"] == {
+        "confidence": 0.0,
+        "provenance": "turn_plan.raw.patient_scope.extent",
+        "status": "invalid",
+        "error": "patient_extent_invalid_type",
+    }
+    for field_name in ("jaw", "stage", "modifiers"):
+        assert shadow["field_meta"]["patient_scope"][field_name]["status"] == "valid"
+
+
+def test_valid_native_scope_does_not_rescue_invalid_legacy_product_branch(
+    monkeypatch,
+) -> None:
+    native_scope = {
+        "extent": "few_teeth",
+        "jaw": "lower",
+        "stage": "extraction_context",
+        "modifiers": ["reported_bone_deficit"],
+    }
+    payload = _native_planner_payload(aspects=[], patient_scope=native_scope)
+    calls, queued = _patch_real_planner_external_completion(monkeypatch, [payload])
+    fallback_calls: list[dict] = []
+    fallback_decision = _decision(
+        route_intent="content",
+        service_topic="prosthetics",
+        service_id="veneers",
+        query_mode="overview",
+    )
+
+    def _fallback(**kwargs):
+        fallback_calls.append(copy.deepcopy(kwargs))
+        return fallback_decision, [], "controlled-fallback"
+
+    monkeypatch.setattr("orchestration.resolver_turn.resolve_with_fallback", _fallback)
+
+    outcome, ctx = _run_real_planner_resolver(Flask(__name__), sid="native-invalid-legacy")
+
+    assert len(calls) == 1
+    assert queued == []
+    assert len(fallback_calls) == 1
+    assert "patient_scope" not in str(fallback_calls[0])
+    assert ctx["turn_planner_used"] is False
+    assert ctx["resolver_used"] is True
+    assert "turn_plan" not in ctx
+    assert ctx["turn_frame_shadow_status"] == SHADOW_STATUS_PARTIAL
+    shadow = ctx["turn_frame_shadow"]
+    assert shadow["patient_scope"] == native_scope
+    assert shadow["field_meta"]["aspects"]["error"] == "aspects_empty"
+    for field_name in ("extent", "jaw", "stage", "modifiers"):
+        assert shadow["field_meta"]["patient_scope"][field_name]["provenance"] == (
+            f"turn_plan.raw.patient_scope.{field_name}"
+        )
+    assert outcome.decision.model_dump() == fallback_decision.model_dump()
+    assert outcome.intent == "content"
+    assert outcome.scope_topic_candidate == "prosthetics"
+
+
 @pytest.mark.parametrize("case_id", _A6_FAIL_OPEN_CASE_IDS)
 def test_frozen_a6_partial_paths_keep_product_fallback(monkeypatch, case_id: str) -> None:
     app = pytest.importorskip("flask").Flask(__name__)
@@ -758,8 +1000,34 @@ def test_run_resolver_turn_source_uses_attempt_once_and_only_legacy_for_product(
     assert "patient_scope" not in source
 
 
+def _native_shadow_ast_hits(path: Path) -> list[str]:
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    hits: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            expression = ast.unparse(node)
+            if node.attr == "patient_scope" and "shadow" in expression:
+                hits.append(expression)
+            if node.attr in {"extent", "jaw", "stage", "modifiers"}:
+                if "patient_scope" in expression and "shadow" in expression:
+                    hits.append(expression)
+        if isinstance(node, ast.Subscript):
+            expression = ast.unparse(node)
+            key = node.slice.value if isinstance(node.slice, ast.Constant) else None
+            if key == "patient_scope" and "turn_frame_shadow" in expression:
+                hits.append(expression)
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            if any(alias.name == "PatientScopeFrame" for alias in node.names):
+                hits.append("PatientScopeFrame import")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id == "PatientScopeFrame":
+                hits.append("PatientScopeFrame constructor")
+    return sorted(set(hits))
+
+
 def test_product_sources_do_not_read_a9_nested_shadow_scope() -> None:
-    paths = [Path("app.py"), Path("llm.py")]
+    paths = sorted(Path(".").glob("*.py"))
     paths.extend(sorted(Path("core").rglob("*.py")))
     paths.extend(sorted(Path("orchestration").rglob("*.py")))
     allowed = {
@@ -782,9 +1050,16 @@ def test_product_sources_do_not_read_a9_nested_shadow_scope() -> None:
             continue
         source = path.read_text(encoding="utf-8")
         hits = [token for token in forbidden if token in source]
+        hits.extend(_native_shadow_ast_hits(path))
         if hits:
-            offenders[relative] = hits
+            offenders[relative] = sorted(set(hits))
     assert offenders == {}
+
+    from core.turn_planner_llm import publish_turn_plan, turn_plan_to_decision_frame
+
+    for product_boundary in (turn_plan_to_decision_frame, publish_turn_plan):
+        assert "patient_scope" not in inspect.getsource(product_boundary)
+    assert "patient_scope" not in TurnPlan.model_fields
 
 
 def test_run_resolver_turn_comparison_override_does_not_rebuild_raw_shadow(monkeypatch) -> None:

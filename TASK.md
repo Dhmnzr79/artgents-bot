@@ -1,245 +1,361 @@
-# TASK — A9 Manual-contact `not_applicable` Taxonomy
+# TASK — A9 Frozen Matrix/Harness v2 Review
 
-Один активный `TASK.md` на один checkpoint. Реализовать отдельную harness-owned pure taxonomy для successful pre-planner `ingress_manual_contact`: отсутствие `TurnFrame` должно классифицироваться как `not_applicable / pre_planner_manual_contact`, а не как transport failure или fake unknown frame.
+Один активный `TASK.md` на один checkpoint. Подготовить и заморозить versioned A9 patient-scope matrix/harness v2 **до** любого нового live/LLM запуска.
 
-Checkpoint eval/unit-only, no live. Runtime/product, v1 harness/raw и patient-scope authority не меняются.
+Checkpoint eval/contract-only. Он не оценивает новую модель, не меняет ответы бота и не передаёт authority. Первый A9 raw, v1 artifacts и audit остаются неизменными.
 
 Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`.
 
 ---
 
-## 1. Baseline
+## 1. Baseline и цель
 
 - branch `codex/stage-a`;
-- HEAD `083bdcd docs: define A9 manual contact taxonomy`;
-- HEAD совпадает с `origin/codex/stage-a`;
-- после первого governance были созданы два разрешённых WIP-файла: `evals/v5/patient_scope_availability_v2.py` и `tests/test_patient_scope_not_applicable_taxonomy.py`;
-- targeted run обнаружил governance contradiction в immutable historical v1 test, не helper regression; до этой revision WIP-файлы больше не менялись;
-- текущий разрешённый diff этой governance revision: `TASK.md` + два названных WIP-файла; любой другой diff запрещён;
-- выбранный design: `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`, §9 и §11.3;
-- observed audit gap: `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`, §10–11;
-- current v1 harness: `evals/v5/run_patient_scope_shadow_eval.py`;
-- current v1 contract tests: `tests/test_patient_scope_shadow_eval_contract.py`;
-- первый A9 raw immutable, один attempt, no retry;
-- live-positive exact первого raw остаётся `0` по `extent/jaw/stage/modifiers`, composite `0/9`;
-- product firewall сохранён, authority запрещена;
-- local demo, production-клиентов нет.
+- baseline HEAD `deaa759 test: add A9 manual contact taxonomy`, совпадает с `origin/codex/stage-a`;
+- до governance edit рабочее дерево было чистым; текущий разрешённый diff — только `TASK.md`;
+- выбранный design: `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`, §9 и §12;
+- первый audit: `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`;
+- v1 matrix/harness: `evals/v5/demo/patient_scope_shadow_matrix.json` и `evals/v5/run_patient_scope_shadow_eval.py`;
+- принятый pure taxonomy helper: `evals/v5/patient_scope_availability_v2.py`;
+- первый A9 raw immutable; live-positive exact остаётся `0` по `extent/jaw/stage/modifiers`, composite `0/9`;
+- product firewall сохранён, patient-scope authority `Forbidden`;
+- бот локальный demo, production-клиентов нет.
 
-Historical v1 note: `tests/test_patient_scope_shadow_eval_contract.py` был создан в `3f11857` как намеренно target-red contract и требует `field isolation = 0/4`. После native builder implementation `302a05e` production binding честно даёт `4/4`; поэтому этот immutable test module больше не является current semantic regression suite. Его нельзя менять, выбирать из него `-k`, skip/xfail или использовать его старые expected как текущий quality gate.
-
-Фактический data flow:
-
-```text
-pre_resolver_turn
-  -> ingress route != normal
-  -> service_reply / meta.service_route=ingress_manual_contact
-  -> resolver/planner не вызывается
-  -> PlannerAttempt и turn_frame_shadow отсутствуют по архитектуре
-```
-
-Поэтому отсутствие frame на этом пути — неприменимость измерения, а не semantic unknown и не transport error.
+Цель checkpoint: заранее заморозить вопросы, ожидания, versioned artifact names, классификацию наблюдений и честные **live-only** знаменатели будущего one-run re-audit. Не запускать этот re-audit.
 
 ## 2. Решение до code
 
-Создать маленький versioned eval helper, который читает только успешный response dict:
+Создать независимые v2 artifacts, не редактируя и не импортируя как mutable config v1 snapshot:
+
+1. `evals/v5/demo/patient_scope_shadow_matrix_v2.json`;
+2. `evals/v5/run_patient_scope_shadow_eval_v2.py`;
+3. `tests/test_patient_scope_shadow_eval_v2_contract.py`.
+
+V2 harness может быть механически основан на v1 коде, но является отдельным frozen executable snapshot. Это исключает retroactive reinterpretation первого run и не требует risky refactor старого измерителя.
+
+V2 matrix сохраняет те же 10 bridge, 4 field-isolation, 20 single-turn и 5×2 multi-turn expectations. Questions, ordering, evidence refs, current-turn/session laws и 30-call denominator не подгоняются под первый raw или текущий output. Изменяются только version/scoring-contract поля, необходимые v2.
+
+## 3. Frozen names и versions
+
+- matrix: `evals/v5/demo/patient_scope_shadow_matrix_v2.json`;
+- harness: `evals/v5/run_patient_scope_shadow_eval_v2.py`;
+- contract tests: `tests/test_patient_scope_shadow_eval_v2_contract.py`;
+- future raw (не создавать сейчас): `eval_patient_scope_a9_v2_last.txt`;
+- future audit (не создавать сейчас): `docs/PATIENT_SCOPE_SHADOW_REAUDIT_A9_V2.md`;
+- matrix schema: `a9.patient_scope_shadow_matrix.v2`;
+- summary schema: `a9.patient_scope_shadow_summary.v2`;
+- output prefixes: `A9_SCOPE_V2_CASE`, `A9_SCOPE_V2_TURN`, `A9_SCOPE_V2_BOUNDARY`, `A9_SCOPE_V2_SUMMARY`.
+
+Harness содержит exact git-blob hash v2 matrix и hashes защищённых upstream fixtures. После completion matrix/harness/test становятся frozen и меняются только отдельным versioned checkpoint.
+
+## 4. Observation priority
+
+V2 harness применяет к каждому successful endpoint response ровно следующий порядок:
 
 ```text
-evals/v5/patient_scope_availability_v2.py
-```
-
-Он не является новым runtime contract и пока не подключается к full harness. Следующий checkpoint `A9 Frozen Matrix/Harness v2 Review` интегрирует helper в новый versioned harness/spec до live.
-
-Current v1 harness, matrix, raw и summary не переписываются. Runtime не получает fake `turn_frame_shadow_status=not_applicable` и не создаёт all-unknown frame.
-
-## 3. Exact classification contract
-
-Public pure helper:
-
-```python
-classify_manual_contact_not_applicable(response: dict[str, Any]) -> tuple[str, str] | None
-```
-
-Exact positive result:
-
-```python
-("not_applicable", "pre_planner_manual_contact")
-```
-
-Helper возвращает positive result только если одновременно:
-
-1. `response` — dict;
-2. `response["meta"]` — dict;
-3. normalized `meta.service_route` (`strip().lower()`) exact `ingress_manual_contact`;
-4. key `meta.metadata_first` либо полностью отсутствует, либо присутствует как dict;
-5. если `metadata_first` — dict, exact key `turn_frame_shadow` полностью отсутствует;
-6. exact status `meta.metadata_first.turn_frame_shadow_status` не равен normalized `not_available` или `degraded`.
-
-Exact sentinel/shape table:
-
-| Shape | Result helper |
-|---|---|
-| key `metadata_first` отсутствует | eligible для positive при exact route |
-| `metadata_first` present dict, включая `{}` | inspect status/frame keys |
-| `metadata_first` present `null`/list/string/любой non-dict | `None` |
-| в metadata dict key `turn_frame_shadow` отсутствует | eligible для positive |
-| key `turn_frame_shadow` present с любым value: valid/malformed dict, `{}`, `null`, list, scalar | `None` |
-| exact status `not_available` или `degraded` | `None` |
-
-Проверяется именно presence key, не truthiness. Empty/malformed present frame не переименовывается в `not_applicable`: caller сохраняет существующий semantic/extraction error path.
-
-Во всех других случаях возвращается `None`; helper не назначает generic error bucket и не заменяет caller ordering.
-
-Priority contract будущего harness v2:
-
-```text
-request exception                              -> transport_error
+request exception                              -> ERROR / transport_error
 scoreable shadow frame                         -> semantic comparison
-runtime status not_available / degraded        -> exact runtime bucket
-exact ingress_manual_contact + allowed metadata shape
-  + key turn_frame_shadow absent                -> not_applicable / pre_planner_manual_contact
-other missing/malformed frame                  -> existing extraction error
+runtime turn_frame_shadow_status=not_available -> ERROR / not_available
+runtime turn_frame_shadow_status=degraded      -> ERROR / degraded
+exact ingress_manual_contact + allowed shape
+  + key turn_frame_shadow absent               -> NOT_APPLICABLE / pre_planner_manual_contact
+other missing/malformed frame                  -> ERROR / extraction_error
 ```
 
-Transport exception находится выше helper и не может быть превращён в `not_applicable`, потому что successful response отсутствует.
+Обязательные свойства:
 
-## 4. Narrow scope / anti-expansion
+- scoreable frame имеет приоритет даже при `service_route=ingress_manual_contact`;
+- runtime `not_available/degraded` имеет приоритет над manual-contact helper;
+- helper вызывается только после successful response и использует production implementation напрямую;
+- `not_applicable` — harness observation status, не fake frame и не runtime status;
+- taxonomy не расширяется за exact `ingress_manual_contact`;
+- generic missing/malformed frame не называется transport error;
+- exception не может стать `not_applicable`.
 
-Positive classification запрещена для:
+## 5. Result rows и group counts
 
-- `ingress_hard_stop_non_target`;
-- `ingress_not_offered_policy`;
-- `ingress_service_not_offered`;
-- `ingress_normal`;
-- noise/promo/ref/lead и любых других short-circuit `service_route`, кроме exact `ingress_manual_contact`;
-- одного `meta.ingress_route=manual_contact` без exact `meta.service_route`;
-- near-match, substring или произвольного route с `manual_contact` внутри;
-- response с scoreable shadow frame;
-- response с runtime status `not_available` или `degraded`.
+Case/turn result сохраняет privacy-safe v1 semantic fields, добавляет exact `availability_status` и использует `status` только из:
 
-Расширение taxonomy требует отдельного inventory/spec checkpoint.
+```text
+PASS | FAIL | ERROR | NOT_APPLICABLE
+```
 
-## 5. Privacy / purity
+`availability_status` имеет одно из шести exact значений:
 
-Helper обязан:
+```text
+available | not_available | degraded | not_applicable | transport_error | extraction_error
+```
 
-- не мутировать input;
-- не читать question, answer, history, sid, session, raw payload или exception;
-- не возвращать input values;
-- возвращать только две stable constants либо `None`;
-- не логировать;
-- не импортировать Flask, app, session, planner, resolver, contracts или client data;
-- не выполнять I/O, network, LLM или environment reads.
+Для deterministic bridge/field rows `availability_status=available`, но они не входят в live `planner_availability`.
 
-Разрешены только стандартные typing/data-shape imports, если нужны.
+Для `NOT_APPLICABLE`:
 
-## 6. Deliverables и allowlist
+- `reason=pre_planner_manual_contact`;
+- `shadow_status=not_applicable`;
+- `availability_status=not_applicable`;
+- observed scope/status/errors равны `null`;
+- row остаётся в frozen total и endpoint completeness;
+- row не является PASS, FAIL или ERROR;
+- row не делает `overall_exit_code=1` сам по себе.
 
-### Governance
+Каждый group count имеет exact keys:
 
-1. `TASK.md`
+```text
+total, passed, failed, errors, not_applicable
+```
 
-До governance checker `✅` разрешён только этот файл. После `✅` — отдельный governance commit/push.
+Их сумма обязана совпадать с `total`.
 
-### Eval/unit после governance
+## 6. Honest summary denominators
 
-2. `evals/v5/patient_scope_availability_v2.py` — новый pure helper.
-3. `tests/test_patient_scope_not_applicable_taxonomy.py` — новый unit/contract test.
+V1 aggregate `per_axis` смешивал 14 deterministic rows с 30 live turns. V2 обязан явно отделить diagnostic deterministic groups от live quality.
 
-### Roadmap только после final checker `✅`
+Summary v2 включает:
 
-4. `docs/STRANGLER_ROADMAP.md`
+1. frozen completeness: 34 case rows, 10 turn rows, 5 boundary rows, planned/executed endpoint calls `30`;
+2. group counts для bridge, field-isolation, single-turn, multi-turn и boundaries;
+3. `planner_availability` **только по 30 live rows** с отдельными exact buckets:
+   - `available`;
+   - `not_available`;
+   - `degraded`;
+   - `not_applicable`;
+   - `transport_error`;
+   - `extraction_error`;
+   - deterministic 14 rows сюда не входят;
+   - сумма шести buckets всегда равна `executed_live_calls=30`;
+4. `live_current_scope` только по 20 single + 10 multi rows:
+   - `total=30`;
+   - `scoreable` — только rows с валидным scope/status/error observation;
+   - `exact_complete` — `PASS` среди scoreable;
+   - `not_applicable` отдельно;
+5. `live_per_axis` для `extent/jaw/stage/modifiers`:
+   - `scoreable`;
+   - `all_value_exact` (value + field status + stable error);
+   - `positive_expected`;
+   - `positive_available`;
+   - `positive_exact`;
+   - confusion только по scoreable rows;
+6. `live_composite`:
+   - `total=7` frozen live expected composite rows: 5 single + 2 multi;
+   - `scoreable` — только scoreable rows среди этих семи;
+   - `exact` — `PASS` среди scoreable live composites;
+7. field-status diagnostics могут считаться только по scoreable live rows и должны иметь явно live-названный key;
+8. `product_parity_source=existing_regression_suites` и `authority_decision_allowed=false`.
 
-После final `✅`:
+Positive definition frozen:
 
-- закрыть только `Manual-contact not_applicable taxonomy`;
-- оставить A9 parent `[ ]`, authority `Forbidden`;
-- назвать следующим `A9 Frozen Matrix/Harness v2 Review`;
-- объяснить владельцу: это исправляет только честность будущего измерения, не ответы бота.
+- scalar axis: expected value не `unknown`;
+- modifiers: expected list непустой.
 
-Любой другой файл — STOP.
+Metric definitions frozen:
 
-## 7. Required tests
+- `positive_available` = positive-expected rows, которые scoreable;
+- `positive_exact` = positive-expected scoreable rows с exact value + field status + stable error;
+- `all_value_exact` = любые scoreable rows с exact value + field status + stable error;
+- confusion включает только scoreable rows и сравнивает frozen expected value с observed value;
+- `live_composite.scoreable/exact` никогда не включает deterministic rows или non-scoreable live rows.
 
-Новый test module обязан проверить production helper напрямую:
+Composite definition frozen: минимум две known/non-empty expected axes.
 
-1. exact `ingress_manual_contact`, key `metadata_first` отсутствует → positive tuple;
-2. exact route, `metadata_first={}` или dict без key `turn_frame_shadow` → positive tuple;
-3. present non-dict/null `metadata_first` → `None`;
-4. present `turn_frame_shadow` с каждым shape: valid dict, malformed/empty dict, null, list, scalar → `None`;
-5. exact nested status path `turn_frame_shadow_status=not_available/degraded` → `None`;
-6. route normalization допускает только whitespace/case normalization;
-7. parameterized exact non-applicable denylist из §4 → `None`;
-8. `meta.ingress_route=manual_contact` без `service_route` → `None`;
-9. near-match/substrings → `None`;
-10. non-dict response/meta shapes fail closed → `None`;
-11. input deep-equal после вызова;
-12. question/answer/history/sid/raw/exception secrets не появляются в result/repr;
-13. source/AST imports не содержат runtime/product dependencies;
-14. production modules не импортируют новый eval helper;
-15. v1 harness/contract-test/matrix/raw hashes unchanged.
+Historical v1 `composite 0/9` остаётся immutable audit fact: там были смешаны 7 live и 2 deterministic field-isolation rows. V2 не публикует all-row composite diagnostic и не переименовывает `0/9` в live metric.
 
-Запрещены conditional PASS, skip/xfail, мок helper-а, подмена ожидаемого текущим output и чтение первого raw для генерации expected.
+`not_applicable`, runtime unavailable, transport и extraction errors исключаются из scope/exact/positive/composite **scoreable** denominators. Они не исчезают из total/completeness и имеют отдельные counts.
 
-## 8. Protected artifacts / versioning
+`overall_exit_code=1`, если есть semantic `FAIL`, `ERROR` observation или boundary `FAIL/ERROR`. Accepted `NOT_APPLICABLE` сам по себе не красит run. Config/spec failure остаётся CLI exit `2`.
 
-После governance immutable:
+## 7. Matrix v2 contract
 
-- `TASK.md`;
-- `evals/v5/run_patient_scope_shadow_eval.py`;
-- `tests/test_patient_scope_shadow_eval_contract.py`;
-- `evals/v5/demo/patient_scope_shadow_matrix.json`;
-- `eval_patient_scope_a9_last.txt`;
-- `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`;
-- native v2 fixture/doc;
-- A6/A7/A8 frozen artifacts.
+V2 matrix:
 
-Protected hashes:
+- отличается от v1 только `schema_version`, `purpose` и exact `scoring_contract` v2;
+- не добавляет observed/current output, route result, answer, authority decision или case-specific first-run facts;
+- не объявляет заранее, какие case IDs станут `not_applicable`: applicability определяется только actual successful response shape и exact service route;
+- сохраняет 39 unique ordered IDs и 30 ordered live turns;
+- сохраняет все question/expected scope/status/evidence/session-boundary payloads byte-equivalent после удаления трёх разрешённых top-level differences;
+- не читает first raw для генерации expectations.
 
-- first A9 raw SHA256: `478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`;
-- v1 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`;
-- native v2 fixture git blob: `c7458e4481489895320ea3de1dec1a81b8da5f50`;
-- v1 harness git blob: `2898ff1d56dba3319f4121158ba98e2879cdb579`.
-- historical v1 contract test git blob: `c2ed5f0655ab8e1dddda1a865ab95c50ffc797b3`.
+Exact scoring contract обязан зафиксировать:
 
-Новый helper использует suffix `v2`, но сам по себе не объявляет full harness v2 frozen/ready и не разрешает live.
+- per-field normalized semantic match;
+- field status/stable error match;
+- current frame is current turn only;
+- legacy carry scored separately;
+- one live call per turn, no retry;
+- confidence descriptive only/no threshold;
+- manual-contact taxonomy/reason;
+- `not_applicable` excluded from scope/exact/positive/composite scoreable denominators but retained in total;
+- live-only quality separation;
+- authority false and parity source existing regression suites.
 
-## 9. Product firewall / non-goals
+Exact `purpose` literal:
+
+```text
+Frozen A9 v2 patient-scope shadow expectations with live-only scoring and harness-owned manual-contact applicability.
+```
+
+Exact `scoring_contract` manifest (никаких дополнительных/отсутствующих keys):
+
+```json
+{
+  "scope_match": "per_field_exact_normalized",
+  "metadata_match": "per_field_status_and_stable_error",
+  "observation_priority": [
+    "transport_error",
+    "scoreable_shadow",
+    "runtime_not_available_or_degraded",
+    "pre_planner_manual_contact",
+    "extraction_error"
+  ],
+  "planner_availability_live_only": true,
+  "manual_contact_not_applicable": {
+    "service_route": "ingress_manual_contact",
+    "status": "not_applicable",
+    "reason": "pre_planner_manual_contact"
+  },
+  "not_applicable_retained_in_frozen_total": true,
+  "not_applicable_excluded_from_scoreable_denominators": [
+    "scope",
+    "exact",
+    "positive",
+    "composite"
+  ],
+  "live_quality_separate_from_deterministic_fixtures": true,
+  "current_frame_is_current_turn_only": true,
+  "legacy_session_carry_scored_separately": true,
+  "one_live_call_per_live_turn": true,
+  "retry_failed_case": false,
+  "confidence_is_descriptive_only": true,
+  "confidence_pass_threshold": null,
+  "authority_decision_allowed": false,
+  "product_parity_source": "existing_regression_suites"
+}
+```
+
+V2 contract test содержит собственные literal `purpose` и `scoring_contract` oracle, не импортирует их из harness и не вычисляет из matrix. Harness содержит отдельный literal manifest. Их равенство проверяется через загруженный frozen JSON, а не сравнением двух импортов одного production constant.
+
+## 7.1 Exact scoreable-frame shape
+
+Frame считается scoreable только если одновременно:
+
+1. `turn_frame_shadow` — dict;
+2. `turn_frame_shadow.patient_scope` — dict с exact keys `extent/jaw/stage/modifiers`;
+3. каждое scope value принадлежит frozen allowed schema, modifiers — sorted unique allowed list;
+4. `turn_frame_shadow.field_meta` — dict;
+5. `field_meta.patient_scope` — dict с exact пятью keys: `container`, `extent`, `jaw`, `stage`, `modifiers`;
+6. `container` meta — dict и содержит keys `status` и `error` (дополнительные штатные metadata keys разрешены):
+   - status только `valid/defaulted/invalid`;
+   - error только `null`, `patient_scope_invalid_type` или `patient_scope_extra_field`;
+   - invariant `(status == "invalid") == (error is not null)` соблюдён;
+7. каждый из четырёх axis meta — dict и **содержит keys** `status` и `error` (дополнительные штатные metadata keys разрешены);
+8. axis status принадлежит `valid/defaulted/missing/invalid`;
+9. axis error равен `null` или одному из exact stable values:
+   - `patient_extent_invalid_type`;
+   - `patient_extent_not_allowed`;
+   - `patient_jaw_invalid_type`;
+   - `patient_jaw_not_allowed`;
+   - `patient_stage_invalid_type`;
+   - `patient_stage_not_allowed`;
+   - `patient_modifiers_invalid_type`;
+   - `patient_modifier_not_allowed`;
+10. для каждого axis invariant `(status == "invalid") == (error is not null)` соблюдён.
+
+Container проверяется только как часть scoreable shape. Semantic comparison, positive/confusion и axis metrics используют только четыре axes; container не является пятой semantic axis и не входит в quality denominators.
+
+Если key `turn_frame_shadow` присутствует, но эта shape-проверка не проходит, observation получает `ERROR / extraction_error`. Это относится и к exact manual-contact route: present malformed/partial frame никогда не становится `not_applicable` и не сравнивается как semantic FAIL.
+
+## 8. Product firewall, privacy и non-goals
 
 Запрещено:
 
-- менять runtime/product code, ingress routing или response payload;
-- создавать fake PlannerAttempt/TurnFrame/status для early boundary;
-- подключать helper из app/core/orchestration/resolver/session;
-- менять v1 harness, matrix, tests, raw, summary или audit;
-- интегрировать helper в live harness в этом checkpoint;
-- менять denominators/summary schema сейчас;
-- расширять `not_applicable` за exact manual-contact route;
-- менять native parser/prompt/wiring;
-- добавлять LLM call/retry/classifier;
+- менять app/core/orchestration/resolver/session/contracts/ingress/product code;
+- менять prompt/native parser/wiring;
+- подключать patient scope к route, evidence, price, composer, CTA, UI или session state;
+- создавать fake PlannerAttempt/TurnFrame/status;
+- менять v1 matrix/harness/test/raw/summary/audit;
+- читать первый raw для построения v2 expected;
 - запускать live/LLM/widget;
+- делать retry, второй classifier или case-specific production hack;
 - менять authority;
-- закрывать matrix/harness v2, live, authority, legacy retirement или A9 parent.
+- закрывать A9 parent, live re-audit, authority или legacy retirement.
 
-## 10. Targeted tests
+V2 emitted rows/summary не содержат question, answer, history, sid/session, raw planner payload, exception text/path, full response, recommendation, diagnosis, price/service choice или PII. Harness не логирует response body. Errors используют только stable constants.
 
-Primary taxonomy slice:
+## 9. Deliverables / allowlist
+
+### Governance до checker `✅`
+
+1. `TASK.md` — единственный разрешённый diff.
+
+После governance `✅`: отдельный commit/push только `TASK.md`.
+
+### Eval/contract после governance
+
+2. `evals/v5/demo/patient_scope_shadow_matrix_v2.json`;
+3. `evals/v5/run_patient_scope_shadow_eval_v2.py`;
+4. `tests/test_patient_scope_shadow_eval_v2_contract.py`.
+
+### Roadmap только после final checker `✅`
+
+5. `docs/STRANGLER_ROADMAP.md`.
+
+Любой другой diff — STOP.
+
+## 10. Required contract tests
+
+Новый test module обязан проверять production v2 harness/helper напрямую, без mock helper и без network/LLM:
+
+1. exact v2 matrix hash/schema/shape/order/counts и byte-equivalence case payloads с v1;
+2. exact protected v1 harness/matrix/contract/raw hashes unchanged;
+3. deterministic bridge + native field isolation дают `14/14 PASS`;
+4. dependency-injected perfect fake run делает ровно 30 calls и выдаёт 34+10+5+1 rows;
+5. два successful exact manual-contact responses без frame дают `NOT_APPLICABLE`, не ERROR/PASS;
+6. perfect fake scoreable rows дают expected live-only totals: `30 total`, `28 scoreable`, `28 exact_complete`, `2 not_applicable`;
+   `planner_availability = available 28 / not_applicable 2 / остальные четыре buckets 0`, сумма `30`;
+7. positive axis denominators из frozen matrix равны first-audit invariants (`13/9/4/3`) и perfect fake даёт exact по каждому;
+8. live composite frozen total `7`, perfect fake scoreable/exact `7/7`; historical all-row `9` не переиспользуется;
+9. group-count arithmetic и availability buckets точны;
+10. scoreable frame имеет приоритет над manual-contact taxonomy, включая overlap `scoreable frame + manual route + runtime not_available/degraded` → semantic comparison и `availability_status=available`;
+11. runtime `not_available/degraded` имеют приоритет над helper и попадают в свои buckets;
+12. request exception становится только transport error;
+13. other missing/malformed frame становится extraction error;
+    exact manual route + present malformed/partial frame также становится extraction error, не NA;
+14. `NOT_APPLICABLE` не красит exit; FAIL/ERROR красит; config failure возвращает `2`;
+15. boundary checks продолжают выполняться и влиять на exit;
+16. output schema/prefixes frozen и recursive privacy scan зелёный;
+17. v2 eval imports отсутствуют в production modules;
+18. no skip/xfail/conditional PASS; fake endpoint возвращает только заранее построенные contract observations.
+19. test-side purpose/scoring oracle literal и независим от harness constants; matrix case payload byte-equivalence проверяется против protected v1 JSON с удалением только трёх разрешённых top-level fields.
+
+## 10.1 Protected literal hashes
+
+- first A9 raw SHA256: `478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`;
+- v1 harness git blob: `2898ff1d56dba3319f4121158ba98e2879cdb579`;
+- historical v1 contract test git blob: `c2ed5f0655ab8e1dddda1a865ab95c50ffc797b3`;
+- v1 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`;
+- native v2 fixture git blob: `c7458e4481489895320ea3de1dec1a81b8da5f50`.
+
+Historical `tests/test_patient_scope_shadow_eval_contract.py` остаётся immutable target-red artifact прежнего implementation gap и не является current regression gate.
+
+## 11. Targeted verification
+
+Primary:
 
 ```powershell
-.\.venv\codex312\Scripts\python.exe -m pytest tests/test_patient_scope_not_applicable_taxonomy.py -q
+.\.venv\codex312\Scripts\python.exe -m pytest tests/test_patient_scope_shadow_eval_v2_contract.py tests/test_patient_scope_not_applicable_taxonomy.py -q
 ```
 
-Historical `tests/test_patient_scope_shadow_eval_contract.py` намеренно не входит в command целиком: это frozen target-red evidence прежнего gap, а не current semantic regression после `302a05e`. Запрещено запускать его выборочно через `-k` ради зелёного отчёта; immutability доказывается exact blob/static check.
+Новые v2 contract tests должны также покрыть deterministic native field-isolation path, поэтому старый target-red v1 module не запускается и не фильтруется через `-k` ради зелёного отчёта.
 
-Full suite не обязателен: два новых isolated eval/unit files, production и v1 artifacts immutable. Если taxonomy test обнаруживает необходимость runtime/v1 change — СТОП и новая оценка scope.
+Full suite не обязателен: разрешённый diff isolated eval/spec/test/roadmap, runtime/product immutable. Если новый test обнаруживает необходимость runtime/v1 изменения — STOP и новая оценка scope.
 
-## 11. Static checks
+Static checks:
 
 ```powershell
 git diff --check
 git diff --name-only
 git diff -- app.py llm.py resolver.py session.py core contracts orchestration ingress_gate.py
-git diff -- evals/v5/run_patient_scope_shadow_eval.py tests/test_patient_scope_shadow_eval_contract.py evals/v5/demo/patient_scope_shadow_matrix.json
-rg -n "patient_scope_availability_v2" app.py llm.py resolver.py session.py core contracts orchestration ingress_gate.py
+git diff -- evals/v5/run_patient_scope_shadow_eval.py tests/test_patient_scope_shadow_eval_contract.py evals/v5/demo/patient_scope_shadow_matrix.json docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md
+rg -n "patient_scope_shadow_eval_v2|patient_scope_availability_v2" app.py llm.py resolver.py session.py core contracts orchestration ingress_gate.py
 Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
 git hash-object evals/v5/run_patient_scope_shadow_eval.py
 git hash-object tests/test_patient_scope_shadow_eval_contract.py
@@ -247,38 +363,37 @@ git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
 git hash-object tests/fixtures/patient_scope_native_contract_a9_v2.json
 ```
 
-Expected implementation diff до roadmap: только два new files. Runtime/product/v1 diff empty.
-
 ## 12. Checkpoints
 
 ### Checkpoint 1 — governance review
 
-Independent checker проверяет exact taxonomy, priority, harness-owned ownership, anti-expansion, versioning и test sufficiency до code. После `✅` — отдельный commit/push только `TASK.md`.
+Independent checker проверяет versions/names, exact observation priority, denominators, matrix immutability, privacy, firewall и tests до code. После `✅` — отдельный governance commit/push.
 
-### Checkpoint 2 — taxonomy helper/tests
+### Checkpoint 2 — matrix/harness/tests
 
-Создать только два allowlist files. Выполнить targeted tests/static checks. Roadmap не менять, commit не делать.
+Создать только три allowlist files, выполнить targeted verification/static checks. Roadmap не менять, commit не делать.
 
 ### Checkpoint 3 — independent code review
 
-Checker начинает с test diff, сверяет exact positive/negative cases, purity/privacy, imports, v1 immutability и test evidence.
+Checker начинает с test diff, независимо пересчитывает live/positive/composite denominators, проверяет priority/error taxonomy/privacy/hashes и evidence tests.
 
 ### Checkpoint 4 — completion
 
-Только после checker `✅` обновить roadmap, повторить static checks, затем один completion commit и push в `codex/stage-a`.
+Только после final checker `✅` обновить roadmap, повторить static checks, затем один completion commit и push в `codex/stage-a`.
 
 ## 13. Definition of Done
 
-1. Governance checker принял helper-only решение до code.
-2. Exact successful `ingress_manual_contact` без frame возвращает только `not_applicable / pre_planner_manual_contact`.
-3. Scoreable frame и runtime `not_available/degraded` имеют приоритет.
-4. Все другие routes/shapes fail closed в `None`; taxonomy не расширена.
-5. Helper pure/privacy-safe и не мутирует input.
-6. Runtime/product не импортирует helper и не меняется.
-7. V1 harness/matrix/tests/raw/summary/audit неизменны и имеют exact hashes.
-8. Taxonomy targeted tests зелёные; historical target-red v1 test module не объявляется current regression suite и защищён exact blob; full suite обоснованно не запускался.
-9. Live/LLM/widget не запускались; authority forbidden.
-10. Final checker дал `✅` до roadmap/commit.
-11. Roadmap закрывает только taxonomy и называет следующим frozen matrix/harness v2 review.
+1. Governance checker принял design до code.
+2. V2 matrix/harness names, schemas и hashes frozen.
+3. Все 30 live turns и исходные semantic expectations сохранены без first-run fitting.
+4. Manual contact честно `NOT_APPLICABLE`; priority contract доказан.
+5. Live-only total/scoreable/exact/positive/composite denominators отделены от deterministic fixtures.
+6. Completeness остаётся 30/30, `not_applicable` не исчезает из total.
+7. Perfect dependency-injected run доказывает summary arithmetic без network/LLM.
+8. Targeted tests и static checks зелёные; full suite обоснованно не запускался.
+9. Runtime/product и все v1/first-raw artifacts неизменны exact hashes.
+10. Live/LLM/widget не запускались; authority forbidden.
+11. Final checker дал `✅` до roadmap/commit.
+12. Roadmap закрывает только `A9 Frozen Matrix/Harness v2 Review`, оставляет A9 parent `[ ]` и называет следующим `A9 One-run Live Re-audit — permission required`.
 
-После completion commit — СТОП. `A9 Frozen Matrix/Harness v2 Review` начинается только с нового TASK и governance review.
+После completion commit — STOP. Любой live re-audit начинается только после отдельного явного разрешения владельца и нового TASK/checker review.

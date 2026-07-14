@@ -23,6 +23,11 @@ from contracts.turn_frame import (
 
 _ALLOWED_ASPECTS = frozenset(get_args(AspectKind))
 _ALLOWED_ROUTES = frozenset(get_args(RouteIntent))
+_ALLOWED_PATIENT_EXTENTS = frozenset(get_args(PatientExtent))
+_ALLOWED_PATIENT_JAWS = frozenset(get_args(PatientJaw))
+_ALLOWED_PATIENT_STAGES = frozenset(get_args(PatientCareStage))
+_ALLOWED_PATIENT_MODIFIERS = frozenset(get_args(PatientScopeModifier))
+_PATIENT_SCOPE_KEYS = frozenset({"extent", "jaw", "stage", "modifiers"})
 _RAW_ROUTE = "turn_plan.raw.route"
 _RAW_TOPIC = "turn_plan.raw.topic"
 _RAW_ASPECTS = "turn_plan.raw.aspects"
@@ -37,6 +42,11 @@ _PATIENT_EXTENT = "turn_plan.patient_situation.extent"
 _PATIENT_JAW = "turn_plan.patient_situation.jaw"
 _PATIENT_STAGE = "turn_plan.patient_situation.stage"
 _PATIENT_MODIFIERS = "turn_plan.patient_situation.modifiers"
+_NATIVE_PATIENT_SCOPE = "turn_plan.raw.patient_scope"
+_NATIVE_PATIENT_EXTENT = "turn_plan.raw.patient_scope.extent"
+_NATIVE_PATIENT_JAW = "turn_plan.raw.patient_scope.jaw"
+_NATIVE_PATIENT_STAGE = "turn_plan.raw.patient_scope.stage"
+_NATIVE_PATIENT_MODIFIERS = "turn_plan.raw.patient_scope.modifiers"
 
 _PatientScopeBridge = tuple[
     PatientExtent | None,
@@ -91,7 +101,7 @@ def _default_patient_scope_meta() -> PatientScopeFrameMeta:
     )
 
 
-def _patient_scope_from_raw(
+def _patient_scope_from_scalar(
     raw: dict[str, Any],
 ) -> tuple[PatientScopeFrame, PatientScopeFrameMeta]:
     """Map only lossless parts of the current scalar patient-situation kind."""
@@ -131,6 +141,130 @@ def _patient_scope_from_raw(
         ),
     )
     return scope, meta
+
+
+def _native_scope_scalar(
+    container: dict[str, Any],
+    *,
+    field: str,
+    allowed: frozenset[str],
+    provenance: str,
+    invalid_type_error: FieldErrorReason,
+    not_allowed_error: FieldErrorReason,
+) -> tuple[str, FieldMeta]:
+    if field not in container:
+        return "unknown", _meta(provenance=provenance, status="missing")
+    raw_value = container[field]
+    if not isinstance(raw_value, str):
+        return "unknown", _meta(
+            provenance=provenance,
+            status="invalid",
+            error=invalid_type_error,
+        )
+    if raw_value not in allowed:
+        return "unknown", _meta(
+            provenance=provenance,
+            status="invalid",
+            error=not_allowed_error,
+        )
+    return raw_value, _meta(provenance=provenance, status="valid")
+
+
+def _native_scope_modifiers(
+    container: dict[str, Any],
+) -> tuple[list[PatientScopeModifier], FieldMeta]:
+    if "modifiers" not in container:
+        return [], _meta(provenance=_NATIVE_PATIENT_MODIFIERS, status="missing")
+    raw_value = container["modifiers"]
+    if not isinstance(raw_value, list) or any(not isinstance(item, str) for item in raw_value):
+        return [], _meta(
+            provenance=_NATIVE_PATIENT_MODIFIERS,
+            status="invalid",
+            error="patient_modifiers_invalid_type",
+        )
+    if any(item not in _ALLOWED_PATIENT_MODIFIERS for item in raw_value):
+        return [], _meta(
+            provenance=_NATIVE_PATIENT_MODIFIERS,
+            status="invalid",
+            error="patient_modifier_not_allowed",
+        )
+    return [cast(PatientScopeModifier, item) for item in raw_value], _meta(
+        provenance=_NATIVE_PATIENT_MODIFIERS,
+        status="valid",
+    )
+
+
+def _patient_scope_from_native(
+    raw_container: object,
+) -> tuple[PatientScopeFrame, PatientScopeFrameMeta]:
+    if not isinstance(raw_container, dict):
+        return PatientScopeFrame(), PatientScopeFrameMeta(
+            container=_meta(
+                provenance=_NATIVE_PATIENT_SCOPE,
+                status="invalid",
+                error="patient_scope_invalid_type",
+            ),
+            extent=_schema_default_meta(),
+            jaw=_schema_default_meta(),
+            stage=_schema_default_meta(),
+            modifiers=_schema_default_meta(),
+        )
+
+    container_meta = (
+        _meta(
+            provenance=_NATIVE_PATIENT_SCOPE,
+            status="invalid",
+            error="patient_scope_extra_field",
+        )
+        if set(raw_container) - _PATIENT_SCOPE_KEYS
+        else _meta(provenance=_NATIVE_PATIENT_SCOPE, status="valid")
+    )
+    extent, extent_meta = _native_scope_scalar(
+        raw_container,
+        field="extent",
+        allowed=_ALLOWED_PATIENT_EXTENTS,
+        provenance=_NATIVE_PATIENT_EXTENT,
+        invalid_type_error="patient_extent_invalid_type",
+        not_allowed_error="patient_extent_not_allowed",
+    )
+    jaw, jaw_meta = _native_scope_scalar(
+        raw_container,
+        field="jaw",
+        allowed=_ALLOWED_PATIENT_JAWS,
+        provenance=_NATIVE_PATIENT_JAW,
+        invalid_type_error="patient_jaw_invalid_type",
+        not_allowed_error="patient_jaw_not_allowed",
+    )
+    stage, stage_meta = _native_scope_scalar(
+        raw_container,
+        field="stage",
+        allowed=_ALLOWED_PATIENT_STAGES,
+        provenance=_NATIVE_PATIENT_STAGE,
+        invalid_type_error="patient_stage_invalid_type",
+        not_allowed_error="patient_stage_not_allowed",
+    )
+    modifiers, modifiers_meta = _native_scope_modifiers(raw_container)
+    return PatientScopeFrame(
+        extent=cast(PatientExtent, extent),
+        jaw=cast(PatientJaw, jaw),
+        stage=cast(PatientCareStage, stage),
+        modifiers=modifiers,
+    ), PatientScopeFrameMeta(
+        container=container_meta,
+        extent=extent_meta,
+        jaw=jaw_meta,
+        stage=stage_meta,
+        modifiers=modifiers_meta,
+    )
+
+
+def _patient_scope_from_raw(
+    raw: dict[str, Any],
+) -> tuple[PatientScopeFrame, PatientScopeFrameMeta]:
+    """Prefer a present native sibling; bridge only when the sibling is absent."""
+    if "patient_scope" not in raw:
+        return _patient_scope_from_scalar(raw)
+    return _patient_scope_from_native(raw["patient_scope"])
 
 
 def _intent_from_raw(raw: dict[str, Any]) -> tuple[RouteIntent, FieldMeta]:

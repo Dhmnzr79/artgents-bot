@@ -1,23 +1,36 @@
 from __future__ import annotations
 
 import ast
+import copy
 import json
 import re
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
+from contracts.answer_plan import AspectKind
+from contracts.decision_frame import RouteIntent
+from contracts.patient_situation import PatientSituationKind
 from contracts.planner_attempt import PlannerAttempt
+from contracts.turn_frame import PatientCareStage, PatientExtent, PatientJaw, PatientScopeModifier
 from contracts.turn_plan import TurnPlan
+from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
 from core.turn_frame_from_raw import build_turn_frame_from_raw as _real_build_turn_frame_from_raw
 from core.turn_planner_llm import (
+    _PATIENT_SCOPE_PROMPT,
     _SYSTEM,
+    _TURN_PLANNER_MAX_COMPLETION_TOKENS,
+    _planner_chat_completions_create,
+    _planner_completion_controls,
+    _project_legacy_turn_plan_raw,
     _sanitize_topic_fields,
     _validate_plan,
     plan_turn,
     plan_turn_attempt,
     turn_plan_to_decision_frame,
 )
+from core.topic_taxonomy import load_client_topic_taxonomy
 
 _DEMO_TOPICS = frozenset(
     {
@@ -32,6 +45,11 @@ _DEMO_TOPICS = frozenset(
         "whitening",
     }
 )
+_NATIVE_FIXTURE = Path("tests/fixtures/patient_scope_native_contract_a9_v2.json")
+
+
+def _native_spec() -> dict:
+    return json.loads(_NATIVE_FIXTURE.read_text(encoding="utf-8"))
 
 
 def _mock_llm(monkeypatch, payload):
@@ -751,6 +769,206 @@ def _valid_attempt_payload() -> dict:
         "topic": "implantation",
         "topic_confidence": 0.9,
     }
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [row["id"] for row in _native_spec()["projection_cases"]],
+)
+def test_native_scope_projection_matches_frozen_cases_without_mutation(case_id):
+    row = next(row for row in _native_spec()["projection_cases"] if row["id"] == case_id)
+    raw = copy.deepcopy(row["synthetic_planner_object"])
+    before = copy.deepcopy(raw)
+
+    projected = _project_legacy_turn_plan_raw(raw)
+
+    assert projected == row["expected_legacy_object"]
+    assert raw == before
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [row["id"] for row in _native_spec()["projection_cases"]],
+)
+def test_plan_turn_attempt_binds_frozen_native_projection_cases(monkeypatch, case_id):
+    row = next(row for row in _native_spec()["projection_cases"] if row["id"] == case_id)
+    payload = copy.deepcopy(row["synthetic_planner_object"])
+    before = copy.deepcopy(payload)
+    captured = _prepare_attempt(monkeypatch, payload)
+
+    attempt = plan_turn_attempt("Синтетический contract turn", f"native-{case_id}", "demo")
+
+    assert captured["_call_count"] == 1
+    assert payload == before
+    assert attempt.shadow_frame is not None
+    if row["expected_legacy_valid"]:
+        assert attempt.legacy_plan is not None
+        assert attempt.legacy_plan.model_dump() == row["expected_legacy_object"]
+        assert "patient_scope" not in attempt.legacy_plan.model_dump()
+    else:
+        assert attempt.legacy_plan is None
+
+    raw_scope = row["synthetic_planner_object"]["patient_scope"]
+    if isinstance(raw_scope, dict):
+        expected_scope = {
+            "extent": raw_scope.get("extent", "unknown"),
+            "jaw": raw_scope.get("jaw", "unknown"),
+            "stage": raw_scope.get("stage", "unknown"),
+            "modifiers": raw_scope.get("modifiers", []),
+        }
+    else:
+        expected_scope = {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []}
+    assert attempt.shadow_frame.patient_scope.model_dump() == expected_scope
+
+    should_be_ok = row["expected_legacy_valid"] and isinstance(raw_scope, dict)
+    assert attempt.shadow_status == ("ok" if should_be_ok else "partial")
+
+
+def test_native_scope_product_wrapper_returns_only_strict_legacy_plan(monkeypatch):
+    payload = _valid_attempt_payload()
+    payload["patient_scope"] = {
+        "extent": "one_tooth",
+        "jaw": "upper",
+        "stage": "unknown",
+        "modifiers": [],
+    }
+    captured = _prepare_attempt(monkeypatch, payload)
+
+    plan = plan_turn("Синтетический product firewall turn", "native-product-wrapper", "demo")
+
+    assert captured["_call_count"] == 1
+    assert isinstance(plan, TurnPlan)
+    assert "patient_scope" not in plan.model_dump()
+
+
+def test_native_scope_prompt_is_frozen_semantic_block_without_product_mappings():
+    assert _PATIENT_SCOPE_PROMPT in _SYSTEM
+    for fragment in (
+        "extent, jaw, stage, modifiers",
+        "unknown | one_tooth | few_teeth | full_arch",
+        "unknown | upper | lower | both",
+        "unknown | extraction_context | implant_placed",
+        "[reported_bone_deficit]",
+        "текущего сообщения",
+        "не угадывай",
+        "не переноси старое scope-значение",
+        "patient_situation верни отдельно",
+        "service, protocol, price unit, document, evidence или diagnosis",
+        "urgency и pain не входят",
+        "не клиническое подтверждение",
+        "Не добавляй другие ключи",
+    ):
+        assert fragment in _PATIENT_SCOPE_PROMPT
+    lowered = _PATIENT_SCOPE_PROMPT.lower()
+    for forbidden in (
+        "all-on-4",
+        "all-on-6",
+        "patient_scope_a9_",
+        "retry",
+        "second call",
+        "classifier",
+    ):
+        assert forbidden not in lowered
+
+
+def test_planner_completion_controls_are_bounded_and_disable_qwen_thinking(monkeypatch):
+    monkeypatch.setattr("core.turn_planner_llm.TURN_PLANNER_LLM_MODEL", "qwen3.6-flash")
+    assert _planner_completion_controls() == {
+        "max_completion_tokens": 700,
+        "extra_body": {"enable_thinking": False},
+    }
+    monkeypatch.setattr("core.turn_planner_llm.TURN_PLANNER_LLM_MODEL", "gpt-test")
+    assert _planner_completion_controls() == {"max_completion_tokens": 700}
+    assert _TURN_PLANNER_MAX_COMPLETION_TOKENS == 700
+
+
+def test_non_qwen_planner_outgoing_kwargs_bypass_qwen_wrapper(monkeypatch):
+    captured: dict = {}
+
+    def _direct_create(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(
+        "core.turn_planner_llm.chat_completions_create",
+        lambda **_kwargs: pytest.fail("non-Qwen planner must not use Qwen wrapper"),
+    )
+    monkeypatch.setattr(
+        "core.turn_planner_llm.chat_client.chat.completions.create",
+        _direct_create,
+    )
+
+    result = _planner_chat_completions_create(
+        model="gpt-test",
+        temperature=0,
+        **{"max_completion_tokens": 700},
+    )
+
+    assert result is not None
+    assert captured == {
+        "model": "gpt-test",
+        "temperature": 0,
+        "max_completion_tokens": 700,
+    }
+    assert "extra_body" not in captured
+
+
+def test_planner_call_uses_qwen_controls_once_without_retry(monkeypatch):
+    monkeypatch.setattr("core.turn_planner_llm.TURN_PLANNER_LLM_MODEL", "qwen3.6-flash")
+    captured = _prepare_attempt(monkeypatch, _valid_attempt_payload())
+
+    attempt = plan_turn_attempt("Синтетический budget turn", "native-budget", "demo")
+
+    assert attempt.legacy_plan is not None
+    assert captured["_call_count"] == 1
+    assert captured["max_completion_tokens"] == 700
+    assert captured["extra_body"] == {"enable_thinking": False}
+
+
+def test_current_demo_compact_reference_and_catalog_drift_guard():
+    spec = _native_spec()
+    sample = spec["completion_size_sample"]["planner_object"]
+    service_ids = list(list_pricebook_service_ids("demo"))
+    entries = [load_pricebook_service("demo", service_id) for service_id in service_ids]
+    variants = [variant for entry in entries if entry for variant in entry.variants]
+    brand_groups = [str(variant.brand_group or "") for variant in variants]
+    brands = [str(variant.brand or "") for variant in variants]
+    topics = list(load_client_topic_taxonomy("demo"))
+
+    utf8_len = lambda value: len(str(value).encode("utf-8"))
+    longest = lambda values: max(values, key=utf8_len)
+    assert utf8_len(longest(service_ids)) <= utf8_len(sample["service_id"])
+    assert utf8_len(longest(brand_groups)) <= utf8_len(sample["brand_filter"]["brand_group"])
+    assert utf8_len(longest(brands)) <= utf8_len(sample["brand_filter"]["brand"])
+    assert utf8_len(longest(topics)) <= utf8_len(sample["topic"])
+
+    derived = {
+        "route": longest(get_args(RouteIntent)),
+        "aspects": list(get_args(AspectKind)),
+        "service_id": longest(service_ids),
+        "followup_of": longest(service_ids),
+        "needs_clarify": True,
+        "patient_situation": longest(get_args(PatientSituationKind)),
+        "brand_filter": {
+            "brand_group": longest(brand_groups),
+            "brand": longest(brands),
+        },
+        "topic": longest(topics),
+        "topic_confidence": 1.0,
+        "patient_scope": {
+            "extent": longest(get_args(PatientExtent)),
+            "jaw": longest(get_args(PatientJaw)),
+            "stage": longest(get_args(PatientCareStage)),
+            "modifiers": [longest(get_args(PatientScopeModifier))],
+        },
+    }
+    compact_bytes = json.dumps(
+        derived,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    assert len(compact_bytes) == 530
+    assert len(compact_bytes) < _TURN_PLANNER_MAX_COMPLETION_TOKENS
 
 
 def test_plan_turn_attempt_valid_payload_returns_ok(monkeypatch):

@@ -15,7 +15,7 @@ from core.service_selector_llm import build_compact_service_catalog, _read_servi
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.topic_taxonomy import load_client_topic_taxonomy
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
-from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
+from llm import LLM_REQUEST_TIMEOUT_SEC, chat_client, chat_completions_create
 from session import format_dialog_context_for_understanding, get_pending_clarify, recent_dialog_history
 
 logger = get_logger(__name__)
@@ -32,11 +32,26 @@ _ASPECT_PRIORITY: tuple[AspectKind, ...] = (
     "overview",
 )
 
+_TURN_PLANNER_MAX_COMPLETION_TOKENS = 700
+
+_PATIENT_SCOPE_PROMPT = (
+    "patient_scope: верни компактный объект ровно с четырьмя ключами extent, jaw, stage, modifiers. "
+    "extent: unknown | one_tooth | few_teeth | full_arch; jaw: unknown | upper | lower | both; "
+    "stage: unknown | extraction_context | implant_placed; modifiers: [] или [reported_bone_deficit]. "
+    "Всегда верни все четыре ключа. Извлекай только явно сообщённые признаки текущего сообщения; "
+    "если признак не сообщён — unknown или [], не угадывай. История может помочь понять referent, "
+    "но не переноси старое scope-значение без явного упоминания в текущем сообщении. "
+    "patient_situation верни отдельно по legacy enum. Patient scope не выбирает service, protocol, "
+    "price unit, document, evidence или diagnosis; urgency и pain не входят в patient scope. "
+    "reported_bone_deficit означает сообщённый контекст, не клиническое подтверждение. "
+    "Не добавляй другие ключи внутрь patient_scope.\n"
+)
+
 _SYSTEM = (
     "Ты единый планировщик одного хода диалога для стоматологического чата. "
     "Ты НЕ отвечаешь пациенту и НЕ называешь цены. Ты только возвращаешь JSON-план.\n"
     "Поля JSON строго такие: route, aspects, service_id, followup_of, needs_clarify, "
-    "patient_situation, brand_filter, topic, topic_confidence.\n"
+    "patient_situation, patient_scope, brand_filter, topic, topic_confidence.\n"
     "route: content | price_lookup | price_concern | unknown.\n"
     "aspects: подмножество price, payment, warranty, pain, included, duration, comparison, stages, overview. "
     "comparison — когда пациент сравнивает варианты или спрашивает «X вместо Y», "
@@ -58,7 +73,8 @@ _SYSTEM = (
     "НЕ ставь needs_clarify, если различие определяет врач (диагноз, состояние кости) "
     "или если в диалоге уже ясно, о чём речь.\n"
     "patient_situation: один enum kind ситуации пациента или null.\n"
-    "brand_filter: null или объект {brand_group, brand}; только если пациент ЯВНО назвал бренд "
+    + _PATIENT_SCOPE_PROMPT
+    + "brand_filter: null или объект {brand_group, brand}; только если пациент ЯВНО назвал бренд "
     "или группу (Nobel, Impro, корейские, немецкие). НЕ выводи brand_filter из «дешевле», "
     "«подешевле», «бюджет», «доступные» — это не бренд.\n"
     "topic: одна предметная область из списка разрешённых topics в user-сообщении или null. "
@@ -67,6 +83,28 @@ _SYSTEM = (
     "Если область неоднозначна — topic=null, topic_confidence=0.0; не угадывай.\n"
     "Не добавляй query_rewrite и любые другие поля. Верни только JSON без markdown."
 )
+
+
+def _planner_completion_controls() -> dict[str, Any]:
+    controls: dict[str, Any] = {
+        "max_completion_tokens": _TURN_PLANNER_MAX_COMPLETION_TOKENS,
+    }
+    if "qwen" in TURN_PLANNER_LLM_MODEL.lower():
+        controls["extra_body"] = {"enable_thinking": False}
+    return controls
+
+
+def _planner_chat_completions_create(**kwargs: Any):
+    """Keep Qwen controls model-aware when the planner model is overridden."""
+    model = str(kwargs.get("model") or "").lower()
+    if "qwen" in model:
+        return chat_completions_create(**kwargs)
+    return chat_client.chat.completions.create(**kwargs)
+
+
+def _project_legacy_turn_plan_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    """Remove only the governed shadow sibling; preserve every other entry."""
+    return {key: value for key, value in raw.items() if key != "patient_scope"}
 
 
 def _implantation_tagged_service_ids(client_id: str | None) -> frozenset[str]:
@@ -551,16 +589,16 @@ def plan_turn_attempt(
         f"Вопрос пациента:\n{msg[:900]}"
     )
     try:
-        resp = chat_completions_create(
+        resp = _planner_chat_completions_create(
             model=TURN_PLANNER_LLM_MODEL,
             temperature=0,
-            max_completion_tokens=300,
             response_format={"type": "json_object"},
             timeout=LLM_REQUEST_TIMEOUT_SEC,
             messages=[
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user", "content": user_content},
             ],
+            **_planner_completion_controls(),
         )
         log_llm_usage(logger, resp, call_type="turn_planner_plan", model=TURN_PLANNER_LLM_MODEL)
         raw_text = (resp.choices[0].message.content or "").strip()
@@ -596,7 +634,7 @@ def plan_turn_attempt(
     legacy_plan: TurnPlan | None = None
     try:
         plan = _validate_plan(
-            obj,
+            _project_legacy_turn_plan_raw(obj),
             allowed_service_ids=allowed_ids,
             allowed_brand_groups=allowed_groups,
             allowed_brands=allowed_brands,

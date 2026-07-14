@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import ast
 import copy
+import json
 from pathlib import Path
 
 import pytest
 
+from contracts.planner_attempt import turn_frame_has_invalid_or_missing
 from contracts.turn_frame import PatientScopeFrame, PatientScopeFrameMeta
 from core.turn_frame_from_raw import _PATIENT_SCOPE_BRIDGE, build_turn_frame_from_raw
 
@@ -39,6 +41,11 @@ _SCOPE_PROVENANCE = {
     "stage": "turn_plan.patient_situation.stage",
     "modifiers": "turn_plan.patient_situation.modifiers",
 }
+_NATIVE_FIXTURE = Path("tests/fixtures/patient_scope_native_contract_a9_v2.json")
+
+
+def _native_spec() -> dict:
+    return json.loads(_NATIVE_FIXTURE.read_text(encoding="utf-8"))
 
 
 def _assert_patient_scope_meta(frame, mapped_fields: set[str]) -> None:
@@ -568,6 +575,80 @@ def test_patient_scope_bridge_has_no_shared_mutable_modifier_state():
 def test_patient_scope_bridge_mapping_is_immutable():
     with pytest.raises(TypeError):
         _PATIENT_SCOPE_BRIDGE["secret-kind"] = (None, None, None, ())
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [row["id"] for row in _native_spec()["parser_cases"]],
+)
+def test_native_patient_scope_parser_matches_frozen_cases(case_id):
+    spec = _native_spec()
+    row = next(row for row in spec["parser_cases"] if row["id"] == case_id)
+    raw = _valid_raw()
+    raw["patient_situation"] = "one_tooth_missing"
+    raw["patient_scope"] = copy.deepcopy(row["raw_container"])
+    before = copy.deepcopy(raw)
+
+    frame = _build(raw)
+
+    assert frame.patient_scope.model_dump() == row["expected_scope"]
+    scope_meta = frame.field_meta.patient_scope
+    assert scope_meta.container.model_dump() == {
+        "confidence": 0.0,
+        "provenance": "turn_plan.raw.patient_scope",
+        "status": row["expected_container"]["status"],
+        "error": row["expected_container"]["error"],
+    }
+    native_provenance = spec["raw_contract"]["metadata_contract"]["native_field_provenance"]
+    for field in ("extent", "jaw", "stage", "modifiers"):
+        status = row["expected_field_status"][field]
+        assert getattr(scope_meta, field).model_dump() == {
+            "confidence": 0.0,
+            "provenance": (
+                "turn_plan.schema_default"
+                if status == "defaulted"
+                else native_provenance[field]
+            ),
+            "status": status,
+            "error": row["expected_field_error"][field],
+        }
+    assert turn_frame_has_invalid_or_missing(frame) is (row["expected_shadow_status"] == "partial")
+    assert raw == before
+    if case_id == "container_extra_field_preserves_neighbors":
+        dumped = str(frame.model_dump())
+        assert "synthetic_extra" not in dumped
+        assert "must_not_serialize" not in dumped
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [row["id"] for row in _native_spec()["precedence_cases"]],
+)
+def test_native_patient_scope_precedence_matches_frozen_cases(case_id):
+    row = next(row for row in _native_spec()["precedence_cases"] if row["id"] == case_id)
+    raw = _valid_raw()
+    raw.update(copy.deepcopy(row["synthetic_input"]))
+    before = copy.deepcopy(raw)
+
+    frame = _build(raw)
+
+    assert frame.patient_scope.model_dump() == row["expected_scope"]
+    scope_meta = frame.field_meta.patient_scope
+    assert scope_meta.container.model_dump() == {
+        "confidence": 0.0,
+        **row["expected_container"],
+    }
+    for field in ("extent", "jaw", "stage", "modifiers"):
+        meta = getattr(scope_meta, field)
+        assert meta.status == row["expected_field_status"][field]
+        assert meta.provenance == row["expected_field_provenance"][field]
+        assert meta.confidence == 0.0
+    expected_partial = scope_meta.container.status == "invalid" or any(
+        getattr(scope_meta, field).status in {"missing", "invalid"}
+        for field in ("extent", "jaw", "stage", "modifiers")
+    )
+    assert turn_frame_has_invalid_or_missing(frame) is expected_partial
+    assert raw == before
 
 
 def test_builder_has_no_runtime_or_thematic_dependencies():

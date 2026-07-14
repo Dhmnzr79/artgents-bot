@@ -22,8 +22,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Native Raw Contract / Prompt Spec** (governance `405a6ac`, completion — текущий commit) |
-| Следующий checkpoint | **A9 Native Extraction Implementation** |
+| Последний завершённый checkpoint | **A9 Native Extraction Implementation** (governance `e46a428`, completion — текущий commit) |
+| Следующий checkpoint | **A9 Native Shadow Wiring / Firewall Proof** |
 | Что сейчас отвечает пациенту | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -190,7 +190,7 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] Native extraction design (`16ced47`)
 - [x] Native container metadata contract (governance `375ac13`, contract/tests reviewed)
 - [x] Native raw contract и prompt spec (governance `405a6ac`, frozen fixture/tests reviewed)
-- [ ] Native extraction implementation
+- [x] Native extraction implementation (governance `e46a428`, implementation/tests reviewed)
 - [ ] Native shadow wiring/firewall proof
 - [ ] Manual-contact `not_applicable` taxonomy
 - [ ] Frozen matrix/harness v2 review
@@ -218,20 +218,20 @@ A1–A9 не были целиком придуманы заранее как н
 
 ## Следующий checkpoint
 
-### A9 Native Extraction Implementation
+### A9 Native Shadow Wiring / Firewall Proof
 
-Нужно реализовать уже замороженные правила:
+Нужно отдельно доказать на runtime-швах, что уже реализованный native `patient_scope`:
 
-- добавить `patient_scope` в output-инструкцию единого planner call;
-- разобрать четыре поля независимо и безопасно;
-- удалить только shadow sibling перед strict legacy validation;
-- использовать scalar bridge только когда native sibling полностью отсутствует.
+- действительно доходит из единого planner call в shadow-frame;
+- не попадает в strict legacy plan;
+- не меняет routing, цену, evidence, composer, текст ответа или UI;
+- не получает authority даже при полностью валидном native scope.
 
-До кода новый TASK обязан отдельно решить, достаточно ли `max_completion_tokens=300`: frozen representative sample показал `465 → 585 UTF-8 bytes` (`+120`), но bytes не равны точным model tokens.
+Native extraction implementation уже завершён и проверен без live/LLM. Planner теперь умеет вернуть составную shadow-карточку из четырёх полей, а parser независимо и безопасно разбирает каждое поле. Перед strict legacy validation удаляется только новый shadow sibling; если sibling присутствует, старое scalar-значение не подмешивается.
 
-**Как это скажется на боте:** новый planner начнёт формировать более точную составную карточку ситуации параллельно с legacy-полем. Она останется shadow-only: пациентский ответ, цена, маршрут и UI не должны переключиться на неё.
+**Как это скажется на боте:** внутри появится более точная измерительная карточка масштаба ситуации пациента, но для пациента пока ничего не изменится. Следующий checkpoint нужен, чтобы ещё раз отдельно доказать: ответы, цены, маршруты и интерфейс по-прежнему принадлежат действующей логике, а новая карточка только наблюдается.
 
-Checkpoint будет code/unit-only. Live/LLM по-прежнему требует отдельного разрешения владельца. Этот roadmap сам по себе implementation не разрешает: сначала новый governance `TASK.md` и checker-review.
+Checkpoint будет code/runtime-proof без live/LLM. Live/LLM по-прежнему требует отдельного разрешения владельца. Этот roadmap сам по себе следующую реализацию не разрешает: сначала новый governance `TASK.md` и checker-review.
 
 ## Как поддерживать чекбоксы
 

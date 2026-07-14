@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import copy
 import json
 from pathlib import Path
@@ -531,21 +530,16 @@ def test_representative_completion_size_and_native_delta_are_reproducible() -> N
     assert sample["budget_verdict"] == "implementation_decision_required"
 
 
-def test_current_system_prompt_and_production_parser_are_not_implemented_yet() -> None:
+def test_frozen_contract_is_bound_to_native_implementation_seams() -> None:
     planner_path = Path("core/turn_planner_llm.py")
     planner_source = planner_path.read_text(encoding="utf-8")
-    tree = ast.parse(planner_source)
-    system_value = None
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "_SYSTEM" for target in node.targets
-        ):
-            system_value = ast.literal_eval(node.value)
-            break
-    assert isinstance(system_value, str)
-    assert "patient_scope" not in system_value
-    assert 'key != "patient_scope"' not in planner_source
+    assert "_PATIENT_SCOPE_PROMPT" in planner_source
+    assert "patient_situation, patient_scope, brand_filter" in planner_source
+    assert 'key != "patient_scope"' in planner_source
+    assert "_project_legacy_turn_plan_raw(obj)" in planner_source
 
     builder_source = Path("core/turn_frame_from_raw.py").read_text(encoding="utf-8")
-    assert 'raw.get("patient_scope")' not in builder_source
-    assert 'raw["patient_scope"]' not in builder_source
+    assert 'if "patient_scope" not in raw' in builder_source
+    assert 'raw["patient_scope"]' in builder_source
+    assert "_patient_scope_from_scalar(raw)" in builder_source
+    assert "_patient_scope_from_native" in builder_source

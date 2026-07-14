@@ -1,278 +1,265 @@
-# TASK — A9 Native Extraction Implementation
+# TASK — A9 Native Shadow Wiring / Firewall Proof
 
-Один активный `TASK.md` на один checkpoint. Реализовать approved/frozen A9 native patient-scope extraction в существующем едином planner call: compact prompt contract, exact one-key legacy projection и independent field parser с scalar bridge fallback только при absent sibling.
+Один активный `TASK.md` на один checkpoint. Доказать на реальных локальных runtime-швах, что уже реализованный native `patient_scope` проходит из единого planner payload в существующий shadow/telemetry channel, но не становится входом product path.
 
-Checkpoint code/unit-only, shadow-only. Live/LLM, product authority и downstream wiring запрещены.
-
-Общие правила: `.cursor/rules/00-guardrails.mdc`, `REVIEW_CHECKLIST.md`.
+Checkpoint test/runtime-proof-only, shadow-only. Production code, live/LLM, product authority и downstream wiring запрещены.
 
 ---
 
 ## 1. Baseline
 
 - branch `codex/stage-a`;
-- HEAD `7425c77 test: freeze A9 native raw contract spec`;
-- `origin/codex/stage-a` на том же commit;
-- рабочее дерево до governance diff чистое;
-- approved design: `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` (`16ced47`);
-- frozen v2 spec: `docs/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md`;
-- frozen machine fixture: `tests/fixtures/patient_scope_native_contract_a9_v2.json`;
-- container metadata contract завершён (`28a8b24`);
-- product firewall сохранён, patient-scope authority запрещена;
-- первый A9 raw immutable и не перезапускается.
+- HEAD `302a05e feat: implement A9 native patient scope extraction`;
+- до governance-редактирования working tree был clean; текущий разрешённый diff — только `TASK.md`; HEAD совпадает с `origin/codex/stage-a`;
+- governance предыдущего checkpoint: `e46a428 docs: define A9 native extraction implementation`;
+- native raw/prompt fixture: `tests/fixtures/patient_scope_native_contract_a9_v2.json`;
+- generic shadow recorder: `core/turn_frame_shadow.py`;
+- planner runtime seam: `core/turn_planner_llm.py::plan_turn_attempt`;
+- product seam: `orchestration/resolver_turn.py::run_resolver_turn`;
+- observability seam: `core/metadata_first_observability.py` + `orchestration/finalize_turn.py`;
+- первый A9 raw immutable и не перезапускается;
+- live-positive exact первого raw остаётся `0` по `extent/jaw/stage/modifiers`, composite `0/9`;
+- product firewall сохранён, patient-scope authority запрещена.
 
-## 2. Completion-budget decision до code
+Контекст продукта: бот работает только как local demo, production-клиентов нет. Этот checkpoint не сохраняет legacy ради действующих пользователей и не улучшает legacy-ответы. Legacy branch используется только как временный контрольный контур, чтобы доказать отсутствие скрытой authority у native shadow.
 
-Default planner model: `qwen3.6-flash`. Локального model tokenizer в repository/runtime environment нет; exact token count не заявляется и live-подбор запрещён.
+## 2. Архитектурное решение до test code
 
-Representative capacity evidence из frozen fixture:
+Production wiring уже generic и достаточен:
 
-- representative full object без sibling: `465 UTF-8 bytes`;
-- с native sibling: `585 UTF-8 bytes`;
-- additive delta: `120 bytes`;
-- sample содержит все legacy fields и все 9 allowed aspects, но не объявляется общим worst-case;
-- synthetic service ID: 36 bytes, current demo maximum: 29;
-- synthetic brand group: 21 bytes, current demo maximum: 6;
-- synthetic brand: 26 bytes, current demo maximum: 13;
-- synthetic topic: 34 bytes, current demo maximum: 14;
-- native values — bounded enums/one-item modifier list.
+```text
+plan_turn_attempt(original planner object)
+  ├─ shadow_frame <- original object including patient_scope
+  └─ legacy_plan  <- exact object without only patient_scope
 
-Отдельный derived compact current-demo reference, построенный из самых длинных **фактических** legacy/native enum и config values, занимает `530 UTF-8 bytes`. Он учитывает `existing_implant_prosthetic_stage`, `jaw=unknown`, все aspects и текущие longest demo catalog/topic/brand values. Это current-config reference, не bound на whitespace, произвольные будущие client strings или tokenizer output.
+run_resolver_turn
+  ├─ record_planner_attempt_shadow(attempt) -> request.ctx / telemetry
+  └─ product decision <- attempt.legacy_plan or existing resolver fallback
+```
 
-Решение checkpoint: изменить private planner ceiling с `300` на `700 max_completion_tokens`.
+Поэтому новый runtime adapter, flag, serializer, route или product consumer не добавляется. Checkpoint закрывается только executable proof в существующих test modules. Если доказательство требует production change — СТОП и новое governance-решение; silently расширять allowlist запрещено.
 
-Обоснование policy:
-
-- cap `300` нельзя честно доказать достаточным без tokenizer;
-- frozen representative sample занимает 585 bytes, derived current-demo compact reference — 530 bytes;
-- `700` даёт консервативный capacity margin над обоими compact byte measurements, но **не является universal token/whitespace guarantee**;
-- prompt требует compact JSON и exact fields;
-- это ceiling, не второй call, не retry и не разрешение на free text;
-- arbitrary future client strings не bounded контрактом: unit guard обязан остановить drift current demo maxima за frozen synthetic catalog-field lengths, после чего нужен новый budget review;
-- tokenizer-exact tokens не известны; byte measurements не переименовываются в tokens.
-
-Canonical planner assumption/guard: для Qwen planner call thinking отключается явно через `extra_body={"enable_thinking": false}` независимо от global `QWEN_ENABLE_THINKING`. Для non-Qwen override Qwen-specific `extra_body` не передаётся. Unit tests обязаны проверить оба kwargs paths.
-
-Не менять model, temperature или timeout. Не поднимать cap выше `700` в этом checkpoint.
+Это proof data-flow isolation, а не утверждение о качестве текста legacy-ответов. Price/evidence/composer/UI не нужно прогонять через старый widget: отсутствие native input доказывается A/B runtime signature + source/AST firewall + нулевым production diff.
 
 ## 3. Deliverables и allowlist
 
-После отдельного governance commit разрешено менять только:
+### Governance
 
-### Production
+1. `TASK.md`
 
-1. `core/turn_frame_from_raw.py`
-2. `core/turn_planner_llm.py`
+До governance checker `✅` разрешён только этот файл. После `✅` — отдельный governance commit/push.
 
-### Tests
+### Tests после governance commit
 
-3. `tests/test_turn_frame_from_raw.py`
-4. `tests/test_turn_planner_llm.py`
-5. `tests/test_patient_scope_native_contract_spec.py`
+2. `tests/test_turn_frame_shadow.py`
+3. `tests/test_metadata_first_observability.py`
 
-В spec-test разрешено только заменить финальный pre-implementation gate на post-implementation binding. Hardcoded manifests, declarative expectations, fixture paths, `465/585/120` evidence и frozen semantics не менять/не ослаблять.
+Production files менять запрещено. Новый fixture создавать запрещено: использовать frozen v2 JSON только как read-only evidence либо компактные synthetic payloads, прямо связанные с его enums/semantics.
 
-### Roadmap после checker ✅
+### Roadmap только после final checker `✅`
 
-6. `docs/STRANGLER_ROADMAP.md` — только после independent code review `✅`:
-   - отметить `[x] Native extraction implementation`;
-   - назвать последним завершённым этот checkpoint;
-   - назвать следующим `A9 Native Shadow Wiring / Firewall Proof`;
-   - сохранить A9 parent `[ ]`, shadow-only и authority forbidden.
+4. `docs/STRANGLER_ROADMAP.md`
 
-Frozen spec doc/JSON, v1 matrix/harness/raw/audit и любой другой tracked/untracked file менять запрещено.
+После code/runtime checker `✅`:
 
-## 4. Native parser contract
+- закрыть только `Native shadow wiring/firewall proof`;
+- оставить A9 parent `[ ]`, authority `Forbidden`;
+- назвать следующим checkpoint `A9 Manual-contact not_applicable Taxonomy`;
+- исправить вводную формулировку roadmap: бот — local demo без production-клиентов; legacy временно служит измерительным/контрольным контуром, а не защищаемым продуктом;
+- кратко объяснить владельцу: native карточка наблюдаема технически, но ещё не управляет ответом.
 
-`core/turn_frame_from_raw.py`:
+Любой другой файл — STOP.
 
-1. Проверять **presence**, а не truthiness:
-   - key `patient_scope` absent → существующий scalar bridge byte/semantics unchanged;
-   - key present → только native container, scalar не backfill’ит ни одного member.
-2. Не мутировать raw.
-3. Container:
-   - object только с allowed keys → `valid/None`;
-   - `null`/wrong type → `invalid/patient_scope_invalid_type`, safe frame, четыре child metas `defaulted`;
-   - unknown extra → `invalid/patient_scope_extra_field`, known members parse independently;
-   - object с missing/invalid member → container остаётся `valid`.
-4. Container provenance `turn_plan.raw.patient_scope`, confidence `0.0`.
-5. Member provenance `turn_plan.raw.patient_scope.<field>`, включая missing/invalid; invalid-container default children используют `turn_plan.schema_default`.
-6. Scalar bridge provenance `turn_plan.patient_situation.*` и current values/statuses не менять.
+## 4. Primary runtime proof
 
-Known members:
+В `tests/test_turn_frame_shadow.py` добавить integration tests через production functions. В primary tests запрещено мокать:
 
-- allowed value и explicit `unknown`/`[]` → `valid`;
-- missing → safe value + `missing`;
-- wrong type → safe value + matching `*_invalid_type`;
-- outside allowlist → safe value + matching `*_not_allowed`;
-- modifiers non-list или любой non-string item → whole field `[]/invalid/patient_modifiers_invalid_type`;
-- modifiers с unsupported string, включая mixed valid+unsupported → whole field `[]/invalid/patient_modifier_not_allowed`;
-- duplicate allowed modifiers → current model canonical unique sorted list;
-- invalid одного member сохраняет valid neighbors.
+- `plan_turn_attempt`;
+- `build_turn_frame_from_raw`;
+- `record_planner_attempt_shadow`;
+- `run_resolver_turn`;
+- `turn_plan_to_decision_frame`;
+- `publish_turn_plan`.
 
-Raw value/unknown extra name/value не включать в error, provenance или logs.
+Разрешено мокать только внешний chat completion, catalog/config loaders, event/usage side effects и controlled existing resolver fallback. Один synthetic planner response = один planner call; retry/second call запрещены.
 
-## 5. Exact legacy projection
+### 4.1 Valid native A/B isolation
 
-В `core/turn_planner_llm.py` добавить один pure private helper, который:
+Два запуска с одинаковыми legacy keys:
 
-```python
-return {key: value for key, value in raw.items() if key != "patient_scope"}
-```
+1. control без `patient_scope`;
+2. treatment с полностью valid native composite sibling, намеренно отличающимся от legacy scalar `patient_situation`.
 
-Только этот projected dict передаётся в current `_validate_plan()`.
+Оба проходят через реальный `plan_turn_attempt` внутри `run_resolver_turn`.
 
-Обязательно:
+Обязательные assertions:
 
-- original parsed `obj` остаётся неизменным и идёт в shadow builder;
-- удаляется только exact top-level `patient_scope`;
-- любой другой extra сохраняется и остаётся fatal;
-- invalid native не меняет valid legacy plan;
-- invalid legacy не уничтожает independently valid native frame;
-- `_sanitize_topic_fields`, catalog/brand guards, protocol guard, follow-up enrichment, logging и fail-open не изменяются;
-- `plan_turn()` возвращает только `legacy_plan` как раньше;
-- `patient_scope` не попадает в `TurnPlan`, product ctx/dump, resolver/composer.
+- в treatment `request.ctx.turn_frame_shadow.patient_scope` точно равен native composite;
+- все четыре native member meta имеют provenance `turn_plan.raw.patient_scope.<field>`, status `valid`, confidence `0.0`;
+- `request.ctx.turn_plan` не содержит `patient_scope`;
+- control/treatment product signatures совпадают: `ResolverTurnOutcome.intent`, `decision.model_dump()`, `scope_topic_candidate`, published strict `turn_plan`;
+- route/service/topic/aspects/follow-up/clarify не зависят от native sibling;
+- fallback не вызывается;
+- на каждый запуск ровно один planner completion, retry отсутствует.
 
-## 6. Prompt implementation
+### 4.2 Invalid native does not invalidate valid legacy
 
-Добавить отдельную private константу `_PATIENT_SCOPE_PROMPT` и включить её в существующий `_SYSTEM`.
+Synthetic payload содержит valid legacy keys и present native container с одним invalid member и valid соседями.
 
-Scope block обязан кратко требовать:
+Обязательные assertions:
 
-1. compact `patient_scope` object ровно с keys `extent`, `jaw`, `stage`, `modifiers`;
-2. exact enum/list values из frozen contract;
-3. только explicit facts текущего сообщения;
-4. absent fact → `unknown`/`[]`, no guess;
-5. history помогает referent, но не переносит old scope без current mention;
-6. legacy `patient_situation` возвращается отдельно;
-7. no service/protocol/price unit/document/evidence/diagnosis selection;
-8. urgency/pain outside scope;
-9. reported bone context не clinical confirmation;
-10. no extra scope fields.
+- legacy plan остаётся valid и публикуется без `patient_scope`;
+- product decision идёт по legacy planner branch, existing fallback не вызывается;
+- shadow status `partial`;
+- invalid member получает safe value + exact error/provenance;
+- valid native neighbors сохраняются в ctx snapshot;
+- native values не меняют decision/output signature.
 
-Scope block не содержит:
+### 4.3 Valid native does not rescue invalid legacy
 
-- frozen case IDs;
-- exhaustive phrase list;
-- All-on-4/All-on-6 или другие service mappings;
-- retry/second call/classifier;
-- instruction влиять на answer/routing/price/UI.
+Synthetic payload содержит independently valid native composite и invalid legacy field (`aspects=[]` или второй top-level extra, как уже frozen contract допускает для proof).
 
-Существующие legacy prompt rules не переписывать, кроме добавления sibling в exact field list и подключения scope block.
+Обязательные assertions:
 
-## 7. Test binding к frozen fixture
+- `legacy_plan is None`, strict branch не repair'ится;
+- native frame и exact member provenance доступны в shadow ctx;
+- shadow status `partial`;
+- `run_resolver_turn` использует controlled existing resolver fallback;
+- fallback decision/product signature не строится из native scope;
+- planner completion ровно один, scope retry отсутствует.
 
-### `tests/test_turn_frame_from_raw.py`
+## 5. Observability / privacy proof
 
-- загрузить frozen v2 fixture;
-- прогнать exact 18 parser cases через production builder;
-- прогнать 4 precedence cases;
-- проверить values, container/member status/error/provenance, recursive partial signal, raw immutability и отсутствие extra leak;
-- сохранить все существующие scalar bridge tests unchanged.
+В `tests/test_metadata_first_observability.py` доказать существующий generic channel для native sibling:
 
-### `tests/test_turn_planner_llm.py`
+1. Valid composite и его nested `field_meta` без преобразований проходят:
+   - `request.ctx`;
+   - `metadata_first_turn_details()`;
+   - `metadata_first_response_meta()`;
+   - `finalize_ask()` только при `E2E_USE_TEST_CLIENT=1`.
+2. При отсутствии `E2E_USE_TEST_CLIENT` metadata/shadow не появляется в обычном response payload.
+3. Partial native container сохраняет valid neighbors и exact generic errors/status.
+4. Extra native key/name/value, question/history, exception text и raw object не сериализуются в ctx/details/response slice.
+5. Нельзя логировать пользовательский вопрос, историю, raw scope или exception payload ради proof.
 
-- exact projection helper: пять frozen projection cases, input immutable;
-- native sibling + valid legacy → valid legacy plan;
-- second unknown top extra остаётся fatal;
-- invalid native + valid legacy → legacy plan valid, shadow partial;
-- invalid legacy + valid native → legacy none, native neighbors preserved;
-- one call/no retry;
-- Qwen call явно использует `extra_body.enable_thinking=false`; non-Qwen call не получает Qwen-specific body;
-- `_PATIENT_SCOPE_PROMPT` содержит required semantics и не содержит forbidden scope mappings;
-- captured call использует `max_completion_tokens=700`;
-- current demo catalog/topic/brand maxima не превышают frozen synthetic sample lengths;
-- independently derived compact current-demo longest-values object воспроизводимо равен `530 bytes`; это capacity evidence, не tokenizer/whitespace guarantee;
-- product wrapper/published `TurnPlan` не содержит `patient_scope`.
+Existing generic recorder/metadata production code менять не требуется и запрещено.
 
-### `tests/test_patient_scope_native_contract_spec.py`
+## 6. Static product firewall
 
-Только заменить gate «implementation ещё отсутствует» на binding:
+Усилить source/AST assertions без изменения production:
 
-- `_SYSTEM` включает scope block;
-- exact projection seam присутствует;
-- native builder читает sibling по presence;
-- frozen fixture/manifests/evidence остаются неизменны.
+1. `run_resolver_turn()` вызывает `plan_turn_attempt` один раз, записывает весь attempt в recorder, но для product использует только `attempt.legacy_plan`.
+2. Product modules не читают:
+   - `attempt.shadow_frame.patient_scope`;
+   - `shadow_frame.patient_scope`;
+   - nested `turn_frame_shadow["patient_scope"]`;
+   - native member axes через shadow (`extent/jaw/stage/modifiers`).
+3. `turn_plan_to_decision_frame()` и `publish_turn_plan()` не читают/публикуют native `patient_scope`.
+4. `TurnPlan` contract не содержит `patient_scope`.
+5. Imports/constructors `PatientScopeFrame` остаются только в contract/builder/adapter shadow boundary; product routing, resolver, price, evidence, playbook, composer, marketing, booking, contacts, medzone и session mutation не получают этот type.
+6. No native scope enum/value mapping добавлен в service-id, price-unit/group или document-id selection.
+
+AST/source proof должен различать новый nested `contracts.turn_frame.PatientScopeFrame` и одноимённый legacy scalar `PatientSituationResult.patient_scope`; запрещено объявлять нарушением существующий legacy scalar только по совпадению строки.
+
+## 7. Frozen/protected artifacts
+
+После governance immutable:
+
+- `TASK.md`;
+- `tests/fixtures/patient_scope_native_contract_a9_v2.json`;
+- `docs/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md`;
+- `evals/v5/demo/patient_scope_shadow_matrix.json`;
+- A9 v1 harness/audit;
+- `eval_patient_scope_a9_last.txt`;
+- A6/A7/A8 frozen artifacts.
+
+Запрещены resnapshot, изменение expected/target, ослабление asserts, skip/xfail, hardcode live case ids и условный PASS.
+
+Protected hashes:
+
+- first A9 raw SHA256: `478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`;
+- v1 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`;
+- v2 fixture git blob: `c7458e4481489895320ea3de1dec1a81b8da5f50`.
 
 ## 8. Product firewall / non-goals
 
 Запрещено:
 
-- менять contracts/value/error allowlists;
-- менять resolver/composer/routing/app/response metadata wiring;
-- передавать native scope в product decisions;
-- добавлять session carry/merge, question/history parser, detector или scalar reconciliation;
-- добавлять second call/retry/fallback classifier;
-- менять logging payload или логировать raw scope;
-- менять frozen spec JSON/doc, v1 matrix/harness/raw/audit;
-- запускать live/LLM;
+- менять production code;
+- улучшать или сохранять legacy ответы ради production parity;
+- подключать native scope к resolver/routing/price/evidence/playbook/composer/marketing/booking/UI/session;
+- добавлять native scope в `TurnPlan`, `DecisionFrame`, `AnswerPlan`, `ResponseSpec` или product ctx;
+- добавлять flag/default flip, new route, classifier, handler, adapter или serializer;
+- добавлять second LLM call, retry, fallback classifier или question/history parser;
+- менять scalar bridge/native parser/prompt/completion cap;
+- менять logging payload;
+- менять manual-contact semantics в этом checkpoint;
+- запускать live/LLM/widget;
 - менять authority;
-- закрывать wiring/firewall, harness v2, live, authority или A9 parent checkbox.
+- закрывать manual-contact, matrix/harness v2, live, authority, legacy retirement или A9 parent checkbox.
 
 ## 9. Targeted tests
 
-Primary implementation slice:
+Primary wiring/firewall slice:
 
 ```powershell
-.\.venv\codex312\Scripts\python.exe -m pytest tests/test_turn_frame_from_raw.py tests/test_turn_planner_llm.py tests/test_patient_scope_native_contract_spec.py -q
+.\.venv\codex312\Scripts\python.exe -m pytest tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py -q
 ```
 
-Related shadow/product regressions:
+Related planner/contracts regressions:
 
 ```powershell
-.\.venv\codex312\Scripts\python.exe -m pytest tests/test_turn_planner_wiring.py tests/test_turn_frame_shadow.py tests/test_metadata_first_observability.py -q
+.\.venv\codex312\Scripts\python.exe -m pytest tests/test_turn_planner_llm.py tests/test_turn_planner_wiring.py tests/test_patient_scope_native_contract_spec.py -q
 ```
 
-Full suite не обязателен при зелёных targeted slices и пустом downstream diff. Если targeted regression показывает широкий риск — СТОП и новая оценка scope.
+Full suite не обязателен: production diff запрещён, primary integration + related seams достаточны. Если targeted test обнаруживает production gap — СТОП, не чинить вне allowlist.
 
 ## 10. Static checks
 
 ```powershell
 git diff --check
 git diff --name-only
-git diff -- contracts orchestration app.py
-rg -n "patient_scope" core/turn_planner_llm.py core/turn_frame_from_raw.py
+git diff -- core contracts orchestration app.py llm.py
+rg -n "patient_scope|PatientScopeFrame|shadow_frame" core orchestration contracts app.py llm.py
 Get-FileHash -Algorithm SHA256 eval_patient_scope_a9_last.txt
 git hash-object evals/v5/demo/patient_scope_shadow_matrix.json
 git hash-object tests/fixtures/patient_scope_native_contract_a9_v2.json
 ```
 
-Protected baselines:
-
-- first A9 raw SHA256: `478CF92060557C2A915EBBEAFAC911829EADC64F490C86C6ABFADD423A3ECE21`;
-- v1 matrix git blob: `d459073bbf8767f7ff590ece2958f7aa8cb18b25`;
-- v2 fixture git blob: `c7458e4481489895320ea3de1dec1a81b8da5f50`.
+Expected implementation diff до roadmap update: только два test files; production diff пустой; protected hashes exact.
 
 ## 11. Checkpoints
 
 ### Checkpoint 1 — governance review
 
-Independent checker проверяет TASK и budget decision до code. После `✅` — отдельный commit/push только `TASK.md`.
+Independent checker проверяет TASK, sufficiency test-only решения, A/B signatures, mock boundaries, privacy и firewall до test code. После `✅` — отдельный commit/push только `TASK.md`.
 
-### Checkpoint 2 — implementation
+### Checkpoint 2 — test/runtime proof
 
-Изменить только allowlist production/tests. Выполнить targeted tests/static checks. Roadmap не менять, commit не делать.
+Изменить только два allowlist test files. Выполнить targeted tests/static checks. Roadmap не менять, commit не делать.
 
 ### Checkpoint 3 — independent code/runtime review
 
-Checker сверяет diff с frozen fixture, test evidence, budget guard, one-call invariant, exact projection, privacy и product firewall.
+Checker начинает с test diff, подтверждает отсутствие hidden mocks/conditional PASS, затем сверяет runtime proof, product isolation, observability, privacy, production-empty diff и test evidence.
 
 ### Checkpoint 4 — completion
 
-Только после checker `✅` обновить один roadmap checkbox/status, повторить static checks, затем один implementation commit и push в `codex/stage-a`.
+Только после checker `✅` обновить roadmap checkbox/status и local-demo wording, повторить static checks, затем один completion commit и push в `codex/stage-a`.
 
 ## 12. Definition of Done
 
-1. Все 18 parser + 4 precedence + 5 projection cases проходят production binding.
-2. Absent использует unchanged bridge; любой present container полностью владеет native scope.
-3. Exact one-key projection сохраняет strict legacy extras/eligibility.
-4. Prompt реализует frozen current-turn/unknown-safe semantics без product mappings.
-5. Один planner call, no retry; cap ровно `700`, Qwen thinking explicitly off, current-demo drift/reference guards зелёные без universal sufficiency claim.
-6. Legacy `TurnPlan`/product path не содержит `patient_scope`.
-7. Оба targeted pytest slices зелёные; full suite обоснованно не запускался.
-8. Production diff только в двух allowlist modules; downstream contracts/wiring untouched.
-9. Frozen v1/v2 artifacts и raw hashes неизменны; live/LLM не запускались.
-10. Independent checker дал `✅` до roadmap update/commit.
-11. Roadmap закрывает только native extraction implementation; A9 parent открыт, authority forbidden.
+1. Test-only решение подтверждено checker до реализации; governance commit отдельно зафиксирован.
+2. Actual `plan_turn_attempt -> run_resolver_turn -> record_planner_attempt_shadow` материализует valid native composite в ctx с exact nested metadata.
+3. A/B с/без native sibling имеет одинаковую product signature и различается только shadow observation.
+4. Invalid native не ломает valid legacy; valid native не repair'ит invalid legacy.
+5. Existing resolver fallback не получает native scope как input и сохраняет controlled output.
+6. Native valid/partial frame проходит generic turn details и E2E-only response metadata; обычный response не содержит shadow.
+7. Raw/extra/question/history/exception secrets не сериализуются.
+8. AST/source firewall различает native nested и legacy scalar и не находит product consumers native scope.
+9. Production diff пустой; изменены только два allowlist test files, затем roadmap.
+10. Оба targeted pytest slices зелёные; full suite обоснованно не запускался.
+11. Frozen v1/v2 artifacts и первый raw имеют exact hashes; live/LLM/widget не запускались.
+12. Independent checker дал final `✅` до roadmap update/commit.
+13. Roadmap закрывает только native wiring/firewall proof, корректно описывает local demo, A9 parent открыт, authority forbidden.
 
-После completion commit — СТОП. `A9 Native Shadow Wiring / Firewall Proof` начинается только с нового TASK и governance review.
+После completion commit — СТОП. `A9 Manual-contact not_applicable Taxonomy` начинается только с нового TASK и governance review.

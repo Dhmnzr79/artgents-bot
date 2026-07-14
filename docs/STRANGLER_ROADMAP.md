@@ -22,8 +22,9 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Manual-contact `not_applicable` Taxonomy** (governance `083bdcd`, revision `0eb8566`, completion — текущий commit) |
-| Следующий checkpoint | **A9 Frozen Matrix/Harness v2 Review** |
+| Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion — текущий commit) |
+| Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
+| Ближайший рабочий фокус без live | **Инвентаризация вопросов и маркетинговых сценариев бота** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -193,7 +194,7 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] Native extraction implementation (governance `e46a428`, implementation/tests reviewed)
 - [x] Native shadow wiring/firewall proof (governance `4162111`, runtime/tests reviewed)
 - [x] Manual-contact `not_applicable` taxonomy (governance `083bdcd`, revision `0eb8566`, helper/tests reviewed)
-- [ ] Frozen matrix/harness v2 review
+- [x] Frozen matrix/harness v2 review (governance `71aa405`, matrix/harness/tests independently reviewed)
 - [ ] One-run live re-audit — только после отдельного разрешения владельца
 - [ ] Authority decision
 - [ ] Legacy retirement — только после принятой authority architecture
@@ -202,11 +203,15 @@ A1–A9 не были целиком придуманы заранее как н
 
 - инфраструктура и первый raw признаны целыми;
 - deterministic scalar bridge прошёл `10/10`;
-- live-positive exact = `0` для `extent`, `jaw`, `stage`, `modifiers`;
-- composite exact = `0/9`;
+- в первом immutable v1 raw live-positive exact = `0` для `extent`, `jaw`, `stage`, `modifiers`;
+- исторический v1 aggregate composite exact = `0/9` (7 live + 2 deterministic rows); нового live-результата ещё нет;
 - current product path не читает новый nested scope;
 - реальные тексты ответов, цены и UI этим harness не оценивались;
-- authority запрещена.
+- authority запрещена;
+- frozen v2 matrix сохранила все 30 live-вопросов и исходные ожидания без подгонки под первый raw;
+- v2 harness отделяет 30 live-наблюдений от 14 локальных deterministic fixtures: positive denominators `13/9/4/3`, live composite total `7`;
+- manual-contact остаётся в полном total как `not_applicable`, но не притворяется ошибкой распознавания; transport, runtime и malformed-frame ошибки остаются видимыми отдельно;
+- offline fake-run и privacy/contract проверки зелёные (`68 passed`), но новый live/LLM run не выполнялся;
 
 **Как это сказалось на логике и маркетинге:** мы построили безопасную измерительную инфраструктуру и увидели, что на первом frozen live sample measured shadow не материализовал ни одного exact positive axis. Следовательно, включать его в реальные ответы рано.
 
@@ -216,22 +221,22 @@ A1–A9 не были целиком придуманы заранее как н
 
 Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
 
-## Следующий checkpoint
+## Следующий технический checkpoint A9 — требуется отдельное разрешение
 
-### A9 Frozen Matrix/Harness v2 Review
+### A9 One-run Live Re-audit
 
-Нужно подготовить и независимо проверить новую frozen-версию матрицы и harness до любого live-прогона:
+Frozen matrix/harness v2 подготовлены и независимо проверены **до** live. Первый A9 raw, v1 matrix/harness/summary и исторический audit не переписаны. Product path и ответы бота не менялись; patient-scope authority остаётся запрещённой.
 
-- встроить принятую manual-contact taxonomy в versioned harness v2;
-- заморозить новые native expectations и точные denominator/availability правила;
-- назначить новые schema/artifact names, не переписывая первый raw и v1 summary;
-- доказать unit/fake-run тестами порядок `transport → frame → runtime status → not_applicable → extraction error`.
+Следующий A9 шаг — один контролируемый live/LLM re-audit по 30 frozen turns, один attempt без retry, с новым raw `eval_patient_scope_a9_v2_last.txt`. Он не запускается автоматически и требует:
 
-Manual-contact taxonomy завершена без runtime-изменений и без live/LLM. Pure eval helper помечает `not_applicable` только успешный exact `ingress_manual_contact` без shadow-frame. Любой другой route, runtime `not_available/degraded`, присутствующий или malformed frame остаётся в своём прежнем bucket. Historical v1 target-red tests и первый raw сохранены точными хэшами.
+1. отдельного явного разрешения владельца на live/LLM;
+2. нового `TASK.md`;
+3. governance checker-review до запуска;
+4. сохранения raw без повторного прогона или «улучшения» результата.
 
-**Как это скажется на боте:** ответы по-прежнему не изменятся. Мы подготовим честную измерительную линейку для следующей версии: передача обращения администратору не будет ошибочно портить статистику распознавания patient scope, а настоящие transport и malformed-frame ошибки не спрячутся в `not_applicable`.
+**Как это скажется на боте:** пока никак — мы лишь сделали будущую проверку честной. Когда владелец разрешит один live-run, отчёт отдельно покажет, распознаёт ли новая архитектура реальные положительные признаки пациента, а не смешает их с локальными fixtures или передачей обращения администратору.
 
-Checkpoint будет spec/harness/unit-only и не разрешает live/LLM. Этот roadmap сам по себе следующую реализацию не разрешает: сначала новый `TASK.md` и checker-review.
+До такого разрешения A9 стоит на паузе. Ближайшая работа без live — собрать полную карту типов вопросов и маркетинговых сценариев: примеры запросов, ожидаемое поведение, ответы, цены/акции, врачи, страхи, сравнения, запись, spam и fallback.
 
 ## Как поддерживать чекбоксы
 

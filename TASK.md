@@ -1,174 +1,111 @@
-# TASK — Documentation Canon Cleanup, Phase 1
+# TASK — Close Three Remaining Product/UI Decisions
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `853788a docs: define marketing scenario architecture`
+**Baseline:** `b3a571f docs: clean up documentation canon`
 
-**Режим:** documentation-only. Код, tests, runtime, client data и A9 raw не меняются.
-
-## Контекст baseline
-
-После baseline остался известный незакоммиченный WIP предыдущего product-gap review:
-
-- `TASK.md`;
-- `docs/README.md`;
-- `docs/STRANGLER_ROADMAP.md`;
-- новый `docs/PRODUCT_GAP_REVIEW.md`.
-
-Этот WIP принадлежит текущему агенту и в данном checkpoint намеренно поглощается:
-`PRODUCT_GAP_REVIEW.md` не становится постоянным документом, а README/roadmap
-переписываются под новый канон. Другого содержательного pre-existing diff нет.
+**Режим:** documentation-only, без изменения runtime.
 
 ## Цель
 
-Навести основной порядок в документации без потери необходимых рабочих контрактов:
+Последовательно согласовать с владельцем и внести прямо в действующий product canon три
+оставшихся решения перед schema/runtime checkpoints:
 
-1. владелец продукта регулярно читает только roadmap и маркетинговый фундамент;
-2. current runtime, target design, evidence и archive явно разделены;
-3. исторические документы не лежат среди активных;
-4. очевидно отменённые разведки удалены из текущего дерева и остаются в Git history;
-5. A9 в корне сокращён с четырёх документов до трёх активных; original design временно
-   сохраняет старый путь из-за frozen `evidence_refs` и нормативных session laws;
-6. первый A9 raw и доказательства его результата не меняются;
-7. известные current-vs-target расхождения явно помечены и не выглядят одновременно действующими законами.
+1. состав первого ответа, который уже содержит marketing concern;
+2. иерархию CTA, clarify/service/follow-up, видео и «Рассказать о ситуации»;
+3. набор CTA-смыслов и правило стабильности CTA.
 
-## Канон после cleanup
+Не создавать отдельный временный review-документ. До commit должны быть приняты все три
+решения, синхронизированы два маркетинговых канона и обновлён roadmap.
 
-### Владелец продукта
+## Уже принято владельцем — решение 1
 
-- `docs/STRANGLER_ROADMAP.md` — прогресс A1–A9 и следующий checkpoint;
-- `docs/MARKETING_QUESTION_FOUNDATION.md` — маркетинговое поведение бота.
+Если первый вопрос об услуге одновременно содержит маркетинговое сомнение:
 
-### Активные архитектурные/операционные документы для агентов
+1. основной ответ берётся из утверждённой базы и не занимает marketing slots;
+2. выбираются до двух релевантных усилителей активного сценария;
+3. оставшиеся места общего лимита трёх marketing facts занимают применимые коммерческие
+   предложения по приоритету клиники;
+4. CTA добавляется отдельно и не входит в лимит;
+5. пустые слоты не заполняются искусственно;
+6. если подходящий усилитель один, могут быть показаны один усилитель и до двух
+   коммерческих предложений; если два — два усилителя и до одного предложения.
 
-- `docs/ARCH_TARGET_DESIGN.md`;
-- `docs/CURRENT_ARCHITECTURE.md`;
-- `docs/MARKETING_SCENARIO_ARCHITECTURE.md`;
-- `docs/MARKETING_QUESTION_TECH.md`;
-- `docs/SERVICE_SELECTION_CONTEXTS.md`;
-- `drafts/PRICE_RESPONSE_RULES_DRAFT.md`;
-- `docs/PRICEBOOK_V2.md` — только current runtime schema;
-- `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`;
-- `docs/PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md`;
-- `docs/PATIENT_SCOPE_DESIGN_A9.md` — сохраняется по старому пути до отдельной миграции
-  frozen matrix refs;
-- эксплуатационные документы, перечисленные в README.
+Это composition rule, а не готовый текст ответа. Факты и усилители только source-owned.
 
-Сведение marketing-tech и price/service документов в меньшее число канонов — отдельная
-будущая фаза после закрытия текущих product decisions; этот checkpoint не должен
-механически склеить документы и потерять детали.
+## Принято владельцем — решение 2
 
-## Удалить из текущего дерева
+Для content-ответов:
 
-- `docs/TRUST_INTENT_PHASE1_REPORT.md` — отменённая разведка отдельного thematic route;
-- `docs/DOCS_AUDIT.md` — исторический снимок 10 июля, не действующий канон;
-- незакоммиченный `docs/PRODUCT_GAP_REVIEW.md` — временный review, решения ещё не приняты.
+1. CTA существует отдельно и не занимает secondary UI slots;
+2. pure clarify показывает только уточняющие кнопки, без content follow-up/video;
+3. follow-up появляются только после содержательного content-ответа;
+4. на follow-up/video всего два secondary UI slots;
+5. video имеет приоритет и показывается один раз на первом содержательном ответе по
+   соответствующему материалу;
+6. оставшиеся места занимают следующие ещё не показанные follow-up;
+7. механического повтора и sliding-window rotation нет;
+8. при переходе к другому материалу кандидаты рассчитываются заново;
+9. усилители идут текстом, UI slots не занимают, но сохраняют marketing limit 3/2;
+10. service-detail и «Рассказать о ситуации» относятся к secondary UI actions и
+    конкурируют за те же два места.
 
-Tracked-файлы остаются доступны в Git history. `PRODUCT_GAP_REVIEW.md` не имеет Git
-history, поэтому перед удалением три непринятых вопроса из него кратко переносятся в
-`STRANGLER_ROADMAP.md`: mixed first-concern allocation, UI capacity и CTA semantic set.
-Полезные текущие правила не должны ссылаться на удалённые tracked-файлы.
+Для price-ответов:
 
-## Переместить в archive
+11. CTA также существует отдельно;
+12. доступно не более двух price-navigation slots;
+13. price navigation не смешивается с content follow-up;
+14. кнопками становятся только элементы, явно записанные в `service.followups`;
+15. `fact_refs` добавляют source-owned facts текстом и не создают автоматические кнопки;
+16. прямой вопрос получает ответ сразу, а совпадающая кнопка повторно не показывается;
+17. в обычном первом price-ответе demo приоритет при наличии в `followups`: «Что входит»,
+    затем «Оплата по этапам»;
+18. показанные/нажатые price follow-up автоматически не повторяются.
 
-- `docs/ARCH_RECON_REPORT.md` → `docs/archive/ARCH_RECON_REPORT.md`;
-- `docs/FULLCONTEXT_ROADMAP.md` → `docs/archive/FULLCONTEXT_ROADMAP.md`;
-Archive сохраняет происхождение решений, но не является текущим каноном.
+## Принято владельцем — решение 3
 
-`docs/PATIENT_SCOPE_DESIGN_A9.md` в Phase 1 не перемещается: frozen matrices содержат
-защищённые ссылки на его текущие строки, а active native design использует его session laws.
-
-## Переместить в evidence
-
-### Завершённые A-series checkpoints
-
-- `TURN_FRAME_SHADOW_AUDIT_A3.md`;
-- `TOPIC_SHADOW_AUDIT_A6.md`;
-- `TOPIC_SHADOW_REAUDIT_A7.md`;
-- `FIELD_LEVEL_PLANNER_OUTCOME_A7.md`;
-- `A7_REGRESSION_LIVE_PROOF.md`;
-
-Target: `docs/evidence/a_series/`.
-
-### Открытый A9
-
-- `PATIENT_SCOPE_SHADOW_AUDIT_A9.md` →
-  `docs/evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md`.
-
-Evidence не переписывается по смыслу. Допустимы только относительные ссылки после move.
-Raw hash, denominators, claims и quality verdict должны остаться byte-for-byte по тексту,
-кроме путей ссылок, если без этого они перестают разрешаться.
-
-## Явно устранить конфликты статусов
-
-1. `README.md` задаёт precedence:
-   - owner canon;
-   - target contracts;
-   - current runtime references;
-   - evidence;
-   - archive.
-2. Current runtime документы про promo (`MARKETING_EDITING_GUIDE.md`, `PRICEBOOK_V2.md`)
-   прямо предупреждают, что current pain/safety blocking не является новой target policy.
-3. Target marketing policy прямо имеет приоритет для будущей реализации:
-   - текущая личная боль/осложнение/жалоба → phone-only hard-stop;
-   - общий страх будущего лечения/противопоказания → source-grounded ответ и применимый
-     marketing layer по target rules.
-4. `.cursor/rules/00-guardrails.mdc` различает строгий current-personal-pain hard-stop и
-   общую медицинскую/противопоказательную тему, чтобы не противоречить product canon.
-5. Конфликт UI capacity не решать за владельца: current widget limit и target три кнопки
-   масштаба должны быть явно помечены как открытое product/UI решение.
+CTA задаётся не на каждый документ/ответ, а один раз для смыслового контекста темы. Одна
+и та же CTA может показываться после каждого содержательного коммерчески релевантного
+ответа внутри этого контекста. При явной смене контекста выбирается другая настроенная
+CTA: например, имплантация использует одну CTA, вопросы о врачах — врачебную CTA, если
+она определена клиникой. Если специальной CTA нет, используется clinic default; модель
+не придумывает кнопку. Hard-stop, pure clarify, explicit refusal и lead-flow сохраняют
+прежние запреты CTA.
 
 ## Allowlist
 
 - `TASK.md`;
-- `.cursor/rules/00-guardrails.mdc`;
-- `docs/README.md`;
-- `docs/STRANGLER_ROADMAP.md`;
-- `docs/ARCH_TARGET_DESIGN.md`;
 - `docs/MARKETING_QUESTION_FOUNDATION.md`;
 - `docs/MARKETING_SCENARIO_ARCHITECTURE.md`;
-- `docs/MARKETING_EDITING_GUIDE.md`;
-- `docs/PRICEBOOK_V2.md`;
-- `docs/FLAGS_AND_STATUS.md`;
-- `docs/PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md`;
-- `docs/TRUST_INTENT_PHASE1_REPORT.md` (delete);
-- `docs/DOCS_AUDIT.md` (delete);
-- `docs/PRODUCT_GAP_REVIEW.md` (delete);
-- все source/target paths из разделов archive/evidence выше.
-
-Только правки ссылок после move разрешены внутри перемещаемых archive/evidence файлов.
+- `docs/STRANGLER_ROADMAP.md`.
 
 ## Protected / forbidden
 
 - весь код, tests, evals, fixtures, prompts, configs и client data;
-- `eval_patient_scope_a9_last.txt` и любой другой raw;
-- A9 harness/matrix/evidence claims;
-- содержательные правила active patient-scope design/raw contract;
+- current runtime/Pricebook/UI implementation;
+- archive/evidence;
+- A9 design, raw, harness, matrix и evidence;
 - live/LLM;
 - authority;
 - merge и push в `main`.
 
 ## Verification
 
-1. Governance checker `✅` до move/delete.
-2. После cleanup нет содержательных изменений вне allowlist.
-3. Все локальные Markdown links разрешаются после перемещений.
-4. Поиск старых root-paths не находит битых ссылок.
-5. A9 audit сохраняет raw SHA256, exact=0/quality-red и authority forbidden.
-6. Три active A9 design/raw documents сохраняют старые frozen refs, shadow-only, raw
-   immutable и authority forbidden.
-7. `git diff --check` проходит.
-8. Никакие tests/live не запускаются: исполняемое поведение не меняется.
-9. Финальный независимый checker даёт `✅` до commit/push.
+1. Governance checker `✅` до правок product canon.
+2. Каждое решение дословно соответствует ответу владельца и не расширяется догадкой.
+3. Foundation и marketing architecture не противоречат друг другу.
+4. Общий лимит остаётся `3 marketing facts / 2 amplifiers`; CTA отдельно.
+5. Нет готовых сценарных фраз и дублей source-owned content.
+6. Roadmap хранит только ещё открытые решения.
+7. `git diff --check` и локальные Markdown links проходят.
+8. Финальный checker `✅` до commit/push.
+
+`pytest` и live не запускать: исполняемое поведение не меняется.
 
 ## Definition of Done
 
-- README начинается с двух документов владельца;
-- root `docs/` больше не смешивает active, evidence и отменённые разведки;
-- A9 имеет три активных root-документа; audit вынесен в evidence, а original design
-  остаётся на месте до отдельной безопасной миграции frozen refs;
-- удалены три ненужных текущих файла;
-- current-vs-target promo/medzone расхождения объяснены precedence, а не замаскированы;
-- UI capacity честно отмечен как открытый вопрос;
-- commit/push только в `origin/codex/stage-a` после checker `✅`;
-- рабочее дерево чистое.
+- все три решения приняты владельцем;
+- решения находятся в существующих канонических документах;
+- roadmap больше не содержит открытых product/UI gaps этого набора;
+- code/runtime/A9 не затронуты;
+- commit/push только в `origin/codex/stage-a`, дерево чистое.

@@ -24,7 +24,7 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Ближайший рабочий фокус без live | **Три оставшихся product/UI решения перед schema/runtime checkpoints** |
+| Ближайший рабочий фокус без live | **Product/UI решения закрыты; следующий шаг — отдельный schema governance checkpoint** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -238,11 +238,9 @@ Frozen matrix/harness v2 подготовлены и независимо про
 
 До такого разрешения A9 стоит на паузе. Карта вопросов, правила цен/услуг и [target-архитектура маркетинговых сценариев](MARKETING_SCENARIO_ARCHITECTURE.md) уже документированы.
 
-Перед будущими schema/runtime checkpoints остаются три product/UI решения владельца:
-
-1. как делить общий лимит трёх marketing facts, если первый вопрос уже содержит сомнение;
-2. как размещать CTA, три кнопки масштаба, service/follow-up, видео и «Рассказать о ситуации» в текущем виджете;
-3. использовать одну универсальную CTA или небольшой стабильный набор CTA по намерению.
+Три product/UI решения перед schema/runtime закрыты: composition первого marketing-concern
+ответа, content/price navigation slots и стабильная CTA по смысловому контексту. Следующий
+шаг без live — отдельный governance TASK на schema design; runtime заранее не меняется.
 
 ## Как поддерживать чекбоксы
 

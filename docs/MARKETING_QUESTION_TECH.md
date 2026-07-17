@@ -1,10 +1,12 @@
 # Технический слой маркетинговой карты
 
-**Статус:** парный документ к [`MARKETING_QUESTION_FOUNDATION.md`](MARKETING_QUESTION_FOUNDATION.md), 16 июля 2026 года.
+**Статус:** парный документ к [`MARKETING_QUESTION_FOUNDATION.md`](MARKETING_QUESTION_FOUNDATION.md), синхронизирован с target-контрактом 17 июля 2026 года.
 **Для кого:** разработка, Cursor — маршруты, источники, операции пайплайна.
 **Не является:** маркетинговым описанием экрана; текстом ответов.
 
 Нумерация разделов совпадает с foundation. Колонка **«На экране»** там; здесь — **«Технически»**.
+
+Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Этот документ показывает места интеграции и честно отделяет требуемое поведение от текущего runtime.
 
 ## Обязательные продуктовые требования
 
@@ -12,11 +14,12 @@
 
 1. **Authority базы над содержанием ответа.** Согласованные md, pricebook, marketing и policies конкретной клиники определяют факты и силу утверждений. Это не связано с запрещённой product authority A9 `patient_scope`: A9 остаётся shadow-only и не управляет ответом.
 2. **Запрет семантического смягчения.** Composer может добавлять только связующий текст. Числа, проценты, модальность, гарантии, обещания, отрицания и оговорки источника должны сохраняться точно; будущая проверка должна обнаруживать их ослабление, усиление или подмену.
-3. **Promo eligibility.** Активная акция допускается, когда она релевантна теме, включая страх, боль без острых признаков и противопоказания. Общий запрет по одному лишь аспекту `pain`/`safety`/`contraindications` противоречит согласованной продуктовой политике.
-4. **Promo cadence.** Первая релевантная реплика показывает акцию и сохраняет факт показа этой акции в сессии. Повтор той же акции подавляется; другая релевантная акция может быть показана при смене темы. Явный вопрос об акции всегда обрабатывается независимо от предыдущего показа.
-5. **CTA cadence отделена от promo cadence.** Одна основная CTA может появляться повторно в следующих подходящих ответах и не блокируется тем, что акция уже была показана.
-6. **Manual-contact boundary.** Срочная боль, острое осложнение после лечения, жалоба, спор или отзыв, требующий реакции, должны завершаться до retrieval/composer/UI-policy и возвращать только фиксированный шаблон с номером из client config.
-7. **Отзывы разделяются по смыслу.** Обычный вопрос о том, где посмотреть отзывы, остаётся content/trust-вопросом. Негативный отзыв или претензия включают manual contact.
+3. **Единый marketing-fact limit.** В ответе максимум три marketing facts, из них максимум два усилителя. Основной ответ, price/service cards, CTA и follow-up не считаются слотами.
+4. **Eligibility и cadence.** Селектор использует только активные и применимые source-owned facts. `shown_fact_ids` и `shown_amplifier_ids` подавляют повторный автопоказ внутри `session_id`; прямой вопрос о факте всегда обрабатывается.
+5. **CTA cadence независима.** Одна основная CTA может появляться после каждого содержательного коммерчески релевантного ответа и не блокируется показанными marketing facts.
+6. **Structured scenarios.** Target `marketing_scenarios` содержит 0–2 стандартных значения и определяется общим пониманием вопроса без отдельного regex/classifier на каждый сценарий. Общий flow задаёт порядок смысловых операций, но не готовые фразы.
+7. **Manual-contact boundary.** Любая текущая личная боль, осложнение после лечения, жалоба, спор или отзыв, требующий реакции, должны завершаться до marketing/retrieval/composer/UI-policy и возвращать только фиксированный шаблон с номером из client config. Общий страх будущей боли остаётся `pain_fear`.
+8. **Отзывы разделяются по смыслу.** Обычный вопрос о том, где посмотреть отзывы, остаётся content/trust-вопросом. Негативный отзыв или претензия включают manual contact.
 
 Точный требуемый manual-contact шаблон:
 
@@ -57,6 +60,7 @@
 | `comparison_route` | `query_mode=comparison`, skip catalog |
 | `composite` | `is_composite_question`, 2+ аспекта |
 | `not_offered` | `clinic_policies` + альтернатива |
+| `marketing_scenario_policy` | Target: scenario pools → eligibility/no-repeat → общий лимит 3/2 |
 | `lead_flow` | Имя → телефон → demo-msg |
 | `handoff_template` | Фиксированный шаблон §10 |
 | `policy_ui` | CTA, `suggest_h3`, video, situation |
@@ -131,13 +135,13 @@
 
 | Подтип | Технически |
 |---|---|
-| Какие акции сейчас | `marketing.yaml` → текст |
-| Акция на услугу | `marketing` + `pricebook`; фильтр по услуге |
+| Какие акции сейчас | Target selector: до 3 применимых promo/gift facts по приоритету; direct-question override |
+| Акция на услугу | `marketing` rules + commercial facts; фильтр активности/услуги/session |
 | Как сделать дешевле | `retrieval` clinic md + `price_route`; `marketing` опц. |
 | Условия оплаты | `clinic__info__payment_terms` → `composer`; `suggest_h3`, CTA `callback` |
 | Скидка у врача | `marketing.yaml`; без персональных скидок |
 
-**Текущий долг:** runtime блокирует промо на `pain`/`safety`/`contraindications` через `blocked_aspects_for_promo`. Это не соответствует утверждённому требованию выше и должно меняться отдельной code/runtime-задачей с тестами.
+**Текущий долг:** runtime ещё не реализует общий selector, лимит 3/2, `shown_amplifier_ids`, incompatibility и structured `marketing_scenarios`. Текущий promo-блок также использует отдельные ограничения аспектов. Это меняется только отдельной code/runtime-задачей с тестами.
 
 ---
 
@@ -185,10 +189,11 @@
 |---|---|
 | Страх перед лечением | `faq` pain → `composer`; video; CTA `consult` |
 | Страх неприживления | `faq` osseointegration, `empathy_enabled`; `suggest_h3` |
-| Восстановление | `info` aftercare → `composer`; `suggest_h3` |
+| Общее/будущее восстановление | `info` aftercare → `composer`; `suggest_h3` |
+| Текущая личная боль | `manual_contact` boundary до marketing/retrieval/composer |
 | Сравнение боли | `faq`/`service` → `composer` |
 
-Требование: неострый страх/боль не блокируют релевантную акцию; показ регулируется общей promo eligibility/cadence, а не отдельным тематическим маршрутом.
+Требование: общий вопрос о будущей боли/страх лечения может дать `pain_fear`; любая текущая личная боль не оценивается по срочности и уходит в manual contact. Для marketing scenario действует общий selector 3/2, а не отдельный тематический promo-route.
 
 ---
 
@@ -210,7 +215,7 @@
 
 | Подтип | Технически |
 |---|---|
-| Срочная боль / острое осложнение после лечения / жалоба / спор / негативный отзыв | Boundary до retrieval/composer; только фиксированный шаблон и телефон из `clinic` config; без любого UI |
+| Любая текущая личная боль / осложнение после лечения / жалоба / спор / негативный отзыв | Boundary до marketing/retrieval/composer; только фиксированный шаблон и телефон из `clinic` config; без любого UI |
 | Вопрос «где посмотреть отзывы?» | Обычный content/trust path; не `manual_contact` |
 
 Текущий runtime уже использует `manual_contact` до основного ответа и не добавляет CTA, но текст шаблона отличается от согласованного. Замена шаблона и проверка классификации — отдельная code/runtime-задача.
@@ -284,16 +289,16 @@
 1. `retrieval` / `composer` / `price_route` — основные пути контента.
 2. `policy_ui` решает, показать ли CTA и follow-up.
 3. `clarify` — только услуга / масштаб / этап.
-4. Текущий promo-блок на `pain`/`safety`/`contraindications` требуется заменить проверкой релевантности, активности и session-cadence.
+4. Текущий promo-блок требуется заменить общим source-owned selector из `MARKETING_SCENARIO_ARCHITECTURE.md`: eligibility, лимит 3/2, no-repeat, direct-question override и incompatibility.
 5. Текущий composer/verifier требуется отдельно проверить на точное сохранение силы согласованных утверждений.
 6. Demo: `lead_flow` не шлёт в CRM.
-7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую проверку границы.
+7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую границу для любой текущей личной боли.
 8. `comparison_route` — catalog fast-path не перебивает comparison-md.
 
 ---
 
 ## Что дальше
 
-1. Сверить с foundation «На экране» в виджете.
-2. Отметить расхождения маршрут ↔ UI.
-3. Regression — ключевые сценарии §3, §13, §14.
+1. До runtime подготовить отдельные schema/governance checkpoints для `marketing_scenarios`, source refs, session state и selector 3/2.
+2. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
+3. Regression будущей реализации должен доказать no-repeat, direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts.

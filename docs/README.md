@@ -21,6 +21,7 @@
 |---|---|
 | `MARKETING_QUESTION_FOUNDATION.md` | продуктовый фундамент маркетинговых вопросов |
 | `MARKETING_QUESTION_TECH.md` | техническая модель маркетинговых вопросов |
+| `MARKETING_SCENARIO_ARCHITECTURE.md` | target-контракт commercial facts, усилителей, CTA, session-cadence и manual contact |
 | `SERVICE_SELECTION_CONTEXTS.md` | контексты выбора услуги |
 | `PRICEBOOK_V2.md` | модель и сценарии PriceBook |
 | [`../drafts/PRICE_RESPONSE_RULES_DRAFT.md`](../drafts/PRICE_RESPONSE_RULES_DRAFT.md) | активный продуктовый черновик правил ценовых ответов |

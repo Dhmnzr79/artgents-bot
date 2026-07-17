@@ -72,7 +72,7 @@ current-runtime promo-ограничениями из `MARKETING_EDITING_GUIDE.m
 
 `marketing_scenarios` — список из 0–2 значений: это позволяет сохранить составное сомнение вроде «боюсь, что будет больно и дорого». Прямой вопрос «кто у вас ставит импланты?» не означает `doctor_trust`; сценарий нужен при выраженном сомнении/недоверии.
 
-Усилители — ссылки на уже утверждённый факт из KB, commercial facts или профиля врача. В `marketing.yaml` хранятся правила, применимость, порядок и ссылки, а не дубли текста. Обычно клинике достаточно 2–4 усилителей на сценарий, но сама schema не ограничивает размер pool. Порядок ссылок задаёт приоритет; нейтральный follow-up не прокручивает pool.
+Усилители — ссылки на уже утверждённый факт из KB, commercial facts или профиля врача. В `marketing.yaml` хранятся правила, ограничения scenario/pool context, порядок и ссылки, а не source-fact eligibility или дубли текста. Обычно клинике достаточно 2–4 усилителей на сценарий, но сама schema не ограничивает размер pool. Порядок ссылок задаёт приоритет; нейтральный follow-up не прокручивает pool.
 
 Ненормативный target-пример:
 
@@ -84,8 +84,8 @@ response_limits:
 scenario_rules:
   pain_fear:
     amplifiers:
-      - ref: "kb:clinic__info__anesthesia.md#without_pain"
-      - ref: "doctor:implantologist_main"
+      - ref: "kb:content_doc.md#approved_chunk"
+      - ref: "doctor:doctor_id"
 ```
 
 Пример показывает только форму ссылок. Он не предписывает demo конкретные факты или врача.
@@ -157,13 +157,103 @@ price-ответе demo приоритет при наличии в `followups`:
 
 | Владелец | Что хранит |
 |---|---|
-| `clients/<client_id>/marketing.yaml` | Лимиты, scenario rules, упорядоченные amplifier refs, применимость, CTA key selection и cadence policy; без дублей текста |
+| `clients/<client_id>/marketing.yaml` | Лимиты, scenario rules, упорядоченные amplifier refs, ограничения scenario/pool context, CTA key selection и cadence policy; без дублей текста и без source-fact eligibility |
 | Pricebook/commercial facts | Консультация, рассрочка, скидка/подарок, вычет, гарантия как commercial fact, даты, точные условия и `incompatible_with` |
 | KB/md | Содержательный утверждённый контент и факты клиники |
 | Doctor layer | Имя, специализация, связь с услугами и утверждённые факты о враче |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
 | Session state | `shown_fact_ids`, `shown_amplifier_ids`, текущая тема/услуга, lead/refusal state |
 | Common planner/TurnFrame target | `marketing_scenarios` как общее структурированное понимание, а не отдельный regex/classifier на каждый сценарий |
+
+Полная target ownership услуг, offers, брендов и client strategy находится в
+[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md). Marketing schema ниже
+ссылается на этих владельцев по ID/ref и не копирует их текст или деньги.
+
+## Нормативная target-схема marketing policy
+
+Имена полей и форма ниже нормативны; значения ID/ref намеренно условны и не описывают
+demo или другую конкретную клинику.
+
+```yaml
+version: 1
+
+limits:
+  max_marketing_facts_per_turn: 3
+  max_amplifiers_per_turn: 2
+  max_scenarios_per_turn: 2
+
+initial_commercial_blocks:
+  service_family_context:
+    ordered_fact_refs:
+      - fact:consultation_offer
+      - fact:installment_offer
+      - fact:discount_offer
+
+scenario_rules:
+  pain_fear:
+    ordered_amplifier_refs:
+      - kb:content_doc.md#approved_chunk
+      - doctor:doctor_id
+      - fact:warranty_fact_id
+    allowed_semantic_contexts: [service_family_context]
+
+cta_contexts:
+  service_family_context: consult
+  doctors: doctor
+  default: callback
+```
+
+Это схема ссылок и порядка, а не готовых фраз. В одном scenario pool может быть сколько
+угодно проверяемых refs конкретной клиники; selector берёт максимум два усилителя на ход и
+максимум три marketing facts суммарно. Demo не нужно наполнять большим числом сценариев.
+
+### Допустимые source refs
+
+| Ref | Владелец факта | Проверка |
+|---|---|---|
+| `fact:<fact_id>` | `pricebook/facts.json` | fact существует, active, применим, не просрочен |
+| `kb:<doc>#<chunk>` | KB/md | точный doc/chunk существует в client pack |
+| `doctor:<doctor_id>` | doctor layer | врач существует, active и связан с темой/услугой |
+
+Policy не содержит свободный amplifier text. Если source ref исчез или не проходит
+eligibility, он отбрасывается; модель не заменяет его похожим утверждением.
+
+### Structured scenarios
+
+Target planner output содержит список `marketing_scenarios` из 0–2 стандартных значений:
+`pain_fear`, `cost`, `time`, `doctor_trust`, `result_reliability`. Значение означает
+потребность применить общий порядок
+операций, но не выбирает готовую реплику:
+
+1. ответить по релевантному source content;
+2. выбрать до двух source-backed amplifiers этого сценария;
+3. заполнить оставшиеся из трёх marketing slots применимыми commercial facts;
+4. добавить одну CTA отдельно.
+
+Отдельные regex/classifier paths для боли, цены, врача и приживаемости запрещены. До
+отдельного authority checkpoint новое поле не управляет product answer.
+
+### Session и cadence
+
+Target session изолирован по `client_id + session_id` и хранит:
+
+- `shown_fact_ids`, `shown_amplifier_ids`;
+- показанные/нажатые content follow-up IDs;
+- показанные/нажатые price follow-up IDs;
+- `shown_video_ids`;
+- текущий semantic context/услугу и выбранный CTA key;
+- lead/refusal state.
+
+Тот же fact/amplifier автоматически не повторяется в session. Новый диалог/сброс создаёт
+новую session; TTL пока нет. Прямой вопрос обходит только suppression повтора, но не
+active dates, eligibility, source fidelity, incompatibility или manual-contact boundary.
+
+### CTA selector
+
+CTA key берётся один раз для semantic context. Context-specific key имеет приоритет,
+иначе используется clinic default; видимая подпись берётся из CTA/tone config. CTA не
+занимает marketing или navigation slots и не показывается в manual contact, spam/off-topic,
+pure clarify, после явного отказа или внутри активного lead-flow.
 
 ## Что не нужно делать сейчас
 
@@ -174,9 +264,12 @@ price-ответе demo приоритет при наличии в `followups`:
 - передавать product authority новому `marketing_scenarios` до schema/runtime/tests и отдельного authority-решения;
 - менять или перезапускать A9 raw/harness/live.
 
-## Будущий schema/runtime checkpoint
+## Будущий runtime checkpoint
 
-Перед реализацией нужны отдельные governance TASK и checker-review. Они должны отдельно доказать:
+Schema governance зафиксирован этим документом и
+[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), но ничего ещё не
+подключено к product path. Перед реализацией нужны отдельные code TASK и checker-review.
+Они должны доказать:
 
 - schema и source-ref validation;
 - отсутствие межклиентского переноса приоритетов и session state;

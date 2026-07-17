@@ -34,8 +34,7 @@
 | [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md) | общее архитектурное направление |
 | [MARKETING_SCENARIO_ARCHITECTURE.md](MARKETING_SCENARIO_ARCHITECTURE.md) | target marketing facts, усилители, CTA и manual contact |
 | [MARKETING_QUESTION_TECH.md](MARKETING_QUESTION_TECH.md) | технические точки интеграции маркетинговой карты |
-| [SERVICE_SELECTION_CONTEXTS.md](SERVICE_SELECTION_CONTEXTS.md) | минимальные условия показа услуг |
-| [PRICE_RESPONSE_RULES_DRAFT.md](../drafts/PRICE_RESPONSE_RULES_DRAFT.md) | согласованные правила цен/услуг; draft до schema checkpoint |
+| [PRICE_SERVICE_ARCHITECTURE.md](PRICE_SERVICE_ARCHITECTURE.md) | единый target-канон услуг, применимости, брендов, стратегии и цен |
 | [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md) | original frozen-linked A9 semantic design |
 | [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) | текущий A9 native extraction design |
 | [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md) | frozen A9 raw/parser/prompt contract |

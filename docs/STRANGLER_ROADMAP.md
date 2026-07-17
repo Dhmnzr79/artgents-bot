@@ -24,7 +24,7 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Ближайший рабочий фокус без live | **Product/UI решения закрыты; следующий шаг — отдельный schema governance checkpoint** |
+| Ближайший рабочий фокус без live | **Выбрать отдельным governance TASK первую узкую runtime-вертикаль target schema** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -236,11 +236,23 @@ Frozen matrix/harness v2 подготовлены и независимо про
 
 **Как это скажется на боте:** пока никак — мы лишь сделали будущую проверку честной. Когда владелец разрешит один live-run, отчёт отдельно покажет, распознаёт ли новая архитектура реальные положительные признаки пациента, а не смешает их с локальными fixtures или передачей обращения администратору.
 
-До такого разрешения A9 стоит на паузе. Карта вопросов, правила цен/услуг и [target-архитектура маркетинговых сценариев](MARKETING_SCENARIO_ARCHITECTURE.md) уже документированы.
+До такого разрешения A9 стоит на паузе. Карта вопросов,
+[target-архитектура услуг и цен](PRICE_SERVICE_ARCHITECTURE.md) и
+[target-архитектура маркетинговых сценариев](MARKETING_SCENARIO_ARCHITECTURE.md) уже
+документированы.
+
+### Product/schema checkpoints вне A-series
+
+- [x] Маркетинговая карта вопросов и базовые правила ответа.
+- [x] Product/UI composition: лимит 3/2, content/price slots и стабильная CTA.
+- [x] **Response Data Schema Governance** — единый target-канон услуг, применимости,
+  брендов, prices, client strategy, marketing refs и session/UI state материализован и
+  независимо проверен checker-ом; runtime/client data не менялись.
 
 Три product/UI решения перед schema/runtime закрыты: composition первого marketing-concern
-ответа, content/price navigation slots и стабильная CTA по смысловому контексту. Следующий
-шаг без live — отдельный governance TASK на schema design; runtime заранее не меняется.
+ответа, content/price navigation slots и стабильная CTA по смысловому контексту. Для
+schema design создан отдельный governance TASK `dbf2c46`; runtime и client data заранее
+не меняются.
 
 ## Как поддерживать чекбоксы
 

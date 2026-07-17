@@ -189,7 +189,7 @@ Target-контракт лимитов, сценариев, усилителей
 поэтому ситуация, страх, боль, цена, жалоба и прошлый опыт внутри него идут в lead note,
 а не возвращаются в тематический routing. Вне этого state продолжают действовать обычные
 hard-stop и marketing rules. Реализация и parity текущего runtime принимаются только
-отдельным schema/code TASK; этот документ сам по себе поведение не переключает.
+отдельным code/runtime TASK; этот документ сам по себе поведение не переключает.
 
 ---
 
@@ -312,6 +312,12 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 
 ## Что дальше
 
-1. До runtime подготовить отдельные schema/governance checkpoints для `marketing_scenarios`, source refs, session state и selector 3/2.
-2. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
-3. Regression будущей реализации должен доказать no-repeat, direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts.
+1. Target schema услуг/цен и marketing policy зафиксирована в
+   [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md) и
+   [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md); runtime
+   пока не мигрирован.
+2. Следующий code TASK должен выбрать безопасную вертикаль реализации, не подключая весь
+   schema сразу и не меняя A9 authority.
+3. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
+4. Regression будущей реализации должен доказать no-repeat, direct-question override,
+   межклиентскую изоляцию, hard-stop и точность source-owned facts.

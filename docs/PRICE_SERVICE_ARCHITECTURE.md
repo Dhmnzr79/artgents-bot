@@ -1,10 +1,12 @@
-# Черновик правил ценовых ответов
+# Архитектура услуг и цен
 
-**Статус:** рабочий продуктовый черновик, 16 июля 2026 года.
+**Статус:** канонический target design, 18 июля 2026 года. Schema/runtime ещё не реализованы.
 
-**Назначение:** не потерять согласованные идеи до утверждения полной ценовой логики.
+**Назначение:** единый источник целевых правил услуг, применимости, брендов, стратегии
+клиники, коммерческих offers и ценовых ответов.
 
-**Не является:** готовой спецификацией, медицинской схемой выбора лечения или разрешением менять runtime.
+**Не является:** медицинской схемой выбора лечения, описанием текущего runtime или
+разрешением менять client data/A9 authority.
 
 ## Главный принцип
 
@@ -27,14 +29,14 @@
 8. **Явный выбор пациента важнее приоритета клиники.** Приоритет не должен перебивать конкретно названную услугу.
 9. **Не строим дерево из десятков веток.** Бот задаёт один вопрос за шаг и только тогда, когда ответ действительно изменит доступные предложения или их порядок.
 10. **Кнопка сохраняет факт, а не текст для повторного угадывания.** Например, «Один зуб» передаёт структурированное значение масштаба ситуации.
-11. **Цены, marketing facts и CTA берутся из источников конкретной клиники.** Их target-отбор, лимит, повторы и CTA cadence определены отдельно в [`docs/MARKETING_SCENARIO_ARCHITECTURE.md`](../docs/MARKETING_SCENARIO_ARCHITECTURE.md) и не дублируются в ценовой модели.
+11. **Цены, marketing facts и CTA берутся из источников конкретной клиники.** Их target-отбор, лимит, повторы и CTA cadence определены отдельно в [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md) и не дублируются в ценовой модели.
 12. **Одна модель «зуб/челюсть» работает для всех типов вопроса.** Информационный, ценовой и последующий вопрос должны одинаково понимать масштаб, челюсть и этап ситуации.
 13. **Показываем 2–3 услуги за раз.** После отбора по применимости бот сортирует предложения по приоритетам конкретной клиники и не перегружает пациента полным каталогом.
 14. **Первичные кнопки ситуации желательно показывать один раз.** После выбора факт сохраняется и используется дальше. Кнопки повторяются только при исправлении ситуации, новой теме, устаревшем или действительно потерянном контексте.
 15. **Точность важнее архитектурной чистоты.** Дополнительные узкие проверки разрешены, если они защищают правильный ответ и не создают вторую противоречащую модель ситуации.
 16. **Текущий виджет показывает quick replies единым списком под сообщением.** Поэтому в одном ответе не смешиваем много равнозначных навигационных, ценовых и конверсионных действий.
-17. **Для вопроса «Что мне подойдёт?» бот кратко описывает 2–3 подходящие услуги в тексте.** Внизу показывает кнопки с названиями этих услуг; нажатие означает запрос подробного ответа по выбранной услуге. Слово «Подробнее» в каждой подписи не обязательно.
-18. **К списку услуг добавляется не более одной основной CTA.** В обычном ответе получается 2–3 кнопки услуг и одна CTA, то есть желательно не более 3–4 кнопок всего. Если у релевантной акции есть собственная CTA, она заменяет общую CTA, а не добавляется ещё одной кнопкой.
+17. **Для вопроса «Что мне подойдёт?» бот кратко описывает 2–3 подходящие услуги в тексте.** Secondary UI показывает кнопки наиболее приоритетных из них в пределах двух content slots; нажатие означает запрос подробного ответа по выбранной услуге. Если slot занят video или situation action, не каждая названная услуга обязана получить кнопку. Слово «Подробнее» в подписи не обязательно.
+18. **К списку услуг добавляется не более одной основной CTA.** CTA существует отдельно от двух content slots. Если у релевантной акции есть собственная CTA, она заменяет общую CTA, а не добавляется ещё одной кнопкой.
 19. **Контекстные follow-up появляются после выбора услуги или показа цены.** «Что входит», «Оплата по этапам» и другие действия берутся только из источников конкретной клиники и не перегружают первый список выбора.
 20. **Кнопка «Показать цены» не входит в текущую схему.** Она остаётся возможной идеей на будущее. При прямом ценовом запросе бот показывает цены сразу; отдельная кнопка для их раскрытия не нужна.
 21. **«Имплант уже установлен» — контекстный факт этапа, а не постоянная кнопка общего меню.** Если пациент сообщил это явно, бот сохраняет факт без повторного вопроса. Если формулировка двусмысленна и этап действительно меняет доступные услуги или цену, бот задаёт короткий текстовый вопрос «Имплант уже установлен?» и предлагает кнопки «Да, установлен» / «Нет, ещё не установлен»; при необходимости допускается «Не уверен». Узкое уточняющее сообщение не дополняется CTA.
@@ -163,7 +165,9 @@
 
 ### 5. Типы цен и отсутствие публичной цены
 
-Target поддерживает четыре продуктовых состояния: фиксированная цена, цена «от», диапазон и публичной цены нет/по запросу. Любая числовая цена обязана иметь точную единицу расчёта. Конкретные schema names и migration текущих `fixed/from` выбираются позднее.
+Target поддерживает четыре продуктовых состояния: `fixed`, `from`, `range` и
+`no_public_price`. Любая числовая цена обязана иметь точные `currency` и `billing_unit`.
+`no_public_price` вместо суммы содержит утверждённый `approved_text`.
 
 Если применимая услуга есть, но публичной цены нет:
 
@@ -177,7 +181,10 @@ Target поддерживает четыре продуктовых состоя
 
 На «Какие протоколы имплантации у вас есть?» бот берёт активные услуги по `family` и ролям `protocol`/`advanced_protocol` из каталога. Синус-лифтинг, КТ, временная коронка и другие связанные процедуры не становятся протоколами только потому, что относятся к имплантации.
 
-Разумно короткий список можно назвать полностью в тексте, отдельно обозначив сложные протоколы. Кнопками показываются 2–3 приоритетных протокола и одна CTA. Цена добавляется только при ценовом акценте; нажатие протокола открывает подробный ответ по его KB-документу.
+Разумно короткий список можно назвать полностью в тексте, отдельно обозначив сложные
+протоколы. Кнопками показываются наиболее приоритетные протоколы в пределах двух content
+slots; CTA идёт отдельно. Цена добавляется только при ценовом акценте; нажатие протокола
+открывает подробный ответ по его KB-документу.
 
 Пример: «В клинике доступны классическая и одномоментная имплантация, а для полного зубного ряда — All-on-4 и All-on-6. Для сложных случаев верхней челюсти предусмотрены отдельные протоколы». Точные названия берутся только из активного каталога конкретной клиники.
 
@@ -194,6 +201,298 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 - «Что лучше?» — отвечать только по утверждённому KB-сравнению. Цена, страна и clinic priority не становятся медицинским преимуществом.
 
 В brand-list сценарии допустимы кнопки брендов; в protocol/service сценарии — кнопки соответствующих услуг. Отдельная кнопка «Показать цены» не добавляется.
+
+## Target-файлы и единственные владельцы данных
+
+Это логическая схема будущего client pack. Она не означает, что текущие demo-файлы уже
+мигрированы.
+
+| Файл / слой | Единственная ответственность | Не хранит |
+|---|---|---|
+| `service_catalog.json` | semantic identity услуги и option, aliases, family/roles, active, KB refs, coarse selection | деньги, коммерческий порядок, CTA, рекламный текст |
+| `brand_catalog.json` | canonical brand name, country, aliases | цену, применимость услуги, медицинские преимущества |
+| `pricebook/services/*.json` | offers: service/option/brand, price state, unit, package, fact refs, price follow-ups | применимость услуги и приоритет клиники |
+| `pricebook/facts.json` | точный commercial fact, даты, eligibility, detail ref, `incompatible_with` | scenario order и CTA-copy |
+| `clinic_strategy.yaml` | priority уже допустимых services/offers, max 2–3, редкие context overrides | active, selection, деньги, fact text, CTA |
+| `marketing.yaml` | limits, scenario pools, ordered refs, cadence, CTA-key selection | дубли source text, dates и incompatibility |
+| KB/md | утверждённый содержательный ответ и сравнения | цена и runtime routing |
+| doctor layer | врач, специализация, связи с услугами, утверждённые doctor facts | готовый ответ сценария |
+| `ui.yaml` / `tone.yaml` | CTA label, clinic default и lead-flow copy | сценарные вступления и медицинские факты |
+| session | известные dialog facts, histories UI/facts, semantic CTA context, lead/refusal state | межклиентские defaults и новый source content |
+
+Связи идут только по стабильным ID/ref. Текст не копируется из одного владельца в другой.
+Ссылка может дать право использовать факт, но не право переписать его смысл.
+
+## Нормативная target-схема
+
+Примеры ниже фиксируют поля и границы. Имена полей нормативны, а конкретные ID, названия,
+тексты и суммы внутри snippets — условные иллюстрации, не данные demo или универсальные
+приоритеты. Конкретный JSON/YAML loader появится только в отдельном runtime TASK.
+
+### Каталог услуги
+
+```json
+{
+  "classic": {
+    "name": "Классическая имплантация",
+    "aliases": ["классическая установка импланта"],
+    "family": "implantology",
+    "roles": ["protocol"],
+    "active": true,
+    "content_ref": "implantation__service__classic.md",
+    "selection": {
+      "mode": "scope",
+      "extent": ["one_tooth", "few_teeth"]
+    },
+    "options": [
+      {
+        "option_id": "semantic_option_id",
+        "name": "Название смыслового варианта",
+        "aliases": ["синоним варианта"],
+        "active": true,
+        "content_ref": "service__option.md",
+        "selection": {
+          "extent": ["one_tooth"]
+        }
+      }
+    ]
+  }
+}
+```
+
+Обязательны `family` и `selection.mode`; остальные selection fields отсутствуют, если
+ограничение не нужно. Допустимые `mode`:
+
+- `scope` — можно включить в нейтральный shortlist по известным coarse facts;
+- `context` — нужен явно настроенный недиагностический контекст;
+- `direct` — только прямое название/подтверждённый термин или связь от выбранного offer.
+
+Base enum `family`: `diagnostics`, `therapy`, `endodontics`, `surgery`,
+`periodontology`, `implantology`, `prosthodontics`, `orthodontics`, `aesthetics`.
+Произвольная строка запрещена. Если будущей клинике действительно нужно новое направление,
+оно добавляется versioned schema extension с отдельным governance/checker-review, а не
+локальным hardcode или невалидируемым значением в карточке услуги.
+
+Roles `protocol`, `advanced_protocol`, `supporting` отвечают на каталожные вопросы, но не
+доказывают применимость. Semantic option используется, если вариант меняет смысл услуги,
+например partial/full denture или open/closed sinus lift. У option обязательны уникальный
+внутри service `option_id` и `name`; `aliases`, `active`, `content_ref` и `selection`
+необязательны. Отсутствующие `active`/`content_ref` наследуются от parent service, а
+option-selection уточняет parent eligibility. Offer с `option_id` обязан ссылаться на
+option внутри своего `service_id`. Реальный бренд option не является.
+
+### Минимальный словарь selection
+
+| Поле | Значения | Правило |
+|---|---|---|
+| `extent` | `one_tooth`, `few_teeth`, `full_arch` | только у восстановительных услуг, где масштаб меняет shortlist |
+| `stage` | `natural_tooth_present`, `extraction_context`, `implant_placed` | только если исходное состояние меняет класс предложения |
+| `jaw` | `upper`, `lower` | только intrinsic-анатомическое ограничение |
+| `reported_context` | сначала только `reported_bone_deficit` | только явно сообщённый факт пациента/врача/КТ; не выводится из симптомов |
+
+Отсутствие поля означает отсутствие coarse-ограничения. Unknown не является совпадением
+с обязательным условием. Детальные признаки кости, прикуса, воспаления, опор и
+противопоказаний не кодируются: это было бы медицинским назначением.
+
+### Справочник брендов
+
+```json
+{
+  "version": 1,
+  "brands": {
+    "nobel_biocare": {
+      "canonical_name": "Nobel Biocare",
+      "country": "Switzerland",
+      "aliases": ["Nobel", "Нобель"]
+    }
+  }
+}
+```
+
+Страна фильтруется только по точному полю. Описание/сравнение бренда берётся из KB, а
+наличие — только из активной связи offer.
+
+### Pricebook offer
+
+```json
+{
+  "offer_id": "service_brand_scope_offer",
+  "service_id": "service_id",
+  "option_id": null,
+  "brand_id": "brand_id",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 120000,
+    "currency": "RUB",
+    "billing_unit": "tooth_package"
+  },
+  "package": {
+    "label": "за один зуб под ключ",
+    "includes": ["implant", "abutment", "crown"]
+  },
+  "fact_refs": ["consultation_offer", "installment_offer"],
+  "followups": [
+    {"id": "includes", "label": "Что входит", "action": "price_aspect"}
+  ]
+}
+```
+
+Физическая форма price зависит от `mode`: `fixed` требует `amount`; `from` —
+`min_amount`; `range` — `min_amount` и `max_amount`; `no_public_price` —
+`approved_text` без numeric fields. Для трёх numeric modes обязательны `currency` и
+`billing_unit`, а выдуманная сумма запрещена. Numeric offer нельзя
+пересчитать на другой `billing_unit`, масштаб или package. `fact_refs` дают текстовые
+marketing facts; кнопками становятся только `followups`.
+
+`billing_unit` — стабильный source-owned ID (`tooth`, `implant`, `tooth_package`, `jaw`,
+`both_jaws`, `procedure`, `unit`, `course` или отдельно утверждённая schema extension).
+`both_jaws` никогда не выводится из `jaw × 2`. Видимая формулировка единицы и состава
+берётся из offer/package, а не генерируется по имени ID.
+
+### Commercial fact
+
+```json
+{
+  "id": "discount_offer",
+  "kind": "discount",
+  "text_fact": "Утверждённый клиникой точный текст",
+  "render_mode": "strict",
+  "active": true,
+  "active_from": "2026-07-01",
+  "active_until": "2026-08-31",
+  "allowed_service_ids": ["service_id"],
+  "detail_ref": null,
+  "incompatible_with": ["installment_offer"]
+}
+```
+
+`incompatible_with` принадлежит самому source fact. Универсального правила «скидка не
+совместима с рассрочкой» нет. Marketing policy только исполняет точные данные клиники.
+
+### Стратегия клиники
+
+```yaml
+version: 1
+default_max_options: 3
+rules:
+  - id: full_arch_implantology
+    match:
+      family: implantology
+      extent: full_arch
+    max_options: 3
+    service_priorities:
+      all_on_4: 100
+      all_on_6: 80
+    offer_priorities: {}
+```
+
+Strategy применяется только после active/selection filtering. Она может менять порядок,
+но не делать услугу допустимой, создавать цену или перебивать явно названный service.
+Для другой клиники меняется client pack, а не общий код.
+
+### Session state
+
+```yaml
+patient_facts:
+  extent: one_tooth
+  jaw: unknown
+  stage: implant_placed
+shown_fact_ids: []
+shown_amplifier_ids: []
+shown_content_followup_ids: []
+clicked_content_followup_ids: []
+shown_price_followup_ids: []
+clicked_price_followup_ids: []
+shown_video_ids: []
+semantic_cta_context: implantation
+lead_state: idle
+refusal_state: false
+```
+
+UI action записывает структурированный факт, а не текст для повторного угадывания.
+Исправление пациента заменяет соответствующий факт. Новый диалог/сброс создаёт новую
+сессию; TTL пока нет. Все state keys изолированы по `client_id + session_id`.
+
+До отдельного authority-решения A9 native `patient_scope` не заполняет product session:
+он остаётся shadow-only, а product path использует только уже разрешённые источники и
+явные UI actions.
+
+## Детерминированный порядок отбора
+
+1. Если пациент прямо назвал активную услугу/option/бренд, сначала обработать этот выбор.
+2. Иначе взять только active catalog entries нужного family/явного направления.
+3. Применить `selection` к известным patient facts; unknown не удовлетворяет required field.
+4. Найти active offers, не используя price/billing unit как eligibility услуги.
+5. Отсортировать допустимые services/offers по client strategy.
+6. Показать 2–3, сохраняя обязательное покрытие масштабов для общего price overview.
+7. Если ровно один неизвестный факт действительно меняет shortlist — задать одно
+   уточнение; уже известное не спрашивать повторно.
+8. Информационный аспект получает KB projection, ценовой — только Pricebook projection.
+9. Marketing selector и CTA применяются позже по
+   [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md).
+
+## Inventory минимальной применимости demo
+
+Таблица проверяет, что target-схема покрывает все 21 текущую demo-услугу. Она не является
+универсальным приоритетом и не меняет client data этим checkpoint.
+
+| `service_id` | Family / role | Mode | Минимальные условия | Граница |
+|---|---|---|---|---|
+| `tomography` | `diagnostics`; `supporting` | `direct` | — | КТ связано с диагностикой/лечением, но не метод восстановления |
+| `professional_whitening` | `aesthetics` | `context` | — | нужен явный эстетический запрос |
+| `classic` | `implantology`; `protocol` | `scope` | extent: `one_tooth`, `few_teeth` | demo подтверждает поштучный offer, не full-arch |
+| `one_stage` | `implantology`; `protocol` | `context` | extent: `one_tooth`, `few_teeth`; stage: `extraction_context` | отсутствие зуба не доказывает одномоментную установку |
+| `all_on_4` | `implantology`; `protocol` | `scope` | extent: `full_arch` | число опор бот не назначает |
+| `all_on_6` | `implantology`; `protocol` | `scope` | extent: `full_arch` | число опор бот не назначает |
+| `temporary_teeth` | `prosthodontics`; `supporting` | `direct` | stage: `extraction_context`, `implant_placed` | временный этап, не универсальный первый вариант |
+| `implant_supported_prosthetics` | `prosthodontics` | `scope` | extent: `one_tooth`, `few_teeth`, `full_arch`; stage: `implant_placed` | текущая цена подтверждает только one-tooth offer |
+| `caries` | `therapy` | `direct` | — | симптомы не превращаются в диагноз |
+| `pulpitis` | `endodontics` | `direct` | — | симптомы не превращаются в диагноз |
+| `teeth_treatment` | `therapy` | `context` | — | нужен явный запрос на лечение |
+| `tooth_extraction` | `surgery` | `direct` | — | удаление не предлагается автоматически по боли/цене |
+| `periodontitis` | `periodontology` | `direct` | — | прямой вопрос или явно сообщённый диагноз |
+| `aligners` | `orthodontics` | `context` | — | нужен запрос на выравнивание/прикус |
+| `veneers` | `aesthetics` | `context` | — | нужен эстетический запрос или прямой вопрос |
+| `zirconia_crowns` | `prosthodontics` | `scope` | extent: `one_tooth`, `few_teeth`; stage: `natural_tooth_present`, `implant_placed` | свой зуб и имплант требуют разных offers |
+| `clasp_dentures` | `prosthodontics` | `scope` | extent: `few_teeth`; stage: `natural_tooth_present` | пригодность опор определяет врач |
+| `sinus_lift` | `implantology` | `context` | jaw: `upper`; reported_context: `reported_bone_deficit` | способ бот не выбирает |
+| `zygomatic_implants` | `implantology`; `advanced_protocol` | `context` | extent: `full_arch`; jaw: `upper`; reported_context: `reported_bone_deficit` | узкий сложный контекст |
+| `pterygoid_implants` | `implantology`; `advanced_protocol` | `context` | extent: `few_teeth`, `full_arch`; jaw: `upper`; reported_context: `reported_bone_deficit` | узкий сложный контекст |
+| `removable_dentures` | `prosthodontics` | `scope` | extent: `few_teeth`, `full_arch` | partial/full — semantic options, не бренды |
+
+Схема остаётся минимальной: у всех обязательны только family/mode; extent нужен лишь
+восстановительным услугам, stage — когда меняется класс предложения, jaw/reported context
+— только трём сложным upper-jaw направлениям.
+
+### Конфликты текущих данных, которые нельзя переносить как target
+
+1. Partial/full removable denture сейчас местами записаны как brand; это semantic options.
+2. Open/closed sinus lift — semantic options процедуры, а не бренды.
+3. MD `implant_supported_prosthetics` шире текущего one-tooth price offer; content scope и
+   offer scope должны оставаться разными.
+4. Zirconia crown на своём зубе и на импланте может иметь общий parent service, но требует
+   отдельных offers при различии состава/цены.
+
+### Стоматологическая граница
+
+Coarse taxonomy опирается на общепринятые различия одного/нескольких/полного ряда,
+частичного/полного протеза, собственного зуба/импланта и upper-jaw advanced procedures.
+Она нужна только для безопасного маркетингового shortlist. Возможность лечения,
+конструкция, число имплантов, состояние кости и противопоказания остаются у врача и
+согласованной KB клиники.
+
+Исходная проверка использовала материалы
+[AAP](https://www.perio.org/for-patients/periodontal-treatments-and-procedures/dental-implant-procedures/),
+[ACP о протезах](https://www.gotoapro.org/dentures/),
+[ACP об отсутствующих зубах](https://www.gotoapro.org/missing-teeth/),
+[ADA о коронках](https://www.mouthhealthy.org/all-topics-a-z/crowns/),
+[ITI о full-arch](https://academy.iti.org/academy/consensus-database/consensus-statement/-/consensus/loading-protocols-for-fixed-prostheses-in-edentulous-jaws/1313) и
+[ITI о скуловых имплантах](https://academy.iti.org/academy/consensus-database/consensus-statement/-/consensus/evaluation-of-surgical-techniques-in-survival-rate-and-complications-of-zygomatic-implants-for-the-rehabilitation-of-the-atrophic-edentulous-maxilla/2402),
+[systematic review по птеригоидным имплантам](https://pubmed.ncbi.nlm.nih.gov/30799134/) и
+[AAO об элайнерах](https://aaoinfo.org/treatments/aligners/). Эти источники подтверждают
+границы taxonomy, но не являются контентом ответа: пациенту бот отвечает только по базе
+конкретной клиники.
 
 ## Что уже частично есть в demo
 
@@ -219,7 +518,8 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 - `recommended` в текущем pricebook означает рекомендуемый бренд/вариант внутри услуги; в target порядок показа вариантов относится к стратегии клиники, а не к ценовому факту;
 - текущие pricebook groups содержат заранее перечисленные услуги и не заменяют клиентскую стратегию.
 
-Согласованное target-разделение и минимальные условия показа всех 21 demo-услуг зафиксированы в [`docs/SERVICE_SELECTION_CONTEXTS.md`](../docs/SERVICE_SELECTION_CONTEXTS.md). Каталог хранит semantic identity и условия показа услуги, Pricebook — коммерческое предложение, справочник брендов — канонические бренды и aliases, а стратегия клиники — порядок и лимит. Billing unit не используется как применимость.
+Target-разделение, минимальные условия показа и полный inventory всех 21 demo-услуг
+зафиксированы выше в этом документе. Billing unit не используется как применимость.
 
 ## Что не фиксируем как правило
 
@@ -246,7 +546,7 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 - зацикливание уточнений после смены темы;
 - попытка дать A9 `patient_scope` product authority до завершения shadow-проверки.
 
-## Открытые решения
+## Статус product decisions
 
 - [x] Первый общий обзор содержит два доступных ориентира по масштабам — один зуб и вся челюсть — плюс необязательную третью позицию по стратегии клиники.
 - [x] Первичное общее меню ограничено тремя кнопками масштаба: «Один зуб», «Несколько зубов», «Вся челюсть»; установленный имплант сохраняется как контекстный факт этапа, а отдельное уточнение задаётся только при двусмысленности и существенном влиянии на услуги или цену.
@@ -256,20 +556,95 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 - [x] `full_jaw` / `full_arch` означает полный зубной ряд на одной челюсти; «нет всех зубов» оставляет челюсть неизвестной; верх/низ/обе сохраняются при явном сообщении, но не уточняются обязательно; обе челюсти не рассчитываются удвоением без отдельной позиции pricebook.
 - [x] Когда имплант уже установлен, локальный факт этапа переводит указанное место к применимому протезированию и не продаёт установку повторно только для этого места; другие отсутствующие зубы или другая челюсть не блокируются. Бот переиспользует известный масштаб; временная/постоянная/замена различаются только по явному контексту и источникам клиники, а риск уходит в hard-stop.
 - [x] Клиентская стратегия хранится в target `clients/<client_id>/clinic_strategy.yaml`: max options, приоритет услуг, редкие context overrides и порядок offers/брендов. Активность, применимость, деньги и CTA/promo остаются у своих источников.
-- [x] Минимальные условия показа хранятся в карточке услуги каталога: обязательны только family и mode, а extent/stage/jaw/reported context добавляются лишь при доказанной необходимости. Полная проверка demo — в `docs/SERVICE_SELECTION_CONTEXTS.md`.
+- [x] Минимальные условия показа хранятся в карточке услуги каталога: обязательны только family и mode, а extent/stage/jaw/reported context добавляются лишь при доказанной необходимости. Полная проверка demo находится в inventory выше.
 - [x] Поддерживаются фиксированная цена, «от», диапазон и отсутствие публичной цены; любая числовая цена имеет billing unit.
 - [x] При отсутствии публичной цены бот использует утверждённую offer-формулировку, не подставляет похожую/вычисленную сумму и называет priced alternative только как отдельную услугу.
 - [x] Протоколы перечисляются по catalog family/roles без смешения со связанными процедурами; бренды нормализуются по dictionary и связываются с услугами/ценами только через активные offers.
 - [x] Brand-price overview сразу показывает 2–3 точных offers; сравнение «дешевле» требует одинаковых service/unit/package, а «лучше» — утверждённого KB-сравнения.
 - [x] Граница автопоказа определена общей marketing policy: текущий `session_id`, новый диалог/сброс создаёт новую сессию, TTL пока не вводится; прямой вопрос обходит только suppression повтора.
-- [ ] Какими тестами доказать отсутствие повторных уточнений, неправильного метода и межклиентского переноса приоритетов.
-- [ ] Какие дополнительные узкие guards нужны для точности и как доказать, что они не создают второй источник понимания ситуации.
+- [ ] Runtime-checkpoint должен реализовать verification matrix ниже и доказать отсутствие
+  повторных уточнений, неправильного метода и межклиентского переноса приоритетов.
+- [ ] Runtime-checkpoint может добавить только source-backed guards из раздела ниже и
+  обязан доказать, что они не создают второй источник понимания ситуации.
 
-## Рабочее решение на текущий момент
+## Граница до runtime checkpoint
 
-До schema/runtime checkpoints:
+До отдельного runtime checkpoint:
 
 - не добавлять сложное дерево ценовых кнопок в legacy runtime;
 - не передавать A9 authority;
 - использовать согласованный target-контракт promo, CTA, marketing hooks и session cadence из `docs/MARKETING_SCENARIO_ARCHITECTURE.md`;
-- затем проектировать один общий клиент-конфигурируемый механизм, а не отдельные ветки под каждую услугу.
+- реализовывать один общий клиент-конфигурируемый механизм, а не отдельные ветки под каждую услугу.
+
+## Обязательная verification matrix будущей реализации
+
+| Закон | Минимальное доказательство |
+|---|---|
+| Известный scope не спрашивается повторно | multi-turn unit: текст → UI → price continuation |
+| Исправление пациента заменяет факт | `one_tooth` → «нет, два» → `few_teeth`, без старого shortlist |
+| Scope не выбирает метод | одинаковый extent при разных client strategies даёт разные допустимые порядки |
+| Explicit service важнее priority | низкоприоритетная названная услуга всё равно отвечает первой |
+| Unknown не проходит required condition | service с обязательным stage/jaw не попадает без факта |
+| Unit/package не смешиваются | tooth/implant/jaw и разные includes не сравниваются как одна цена |
+| Никакого умножения | количество зубов и обе челюсти не создают вычисленную сумму |
+| Brand aliases/country точны | alias → canonical; country только из dictionary; offers active-only |
+| «Дешевле»/«лучше» разделены | price compare только same service/unit/package; «лучше» требует KB |
+| 2–3 и scale coverage | общий overview покрывает one-tooth/full-arch при наличии offers |
+| No-public-price честен | только `approved_text`, без похожей или рассчитанной суммы |
+| Client isolation | одинаковый запрос в двух packs не переносит priorities/data/session |
+| UI state | clarify без content UI; content/price histories и video не повторяются |
+| Marketing/CTA | лимит 3/2, CTA отдельно, suppression/fallback по канону |
+| A9 firewall | product output/state не читает native shadow scope |
+
+Полный набор конкретных tests выбирается в code TASK. Governance фиксирует наблюдаемые
+законы, а не имена будущих test functions.
+
+## Разрешённые узкие guards
+
+Guard допустим только как детерминированная проверка source-backed инварианта:
+
+- active/ref existence и client ownership;
+- enum/schema validation;
+- exact service/option/brand linkage;
+- currency/billing-unit/package comparability;
+- required-known-fact check;
+- max count, duplicate-ID и incompatible-ID check;
+- запрет numeric inference, cross-unit multiplication и cross-client state.
+
+Guard не может классифицировать медицинскую ситуацию вторым regex/деревом, назначать
+услугу, придумывать synonym/country, менять source text или читать A9 shadow как product
+authority.
+
+## Карта поглощения прежних документов
+
+Она нужна checker-у, чтобы удаление draft и отдельной применимости не потеряло решения.
+
+### `drafts/PRICE_RESPONSE_RULES_DRAFT.md`
+
+| Прежний раздел | Где теперь |
+|---|---|
+| Главный принцип / Уже согласованные правила | начало этого документа |
+| Единая модель «зуб/челюсть» / три уровня / паритет | одноимённые разделы выше |
+| Общий ценовой ответ | «Как должен выглядеть общий ценовой ответ» |
+| Универсальная модель: facts/applicability/strategy/order | target schema + deterministic order |
+| Типы цен / no-public-price | Pricebook offer + зафиксированные правила |
+| Протоколы / бренды | одноимённые разделы + brand schema |
+| Что частично есть в demo | текущая честная граница выше |
+| Что не фиксируем / риски | сохранённые разделы выше |
+| Закрытые и открытые решения | «Статус product decisions» + verification/guards |
+| Рабочее решение | «Граница до runtime checkpoint» |
+
+### `docs/SERVICE_SELECTION_CONTEXTS.md`
+
+| Прежний раздел | Где теперь |
+|---|---|
+| Зачем / четыре разделённых смысла | главный принцип + target ownership |
+| Где хранить | target-файлы и каталог услуги |
+| Обязательные и optional поля | каталог + минимальный словарь selection |
+| Правила использования | deterministic order + product laws |
+| Проверка 21 demo-услуги | полный inventory выше |
+| Насколько схема минимальна | вывод сразу после inventory |
+| Смысловые конфликты current data | «Конфликты текущих данных» |
+| Стоматологическая опора | «Стоматологическая граница» |
+| Что можно зашить универсально | «Разрешённые узкие guards» |
+| Что осталось до schema/runtime | verification matrix + граница checkpoint |

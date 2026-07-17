@@ -12,7 +12,7 @@ A6 Live Proof зафиксировал coupling all-or-nothing validation:
 
 | metric | value | источник |
 |--------|------:|----------|
-| frozen denominator | 33 | `docs/TOPIC_SHADOW_AUDIT_A6.md` §4 |
+| frozen denominator | 33 | `docs/evidence/a_series/TOPIC_SHADOW_AUDIT_A6.md` §4 |
 | scoreable plans | 26 | coverage 26/33 |
 | unavailable | 7 | все `planner_unavailable` |
 | exact among scoreable | 26/26 | zero topic mismatches |
@@ -21,7 +21,7 @@ A6 Live Proof зафиксировал coupling all-or-nothing validation:
 Все семь unavailable связаны с одной цепочкой: LLM вернул `aspects=[]` → `TurnPlan.model_validate()` отклонил весь payload → `plan_turn()` → `None` → shadow `not_available`.  
 Raw **не доказывает** topic в отклонённых payload; audit не присваивает им значения.
 
-См. `docs/TOPIC_SHADOW_AUDIT_A6.md` §6–§10. Original raw SHA256 неизменен: `2EF96AB8660657501137B0A6880E7EA54594E02417197F031BE1BCE2D9D5A40A`.
+См. `docs/evidence/a_series/TOPIC_SHADOW_AUDIT_A6.md` §6–§10. Original raw SHA256 неизменен: `2EF96AB8660657501137B0A6880E7EA54594E02417197F031BE1BCE2D9D5A40A`.
 
 ---
 
@@ -415,7 +415,7 @@ AST/firewall acceptance (будущий): downstream modules **не** import/rea
 | `core/turn_frame_adapter.py` | `build_turn_frame_from_legacy` (valid plan only today) |
 | `contracts/turn_frame.py` | current `FieldMeta`, `TurnFrame` constraints |
 | `contracts/decision_frame.py` | product routing contract |
-| `docs/TOPIC_SHADOW_AUDIT_A6.md` | 26/33, 7 unavailable, coupling evidence |
+| `docs/evidence/a_series/TOPIC_SHADOW_AUDIT_A6.md` | 26/33, 7 unavailable, coupling evidence |
 | `evals/v5/run_topic_shadow_eval.py` | A6 harness `planner_unavailable` semantics |
 
 ---

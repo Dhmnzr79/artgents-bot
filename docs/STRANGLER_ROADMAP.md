@@ -24,7 +24,7 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Ближайший рабочий фокус без live | **Product gap review маркетинговой карты перед schema/runtime checkpoints** |
+| Ближайший рабочий фокус без live | **Три оставшихся product/UI решения перед schema/runtime checkpoints** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -41,11 +41,11 @@
 - [x] **A8 — service/follow-up/clarification в shadow**
 - [ ] **A9 — composable patient scope** — инфраструктура построена, native positive quality ещё не готова
 
-## Почему есть два roadmap
+## Какой roadmap актуален
 
-[FULLCONTEXT_ROADMAP.md](FULLCONTEXT_ROADMAP.md) — широкий продуктовый план: composer, история, clarify, вертикали, маркетинговые схемы и техническая гигиена.
+Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.
 
-Этот файл — отдельный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.
+Старый накопительный [FULLCONTEXT_ROADMAP.md](archive/FULLCONTEXT_ROADMAP.md) перенесён в archive: он сохраняет историю composer/clarify/marketing работ, но больше не задаёт текущий порядок checkpoint-ов.
 
 A1–A9 не были целиком придуманы заранее как неизменяемый master-plan. Макронаправление задано [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md), а следующий маленький checkpoint выбирается по результатам предыдущего аудита. Но он не придумывается во время написания кода: сначала появляется `TASK.md`, затем независимый checker-review, и только после этого начинается работа.
 
@@ -91,7 +91,7 @@ A1–A9 не были целиком придуманы заранее как н
 
 **Что увидел пациент:** никаких изменений. Результат этапа — честная диагностика, а не новый ответ.
 
-Подробнее: [TURN_FRAME_SHADOW_AUDIT_A3.md](TURN_FRAME_SHADOW_AUDIT_A3.md).
+Подробнее: [TURN_FRAME_SHADOW_AUDIT_A3.md](evidence/a_series/TURN_FRAME_SHADOW_AUDIT_A3.md).
 
 ### A4 — темы из конфигурации клиента
 
@@ -129,7 +129,7 @@ A1–A9 не были целиком придуманы заранее как н
 
 **Что увидел пациент:** product не переключался. Аудит измерял внутреннюю ось, а не качество текста ответа.
 
-Подробнее: [TOPIC_SHADOW_AUDIT_A6.md](TOPIC_SHADOW_AUDIT_A6.md).
+Подробнее: [TOPIC_SHADOW_AUDIT_A6.md](evidence/a_series/TOPIC_SHADOW_AUDIT_A6.md).
 
 ### A7 — field-level planner outcome и topic re-audit
 
@@ -148,7 +148,7 @@ A1–A9 не были целиком придуманы заранее как н
 
 **Что увидел пациент:** прежний безопасный fallback и прежняя продуктовая логика. `33/33` — результат shadow measurement, а не доказательство точности всех ответов бота.
 
-Подробнее: [FIELD_LEVEL_PLANNER_OUTCOME_A7.md](FIELD_LEVEL_PLANNER_OUTCOME_A7.md) и [TOPIC_SHADOW_REAUDIT_A7.md](TOPIC_SHADOW_REAUDIT_A7.md).
+Подробнее: [FIELD_LEVEL_PLANNER_OUTCOME_A7.md](evidence/a_series/FIELD_LEVEL_PLANNER_OUTCOME_A7.md) и [TOPIC_SHADOW_REAUDIT_A7.md](evidence/a_series/TOPIC_SHADOW_REAUDIT_A7.md).
 
 ### A8 — service/follow-up/clarification в shadow
 
@@ -219,7 +219,7 @@ A1–A9 не были целиком придуманы заранее как н
 
 После будущего подтверждения качества эта ось сможет помогать делать ответ релевантнее масштабу ситуации, но только через отдельное product/authority решение. Она не должна сама ставить диагноз или назначать лечение.
 
-Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
+Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
 
 ## Следующий технический checkpoint A9 — требуется отдельное разрешение
 
@@ -236,7 +236,13 @@ Frozen matrix/harness v2 подготовлены и независимо про
 
 **Как это скажется на боте:** пока никак — мы лишь сделали будущую проверку честной. Когда владелец разрешит один live-run, отчёт отдельно покажет, распознаёт ли новая архитектура реальные положительные признаки пациента, а не смешает их с локальными fixtures или передачей обращения администратору.
 
-До такого разрешения A9 стоит на паузе. Карта вопросов, правила цен/услуг и [target-архитектура маркетинговых сценариев](MARKETING_SCENARIO_ARCHITECTURE.md) уже документированы; ближайшая работа без live — короткий product gap review перед будущими schema/runtime checkpoints.
+До такого разрешения A9 стоит на паузе. Карта вопросов, правила цен/услуг и [target-архитектура маркетинговых сценариев](MARKETING_SCENARIO_ARCHITECTURE.md) уже документированы.
+
+Перед будущими schema/runtime checkpoints остаются три product/UI решения владельца:
+
+1. как делить общий лимит трёх marketing facts, если первый вопрос уже содержит сомнение;
+2. как размещать CTA, три кнопки масштаба, service/follow-up, видео и «Рассказать о ситуации» в текущем виджете;
+3. использовать одну универсальную CTA или небольшой стабильный набор CTA по намерению.
 
 ## Как поддерживать чекбоксы
 

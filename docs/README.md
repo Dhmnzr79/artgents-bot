@@ -1,71 +1,82 @@
-# Документация
+# Документация — с чего начинать
 
-Документы в `docs/` описывают текущий runtime, архитектурное направление и рабочие продуктовые контракты. Исторические audit/evidence сохранены отдельно от канона текущего checkpoint.
+## Владельцу продукта нужно читать только два документа
 
----
+1. [Roadmap A1–A9](STRANGLER_ROADMAP.md) — что уже сделано, что заблокировано и какой
+   следующий checkpoint.
+2. [Маркетинговая карта ответов](MARKETING_QUESTION_FOUNDATION.md) — как должен вести
+   себя бот с точки зрения маркетинга и логики ответа.
 
-## Главные точки входа
+Остальные документы нужны агентам и checker-ам для реализации, проверки и сохранения
+доказательств. Владельцу не нужно читать их подряд.
 
-| Документ | Для чего |
+## Как разрешать расхождения
+
+Документы разделены по назначению. Нельзя смешивать их правила без учёта статуса:
+
+1. **Product canon** определяет, как бот должен работать в целевой архитектуре.
+2. **Target design** объясняет будущую реализацию product canon.
+3. **Current runtime** описывает только то, что код делает сейчас; старое ограничение
+   runtime не отменяет более новое согласованное target-решение.
+4. **Evidence** доказывает результат конкретного checkpoint, но не выдаёт authority.
+5. **Archive** хранит происхождение решений и не является текущим планом работ.
+
+Если два active-документа действительно противоречат друг другу, работа останавливается
+до решения владельца/Архитектора. Старый archive-текст не используется как действующий
+закон.
+
+## Product canon и target design
+
+| Документ | Роль |
 |---|---|
-| `CURRENT_ARCHITECTURE.md` | текущий runtime |
-| `STRANGLER_ROADMAP.md` | текущий статус A1–A9 |
-| `ARCH_TARGET_DESIGN.md` | архитектурное направление |
-| `FULLCONTEXT_ROADMAP.md` | широкий историко-продуктовый roadmap; **не** канон текущего checkpoint |
+| [STRANGLER_ROADMAP.md](STRANGLER_ROADMAP.md) | единственный актуальный статус A1–A9 |
+| [MARKETING_QUESTION_FOUNDATION.md](MARKETING_QUESTION_FOUNDATION.md) | продуктовая карта поведения для владельца |
+| [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md) | общее архитектурное направление |
+| [MARKETING_SCENARIO_ARCHITECTURE.md](MARKETING_SCENARIO_ARCHITECTURE.md) | target marketing facts, усилители, CTA и manual contact |
+| [MARKETING_QUESTION_TECH.md](MARKETING_QUESTION_TECH.md) | технические точки интеграции маркетинговой карты |
+| [SERVICE_SELECTION_CONTEXTS.md](SERVICE_SELECTION_CONTEXTS.md) | минимальные условия показа услуг |
+| [PRICE_RESPONSE_RULES_DRAFT.md](../drafts/PRICE_RESPONSE_RULES_DRAFT.md) | согласованные правила цен/услуг; draft до schema checkpoint |
+| [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md) | original frozen-linked A9 semantic design |
+| [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) | текущий A9 native extraction design |
+| [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md) | frozen A9 raw/parser/prompt contract |
 
----
+## Current runtime и эксплуатация
 
-## Активные продуктовые документы
-
-| Документ | Для чего |
+| Документ | Роль |
 |---|---|
-| `MARKETING_QUESTION_FOUNDATION.md` | продуктовый фундамент маркетинговых вопросов |
-| `MARKETING_QUESTION_TECH.md` | техническая модель маркетинговых вопросов |
-| `MARKETING_SCENARIO_ARCHITECTURE.md` | target-контракт commercial facts, усилителей, CTA, session-cadence и manual contact |
-| `SERVICE_SELECTION_CONTEXTS.md` | контексты выбора услуги |
-| `PRICEBOOK_V2.md` | модель и сценарии PriceBook |
-| [`../drafts/PRICE_RESPONSE_RULES_DRAFT.md`](../drafts/PRICE_RESPONSE_RULES_DRAFT.md) | активный продуктовый черновик правил ценовых ответов |
+| [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md) | фактический runtime |
+| [FLAGS_AND_STATUS.md](FLAGS_AND_STATUS.md) | флаги и канонный набор прогонов |
+| [ROUTING_MAP.md](ROUTING_MAP.md) | текущий порядок маршрутов |
+| [PRICEBOOK_V2.md](PRICEBOOK_V2.md) | текущая demo Pricebook schema/runtime |
+| [MARKETING_EDITING_GUIDE.md](MARKETING_EDITING_GUIDE.md) | текущие demo marketing data/config |
+| [MULTICLIENT.md](MULTICLIENT.md) | client packs и sessions |
+| [WIDGET_ANSWER_FORMAT.md](WIDGET_ANSWER_FORMAT.md) | текущий формат виджета |
+| [DASHBOARD.md](DASHBOARD.md) | observability/admin dashboard |
+| [TECH_DEBT.md](TECH_DEBT.md) | открытый технический долг |
 
----
+## Evidence — не читать без конкретной проверки
 
-## Исторические audit/evidence
-
-| Документ | Для чего |
+| Папка/документ | Что доказывает |
 |---|---|
-| `TURN_FRAME_SHADOW_AUDIT_A3.md` | A3 — первый аудит TurnFrame |
-| `TOPIC_SHADOW_AUDIT_A6.md` | A6 — измерение качества topic |
-| `TOPIC_SHADOW_REAUDIT_A7.md` | A7 — повторный topic-аудит |
-| `FIELD_LEVEL_PLANNER_OUTCOME_A7.md` | A7 — field-level planner outcome |
-| `A7_REGRESSION_LIVE_PROOF.md` | A7 — live regression proof |
-| `PATIENT_SCOPE_DESIGN_A9.md` | A9 — original patient-scope design |
-| `PATIENT_SCOPE_SHADOW_AUDIT_A9.md` | A9 — shadow audit |
-| `PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md` | A9 — native extraction design |
-| `PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md` | A9 — frozen raw/projection/parser/prompt spec |
-| `ARCH_RECON_REPORT.md` | архитектурная разведка (baseline для target design) |
-| `DOCS_AUDIT.md` | снимок сверки docs vs код |
-| `TRUST_INTENT_PHASE1_REPORT.md` | отчёт phase 1 trust/intent |
+| [evidence/a_series/](evidence/a_series/) | завершённые A3/A6/A7 shadow-аудиты и proof |
+| [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md) | первый A9 raw принят по integrity, качество red, authority forbidden |
 
----
+Evidence не меняется ради нового красивого результата. Первый A9 raw отдельно остаётся
+immutable и не перезапускается без разрешения владельца.
 
-## Эксплуатационные документы
+## Archive — не текущий канон
 
-| Документ | Для чего |
+| Документ | Почему сохранён |
 |---|---|
-| `FLAGS_AND_STATUS.md` | флаги, дефолты, канонный набор для прогонов |
-| `ROUTING_MAP.md` | порядок маршрутов и route labels |
-| `MULTICLIENT.md` | client packs, sessions, domains, provider model |
-| `WIDGET_ANSWER_FORMAT.md` | формат ответа для виджета |
-| `DASHBOARD.md` | admin dashboard, events, Postgres |
-| `TECH_DEBT.md` | открытый долг и закрытые решения |
-| `MARKETING_EDITING_GUIDE.md` | как править marketing copy/config |
+| [FULLCONTEXT_ROADMAP.md](archive/FULLCONTEXT_ROADMAP.md) | накопительный исторический roadmap, заменён A-series roadmap |
+| [ARCH_RECON_REPORT.md](archive/ARCH_RECON_REPORT.md) | разведка, на которой строился target design |
 
----
+Удалённые разведочные отчёты остаются в Git history и не используются для реализации.
 
-## Правила
+## Постоянные правила
 
-- Если код и docs расходятся, сверяться с кодом и править docs в том же PR.
-- Текущий A-series checkpoint — только в `STRANGLER_ROADMAP.md`; `ARCH_TARGET_DESIGN.md` и `FULLCONTEXT_ROADMAP.md` на него не дублируют.
-- Не описывать RAG/search как runtime: content-путь после Stage 3.4 — full-context composer.
-- `core/md_chunks.py` и `get_chunk_by_ref` — это прямой ref resolver, не RAG.
-- Цены, бренды, порядок и кнопки — deterministic; LLM пишет только текстовое обрамление там, где это явно включено.
-- Активная продуктовая работа по умолчанию идёт по `clients/demo/`; другие packs трогать только по задаче владельца.
+- Код и current-runtime docs синхронизируются в одном checkpoint.
+- RAG/search не описывается как действующий content path после Stage 3.4.
+- Цены, бренды, порядок и UI-контракты детерминированы; LLM не изобретает их.
+- Утверждения клиники, числа и сила формулировок не смягчаются и не усиливаются.
+- `clients/demo/` — текущий продуктовый pack; другие packs меняются только по отдельной задаче.

@@ -5,6 +5,10 @@
 **Другие packs:** legacy `price_offers.json` / `prices.json` — fallback при отсутствии entry.  
 **Связь:** этап 3 (MVP offers) → **3.5 PriceBook v2** → этап 4 planner-lite → этап 5 verifier gate.
 
+**Граница:** документ описывает current Pricebook schema/runtime. Его старые примеры
+promo-blocking не задают target marketing policy; актуальный target-контракт —
+[`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md).
+
 **Парные документы:** `CURRENT_ARCHITECTURE.md` §6, `ROUTING_MAP.md`, `contracts/pricebook.py`, `TECH_DEBT.md` § PriceBook v2.
 
 ---

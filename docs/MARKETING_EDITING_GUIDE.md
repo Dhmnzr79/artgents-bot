@@ -1,6 +1,14 @@
 # Как редактировать маркетинг клиента
 
+**Статус:** current demo runtime/config, не target marketing policy.
+
 Короткая памятка для demo-клиента и будущих паков. Канон demo на дату: `clients/demo/pricebook/facts.json` + `clients/demo/marketing.yaml`.
+
+Текущий runtime ещё блокирует promo на `pain/safety/contraindications`. Это честное
+описание старого кода, а не правило будущей архитектуры. Target-разделение находится в
+[`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md): текущая личная
+боль/осложнение/жалоба дают phone-only hard-stop, а общий страх будущего лечения или
+вопрос о противопоказаниях может получить source-grounded ответ и применимый marketing layer.
 
 ## Быстрая карта
 
@@ -30,7 +38,7 @@
 
 **promo_rules:** те же три promo (`free_implant_consult`, `implant_same_day_discount`, `professional_whitening_discount`).
 
-Известный долг: `free_implant_consult` с `kind: promo` блокируется на pain/safety — планируется `promo` → `benefit` (см. `FULLCONTEXT_ROADMAP.md` Этап 7).
+Известный current-runtime долг: `free_implant_consult` с `kind: promo` блокируется на pain/safety. Не исправлять это старым тематическим route; будущая реализация следует общей target policy.
 
 ## Правило про facts и marketing
 

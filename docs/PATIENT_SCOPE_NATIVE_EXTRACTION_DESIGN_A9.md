@@ -10,7 +10,7 @@
 
 Если `patient_scope` присутствует, его четыре subfields валидируются независимо и scalar bridge ничего в них не backfill'ит. Если sibling отсутствует, принятый deterministic scalar bridge остаётся backward-compatible fallback. Scope публикуется только в существующий shadow channel. Pre-planner `ingress_manual_contact` не получает fake frame: будущий harness классифицирует успешный boundary response без frame как `not_applicable`, отдельно от transport failure.
 
-Это design materialization, а не authority decision. Audit остаётся красным по native-positive quality: exact `0` для extent/jaw/stage/modifiers и composite `0/9` (`docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:149-184`, `:200-205`).
+Это design materialization, а не authority decision. Audit остаётся красным по native-positive quality: exact `0` для extent/jaw/stage/modifiers и composite `0/9` (`docs/evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:149-184`, `:200-205`).
 
 ## 2. Current evidence и причина checkpoint
 
@@ -27,7 +27,7 @@ Frozen D2 уже задаёт будущий raw shape и field isolation:
 - invalid modifier сохраняет stage (`:139-157`);
 - missing stage сохраняет composite neighbors (`:159-177`).
 
-Все четыре target-red в первом run (`docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:117-136`).
+Все четыре target-red в первом run (`docs/evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:117-136`).
 
 ### 2.2 One-call dual branch уже существует
 
@@ -37,7 +37,7 @@ Strict `TurnPlan` имеет `extra="forbid"`, required `route`, `aspects(min_le
 
 Product wiring читает только `attempt.legacy_plan`; shadow записывается отдельно (`orchestration/resolver_turn.py:54-63`). Это принятый A7 dual-branch firewall, и A9 его не меняет.
 
-A7 design требует immutable one-raw dual branch и unchanged strict validation (`docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md:91-124`, `:229`), а product firewall отделяет `legacy_plan` от telemetry-only `shadow_frame` (`:139-154`). Native seam обязан сохранить эти законы.
+A7 design требует immutable one-raw dual branch и unchanged strict validation (`docs/evidence/a_series/FIELD_LEVEL_PLANNER_OUTCOME_A7.md:91-124`, `:229`), а product firewall отделяет `legacy_plan` от telemetry-only `shadow_frame` (`:139-154`). Native seam обязан сохранить эти законы.
 
 Current recorder различает только `ok | partial | not_available | degraded`, со stable reasons `turn_plan_missing` и `turn_frame_build_failed`; ctx contract — `turn_frame_shadow`, `turn_frame_shadow_status`, `turn_frame_shadow_reason` (`core/turn_frame_shadow.py:18-28`, `:37-94`). Metadata-first allowlist переносит эти три keys в turn details/response test slice (`core/metadata_first_observability.py:24-71`, `:101`, `:144-170`). Native design не переименовывает их и не использует `degraded` для model/schema invalidity.
 
@@ -53,7 +53,7 @@ Current recorder различает только `ok | partial | not_available |
 - product firewall сохранён;
 - authority forbidden.
 
-Подробные denominators и claims boundary находятся в `docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:111-184`, `:203-215`, `:300-370`. Native design не переинтерпретирует эти результаты и не переписывает raw.
+Подробные denominators и claims boundary находятся в `docs/evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:111-184`, `:203-215`, `:300-370`. Native design не переинтерпретирует эти результаты и не переписывает raw.
 
 ## 3. Exact raw contract
 
@@ -112,7 +112,7 @@ patient_scope_invalid_type
 patient_scope_extra_field
 ```
 
-Это осознанное узкое уточнение A9 metadata, а не новый value, product field или второй error store. Оно требуется, чтобы не смешивать model/schema invalidity с A7 `degraded`, зарезервированным для internal builder/serialization failure (`docs/FIELD_LEVEL_PLANNER_OUTCOME_A7.md:214-223`). Первый raw/v1 matrix не resnapshot'ятся; новое metadata expectation сначала freeze'ится в отдельном v2 contract spec.
+Это осознанное узкое уточнение A9 metadata, а не новый value, product field или второй error store. Оно требуется, чтобы не смешивать model/schema invalidity с A7 `degraded`, зарезервированным для internal builder/serialization failure (`docs/evidence/a_series/FIELD_LEVEL_PLANNER_OUTCOME_A7.md:214-223`). Первый raw/v1 matrix не resnapshot'ятся; новое metadata expectation сначала freeze'ится в отдельном v2 contract spec.
 
 ## 4. Branch isolation без raw repair
 
@@ -297,7 +297,7 @@ Native frame — observation текущего turn:
 
 Ingress вызывается до resolver/planner; non-normal route немедленно возвращает service reply (`orchestration/pre_resolver_turn.py:145-176`). Route materializes как `ingress_<route>` (`ingress_gate.py:580-583`) и app сохраняет `meta.service_route` (`app.py:158`, `:588`). Поэтому `ingress_manual_contact` не создаёт `PlannerAttempt` и не обязан иметь `turn_frame_shadow`.
 
-Первый harness при отсутствии frame возвращает `shadow_frame_missing`; generic availability fallback затем относит неизвестный status к `transport_error` (`evals/v5/run_patient_scope_shadow_eval.py:677-727`, `:953-983`). Audit правильно зафиксировал taxonomy gap, а не transport failure (`docs/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:217-236`).
+Первый harness при отсутствии frame возвращает `shadow_frame_missing`; generic availability fallback затем относит неизвестный status к `transport_error` (`evals/v5/run_patient_scope_shadow_eval.py:677-727`, `:953-983`). Audit правильно зафиксировал taxonomy gap, а не transport failure (`docs/evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md:217-236`).
 
 ### 9.2 Выбран harness-owned seam
 

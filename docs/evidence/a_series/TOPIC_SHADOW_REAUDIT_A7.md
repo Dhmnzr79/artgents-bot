@@ -144,7 +144,7 @@ Unit replay отдельно доказал deterministic fail-open/partial по
 | Frozen overall exact | 26/33 | 33/33 | +7 exact observations |
 | Topic mismatches | 0 | 0 | 0 |
 
-A6 source: `docs/TOPIC_SHADOW_AUDIT_A6.md` + first raw. A7 source: raw L106.
+A6 source: `docs/evidence/a_series/TOPIC_SHADOW_AUDIT_A6.md` + first raw. A7 source: raw L106.
 
 Вывод ограничен: A7 устранил all-or-nothing **observability loss** на этой выборке. Один stochastic run не доказывает стабильность 100% на будущих runs.
 

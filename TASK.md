@@ -1,106 +1,61 @@
-# TASK — Lead-flow Cancel and Date/Time Safety
+# TASK — Fix Situation Intake Target Contract
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `5f18801 docs: note startup price quiz idea`
+**Baseline:** `4cae480 fix: harden lead cancellation and date handoff`
 
-**Режим:** узкий code/runtime checkpoint без live/LLM.
+**Режим:** documentation-only product contract. Runtime не меняется.
 
-## Причина
+## Цель
 
-Read-only аудит lead-flow и узкий offline pytest выявили regression:
+Зафиксировать согласованный будущий контракт кнопки «Рассказать о ситуации» без
+латания legacy FullContext:
 
-- `Я передумал` / `Не, я передумал` при включённом booking-date defer могут ошибочно
-  классифицироваться как изменение даты вместо отмены;
-- текущий internal parser сохраняет из составного пожелания вроде `завтра в 18:00`
-  только первый фрагмент;
-- пользовательская формулировка про дату должна ещё жёстче исключать впечатление, что
-  бот принял или подтвердил запись.
-
-Baseline evidence: `90 passed, 2 failed`; оба падения в
-`tests/test_lead_turn_classifier.py` относятся к conversational cancel.
-
-## Verification incident
-
-Во время первых focused pytest запусков runner не зафиксировал LLM flags в `OFF`.
-`test_invalid_name_is_unclear_not_slot_first` четыре раза вызвал `lead_turn_gray` для
-синтетической строки `12345` (`qwen3.6-flash`, суммарная оценка `$0.0004812`). Это
-нарушение режима checkpoint, поэтому оно не скрывается:
-
-- вызовы не относились к A9/patient-scope и не изменили A9 raw/evidence;
-- это не были ответы пациенту или widget session;
-- после обнаружения все проверки запускаются с явными offline flags;
-- финальный checker должен проверить incident statement и отсутствие последующих
-  `lead_turn_gray` вызовов.
-
-## Product contract
-
-1. Явное `Я передумал` / `Не, я передумал` детерминированно отменяет lead-flow без LLM.
-2. Составная фраза с новой датой, например `Передумал, а можно на 11-е?`, остаётся
-   пожеланием изменить дату, а не отменой всей записи.
-3. Любая дата/время — только пожелание для администратора.
-4. Бот никогда не сообщает и не подразумевает, что дата/время приняты, забронированы,
-   доступны, согласованы или подтверждены.
-5. Patient-facing ответ остаётся мягким: пожелание по дате передадим, а удобные дату и
-   время администратор уточнит при звонке. Бот не произносит техническое предупреждение
-   о собственных ограничениях.
-6. Полное распознанное пожелание даты и времени сохраняется для handoff; оно не
-   показывается как подтверждённый слот.
-
-## Scope
-
-- сделать conversational cancel детерминированным и приоритетным;
-- отделить голое `передумал` от реального изменения даты;
-- не терять время в составной фразе дата + время;
-- усилить нейтральный booking-date copy в default config и demo override;
-- синхронизировать owner/technical docs;
-- добавить/обновить узкие offline tests.
+1. `situation_intake` — отдельный intake state до FullContext/retrieval/composer.
+2. Введённый текст — user-authored lead note, а не вопрос к базе.
+3. Любое осмысленное стоматологическое описание внутри intake — ситуация, страх, боль,
+   цена, жалоба или прошлый опыт — сохраняется с заявкой → имя → телефон, без
+   content-ответа и без повторной медицинской маршрутизации.
+4. Phone-only hard-stop действует на обычном входе в диалог до intake. Явно выбранный
+   `situation_intake` является конверсионным lead-capture шагом и не обрывается по теме
+   введённого стоматологического текста.
+5. Вне intake обычный страх будущего лечения остаётся маркетинговым вопросом.
+6. Минимальный deterministic anti-spam: length, empty/short, link-only, obvious garbage,
+   общий rate limit и один retry; без LLM spam analysis.
+7. Выход до note — «Назад к диалогу»; после note — обычная текстовая отмена lead-flow.
+   Заметную кнопку выхода на первом экране имени не добавлять без отдельного решения.
 
 ## Allowlist
 
 - `TASK.md`;
-- `lead_interrupt.py`;
-- `core/booking_date_defer.py`;
-- `core/client_config_loader.py`;
-- `clients/demo/tone.yaml`;
-- `tests/test_lead_turn_classifier.py`;
-- `tests/test_lead_interrupt.py`;
-- `tests/test_booking_date_defer.py`;
 - `docs/MARKETING_QUESTION_FOUNDATION.md`;
-- `docs/MARKETING_QUESTION_TECH.md`.
+- `docs/MARKETING_QUESTION_TECH.md`;
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md`;
+- `.cursor/rules/00-guardrails.mdc`.
 
 ## Protected / вне scope
 
-- CTA-context и состав заявки;
-- `Рассказать о ситуации` и hard-stop precedence;
-- видимая кнопка выхода из первого lead-экрана;
-- email/CRM/n8n delivery;
-- остальные lead-flow состояния и UI;
-- Pricebook, service catalog и marketing schema;
+- весь code/runtime, tests, evals, prompts, configs и client data;
+- реализация `situation_intake`;
+- CTA-context/schema и delivery CRM/email/n8n;
+- first-screen lead exit UI;
 - A9 design/raw/harness/evidence;
 - live/LLM, authority, merge и `main`.
 
 ## Verification
 
-1. Governance checker `✅` до code changes.
-2. Focused pytest для cancel/date и соседнего lead-flow набора с явными
-   `LEAD_TURN_LLM_CLASSIFY=0`, `BOOKING_INTENT_LLM_ON=0`, `PRICE_INTENT_LLM_ON=0`.
-   Unit-test booking-intent cache запускается отдельно с monkeypatch classifier-а.
-3. Новые тесты доказывают:
-   - `Я передумал` и `Не, я передумал` → `meta_cancel` без gray LLM;
-   - `передумал, а на 11?` → `booking_date`;
-   - `завтра в 18:00` сохраняет оба фрагмента;
-   - patient-facing copy мягко передаёт пожелание администратору и не содержит обещания
-     или намёка на согласованный слот.
-4. `git diff --check`.
-5. Verification incident зафиксирован; A9 raw/evidence не затронуты.
-6. Финальный независимый checker `✅` до commit/push.
+1. Все четыре канона одинаково различают обычный ingress hard-stop и явно выбранный
+   conversion intake, принимающий любое стоматологическое описание.
+2. Нигде нет заявления, что target уже реализован.
+3. Изменения только внутри allowlist.
+4. `git diff --check` и локальные Markdown links проходят.
+5. Независимый checker `✅` до commit/push.
+
+`pytest` не запускать: исполняемое поведение не меняется.
 
 ## Definition of Done
 
-- два исходных failing tests исправлены правильным runtime behavior;
-- focused offline suite green;
-- все проверки после обнаруженного incident принудительно offline; incident сохранён в
-  checkpoint без ложного заявления «live не было»;
-- commit/push только в `origin/codex/stage-a`;
-- рабочее дерево чистое.
+- правила сохранены в существующих канонах без нового постоянного документа;
+- future schema governance получает однозначный `situation_intake` contract;
+- code/runtime/A9 не затронуты;
+- commit/push только в `origin/codex/stage-a`, дерево чистое.

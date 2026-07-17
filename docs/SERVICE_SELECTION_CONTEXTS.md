@@ -139,7 +139,8 @@
 ## Что остаётся до schema/runtime checkpoint
 
 - утвердить физический формат catalog option для full/partial, open/closed и own-tooth/implant crown;
-- решить, остаётся ли стратегия в эволюции `patient_playbook.yaml` или получает отдельный компактный конфиг;
-- определить approved fallback, когда применимая услуга есть, а публичной цены нет;
+- создать target `clients/<client_id>/clinic_strategy.yaml` и перенести туда max options, приоритет услуг, редкие context overrides и порядок offers/брендов без CTA/promo;
+- расширить Pricebook schema четырьмя согласованными типами цены и offer-owned утверждённой формулировкой для отсутствующей публичной цены;
+- создать target brand dictionary с canonical name, country и aliases и связать его с Pricebook offers без дублирования страны в каждом label;
 - сформировать protected tests на прямой запрос, unknown facts, исправление пациентом контекста и межклиентскую изоляцию;
 - до отдельного разрешения не подключать A9 shadow `patient_scope` к product path.

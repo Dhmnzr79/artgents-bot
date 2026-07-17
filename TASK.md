@@ -1,111 +1,106 @@
-# TASK — Close Three Remaining Product/UI Decisions
+# TASK — Lead-flow Cancel and Date/Time Safety
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `b3a571f docs: clean up documentation canon`
+**Baseline:** `5f18801 docs: note startup price quiz idea`
 
-**Режим:** documentation-only, без изменения runtime.
+**Режим:** узкий code/runtime checkpoint без live/LLM.
 
-## Цель
+## Причина
 
-Последовательно согласовать с владельцем и внести прямо в действующий product canon три
-оставшихся решения перед schema/runtime checkpoints:
+Read-only аудит lead-flow и узкий offline pytest выявили regression:
 
-1. состав первого ответа, который уже содержит marketing concern;
-2. иерархию CTA, clarify/service/follow-up, видео и «Рассказать о ситуации»;
-3. набор CTA-смыслов и правило стабильности CTA.
+- `Я передумал` / `Не, я передумал` при включённом booking-date defer могут ошибочно
+  классифицироваться как изменение даты вместо отмены;
+- текущий internal parser сохраняет из составного пожелания вроде `завтра в 18:00`
+  только первый фрагмент;
+- пользовательская формулировка про дату должна ещё жёстче исключать впечатление, что
+  бот принял или подтвердил запись.
 
-Не создавать отдельный временный review-документ. До commit должны быть приняты все три
-решения, синхронизированы два маркетинговых канона и обновлён roadmap.
+Baseline evidence: `90 passed, 2 failed`; оба падения в
+`tests/test_lead_turn_classifier.py` относятся к conversational cancel.
 
-## Уже принято владельцем — решение 1
+## Verification incident
 
-Если первый вопрос об услуге одновременно содержит маркетинговое сомнение:
+Во время первых focused pytest запусков runner не зафиксировал LLM flags в `OFF`.
+`test_invalid_name_is_unclear_not_slot_first` четыре раза вызвал `lead_turn_gray` для
+синтетической строки `12345` (`qwen3.6-flash`, суммарная оценка `$0.0004812`). Это
+нарушение режима checkpoint, поэтому оно не скрывается:
 
-1. основной ответ берётся из утверждённой базы и не занимает marketing slots;
-2. выбираются до двух релевантных усилителей активного сценария;
-3. оставшиеся места общего лимита трёх marketing facts занимают применимые коммерческие
-   предложения по приоритету клиники;
-4. CTA добавляется отдельно и не входит в лимит;
-5. пустые слоты не заполняются искусственно;
-6. если подходящий усилитель один, могут быть показаны один усилитель и до двух
-   коммерческих предложений; если два — два усилителя и до одного предложения.
+- вызовы не относились к A9/patient-scope и не изменили A9 raw/evidence;
+- это не были ответы пациенту или widget session;
+- после обнаружения все проверки запускаются с явными offline flags;
+- финальный checker должен проверить incident statement и отсутствие последующих
+  `lead_turn_gray` вызовов.
 
-Это composition rule, а не готовый текст ответа. Факты и усилители только source-owned.
+## Product contract
 
-## Принято владельцем — решение 2
+1. Явное `Я передумал` / `Не, я передумал` детерминированно отменяет lead-flow без LLM.
+2. Составная фраза с новой датой, например `Передумал, а можно на 11-е?`, остаётся
+   пожеланием изменить дату, а не отменой всей записи.
+3. Любая дата/время — только пожелание для администратора.
+4. Бот никогда не сообщает и не подразумевает, что дата/время приняты, забронированы,
+   доступны, согласованы или подтверждены.
+5. Patient-facing ответ остаётся мягким: пожелание по дате передадим, а удобные дату и
+   время администратор уточнит при звонке. Бот не произносит техническое предупреждение
+   о собственных ограничениях.
+6. Полное распознанное пожелание даты и времени сохраняется для handoff; оно не
+   показывается как подтверждённый слот.
 
-Для content-ответов:
+## Scope
 
-1. CTA существует отдельно и не занимает secondary UI slots;
-2. pure clarify показывает только уточняющие кнопки, без content follow-up/video;
-3. follow-up появляются только после содержательного content-ответа;
-4. на follow-up/video всего два secondary UI slots;
-5. video имеет приоритет и показывается один раз на первом содержательном ответе по
-   соответствующему материалу;
-6. оставшиеся места занимают следующие ещё не показанные follow-up;
-7. механического повтора и sliding-window rotation нет;
-8. при переходе к другому материалу кандидаты рассчитываются заново;
-9. усилители идут текстом, UI slots не занимают, но сохраняют marketing limit 3/2;
-10. service-detail и «Рассказать о ситуации» относятся к secondary UI actions и
-    конкурируют за те же два места.
-
-Для price-ответов:
-
-11. CTA также существует отдельно;
-12. доступно не более двух price-navigation slots;
-13. price navigation не смешивается с content follow-up;
-14. кнопками становятся только элементы, явно записанные в `service.followups`;
-15. `fact_refs` добавляют source-owned facts текстом и не создают автоматические кнопки;
-16. прямой вопрос получает ответ сразу, а совпадающая кнопка повторно не показывается;
-17. в обычном первом price-ответе demo приоритет при наличии в `followups`: «Что входит»,
-    затем «Оплата по этапам»;
-18. показанные/нажатые price follow-up автоматически не повторяются.
-
-## Принято владельцем — решение 3
-
-CTA задаётся не на каждый документ/ответ, а один раз для смыслового контекста темы. Одна
-и та же CTA может показываться после каждого содержательного коммерчески релевантного
-ответа внутри этого контекста. При явной смене контекста выбирается другая настроенная
-CTA: например, имплантация использует одну CTA, вопросы о врачах — врачебную CTA, если
-она определена клиникой. Если специальной CTA нет, используется clinic default; модель
-не придумывает кнопку. Hard-stop, pure clarify, explicit refusal и lead-flow сохраняют
-прежние запреты CTA.
+- сделать conversational cancel детерминированным и приоритетным;
+- отделить голое `передумал` от реального изменения даты;
+- не терять время в составной фразе дата + время;
+- усилить нейтральный booking-date copy в default config и demo override;
+- синхронизировать owner/technical docs;
+- добавить/обновить узкие offline tests.
 
 ## Allowlist
 
 - `TASK.md`;
+- `lead_interrupt.py`;
+- `core/booking_date_defer.py`;
+- `core/client_config_loader.py`;
+- `clients/demo/tone.yaml`;
+- `tests/test_lead_turn_classifier.py`;
+- `tests/test_lead_interrupt.py`;
+- `tests/test_booking_date_defer.py`;
 - `docs/MARKETING_QUESTION_FOUNDATION.md`;
-- `docs/MARKETING_SCENARIO_ARCHITECTURE.md`;
-- `docs/STRANGLER_ROADMAP.md`.
+- `docs/MARKETING_QUESTION_TECH.md`.
 
-## Protected / forbidden
+## Protected / вне scope
 
-- весь код, tests, evals, fixtures, prompts, configs и client data;
-- current runtime/Pricebook/UI implementation;
-- archive/evidence;
-- A9 design, raw, harness, matrix и evidence;
-- live/LLM;
-- authority;
-- merge и push в `main`.
+- CTA-context и состав заявки;
+- `Рассказать о ситуации` и hard-stop precedence;
+- видимая кнопка выхода из первого lead-экрана;
+- email/CRM/n8n delivery;
+- остальные lead-flow состояния и UI;
+- Pricebook, service catalog и marketing schema;
+- A9 design/raw/harness/evidence;
+- live/LLM, authority, merge и `main`.
 
 ## Verification
 
-1. Governance checker `✅` до правок product canon.
-2. Каждое решение дословно соответствует ответу владельца и не расширяется догадкой.
-3. Foundation и marketing architecture не противоречат друг другу.
-4. Общий лимит остаётся `3 marketing facts / 2 amplifiers`; CTA отдельно.
-5. Нет готовых сценарных фраз и дублей source-owned content.
-6. Roadmap хранит только ещё открытые решения.
-7. `git diff --check` и локальные Markdown links проходят.
-8. Финальный checker `✅` до commit/push.
-
-`pytest` и live не запускать: исполняемое поведение не меняется.
+1. Governance checker `✅` до code changes.
+2. Focused pytest для cancel/date и соседнего lead-flow набора с явными
+   `LEAD_TURN_LLM_CLASSIFY=0`, `BOOKING_INTENT_LLM_ON=0`, `PRICE_INTENT_LLM_ON=0`.
+   Unit-test booking-intent cache запускается отдельно с monkeypatch classifier-а.
+3. Новые тесты доказывают:
+   - `Я передумал` и `Не, я передумал` → `meta_cancel` без gray LLM;
+   - `передумал, а на 11?` → `booking_date`;
+   - `завтра в 18:00` сохраняет оба фрагмента;
+   - patient-facing copy мягко передаёт пожелание администратору и не содержит обещания
+     или намёка на согласованный слот.
+4. `git diff --check`.
+5. Verification incident зафиксирован; A9 raw/evidence не затронуты.
+6. Финальный независимый checker `✅` до commit/push.
 
 ## Definition of Done
 
-- все три решения приняты владельцем;
-- решения находятся в существующих канонических документах;
-- roadmap больше не содержит открытых product/UI gaps этого набора;
-- code/runtime/A9 не затронуты;
-- commit/push только в `origin/codex/stage-a`, дерево чистое.
+- два исходных failing tests исправлены правильным runtime behavior;
+- focused offline suite green;
+- все проверки после обнаруженного incident принудительно offline; incident сохранён в
+  checkpoint без ложного заявления «live не было»;
+- commit/push только в `origin/codex/stage-a`;
+- рабочее дерево чистое.

@@ -39,9 +39,12 @@ def gate_off(monkeypatch):
 _FORBIDDEN_REPLY_RX = re.compile(
     r"(?:"
     r"записал[аи]"
+    r"|принял[аи]?"
     r"|зафиксировал[аи]"
     r"|меняю\s+дат"
     r"|подтвердит"
+    r"|согласован"
+    r"|заброниров"
     r"|свободн"
     r"|жд[её]м\s+вас"
     r"|\d"
@@ -75,10 +78,11 @@ def _txt() -> dict:
     return {
         "lead_name_prompt": "Как к вам можно обращаться?",
         "lead_booking_date_defer": (
-            "Приняла запрос — по дате с вами свяжется и уточнит администратор."
+            "Пожелание по дате передам администратору. "
+            "Удобные дату и время он уточнит с вами при звонке."
         ),
         "lead_booking_date_defer_phone": (
-            "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами."
+            "Оставьте, пожалуйста, номер телефона для звонка администратора."
         ),
     }
 
@@ -171,7 +175,43 @@ def test_negatives_not_booking_date_signal(gate_on, q: str):
 def test_extract_preference_internal_only(gate_on):
     assert extract_booking_datetime_preference("можно на 10 июля?") == "10 июля"
     assert extract_booking_datetime_preference("на 11?") == "на 11"
+    assert extract_booking_datetime_preference("завтра в 18:00") == "завтра, 18:00"
     assert extract_booking_datetime_preference("сколько стоит имплант?") is None
+
+
+@pytest.mark.parametrize("q", ["Я передумал", "Не, я передумал"])
+def test_cancel_phrase_is_not_a_booking_date_signal(gate_on, q: str):
+    assert not looks_like_booking_datetime_signal(q, in_lead_flow=True)
+    assert not looks_like_booking_datetime_signal(
+        q,
+        in_lead_flow=True,
+        has_prior_preference=True,
+    )
+
+
+def test_date_change_with_new_date_remains_booking_date(gate_on):
+    decision = classify_lead_active_turn(
+        "передумал, а на 11?",
+        st={"lead_intent": "collecting_name"},
+        client_id="demo",
+        sid="s-date-change",
+    )
+    assert decision.kind == "booking_date"
+
+
+@pytest.mark.parametrize(
+    "q",
+    ["другой день", "поменяйте дату", "а раньше можно", "на другую"],
+)
+def test_explicit_date_change_phrases_remain_booking_date(gate_on, q: str):
+    assert looks_like_booking_datetime_signal(q, in_lead_flow=True)
+    decision = classify_lead_active_turn(
+        q,
+        st={"lead_intent": "collecting_name"},
+        client_id="demo",
+        sid="s-explicit-date-change",
+    )
+    assert decision.kind == "booking_date"
 
 
 def test_classifier_gate_off_preserves_content_interrupt(gate_off):

@@ -24,38 +24,28 @@ def test_obvious_peredumal_is_deterministic_cancel() -> None:
     assert parse_lead_cancel("передумал")
 
 
-def test_conversational_cancel_not_regex() -> None:
-    assert not parse_lead_cancel("Я передумал")
-    assert not parse_lead_cancel("Не, я передумал")
+def test_conversational_cancel_is_deterministic() -> None:
+    assert parse_lead_cancel("Я передумал")
+    assert parse_lead_cancel("Не, я передумал")
     assert not parse_lead_cancel("я не буду")
 
 
-def test_ne_comma_ya_peredumal_gray_zone_cancel(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fake_gray(q: str, **kwargs):
-        if "передумал" in q.lower():
-            return LeadTurnDecision(kind="meta_cancel", confidence=0.92)
-        return None
-
+@pytest.mark.parametrize("q", ["Я передумал", "Не, я передумал"])
+def test_conversational_peredumal_cancel_does_not_use_gray_llm(
+    monkeypatch: pytest.MonkeyPatch,
+    q: str,
+) -> None:
     monkeypatch.setattr(
         "core.lead_turn_classifier.classify_lead_turn_gray_zone",
-        _fake_gray,
+        lambda *a, **k: pytest.fail("gray LLM must not be called for explicit cancel"),
     )
     decision = classify_lead_active_turn(
-        "Не, я передумал",
+        q,
         st=_st(),
         sid="s1",
         client_id="demo",
     )
     assert decision.kind == "meta_cancel"
-
-
-def test_ne_comma_ya_peredumal_unclear_without_gray_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "core.lead_turn_classifier.classify_lead_turn_gray_zone",
-        lambda *a, **k: None,
-    )
-    decision = classify_lead_active_turn("Не, я передумал", st=_st())
-    assert decision.kind == "unclear"
 
 
 def test_ya_ne_budu_gray_zone_cancel(monkeypatch: pytest.MonkeyPatch) -> None:

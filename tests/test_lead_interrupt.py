@@ -60,8 +60,8 @@ def test_parse_lead_cancel_includes_ne_seychas() -> None:
     assert parse_lead_cancel("Не хочу")
     assert parse_lead_cancel("не хочу записываться")
     assert parse_lead_cancel("передумал")
-    assert not parse_lead_cancel("Я передумал")
-    assert not parse_lead_cancel("Не, я передумал")
+    assert parse_lead_cancel("Я передумал")
+    assert parse_lead_cancel("Не, я передумал")
     assert not parse_lead_cancel("я не буду")
     assert not parse_lead_cancel("Мария")
 

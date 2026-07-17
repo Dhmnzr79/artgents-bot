@@ -1,5 +1,7 @@
 # Full-context Roadmap (audit-driven)
 
+> **Не канон текущего checkpoint.** Это широкий накопительный roadmap: в нём есть исторические статусы и решения. Текущий A-series checkpoint — в [`STRANGLER_ROADMAP.md`](STRANGLER_ROADMAP.md); текущий runtime — в [`CURRENT_ARCHITECTURE.md`](CURRENT_ARCHITECTURE.md).
+
 **Статус:** ядро full-context собрано и проверено на demo; впереди — эксплуатационные правки, объединение путей и уборка легаси. Инкорпорирует внешний аудит (2026-07).
 **Прогресс (2026-07-03):** Этап 1 ✓ (кэш: cached_tokens 0→17024) · Этап 2 ✓ (история) · 3.0–3.3 ✓ (parity, wiring, контакты, md_chunks) · 3.1c ✓ · **Этап 4 ✓ принят** (плановый вызов: flags-on smoke 24/24, risk 28/29 + r17 закрыт якорем с unit-доказательством, live 16/16; бывшие KNOWN зелёные). **3.4 ✓ принят (2026-07-03):** RAG-стек удалён (−10.6k строк), OpenAI-зависимость исчезла, дефолты флагов ON, композер — единственный content-путь; прогон БЕЗ флагов: product 24/24, risk 29/29, live 16/16. Следующие: остаток 3.1b (display chunk, ограничения клиники в KB, слоты), этап 5 (clarify), 6 (вертикали → pack), 7 (маркетинг-воронка), 8 (гигиена).
 **Прогресс (2026-07-08):** слабые места №1 (логи fail-open) ✓ и №2 (паритет-гейт цен, + в CI) ✓ — в main; №3 clarify смержен (флаг `CLARIFY_STATE_ON` OFF); medzone price→consult — **с 2026-07-09 дефолт-ON** (`PRICE_SYMPTOM_CONSULT_ON`, см. `FLAGS_AND_STATUS.md`). Новые находки — раздел «Ход 2026-07-08».

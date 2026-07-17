@@ -80,13 +80,7 @@ A0 не является задачей «сначала сделать legacy �
 
 ## Текущий strangler-checkpoint
 
-Канонический актуальный статус A-series, чекбоксы и объяснение влияния на ответы бота находятся в [`docs/STRANGLER_ROADMAP.md`](STRANGLER_ROADMAP.md).
-
-- **A1–A8 завершены как migration checkpoints.** Большинство изменений были shadow/measurement infrastructure и сами по себе не передавали product authority.
-- **A9 активен:** последний завершённый checkpoint — Native Patient-scope Extraction Design (`16ced47`).
-- Первый A9 audit принял infrastructure integrity, но native live-positive exact остаётся `0` по `extent/jaw/stage/modifiers`; composite exact `0/9`.
-- Product firewall сохранён: новый nested patient scope не управляет route/evidence/composer/UI. **Authority запрещена.**
-- Следующий checkpoint — **A9 Native Container Metadata Contract**; contract/unit-only, без prompt/runtime/live.
+Канонический актуальный статус A-series (чекбоксы A1–A9, последний/следующий checkpoint, authority) — **только** в [`docs/STRANGLER_ROADMAP.md`](STRANGLER_ROADMAP.md). Этот файл на текущий checkpoint не дублирует.
 
 Переход ownership на `TurnFrame` разрешён только отдельными последующими задачами после проверки telemetry; сам факт появления frame в ctx не означает переключение архитектуры.
 

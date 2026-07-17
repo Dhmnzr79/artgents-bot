@@ -22,9 +22,9 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion — текущий commit) |
+| Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Ближайший рабочий фокус без live | **Инвентаризация вопросов и маркетинговых сценариев бота** |
+| Ближайший рабочий фокус без live | **Согласование promo, CTA, marketing hooks и session cadence — documentation-only** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -49,7 +49,7 @@
 
 A1–A9 не были целиком придуманы заранее как неизменяемый master-plan. Макронаправление задано [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md), а следующий маленький checkpoint выбирается по результатам предыдущего аудита. Но он не придумывается во время написания кода: сначала появляется `TASK.md`, затем независимый checker-review, и только после этого начинается работа.
 
-Будущий A10 пока не определён. Он появится только после отдельного архитектурного решения.
+После A9 пока **не утверждены** ни A10, ни отдельный B-series roadmap. Следующий этап определяется только отдельным architecture/governance решением, а не из этого файла.
 
 ---
 

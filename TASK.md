@@ -1,249 +1,207 @@
-# TASK — S2 Offline Target-Pack Loader
+# TASK — S3 External Source-Reference Integrity
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `9443716 feat: add target schema contracts S1`
+**Baseline:** `dbf9c37 chore: clean S2 file endings`
 
-**Серия / checkpoint:** `S2` — строгая offline-загрузка target schema из явного
-client-pack path без подключения к ответам бота.
+**Серия / checkpoint:** `S3` — offline-проверка внешних `kb:`/`doctor:` ссылок target
+marketing policy по явно переданному in-memory индексу.
 
-**Режим:** filesystem-to-contract foundation only. Никаких live/LLM, migration
-`clients/**`, runtime consumers, selectors, session или product authority.
+**Режим:** pure contract validation only. Никаких filesystem loaders, `clients/**`,
+live/LLM, selectors, session, routes/UI или product authority.
 
 ## Цель
 
-Добавить один изолированный loader, который читает будущий target pack из явно
-переданного каталога, разбирает JSON/YAML без тихих fallback и возвращает проверенный
-`ResponseSchemaBundle` из S1.
+Закрыть оставшуюся после S1/S2 границу ссылочной целостности: S1 уже проверяет wire
+syntax и локальные `fact:` refs, а S2 строго собирает bundle, но `kb:`/`doctor:` refs
+намеренно не проверяет без соответствующих source indexes.
 
-S2 отвечает только на вопрос: «Можно ли однозначно прочитать полный набор target-файлов
-и доказать их schema/cross-ref целостность?». Он не отвечает на вопросы «какой pack
-активен», «что выбрать пациенту» и «как показать это в ответе».
+S3 добавляет:
 
-## Почему это следующий минимальный scope
+- строгий in-memory index доступных KB chunk refs и doctor refs;
+- чистую детерминированную функцию, которая проверяет все внешние refs в уже валидном
+  `ResponseSchemaBundle`;
+- одну typed aggregate error со всеми отсутствующими refs в стабильном порядке.
 
-S1 уже фиксирует модели и in-memory cross-reference validation. Следующий безопасный
-шаг — материализовать только границу disk → S1 contract на синтетическом pack. Без этого
-client migration преждевременна: ошибки формата, дубли ключей или частично прочитанные
-файлы могли бы скрываться за current-runtime fallback.
+S3 не строит индекс из файлов и не меняет loader S2. Он только формализует следующий
+contract boundary: future index builder сможет передать найденные refs, не меняя закон
+проверки.
 
-S2 намеренно не использует `client_id`, глобальный `clients/` root, current loaders,
-cache или feature flag. Поэтому новый код нельзя случайно включить в ответы. Интеграция
-с client resolution и миграция demo требуют отдельных governance checkpoint-ов.
+## Почему scope минимален
+
+Target marketing policy нормативно использует `kb:<doc>#<chunk>` и
+`doctor:<doctor_id>`. Придумывать сейчас doctor schema, KB parser или client discovery
+рано. Но сравнение уже валидных точных refs с явным набором доступных refs не требует
+ни product logic, ни медицинских решений, ни client migration.
+
+Индекс in-memory и не является новым persisted target-файлом. Это предотвращает
+появление неутверждённого manifest/wrapper и сохраняет ownership у KB/doctor layers.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `core/response_schema_loader.py` (new);
-- `tests/test_response_schema_loader.py` (new);
-- `docs/STRANGLER_ROADMAP.md` — только краткий статус S2 после независимого completion
-  review; A9 status/raw/frozen/live не менять.
+- `contracts/response_schema_refs.py` (new);
+- `tests/test_response_schema_refs.py` (new);
+- `docs/STRANGLER_ROADMAP.md` — после реализации добавить честный pending-статус S3
+  `[ ]` для completion review; менять на `[x]` только после checker `✅`. A9
+  status/raw/frozen/live не менять.
 
 Любой другой файл требует остановки и отдельного решения владельца/Архитектора.
 
 ## Protected / вне scope
 
-- весь `clients/**`, включая создание target-файлов и migration demo;
-- `contracts/response_schema.py` и `tests/test_response_schema_contract.py`: S1 frozen
-  baseline; если loader требует изменить contract, остановиться и открыть отдельное
-  governance-решение;
-- все существующие loaders, включая `core/client_config_loader.py`,
-  `core/client_runtime.py`, `core/pricebook_loader.py`, `core/marketing_loader.py`;
-- `contracts/__init__.py`, `config.py`, flags, environment и dependency files;
-- routes/API/app/orchestration/resolver/composer, prompts, answer/UI/widget code;
-- selection/applicability/priority/marketing/CTA logic и rendering source text;
-- session state, caches, mtime/watch/reload и global singleton;
-- KB chunk parser, doctor index, CTA/tone loader и проверка существования внешних
-  `kb:`/`doctor:` refs;
-- current-client compatibility, legacy fallback или dual-read/shadow wiring;
+- весь `clients/**` и любое чтение реальных client packs;
+- frozen S1: `contracts/response_schema.py`, `tests/test_response_schema_contract.py`;
+- frozen S2: `core/response_schema_loader.py`, `tests/test_response_schema_loader.py`;
+- все current loaders/runtime, `contracts/__init__.py`, config/flags/environment;
+- KB/md parsing, heading/chunk discovery, frontmatter и content normalization;
+- doctor model/index construction, active/service eligibility и source text;
+- service/option `content_ref`, commercial fact `detail_ref` и CTA-key existence: их
+  wire/index contracts ещё не материализованы и не должны угадываться в S3;
+- `fact:` existence — остаётся единственной ответственностью S1 aggregate bundle;
+- selection/applicability/strategy/marketing selector, cadence, rendering и UI;
+- session state, cache/global registry и cross-client lookup;
+- routes/API/app/orchestration/resolver/composer, prompts и answers;
 - protected acceptance/golden/eval fixtures и весь A9 design/raw/harness/evidence;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Нормативный filesystem contract S2
+## Нормативный in-memory contract
 
-Loader принимает только явный `pack_root: Path` и читает фиксированную target-layout:
+Новый модуль определяет:
 
-```text
-<pack_root>/
-  service_catalog.json
-  brand_catalog.json
-  clinic_strategy.yaml
-  marketing.yaml
-  pricebook/
-    facts.json
-    services/
-      *.json
+```python
+class ResponseSchemaExternalIndex(BaseModel):
+    kb_refs: tuple[SourceRef, ...]
+    doctor_refs: tuple[SourceRef, ...]
+
+def validate_response_schema_external_refs(
+    bundle: ResponseSchemaBundle,
+    index: ResponseSchemaExternalIndex,
+) -> None: ...
 ```
 
-Формы данных не переопределяются loader-ом:
+`ResponseSchemaExternalIndex`:
 
-- `service_catalog.json` — direct mapping `service_id -> TargetService`;
-- `brand_catalog.json` — `TargetBrandCatalog` wrapper;
-- каждый `pricebook/services/*.json` — один `TargetOffer`; loader сортирует файлы по
-  имени для детерминированного порядка, но не выводит `offer_id` из filename;
-- `pricebook/facts.json` — direct mapping `fact_id -> TargetCommercialFact`;
-- `clinic_strategy.yaml` — `TargetClinicStrategy`;
-- `marketing.yaml` — `TargetMarketingPolicy`.
+- Pydantic v2, `extra="forbid"`, `frozen=True`, strict input;
+- принимает только tuple, не конвертирует list/set/string скрыто;
+- `kb_refs` содержит полные exact wire refs только вида `kb:<doc>#<chunk>`;
+- `doctor_refs` содержит полные exact wire refs только вида `doctor:<doctor_id>`;
+- использует frozen S1 `SourceRef` syntax validation, затем проверяет правильный prefix;
+- refs внутри каждого tuple уникальны; порядок входа сохраняется, сортировки/normalization
+  index model не делает;
+- пустые tuples допустимы.
 
-Все пять файлов и каталог `pricebook/services/` обязательны. Пустой services-каталог
-допустим на уровне IO; допустимость пустого/неполного bundle решает только S1 contract.
-Не-JSON entries в services-каталоге не считаются offers и игнорируются. Loader не ищет
-файлы рекурсивно и не читает пути из содержимого source-файлов.
+Индекс не хранит fact refs, source text, active/eligibility, client ID или paths. Лишний
+доступный ref, который bundle не использует, допустим.
 
-## Loader API и ошибки
+## Проверяемые refs
 
-Новый public surface внутри модуля:
+S3 обходит только `marketing.scenario_rules[*].ordered_amplifier_refs`, потому что:
 
-- `load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle`;
-- `ResponseSchemaLoadError` с machine-readable `code`, `path: Path` относительно
-  `pack_root` и исходной причиной через exception chaining. Для ошибки самого root
-  используется `Path(".")`; абсолютный host path в error API не записывается.
+- `initial_commercial_blocks[*].ordered_fact_refs` по S1 допускают только `fact:`;
+- structured external refs в target schema сейчас нормативно существуют только в
+  scenario amplifier pools;
+- plain `content_ref`/`detail_ref` имеют другие wire contracts и protected от
+  расширения scope.
 
-`pack_root` обязан быть `pathlib.Path`; строка не нормализуется и не принимается скрыто:
-она даёт `pack_root_invalid`, `Path(".")`, chained `TypeError`.
-Loader не резолвит client alias/default, не добавляет repo root и не меняет cwd.
+Для каждого scenario ref:
 
-Обязательные error codes:
+- `fact:` игнорируется S3 и уже доказан S1;
+- `kb:` должен точно и case-sensitive присутствовать в `index.kb_refs`;
+- `doctor:` должен точно и case-sensitive присутствовать в `index.doctor_refs`;
+- неизвестный prefix невозможен после S1; отдельный fallback/guess запрещён.
 
-- `pack_root_invalid` — root отсутствует или не является каталогом: cause
-  `FileNotFoundError` либо `NotADirectoryError`; non-`Path` даёт `TypeError`;
-- `required_path_missing` — обязательный файл/каталог отсутствует или имеет неверный
-  filesystem kind: cause `FileNotFoundError`, `IsADirectoryError` для ожидаемого файла
-  либо `NotADirectoryError` для ожидаемого каталога;
-- `file_read_failed` — UTF-8/read ошибка: cause `UnicodeDecodeError` либо `OSError`;
-- `json_invalid` — синтаксическая ошибка с cause `json.JSONDecodeError`;
-- `yaml_invalid` — синтаксическая ошибка или запрещённый YAML merge key `<<`, cause
-  `yaml.YAMLError` (для merge допустим локальный subclass);
-- `duplicate_key` — повтор mapping key на любом уровне JSON/YAML, cause один локальный
-  `DuplicateKeyError(ValueError)` для обоих форматов;
-- `top_level_type_invalid` — JSON/YAML source не является требуемым mapping, cause
-  `TypeError`;
-- `schema_invalid` — Pydantic/S1 bundle validation не прошла, cause
-  `pydantic.ValidationError`.
+Проверяются все authored refs независимо от будущей active/eligibility/cadence: source
+integrity не должна зависеть от selector-а.
 
-Loader не возвращает `None`, default model или частичный bundle при ошибке. Текст ошибки
-не является API; тесты проверяют `code`, `path`, тип cause и стабильный S1 error token,
-когда применимо.
+## Error contract
 
-## Детерминированное чтение
+`ResponseSchemaExternalRefError`:
 
-1. Каждый source читается строго как UTF-8.
-2. JSON parser отклоняет duplicate object keys на любом уровне до Pydantic.
-3. YAML использует изолированный subclass `yaml.SafeLoader` без произвольного object
-   construction и отклоняет duplicate mapping keys на любом уровне. Таблица implicit
-   resolvers сначала копируется для subclass; `yaml.SafeLoader` и поведение
-   `yaml.safe_load` глобально не мутируются.
-4. Timestamp resolver удаляется только из изолированной копии: unquoted ISO-looking
-   scalar остаётся точной строкой. YAML merge key `<<` полностью запрещён как
-   `yaml_invalid`, потому что target layout не требует merge semantics и коллизии после
-   merge не должны иметь вторую трактовку.
-5. Top-level type проверяется до сборки bundle: все фиксированные sources и каждый offer
-   обязаны быть mappings.
-6. Offer files читаются в лексикографическом порядке filename; порядок не зависит от OS.
-7. После parse loader делает ровно один authoritative
-   `ResponseSchemaBundle.model_validate(...)`; отдельной ослабленной cross-ref модели нет.
-8. Любая ошибка прекращает загрузку; fallback к current Pricebook/marketing запрещён.
+- наследует `ValueError`;
+- `code == "external_refs_missing"`;
+- `missing_kb_refs: tuple[str, ...]`;
+- `missing_doctor_refs: tuple[str, ...]`;
+- оба tuple содержат уникальные exact refs в лексикографическом порядке;
+- ошибка поднимается один раз после полного scan, чтобы не скрывать второй класс missing
+  refs;
+- human-readable `str(error)` не является API и не содержит source text.
 
-## Client isolation и внешние refs
-
-- Loader читает только фиксированные descendants переданного `pack_root`.
-- Symlink policy в S2 не вводится: path передаёт trusted offline caller, а loader не
-  получает пути из пользовательского/source content. Security boundary для runtime
-  client resolution появится только вместе с таким consumer.
-- `kb:` и `doctor:` refs проходят S1 syntax validation, но S2 не проверяет их
-  существование: соответствующие target indexes ещё не материализованы.
-- `fact:` refs и все service/option/brand/strategy links проверяет S1 aggregate bundle.
-- Два последовательных вызова независимы: нет cache/shared state; изменение synthetic
-  source между вызовами видно во втором результате.
+Если missing refs нет, функция возвращает строго `None`. Она не возвращает filtered
+bundle/report и не мутирует bundle/index.
 
 ## Обязательные invariants
 
-1. Новый loader импортирует только stdlib, PyYAML, Pydantic error type и
-   `contracts.response_schema`; current loaders/runtime не импортируются.
-2. Loader не знает `client_id`, `DEFAULT_CLIENT_ID`, `clients/` и demo.
-3. Loader не меняет source values, не trim/normalize ID/text/ref и не выводит ID из
-   filename.
-4. File order влияет только на стабильный порядок `offers`, не на eligibility/priority.
-5. Missing/malformed/invalid source всегда fail-closed с typed error; partial/default
-   bundle запрещён.
-6. Duplicate JSON/YAML keys не могут быть тихо перезаписаны parser-ом.
-7. Validation делегируется frozen S1 contract; loader не создаёт второй набор schema
-   rules.
-8. Никаких filesystem writes, cache, logging side effects, environment reads или network.
-9. Model load не классифицирует запрос, не выбирает service/fact/CTA и не рендерит ответ.
-10. S2 не объявляет target schema активной и не меняет product authority.
+1. Новый модуль импортирует только stdlib typing, Pydantic и frozen
+   `contracts.response_schema`.
+2. Нет filesystem, environment, network, logging, cache, client resolution или globals,
+   зависящих от вызовов.
+3. Exact ref не trim/lower/resolve; сравнение case-sensitive.
+4. Validator не проверяет content, doctor activity/service eligibility или medical facts.
+5. Extras в index не влияют на результат и не считаются ошибкой.
+6. Один bundle с двумя разными indexes проверяется независимо; state не переносится.
+7. Функция не изменяет marketing pools, их порядок или source refs.
+8. S3 не подключается к S2 loader или product path и не объявляет schema активной.
+9. A9 patient scope не является входом и не получает authority.
 
 ## Protected tests / честность
 
-- Новый `tests/test_response_schema_loader.py` — только synthetic `tmp_path` fixtures;
-  он не читает и не копирует `clients/demo`.
-- S1 contract/tests и все существующие tests/evals/golden не меняются.
-- Запрещены skip/xfail, условные asserts, broad mocks current runtime и подмена target
-  под текущий output.
-- Допустим monkeypatch только synthetic file content/path behavior, если невозможно
-  доказать branch обычным `tmp_path`; предпочтительны реальные temp files.
+- Новый `tests/test_response_schema_refs.py` использует только synthetic S1 models;
+  `clients/demo` не читается и не копируется.
+- Frozen S1/S2 tests и все существующие acceptance/evals/golden не меняются.
+- Запрещены skip/xfail, условные PASS, runtime mocks и ослабление source-ref syntax.
 
 ## Минимальные acceptance tests
 
-Без избыточной матрицы новый test module доказывает:
+Новый compact test module доказывает:
 
-1. полный synthetic pack загружается в `ResponseSchemaBundle`, source text/refs/IDs
-   сохраняются дословно;
-2. offer filenames намеренно не совпадают с `offer_id`, а result order следует sorted
-   filename — ID из filename не выводится;
-3. string вместо `Path`, invalid root и каждый класс missing/wrong-kind required path
-   дают точные `code`, relative `Path`, cause type и chaining;
-4. malformed JSON и malformed YAML различаются по error code/cause;
-5. duplicate keys отклоняются на top-level и nested level отдельно для JSON и YAML;
-6. wrong top-level list/scalar отклоняется для fixed source и offer file;
-7. invalid nested schema и dangling cross-ref дают `schema_invalid` с исходным
-   `ValidationError` и стабильным S1 token;
-8. unquoted date-looking scalar в строковом YAML-поле (например strategy rule
-   `id: 2026-07-01`) остаётся точной строкой и успешно проходит S1; обычный
-   `yaml.safe_load` до и после S2-load по-прежнему превращает такой scalar в `date`, что
-   доказывает отсутствие глобальной мутации resolver table;
-9. unknown/non-JSON service-directory entry игнорируется, вложенный каталог не
-   сканируется;
-10. внешние валидные `kb:`/`doctor:` refs не требуют filesystem lookup;
-11. повторная загрузка после изменения synthetic source видит новое значение, доказывая
-    отсутствие cache/shared state;
-12. invalid UTF-8 source даёт `file_read_failed`, точный relative path и chained
-    `UnicodeDecodeError`; source/AST audit подтверждает отсутствие current loaders,
-    client resolution,
-    environment/network/write APIs и product imports.
-
-Отдельный compact case подтверждает, что YAML merge key `<<` отклоняется как
-`yaml_invalid` с `yaml.YAMLError`, а не применяется и не классифицируется как обычный
-duplicate key.
+1. bundle с `fact:`, `kb:` и `doctor:` refs проходит при полном exact index и функция
+   возвращает `None`;
+2. отсутствующие KB и doctor refs собираются одним точным
+   `ResponseSchemaExternalRefError`, который является `ValueError`, имеет
+   `code == "external_refs_missing"` и два sorted unique tuple;
+3. index отклоняет list/set/string вместо tuple, extra fields, duplicate refs, wrong
+   prefix и malformed S1 source ref; introspection проверяет `strict=True`,
+   `frozen=True`, `extra="forbid"`, присваивание полю запрещено, а созданная model
+   сохраняет exact tuple order/case без normalization;
+4. empty index допустим для bundle без внешних refs;
+5. лишние index refs допустимы;
+6. case mismatch считается missing и не нормализуется;
+7. `fact:` ref не требуется в external index;
+8. два последовательных вызова с разными indexes не делят state;
+9. до/после validation bundle/index `model_dump()` идентичны, порядок pools и exact
+   index tuple order/case сохранены;
+10. external refs проверяются во всех scenario rules, а duplicate missing ref между pools
+    появляется в error только один раз;
+11. source/AST audit подтверждает отсутствие IO/current loader/client/runtime/session/A9
+    imports и side effects.
 
 ## Verification
 
 До кода:
 
-1. независимый read-only checker читает этот TASK, S1 contract/tests, оба target
-   architecture docs, `REVIEW_CHECKLIST.md` и guardrails;
-2. checker подтверждает exact layout, fail-closed boundary, отсутствие скрытого runtime/
-   A9 authority и достаточность acceptance laws;
+1. независимый read-only checker читает этот TASK, frozen S1/S2 contracts/tests,
+   `MARKETING_SCENARIO_ARCHITECTURE.md`, `REVIEW_CHECKLIST.md` и guardrails;
+2. checker подтверждает минимальность, exact ownership, отсутствие придуманного persisted
+   index/runtime authority и достаточность acceptance laws;
 3. при `❌`/`❓` TASK исправляется и повторно проверяется до кода.
 
 После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_loader.py -q --basetemp=.pytest_cache/s2-loader-basetemp`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py -q`;
-3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_pricebook_loader.py tests/test_marketing_loader.py -q --basetemp=.pytest_cache/s2-current-basetemp`
-   как узкая current-loader regression;
-4. `git diff --check`, `git status --short`, diff только по allowlist;
-5. независимый read-only checker сначала читает новый test diff, затем loader/roadmap
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_refs.py -q`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py tests/test_response_schema_loader.py -q --basetemp=.pytest_cache/s3-regression-basetemp`;
+3. `git diff --check`, `git status --short`, diff только по allowlist;
+4. независимый read-only checker сначала читает новый test diff, затем contract/roadmap
    diff и сам запускает те же команды;
-6. live/LLM и полный pytest не запускаются: ни один product consumer не меняется.
+5. live/LLM и полный pytest не запускаются: product consumers не меняются.
 
 ## Definition of Done
 
-- explicit-path loader строго собирает S1 bundle из target layout;
-- duplicate/syntax/shape/schema/cross-ref ошибки fail-closed и различимы;
-- synthetic tests доказывают deterministic order, no cache и отсутствие client/runtime
-  wiring;
-- `clients/**`, existing loaders, ответы, routes, UI, session и authority не изменились;
-- roadmap отмечает S2 как offline IO foundation, не как schema activation;
+- все structured external marketing refs имеют одну pure integrity boundary;
+- missing KB/doctor refs выдаются вместе и детерминированно;
+- index остаётся in-memory input, а KB/doctor ownership не дублируется;
+- S1/S2, `clients/**`, current loaders, answers, routes, UI, session и authority не
+  изменились;
+- roadmap отмечает S3 как offline reference foundation, не schema activation;
 - checker `✅`, отдельные governance/completion commits и push только в
   `origin/codex/stage-a`, рабочее дерево чистое.

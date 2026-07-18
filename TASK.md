@@ -228,9 +228,9 @@ duplicate key.
 
 После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_loader.py -q`;
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_loader.py -q --basetemp=.pytest_cache/s2-loader-basetemp`;
 2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py -q`;
-3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_pricebook_loader.py tests/test_marketing_loader.py -q`
+3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_pricebook_loader.py tests/test_marketing_loader.py -q --basetemp=.pytest_cache/s2-current-basetemp`
    как узкая current-loader regression;
 4. `git diff --check`, `git status --short`, diff только по allowlist;
 5. независимый read-only checker сначала читает новый test diff, затем loader/roadmap

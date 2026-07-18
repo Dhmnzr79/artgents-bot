@@ -243,4 +243,3 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
         )
     except ValidationError as exc:
         _raise_load_error("schema_invalid", Path("."), exc)
-

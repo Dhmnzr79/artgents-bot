@@ -427,4 +427,3 @@ def test_loader_source_has_no_runtime_client_environment_network_or_write_depend
     }
     assert not ({"write_text", "write_bytes", "open", "getenv"} & called_attributes)
     assert not ({"client_id", "DEFAULT_CLIENT_ID", "environ", "requests"} & identifier_names)
-

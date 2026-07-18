@@ -24,7 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Ближайший рабочий фокус без live | **Выбрать отдельным governance TASK первую узкую runtime-вертикаль target schema** |
+| Отдельная S-series без live | **S1 — offline-модели и детерминированные валидаторы target schema завершены и независимо проверены; product path не подключён** |
+| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; schema wiring и authority не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -40,6 +41,12 @@
 - [x] **A7 — независимая валидация полей и повторный topic-аудит**
 - [x] **A8 — service/follow-up/clarification в shadow**
 - [ ] **A9 — composable patient scope** — инфраструктура построена, native positive quality ещё не готова
+
+Отдельно начата S-series для materialization target schema без подключения к ответам:
+
+- [x] **S1 — schema models/validators** — изолированный offline contract и
+  детерминированные unit-тесты независимо проверены. Runtime, client data, session и
+  authority не подключены.
 
 ## Какой roadmap актуален
 

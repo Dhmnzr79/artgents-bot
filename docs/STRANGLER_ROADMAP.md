@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S3 — external KB/doctor ref integrity завершена и независимо проверена как pure in-memory contract; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; source index builders, client migration, wiring и authority не разрешены** |
+| Отдельная S-series без live | **S4 — offline KB source-index builder завершён и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; client migration, doctor schema, wiring и authority не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -53,6 +53,9 @@
 - [x] **S3 — external source-ref integrity** — pure in-memory проверка `kb:`/`doctor:`
   refs и synthetic tests независимо проверены. Source index builders и product path не
   подключены.
+- [x] **S4 — offline KB source-index builder** — exact `kb:` refs строятся только из
+  explicit target Markdown root; synthetic tests независимо проверены. `clients/**`,
+  legacy loaders и product path не подключены.
 
 ## Какой roadmap актуален
 

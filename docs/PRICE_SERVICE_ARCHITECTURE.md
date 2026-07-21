@@ -517,6 +517,21 @@ S24 не распознаёт alias, country или бренд из текста
 подключён к FullContext, session/runtime, ответам либо product authority. Brand
 recognition остаётся отдельной будущей границей.
 
+### Deterministic brand term resolution S25
+
+S25 закрывает dictionary boundary перед S24: один уже выделенный brand term разрешается
+по target brand ID, canonical name и authored aliases. Единственная normalization —
+`strip().casefold()`, поэтому регистр и внешние пробелы не мешают, но опечатки, окончания,
+пунктуация и целые фразы не превращаются в скрытый fuzzy/substring поиск.
+
+Ноль совпадений означает `None` без похожего бренда. Несколько разных brand IDs с одним
+normalized label дают typed ambiguity error в authored catalog order: первый бренд не
+выбирается случайно. Совпадения ID/canonical/alias внутри одного brand объединяются.
+
+Result содержит exact `brand_id` и deep-copied canonical brand record. Caller может явно
+передать ID в S24, но S25 сам не выбирает service/offer, не проверяет наличие цены и не
+подключён к извлечению текста, FullContext, session/runtime или product authority.
+
 ### Session state
 
 ```yaml

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "brands": {
+    "implantium": {
+      "canonical_name": "Implantium",
+      "country": "Южная Корея",
+      "aliases": [
+        "имплантиум"
+      ]
+    },
+    "impro": {
+      "canonical_name": "Impro",
+      "country": "Германия",
+      "aliases": [
+        "импро"
+      ]
+    },
+    "nobel_biocare": {
+      "canonical_name": "Nobel Biocare",
+      "country": "Швейцария",
+      "aliases": [
+        "nobel",
+        "нобель",
+        "нобел"
+      ]
+    }
+  }
+}

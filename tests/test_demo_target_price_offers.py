@@ -1,0 +1,459 @@
+from __future__ import annotations
+
+import ast
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml
+
+from contracts.response_schema import (
+    ResponseSchemaBundle,
+    TargetBrandCatalog,
+    TargetCommercialFact,
+    TargetOffer,
+    TargetService,
+)
+from core.doctor_schema_loader import load_doctor_catalog
+from core.response_schema_kb_index import build_response_schema_kb_refs
+from core.service_data_context import build_service_data_context
+
+
+DEMO_ROOT = Path("clients/demo")
+TARGET_ROOT = DEMO_ROOT / "target_response"
+TARGET_SERVICES = TARGET_ROOT / "service_catalog.json"
+TARGET_BRANDS = TARGET_ROOT / "brand_catalog.json"
+TARGET_FACTS = TARGET_ROOT / "pricebook/facts.json"
+TARGET_OFFERS = TARGET_ROOT / "pricebook/services"
+CURRENT_OFFERS = DEMO_ROOT / "pricebook/services"
+
+UNIT_LABELS = {
+    "aligners": (
+        "course",
+        "за полный курс лечения; зависит от сложности прикуса и количества кап",
+    ),
+    "all_on_4": (
+        "jaw",
+        "за одну челюсть; КТ и костная пластика по показаниям — отдельно",
+    ),
+    "all_on_6": (
+        "jaw",
+        "за одну челюсть; КТ и костная пластика по показаниям — отдельно",
+    ),
+    "caries": (
+        "tooth",
+        "за лечение одного зуба; зависит от глубины поражения и объёма пломбирования",
+    ),
+    "clasp_dentures": (
+        "unit",
+        "за один протез; частичное восстановление, вариант на кламмерах или замках",
+    ),
+    "classic": (
+        "tooth_package",
+        "за один зуб под ключ; КТ при необходимости — отдельно",
+    ),
+    "implant_supported_prosthetics": (
+        "tooth",
+        "за ортопедический этап для одного зуба (коронка/мост); "
+        "имплантация оплачивается отдельно",
+    ),
+    "one_stage": (
+        "tooth_package",
+        "за один зуб под ключ; КТ и лечение воспаления до операции — "
+        "по показаниям, отдельно",
+    ),
+    "periodontitis": (
+        "course",
+        "за полный курс лечения; точный план после диагностики дёсен",
+    ),
+    "professional_whitening": (
+        "procedure",
+        "за одну процедуру; точная стоимость зависит от выбранного протокола",
+    ),
+    "pterygoid_implants": (
+        "implant",
+        "за один имплант; коронка или протез — отдельно",
+    ),
+    "pulpitis": (
+        "tooth",
+        "за лечение одного зуба: лечение каналов и восстановление зуба; "
+        "при необходимости коронка оплачивается отдельно",
+    ),
+    "removable_dentures": (
+        "jaw",
+        "за одну челюсть; имплантация — отдельно",
+    ),
+    "sinus_lift": (
+        "procedure",
+        "за одну область; стоимость зависит от объёма костного материала и "
+        "способа доступа; имплант, коронка и КТ — отдельно",
+    ),
+    "teeth_treatment": ("tooth", "за лечение одного зуба"),
+    "temporary_teeth": (
+        "tooth",
+        "за одну временную коронку на период приживления; "
+        "постоянная коронка — отдельно",
+    ),
+    "tomography": ("procedure", "за одно исследование"),
+    "tooth_extraction": (
+        "tooth",
+        "за удаление одного зуба; сложное удаление или зуб мудрости — "
+        "по результатам осмотра",
+    ),
+    "veneers": (
+        "tooth",
+        "за один зуб; полная реставрация улыбки рассчитывается на консультации",
+    ),
+    "zirconia_crowns": (
+        "unit",
+        "за одну конструкцию; стоимость зависит от сложности и типа — коронка или мост",
+    ),
+    "zygomatic_implants": (
+        "jaw",
+        "за одну челюсть; временный и постоянный протез — по плану лечения",
+    ),
+}
+
+EXPECTED_BRANDS = {
+    "version": 1,
+    "brands": {
+        "implantium": {
+            "canonical_name": "Implantium",
+            "country": "Южная Корея",
+            "aliases": ["имплантиум"],
+        },
+        "impro": {
+            "canonical_name": "Impro",
+            "country": "Германия",
+            "aliases": ["импро"],
+        },
+        "nobel_biocare": {
+            "canonical_name": "Nobel Biocare",
+            "country": "Швейцария",
+            "aliases": ["nobel", "нобель", "нобел"],
+        },
+    },
+}
+
+BRAND_IDS = {
+    "Implantium": "implantium",
+    "Impro": "impro",
+    "Nobel Biocare": "nobel_biocare",
+}
+OPTION_IDS = {
+    ("removable_dentures", "partial"): "partial",
+    ("removable_dentures", "full"): "full",
+    ("sinus_lift", "closed"): "closed",
+    ("sinus_lift", "open"): "open",
+}
+
+
+def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate_mapping_key:{key}")
+        result[key] = value
+    return result
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    value = json.loads(
+        path.read_text(encoding="utf-8"),
+        object_pairs_hook=_reject_duplicate_pairs,
+    )
+    if not isinstance(value, dict):
+        raise TypeError("json_top_level_must_be_mapping")
+    return value
+
+
+def _target_offer_files() -> list[Path]:
+    return sorted(TARGET_OFFERS.glob("*.json"), key=lambda path: path.name)
+
+
+def _target_offer_records() -> list[dict[str, Any]]:
+    return [_load_json(path) for path in _target_offer_files()]
+
+
+def _current_price_records() -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    for path in sorted(CURRENT_OFFERS.glob("*.json")):
+        record = _load_json(path)
+        records[record["service_id"]] = record
+    return records
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _real_bundle() -> ResponseSchemaBundle:
+    raw_services = _load_json(TARGET_SERVICES)
+    return ResponseSchemaBundle.model_validate(
+        {
+            "services": {
+                service_id: TargetService.model_validate(record)
+                for service_id, record in raw_services.items()
+            },
+            "brands": _load_json(TARGET_BRANDS),
+            "offers": _target_offer_records(),
+            "facts": _load_json(TARGET_FACTS),
+            "strategy": {"version": 1, "default_max_options": 3, "rules": []},
+            "marketing": {
+                "version": 1,
+                "limits": {
+                    "max_marketing_facts_per_turn": 0,
+                    "max_amplifiers_per_turn": 0,
+                    "max_scenarios_per_turn": 0,
+                },
+                "initial_commercial_blocks": {},
+                "scenario_rules": {},
+                "cta_contexts": {"default": "validation_only"},
+            },
+        }
+    )
+
+
+def test_target_files_are_strict_complete_frozen_wire_data() -> None:
+    offer_files = _target_offer_files()
+    offers = _target_offer_records()
+    brands_raw = _load_json(TARGET_BRANDS)
+    facts_raw = _load_json(TARGET_FACTS)
+
+    assert len(offer_files) == len(offers) == 31
+    assert len({offer["offer_id"] for offer in offers}) == 31
+    for path, offer in zip(offer_files, offers, strict=True):
+        assert path.name == f'{offer["offer_id"]}.json'
+    for offer in offers:
+        assert TargetOffer.model_validate(offer).model_dump(exclude_none=True) == offer
+    assert (
+        TargetBrandCatalog.model_validate(brands_raw).model_dump(exclude_none=True)
+        == brands_raw
+    )
+    assert len(facts_raw) == 6
+    for fact in facts_raw.values():
+        assert (
+            TargetCommercialFact.model_validate(fact).model_dump(exclude_none=True)
+            == fact
+        )
+
+
+def test_nested_duplicate_keys_are_rejected() -> None:
+    duplicate = '{"offer":{"price":{"mode":"fixed","mode":"from"}}}'
+    with pytest.raises(ValueError, match="duplicate_mapping_key:mode"):
+        json.loads(duplicate, object_pairs_hook=_reject_duplicate_pairs)
+
+
+def test_all_15_simple_and_16_complex_offers_preserve_source_prices() -> None:
+    target = {offer["offer_id"]: offer for offer in _target_offer_records()}
+    current = _current_price_records()
+    simple_count = 0
+    variant_count = 0
+
+    for service_id, source in current.items():
+        expected_followups = (
+            []
+            if service_id == "pulpitis"
+            else [
+                {"id": "includes", "label": item["label"], "action": item["action"]}
+                for item in source.get("followups", [])
+                if item.get("aspect") == "includes"
+            ]
+        )
+        if source["price_model"] == "simple":
+            simple_count += 1
+            offer = target[f"{service_id}.default"]
+            price = source["price"]
+            assert offer["service_id"] == service_id
+            assert offer["price"]["mode"] == price["price_type"]
+            amount_key = "amount" if price["price_type"] == "fixed" else "min_amount"
+            assert offer["price"][amount_key] == price["value"]
+            assert offer["price"]["currency"] == price["currency"]
+            assert offer["package"]["includes"] == []
+            assert offer["fact_refs"] == source["fact_refs"]
+            assert offer["followups"] == expected_followups
+            assert "brand_id" not in offer and "option_id" not in offer
+            continue
+
+        for variant in source["variants"]:
+            variant_count += 1
+            offer = target[variant["offer_id"]]
+            assert offer["service_id"] == service_id
+            expected_mode = "from" if service_id == "sinus_lift" else "fixed"
+            amount_key = "min_amount" if expected_mode == "from" else "amount"
+            assert offer["price"]["mode"] == expected_mode
+            assert offer["price"][amount_key] == variant["total"]
+            assert offer["price"]["currency"] == variant["currency"]
+            assert offer["package"]["includes"] == variant["includes"]
+            assert offer["fact_refs"] == source["fact_refs"]
+            assert offer["followups"] == expected_followups
+            option_key = (service_id, variant["brand"])
+            if option_key in OPTION_IDS:
+                assert offer["option_id"] == OPTION_IDS[option_key]
+                assert "brand_id" not in offer
+            else:
+                assert offer["brand_id"] == BRAND_IDS[variant["brand"]]
+                assert "option_id" not in offer
+
+    assert simple_count == 15
+    assert variant_count == 16
+    assert set(target) == {
+        f"{service_id}.default"
+        for service_id, source in current.items()
+        if source["price_model"] == "simple"
+    } | {
+        variant["offer_id"]
+        for source in current.values()
+        for variant in source["variants"]
+    }
+
+
+def test_owner_units_labels_and_followups_have_no_legacy_dead_actions() -> None:
+    offers = _target_offer_records()
+
+    assert set(UNIT_LABELS) == set(_load_json(TARGET_SERVICES))
+    for offer in offers:
+        unit, label = UNIT_LABELS[offer["service_id"]]
+        assert offer["price"]["billing_unit"] == unit
+        assert offer["package"]["label"] == label
+        assert all(followup["id"] == "includes" for followup in offer["followups"])
+        assert all(followup["action"] == "price_aspect" for followup in offer["followups"])
+        assert not (
+            {"recommended", "payment_stages", "excludes", "note", "intro_text"}
+            & set(offer)
+        )
+
+    sinus = [offer for offer in offers if offer["service_id"] == "sinus_lift"]
+    assert {offer["price"]["mode"] for offer in sinus} == {"from"}
+    assert {offer["price"]["min_amount"] for offer in sinus} == {42000, 68000}
+    assert next(offer for offer in offers if offer["service_id"] == "pulpitis")[
+        "followups"
+    ] == []
+
+
+def test_brands_and_facts_preserve_sources_and_promo_integrity() -> None:
+    brands = _load_json(TARGET_BRANDS)
+    aliases = _load_json(DEMO_ROOT / "price_brand_aliases.json")["brand_aliases"]
+    facts = _load_json(TARGET_FACTS)
+    source_facts = _load_json(DEMO_ROOT / "pricebook/facts.json")["facts"]
+    marketing = yaml.safe_load(
+        (DEMO_ROOT / "marketing.yaml").read_text(encoding="utf-8")
+    )
+    promo_rules = marketing["promo_rules"]
+    services = list(_load_json(TARGET_SERVICES))
+    current = _current_price_records()
+
+    assert brands == EXPECTED_BRANDS
+    assert set(brands["brands"]) == {"implantium", "impro", "nobel_biocare"}
+    for brand in brands["brands"].values():
+        for alias in brand["aliases"]:
+            assert aliases[alias] == brand["canonical_name"]
+
+    assert list(facts) == list(source_facts)
+    kb_refs = set(build_response_schema_kb_refs(DEMO_ROOT / "md"))
+    for fact_id, fact in facts.items():
+        source = source_facts[fact_id]
+        assert fact["id"] == source["id"]
+        assert fact["kind"] == source["kind"]
+        assert fact["text_fact"] == source["text_fact"]
+        assert fact["render_mode"] == source["render_mode"]
+        assert fact["active"] is True
+        assert "active_from" not in fact
+        assert fact["incompatible_with"] == []
+        assert fact["allowed_service_ids"] == [
+            service_id
+            for service_id in services
+            if fact_id in current[service_id]["fact_refs"]
+        ]
+        if source.get("detail_ref") is None:
+            assert "detail_ref" not in fact
+        else:
+            assert fact["detail_ref"] == source["detail_ref"]
+            assert f'kb:{fact["detail_ref"]}' in kb_refs
+
+    for fact_id, rule in promo_rules.items():
+        fact = facts[fact_id]
+        assert fact["active"] == rule["active"] is True
+        assert fact["active_until"] == rule["active_until"]
+        assert set(fact["allowed_service_ids"]) == set(rule["allowed_service_ids"])
+
+    undated = set(facts) - set(promo_rules)
+    for fact_id in undated:
+        assert "active_until" not in facts[fact_id]
+
+
+def test_real_bundle_builds_every_service_price_doctor_context() -> None:
+    bundle = _real_bundle()
+    doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+
+    assert len(bundle.services) == 21
+    assert len(bundle.offers) == 31
+    for service_id in bundle.services:
+        context = build_service_data_context(bundle, doctors, service_id)
+        expected_offers = [
+            offer.model_dump() for offer in bundle.offers if offer.service_id == service_id
+        ]
+        expected_doctor_ids = [
+            doctor_id
+            for doctor_id, doctor in doctors.doctors.items()
+            if service_id in doctor.service_ids
+        ]
+        assert context.service_id == service_id
+        assert context.service.model_dump() == bundle.services[service_id].model_dump()
+        assert [offer.model_dump() for offer in context.offers] == expected_offers
+        assert expected_offers
+        assert [doctor.doctor_id for doctor in context.doctors] == expected_doctor_ids
+
+    tomography = build_service_data_context(bundle, doctors, "tomography")
+    assert len(tomography.offers) == 1
+    assert tomography.doctors == ()
+
+
+def test_real_sources_are_read_only_and_test_has_no_product_wiring() -> None:
+    paths = [
+        TARGET_SERVICES,
+        TARGET_BRANDS,
+        TARGET_FACTS,
+        DEMO_ROOT / "doctor_catalog.json",
+        DEMO_ROOT / "pricebook/facts.json",
+        DEMO_ROOT / "price_brand_aliases.json",
+        DEMO_ROOT / "marketing.yaml",
+        *_target_offer_files(),
+        *sorted(CURRENT_OFFERS.glob("*.json")),
+        *sorted((DEMO_ROOT / "md").glob("*.md")),
+    ]
+    before = {path: _sha256(path) for path in paths}
+
+    _real_bundle()
+    load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+    build_response_schema_kb_refs(DEMO_ROOT / "md")
+
+    assert {path: _sha256(path) for path in paths} == before
+
+    source = Path(__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    imported_modules.update(
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    )
+    called_attributes = {
+        node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+
+    assert imported_modules.isdisjoint(
+        {"app", "core.pricebook_loader", "doctors_lookup", "orchestration"}
+    )
+    assert called_attributes.isdisjoint(
+        {"mkdir", "open", "touch", "unlink", "write_bytes", "write_text"}
+    )

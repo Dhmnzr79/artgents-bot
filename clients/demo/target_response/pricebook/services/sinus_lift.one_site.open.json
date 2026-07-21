@@ -1,0 +1,33 @@
+{
+  "offer_id": "sinus_lift.one_site.open",
+  "service_id": "sinus_lift",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 68000,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "за одну область; стоимость зависит от объёма костного материала и способа доступа; имплант, коронка и КТ — отдельно",
+    "includes": [
+      "анестезия",
+      "костный материал",
+      "мембрана",
+      "контрольные осмотры"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "option_id": "open"
+}

@@ -1,0 +1,36 @@
+{
+  "offer_id": "all_on_4.jaw.nobel",
+  "service_id": "all_on_4",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 428000,
+    "currency": "RUB",
+    "billing_unit": "jaw"
+  },
+  "package": {
+    "label": "за одну челюсть; КТ и костная пластика по показаниям — отдельно",
+    "includes": [
+      "4 импланта с документами",
+      "хирургия и анестезия",
+      "несъёмный протез в день операции",
+      "постоянный протез через 3–6 месяцев",
+      "куратор лечения"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount",
+    "tax_deduction"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "brand_id": "nobel_biocare"
+}

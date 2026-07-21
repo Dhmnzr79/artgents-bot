@@ -1,0 +1,34 @@
+{
+  "offer_id": "classic.one_tooth.impro",
+  "service_id": "classic",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 85200,
+    "currency": "RUB",
+    "billing_unit": "tooth_package"
+  },
+  "package": {
+    "label": "за один зуб под ключ; КТ при необходимости — отдельно",
+    "includes": [
+      "имплант с документами",
+      "хирургия и анестезия",
+      "коронка на импланте",
+      "контрольные осмотры и куратор"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "brand_id": "impro"
+}

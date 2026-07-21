@@ -1,0 +1,22 @@
+{
+  "offer_id": "zygomatic_implants.default",
+  "service_id": "zygomatic_implants",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 420000,
+    "currency": "RUB",
+    "billing_unit": "jaw"
+  },
+  "package": {
+    "label": "за одну челюсть; временный и постоянный протез — по плану лечения",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": []
+}

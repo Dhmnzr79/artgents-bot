@@ -1,0 +1,20 @@
+{
+  "offer_id": "zirconia_crowns.default",
+  "service_id": "zirconia_crowns",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 25000,
+    "currency": "RUB",
+    "billing_unit": "unit"
+  },
+  "package": {
+    "label": "за одну конструкцию; стоимость зависит от сложности и типа — коронка или мост",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": []
+}

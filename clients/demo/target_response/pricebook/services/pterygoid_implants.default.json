@@ -1,0 +1,22 @@
+{
+  "offer_id": "pterygoid_implants.default",
+  "service_id": "pterygoid_implants",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 95000,
+    "currency": "RUB",
+    "billing_unit": "implant"
+  },
+  "package": {
+    "label": "за один имплант; коронка или протез — отдельно",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": []
+}

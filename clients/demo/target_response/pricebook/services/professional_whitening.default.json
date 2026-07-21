@@ -1,0 +1,19 @@
+{
+  "offer_id": "professional_whitening.default",
+  "service_id": "professional_whitening",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 18000,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "за одну процедуру; точная стоимость зависит от выбранного протокола",
+    "includes": []
+  },
+  "fact_refs": [
+    "professional_whitening_discount"
+  ],
+  "followups": []
+}

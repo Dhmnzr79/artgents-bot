@@ -1,0 +1,17 @@
+{
+  "offer_id": "tomography.default",
+  "service_id": "tomography",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 3000,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "за одно исследование",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

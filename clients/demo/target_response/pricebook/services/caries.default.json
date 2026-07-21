@@ -1,0 +1,17 @@
+{
+  "offer_id": "caries.default",
+  "service_id": "caries",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 6500,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за лечение одного зуба; зависит от глубины поражения и объёма пломбирования",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

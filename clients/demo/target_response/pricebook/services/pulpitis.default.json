@@ -1,0 +1,17 @@
+{
+  "offer_id": "pulpitis.default",
+  "service_id": "pulpitis",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 12000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за лечение одного зуба: лечение каналов и восстановление зуба; при необходимости коронка оплачивается отдельно",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

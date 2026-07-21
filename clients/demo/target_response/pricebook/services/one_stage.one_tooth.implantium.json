@@ -1,0 +1,35 @@
+{
+  "offer_id": "one_stage.one_tooth.implantium",
+  "service_id": "one_stage",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 86500,
+    "currency": "RUB",
+    "billing_unit": "tooth_package"
+  },
+  "package": {
+    "label": "за один зуб под ключ; КТ и лечение воспаления до операции — по показаниям, отдельно",
+    "includes": [
+      "удаление зуба при показаниях",
+      "имплант с документами в день удаления",
+      "хирургия и анестезия",
+      "коронка на импланте",
+      "контрольные осмотры и куратор"
+    ]
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "implant_warranty",
+    "installment_12",
+    "implant_same_day_discount"
+  ],
+  "followups": [
+    {
+      "id": "includes",
+      "label": "Что входит",
+      "action": "price_aspect"
+    }
+  ],
+  "brand_id": "implantium"
+}

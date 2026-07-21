@@ -286,7 +286,7 @@ Test собирает frozen `ResponseSchemaBundle` из real target data и val
 3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py tests/test_demo_doctor_catalog.py -q --basetemp=.pytest_tmp_s12_neighbors`;
 4. `.venv/codex312/Scripts/python.exe -m pytest tests/test_pricebook_contract.py tests/test_pricebook_loader.py -q --basetemp=.pytest_tmp_s12_legacy`;
 5. `.venv/codex312/Scripts/python.exe scripts/lint_content.py --client demo` и
-   `.venv/codex312/Scripts/python.exe scripts/lint_pricebook.py --client demo`;
+   `.venv/codex312/Scripts/python.exe scripts/lint_pricebook.py demo`;
 6. `git diff --check`, clean allowlist diff; independent checker повторяет review/runs;
 7. live/LLM и полный pytest не запускаются.
 

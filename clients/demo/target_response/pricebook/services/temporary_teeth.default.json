@@ -1,0 +1,20 @@
+{
+  "offer_id": "temporary_teeth.default",
+  "service_id": "temporary_teeth",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 18000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за одну временную коронку на период приживления; постоянная коронка — отдельно",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": []
+}

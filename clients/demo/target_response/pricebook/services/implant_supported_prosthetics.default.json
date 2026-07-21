@@ -1,0 +1,20 @@
+{
+  "offer_id": "implant_supported_prosthetics.default",
+  "service_id": "implant_supported_prosthetics",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 31000,
+    "currency": "RUB",
+    "billing_unit": "tooth"
+  },
+  "package": {
+    "label": "за ортопедический этап для одного зуба (коронка/мост); имплантация оплачивается отдельно",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": []
+}

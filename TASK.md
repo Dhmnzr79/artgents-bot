@@ -242,16 +242,21 @@ block повторно.
 
 ## Slot accounting examples
 
-### Один `cost` scenario для All-on-4
+### Один `cost` scenario для All-on-4 в context `price`
 
 На demo data и дате `2026-07-21`:
 
 1. `fact:installment_12` — amplifier + marketing slot;
 2. `fact:implant_same_day_discount` — amplifier + marketing slot;
-3. `fact:free_implant_consult` — initial marketing slot;
-4. CTA `price` отдельно.
+3. exact initial block `price` отсутствует, поэтому третий slot остаётся пустым;
+4. CTA `price` выбирается отдельно.
 
-Итого: 3 marketing refs, 2 amplifiers, одна CTA. Дубли scenario/initial не повторяются.
+Итого: 2 marketing refs, 2 amplifiers, одна CTA. Selector не использует block
+`service` как скрытый fallback для `price`.
+
+В context `service` тот же `cost` scenario может после двух amplifiers заполнить третий
+slot `fact:free_implant_consult` из exact `service` block, но CTA тогда будет `plan`.
+Оба результата следуют данным, а не догадке selector’а.
 
 ### Professional whitening initial block
 
@@ -338,7 +343,8 @@ Round-robin acceptance обязательно включает shared-first-ref 
 `tests/test_demo_target_marketing_selection.py` обязан доказать:
 
 1. S2/S4/S5/S6/S20 boundaries строят explicit real inputs read-only;
-2. All-on-4 cost example возвращает exact 3/2 refs и CTA `price`;
+2. All-on-4 cost в context `price` возвращает exact 2/2 refs, не использует чужой
+   `service` block и выбирает CTA `price`;
 3. professional whitening initial возвращает только применимую скидку;
 4. doctor-trust для конкретной услуги не возвращает несвязанных doctors;
 5. general doctors context разрешает exact doctor refs и CTA `doctor`;

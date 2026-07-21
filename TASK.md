@@ -1,60 +1,92 @@
-# TASK — S11 Demo Target Service Catalog Materialization
+# TASK — S12 Demo Target Price Offers Materialization
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `c548423 feat: assemble target service data context S10`
+**Baseline:** `e9dcc41 data: materialize demo target service catalog S11`
 
-**Серия / checkpoint:** `S11` — материализация полного target-каталога всех 21
-demo-услуг в final S1 wire shape и offline-доказательство его целостности.
+**Серия / checkpoint:** `S12` — материализация полного offline target price layer для
+всех 21 demo-услуг: brand catalog, 31 offer и 6 commercial facts в frozen S1 wire
+shape.
 
-**Режим:** client data materialization only. Никаких target offers, product consumers,
-routes/UI, live/LLM или product authority.
+**Режим:** client data materialization only. Никаких strategy/marketing files,
+product consumers, routes/UI, live/LLM или product authority.
+
+## Owner decision после первого checker-review
+
+21 июля 2026 владелец demo явно утвердил:
+
+- недостающие source-owned единицы для девяти current simple prices:
+  - `aligners` и `periodontitis` — полный курс;
+  - `caries`, `pulpitis`, `teeth_treatment`, `tooth_extraction` — один зуб;
+  - `professional_whitening` и `tomography` — одна процедура/исследование;
+  - `clasp_dentures` — один протез;
+- `sinus_lift` 42 000/68 000 показывается как цена **от**, потому что current source
+  говорит о зависимости от объёма материала и способа доступа;
+- важные authored границы и состав сохраняются в package label/includes;
+- legacy payment-stage breakdown 60/40 и связанные с ним кнопки не мигрируют; общая
+  цена, состав и существенные ограничения сохраняются.
+
+Это owner-authoring данных будущего demo pack, но не product authority: target pack не
+подключается к ответам.
 
 ## Цель
 
-Создать `clients/demo/target_response/service_catalog.json`, который:
+Дополнить изолированный `clients/demo/target_response/`:
 
-- содержит все 21 существующие demo-услуги с теми же exact `service_id`;
-- хранит только semantic identity услуги: имя, aliases, family/roles, active,
-  content ref, coarse selection и semantic options;
-- соответствует frozen S1 `TargetService` без отдельной/упрощённой schema;
-- сохраняет exact авторские name/aliases/active/MD-связи текущего demo-каталога;
-- материализует нормативную минимальную применимость из
-  `docs/PRICE_SERVICE_ARCHITECTURE.md`, не превращая её в медицинское назначение;
-- исправляет только две уже зафиксированные target-классификации: partial/full
-  removable denture и open/closed sinus lift являются options, а не брендами.
+- `brand_catalog.json` — три реальных бренда имплантов;
+- `pricebook/services/*.json` — ровно 31 target `TargetOffer`, по одному offer на файл;
+- `pricebook/facts.json` — шесть target `TargetCommercialFact`.
 
-S11 создаёт service-side общей связи «описание → цена → врач». Он не переносит цены,
-не строит offers и не вызывает S10 на реальном demo pack: target bundle ещё неполон.
+Каждая из 21 target-услуг S11 получает минимум один exact price offer. Суммы, currency,
+variant IDs, `includes`, fact refs и fact texts берутся из current demo pricebook.
+Owner-approved units/labels закрывают неоднозначности current source без runtime guesses.
 
-## Почему это следующий минимальный scope
+S12 не выбирает offer, не сортирует по коммерческому приоритету и не формирует ответ.
 
-S1–S4 уже определили и проверили target response-data contracts/loaders/indexes,
-S5–S9 — doctor schema и реальный demo doctor catalog, S10 — pure join по exact
-`service_id`. Но S10 пока доказан только на synthetic service/offer data.
+## Почему это минимальный scope
 
-Перед переносом price offers нужен один проверенный target service catalog, потому что
-каждый будущий offer и каждая doctor-связь обязаны ссылаться на него. Переносить
-services и offers одним checkpoint нельзя: legacy units/package/payment-stage data
-требуют отдельной точной проекции и checker-review, а S11 не должен принимать эти
-решения скрыто.
+S11 создал service-side общей связи «описание → цена → врач», а S10 умеет pure собирать
+service, offers и doctors по одному exact `service_id`. Но real target offers ещё нет.
 
-## Final pack boundary
+Offer нельзя aggregate-валидировать без service/option/brand/fact refs. Поэтому S12
+переносит ровно три взаимозависимых owner-слоя: brands, offers и facts. Clinic strategy
+и target marketing остаются следующим отдельным checkpoint; persisted заглушки
+запрещены.
 
-`clients/demo/target_response/` является изолированным корнем будущего S2 target pack.
-S11 создаёт в нём только `service_catalog.json`. Отсутствующие пока
-`brand_catalog.json`, `pricebook/**`, `clinic_strategy.yaml` и target `marketing.yaml`
-не подменяются пустыми заглушками.
+## Incomplete target-pack boundary
 
-Поэтому S2 `load_response_schema_bundle(...)` намеренно ещё не вызывается на этом
-каталоге: fail-closed loader требует полный pack. Следующие отдельные checkpoints
-добавят остальные owner-файлы. Current runtime не ищет и не читает этот каталог.
+`clients/demo/target_response/` остаётся неполным будущим S2 pack. После S12 в нём есть
+services, brands, offers и facts, но нет `clinic_strategy.yaml` и target
+`marketing.yaml`. Real S2 `load_response_schema_bundle(...)` пока намеренно fail-closed
+и не вызывается.
+
+Acceptance test проверяет real data одним frozen `ResponseSchemaBundle` только с двумя
+in-memory validation shells:
+
+```python
+strategy = {"version": 1, "default_max_options": 3, "rules": []}
+marketing = {
+    "version": 1,
+    "limits": {
+        "max_marketing_facts_per_turn": 0,
+        "max_amplifiers_per_turn": 0,
+        "max_scenarios_per_turn": 0,
+    },
+    "initial_commercial_blocks": {},
+    "scenario_rules": {},
+    "cta_contexts": {"default": "validation_only"},
+}
+```
+
+Shells не записываются, не экспортируются и запрещены как product defaults/strategy.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `clients/demo/target_response/service_catalog.json` (new);
-- `tests/test_demo_target_service_catalog.py` (new);
+- `clients/demo/target_response/brand_catalog.json` (new);
+- `clients/demo/target_response/pricebook/facts.json` (new);
+- `clients/demo/target_response/pricebook/services/*.json` (31 new files);
+- `tests/test_demo_target_price_offers.py` (new);
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -62,191 +94,210 @@ S11 создаёт в нём только `service_catalog.json`. Отсутст
 
 ## Protected / вне scope
 
-- существующий `clients/demo/service_catalog.json`, все MD, pricebook, marketing,
-  policies, doctor catalog и остальные current client files;
+- весь current `clients/demo/pricebook/**`, aliases, marketing, current service catalog,
+  MD, doctor catalog и остальные current client files;
+- S11 `clients/demo/target_response/service_catalog.json`;
 - весь `clients/cesi/**` и `clients/nikadent/**`;
-- frozen S1–S10 contracts/loaders/builders/tests;
-- target brands, offers, prices, packages, facts, strategy, marketing и CTA;
-- преобразователь/adapter/dual-read между legacy и target formats;
-- current service/price/doctor loaders, retrieval, caches и client discovery;
-- query recognition, TurnFrame/session/follow-up/dialog focus, applicability selector,
-  ranking/recommendations и answer composition;
-- routes/API/app, prompts, answers, UI/cards и feature flags;
-- doctor data, booking, availability, schedule/calendar/CRM;
+- frozen S1–S11 contracts/loaders/builders/tests и изменение target schema/layout;
+- persisted strategy, target marketing, manifest/groups и CTA;
+- adapter/converter/dual-read/fallback/runtime loader wiring;
+- selection/applicability, filtering, ranking, brand comparison, promo/cadence policy;
+- TurnFrame/session/follow-up focus, rendering/composer/verifier, routes/API/app/UI;
 - protected acceptance/golden/eval fixtures;
 - весь A9 design/raw/frozen/harness/evidence и A9 live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Нормативная форма файла
+## Нормативный brand catalog
 
-UTF-8 JSON содержит один top-level mapping без wrapper/version. Keys и их authored
-order exact равны текущему `clients/demo/service_catalog.json`. Каждое значение
-содержит ровно поля frozen S1 `TargetService`:
+`brand_catalog.json` exact:
 
 ```json
 {
-  "name": "...",
-  "aliases": [],
-  "family": "...",
-  "roles": [],
-  "active": true,
-  "content_ref": "...md",
-  "selection": {"mode": "..."},
-  "options": []
+  "version": 1,
+  "brands": {
+    "implantium": {
+      "canonical_name": "Implantium",
+      "country": "Южная Корея",
+      "aliases": ["имплантиум"]
+    },
+    "impro": {
+      "canonical_name": "Impro",
+      "country": "Германия",
+      "aliases": ["импро"]
+    },
+    "nobel_biocare": {
+      "canonical_name": "Nobel Biocare",
+      "country": "Швейцария",
+      "aliases": ["nobel", "нобель", "нобел"]
+    }
+  }
 }
 ```
 
-`content_ref` отсутствует только у `tomography`; optional `None` fields semantic options
-также не записываются. Никаких legacy `facts`, `response_mode`, `price_key`, `price_ref`, `price_display`,
-`concern_ref`, `suggest_refs`, денег, CTA или doctor IDs в target catalog нет.
+Canonical names/countries подтверждаются current variant labels. Aliases exact
+проецируются из `price_brand_aliases.json`, кроме lowercase canonical name.
+`partial/full/closed/open` являются S11 options и как brands запрещены.
 
-## Exact transitional projection
+## Offer file law
 
-Для каждого exact `service_id` из current demo catalog target сохраняет:
+Каждый file содержит ровно один frozen `TargetOffer` mapping без wrapper:
 
-- `name` = exact current `title`;
-- `aliases` = exact current `aliases`, включая authored order;
-- `active` = exact current `active`;
-- `content_ref` = `<md_entry_ref>.md`, если current `md_entry_ref` не `null`;
-- key `content_ref` отсутствует для `tomography`, где утверждённого MD entry нет;
-  validated S1 model при этом имеет `content_ref is None`.
+- 15 simple services → `<service_id>.default` в `<service_id>.default.json`;
+- 16 complex variants сохраняют exact current `offer_id` и filename
+  `<offer_id>.json`;
+- итого exact 31 unique IDs/files;
+- filename/ID parity проверяется real-data test, но loader не выводит ID из filename.
 
-Это read-only migration evidence, а не runtime adapter. Новый acceptance test строит
-projection только внутри test module и требует exact parity. После будущего authority
-transfer legacy catalog и transitional parity test удаляются отдельным checkpoint.
+Все offers:
 
-## Exact family / roles / selection inventory
+- exact `service_id`, source amount/min_amount, `currency`, fact refs/order;
+- `active: true`;
+- current simple `fixed/from` → target `fixed/from`;
+- complex variant total → `fixed`, кроме двух `sinus_lift` variants → `from` по owner
+  decision и authored dependency statement;
+- complex `package.includes` exact current list; simple includes empty;
+- optional `option_id`/`brand_id` keys отсутствуют, когда model value `None`;
+- только current `aspect == includes` followup сохраняется как
+  `{id: includes, exact label, exact action}`.
 
-Нормативная проекция дословно следует таблице «Inventory минимальной применимости demo»
-в `docs/PRICE_SERVICE_ARCHITECTURE.md`:
+## Exact option / brand linkage
 
-| service_id | family | roles | selection |
-|---|---|---|---|
-| `tomography` | `diagnostics` | `supporting` | `direct` |
-| `professional_whitening` | `aesthetics` | — | `context` |
-| `classic` | `implantology` | `protocol` | `scope`; extent `one_tooth`, `few_teeth` |
-| `one_stage` | `implantology` | `protocol` | `context`; extent `one_tooth`, `few_teeth`; stage `extraction_context` |
-| `all_on_4` | `implantology` | `protocol` | `scope`; extent `full_arch` |
-| `all_on_6` | `implantology` | `protocol` | `scope`; extent `full_arch` |
-| `temporary_teeth` | `prosthodontics` | `supporting` | `direct`; stage `extraction_context`, `implant_placed` |
-| `implant_supported_prosthetics` | `prosthodontics` | — | `scope`; extent `one_tooth`, `few_teeth`, `full_arch`; stage `implant_placed` |
-| `caries` | `therapy` | — | `direct` |
-| `pulpitis` | `endodontics` | — | `direct` |
-| `teeth_treatment` | `therapy` | — | `context` |
-| `tooth_extraction` | `surgery` | — | `direct` |
-| `periodontitis` | `periodontology` | — | `direct` |
-| `aligners` | `orthodontics` | — | `context` |
-| `veneers` | `aesthetics` | — | `context` |
-| `zirconia_crowns` | `prosthodontics` | — | `scope`; extent `one_tooth`, `few_teeth`; stage `natural_tooth_present`, `implant_placed` |
-| `clasp_dentures` | `prosthodontics` | — | `scope`; extent `few_teeth`; stage `natural_tooth_present` |
-| `sinus_lift` | `implantology` | — | `context`; jaw `upper`; reported_context `reported_bone_deficit` |
-| `zygomatic_implants` | `implantology` | `advanced_protocol` | `context`; extent `full_arch`; jaw `upper`; reported_context `reported_bone_deficit` |
-| `pterygoid_implants` | `implantology` | `advanced_protocol` | `context`; extent `few_teeth`, `full_arch`; jaw `upper`; reported_context `reported_bone_deficit` |
-| `removable_dentures` | `prosthodontics` | — | `scope`; extent `few_teeth`, `full_arch` |
+- removable `partial/full` → одноимённые `option_id`, no brand;
+- sinus `closed/open` → одноимённые `option_id`, no brand;
+- `Implantium/Impro/Nobel Biocare` → `implantium/impro/nobel_biocare` brand IDs;
+- simple offers имеют no option/brand.
 
-`—` означает exact empty list. Отсутствующие selection axes не записываются и не
-заполняются `null`.
+Никакая связь не выводится из filename или human label.
 
-## Semantic options
+## Exact billing units и owner-approved package labels
 
-Только две услуги имеют options в S11.
+| service_id | billing_unit | exact package.label |
+|---|---|---|
+| `aligners` | `course` | `за полный курс лечения; зависит от сложности прикуса и количества кап` |
+| `all_on_4` | `jaw` | `за одну челюсть; КТ и костная пластика по показаниям — отдельно` |
+| `all_on_6` | `jaw` | `за одну челюсть; КТ и костная пластика по показаниям — отдельно` |
+| `caries` | `tooth` | `за лечение одного зуба; зависит от глубины поражения и объёма пломбирования` |
+| `clasp_dentures` | `unit` | `за один протез; частичное восстановление, вариант на кламмерах или замках` |
+| `classic` | `tooth_package` | `за один зуб под ключ; КТ при необходимости — отдельно` |
+| `implant_supported_prosthetics` | `tooth` | `за ортопедический этап для одного зуба (коронка/мост); имплантация оплачивается отдельно` |
+| `one_stage` | `tooth_package` | `за один зуб под ключ; КТ и лечение воспаления до операции — по показаниям, отдельно` |
+| `periodontitis` | `course` | `за полный курс лечения; точный план после диагностики дёсен` |
+| `professional_whitening` | `procedure` | `за одну процедуру; точная стоимость зависит от выбранного протокола` |
+| `pterygoid_implants` | `implant` | `за один имплант; коронка или протез — отдельно` |
+| `pulpitis` | `tooth` | `за лечение одного зуба: лечение каналов и восстановление зуба; при необходимости коронка оплачивается отдельно` |
+| `removable_dentures` | `jaw` | `за одну челюсть; имплантация — отдельно` |
+| `sinus_lift` | `procedure` | `за одну область; стоимость зависит от объёма костного материала и способа доступа; имплант, коронка и КТ — отдельно` |
+| `teeth_treatment` | `tooth` | `за лечение одного зуба` |
+| `temporary_teeth` | `tooth` | `за одну временную коронку на период приживления; постоянная коронка — отдельно` |
+| `tomography` | `procedure` | `за одно исследование` |
+| `tooth_extraction` | `tooth` | `за удаление одного зуба; сложное удаление или зуб мудрости — по результатам осмотра` |
+| `veneers` | `tooth` | `за один зуб; полная реставрация улыбки рассчитывается на консультации` |
+| `zirconia_crowns` | `unit` | `за одну конструкцию; стоимость зависит от сложности и типа — коронка или мост` |
+| `zygomatic_implants` | `jaw` | `за одну челюсть; временный и постоянный протез — по плану лечения` |
 
-`removable_dentures` exact order:
+Все variants одной service используют одинаковые unit/label. `jaw` означает одну
+челюсть; `tooth_package` не умножается; `unit` не переименовывается автоматически.
 
-1. `option_id: partial`, `name: Частичный съёмный протез`, empty aliases,
-   `selection.extent: [few_teeth]`;
-2. `option_id: full`, `name: Полный съёмный протез`, empty aliases,
-   `selection.extent: [full_arch]`.
+## Осознанно удаляемая legacy complexity
 
-`sinus_lift` exact order:
+По owner decision не мигрируют `recommended`, `payment_stages`, отдельный `excludes`,
+`note`, `intro_text`, `tags`, `promo`, `cta_key`, stage followups, dead pulpitis
+followup и manifest/groups.
 
-1. `option_id: closed`, `name: Закрытый синус-лифтинг`, empty aliases;
-2. `option_id: open`, `name: Открытый синус-лифтинг`, empty aliases.
+- существенные note/excludes границы сохранены в labels выше;
+- exact structured includes сохранены;
+- `recommended` позже принадлежит clinic strategy;
+- stages не имеют target data и поэтому не создают мёртвых buttons;
+- current pulpitis detail ref указывает на отсутствующий file/chunk и не переносится;
+- никаких compatibility fields/fallbacks не создаётся.
 
-У этих options `active` и `content_ref` отсутствуют (`None` в S1 model), то есть они
-наследуют parent. Sinus option selection отсутствует: бот не выбирает способ процедуры
-по coarse patient facts. У всех остальных услуг `options` exact empty.
+## Commercial facts law
 
-Option names подтверждаются текущими authored pricebook variant labels, но S11 не
-читает варианты как brands и не переносит их цены. Acceptance test проверяет exact
-names против двух соответствующих current price files read-only.
+Target `facts.json` — plain mapping шести current IDs в exact current order. Для каждого:
 
-## Content-ref integrity
+- exact `id/kind/text_fact/render_mode`;
+- `active: true`;
+- `allowed_service_ids` — target service-catalog order services, где current price file
+  содержит fact ref;
+- `incompatible_with: []`, no `active_from` key;
+- non-null `detail_ref` exact current; при current null key отсутствует и validated
+  model имеет `detail_ref is None`;
+- `active_until` key есть только при source-owned дате: current fact date или exact
+  `2026-12-31` из promo rule для `implant_same_day_discount`; иначе key отсутствует и
+  validated model имеет `active_until is None`.
 
-Для каждого non-null `content_ref`:
+Для трёх promo facts test отдельно требует set-parity `allowed_service_ids`, exact
+`active: true` и `active_until` с current `marketing.yaml/promo_rules`; authored target
+order при этом остаётся service-catalog order.
 
-1. exact файл существует в `clients/demo/md`;
-2. S4 `build_response_schema_kb_refs(...)` содержит exact
-   `kb:<content_ref>#korotko`;
-3. `tomography` является единственным service без content ref.
+Legacy `usable_in`, `followup_label`, routes/aspects/CTA не мигрируют: они принадлежат
+будущему target marketing. Все non-null detail refs существуют как `kb:<detail_ref>`.
 
-S11 не расширяет frozen S3 external-ref contract: service `content_ref` остаётся plain
-S1 field, а integrity доказывается только real-data acceptance test.
+## Aggregate / common-context law
+
+Test собирает frozen `ResponseSchemaBundle` из real target data и validation-only shells,
+доказывая service/option/brand/fact refs без нового validator-а.
+
+Для каждого 21 service S10 с real bundle + S9 doctor catalog возвращает:
+
+- exact service и все/только его offers, минимум один;
+- exact doctors по S9 links;
+- у `tomography` один offer и empty doctors;
+- без sorting/filtering/rendering.
 
 ## Protected tests / честность
 
-- новый test читает target catalog, current service catalog, два option source price
-  files и demo MD-root только read-only;
-- target records валидируются напрямую frozen `TargetService`; новая schema/wrapper не
-  создаётся;
-- current→target helper существует только в test и сравнивает разрешённую projection;
-- family/roles/selection inventory задан независимой expected-константой, а не копируется
-  из target output;
-- тест не импортирует current runtime loaders/routes/session/price selection;
-- source files до/после имеют exact одинаковые hashes;
-- frozen tests не меняются; skip/xfail, conditional PASS и runtime mocks запрещены.
+- new test читает real target/current sources, MD и doctor catalog только read-only;
+- strict JSON helper запрещает duplicate keys на любом уровне;
+- frozen S1 models/bundle/S10 используются напрямую; converter/schema не создаётся;
+- expected units/labels/link maps независимы от target output;
+- exact source amounts/currency/includes/fact refs сравниваются с current;
+- before/after hashes идентичны;
+- no current runtime loader/routes/session imports, writes, skip/xfail или mocks.
 
 ## Минимальные acceptance tests
 
-Один compact module доказывает:
-
-1. target JSON strict-decode с reject duplicate keys на любом уровне проходит,
-   top-level mapping имеет exact 21 IDs и order; compact synthetic duplicate-key case
-   доказывает fail-closed decoder test helper;
-2. каждая запись проходит frozen S1 `TargetService.model_validate`, а
-   `model_dump(exclude_none=True)` exact равен raw payload;
-3. target содержит только S1 service fields и не содержит legacy/price/doctor/UI keys;
-4. exact name/aliases/active/content-ref projection совпадает с current catalog;
-5. family/roles/selection exact равны нормативной inventory для всех 21 услуг;
-6. options exact существуют только у removable dentures и sinus lift, имеют
-   нормативные IDs/order/names/selection и не считаются brands;
-7. все non-null content refs существуют и имеют exact `#korotko` в S4 KB index;
-8. doctor catalog `service_ids` являются subset target IDs, а exact union равен target
-   IDs минус clinic-level `tomography`;
-9. before/after hashes всех прочитанных real files идентичны;
-10. source/AST audit подтверждает отсутствие writes, current runtime/session/A9 imports,
-    adapter/normalization и product wiring.
+1. Exact 3 brands, 6 facts, 31 sorted offer files/IDs; strict duplicate rejection.
+2. Frozen S1 validation и `model_dump(exclude_none=True) == raw` для каждого record.
+3. Exact 15 simple + 16 complex source projection, включая sinus `from` exception.
+4. Exact owner-approved unit/label table, source amounts, RUB, includes, refs/links.
+5. Только valid includes followups; stages/dead pulpitis/unknown actions отсутствуют.
+6. Brand aliases/countries exact; pseudo-brands отсутствуют.
+7. Facts exact, optional keys omitted, promo-rule parity и KB detail integrity.
+8. Real aggregate valid; каждый service проходит S10 с offer и exact doctors.
+9. No multiplication/strategy/ranking/runtime fields или persisted shells.
+10. Read-only hashes и AST/source no-product-wiring audit.
 
 ## Verification
 
 До data edits:
 
-1. independent read-only checker читает TASK, current service catalog, two option price
-   files, doctor catalog, frozen S1/S4/S5/S8/S10 contracts/tests, architecture docs,
+1. independent checker читает revised TASK, owner decision, all current price/fact/
+   alias/promo sources, target catalogs, frozen S1/S2/S4/S8/S10, architecture docs,
    checklist и guardrails;
-2. checker подтверждает final pack boundary, exact 21-service inventory, transitional
-   projection, option classification и отсутствие offer/runtime/A9 authority;
-3. при `❌`/`❓` TASK исправляется и повторно проверяется до data edits.
+2. checker подтверждает устранение previous ❌: nine units, sinus from, corrected labels,
+   optional fact keys, promo parity и exact validation shells;
+3. при `❌`/`❓` TASK снова исправляется до data edits.
 
 После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py -q --basetemp=.pytest_tmp_s11`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py tests/test_response_schema_kb_index.py -q --basetemp=.pytest_tmp_s11_contracts`;
-3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_doctor_catalog.py tests/test_service_data_context.py -q --basetemp=.pytest_tmp_s11_neighbors`;
-4. `.venv/codex312/Scripts/python.exe scripts/lint_content.py --client demo`;
-5. `git diff --check`, `git status --short`, diff only по allowlist;
-6. independent read-only checker сначала читает data/test diff, затем сам запускает те
-   же команды;
-7. live/LLM и полный pytest не запускаются: product consumers не меняются.
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_price_offers.py -q --basetemp=.pytest_tmp_s12`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py tests/test_response_schema_loader.py tests/test_service_data_context.py -q --basetemp=.pytest_tmp_s12_contracts`;
+3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py tests/test_demo_doctor_catalog.py -q --basetemp=.pytest_tmp_s12_neighbors`;
+4. `.venv/codex312/Scripts/python.exe -m pytest tests/test_pricebook_contract.py tests/test_pricebook_loader.py -q --basetemp=.pytest_tmp_s12_legacy`;
+5. `.venv/codex312/Scripts/python.exe scripts/lint_content.py --client demo` и
+   `.venv/codex312/Scripts/python.exe scripts/lint_pricebook.py --client demo`;
+6. `git diff --check`, clean allowlist diff; independent checker повторяет review/runs;
+7. live/LLM и полный pytest не запускаются.
 
 ## Definition of Done
 
-- один полный target service catalog всех 21 demo-услуг существует в final S1 shape;
-- exact current content identity и нормативная minimal selection inventory доказаны;
-- partial/full и open/closed представлены как semantic options, не brands;
-- content refs и doctor service links целостны;
-- target offers/full S2 pack и product wiring честно остаются следующими checkpoints;
-- current runtime, answers, routes, UI, session, A9 и authority не изменились;
-- roadmap отмечает S11 как offline demo materialization, не product activation;
-- checker `✅`, отдельные governance/completion commits и push только в
-  `origin/codex/stage-a`, рабочее дерево чистое.
+- all 21 services имеют минимум один target offer; всего exact 31;
+- brands/options/facts/services связаны stable IDs и aggregate valid;
+- source amounts/currency/includes/facts exact, owner units/labels explicit;
+- S10 real common context offline собирает description pointer + prices + doctors;
+- incomplete pack и удалённая legacy complexity описаны честно;
+- runtime/answers/UI/session/A9/authority не изменены;
+- roadmap S12 offline status независимо проверен;
+- checker `✅`, отдельные governance/completion commits и push только в stage-a,
+  рабочее дерево чистое.

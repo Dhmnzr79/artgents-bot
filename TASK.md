@@ -1,86 +1,171 @@
-# TASK — S19 Demo Implantation Consultation Values
+# TASK — S20 Demo Target Marketing Policy Materialization
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `07613c5 feat: validate service consultation values S18`
+**Baseline:** `3c578cf data: add demo consultation values S19`
 
-**Серия / checkpoint:** `S19` — минимальное demo-наполнение трёх implantation service
-Markdown через уже проверенный S18 `consultation_value` contract.
+**Серия / checkpoint:** `S20` — минимальная offline-материализация target marketing
+policy для demo и проверка CTA/source references.
 
-**Режим:** governance + three source-data fields + narrow real-data acceptance tests.
-Никаких schema/code/runtime/session/answers/routes/UI/live/LLM или product authority.
+**Режим:** governance + один target YAML + isolated CTA-reference contract + narrow
+synthetic/real-data acceptance + architecture status docs. Никаких selector/session,
+ответов, routes/UI, live/LLM или product authority.
 
 ## Owner direction
 
-21 июля 2026 владелец разрешил Исполнителю самостоятельно подготовить 2–3 небольшие
-продающие подводки только для demo-услуг имплантации. Это тестовое demo-наполнение, а не
-универсальные тексты для реальных клиник. Для будущих клиентов содержание отдельно
-редактируется и утверждается по их базе.
+21 июля 2026 владелец разрешил продолжить S-series после S19 и ранее подтвердил:
 
-Владелец не требует наполнять все услуги. S19 выбирает три репрезентативных документа:
+1. пять standard marketing scenarios из frozen target schema используются как общие
+   стоматологические ситуации, но конкретные refs/порядок остаются client data;
+2. clinic-specific приоритет задаётся простым ordered rule/pool, без ручного сценария
+   под каждый возможный вопрос;
+3. продающие акценты должны быть source-backed meanings, а не зашитые готовые ответы;
+4. три demo `consultation_value` S19 остаются отдельным same-MD источником и не
+   дублируются в target marketing policy;
+5. `consultation_value` cadence уже является universal law S18 и не добавляется в
+   client schema;
+6. следующий минимальный шаг — заполнить target marketing data и проверить его
+   offline, не подключая к ответам бота.
 
-- классическая имплантация;
-- одномоментная имплантация;
-- All-on-4.
+Demo не имеет live-клиентов. S20 не сохраняет старые combined-механизмы ради
+совместимости и не создаёт adapter/dual-read.
 
-## Основание
+## Архитектурное решение
 
-- S18 зафиксировал optional `consultation_value` в YAML frontmatter того же service MD;
-- поле не входит в общий FullContext body и разрешается только exact lookup по
-  service/option `content_ref`;
-- automatic cadence/placement остаются unwired: максимум один раз на document/session,
-  один marketing slot + один amplifier slot, direct question вне automatic slots;
-- current demo `marketing.yaml` уже содержит consult-reason semantics для этих трёх
-  услуг, а их service MD подтверждают соответствующие diagnostic/selection facts;
-- S19 публикует три owner-approved demo source values и не переносит остальные legacy
-  marketing strings.
+### Что материализуется
 
-## Exact approved data
+Создать `clients/demo/target_response/marketing.yaml`, который проходит frozen S1
+`TargetMarketingPolicy` и содержит только:
 
-В каждый файл добавляется ровно один YAML scalar `consultation_value` после `subtopic` и
-до `aliases`. Предпочтительная форма authoring — folded scalar `>-`.
+- универсальные лимиты `3 marketing facts / 2 amplifiers / 2 scenarios`;
+- один initial commercial block для semantic context `service`;
+- пять frozen scenario pools с exact ordered `fact:`/`kb:`/`doctor:` refs;
+- четыре semantic CTA contexts: `service`, `price`, `doctors`, `default`.
 
-### `implantation__service__classic.md`
+YAML хранит только порядок, refs, contexts и CTA keys. В нём запрещены готовые фразы,
+копии source facts, eligibility, route/aspect gates, labels и lead-flow copy.
 
-```yaml
-consultation_value: >-
-  На консультации врач оценит состояние кости и соседних зубов, сравнит подходящие системы имплантов и составит поэтапный план восстановления.
-```
-
-### `implantation__service__one_stage.md`
+### Exact target data
 
 ```yaml
-consultation_value: >-
-  На консультации врач проверит, можно ли удалить зуб и установить имплант в один день именно в вашей ситуации.
+version: 1
+limits:
+  max_marketing_facts_per_turn: 3
+  max_amplifiers_per_turn: 2
+  max_scenarios_per_turn: 2
+
+initial_commercial_blocks:
+  service:
+    ordered_fact_refs:
+      - fact:free_implant_consult
+      - fact:installment_12
+      - fact:implant_same_day_discount
+      - fact:professional_whitening_discount
+
+scenario_rules:
+  pain_fear:
+    ordered_amplifier_refs:
+      - kb:implantation__faq__pain.md#korotko
+      - kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut
+    allowed_semantic_contexts:
+      - service
+  cost:
+    ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:implant_same_day_discount
+      - fact:tax_deduction
+      - kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee
+      - kb:clinic__info__payment_terms.md#korotko
+    allowed_semantic_contexts:
+      - service
+      - price
+  time:
+    ordered_amplifier_refs:
+      - kb:implantation__faq__duration.md#korotko
+      - kb:implantation__faq__duration.md#mozhno-li-uskorit-implantatsiyu
+      - kb:implantation__faq__tooth_one_day.md#korotko
+      - kb:implantation__info__steps.md#korotko
+    allowed_semantic_contexts:
+      - service
+  doctor_trust:
+    ordered_amplifier_refs:
+      - doctor:doctors__doctor__volkov
+      - doctor:doctors__doctor__orlov
+      - kb:doctors__doctor__overview.md#korotko
+      - kb:clinic__info__technology.md#korotko
+    allowed_semantic_contexts:
+      - service
+      - doctors
+  result_reliability:
+    ordered_amplifier_refs:
+      - fact:implant_warranty
+      - kb:implantation__faq__osseointegration.md#korotko
+      - kb:implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie
+      - kb:clinic__info__warranty.md#korotko
+    allowed_semantic_contexts:
+      - service
+
+cta_contexts:
+  service: plan
+  price: price
+  doctors: doctor
+  default: callback
 ```
 
-### `implantation__service__all_on_4.md`
+Порядок является приоритетом для будущего selector, но S20 selector не реализует.
+Eligibility конкретного commercial fact остаётся только в target facts/offers; наличие
+ref в block/pool само по себе не разрешает показать неприменимый факт.
 
-```yaml
-consultation_value: >-
-  На консультации врач оценит КТ и поможет понять, подходит ли протокол All-on-4 или лучше рассмотреть другой вариант восстановления.
-```
+### CTA ownership and integrity
 
-Эти значения являются source-backed demo meanings. Они не являются обязательным
-дословным output: future composer может связать слова свободно, не меняя смысл и силу.
+- target policy хранит semantic context → CTA key;
+- видимый label и lead-flow copy продолжают принадлежать `clients/demo/tone.yaml`;
+- `service → plan`, `price → price`, `doctors → doctor`, fallback `default → callback`;
+- legacy `ct_consultation` не переносится и не приравнивается к `consult`;
+- все четыре target keys обязаны существовать в tone CTA index;
+- pure validator возвращает один deterministic sorted typed error для всех missing keys;
+- validator только проверяет уже переданные модели/index и ничего не читает сам.
+
+### Legacy marketing decisions
+
+- три S19 `consultation_value` — единственные отдельно опубликованные source meanings
+  из этого migration thread;
+- остальные 21 legacy free strings не копируются в target marketing policy и уходят
+  вместе со старой combined-архитектурой, если отдельно не опубликованы в source MD;
+- current `benefits` и `what_included` не являются target service IDs и не получают
+  marketing-key mapping;
+- current `teeth_whitening` не переносится как alias-key: target service уже называется
+  `professional_whitening`, а применимый promo принадлежит commercial fact;
+- current `clients/demo/marketing.yaml` и `patient_playbook.yaml` в S20 не меняются.
+
+### Historical S17 acceptance
+
+S17 корректно доказывал, что **на момент S17** target `marketing.yaml` отсутствовал.
+После осознанной S20 materialization его acceptance test меняется только так, чтобы
+проверять историческую запись в audit doc и frozen contract boundary, а не требовать
+текущее отсутствие файла. Inventory, 24-string audit и все прочие protected
+expectations не ослабляются.
 
 ## Цель
 
-1. Добавить exact три поля выше в same-MD frontmatter.
-2. Не менять MD body, H2/H3, aliases, `suggest_h3`, CTA или situation metadata.
-3. Доказать через real-data test, что S18 reader находит ровно эти три значения.
-4. Доказать exact cross-ref к target service catalog для `classic`, `one_stage`,
-   `all_on_4`.
-5. Доказать, что значения не находятся в MD body и не создают H3/follow-up.
-6. Не подключать values к product answer/session/runtime.
+1. До data/code зафиксировать exact policy и границы в governance commit.
+2. Добавить pure strict/frozen CTA key index и fail-closed reference validation.
+3. Создать ровно один target `marketing.yaml` с exact data выше.
+4. Доказать, что полный real demo target pack загружается S2 loader.
+5. Доказать local `fact:` refs, external `kb:`/`doctor:` refs и CTA refs.
+6. Сохранить runtime/answer/authority полностью unwired.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `clients/demo/md/implantation__service__classic.md`;
-- `clients/demo/md/implantation__service__one_stage.md`;
-- `clients/demo/md/implantation__service__all_on_4.md`;
-- `tests/test_demo_service_consultation_values.py` — new read-only real-data acceptance;
+- `contracts/marketing_cta_refs.py` — new pure CTA index/error/validator;
+- `tests/test_marketing_cta_refs.py` — new synthetic contract tests;
+- `clients/demo/target_response/marketing.yaml` — new exact target policy;
+- `tests/test_demo_target_marketing_policy.py` — new read-only real-data acceptance;
+- `tests/test_demo_target_marketing_migration_audit.py` — только замена obsolete
+  current-absence assertion на historical-audit assertion;
+- `docs/MARKETING_TARGET_MIGRATION_AUDIT.md` — S20 decision/status addendum;
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — demo materialization status only;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -88,76 +173,100 @@ consultation_value: >-
 
 ## Protected / вне scope
 
-- любые другие `clients/demo/md/*.md`, включая All-on-6 и advanced protocols;
-- body/content/H2/H3/aliases/suggest_h3/CTA/situation changes выбранных трёх MD;
-- current `clients/demo/marketing.yaml`, pricebook, playbook, doctors, tone/UI;
-- весь `clients/demo/target_response/**`;
-- перенос `clinic_proof`, promo, CTA или остальных `consult_reasons`;
-- `contracts/**`, `core/**`, orchestration, routes/API/app/UI/config;
-- изменение S18 schema/parser/cross-ref;
-- session state, cadence, selection, placement, composer prompt и FullContext assembly;
+- frozen `contracts/response_schema.py` и S1 model semantics;
+- S2/S3/S4/S5/S6/S8 loaders/index builders/validators;
+- current `clients/demo/marketing.yaml`, `patient_playbook.yaml`, `tone.yaml`, MD,
+  current/target pricebook, service/brand/doctor catalogs и clinic strategy;
+- новые/изменённые commercial facts, offers, doctors, services или source content;
+- перенос оставшихся legacy free strings и изменение S19 consultation values;
+- selector, matching, rotation, eligibility filtering, no-repeat/session state;
+- ResponseSpec/evidence/composer/FullContext/prompt/cache;
+- ответы, routes, API/app/UI/config, lead-flow и product authority;
 - adapters, dual-read, fallback, feature flags и product wiring;
-- protected golden/eval fixtures;
+- protected golden/eval fixtures, кроме exact obsolete S17 absence assertion,
+  явно разрешённого выше;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Frozen body preservation
+## Exact CTA-reference contract
 
-После split outer frontmatter delimiters через `text.split("---", 2)[2]` exact SHA-256
-body обязан остаться:
+### `MarketingCtaIndex`
 
-- classic: `cbd72f3339cfb91456a7ef19a5a87ea2b59214f732650253b454ca42658b6cb1`;
-- one_stage: `478ecab092824ef29b82433c0ee84a4bb59568a67a69290ddc9f19969bc09800`;
-- all_on_4: `efa435bafef8f5400a5b01f93ea5109b3d538ee0f64951d60edeb4107f43ec27`.
+Frozen strict Pydantic model:
 
-Тест не resnapshot-ит эти hashes после реализации. Любое расхождение — stop/review.
+- `cta_keys`: immutable tuple of exact nonblank strings;
+- duplicate keys fail validation deterministically;
+- extra fields forbidden;
+- order preserved; validator never treats the first key as default.
+
+### `validate_marketing_cta_refs(policy, index)`
+
+- принимает validated `TargetMarketingPolicy` и `MarketingCtaIndex`;
+- проверяет every value из `policy.cta_contexts` against exact index keys;
+- unknown keys собираются без дублей в один lexical sorted tuple;
+- при missing бросает typed `MarketingCtaReferenceError` с stable code
+  `marketing_cta_refs_missing` и field `missing_cta_keys`;
+- при полном index возвращает `None`;
+- stateless, не мутирует inputs, не читает files/env/config и не импортирует runtime.
+
+S20 не создаёт общий tone loader. Real-data test извлекает CTA keys из существующего
+`tone.yaml` read-only и передаёт их в pure index.
 
 ## Acceptance tests
 
-`tests/test_demo_service_consultation_values.py` обязан доказать:
+### Synthetic CTA contract
 
-1. S18 explicit-root reader на real `clients/demo/md` возвращает ровно три records;
-2. exact `content_ref → value` равны approved data выше;
-3. каждый документ сохраняет exact `doc_id`, `doc_type: service`, `topic: implantation`,
-   subtopic и существующие `suggest_h3`/CTA/situation fields;
-4. exact body hashes выше не изменились;
-5. `consultation_value` отсутствует в body, а `consultation-value` отсутствует среди
-   H2/H3 anchors и `suggest_h3`;
-6. target `service_catalog.json` содержит `classic`, `one_stage`, `all_on_4` с exact
-   соответствующими `content_ref`;
-7. real records проходят S18 `validate_service_consultation_refs` against validated
-   target services;
-8. остальные demo service MD не получили field;
-9. no imports/wiring from product runtime, no writes, skip/xfail, live or LLM.
+`tests/test_marketing_cta_refs.py` доказывает:
 
-Test может читать real demo/target data, S18 contract/reader и frozen file metadata. Он
-не вызывает ответы, session, resolver, composer или LLM.
+1. все CTA refs принимаются, unused index key разрешён;
+2. missing refs дают один typed sorted/deduplicated error;
+3. exact case-sensitive matching;
+4. strict/frozen/extra-forbid/nonblank/duplicate invariants index;
+5. deterministic repeated calls, no mutation/writes;
+6. AST/import boundary без clients, file IO, runtime/session/network/LLM.
+
+### Real demo target policy
+
+`tests/test_demo_target_marketing_policy.py` доказывает:
+
+1. S2 loader загружает весь real `clients/demo/target_response` bundle;
+2. exact limits, block order, five scenario order/refs/contexts и CTA map равны TASK;
+3. S3/S4/S6 validators подтверждают все external KB/doctor refs;
+4. все fact refs существуют локально и проходят bundle validation;
+5. CTA keys, прочитанные из real tone config, unique и покрывают target policy;
+6. current marketing/tone/playbook и все pre-existing target files не меняются;
+7. никакого runtime wiring/import, skip/xfail, live/LLM или writes.
+
+S17 audit acceptance сохраняет все inventory assertions и меняет только obsolete
+утверждение о текущем отсутствии target file.
 
 ## Verification
 
-До client-data/test edits:
+До implementation:
 
-1. governance TASK коммитится отдельно;
-2. independent checker читает exact TASK, три service MD, legacy consult reasons, S18
-   contract/tests, service catalog, architecture docs, checklist/guardrails;
-3. checker подтверждает factual support, bounded demo-only scope, exact texts/body
-   preservation и no-runtime/no-authority boundary;
-4. при `❌`/`❓` TASK исправляется до data implementation.
+1. governance TASK + roadmap pending коммитятся отдельно и push только в
+   `codex/stage-a`;
+2. independent read-only checker читает TASK, S17 audit/tests, frozen schema/loader/ref
+   boundaries, exact facts/KB/doctors/tone и architecture/checklist/guardrails;
+3. checker подтверждает exact policy, source existence, CTA ownership, legacy decisions,
+   obsolete-test transition и no-runtime/no-authority boundary;
+4. при `❌`/`❓` governance исправляется и проверяется повторно до code/data.
 
-После реализации:
+После implementation:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_service_consultation_values.py -q --basetemp=.pytest_tmp_s19_data`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_service_consultation_source.py tests/test_knowledge_base.py -q --basetemp=.pytest_tmp_s19_neighbors`;
-3. `git diff --check`, exact allowlist, exact body hashes и отсутствие skip/xfail;
-4. independent checker повторяет review и команды;
-5. no full pytest, no live/LLM.
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_marketing_cta_refs.py tests/test_demo_target_marketing_policy.py tests/test_demo_target_marketing_migration_audit.py -q --basetemp=.pytest_tmp_s20_policy`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py tests/test_response_schema_loader.py tests/test_response_schema_refs.py tests/test_response_schema_kb_index.py tests/test_doctor_schema_refs.py -q --basetemp=.pytest_tmp_s20_neighbors`;
+3. `git diff --check`, exact allowlist, no skip/xfail, no full pytest;
+4. independent completion checker повторяет review и команды;
+5. roadmap `[x]`, completion commit/push only `codex/stage-a`, tree clean/synced.
 
 ## Definition of Done
 
-- ровно три owner-approved demo consultation values опубликованы в same-MD frontmatter;
-- ни одно тело MD/H3/follow-up/CTA не изменено;
-- S18 reader/cross-ref проходят real demo data;
-- FullContext body не получает consultation values;
-- no client-wide rollout, runtime/session/answer/A9/authority changes;
-- roadmap S19 independently reviewed;
-- governance и completion commits/push только `codex/stage-a`, tree clean/synced.
+- real demo target pack впервые полностью загружается offline;
+- policy содержит ровно approved limits/block/five pools/four CTA contexts;
+- все fact/KB/doctor/CTA refs fail-closed проверены через owner boundaries;
+- 21 legacy free strings и legacy alias keys не продублированы;
+- frozen S1/S2/S3 contracts не изменены;
+- selector/session/answer/UI/runtime/A9/authority не подключены;
+- independent governance и completion reviews `✅`;
+- commits/push только `codex/stage-a`, working tree clean и HEAD synced с origin.

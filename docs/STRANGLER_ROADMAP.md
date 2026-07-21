@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S19 — три demo `consultation_value` для имплантации материализованы и независимо проверены; session/runtime и product path не подключены** |
-| Ближайший рабочий фокус без live | **Отдельно решить более широкую редактуру продающих service MD и target marketing data** |
+| Отдельная S-series без live | **S20 governance — exact demo target marketing policy зафиксирована; data/code ждут независимый checker-review** |
+| Ближайший рабочий фокус без live | **S20 — offline materialization marketing policy и проверка fact/KB/doctor/CTA refs** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -116,6 +116,10 @@
   опубликованы только в frontmatter classic/one-stage/All-on-4; тела MD и FullContext
   сохранены. Independent completion review `✅`: real data `5 passed`, neighbors
   `40 passed`; skip/xfail нет. Session/runtime, composer и authority не подключены.
+- [ ] **S20 — demo target marketing policy materialization** — exact limits, initial
+  commercial block, пять source-backed scenario pools и semantic CTA map зафиксированы
+  governance. До independent checker `✅` target data/contract не создаются; selector,
+  session/runtime, ответы и authority остаются вне scope.
 
 ## Какой roadmap актуален
 

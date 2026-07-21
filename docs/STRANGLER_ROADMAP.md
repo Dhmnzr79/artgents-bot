@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S10 — target service data context завершён и независимо проверен; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; demo target service/offer materialization, product wiring и authority не разрешены** |
+| Отдельная S-series без live | **S11 — полный demo target service catalog материализован и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; target offers/price materialization, product wiring и authority пока не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -74,6 +74,10 @@
 - [x] **S10 — target service data context** — pure exact-service join для service,
   full offers и doctor contexts реализован на synthetic target models и независимо
   проверен; product path не подключён.
+- [x] **S11 — demo target service catalog materialization** — final-wire S1 JSON для
+  всех 21 demo-услуг создан в изолированном неполном target pack; real-data acceptance
+  и независимый completion review пройдены. Offers, runtime и product authority не
+  подключены.
 
 ## Какой roadmap актуален
 

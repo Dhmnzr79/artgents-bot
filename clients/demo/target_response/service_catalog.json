@@ -1,0 +1,551 @@
+{
+  "tomography": {
+    "name": "КТ (компьютерная томография)",
+    "aliases": [
+      "кт зубов",
+      "компьютерная томография",
+      "снимок зуба",
+      "томография зуба",
+      "нужна ли кт",
+      "кт перед имплантацией",
+      "сколько стоит кт",
+      "цена кт",
+      "стоимость кт",
+      "сколько стоит компьютерная томография"
+    ],
+    "family": "diagnostics",
+    "roles": [
+      "supporting"
+    ],
+    "active": true,
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "professional_whitening": {
+    "name": "Профессиональное отбеливание",
+    "aliases": [
+      "отбеливание",
+      "отбеливание зубов",
+      "отбелить зубы",
+      "осветлить зубы",
+      "зубы пожелтели"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "whitening__service__teeth_whitening.md",
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "classic": {
+    "name": "Классическая имплантация",
+    "aliases": [
+      "классическая имплантация",
+      "поставить имплант",
+      "вставить зуб",
+      "двухэтапная имплантация",
+      "имплант на один зуб",
+      "один имплант",
+      "цена импланта на один зуб",
+      "сколько стоит имплант на один зуб"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__classic.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ]
+    },
+    "options": []
+  },
+  "one_stage": {
+    "name": "Одномоментная имплантация",
+    "aliases": [
+      "одномоментная имплантация",
+      "имплант сразу после удаления",
+      "удаление и имплант",
+      "имплант в день удаления"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__one_stage.md",
+    "selection": {
+      "mode": "context",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ],
+      "stage": [
+        "extraction_context"
+      ]
+    },
+    "options": []
+  },
+  "all_on_4": {
+    "name": "Имплантация All-on-4",
+    "aliases": [
+      "all-on-4",
+      "имплантация all-on-4",
+      "все на четырёх",
+      "восстановление всех зубов на 4",
+      "протез на 4 имплантах",
+      "цена all-on-4",
+      "сколько стоит all-on-4",
+      "стоимость all on 4",
+      "имплантация all-on-4 цена",
+      "все зубы на 4 имплантах цена",
+      "протез на 4 имплантах стоимость"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__all_on_4.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "full_arch"
+      ]
+    },
+    "options": []
+  },
+  "all_on_6": {
+    "name": "Имплантация All-on-6",
+    "aliases": [
+      "all-on-6",
+      "имплантация all-on-6",
+      "все на шести",
+      "все зубы на 6 имплантах",
+      "протез на 6 имплантах",
+      "цена all-on-6",
+      "сколько стоит all-on-6",
+      "стоимость all on 6",
+      "имплантация all-on-6 цена",
+      "все зубы на 6 имплантах цена",
+      "протез на 6 имплантах стоимость"
+    ],
+    "family": "implantology",
+    "roles": [
+      "protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__all_on_6.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "full_arch"
+      ]
+    },
+    "options": []
+  },
+  "temporary_teeth": {
+    "name": "Временные зубы на имплантах",
+    "aliases": [
+      "временные зубы",
+      "временная коронка",
+      "временный зуб на имплант",
+      "временные зубы на имплантах",
+      "зачем нужна временная коронка",
+      "временные или постоянные зубы",
+      "временные пластиковые зубы",
+      "пластиковые или нормальные зубы"
+    ],
+    "family": "prosthodontics",
+    "roles": [
+      "supporting"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__temporary_teeth.md",
+    "selection": {
+      "mode": "direct",
+      "stage": [
+        "extraction_context",
+        "implant_placed"
+      ]
+    },
+    "options": []
+  },
+  "implant_supported_prosthetics": {
+    "name": "Протезирование на имплантах",
+    "aliases": [
+      "протезирование на имплантах",
+      "зубы на имплантах",
+      "несъемные зубы на имплантах",
+      "несъёмные зубы на имплантах",
+      "восстановить зубы на имплантах",
+      "протез на имплантах",
+      "импланты с коронками"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__implant_supported_prosthetics.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth",
+        "full_arch"
+      ],
+      "stage": [
+        "implant_placed"
+      ]
+    },
+    "options": []
+  },
+  "caries": {
+    "name": "Лечение кариеса",
+    "aliases": [
+      "лечение кариеса",
+      "кариес",
+      "пломба",
+      "поставить пломбу",
+      "вылечить зуб",
+      "зуб с кариесом"
+    ],
+    "family": "therapy",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__caries.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "pulpitis": {
+    "name": "Лечение пульпита",
+    "aliases": [
+      "лечение пульпита",
+      "пульпит",
+      "пультип",
+      "удалить нерв",
+      "лечение каналов"
+    ],
+    "family": "endodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__pulpitis.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "teeth_treatment": {
+    "name": "Лечение зубов",
+    "aliases": [
+      "лечение зубов",
+      "лечить зубы",
+      "вылечить зубы",
+      "стоматологическое лечение",
+      "терапевтическая стоматология"
+    ],
+    "family": "therapy",
+    "roles": [],
+    "active": true,
+    "content_ref": "treatment__service__teeth_treatment.md",
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "tooth_extraction": {
+    "name": "Удаление зубов любой сложности",
+    "aliases": [
+      "удаление зуба",
+      "удалить зуб",
+      "вырвать зуб",
+      "удаление зуба мудрости",
+      "сложное удаление",
+      "ретинированный зуб",
+      "имплант после удаления зуба",
+      "когда ставить имплант после удаления"
+    ],
+    "family": "surgery",
+    "roles": [],
+    "active": true,
+    "content_ref": "extraction__service__tooth_extraction.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "periodontitis": {
+    "name": "Лечение пародонтита",
+    "aliases": [
+      "лечение пародонтита",
+      "пародонтит",
+      "парадонтит",
+      "лечение пародонтоза",
+      "пародонтоз",
+      "пародонтолог"
+    ],
+    "family": "periodontology",
+    "roles": [],
+    "active": true,
+    "content_ref": "periodontology__service__periodontitis.md",
+    "selection": {
+      "mode": "direct"
+    },
+    "options": []
+  },
+  "aligners": {
+    "name": "Элайнеры для выравнивания зубов",
+    "aliases": [
+      "элайнеры",
+      "капы для зубов",
+      "прозрачные капы",
+      "выровнять зубы",
+      "исправить прикус",
+      "кривые зубы"
+    ],
+    "family": "orthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "orthodontics__service__aligners.md",
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "veneers": {
+    "name": "Виниры E-max",
+    "aliases": [
+      "виниры",
+      "виниры на зубы",
+      "виниры e-max",
+      "голливудская улыбка",
+      "накладки на зубы"
+    ],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__veneers.md",
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
+  "zirconia_crowns": {
+    "name": "Коронки из диоксида циркония",
+    "aliases": [
+      "коронки",
+      "коронка на зуб",
+      "зубная коронка",
+      "поставить коронку",
+      "циркониевая коронка",
+      "коронка из диоксида циркония",
+      "восстановить разрушенный зуб"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__zirconia_crowns.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "one_tooth",
+        "few_teeth"
+      ],
+      "stage": [
+        "natural_tooth_present",
+        "implant_placed"
+      ]
+    },
+    "options": []
+  },
+  "clasp_dentures": {
+    "name": "Бюгельные протезы",
+    "aliases": [
+      "бюгельные протезы",
+      "бюгельный протез",
+      "протез с дугой",
+      "частичный протез с дугой",
+      "протез на кламмерах",
+      "протез на замках"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__clasp_dentures.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "few_teeth"
+      ],
+      "stage": [
+        "natural_tooth_present"
+      ]
+    },
+    "options": []
+  },
+  "sinus_lift": {
+    "name": "Синус-лифтинг",
+    "aliases": [
+      "синус-лифтинг",
+      "синус лифтинг",
+      "синуслифтинг",
+      "открытый синус-лифтинг",
+      "закрытый синус-лифтинг",
+      "нарастить кость сверху",
+      "наращивание кости на верхней челюсти",
+      "мало кости сверху",
+      "не хватает кости сверху для импланта",
+      "сколько стоит синус-лифтинг",
+      "стоимость синус-лифтинга",
+      "цена синус-лифтинга"
+    ],
+    "family": "implantology",
+    "roles": [],
+    "active": true,
+    "content_ref": "implantation__service__sinus_lift.md",
+    "selection": {
+      "mode": "context",
+      "jaw": [
+        "upper"
+      ],
+      "reported_context": [
+        "reported_bone_deficit"
+      ]
+    },
+    "options": [
+      {
+        "option_id": "closed",
+        "name": "Закрытый синус-лифтинг",
+        "aliases": []
+      },
+      {
+        "option_id": "open",
+        "name": "Открытый синус-лифтинг",
+        "aliases": []
+      }
+    ]
+  },
+  "zygomatic_implants": {
+    "name": "Скуловая имплантация",
+    "aliases": [
+      "скуловая имплантация",
+      "скуловые импланты",
+      "скуловые имплантаты",
+      "импланты в скулу",
+      "зигоматические импланты",
+      "zygomatic implants",
+      "сильная атрофия верхней челюсти",
+      "сколько стоит скуловая имплантация",
+      "стоимость скуловых имплантов"
+    ],
+    "family": "implantology",
+    "roles": [
+      "advanced_protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__zygomatic_implants.md",
+    "selection": {
+      "mode": "context",
+      "extent": [
+        "full_arch"
+      ],
+      "jaw": [
+        "upper"
+      ],
+      "reported_context": [
+        "reported_bone_deficit"
+      ]
+    },
+    "options": []
+  },
+  "pterygoid_implants": {
+    "name": "Птеригоидные импланты",
+    "aliases": [
+      "птеригоидные импланты",
+      "птеригоидная имплантация",
+      "крыловидные импланты",
+      "импланты без костной пластики",
+      "импланты без синус-лифтинга",
+      "сколько стоит птеригоидный имплант",
+      "стоимость птеригоидных имплантов"
+    ],
+    "family": "implantology",
+    "roles": [
+      "advanced_protocol"
+    ],
+    "active": true,
+    "content_ref": "implantation__service__pterygoid_implants.md",
+    "selection": {
+      "mode": "context",
+      "extent": [
+        "few_teeth",
+        "full_arch"
+      ],
+      "jaw": [
+        "upper"
+      ],
+      "reported_context": [
+        "reported_bone_deficit"
+      ]
+    },
+    "options": []
+  },
+  "removable_dentures": {
+    "name": "Съёмное протезирование",
+    "aliases": [
+      "съемное протезирование",
+      "съёмное протезирование",
+      "съемные протезы",
+      "съёмные протезы",
+      "зубной протез",
+      "протез если нет зубов",
+      "вставная челюсть",
+      "частичный зубной протез",
+      "полный съемный протез",
+      "полный съёмный протез",
+      "нет всех зубов"
+    ],
+    "family": "prosthodontics",
+    "roles": [],
+    "active": true,
+    "content_ref": "prosthetics__service__removable_dentures.md",
+    "selection": {
+      "mode": "scope",
+      "extent": [
+        "few_teeth",
+        "full_arch"
+      ]
+    },
+    "options": [
+      {
+        "option_id": "partial",
+        "name": "Частичный съёмный протез",
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "few_teeth"
+          ]
+        }
+      },
+      {
+        "option_id": "full",
+        "name": "Полный съёмный протез",
+        "aliases": [],
+        "selection": {
+          "extent": [
+            "full_arch"
+          ]
+        }
+      }
+    ]
+  }
+}

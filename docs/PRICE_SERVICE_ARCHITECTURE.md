@@ -481,6 +481,25 @@ amplifier slot одновременно. Он занимает один slot к�
 документ и не записывает session state. Builder не читает MD, не формирует текст и не
 подключён к runtime/product path.
 
+### One-service active offer projection S23
+
+S23 закрывает следующий узкий offline boundary после S22: из S10 context одной уже
+выбранной услуги он оставляет только active offers parent service и effective-active
+semantic options. `option.active: null` наследует parent, `false` исключает option.
+Если upstream передал exact `selected_option_id`, generic и другие option offers не
+подставляются как его цена; пустой результат остаётся пустым без похожей цены/fallback.
+
+После filtering S23 передаёт только eligible offer IDs в pure S15 resolver. Поэтому
+first-match clinic rule, default/override priority, stable ties, cap 2–3 и exact explicit
+offer pin сохраняют один канон. Strategy не может добавить inactive, other-option или
+offer другой услуги. Valid explicit offer вне filtered candidates получает typed S15
+not-candidate error.
+
+Returned offers — deep copies в resolved order. `fixed`/`from`/`range`/
+`no_public_price`, currency, billing unit, package, payment stages, fact refs, followups
+и brand ID не меняются и не пересчитываются. S23 не выбирает service/brand из текста,
+не оценивает медицинскую применимость и не подключён к session/runtime/product path.
+
 ### Session state
 
 ```yaml

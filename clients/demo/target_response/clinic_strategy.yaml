@@ -1,0 +1,81 @@
+version: 1
+default_max_options: 3
+default_service_priorities: {}
+default_offer_priorities:
+  all_on_4.jaw.impro: 1
+  all_on_6.jaw.impro: 1
+  classic.one_tooth.impro: 1
+  one_stage.one_tooth.impro: 1
+  removable_dentures.jaw.partial: 1
+  sinus_lift.one_site.closed: 1
+rules:
+  - id: existing_implant_prosthetic_stage
+    match:
+      stage: implant_placed
+    max_options: 3
+    service_priorities:
+      implant_supported_prosthetics: 100
+      zirconia_crowns: 60
+      temporary_teeth: 40
+    offer_priorities: {}
+  - id: extraction_then_implant_restore
+    match:
+      extent: one_tooth
+      stage: extraction_context
+    max_options: 3
+    service_priorities:
+      one_stage: 100
+      classic: 80
+      tooth_extraction: 40
+    offer_priorities: {}
+  - id: upper_full_arch_with_bone_deficit
+    match:
+      extent: full_arch
+      jaw: upper
+      reported_context: reported_bone_deficit
+    max_options: 3
+    service_priorities:
+      zygomatic_implants: 100
+      all_on_4: 90
+      all_on_6: 80
+      removable_dentures: 40
+    offer_priorities: {}
+  - id: upper_full_arch_restore
+    match:
+      extent: full_arch
+      jaw: upper
+    max_options: 3
+    service_priorities:
+      all_on_4: 100
+      all_on_6: 90
+      zygomatic_implants: 70
+      removable_dentures: 40
+    offer_priorities: {}
+  - id: full_arch_restore
+    match:
+      extent: full_arch
+    max_options: 3
+    service_priorities:
+      all_on_4: 100
+      all_on_6: 90
+      removable_dentures: 50
+      zygomatic_implants: 40
+    offer_priorities: {}
+  - id: one_tooth_restore
+    match:
+      extent: one_tooth
+    max_options: 2
+    service_priorities:
+      classic: 100
+      one_stage: 80
+    offer_priorities: {}
+  - id: few_teeth_restore
+    match:
+      extent: few_teeth
+    max_options: 3
+    service_priorities:
+      implant_supported_prosthetics: 100
+      classic: 80
+      clasp_dentures: 50
+      removable_dentures: 40
+    offer_priorities: {}

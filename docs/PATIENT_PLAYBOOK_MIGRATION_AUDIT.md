@@ -316,3 +316,25 @@ recommendation signals. Target marketing/CTA migration остаётся отде
 
 До отдельного authority checkpoint current `patient_playbook.yaml` продолжает управлять
 локальным demo; A9 остаётся shadow-only.
+
+## S16 materialization status
+
+S16 materializes в offline demo target семь отдельно одобренных situations и exact
+current service priorities. Четыре current списка из четырёх вариантов получают target
+cap `3`; услуги из каталога при этом не удаляются. Шесть current
+`recommended=true` offer IDs переносятся как равный baseline priority `1`, без нового
+ranking между ними.
+
+Rule order использует уже проверенный S15 first-match: installed-implant stage идёт
+первым, one-tooth extraction — выше общего one-tooth, а upper full-arch bone-deficit —
+выше общих upper/full-arch правил. Strategy только сортирует уже отфильтрованные
+candidates и не получает medical eligibility или treatment-focus authority.
+
+Generic `bone_deficit_solution` безопасно deferred: current rule требует одновременно
+reported bone deficit и `intent=choose_solution`, которого нет во frozen target strategy
+context. CTA, answer style, role/positioning, duplicate fallback и target marketing также
+не материализованы. Current `patient_playbook.yaml`, два известных current test mismatch,
+product path и A9 не меняются.
+
+Independent completion review `✅`: S16 data `6 passed`, S15 contract/resolver
+`80 passed`, neighbors `38 passed`, existing target data `15 passed`; skip/xfail нет.

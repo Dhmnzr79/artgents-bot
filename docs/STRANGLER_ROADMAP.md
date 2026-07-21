@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S15 — deterministic target strategy resolution реализован offline и независимо проверен; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий governance checkpoint может материализовать demo clinic strategy; marketing, product wiring и authority пока не разрешены** |
+| Отдельная S-series без live | **S16 — demo target clinic strategy materialized offline и независимо проверена; product path не подключён** |
+| Ближайший рабочий фокус без live | **Следующий checkpoint требует отдельного governance TASK; marketing, product wiring и authority пока не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -96,6 +96,12 @@
   Independent completion review `✅`: unit `80 passed`, S2/S10 neighbors `38 passed`,
   target data `15 passed`. Demo strategy data, current playbook, product wiring и
   authority не менялись.
+- [x] **S16 — demo target clinic strategy materialization** — семь owner-approved
+  situation priorities и шесть current `recommended=true` offer signals перенесены в
+  offline target data; generic bone-deficit rule отложено без потери его current intent
+  condition. Independent completion review `✅`: S16 data `6 passed`, contract/resolver
+  `80 passed`, neighbors `38 passed`, existing target data `15 passed`; skip/xfail нет.
+  Current playbook, product wiring, marketing и authority не менялись.
 
 ## Какой roadmap актуален
 

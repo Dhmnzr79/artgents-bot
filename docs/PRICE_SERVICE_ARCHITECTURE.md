@@ -432,6 +432,14 @@ candidates. После сортировки остаются 2–3 позици�
 Pure S15 resolver фиксирует эти semantics offline. Он не читает client/session, не
 проверяет применимость и пока не подключён к product path или A9 authority.
 
+S16 после независимой проверки materializes для demo отдельный offline
+`clients/demo/target_response/clinic_strategy.yaml`: семь одобренных ситуаций из
+current playbook и шесть `recommended=true` вариантов цены. Общее
+`bone_deficit_solution` не переносится, потому что current правило дополнительно требует
+`choose_solution`, а target strategy пока не получает intent. Это client data для уже
+проверенного resolver, но не подключение к ответам: eligibility/focus остаются перед
+strategy, target marketing отсутствует, product wiring и authority не меняются.
+
 ### Session state
 
 ```yaml

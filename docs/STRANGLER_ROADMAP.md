@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S5 — minimal doctor data contract завершён и независимо проверен; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; client migration, doctor loader/index, wiring и authority не разрешены** |
+| Отдельная S-series без live | **S6 — doctor cross-reference integrity завершён и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; demo materialization, loader/wiring и authority не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -59,6 +59,9 @@
 - [x] **S5 — minimal doctor data contract** — только имя/ID, должность, стаж,
   service links и exact MD profile ref; synthetic tests независимо проверены. Doctor
   loader/index и product path не подключены.
+- [x] **S6 — doctor cross-reference integrity** — pure проверка service/profile refs и
+  сборка exact `doctor:<id>` refs независимо проверены. Demo data и product path не
+  подключены.
 
 ## Какой roadmap актуален
 

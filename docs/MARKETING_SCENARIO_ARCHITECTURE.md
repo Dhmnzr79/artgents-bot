@@ -1,6 +1,7 @@
 # Архитектура маркетинговых сценариев
 
-**Статус:** согласованный product/design-контракт; schema/runtime ещё не реализованы.
+**Статус:** согласованный product/design-контракт; frozen schema models реализованы
+offline в S1, но demo target policy, selector/session runtime и authority отсутствуют.
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 

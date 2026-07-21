@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S16 — demo target clinic strategy materialized offline и независимо проверена; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий checkpoint требует отдельного governance TASK; marketing, product wiring и authority пока не разрешены** |
+| Отдельная S-series без live | **S17 — read-only marketing/CTA migration audit завершён и независимо проверен; target marketing data и product path не подключены** |
+| Ближайший рабочий фокус без live | **Закрыть семь owner decisions из S17 отдельным governance checkpoint до target marketing data** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -102,6 +102,11 @@
   condition. Independent completion review `✅`: S16 data `6 passed`, contract/resolver
   `80 passed`, neighbors `38 passed`, existing target data `15 passed`; skip/xfail нет.
   Current playbook, product wiring, marketing и authority не менялись.
+- [x] **S17 — demo target marketing/CTA migration audit** — current combined marketing,
+  commercial facts, source refs и CTA owners инвентаризированы до target data. Audit
+  не создаёт `target_response/marketing.yaml`, selector/session/runtime или authority.
+  Independent completion review `✅`: audit `7 passed`, neighbors `112 passed`,
+  skip/xfail нет.
 
 ## Какой roadmap актуален
 

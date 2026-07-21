@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S18 — offline contract для same-MD `consultation_value` завершён и независимо проверен; demo content, session/runtime и product path не подключены** |
-| Ближайший рабочий фокус без live | **Отдельным governance checkpoint решить наполнение продающих service MD и target marketing data** |
+| Отдельная S-series без live | **S19 — три demo `consultation_value` для имплантации материализованы и независимо проверены; session/runtime и product path не подключены** |
+| Ближайший рабочий фокус без live | **Отдельно решить более широкую редактуру продающих service MD и target marketing data** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -112,6 +112,10 @@
   universal once-per-document/session cadence law. Independent completion review `✅`:
   contract `36 passed`, neighbors `83 passed`; skip/xfail нет. Demo MD, session/runtime,
   composer и authority не подключены.
+- [x] **S19 — demo implantation consultation values** — три owner-approved test values
+  опубликованы только в frontmatter classic/one-stage/All-on-4; тела MD и FullContext
+  сохранены. Independent completion review `✅`: real data `5 passed`, neighbors
+  `40 passed`; skip/xfail нет. Session/runtime, composer и authority не подключены.
 
 ## Какой roadmap актуален
 

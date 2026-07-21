@@ -4,6 +4,9 @@ doc_type: service
 topic: implantation
 subtopic: all_on_4
 
+consultation_value: >-
+  На консультации врач оценит КТ и поможет понять, подходит ли протокол All-on-4 или лучше рассмотреть другой вариант восстановления.
+
 aliases:
   - "all-on-4"
   - "протокол all-on-4"

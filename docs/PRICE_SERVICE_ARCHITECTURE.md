@@ -216,7 +216,7 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 | `clinic_strategy.yaml` | priority уже допустимых services/offers, max 2–3, редкие context overrides | active, selection, деньги, fact text, CTA |
 | `marketing.yaml` | limits, scenario pools, ordered refs, cadence, CTA-key selection | дубли source text, dates и incompatibility |
 | KB/md | утверждённый содержательный ответ и сравнения | цена и runtime routing |
-| doctor layer | врач, специализация, связи с услугами, утверждённые doctor facts | готовый ответ сценария |
+| doctor layer | имя, должность, стаж, связи с услугами и exact MD-ref общего продающего профиля | `active`, образование, фото, расписание, рейтинг, отдельная UI-card schema и готовый ответ сценария |
 | `ui.yaml` / `tone.yaml` | CTA label, clinic default и lead-flow copy | сценарные вступления и медицинские факты |
 | session | известные dialog facts, histories UI/facts, semantic CTA context, lead/refusal state | межклиентские defaults и новый source content |
 

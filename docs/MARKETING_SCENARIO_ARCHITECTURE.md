@@ -160,7 +160,7 @@ price-ответе demo приоритет при наличии в `followups`:
 | `clients/<client_id>/marketing.yaml` | Лимиты, scenario rules, упорядоченные amplifier refs, ограничения scenario/pool context, CTA key selection и cadence policy; без дублей текста и без source-fact eligibility |
 | Pricebook/commercial facts | Консультация, рассрочка, скидка/подарок, вычет, гарантия как commercial fact, даты, точные условия и `incompatible_with` |
 | KB/md | Содержательный утверждённый контент и факты клиники |
-| Doctor layer | Имя, специализация, связь с услугами и утверждённые факты о враче |
+| Doctor layer | Имя, должность, стаж и связи с услугами; общий продающий профиль хранится в exact MD chunk |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
 | Session state | `shown_fact_ids`, `shown_amplifier_ids`, текущая тема/услуга, lead/refusal state |
 | Common planner/TurnFrame target | `marketing_scenarios` как общее структурированное понимание, а не отдельный regex/classifier на каждый сценарий |
@@ -213,10 +213,24 @@ cta_contexts:
 |---|---|---|
 | `fact:<fact_id>` | `pricebook/facts.json` | fact существует, active, применим, не просрочен |
 | `kb:<doc>#<chunk>` | KB/md | точный doc/chunk существует в client pack |
-| `doctor:<doctor_id>` | doctor layer | врач существует, active и связан с темой/услугой |
+| `doctor:<doctor_id>` | doctor layer | врач существует и связан с темой/услугой |
 
 Policy не содержит свободный amplifier text. Если source ref исчез или не проходит
 eligibility, он отбрасывается; модель не заменяет его похожим утверждением.
+
+### Минимальный doctor layer
+
+Doctor record содержит только стабильный ID, имя, должность, стаж, service links и
+exact ссылку на общий продающий MD-профиль. Полей `active`, образования, сертификатов,
+фото, расписания, слотов, рейтинга, priority и отдельной UI-card schema нет. Наличие
+врача в каталоге означает, что его утверждённую информацию можно показать; вопросы
+доступности и записи остаются у администратора, синхронизации с расписанием нет.
+
+Будущее product-поведение должно отвечать на запросы «кто делает услугу», «кто сильный
+специалист по услуге» и «какие врачи и какой опыт» через service links и MD-профили.
+При нескольких совпадениях бот показывает релевантных врачей без выдуманного рейтинга
+«лучший». Это описание target behavior, а не разрешение подключать doctor schema к
+ответам до отдельного authority checkpoint.
 
 ### Structured scenarios
 

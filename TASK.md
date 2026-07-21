@@ -1,68 +1,199 @@
-# TASK — S14 Patient Playbook Target Migration Audit
+# TASK — S15 Deterministic Target Strategy Resolution
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `6f1c615 data: preserve target payment stages S13`
+**Baseline:** `3bec780 docs: audit patient playbook migration S14`
 
-**Серия / checkpoint:** `S14` — read-only decomposition audit действующего
-`clients/demo/patient_playbook.yaml` перед переносом приоритетов в target architecture.
+**Серия / checkpoint:** `S15` — минимальный pure offline resolver для target clinic
+strategy и недостающий contract baseline priorities.
 
-**Режим:** documentation/audit only. Никаких client-data, schema/runtime, ответов,
-routes/UI, live/LLM или product authority.
+**Режим:** synthetic models/logic/tests only. Никаких demo strategy data, product
+consumers, ответов, routes/UI, live/LLM или product authority.
 
-## Контекст и решение владельца
+## Owner direction
 
-21 июля 2026 владелец остановил предположение, что приоритетов клиники нет, и указал на
-`clients/demo/patient_playbook.yaml`. Проверка подтвердила: это действующий current
-config старой архитектуры, который сейчас управляет demo options overview. Он не
-является пустым архивом и не должен заменяться новым файлом вслепую.
+21 июля 2026 владелец подтвердил желаемую client-configurable модель: если клиника хочет
+свой приоритет для услуги/ситуации, он задаётся в её конфиге без изменения общего кода.
+После простого объяснения small-rule approach владелец попросил продолжать.
 
-В target architecture его обязанности разделены между:
+S15 формализует этот механизм offline. Он не переносит current playbook и не делает
+target strategy активной.
 
-- `service_catalog.json` — применимость услуги;
-- будущим `clinic_strategy.yaml` — коммерческий порядок уже допустимых услуг/offers;
-- будущим target `marketing.yaml` — CTA и marketing policy;
-- dialog/session facts — известные признаки ситуации пациента;
-- общими product guardrails — запрет медицинского обещания и одиночного «победителя».
+## Основание S14
 
-До материализации target strategy нужен exact audit: что уже перенесено, что имеет
-однозначного target-owner, что дублируется и какие части требуют отдельного решения.
+S14 доказал:
+
+- current `patient_playbook.yaml` активен и содержит 8 rules + fallback;
+- current runtime-specificity уже расходится с одним intended extraction test;
+- frozen S1 strategy models хранят priorities/rules, но не задают resolution semantics;
+- architecture требует baseline priorities + редкие context overrides;
+- current offer `recommended` должен позже стать strategy data;
+- механическая materialization до resolver law небезопасна.
 
 ## Цель
 
-Создать `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md`, который простым языком и технически
-точно:
+Реализовать один pure resolver, который получает:
 
-1. подтверждает, что current playbook активен и пока остаётся неизменным;
-2. инвентаризирует все восемь `rules` и один `patient_situations` fallback;
-3. раскладывает каждое поле current playbook по target-owner или отмечает unresolved;
-4. сверяет уже материализованные S11 selection facts с current `show_when`/match;
-5. отделяет service priority от CTA, marketing copy, eligibility и runtime matching;
-6. фиксирует неоднозначности, которые запрещено решать механическим копированием;
-7. предлагает минимальный следующий governance checkpoint, но не создаёт target data.
+- уже validated `TargetClinicStrategy`;
+- neutral target context (`family`, `extent`, `stage`, `jaw`, `reported_context`);
+- уже отфильтрованные candidate service IDs и/или offer IDs;
+- optional exact explicitly named service/offer ID.
 
-## Почему S14 audit-only
+Resolver возвращает:
 
-Механический перенос сейчас опасен:
+- ID первого matching context rule или `None`;
+- effective `max_options`;
+- deterministic ordered/capped service IDs;
+- deterministic ordered/capped offer IDs.
 
-- current rules используют `problem`, `kind`, `intent`, `modifiers`, а frozen target
-  strategy match использует `family`, `extent`, `stage`, `jaw`, `reported_context`;
-- current overlap выбирается runtime-specificity, а target resolver ещё не реализован;
-- четыре current rules и fallback допускают четыре options, target product decision — 2–3;
-- `primary_cta`, `answer_style`, `role`, `positioning`, `show_when` не принадлежат
-  одному target strategy файлу;
-- current pricebook `recommended` для offers должен жить в strategy, но не входит в
-  `patient_playbook.yaml` и требует отдельной source projection;
-- target `clinic_strategy.yaml` ещё отсутствует, а target marketing policy не
-  материализована.
+Он не читает files/client/session, не проверяет medical eligibility, не выбирает facts,
+не формирует ответ и не подключается к runtime.
 
-S14 не выбирает между first-match, specificity или rule overlay и не объявляет
-lossy mapping эквивалентным current behavior.
+## Почему baseline priorities нужны в contract
+
+Текущий `TargetClinicStrategy` хранит priorities только внутри rules. Это не выражает
+зафиксированное architecture-разделение:
+
+- постоянный базовый порядок клиники;
+- редкие context overrides.
+
+S15 добавляет в `TargetClinicStrategy`:
+
+```python
+default_service_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
+default_offer_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
+```
+
+Имена explicit: это baseline, а не отдельное catch-all rule. Missing fields валидируются
+как empty maps для backward-compatible synthetic payloads. Dict values остаются
+`StrictInt`: bool/float/string запрещены; отрицательные, ноль и положительные значения
+допустимы как относительный порядок.
+
+`ResponseSchemaBundle` проверяет refs обоих default maps теми же stable tokens:
+
+- unknown default service → `bundle_strategy_service_missing`;
+- unknown default offer → `bundle_strategy_offer_missing`.
+
+## Context rule contract
+
+После появления explicit default maps rule с полностью пустым `match` не нужен и
+опасен: он может случайно перехватить все contexts.
+
+`TargetStrategyRule` обязан иметь хотя бы одно non-`None` match field. Полностью empty
+match отклоняется stable token:
+
+- `strategy_rule_match_empty`.
+
+Existing unique rule IDs, max 2–3 and local ref validators сохраняются.
+
+## Exact rule matching law
+
+Для каждого rule authored order:
+
+1. каждое non-`None` field rule match должно exact совпасть с context;
+2. unspecified rule field является wildcard;
+3. required rule field при `None` в context не совпадает;
+4. выбирается **первое** полностью совпавшее rule;
+5. последующие совпавшие rules игнорируются;
+6. specificity score не рассчитывается;
+7. несколько rules не merge/overlay между собой.
+
+Клиника размещает узкие исключения выше общих. Это один небольшой ordered list, а не
+правило под каждую пользовательскую фразу: language understanding сначала даёт neutral
+facts, затем strategy работает только с ними.
+
+## Baseline + selected override
+
+Effective priorities строятся отдельно для services/offers:
+
+1. copy соответствующего default map;
+2. если найден context rule, его map обновляет значения только перечисленных IDs;
+3. IDs, отсутствующие в effective map, имеют priority `0`;
+4. rule value может поднять, оставить или понизить default priority;
+5. input strategy/models не мутируются.
+
+Только одно selected rule overlay применяется поверх baseline. Другие matching rules не
+участвуют.
+
+Effective max:
+
+- selected rule `max_options`, если задан;
+- иначе `strategy.default_max_options`.
+
+## Ranking law
+
+Для каждого входного candidate collection:
+
+1. resolver не добавляет IDs из priority maps;
+2. higher numeric priority идёт раньше;
+3. equal priority сохраняет exact input order (stable tie);
+4. optional explicitly named candidate pin-ится первым независимо от priority;
+5. остальные candidates сохраняют priority order;
+6. после ordering result обрезается effective max `2..3`;
+7. empty/single candidate lists допустимы и не дополняются искусственно.
+
+Explicit ID обязан уже присутствовать в соответствующих candidates. Иначе resolver
+отклоняет input, а не возвращает недоступную сущность:
+
+- `strategy_explicit_service_not_candidate`;
+- `strategy_explicit_offer_not_candidate`.
+
+Duplicate candidate IDs запрещены:
+
+- `strategy_candidate_service_duplicate`;
+- `strategy_candidate_offer_duplicate`.
+
+Candidate IDs должны быть non-blank strings:
+
+- `strategy_candidate_service_invalid`;
+- `strategy_candidate_offer_invalid`.
+
+Эти errors относятся только к offline resolver boundary. Они не являются patient-facing
+fallback и не создают route.
+
+## Public API
+
+Новый `core/response_strategy.py` содержит только:
+
+```python
+@dataclass(frozen=True, slots=True)
+class TargetStrategyResolution:
+    matched_rule_id: str | None
+    max_options: int
+    service_ids: tuple[str, ...]
+    offer_ids: tuple[str, ...]
+
+class TargetStrategyResolutionError(ValueError):
+    code: str
+
+def resolve_target_strategy(
+    strategy: TargetClinicStrategy,
+    context: TargetStrategyMatch,
+    *,
+    service_ids: Sequence[str] = (),
+    offer_ids: Sequence[str] = (),
+    explicit_service_id: str | None = None,
+    explicit_offer_id: str | None = None,
+) -> TargetStrategyResolution:
+    ...
+```
+
+Exact parameter types may use `collections.abc.Sequence`; semantic API and frozen result
+fields above are required.
+
+Resolver may order both lists in one call. Caller is responsible for passing only the
+offers relevant to its already selected context/service. S15 does not join offers to
+services and does not reinterpret S10.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md` — новый audit artifact;
+- `contracts/response_schema.py`;
+- `core/response_strategy.py` — new pure offline module;
+- `tests/test_response_schema_contract.py`;
+- `tests/test_target_strategy_resolution.py` — new synthetic tests;
+- `docs/PRICE_SERVICE_ARCHITECTURE.md`;
+- `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md` — отметить resolution law после completion;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -70,146 +201,97 @@ lossy mapping эквивалентным current behavior.
 
 ## Protected / вне scope
 
-- `clients/demo/patient_playbook.yaml` и весь `clients/**`;
-- `contracts/**`, `core/**`, `orchestration/**`, routes/API/app/UI;
-- весь `clients/demo/target_response/**`;
-- tests/evals/golden/fixtures и существующие docs architecture contracts;
-- создание `clinic_strategy.yaml` или target `marketing.yaml`;
-- изменение S1 strategy/marketing models, S2 loader или S10 context;
-- выбор runtime rule precedence/merge algorithm;
-- перенос/удаление current playbook, adapters, dual-read или feature flags;
+- весь `clients/**`, включая current playbook/pricebook и `target_response/**`;
+- current `contracts/patient_playbook.py`, `core/patient_playbook.py` и их tests;
+- S2 loader behavior, S10 context builder и doctor/KB loaders;
+- materialization `clinic_strategy.yaml`/target marketing;
+- eligibility filtering, service/offer availability, medical applicability;
+- natural-language understanding, planner, TurnFrame, dialog focus/session;
+- response composition, price/doctor rendering, CTA, UI/buttons/routes/app;
+- adapters, dual-read, fallback, feature flags и product wiring;
+- protected golden/eval fixtures;
+- два pre-existing S14 current test mismatches не исправляются и не скрываются;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Exact source inventory
+## Contract tests
 
-Audit обязан перечислить exact current `rules` IDs и не объединять их:
+`tests/test_response_schema_contract.py` минимально доказывает:
 
-1. `one_tooth_restore`;
-2. `extraction_then_implant_restore`;
-3. `few_teeth_restore`;
-4. `existing_implant_prosthetic_stage`;
-5. `full_arch_restore`;
-6. `upper_full_arch_with_bone_deficit`;
-7. `upper_full_arch_restore`;
-8. `bone_deficit_solution`.
+1. missing default maps дают empty maps;
+2. valid strict integer default priorities сохраняются;
+3. bool/float/string default priority запрещены;
+4. unknown default service/offer refs получают existing bundle tokens;
+5. empty rule match получает exact `strategy_rule_match_empty`;
+6. existing rule IDs/max/ref validation не ослаблены;
+7. imports boundary остаётся прежней.
 
-Отдельно фиксируется единственный fallback key:
+## Resolver tests
 
-- `patient_situations.full_arch_missing`.
+`tests/test_target_strategy_resolution.py` synthetic-only доказывает:
 
-Audit показывает, что fallback дублирует основную full-arch конфигурацию по strategy,
-options и priorities, но не объявляет его удаляемым до runtime retirement checkpoint.
+1. first matching rule wins; later matching rule не merge-ится;
+2. non-matching required field и missing context field не выбирают rule;
+3. defaults всегда действуют, selected rule overrides только свои IDs;
+4. missing priority = `0`, negative/zero/positive sort correctly;
+5. equal priorities preserve exact input order;
+6. selected rule max overrides default, otherwise default applies;
+7. service and offer lists both sort/cap independently;
+8. explicit service/offer pin first;
+9. explicit non-candidate exact errors;
+10. duplicates and invalid candidate IDs exact errors;
+11. priority maps cannot add non-candidate IDs;
+12. empty/single lists valid;
+13. input models/maps/sequences are not mutated;
+14. resolver imports no current runtime/client/session/A9 modules.
 
-## Field ownership matrix
+No test may encode demo service IDs as resolver logic; demo-like IDs are allowed only as
+opaque synthetic strings.
 
-Audit обязан разобрать каждое семейство полей:
+## Architecture doc update
 
-| Current field | Target disposition |
-|---|---|
-| `rules[].id` | кандидат на stable target rule id |
-| `match.extent`, `match.jaw` | прямые neutral target axes, после проверки semantics |
-| `match.kind`, `match.problem` | current classifier concepts; не копировать как target field |
-| `match.modifiers: bone_deficit` | кандидат `reported_context: reported_bone_deficit`, не автоматическая эквивалентность |
-| `match.intent` | planner/dialog concern, не strategy eligibility |
-| `max_options` | target strategy, но current `4` требует approved cap `3` и explicit acceptance |
-| `primary_cta` | target marketing/CTA policy, не clinic strategy |
-| `strategy` string | current runtime/telemetry label; нет автоматического target field |
-| `answer_style.max_options` | duplicate current limit, не второй target source |
-| `mention_consult_ct` | marketing/CTA/content policy, не ordering |
-| `avoid_single_winner`, `avoid_medical_promise` | общие product guardrails, не per-rule priority data |
-| `options[].service_id/priority` | кандидат target `service_priorities`, только после applicability filtering |
-| `options[].show_when` | target service/option selection owner; сверить с S11 |
-| `options[].role/positioning` | нет frozen target owner; запрещено молча терять или класть в strategy |
+`docs/PRICE_SERVICE_ARCHITECTURE.md` фиксирует простым языком:
 
-## Per-rule audit requirements
+- defaults + ordered first-match context overrides;
+- specific rules above general rules;
+- exact matching only on neutral target axes;
+- no rule per phrase/service required;
+- missing priority 0 and stable ties;
+- explicit named candidate precedence;
+- resolver only ranks prefiltered candidates and cannot make service eligible;
+- no current/runtime authority.
 
-Для каждого из восьми rules документ содержит одну строку/секцию с:
-
-- exact current match;
-- exact ordered `service_id: priority`;
-- current `max_options`, CTA и strategy label;
-- какие eligibility facts уже представлены в S11 target service catalog;
-- candidate target match без утверждения runtime equivalence;
-- loss/risk/unresolved boundary.
-
-Особо отметить:
-
-- `one_stage.show_when=extraction_context` уже выражен через service selection stage;
-- `zygomatic_implants.show_when=bone_deficit_or_upper_jaw` заменён более строгими
-  target selection axes: full arch + upper jaw + reported bone deficit;
-- `existing_implant_prosthetic_stage` соответствует product-law «не продавать установку
-  повторно», но mapping `kind -> stage=implant_placed` должен проверяться отдельно;
-- `few_teeth_restore`, `full_arch_restore`, `upper_full_arch_restore`,
-  `upper_full_arch_with_bone_deficit` и fallback содержат четыре options, а target
-  primary result ограничен тремя;
-- `bone_deficit_solution` смешивает modifier и intent и не должен становиться
-  отдельным medical classifier/route.
-
-## Already migrated / not yet migrated
-
-Audit явно разделяет:
-
-### Уже материализовано offline
-
-- canonical service IDs, family/roles, active and coarse selection (S11);
-- offers, units, exact prices, brands/facts (S12);
-- payment stages (S13);
-- doctors and service links (S7/S9);
-- pure exact-service common data context (S10).
-
-### Ещё не материализовано
-
-- demo target clinic strategy data;
-- target marketing policy data;
-- deterministic target strategy resolver and overlap law;
-- dialog-focus/product wiring and any authority;
-- explicit target ownership of current role/positioning signals;
-- current offer `recommended` projection into target strategy.
-
-## Required conclusions
-
-Audit не должен давать ложный вывод «можно просто скопировать YAML». Он обязан
-зафиксировать минимальный следующий шаг:
-
-1. отдельный governance TASK для frozen target strategy resolution semantics
-   (default vs context rule, specificity/order/overlay, missing priority, stable tie);
-2. только после этого — materialization demo `clinic_strategy.yaml` из audited source;
-3. marketing/CTA migration остаётся отдельной задачей;
-4. current playbook остаётся единственным product consumer до отдельного wiring/authority
-   checkpoint.
-
-Если audit обнаружит, что frozen S1 contract уже однозначно задаёт resolution semantics,
-он должен привести точное доказательство из code/docs; иначе ambiguity остаётся явной.
+S14 audit получает короткий status addendum: gap resolution semantics закрыт S15, но
+demo strategy materialization, current mismatch fixes and wiring всё ещё не выполнены.
 
 ## Verification
 
-До audit artifact:
+До code/docs edits:
 
-1. independent checker читает TASK, current playbook, current consumer/contracts/tests,
-   S1 strategy models, S11 target catalog, architecture docs, checklist и guardrails;
-2. checker подтверждает exact inventory, audit-only scope и отсутствие скрытого решения
-   strategy semantics;
-3. при `❌`/`❓` TASK исправляется до completion work.
+1. independent checker читает TASK, S14 audit/current findings, S1 models/tests, S2/S10,
+   architecture docs, checklist и guardrails;
+2. checker подтверждает baseline fields, first-match law, no rule explosion, stable
+   ranking/direct precedence и offline boundary;
+3. при `❌`/`❓` TASK исправляется до кода.
 
-После audit artifact:
+После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_patient_playbook.py -q --basetemp=.pytest_tmp_s14_current`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py -q --basetemp=.pytest_tmp_s14_target`;
-3. `git diff --check`, exact allowlist status и independent checker review;
-4. no live/LLM и no full pytest.
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_target_strategy_resolution.py tests/test_response_schema_contract.py -q --basetemp=.pytest_tmp_s15_unit`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_loader.py tests/test_service_data_context.py -q --basetemp=.pytest_tmp_s15_neighbors`;
+3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py tests/test_demo_target_price_offers.py -q --basetemp=.pytest_tmp_s15_data`;
+4. `git diff --check`, exact allowlist and independent checker repeat;
+5. no live/LLM and no full pytest.
 
-Тесты read-only подтверждают, что current behavior и S11 data не менялись; они не
-доказывают target parity и не разрешают wiring.
+Known S14 current playbook result (`15 passed, 2 failed`) is documented and outside this
+allowlist. S15 не запускает его как green gate и не заявляет, что он исправлен.
 
 ## Definition of Done
 
-- владелец получает честный ответ, где находятся current priorities и почему это ещё
-  не target strategy file;
-- все восемь rules и fallback полностью учтены без выдуманных mappings;
-- уже перенесённые selection facts отделены от strategy/marketing/runtime debt;
-- спорные потери и rule-resolution gap явно зафиксированы;
-- client data, code, tests, answers, UI, A9 и authority не изменены;
-- roadmap S14 audit status независимо проверен;
-- checker `✅`, governance/completion commits и push только в `codex/stage-a`, дерево
-  чистое.
+- target strategy имеет explicit baseline priorities и safe non-empty context rules;
+- deterministic first-match + baseline override semantics frozen tests/docs;
+- stable ranking/cap/direct candidate precedence verified on synthetic data;
+- resolver cannot add or make candidates eligible;
+- no demo rules/data/current playbook/runtime consumers изменены;
+- S14 current mismatches remain visible and untouched;
+- roadmap S15 status independently reviewed;
+- checker `✅`, governance/completion commits and push only to `codex/stage-a`, tree clean.

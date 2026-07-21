@@ -1,295 +1,215 @@
-# TASK — S21 Deterministic Offline Marketing Selection
+# TASK — S22 Unified Offline Response Evidence Package
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `91084b2 feat: materialize demo target marketing S20`
+**Baseline:** `b652d00 feat: select target marketing ingredients S21`
 
-**Серия / checkpoint:** `S21` — pure offline-механизм выбора автоматических
-source-backed marketing ingredients из уже validated target bundle.
+**Серия / checkpoint:** `S22` — pure offline-сборщик единого набора материалов одной
+уже выбранной услуги: service/price/doctor context S10, marketing selection S21,
+разрешённые commercial facts/external refs и optional consultation close S18.
 
-**Режим:** governance + один новый unwired selector + synthetic/real-data unit tests +
-architecture status docs. Никаких client-data changes, session storage, ответов,
-routes/UI, live/LLM или product authority.
+**Режим:** governance + один новый unwired builder + synthetic/real-data unit tests +
+architecture status docs. Никаких client-data changes, чтения Markdown, session/runtime,
+ответов, routes/UI, live/LLM или product authority.
 
 ## Owner direction
 
-21 июля 2026 владелец разрешил следующий checkpoint после S20 и подтвердил понятную
-роль механизма: он должен брать правила клиники, выбранную услугу и ситуацию пациента,
-отбрасывать неприменимые материалы и соблюдать лимиты. Владелец ожидает:
+21 июля 2026 владелец разрешил следующий отдельный offline checkpoint после S21:
+собрать единый проверяемый пакет материалов для будущего ответа. Пакет должен сохранять
+общую связку «услуга → её цены → её врачи», добавлять выбранные S21 marketing ingredients
+и включать `consultation_value` только по exact документу и только при наличии места в
+обоих лимитах.
 
-- одинаковые входы всегда дают одинаковый выбор;
-- факты другой услуги, неактивные/просроченные предложения и неподходящие врачи не
-  попадают в результат;
-- механизм не заполняет свободные места нерелевантными фактами;
-- результат остаётся набором проверенных материалов, а не готовой репликой;
-- до отдельного решения ничего не подключается к ответам demo.
+Demo не имеет live-клиентов. S22 не создаёт compatibility path для current/legacy
+архитектуры и ничего не подключает к локальным ответам.
 
-Demo не имеет live-клиентов. S21 не создаёт compatibility path для current marketing.
+## Минимальная граница S22
 
-## Минимальная граница S21
+Создать `core/target_response_evidence.py` с pure function, принимающей только явно
+переданные already-validated target models и snapshots:
 
-Создать `core/target_marketing_selector.py` с pure function, которая принимает только
-явные already-validated inputs:
+- `ResponseSchemaBundle`;
+- `TargetDoctorCatalog`;
+- `ResponseSchemaExternalIndex`;
+- ordered `Sequence[ServiceConsultationValue]`;
+- exact уже выбранный `service_id`;
+- optional exact `selected_content_ref` выбранного service/option документа;
+- exact `semantic_context`, explicit `today`, флаг initial block и requested scenarios;
+- read-only shown snapshots S21;
+- отдельный флаг automatic consultation close и read-only shown consultation refs.
 
-- `ResponseSchemaBundle` — S1/S2 bundle с policy и commercial facts;
-- `TargetDoctorCatalog` — S5 catalog для service links врачей;
-- `ResponseSchemaExternalIndex` — explicit available `kb:`/`doctor:` refs;
-- exact `semantic_context`;
-- optional exact `service_id`, уже выбранный upstream;
-- ordered requested `marketing_scenarios`;
-- explicit `include_initial_block`;
-- snapshots `shown_fact_ids` и `shown_amplifier_refs`;
-- обязательную explicit `today: date`.
+Builder обязан вызвать S10 и S21 с **одним и тем же exact `service_id`**. Поэтому
+marketing result другой услуги невозможно передать как готовый несовместимый объект.
 
 Exact public API:
 
 ```python
 @dataclass(frozen=True, slots=True)
-class TargetMarketingSelection:
-    applied_scenarios: tuple[str, ...]
-    selected_refs: tuple[str, ...]
-    amplifier_refs: tuple[str, ...]
-    cta_key: str
+class TargetResponseEvidencePackage:
+    service_context: ServiceDataContext
+    selected_content_ref: str | None
+    marketing_selection: TargetMarketingSelection
+    commercial_facts: tuple[TargetCommercialFact, ...]
+    external_source_refs: tuple[str, ...]
+    consultation_close: ServiceConsultationValue | None
+    marketing_slots_used: int
+    amplifier_slots_used: int
 
 
-def select_target_marketing(
+def build_target_response_evidence_package(
     bundle: ResponseSchemaBundle,
     doctor_catalog: TargetDoctorCatalog,
     external_index: ResponseSchemaExternalIndex,
+    consultation_values: Sequence[ServiceConsultationValue],
     *,
+    service_id: str,
+    selected_content_ref: str | None,
     semantic_context: str,
-    service_id: str | None,
     today: date,
     include_initial_block: bool,
+    include_consultation_close: bool,
     marketing_scenarios: Sequence[str] = (),
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
-) -> TargetMarketingSelection:
+    shown_consultation_value_refs: Sequence[str] = (),
+) -> TargetResponseEvidencePackage:
     ...
 ```
 
-`TargetMarketingSelection` возвращает:
+Result meaning:
 
-- `applied_scenarios` в фактически применённом порядке;
-- `selected_refs` — общий ordered список автоматических marketing ingredients;
-- `amplifier_refs` — ordered subset усилителей;
-- `cta_key` — exact context key либо clinic default.
+- `service_context` — deep-detached S10 context: exact service, все authored offers этой
+  услуги и все связанные doctors в authored catalog order;
+- `marketing_selection` — exact S21 result для той же услуги;
+- `commercial_facts` — deep copies только выбранных `fact:<id>`, в порядке их появления
+  в `marketing_selection.selected_refs`;
+- `external_source_refs` — выбранные `kb:`/`doctor:` refs, в том же относительном порядке;
+- `consultation_close` — отдельное optional source-owned значение exact выбранного
+  документа; оно не маскируется под `SourceRef` и не добавляется в S21 tuples;
+- slot counts показывают итоговую занятость после optional consultation close;
+- result имеет frozen/slots shell и tuple collections; вложенные Pydantic records
+  deep-detached от inputs. Builder не изменяет входные models/sequences.
 
-Result invariants:
+`service_context.offers` намеренно содержит все authored offers и сохраняет их
+`active`/selection flags. S22 **не** утверждает, что каждую позицию можно показывать,
+не фильтрует и не ранжирует цены. Future eligibility/strategy projection остаётся
+отдельной ответственностью. То же относится к ранжированию врачей: S22 возвращает всех
+врачей с exact service link, а не выбирает «лучшего».
 
-- каждый selected ref любого типа занимает ровно один marketing slot;
-- каждый ref, пришедший из scenario pool, дополнительно занимает ровно один amplifier
-  slot;
-- `amplifier_refs` — exact ordered subsequence `selected_refs`;
-- `selected_refs` состоит сначала из всех amplifiers в фактическом round-robin order,
-  затем из initial fill;
-- в обоих tuples нет дублей;
-- если initial fact уже выбран как amplifier, он остаётся только на своей первой
-  позиции и считается одним marketing + одним amplifier slot.
+## Exact algorithm
 
-Selector ничего не читает с диска, не знает `client_id/session_id`, не получает
-TurnFrame, не вызывает LLM и не меняет переданные models/collections.
+### 1. Базовая связка одной услуги
 
-## Почему `today` передаётся явно
+1. Вызвать `build_service_data_context(bundle, doctor_catalog, service_id)`.
+2. Ошибки S10 `ServiceDataContextError` распространяются без изменения.
+3. Builder не читает service/profile Markdown и не выбирает offer/doctor.
 
-Selector не использует `date.today()`, system clock или environment. Активность facts
-должна быть воспроизводима в тесте и audit. Future caller отдельно передаст текущую дату.
-`active_from` и `active_until` включительны: факт активен в обе граничные даты.
+### 2. Marketing selection той же услуги
 
-## Exact selection algorithm
+Вызвать `select_target_marketing(...)` с тем же exact `service_id` и без изменения всех
+S21 inputs. Ошибки S21 `TargetMarketingSelectionError` распространяются без изменения.
+S22 не повторяет и не ослабляет active/date/service/shown/conflict rules S21.
 
-### 1. Input boundary
+### 3. Consultation input boundary
 
-- `semantic_context` — exact nonblank string;
-- `service_id` — `None` либо exact nonblank existing key из `bundle.services`;
-- `today` принимается только при `type(today) is date`; `datetime`, subclasses и любые
-  строки отклоняются;
-- scenarios/shown inputs — ordered non-string sequences exact nonblank strings без
-  дублей;
-- scenario values обязаны входить в frozen `MarketingScenario` literal;
-- `include_initial_block` обязан быть exact `bool`;
-- invalid input получает typed `TargetMarketingSelectionError` со stable code/value;
-- selector не выбирает service и не нормализует ID/case.
+После успешных S10 и S21:
 
-### 2. Applicable scenarios
+1. `consultation_values` обязан быть non-string ordered `Sequence`; каждый элемент —
+   exact `ServiceConsultationValue` instance.
+2. Duplicate `content_ref` запрещён.
+3. На скопированном tuple обязательно вызывается S18
+   `validate_service_consultation_refs(records, bundle.services)`; orphan refs fail closed
+   через существующий `ServiceConsultationRefError` без переупаковки.
+4. `selected_content_ref` — `None` либо exact valid S18 content ref. При непустом
+   значении ref обязан принадлежать exact выбранной услуге: её `service.content_ref` или
+   одному из её `option.content_ref`.
+5. `include_consultation_close` обязан быть exact `bool`.
+6. `shown_consultation_value_refs` — non-string ordered Sequence valid S18 content refs
+   без duplicate. Snapshot может содержать ref, которого уже нет в текущем списке
+   values; это допустимо и не требует скрытой очистки session.
 
-1. Requested scenarios рассматриваются в authored request order.
-2. Scenario без rule в policy игнорируется.
-3. Context допускается только при exact присутствии в
-   `rule.allowed_semantic_contexts`; пустой allowed list означает запрет automatic use.
-4. После context filtering берутся первые
-   `max_scenarios_per_turn` applicable scenarios.
-5. Result сохраняет их exact order в `applied_scenarios`.
+S22 не normalizes/strip/case-fold IDs или refs.
 
-`applied_scenarios` означает context-applicable rules после scenario cap, выбранные для
-рассмотрения. Scenario остаётся в tuple, даже если его pool не дал eligible ref или
-`max_amplifiers_per_turn == 0`. При `max_scenarios_per_turn == 0` tuple пуст. Это
-diagnostic selection metadata, а не утверждение, что amplifier был показан.
+### 4. Exact consultation close rule
 
-### 3. Amplifier merge
+`consultation_close` включается только когда одновременно истинны все условия:
 
-При двух applicable scenarios pools объединяются round-robin:
+1. `include_consultation_close is True`;
+2. `selected_content_ref is not None`;
+3. в `consultation_values` есть record с exact тем же `content_ref`;
+4. exact ref отсутствует в `shown_consultation_value_refs`;
+5. после S21 `len(selected_refs) < max_marketing_facts_per_turn`;
+6. после S21 `len(amplifier_refs) < max_amplifiers_per_turn`.
 
-1. в каждом круге каждый scenario может дать максимум один следующий eligible ref;
-2. первый круг идёт в `applied_scenarios` order;
-3. внутри каждого pool сохраняется `ordered_amplifier_refs` order;
-4. если один pool исчерпан/неприменим, второй может занять оставшийся amplifier slot;
-5. одинаковый ref из двух pools выбирается один раз по первому появлению;
-6. merge останавливается при любом достигнутом лимите:
-   `max_amplifiers_per_turn` или `max_marketing_facts_per_turn`.
+При включении consultation close занимает ровно **один marketing slot и один amplifier
+slot**. При отсутствии любого условия результат `None`, оба итоговых counts остаются
+равны S21 counts, а другой consultation ref не подставляется.
 
-В свой ход pool последовательно пропускает ineligible, already-selected и cross-pool
-duplicate refs до первого eligible ref. Такой пропуск не расходует slot и не завершает
-ход scenario. После одного выбранного ref ход переходит следующему scenario. Если pool
-исчерпан, scenario не даёт ref в этом и следующих кругах. Protected synthetic fixture:
-оба pools начинаются с одного shared ref; первый scenario выбирает shared, второй в том
-же первом круге пропускает duplicate и выбирает свой следующий eligible ref.
+Сборщик не изменяет shown snapshot и не помечает ref показанным. Future session может
+сделать это только после фактического включения в ответ. Direct question о пользе
+консультации остаётся основным content answer и не моделируется automatic close S22.
 
-Так составное сомнение вроде «боюсь и дорого» по возможности получает по одному
-усилителю каждого сценария, а не два материала только первого scenario.
+### 5. Materialization selected refs
 
-### 4. Candidate eligibility
+Для каждого ref в `marketing_selection.selected_refs`, сохраняя exact порядок:
 
-Для automatic candidate действуют exact gates:
+- `fact:<id>` превращается в deep copy `bundle.facts[id]` и добавляется в
+  `commercial_facts`;
+- `kb:` и `doctor:` остаются exact strings в `external_source_refs`;
+- неизвестного типа быть не может после validated S1/S20/S21 boundary.
 
-**`fact:<id>`**
+Builder не загружает тела KB/doctor Markdown. Exact ref остаётся указателем на
+source-owned материал, а doctor basics уже присутствуют в `service_context.doctors`.
 
-- fact гарантированно существует в `bundle.facts` благодаря
-  `ResponseSchemaBundle` validation;
-- `active is True`;
-- explicit `today` не раньше `active_from` и не позже `active_until`;
-- пустой `allowed_service_ids` означает общую применимость;
-- непустой список требует exact совпадения с переданным `service_id`;
-- `fact.id` отсутствует в `shown_fact_ids`;
-- full ref отсутствует в `shown_amplifier_refs`, если candidate пришёл из scenario;
-- candidate не конфликтует с уже selected fact в любом направлении
-  `incompatible_with`; authored order побеждает, более поздний conflicting fact
-  пропускается.
+## Stable own errors
 
-**`kb:<doc>#<chunk>`**
-
-- exact ref существует в `external_index.kb_refs`;
-- ref отсутствует в `shown_amplifier_refs`.
-
-**`doctor:<id>`**
-
-- exact ref существует в `external_index.doctor_refs`;
-- exact doctor существует в catalog;
-- при заданном `service_id` врач обязан иметь exact service link;
-- при `service_id=None` doctor ref допустим **только** при exact
-  `semantic_context == "doctors"`;
-- при любом другом context и `service_id=None` doctor ref отбрасывается;
-- ref отсутствует в `shown_amplifier_refs`.
-
-Missing/ineligible external `kb:`/`doctor:` marketing candidate просто отбрасывается:
-optional overlay не должен ломать основной content/price answer. Selector не заменяет
-его похожим фактом. Missing local `fact:` невозможно в validated bundle: это остаётся
-fail-closed `ResponseSchemaBundle` validation и не тестируется обходом модели.
-Cross-reference validators S3/S6 всё равно остаются обязательной pack acceptance до
-product wiring.
-
-### Exact input errors
-
-`TargetMarketingSelectionError(ValueError)` хранит exact public fields `code` и
-`value`; message имеет стабильную форму `f"{code}: {value!r}"`.
+`TargetResponseEvidencePackageError(ValueError)` хранит public fields `code` и `value`;
+message: `f"{code}: {value!r}"`.
 
 | Условие | `code` | `value` |
 |---|---|---|
-| context не `str` или blank | `marketing_semantic_context_invalid` | исходный context |
-| service не `None`/`str` или blank | `marketing_service_id_invalid` | исходное значение |
-| exact service key отсутствует | `marketing_service_not_found` | exact service string |
-| `type(today) is not date` | `marketing_today_invalid` | исходное значение |
-| `type(include_initial_block) is not bool` | `marketing_include_initial_block_invalid` | исходное значение |
-| scenarios не non-string `Sequence` либо element не exact allowed scenario string | `marketing_scenario_invalid` | container либо первый offending element |
-| duplicate scenarios | `marketing_scenario_duplicate` | скопированный tuple |
-| shown facts не non-string `Sequence` либо element не nonblank `str` | `marketing_shown_fact_id_invalid` | container либо первый offending element |
-| duplicate shown facts | `marketing_shown_fact_id_duplicate` | скопированный tuple |
-| shown amplifiers не non-string `Sequence` либо element не valid frozen `SourceRef` string | `marketing_shown_amplifier_ref_invalid` | container либо первый offending element |
-| duplicate shown amplifiers | `marketing_shown_amplifier_ref_duplicate` | скопированный tuple |
+| consultation values не non-string `Sequence` или первый элемент не `ServiceConsultationValue` | `evidence_consultation_values_invalid` | container или первый offending element |
+| duplicate consultation `content_ref` | `evidence_consultation_content_ref_duplicate` | скопированный tuple refs |
+| selected ref не `None` и не valid exact S18 content ref | `evidence_selected_content_ref_invalid` | исходное значение |
+| valid selected ref не принадлежит exact service/option | `evidence_selected_content_ref_not_owned` | exact ref |
+| consultation flag не exact `bool` | `evidence_include_consultation_close_invalid` | исходное значение |
+| shown refs не non-string `Sequence` или первый элемент не valid exact S18 content ref | `evidence_shown_consultation_ref_invalid` | container или offending element |
+| duplicate shown refs | `evidence_shown_consultation_ref_duplicate` | скопированный tuple |
 
-Validation идёт сверху вниз в порядке signature/table: context, service, date, bool,
-scenarios, shown facts, shown amplifiers. Exact case сохраняется; selector ничего не
-strip/normalize. Tuple/list принимаются как `Sequence`; `str`, `bytes`, mapping и set
-не принимаются. Existing typed bundle/catalog/index валидируются их owner contracts,
-а не дублируются в S21 error table.
+Validation precedence:
 
-### 5. Initial commercial fill
+1. S10 service boundary;
+2. S21 inputs в его зафиксированном порядке;
+3. consultation values container/items/duplicates, затем S18 cross-ref;
+4. selected content ref grammar, затем ownership;
+5. consultation flag;
+6. shown consultation refs container/items/duplicates.
 
-Если `include_initial_block is True` и после amplifiers остались marketing slots:
+`Sequence` означает tuple/list и другие ordered non-string sequences; `str`, `bytes`,
+mapping и set отклоняются. Existing typed bundle/catalog/index и их cross-ref acceptance
+не дублируются собственной error table S22.
 
-1. используется только block с exact key `semantic_context`;
-2. отсутствие block не вызывает fallback на другой context;
-3. `ordered_fact_refs` идут сверху вниз;
-4. применяются те же fact active/date/service/shown/conflict gates;
-5. ref, уже выбранный как scenario amplifier, не дублируется и занимает один общий
-   marketing slot;
-6. fill останавливается на `max_marketing_facts_per_turn`;
-7. неприменимые кандидаты не заменяются данными вне authored block.
+## Что S22 сознательно не делает
 
-`include_initial_block=False` позволяет future caller представить neutral follow-up:
-без scenarios selector возвращает пустые ingredient lists, а не прокручивает initial
-block повторно.
-
-### 6. CTA
-
-- exact `policy.cta_contexts[semantic_context]` имеет приоритет;
-- иначе используется обязательный `policy.cta_contexts["default"]`;
-- CTA не входит в `selected_refs`, marketing/amplifier limits;
-- S21 предполагает, что S20 CTA-reference validation уже выполнена;
-- возврат CTA key не разрешает показывать CTA в manual-contact, spam/off-topic, pure
-  clarify, после отказа или внутри lead-flow — эти safety/product gates остаются
-  upstream и unwired.
-
-## Slot accounting examples
-
-### Один `cost` scenario для All-on-4 в context `price`
-
-На demo data и дате `2026-07-21`:
-
-1. `fact:installment_12` — amplifier + marketing slot;
-2. `fact:implant_same_day_discount` — amplifier + marketing slot;
-3. exact initial block `price` отсутствует, поэтому третий slot остаётся пустым;
-4. CTA `price` выбирается отдельно.
-
-Итого: 2 marketing refs, 2 amplifiers, одна CTA. Selector не использует block
-`service` как скрытый fallback для `price`.
-
-В context `service` тот же `cost` scenario может после двух amplifiers заполнить третий
-slot `fact:free_implant_consult` из exact `service` block, но CTA тогда будет `plan`.
-Оба результата следуют данным, а не догадке selector’а.
-
-### Professional whitening initial block
-
-Три implantation facts отбрасываются по service eligibility. Остаётся только
-`fact:professional_whitening_discount`; пустые места не заполняются другими данными.
-
-### Doctor trust по конкретной услуге
-
-Doctor refs без соответствующего service link отбрасываются. KB refs pool остаются
-доступны, если exact source существует. При общем doctors context без service exact
-doctor refs разрешены без рейтинга или выбора «лучшего».
-
-## Что S21 сознательно не делает
-
-- не определяет scenario из текста и не добавляет regex/classifier;
-- не выбирает/не сохраняет service/dialog focus;
-- не отвечает на direct fact question: прямой ответ остаётся основным source content и
-  отдельно обходит только repeat suppression;
-- не читает и не выбирает S18/S19 `consultation_value`; future evidence assembly
-  отдельно проверит оставшиеся 3/2 slots перед consultation close;
-- не создаёт session state и не отмечает refs показанными — показ можно записать только
-  после фактического включения в будущий ответ;
-- не читает тексты KB/facts/doctors и не формирует natural-language output;
-- не применяет manual-contact/lead/refusal routing;
-- не подключается к ResponseSpec/composer/UI/product path.
+- не определяет service, patient scope, semantic context или marketing scenarios из текста;
+- не выбирает применимые/приоритетные offers и не вычисляет цены;
+- не ранжирует и не рекомендует врача как «лучшего»;
+- не читает client files/Markdown и не формирует fullcontext/prompt/reply;
+- не копирует wording incompatibility или placement instructions в generated text;
+- не применяет manual-contact, lead/refusal, safety или UI gates;
+- не создаёт/не читает/не меняет session state;
+- не подключается к ResponseSpec/composer/routes/API/app/UI/config;
+- не меняет current/target client data, frozen contracts или S10/S18/S21;
+- не меняет A9, product authority и не запускает live/LLM.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `core/target_marketing_selector.py` — new pure offline selector;
-- `tests/test_target_marketing_selector.py` — new synthetic unit contract;
-- `tests/test_demo_target_marketing_selection.py` — new read-only real-data acceptance;
-- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — S21 algorithm/status boundary;
+- `core/target_response_evidence.py` — new pure offline builder;
+- `tests/test_target_response_evidence.py` — new synthetic unit contract;
+- `tests/test_demo_target_response_evidence.py` — new read-only real-data acceptance;
+- `docs/PRICE_SERVICE_ARCHITECTURE.md` — S22 package/status boundary;
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — consultation slot/package status;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -297,58 +217,55 @@ doctor refs разрешены без рейтинга или выбора «л�
 
 ## Protected / вне scope
 
-- весь `clients/**`, включая current/target marketing, tone, playbook, MD, doctors,
-  pricebook, service/brand/strategy data;
-- весь `contracts/**`, включая frozen S1/S3/S5/S20 models/validators;
-- existing `core/marketing_policy.py`, `marketing_loader.py`, `response_strategy.py`,
-  `service_data_context.py` и все current runtime paths;
-- изменение S20 exact order/refs/contexts/CTA map или S18/S19 consultation values;
-- TurnFrame/planner extraction/scenario classification;
-- session persistence, TTL, client resolver/cache, shown-state mutation;
-- direct-question evidence, consultation-close placement и incompatibility copy;
-- ResponseSpec/evidence/composer/prompt/FullContext/routes/API/app/UI/config;
-- adapters, dual-read, fallback, feature flags и product wiring;
+- весь `clients/**`, включая current/target JSON/YAML/MD, doctors, pricebook, marketing;
+- весь `contracts/**`, включая frozen S1/S3/S5/S18/S20 contracts/validators;
+- existing `core/service_data_context.py`, `target_marketing_selector.py`, loaders,
+  strategy/current runtime paths;
+- изменение S10 authored-order/all-record law, S18 cadence/value data или S21 selection;
+- offer eligibility/strategy selection, dialog focus и patient-scope extraction;
+- session persistence/TTL/client resolver/cache/shown-state mutation;
+- ResponseSpec/evidence composer/prompt/FullContext/routes/API/app/UI/config;
 - protected golden/eval fixtures;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
-- live/LLM, merge, `main`, другие ветки и изменение product authority.
+- live/LLM, merge, `main`, другие ветки и product authority.
 
 ## Acceptance tests
 
-### Synthetic selector contract
+### Synthetic builder contract
 
-`tests/test_target_marketing_selector.py` обязан доказать:
+`tests/test_target_response_evidence.py` обязан доказать:
 
-1. single-scenario pool order, amplifier cap и initial fill до общего cap;
-2. two-scenario round-robin и fallback при пустом/ineligible pool;
-3. context filtering происходит до scenario cap; empty allowed contexts deny automatic;
-4. fact active flag, inclusive date range и service eligibility; missing local fact
-   отдельно fail-closed отклоняется `ResponseSchemaBundle` без обхода validation;
-5. missing external KB/doctor availability skip и doctor
-   existence/service-link/general-`doctors` context eligibility, включая отрицательный
-   `service_id=None` + non-doctors context;
-6. shown fact/amplifier suppression, cross-pool/initial deduplication;
-7. bidirectional incompatibility: first authored candidate wins;
-8. exact zero/partial limits и отсутствие нерелевантного fill;
-9. exact CTA context/default selection вне slot counts;
-10. neutral `include_initial_block=False` path;
-11. stable typed validation errors для invalid context/service/date/sequences/scenarios;
-12. stateless repeated calls, no mutation, frozen/slots result;
-13. selector imports only stdlib + target contracts; no IO/client/runtime/session/LLM.
-
-Round-robin acceptance обязательно включает shared-first-ref fixture: второй scenario
-пропускает уже выбранный shared ref и в тот же ход даёт свой следующий eligible ref.
+1. exact API/result fields, frozen+slots dataclass, tuple collections и честная
+   deep-detachment boundary без заявления о frozen nested Pydantic records;
+2. один exact service управляет одновременно S10 context и S21 selection;
+3. service/offers/doctors сохраняют S10 authored order/flags и deep-detached от inputs;
+4. selected refs детерминированно разделяются на copied commercial facts и external refs
+   без изменения exact order S21 result;
+5. service-level и option-level selected content refs принимаются, `None` разрешён;
+6. invalid/unowned/cross-service selected refs fail closed stable errors;
+7. consultation close при свободных slots занимает exact 1 marketing + 1 amplifier;
+8. отсутствие value, shown ref, false flag и `None` selected ref независимо suppress close;
+9. полный marketing slot и полный amplifier slot независимо suppress close;
+10. invalid/duplicate values и shown snapshots дают exact stable error/code/value;
+11. orphan consultation record отклоняется существующим S18 cross-ref validator;
+12. S10/S21 typed errors распространяются без изменения и соблюдается precedence;
+13. repeated calls stateless, input models/sequences/snapshots не меняются;
+14. imports только stdlib/Pydantic target contracts и pure S10/S21; нет IO, client,
+    session, runtime, LLM или product imports.
 
 ### Real demo acceptance
 
-`tests/test_demo_target_marketing_selection.py` обязан доказать:
+`tests/test_demo_target_response_evidence.py` обязан read-only доказать:
 
-1. S2/S4/S5/S6/S20 boundaries строят explicit real inputs read-only;
-2. All-on-4 cost в context `price` возвращает exact 2/2 refs, не использует чужой
-   `service` block и выбирает CTA `price`;
-3. professional whitening initial возвращает только применимую скидку;
-4. doctor-trust для конкретной услуги не возвращает несвязанных doctors;
-5. general doctors context разрешает exact doctor refs и CTA `doctor`;
-6. shown refs/date меняют выбор только по exact deterministic rules;
+1. real S2/S4/S5/S6/S18/S20 boundaries строят explicit validated inputs;
+2. exact `all_on_4` package содержит одну service, все её authored offers и только
+   doctors с exact service link;
+3. neutral `service` call без initial/scenarios включает real All-on-4 consultation
+   value и считает 1/1 slots;
+4. exact shown consultation ref suppresses close без замены;
+5. `cost + price + all_on_4` даёт S21 2 marketing / 2 amplifiers и поэтому **не**
+   включает consultation close, хотя один общий marketing slot ещё свободен;
+6. selected fact records/external refs точно соответствуют S21 selection;
 7. source/current/target files не меняются;
 8. no product imports/writes/skip/xfail/live/LLM.
 
@@ -356,27 +273,27 @@ Round-robin acceptance обязательно включает shared-first-ref 
 
 До implementation:
 
-1. governance TASK + roadmap pending коммитятся отдельно и push только в
-   `codex/stage-a`;
-2. independent read-only checker читает TASK, S18–S20 data/contracts/tests,
-   architecture, checklist/guardrails и existing pure strategy style;
-3. checker подтверждает slot math, round-robin, eligibility, no-repeat snapshots,
-   conflict handling, CTA and no-runtime/no-authority boundary;
+1. этот TASK + roadmap pending коммитятся отдельно и push только в `codex/stage-a`;
+2. independent read-only checker читает TASK, S10/S18–S21 contracts/data/tests,
+   architecture, checklist/guardrails;
+3. checker подтверждает ownership, slot math, validation precedence, no-selection и
+   no-runtime/no-authority boundary;
 4. при `❌`/`❓` governance исправляется и проверяется повторно до code.
 
 После implementation:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_target_marketing_selector.py tests/test_demo_target_marketing_selection.py -q --basetemp=.pytest_tmp_s21_selector`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_marketing_policy.py tests/test_marketing_cta_refs.py tests/test_response_schema_refs.py tests/test_doctor_schema_refs.py tests/test_target_strategy_resolution.py -q --basetemp=.pytest_tmp_s21_neighbors`;
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_target_response_evidence.py tests/test_demo_target_response_evidence.py -q --basetemp=<temp>/s22-target`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_service_data_context.py tests/test_service_consultation_source.py tests/test_target_marketing_selector.py tests/test_demo_target_marketing_selection.py -q --basetemp=<temp>/s22-neighbors`;
 3. `git diff --check`, exact allowlist, no skip/xfail, no full pytest;
 4. independent completion checker повторяет review/tests;
 5. roadmap `[x]`, completion commit/push only `codex/stage-a`, tree clean/synced.
 
 ## Definition of Done
 
-- pure selector deterministically returns only eligible automatic refs within 3/2/2;
-- exact source/service/date/doctor/no-repeat/conflict gates independently tested;
-- S20 target policy/data and frozen contracts unchanged;
-- no text generation, session mutation, runtime/product path, A9 or authority changes;
-- independent governance and completion reviews `✅`;
-- commits/push only `codex/stage-a`, working tree clean and HEAD synced with origin.
+- pure builder детерминированно собирает one-service evidence package из S10/S18/S21;
+- service/price/doctor link и exact marketing materialization проверены independently;
+- consultation close соблюдает exact document/session cadence snapshot и оба 3/2 slots;
+- никакого offer/doctor selection, IO, text generation, session/runtime/product wiring;
+- current/target client data, frozen contracts, A9 и authority не меняются;
+- independent governance и completion reviews `✅`;
+- commits/push только `codex/stage-a`, working tree clean и HEAD synced with origin.

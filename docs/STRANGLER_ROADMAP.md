@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S21 — deterministic offline marketing selector реализован и независимо проверен; session/runtime и product path не подключены** |
-| Ближайший рабочий фокус без live | **Отдельно определить следующий offline checkpoint; S21 не разрешает session/runtime/authority** |
+| Отдельная S-series без live | **S22 — governance единого offline response evidence package; реализация только после independent checker review** |
+| Ближайший рабочий фокус без live | **S22: связать S10/S18/S21 в pure one-service package без offer selection, session/runtime и authority** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -126,6 +126,11 @@
   два scenarios round-robin и соблюдает limits/CTA без скрытого context fallback.
   Completion review `✅`: selector/real data `44 passed`, frozen neighbors `73 passed`,
   skip/xfail нет. Session/runtime, ответы и authority не подключены.
+- [ ] **S22 — unified offline response evidence package** — governance определяет pure
+  one-service assembly из S10 service/offers/doctors, S21 marketing selection и optional
+  S18 consultation close с exact document snapshot и остатком обоих 3/2 slots. Реализация
+  начнётся только после independent governance checker `✅`; offer/doctor selection,
+  session/runtime, ответы и authority не подключаются.
 
 ## Какой roadmap актуален
 

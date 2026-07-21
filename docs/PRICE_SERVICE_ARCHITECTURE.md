@@ -500,6 +500,23 @@ Returned offers — deep copies в resolved order. `fixed`/`from`/`range`/
 и brand ID не меняются и не пересчитываются. S23 не выбирает service/brand из текста,
 не оценивает медицинскую применимость и не подключён к session/runtime/product path.
 
+### Exact brand offer projection S24
+
+S24 добавляет поверх S23 только exact brand boundary для одной уже выбранной услуги.
+Upstream передаёт точный `selected_brand_id`; S24 проверяет его существование в target
+brand catalog и передаёт в S23 лишь offers с тем же `brand_id`. Unbranded generic offers
+и другие бренды не подставляются даже при высоком clinic priority.
+
+Если известный catalog brand не имеет offer у выбранной услуги, результат пуст: система
+не заменяет его другим брендом, generic price, другой услугой или вычисленной суммой.
+Active service/offer/option semantics, exact option filter, strategy order/cap и explicit
+offer pin остаются в единственном владельце S23/S15. Денежные поля, package, payment
+stages, facts и followups возвращаются без изменений.
+
+S24 не распознаёт alias, country или бренд из текста пациента, не выбирает услугу и не
+подключён к FullContext, session/runtime, ответам либо product authority. Brand
+recognition остаётся отдельной будущей границей.
+
 ### Session state
 
 ```yaml

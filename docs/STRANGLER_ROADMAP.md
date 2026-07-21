@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S24 — exact brand offer projection внутри одной выбранной услуги реализована и независимо проверена; product path не подключён** |
-| Ближайший рабочий фокус без live | **Отдельно определить следующий offline checkpoint; S24 не разрешает brand recognition, service selection, session/runtime или authority** |
+| Отдельная S-series без live | **S25 — deterministic target brand term resolution: governance pending, код ещё не начат** |
+| Ближайший рабочий фокус без live | **Проверить governance S25; до checker ✅ код не писать** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -142,6 +142,10 @@
   S23/S15. Independent completion review `✅`: target `25 passed`, required neighbors
   `65 passed`, skip/xfail нет. Brand recognition, service selection, session/runtime,
   ответы и authority не подключены.
+- [ ] **S25 — deterministic target brand term resolution** — governance подготовлен для
+  pure dictionary lookup одного уже выделенного brand term по exact ID/canonical/alias
+  после `strip().casefold()`, с fail-closed collision law. До независимого governance
+  checker `✅` код не пишется; full-message recognition, runtime и authority не подключаются.
 
 ## Какой roadmap актуален
 

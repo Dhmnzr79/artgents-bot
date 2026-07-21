@@ -1,167 +1,147 @@
-# TASK — S24 Exact Brand Offer Projection
+# TASK — S25 Deterministic Target Brand Term Resolution
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `935b126 feat: project active service offers S23`
+**Baseline:** `95e967b feat: project exact brand offers S24`
 
-**Серия / checkpoint:** `S24` — pure offline-фильтр exact бренда внутри одной уже
-выбранной услуги с повторным использованием S23 active/option/strategy projection.
+**Серия / checkpoint:** `S25` — pure offline-разрешение одного уже выделенного brand
+term в exact target `brand_id` по ID, canonical name или authored alias.
 
-**Режим:** governance + один новый unwired projection module + synthetic/real-data unit
-tests + price architecture status. Никаких изменений client data, распознавания текста,
-выбора услуги, session/runtime, ответов, routes/UI, authority или live/LLM.
+**Режим:** governance + один новый unwired resolver + synthetic/real-data unit tests +
+price architecture status. Никаких client-data changes, извлечения бренда из полного
+сообщения, service selection, session/runtime, ответов, routes/UI, authority или live/LLM.
 
 ## Owner direction
 
-После завершённого S23 владелец разрешил идти дальше. Ближайший минимальный пробел:
-S23 умеет безопасно показать активные offers выбранной услуги и option, но намеренно не
-фильтрует их по бренду. Будущему контуру нужен точный ответ на уже разрешённое upstream
-уточнение вроде «Nobel»: предложения других брендов и без бренда не должны попасть в
-ценовую проекцию.
+После завершённого S24 владелец разрешил идти дальше. S24 принимает только exact
+`brand_id`; следующий минимальный пробел — безопасно превратить уже выделенный upstream
+термин вроде `Nobel Biocare`, `Nobel` или `нобель` в `nobel_biocare` по target brand
+catalog.
 
-Demo не имеет live-клиентов. S24 не строит compatibility path для current/legacy
-архитектуры и ничего не подключает к локальным ответам.
+S25 не получает целое сообщение пациента и не ищет в нём подстроки. Это dictionary
+boundary, а не новый classifier. Demo не имеет live-клиентов; compatibility path для
+current/legacy не создаётся.
 
-## Минимальная граница S24
+## Минимальная граница S25
 
-Создать `core/target_brand_offer_projection.py` с pure function, принимающей:
-
-- `ServiceDataContext` S10 для exact уже выбранной услуги;
-- `TargetBrandCatalog` S1 из того же уже проверенного bundle;
-- `TargetClinicStrategy` S1/S15 и explicit `TargetStrategyMatch`;
-- обязательный exact `selected_brand_id`, уже определённый upstream;
-- optional exact `selected_option_id` и `explicit_offer_id` с тем же смыслом, что в S23.
-
-Exact public API:
+Создать `core/target_brand_resolver.py` с pure function:
 
 ```python
 @dataclass(frozen=True, slots=True)
-class TargetBrandOfferProjection:
-    service_id: str
-    selected_option_id: str | None
-    selected_brand_id: str
+class TargetBrandResolution:
+    brand_id: str
     brand: TargetBrand
-    matched_rule_id: str | None
-    max_options: int
-    offers: tuple[TargetOffer, ...]
 
 
-def project_target_service_brand_offers(
-    service_context: ServiceDataContext,
+def resolve_target_brand_term(
     brand_catalog: TargetBrandCatalog,
-    strategy: TargetClinicStrategy,
-    strategy_context: TargetStrategyMatch,
-    *,
-    selected_brand_id: str,
-    selected_option_id: str | None = None,
-    explicit_offer_id: str | None = None,
-) -> TargetBrandOfferProjection:
+    brand_term: str,
+) -> TargetBrandResolution | None:
     ...
 ```
 
-Result имеет frozen/slots shell. `brand` — deep copy canonical brand record; offers уже
-возвращаются S23 как deep copies. Изменение результата не меняет входные catalog/context,
-bundle или strategy.
+`brand_term` — один exact brand token/name, уже выделенный upstream. Result содержит
+exact authored ID и deep copy canonical brand record. Неизвестный корректный term
+возвращает `None`; это нормальный no-match, а не повод подставить похожий бренд.
 
-S24 не получает текст пациента, TurnFrame или A9 patient scope. `selected_brand_id`,
-option и explicit offer уже выбраны upstream и передаются явно; checkpoint не получает
-product authority.
+## Exact normalization and matching
 
-## Exact algorithm
+### 1. Input validation
 
-### 1. S24-only validation
+`brand_term` обязан быть nonblank `str`. Иначе:
 
-1. `selected_brand_id` обязан быть exact nonblank `str`.
-2. ID не strip/case-fold/normalize и обязан exact присутствовать в
-   `brand_catalog.brands`.
-
-`TargetBrandOfferProjectionError(ValueError)` хранит public `code` и `value`; message:
-`f"{code}: {value!r}"`.
-
-| Условие | `code` | `value` |
-|---|---|---|
-| brand ID не `str` или blank | `brand_offer_projection_brand_id_invalid` | исходное значение |
-| exact brand ID отсутствует в catalog | `brand_offer_projection_brand_not_found` | exact string |
-
-Typed context/catalog/strategy остаются owner-contract inputs. Валидация option и
-explicit offer остаётся у S23 и не дублируется.
-
-### 2. Exact brand candidate boundary
-
-1. Из `service_context.offers` в authored order остаются только offers, где
-   `offer.brand_id == selected_brand_id`.
-2. Generic offers с `brand_id=None`, offers другого бренда и любые похожие строки не
-   допускаются.
-3. Никакой alias/canonical-name/country/natural-language resolution не выполняется.
-4. Если бренд существует в catalog, но у выбранной услуги нет его offers, возвращается
-   нормальная пустая projection — без fallback к другому бренду, generic offer, другой
-   услуге или вычисленной цене.
-5. Inactive offers намеренно остаются во внутреннем отфильтрованном context и затем
-   исключаются S23: одна существующая граница владеет active semantics.
-
-### 3. Делегирование S23
-
-Собрать временный `ServiceDataContext` с той же service/doctors и brand-filtered offers,
-затем вызвать существующий:
-
-```python
-project_target_service_offers(
-    filtered_context,
-    strategy,
-    strategy_context,
-    selected_option_id=selected_option_id,
-    explicit_offer_id=explicit_offer_id,
-)
+```text
+TargetBrandResolutionError.code == "brand_resolution_term_invalid"
+TargetBrandResolutionError.value == original input
+TargetBrandResolutionError.candidate_brand_ids == ()
 ```
 
-- active service/offer/option filtering полностью принадлежит S23;
-- exact option validation, S15 first-match order, priorities, caps и explicit pin также
-  полностью принадлежат S23/S15;
-- priority map не может вернуть offer другого бренда, без бренда или inactive;
-- explicit offer другого бренда получает существующий
-  `TargetStrategyResolutionError("strategy_explicit_offer_not_candidate", id)` без
-  переупаковки;
-- price mode, amounts, currency, billing unit, package, payment stages, fact refs и
-  followups не меняются и не пересчитываются;
-- result копирует S23 service/option/rule/limit/offers и добавляет exact selected brand ID
-  и deep-copied canonical brand record.
+Error наследует `ValueError`; message exact `f"{code}: {value!r}"`.
 
-## Что S24 сознательно не делает
+### 2. Единственная допустимая normalization
 
-- не распознаёт бренд/alias/country/group из natural language и не меняет legacy brand
-  resolver;
-- не выбирает service/family/option/offer и не делает общий service shortlist;
-- не проверяет медицинскую применимость и не рекомендует лечение;
-- не фильтрует по бюджету и не складывает/умножает цены;
-- не выбирает doctors, marketing facts, consultation close или CTA;
-- не создаёт ResponseSpec, prompt, FullContext packet или natural-language answer;
-- не читает файлы/Markdown/client/session/clock и не меняет shown state;
-- не подключается к composer/routes/API/app/UI/config;
-- не меняет S1/S10/S15/S22/S23, target/current client data или product authority;
+Для input и authored lookup values применяется только:
+
+```python
+value.strip().casefold()
+```
+
+Никакой punctuation removal, word splitting, stemming, fuzzy matching, transliteration,
+keyboard-layout repair, substring/regex search или LLM inference.
+
+Lookup values каждого catalog record:
+
+1. dictionary `brand_id`;
+2. `brand.canonical_name`;
+3. каждый authored `brand.aliases` в authored order.
+
+Совпадение после `strip().casefold()` разрешает только разницу регистра и внешних
+пробелов. Например:
+
+- `nobel_biocare`, `Nobel Biocare`, `nobel`, ` НОБЕЛЬ ` → `nobel_biocare`;
+- `сколько стоит Nobel?`, `Nobe`, `Нобелем`, `Straumann` → `None`, если таких exact
+  authored labels нет.
+
+### 3. Collision law
+
+- Несколько lookup values одного и того же brand, совпавшие с term, остаются одним
+  кандидатом.
+- Если normalized term указывает на два или более разных brand IDs, resolver fail-closed:
+
+```text
+code == "brand_resolution_ambiguous"
+value == original brand_term
+candidate_brand_ids == tuple of distinct matching IDs in catalog authored order
+```
+
+- Никакой приоритет ID над canonical/alias и никакой первый случайный бренд не выбирается
+  при cross-brand collision.
+
+### 4. Result law
+
+- Один distinct candidate → frozen/slots `TargetBrandResolution`.
+- `brand_id` остаётся exact dictionary key без normalization.
+- `brand` — deep copy source record; country/aliases не вычисляются и не меняются.
+- Ноль candidates → `None` без fallback.
+- Вызов stateless и не мутирует catalog/records/alias lists.
+
+S25 output напрямую совместим с S24: caller может передать
+`resolution.brand_id` как `selected_brand_id`. S25 сам S24 не вызывает и не выбирает
+service/offer.
+
+## Что S25 сознательно не делает
+
+- не принимает/не анализирует полное сообщение пациента, TurnFrame или A9 scope;
+- не извлекает несколько брендов и не обрабатывает brand groups/countries как запрос;
+- не выбирает service/family/option/offer, не проверяет наличие offer у service;
+- не меняет S24 и не применяет active/strategy/price rules;
+- не создаёт prompt, FullContext packet, ResponseSpec или текст ответа;
+- не читает файлы/Markdown/client/session/clock и не пишет state;
+- не подключается к legacy resolver, composer/routes/API/app/UI/config;
+- не меняет contracts, target/current client data или product authority;
 - не меняет/не перезапускает A9 artifacts и не запускает live/LLM.
 
-Brand alias resolution, service shortlist, target session/runtime и response composition
-остаются отдельными future checkpoints.
+Извлечение brand term из сообщения, multi-brand/group semantics, service shortlist,
+session/runtime и response composition остаются отдельными future checkpoints.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `core/target_brand_offer_projection.py` — new pure offline projection;
-- `tests/test_target_brand_offer_projection.py` — new synthetic unit contract;
-- `tests/test_demo_target_brand_offer_projection.py` — new read-only demo acceptance;
-- `docs/PRICE_SERVICE_ARCHITECTURE.md` — S24 projection/status boundary;
+- `core/target_brand_resolver.py` — new pure offline resolver;
+- `tests/test_target_brand_resolver.py` — new synthetic unit contract;
+- `tests/test_demo_target_brand_resolver.py` — new read-only demo acceptance/composition;
+- `docs/PRICE_SERVICE_ARCHITECTURE.md` — S25 resolver/status boundary;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion checker `✅`.
 
 Любой другой файл требует остановки и отдельного решения владельца/Архитектора.
 
 ## Protected / вне scope
 
-- весь `clients/**`, включая target/current price, service, brand, strategy, marketing,
-  MD и doctors;
-- весь `contracts/**` и frozen S1/S5/S18/S20 models/validators;
-- existing `core/target_offer_projection.py`, S10/S15/S21/S22 modules, loaders и current
-  runtime paths;
-- service/option/brand recognition, general shortlist, dialog focus и session state;
+- весь `clients/**`, включая target/current brand aliases, price/service/strategy/MD;
+- весь `contracts/**`, включая frozen S1 brand schema/validators;
+- existing S10/S15/S21/S22/S23/S24 core modules, loaders и current runtime paths;
+- legacy `core/price_offers.py`, `core/price_brand_money.py`, planner brand filter и их tests;
+- full-message/substring recognition, service selection, dialog/session state;
 - ResponseSpec/composer/prompt/FullContext/routes/API/app/UI/config;
 - protected golden/eval fixtures;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
@@ -169,51 +149,48 @@ Brand alias resolution, service shortlist, target session/runtime и response co
 
 ## Acceptance tests
 
-### Synthetic projection contract
+### Synthetic resolver contract
 
-`tests/test_target_brand_offer_projection.py` обязан доказать:
+`tests/test_target_brand_resolver.py` обязан доказать:
 
-1. exact API/result fields, frozen+slots shell, tuple offers и detached brand/offer models;
-2. invalid/blank/unknown exact brand IDs дают stable S24 errors без normalization;
-3. остаются только exact-brand offers; other-brand и unbranded generic исключены;
-4. существующий бренд без offer выбранной service даёт empty result без fallback;
-5. inactive service/offer и inactive option фильтруются через S23;
-6. exact option filter сочетается с exact brand и не добавляет generic/other option;
-7. strategy priority не может вернуть отфильтрованный offer;
-8. explicit eligible same-brand offer pin-ится, explicit other-brand/unbranded/inactive
-   получает existing S15 not-candidate error;
-9. fixed/from/range/no-public-price, units, packages, payment stages и followups не
-   меняются;
-10. repeated calls stateless, inputs не мутируются;
-11. implementation imports только stdlib + target contracts + pure S10/S23; нет
-    IO/client/session/runtime.
+1. exact API/result fields, frozen+slots shell и detached `TargetBrand`;
+2. invalid/non-string/blank term даёт stable invalid error;
+3. exact ID, canonical name и каждый alias resolve в exact brand ID;
+4. outer whitespace + Unicode `casefold()` разрешены;
+5. punctuation, substring/full phrase, typo, morphology, transliteration и unknown term
+   возвращают `None`, не fuzzy fallback;
+6. совпадение ID/canonical/alias одного brand не создаёт ambiguity;
+7. cross-brand collision ID/canonical/alias fail-closed со stable ordered candidates;
+8. catalog authored order определяет только diagnostic candidate order, не выбор;
+9. country/canonical/aliases возвращаются exact без изменения;
+10. repeated calls stateless, catalog и nested lists не мутируются;
+11. imports только stdlib + target brand contracts; нет IO/client/session/runtime/S24.
 
 ### Real demo acceptance
 
-`tests/test_demo_target_brand_offer_projection.py` обязан read-only доказать:
+`tests/test_demo_target_brand_resolver.py` обязан read-only доказать:
 
-1. real S2/S5/S10/S15 inputs строятся через frozen boundaries;
-2. All-on-4 + exact `nobel_biocare` возвращает только `all_on_4.jaw.nobel`, exact
-   428000 RUB/jaw, package/payment stages/followups и canonical brand metadata;
-3. All-on-4 + exact `implantium`/`impro` никогда не смешивает бренды и сохраняет exact
-   authored money;
-4. classic + `nobel_biocare` возвращает только соответствующий one-tooth offer;
-5. существующий demo brand у услуги без branded offers даёт empty result, не generic
-   price;
-6. demo target/current files не меняются; новый module не импортирует runtime/client IO;
-7. нет skip/xfail и live/LLM.
+1. real S2 brand catalog грузится через frozen loader/bundle boundary;
+2. `implantium`/`Implantium`/`имплантиум` → `implantium`;
+3. `impro`/`Impro`/`импро` → `impro`;
+4. `nobel_biocare`/`Nobel Biocare`/`nobel`/`нобель`/`нобел` и case/outer spaces →
+   `nobel_biocare`;
+5. unknown, typo и full phrase не match;
+6. `нобель` resolution можно явно передать в S24 для `all_on_4` и получить только
+   `all_on_4.jaw.nobel` с exact 428000 RUB/jaw и payment stages;
+7. target/current files не меняются; нет product imports/writes/skip/xfail/live/LLM.
 
 ### Минимальные соседние regression tests
 
 После target tests запустить только:
 
-- `tests/test_target_offer_projection.py`;
-- `tests/test_demo_target_offer_projection.py`;
-- `tests/test_service_data_context.py`;
-- `tests/test_target_strategy_resolution.py`;
-- `tests/test_demo_target_clinic_strategy.py`.
+- `tests/test_target_brand_offer_projection.py`;
+- `tests/test_demo_target_brand_offer_projection.py`;
+- `tests/test_response_schema_contract.py`;
+- `tests/test_response_schema_loader.py`;
+- `tests/test_demo_target_price_offers.py`.
 
-Не запускать full suite, live/LLM и A9 harness/re-audit.
+Не запускать full suite, legacy brand tests, live/LLM или A9 harness/re-audit.
 
 ## Checker gates
 
@@ -221,40 +198,36 @@ Brand alias resolution, service shortlist, target session/runtime и response co
 
 Read-only checker обязан подтвердить:
 
-- scope действительно только exact brand filtering уже выбранной услуги;
-- ownership S23/S15 не дублируется, empty/no-fallback и error contracts однозначны;
+- scope — один already-extracted term, а не full-message brand recognition;
+- normalization/collision/no-match laws однозначны и fail-closed;
+- output минимален и напрямую совместим с S24 без product wiring;
 - allowlist/protected boundary и tests достаточны;
 - нет runtime/authority/A9/live расширения.
 
-До `✅` код/data S24 не писать.
+До `✅` код/data S25 не писать.
 
 ### Gate 2 — completion, до completion commit
 
-После реализации checker обязан подтвердить:
-
-- diff совпадает с TASK и allowlist;
-- точный brand boundary и делегирование S23 реализованы без fallback/денежных изменений;
-- tests реально прошли без skip/xfail;
-- product path/authority/A9/live не затронуты.
+Checker обязан подтвердить exact diff/allowlist, честные tests, no fuzzy/substring/fallback,
+deep-copy/stateless behavior и отсутствие product wiring/authority/A9/live.
 
 ## Git protocol
 
-1. Записать этот TASK и pending roadmap.
-2. `git diff --check`; governance checker `✅`.
-3. Commit `docs: govern exact brand offer projection S24` и push только
+1. Записать TASK + pending roadmap; `git diff --check`.
+2. Получить governance checker `✅` до code/data.
+3. Commit `docs: govern target brand resolution S25` и push только
    `origin/codex/stage-a`.
-4. Реализовать только allowlisted files; запустить target, затем минимальные neighbor tests.
-5. `git diff --check`; completion checker `✅`.
-6. Commit `feat: project exact brand offers S24` и push только
+4. Реализовать allowlist и запустить target + listed neighbor tests.
+5. Получить completion checker `✅`, затем roadmap `[x]`.
+6. Commit `feat: resolve target brand terms S25` и push только
    `origin/codex/stage-a`.
-7. Финал: clean tree и HEAD синхронизирован с `origin/codex/stage-a`.
+7. Финал: clean tree, HEAD == `origin/codex/stage-a`.
 
 ## Definition of Done
 
 - governance checker `✅` получен до code/data;
-- exact brand projection реализована и независимо проверена;
-- все target/neighbor tests green без skip/xfail;
-- client data/current paths/runtime/authority/A9/live не затронуты;
-- roadmap честно отмечает S24 `[x]` только после completion checker;
-- два checkpoint commits pushed в `codex/stage-a`;
+- deterministic exact brand term resolver реализован и независимо проверен;
+- target/neighbor tests green без skip/xfail;
+- client data/contracts/current paths/runtime/authority/A9/live не затронуты;
+- два checkpoint commits pushed only `codex/stage-a`;
 - рабочее дерево чистое и синхронизировано.

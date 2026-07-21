@@ -1,6 +1,7 @@
 # Архитектура услуг и цен
 
-**Статус:** канонический target design, 18 июля 2026 года. Schema/runtime ещё не реализованы.
+**Статус:** канонический target design, 18 июля 2026 года. Schema/data и pure offline
+helpers материализуются S-series; runtime/product wiring ещё не реализован.
 
 **Назначение:** единый источник целевых правил услуг, применимости, брендов, стратегии
 клиники, коммерческих offers и ценовых ответов.
@@ -459,7 +460,26 @@ current playbook и шесть `recommended=true` вариантов цены. �
 `bone_deficit_solution` не переносится, потому что current правило дополнительно требует
 `choose_solution`, а target strategy пока не получает intent. Это client data для уже
 проверенного resolver, но не подключение к ответам: eligibility/focus остаются перед
-strategy, target marketing отсутствует, product wiring и authority не меняются.
+strategy. На момент S16 target marketing отсутствовал; последующие S20–S22 также
+остаются offline, product wiring и authority не меняются.
+
+### One-service offline evidence package S22
+
+S22 не заменяет описанный ниже отбор. Он принимает exact service, уже выбранный
+upstream, и pure собирает один связанный набор материалов: S10 service record, все
+authored offers той же услуги, всех doctors с exact service link, S21 marketing result,
+deep-detached selected commercial facts и exact external source refs.
+
+Это намеренно не готовая ценовая выдача. Неактивные или ещё не прошедшие eligibility
+offers остаются в пакете вместе со своими флагами; S22 их не ранжирует и не разрешает
+показ. Врачи также сохраняются в authored catalog order без рейтинга «лучшего».
+Применимость и client strategy обязаны отработать отдельной projection до ответа.
+
+Optional S18 `consultation_value` добавляется только по exact `content_ref` выбранного
+service/option, при отсутствии этого ref в shown snapshot и при свободном marketing и
+amplifier slot одновременно. Он занимает один slot каждого типа, не подменяет другой
+документ и не записывает session state. Builder не читает MD, не формирует текст и не
+подключён к runtime/product path.
 
 ### Session state
 

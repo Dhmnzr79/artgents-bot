@@ -2,7 +2,8 @@
 
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
 offline в S1, demo target policy материализована в S20, pure deterministic selector —
-в S21. Session/runtime wiring и authority отсутствуют.
+в S21, one-service offline evidence package — в S22. Session/runtime wiring и authority
+отсутствуют.
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
@@ -358,6 +359,24 @@ block `service` не подмешивается. В context `service` после
 добавиться `fact:free_implant_consult`, а CTA будет `plan`. Это разные exact contexts,
 не скрытая эвристика.
 
+### Offline evidence package S22
+
+S22 связывает pure S10/S18/S21 boundaries для одной exact услуги. Builder сам вызывает
+S10 и S21 с одним `service_id`, возвращает service со всеми authored offers и связанными
+doctors, exact marketing selection, deep-detached selected commercial facts и отдельные
+`kb:`/`doctor:` refs. Он не читает тела MD и не формирует текст ответа.
+
+Automatic `consultation_value` ищется только по exact `selected_content_ref`, который
+обязан принадлежать service или его option. Close добавляется отдельным полем только
+когда ref ещё не показан и после S21 свободны одновременно marketing и amplifier slot;
+он занимает ровно один slot каждого вида. Если любой лимит заполнен, value отсутствует,
+ref показан или не выбран, close пропускается без замены данными другого документа.
+
+Пакет имеет immutable shell/tuples и не меняет snapshots. Он не отмечает material
+показанным, не применяет manual-contact/lead/refusal gates и не выбирает offers/doctors.
+Все authored offers в S10 context сохраняют `active` и selection metadata; future
+eligibility/strategy projection обязана выполняться отдельно до показа пациенту.
+
 ## Что не нужно делать сейчас
 
 - наполнять demo десятками усилителей;
@@ -371,9 +390,9 @@ block `service` не подмешивается. В context `service` после
 
 Schema governance зафиксирован этим документом и
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), demo policy
-материализована offline в S20, pure selector — в S21. Ничего ещё не подключено к
-product path. Перед session/evidence/runtime реализацией нужны отдельные TASK и
-checker-review.
+материализована offline в S20, pure selector — в S21, one-service evidence package —
+в S22. Ничего ещё не подключено к product path. Перед session/runtime/composer wiring
+нужны отдельные TASK и checker-review.
 Они должны доказать:
 
 - schema и source-ref validation;

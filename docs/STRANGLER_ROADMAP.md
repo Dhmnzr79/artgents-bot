@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S20 — demo target marketing policy материализована и независимо проверена; selector/session/runtime и product path не подключены** |
-| Ближайший рабочий фокус без live | **Отдельно определить следующий offline checkpoint; S20 не разрешает runtime/authority** |
+| Отдельная S-series без live | **S21 governance — deterministic offline marketing selector зафиксирован; code ждёт независимый checker-review** |
+| Ближайший рабочий фокус без live | **S21 — pure selection по service/context/date/shown snapshots в лимитах 3/2/2** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -121,6 +121,9 @@
   offline target pack; fact/KB/doctor/CTA refs и полный real bundle независимо
   проверены. Completion review `✅`: policy `24 passed`, frozen neighbors `148 passed`,
   skip/xfail нет. Selector, session/runtime, ответы и authority не подключены.
+- [ ] **S21 — deterministic offline marketing selection** — pure algorithm, exact
+  eligibility/round-robin/3-2-2/CTA boundaries и no-session/no-runtime scope
+  зафиксированы governance. До independent checker `✅` code не создаётся.
 
 ## Какой roadmap актуален
 

@@ -1,171 +1,208 @@
-# TASK — S20 Demo Target Marketing Policy Materialization
+# TASK — S21 Deterministic Offline Marketing Selection
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `3c578cf data: add demo consultation values S19`
+**Baseline:** `91084b2 feat: materialize demo target marketing S20`
 
-**Серия / checkpoint:** `S20` — минимальная offline-материализация target marketing
-policy для demo и проверка CTA/source references.
+**Серия / checkpoint:** `S21` — pure offline-механизм выбора автоматических
+source-backed marketing ingredients из уже validated target bundle.
 
-**Режим:** governance + один target YAML + isolated CTA-reference contract + narrow
-synthetic/real-data acceptance + architecture status docs. Никаких selector/session,
-ответов, routes/UI, live/LLM или product authority.
+**Режим:** governance + один новый unwired selector + synthetic/real-data unit tests +
+architecture status docs. Никаких client-data changes, session storage, ответов,
+routes/UI, live/LLM или product authority.
 
 ## Owner direction
 
-21 июля 2026 владелец разрешил продолжить S-series после S19 и ранее подтвердил:
+21 июля 2026 владелец разрешил следующий checkpoint после S20 и подтвердил понятную
+роль механизма: он должен брать правила клиники, выбранную услугу и ситуацию пациента,
+отбрасывать неприменимые материалы и соблюдать лимиты. Владелец ожидает:
 
-1. пять standard marketing scenarios из frozen target schema используются как общие
-   стоматологические ситуации, но конкретные refs/порядок остаются client data;
-2. clinic-specific приоритет задаётся простым ordered rule/pool, без ручного сценария
-   под каждый возможный вопрос;
-3. продающие акценты должны быть source-backed meanings, а не зашитые готовые ответы;
-4. три demo `consultation_value` S19 остаются отдельным same-MD источником и не
-   дублируются в target marketing policy;
-5. `consultation_value` cadence уже является universal law S18 и не добавляется в
-   client schema;
-6. следующий минимальный шаг — заполнить target marketing data и проверить его
-   offline, не подключая к ответам бота.
+- одинаковые входы всегда дают одинаковый выбор;
+- факты другой услуги, неактивные/просроченные предложения и неподходящие врачи не
+  попадают в результат;
+- механизм не заполняет свободные места нерелевантными фактами;
+- результат остаётся набором проверенных материалов, а не готовой репликой;
+- до отдельного решения ничего не подключается к ответам demo.
 
-Demo не имеет live-клиентов. S20 не сохраняет старые combined-механизмы ради
-совместимости и не создаёт adapter/dual-read.
+Demo не имеет live-клиентов. S21 не создаёт compatibility path для current marketing.
 
-## Архитектурное решение
+## Минимальная граница S21
 
-### Что материализуется
+Создать `core/target_marketing_selector.py` с pure function, которая принимает только
+явные already-validated inputs:
 
-Создать `clients/demo/target_response/marketing.yaml`, который проходит frozen S1
-`TargetMarketingPolicy` и содержит только:
+- `ResponseSchemaBundle` — S1/S2 bundle с policy и commercial facts;
+- `TargetDoctorCatalog` — S5 catalog для service links врачей;
+- `ResponseSchemaExternalIndex` — explicit available `kb:`/`doctor:` refs;
+- exact `semantic_context`;
+- optional exact `service_id`, уже выбранный upstream;
+- ordered requested `marketing_scenarios`;
+- explicit `include_initial_block`;
+- snapshots `shown_fact_ids` и `shown_amplifier_refs`;
+- обязательную explicit `today: date`.
 
-- универсальные лимиты `3 marketing facts / 2 amplifiers / 2 scenarios`;
-- один initial commercial block для semantic context `service`;
-- пять frozen scenario pools с exact ordered `fact:`/`kb:`/`doctor:` refs;
-- четыре semantic CTA contexts: `service`, `price`, `doctors`, `default`.
+Function возвращает immutable result:
 
-YAML хранит только порядок, refs, contexts и CTA keys. В нём запрещены готовые фразы,
-копии source facts, eligibility, route/aspect gates, labels и lead-flow copy.
+- `applied_scenarios` в фактически применённом порядке;
+- `selected_refs` — общий ordered список автоматических marketing ingredients;
+- `amplifier_refs` — ordered subset усилителей;
+- `cta_key` — exact context key либо clinic default.
 
-### Exact target data
+Selector ничего не читает с диска, не знает `client_id/session_id`, не получает
+TurnFrame, не вызывает LLM и не меняет переданные models/collections.
 
-```yaml
-version: 1
-limits:
-  max_marketing_facts_per_turn: 3
-  max_amplifiers_per_turn: 2
-  max_scenarios_per_turn: 2
+## Почему `today` передаётся явно
 
-initial_commercial_blocks:
-  service:
-    ordered_fact_refs:
-      - fact:free_implant_consult
-      - fact:installment_12
-      - fact:implant_same_day_discount
-      - fact:professional_whitening_discount
+Selector не использует `date.today()`, system clock или environment. Активность facts
+должна быть воспроизводима в тесте и audit. Future caller отдельно передаст текущую дату.
+`active_from` и `active_until` включительны: факт активен в обе граничные даты.
 
-scenario_rules:
-  pain_fear:
-    ordered_amplifier_refs:
-      - kb:implantation__faq__pain.md#korotko
-      - kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut
-    allowed_semantic_contexts:
-      - service
-  cost:
-    ordered_amplifier_refs:
-      - fact:installment_12
-      - fact:implant_same_day_discount
-      - fact:tax_deduction
-      - kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee
-      - kb:clinic__info__payment_terms.md#korotko
-    allowed_semantic_contexts:
-      - service
-      - price
-  time:
-    ordered_amplifier_refs:
-      - kb:implantation__faq__duration.md#korotko
-      - kb:implantation__faq__duration.md#mozhno-li-uskorit-implantatsiyu
-      - kb:implantation__faq__tooth_one_day.md#korotko
-      - kb:implantation__info__steps.md#korotko
-    allowed_semantic_contexts:
-      - service
-  doctor_trust:
-    ordered_amplifier_refs:
-      - doctor:doctors__doctor__volkov
-      - doctor:doctors__doctor__orlov
-      - kb:doctors__doctor__overview.md#korotko
-      - kb:clinic__info__technology.md#korotko
-    allowed_semantic_contexts:
-      - service
-      - doctors
-  result_reliability:
-    ordered_amplifier_refs:
-      - fact:implant_warranty
-      - kb:implantation__faq__osseointegration.md#korotko
-      - kb:implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie
-      - kb:clinic__info__warranty.md#korotko
-    allowed_semantic_contexts:
-      - service
+## Exact selection algorithm
 
-cta_contexts:
-  service: plan
-  price: price
-  doctors: doctor
-  default: callback
-```
+### 1. Input boundary
 
-Порядок является приоритетом для будущего selector, но S20 selector не реализует.
-Eligibility конкретного commercial fact остаётся только в target facts/offers; наличие
-ref в block/pool само по себе не разрешает показать неприменимый факт.
+- `semantic_context` — exact nonblank string;
+- `service_id` — `None` либо exact nonblank existing key из `bundle.services`;
+- `today` — exact `datetime.date`, но не `datetime.datetime`;
+- scenarios/shown inputs — ordered non-string sequences exact nonblank strings без
+  дублей;
+- scenario values обязаны входить в frozen `MarketingScenario` literal;
+- `include_initial_block` обязан быть exact `bool`;
+- invalid input получает typed `TargetMarketingSelectionError` со stable code/value;
+- selector не выбирает service и не нормализует ID/case.
 
-### CTA ownership and integrity
+### 2. Applicable scenarios
 
-- target policy хранит semantic context → CTA key;
-- видимый label и lead-flow copy продолжают принадлежать `clients/demo/tone.yaml`;
-- `service → plan`, `price → price`, `doctors → doctor`, fallback `default → callback`;
-- legacy `ct_consultation` не переносится и не приравнивается к `consult`;
-- все четыре target keys обязаны существовать в tone CTA index;
-- pure validator возвращает один deterministic sorted typed error для всех missing keys;
-- validator только проверяет уже переданные модели/index и ничего не читает сам.
+1. Requested scenarios рассматриваются в authored request order.
+2. Scenario без rule в policy игнорируется.
+3. Context допускается только при exact присутствии в
+   `rule.allowed_semantic_contexts`; пустой allowed list означает запрет automatic use.
+4. После context filtering берутся первые
+   `max_scenarios_per_turn` applicable scenarios.
+5. Result сохраняет их exact order в `applied_scenarios`.
 
-### Legacy marketing decisions
+### 3. Amplifier merge
 
-- три S19 `consultation_value` — единственные отдельно опубликованные source meanings
-  из этого migration thread;
-- остальные 21 legacy free strings не копируются в target marketing policy и уходят
-  вместе со старой combined-архитектурой, если отдельно не опубликованы в source MD;
-- current `benefits` и `what_included` не являются target service IDs и не получают
-  marketing-key mapping;
-- current `teeth_whitening` не переносится как alias-key: target service уже называется
-  `professional_whitening`, а применимый promo принадлежит commercial fact;
-- current `clients/demo/marketing.yaml` и `patient_playbook.yaml` в S20 не меняются.
+При двух applicable scenarios pools объединяются round-robin:
 
-### Historical S17 acceptance
+1. в каждом круге каждый scenario может дать максимум один следующий eligible ref;
+2. первый круг идёт в `applied_scenarios` order;
+3. внутри каждого pool сохраняется `ordered_amplifier_refs` order;
+4. если один pool исчерпан/неприменим, второй может занять оставшийся amplifier slot;
+5. одинаковый ref из двух pools выбирается один раз по первому появлению;
+6. merge останавливается при любом достигнутом лимите:
+   `max_amplifiers_per_turn` или `max_marketing_facts_per_turn`.
 
-S17 корректно доказывал, что **на момент S17** target `marketing.yaml` отсутствовал.
-После осознанной S20 materialization его acceptance test меняется только так, чтобы
-проверять историческую запись в audit doc и frozen contract boundary, а не требовать
-текущее отсутствие файла. Inventory, 24-string audit и все прочие protected
-expectations не ослабляются.
+Так составное сомнение вроде «боюсь и дорого» по возможности получает по одному
+усилителю каждого сценария, а не два материала только первого scenario.
 
-## Цель
+### 4. Candidate eligibility
 
-1. До data/code зафиксировать exact policy и границы в governance commit.
-2. Добавить pure strict/frozen CTA key index и fail-closed reference validation.
-3. Создать ровно один target `marketing.yaml` с exact data выше.
-4. Доказать, что полный real demo target pack загружается S2 loader.
-5. Доказать local `fact:` refs, external `kb:`/`doctor:` refs и CTA refs.
-6. Сохранить runtime/answer/authority полностью unwired.
+Для automatic candidate действуют exact gates:
+
+**`fact:<id>`**
+
+- fact существует в `bundle.facts`;
+- `active is True`;
+- explicit `today` не раньше `active_from` и не позже `active_until`;
+- пустой `allowed_service_ids` означает общую применимость;
+- непустой список требует exact совпадения с переданным `service_id`;
+- `fact.id` отсутствует в `shown_fact_ids`;
+- full ref отсутствует в `shown_amplifier_refs`, если candidate пришёл из scenario;
+- candidate не конфликтует с уже selected fact в любом направлении
+  `incompatible_with`; authored order побеждает, более поздний conflicting fact
+  пропускается.
+
+**`kb:<doc>#<chunk>`**
+
+- exact ref существует в `external_index.kb_refs`;
+- ref отсутствует в `shown_amplifier_refs`.
+
+**`doctor:<id>`**
+
+- exact ref существует в `external_index.doctor_refs`;
+- exact doctor существует в catalog;
+- при заданном `service_id` врач обязан иметь exact service link;
+- при `service_id=None` doctor ref допустим для общего doctors context;
+- ref отсутствует в `shown_amplifier_refs`.
+
+Missing/ineligible optional marketing candidate просто отбрасывается: optional overlay
+не должен ломать основной content/price answer. Selector не заменяет его похожим фактом.
+Cross-reference validators S3/S6 всё равно остаются обязательной pack acceptance до
+product wiring.
+
+### 5. Initial commercial fill
+
+Если `include_initial_block is True` и после amplifiers остались marketing slots:
+
+1. используется только block с exact key `semantic_context`;
+2. отсутствие block не вызывает fallback на другой context;
+3. `ordered_fact_refs` идут сверху вниз;
+4. применяются те же fact active/date/service/shown/conflict gates;
+5. ref, уже выбранный как scenario amplifier, не дублируется и занимает один общий
+   marketing slot;
+6. fill останавливается на `max_marketing_facts_per_turn`;
+7. неприменимые кандидаты не заменяются данными вне authored block.
+
+`include_initial_block=False` позволяет future caller представить neutral follow-up:
+без scenarios selector возвращает пустые ingredient lists, а не прокручивает initial
+block повторно.
+
+### 6. CTA
+
+- exact `policy.cta_contexts[semantic_context]` имеет приоритет;
+- иначе используется обязательный `policy.cta_contexts["default"]`;
+- CTA не входит в `selected_refs`, marketing/amplifier limits;
+- S21 предполагает, что S20 CTA-reference validation уже выполнена;
+- возврат CTA key не разрешает показывать CTA в manual-contact, spam/off-topic, pure
+  clarify, после отказа или внутри lead-flow — эти safety/product gates остаются
+  upstream и unwired.
+
+## Slot accounting examples
+
+### Один `cost` scenario для All-on-4
+
+На demo data и дате `2026-07-21`:
+
+1. `fact:installment_12` — amplifier + marketing slot;
+2. `fact:implant_same_day_discount` — amplifier + marketing slot;
+3. `fact:free_implant_consult` — initial marketing slot;
+4. CTA `price` отдельно.
+
+Итого: 3 marketing refs, 2 amplifiers, одна CTA. Дубли scenario/initial не повторяются.
+
+### Professional whitening initial block
+
+Три implantation facts отбрасываются по service eligibility. Остаётся только
+`fact:professional_whitening_discount`; пустые места не заполняются другими данными.
+
+### Doctor trust по конкретной услуге
+
+Doctor refs без соответствующего service link отбрасываются. KB refs pool остаются
+доступны, если exact source существует. При общем doctors context без service exact
+doctor refs разрешены без рейтинга или выбора «лучшего».
+
+## Что S21 сознательно не делает
+
+- не определяет scenario из текста и не добавляет regex/classifier;
+- не выбирает/не сохраняет service/dialog focus;
+- не отвечает на direct fact question: прямой ответ остаётся основным source content и
+  отдельно обходит только repeat suppression;
+- не читает и не выбирает S18/S19 `consultation_value`; future evidence assembly
+  отдельно проверит оставшиеся 3/2 slots перед consultation close;
+- не создаёт session state и не отмечает refs показанными — показ можно записать только
+  после фактического включения в будущий ответ;
+- не читает тексты KB/facts/doctors и не формирует natural-language output;
+- не применяет manual-contact/lead/refusal routing;
+- не подключается к ResponseSpec/composer/UI/product path.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `contracts/marketing_cta_refs.py` — new pure CTA index/error/validator;
-- `tests/test_marketing_cta_refs.py` — new synthetic contract tests;
-- `clients/demo/target_response/marketing.yaml` — new exact target policy;
-- `tests/test_demo_target_marketing_policy.py` — new read-only real-data acceptance;
-- `tests/test_demo_target_marketing_migration_audit.py` — только замена obsolete
-  current-absence assertion на historical-audit assertion;
-- `docs/MARKETING_TARGET_MIGRATION_AUDIT.md` — S20 decision/status addendum;
-- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — demo materialization status only;
+- `core/target_marketing_selector.py` — new pure offline selector;
+- `tests/test_target_marketing_selector.py` — new synthetic unit contract;
+- `tests/test_demo_target_marketing_selection.py` — new read-only real-data acceptance;
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — S21 algorithm/status boundary;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -173,72 +210,53 @@ expectations не ослабляются.
 
 ## Protected / вне scope
 
-- frozen `contracts/response_schema.py` и S1 model semantics;
-- S2/S3/S4/S5/S6/S8 loaders/index builders/validators;
-- current `clients/demo/marketing.yaml`, `patient_playbook.yaml`, `tone.yaml`, MD,
-  current/target pricebook, service/brand/doctor catalogs и clinic strategy;
-- новые/изменённые commercial facts, offers, doctors, services или source content;
-- перенос оставшихся legacy free strings и изменение S19 consultation values;
-- selector, matching, rotation, eligibility filtering, no-repeat/session state;
-- ResponseSpec/evidence/composer/FullContext/prompt/cache;
-- ответы, routes, API/app/UI/config, lead-flow и product authority;
+- весь `clients/**`, включая current/target marketing, tone, playbook, MD, doctors,
+  pricebook, service/brand/strategy data;
+- весь `contracts/**`, включая frozen S1/S3/S5/S20 models/validators;
+- existing `core/marketing_policy.py`, `marketing_loader.py`, `response_strategy.py`,
+  `service_data_context.py` и все current runtime paths;
+- изменение S20 exact order/refs/contexts/CTA map или S18/S19 consultation values;
+- TurnFrame/planner extraction/scenario classification;
+- session persistence, TTL, client resolver/cache, shown-state mutation;
+- direct-question evidence, consultation-close placement и incompatibility copy;
+- ResponseSpec/evidence/composer/prompt/FullContext/routes/API/app/UI/config;
 - adapters, dual-read, fallback, feature flags и product wiring;
-- protected golden/eval fixtures, кроме exact obsolete S17 absence assertion,
-  явно разрешённого выше;
+- protected golden/eval fixtures;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Exact CTA-reference contract
-
-### `MarketingCtaIndex`
-
-Frozen strict Pydantic model:
-
-- `cta_keys`: immutable tuple of exact nonblank strings;
-- duplicate keys fail validation deterministically;
-- extra fields forbidden;
-- order preserved; validator never treats the first key as default.
-
-### `validate_marketing_cta_refs(policy, index)`
-
-- принимает validated `TargetMarketingPolicy` и `MarketingCtaIndex`;
-- проверяет every value из `policy.cta_contexts` against exact index keys;
-- unknown keys собираются без дублей в один lexical sorted tuple;
-- при missing бросает typed `MarketingCtaReferenceError` с stable code
-  `marketing_cta_refs_missing` и field `missing_cta_keys`;
-- при полном index возвращает `None`;
-- stateless, не мутирует inputs, не читает files/env/config и не импортирует runtime.
-
-S20 не создаёт общий tone loader. Real-data test извлекает CTA keys из существующего
-`tone.yaml` read-only и передаёт их в pure index.
-
 ## Acceptance tests
 
-### Synthetic CTA contract
+### Synthetic selector contract
 
-`tests/test_marketing_cta_refs.py` доказывает:
+`tests/test_target_marketing_selector.py` обязан доказать:
 
-1. все CTA refs принимаются, unused index key разрешён;
-2. missing refs дают один typed sorted/deduplicated error;
-3. exact case-sensitive matching;
-4. strict/frozen/extra-forbid/nonblank/duplicate invariants index;
-5. deterministic repeated calls, no mutation/writes;
-6. AST/import boundary без clients, file IO, runtime/session/network/LLM.
+1. single-scenario pool order, amplifier cap и initial fill до общего cap;
+2. two-scenario round-robin и fallback при пустом/ineligible pool;
+3. context filtering происходит до scenario cap; empty allowed contexts deny automatic;
+4. fact active flag, inclusive date range, service eligibility и missing fact filtering;
+5. KB availability и doctor existence/service-link/general-context eligibility;
+6. shown fact/amplifier suppression, cross-pool/initial deduplication;
+7. bidirectional incompatibility: first authored candidate wins;
+8. exact zero/partial limits и отсутствие нерелевантного fill;
+9. exact CTA context/default selection вне slot counts;
+10. neutral `include_initial_block=False` path;
+11. stable typed validation errors для invalid context/service/date/sequences/scenarios;
+12. stateless repeated calls, no mutation, frozen/slots result;
+13. selector imports only stdlib + target contracts; no IO/client/runtime/session/LLM.
 
-### Real demo target policy
+### Real demo acceptance
 
-`tests/test_demo_target_marketing_policy.py` доказывает:
+`tests/test_demo_target_marketing_selection.py` обязан доказать:
 
-1. S2 loader загружает весь real `clients/demo/target_response` bundle;
-2. exact limits, block order, five scenario order/refs/contexts и CTA map равны TASK;
-3. S3/S4/S6 validators подтверждают все external KB/doctor refs;
-4. все fact refs существуют локально и проходят bundle validation;
-5. CTA keys, прочитанные из real tone config, unique и покрывают target policy;
-6. current marketing/tone/playbook и все pre-existing target files не меняются;
-7. никакого runtime wiring/import, skip/xfail, live/LLM или writes.
-
-S17 audit acceptance сохраняет все inventory assertions и меняет только obsolete
-утверждение о текущем отсутствии target file.
+1. S2/S4/S5/S6/S20 boundaries строят explicit real inputs read-only;
+2. All-on-4 cost example возвращает exact 3/2 refs и CTA `price`;
+3. professional whitening initial возвращает только применимую скидку;
+4. doctor-trust для конкретной услуги не возвращает несвязанных doctors;
+5. general doctors context разрешает exact doctor refs и CTA `doctor`;
+6. shown refs/date меняют выбор только по exact deterministic rules;
+7. source/current/target files не меняются;
+8. no product imports/writes/skip/xfail/live/LLM.
 
 ## Verification
 
@@ -246,27 +264,25 @@ S17 audit acceptance сохраняет все inventory assertions и меня�
 
 1. governance TASK + roadmap pending коммитятся отдельно и push только в
    `codex/stage-a`;
-2. independent read-only checker читает TASK, S17 audit/tests, frozen schema/loader/ref
-   boundaries, exact facts/KB/doctors/tone и architecture/checklist/guardrails;
-3. checker подтверждает exact policy, source existence, CTA ownership, legacy decisions,
-   obsolete-test transition и no-runtime/no-authority boundary;
-4. при `❌`/`❓` governance исправляется и проверяется повторно до code/data.
+2. independent read-only checker читает TASK, S18–S20 data/contracts/tests,
+   architecture, checklist/guardrails и existing pure strategy style;
+3. checker подтверждает slot math, round-robin, eligibility, no-repeat snapshots,
+   conflict handling, CTA and no-runtime/no-authority boundary;
+4. при `❌`/`❓` governance исправляется и проверяется повторно до code.
 
 После implementation:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_marketing_cta_refs.py tests/test_demo_target_marketing_policy.py tests/test_demo_target_marketing_migration_audit.py -q --basetemp=.pytest_tmp_s20_policy`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py tests/test_response_schema_loader.py tests/test_response_schema_refs.py tests/test_response_schema_kb_index.py tests/test_doctor_schema_refs.py -q --basetemp=.pytest_tmp_s20_neighbors`;
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_target_marketing_selector.py tests/test_demo_target_marketing_selection.py -q --basetemp=.pytest_tmp_s21_selector`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_marketing_policy.py tests/test_marketing_cta_refs.py tests/test_response_schema_refs.py tests/test_doctor_schema_refs.py tests/test_target_strategy_resolution.py -q --basetemp=.pytest_tmp_s21_neighbors`;
 3. `git diff --check`, exact allowlist, no skip/xfail, no full pytest;
-4. independent completion checker повторяет review и команды;
+4. independent completion checker повторяет review/tests;
 5. roadmap `[x]`, completion commit/push only `codex/stage-a`, tree clean/synced.
 
 ## Definition of Done
 
-- real demo target pack впервые полностью загружается offline;
-- policy содержит ровно approved limits/block/five pools/four CTA contexts;
-- все fact/KB/doctor/CTA refs fail-closed проверены через owner boundaries;
-- 21 legacy free strings и legacy alias keys не продублированы;
-- frozen S1/S2/S3 contracts не изменены;
-- selector/session/answer/UI/runtime/A9/authority не подключены;
-- independent governance и completion reviews `✅`;
-- commits/push только `codex/stage-a`, working tree clean и HEAD synced с origin.
+- pure selector deterministically returns only eligible automatic refs within 3/2/2;
+- exact source/service/date/doctor/no-repeat/conflict gates independently tested;
+- S20 target policy/data and frozen contracts unchanged;
+- no text generation, session mutation, runtime/product path, A9 or authority changes;
+- independent governance and completion reviews `✅`;
+- commits/push only `codex/stage-a`, working tree clean and HEAD synced with origin.

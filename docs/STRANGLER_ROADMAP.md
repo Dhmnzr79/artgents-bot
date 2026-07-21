@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S7 — demo doctor template hardening завершён и независимо проверен; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; target loader/wiring и authority не разрешены** |
+| Отдельная S-series без live | **S8 — strict doctor catalog loader завершён и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; demo target materialization, product wiring и authority не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -65,6 +65,9 @@
 - [x] **S7 — demo doctor template hardening** — approved service links/profile copy и
   overview очищены; real demo S4→S5→S6 acceptance и completion review прошли.
   Runtime code и target wiring не менялись.
+- [x] **S8 — strict doctor catalog loader** — explicit JSON→S5 boundary реализован и
+  независимо проверен; demo target catalog не создан, runtime/product path не
+  подключены.
 
 ## Какой roadmap актуален
 

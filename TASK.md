@@ -1,75 +1,68 @@
-# TASK — S13 Target Payment Stages Contract and Demo Data
+# TASK — S14 Patient Playbook Target Migration Audit
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `1cc8497 data: materialize demo target price offers S12`
+**Baseline:** `6f1c615 data: preserve target payment stages S13`
 
-**Серия / checkpoint:** `S13` — минимальное расширение frozen S1 `TargetOffer`
-структурированной оплатой по этапам и materialization exact demo stages для 12 top
-offers.
+**Серия / checkpoint:** `S14` — read-only decomposition audit действующего
+`clients/demo/patient_playbook.yaml` перед переносом приоритетов в target architecture.
 
-**Режим:** offline schema/data extension only. Никаких product consumers, rendering,
+**Режим:** documentation/audit only. Никаких client-data, schema/runtime, ответов,
 routes/UI, live/LLM или product authority.
 
-## Owner decision
+## Контекст и решение владельца
 
-21 июля 2026 владелец явно зафиксировал: «оплата по этапам обязательно нужна; на топ
-услугах это встречается».
+21 июля 2026 владелец остановил предположение, что приоритетов клиники нет, и указал на
+`clients/demo/patient_playbook.yaml`. Проверка подтвердила: это действующий current
+config старой архитектуры, который сейчас управляет demo options overview. Он не
+является пустым архивом и не должен заменяться новым файлом вслепую.
 
-S13 отменяет только S12-решение об удалении полезной stage breakdown. Общая цена,
-offers, units/labels и остальные S12 данные не пересматриваются. Target pack остаётся
-неподключённым к ответам.
+В target architecture его обязанности разделены между:
+
+- `service_catalog.json` — применимость услуги;
+- будущим `clinic_strategy.yaml` — коммерческий порядок уже допустимых услуг/offers;
+- будущим target `marketing.yaml` — CTA и marketing policy;
+- dialog/session facts — известные признаки ситуации пациента;
+- общими product guardrails — запрет медицинского обещания и одиночного «победителя».
+
+До материализации target strategy нужен exact audit: что уже перенесено, что имеет
+однозначного target-owner, что дублируется и какие части требуют отдельного решения.
 
 ## Цель
 
-Добавить в target price offer optional structured data:
+Создать `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md`, который простым языком и технически
+точно:
 
-```json
-"payment_stages": [
-  {
-    "label": "Хирургический этап",
-    "amount": 45200,
-    "currency": "RUB"
-  },
-  {
-    "label": "Ортопедический этап (коронка)",
-    "amount": 31000,
-    "currency": "RUB"
-  }
-]
-```
+1. подтверждает, что current playbook активен и пока остаётся неизменным;
+2. инвентаризирует все восемь `rules` и один `patient_situations` fallback;
+3. раскладывает каждое поле current playbook по target-owner или отмечает unresolved;
+4. сверяет уже материализованные S11 selection facts с current `show_when`/match;
+5. отделяет service priority от CTA, marketing copy, eligibility и runtime matching;
+6. фиксирует неоднозначности, которые запрещено решать механическим копированием;
+7. предлагает минимальный следующий governance checkpoint, но не создаёт target data.
 
-И восстановить target followup:
+## Почему S14 audit-only
 
-```json
-{"id": "stages", "label": "Оплата по этапам", "action": "price_aspect"}
-```
+Механический перенос сейчас опасен:
 
-только у offers, для которых current clinic source действительно содержит несколько
-payment stages и authored `stages` followup.
+- current rules используют `problem`, `kind`, `intent`, `modifiers`, а frozen target
+  strategy match использует `family`, `extent`, `stage`, `jaw`, `reported_context`;
+- current overlap выбирается runtime-specificity, а target resolver ещё не реализован;
+- четыре current rules и fallback допускают четыре options, target product decision — 2–3;
+- `primary_cta`, `answer_style`, `role`, `positioning`, `show_when` не принадлежат
+  одному target strategy файлу;
+- current pricebook `recommended` для offers должен жить в strategy, но не входит в
+  `patient_playbook.yaml` и требует отдельной source projection;
+- target `clinic_strategy.yaml` ещё отсутствует, а target marketing policy не
+  материализована.
 
-## Почему это минимальный scope
-
-S12 сохранил totals, packages и includes, но frozen S1 schema не имела stage field.
-Без S13 при будущем legacy retirement точные суммы хирургического/ортопедического этапа
-и 60/40 breakdown потеряются.
-
-Новый общий contract нужен любому client pack с 2+ этапами. Он не зависит от числа
-услуг, бренда, стоматологического протокола или demo IDs. Demo data доказывает contract
-на реальных источниках; runtime wiring идёт позже.
+S14 не выбирает между first-match, specificity или rule overlay и не объявляет
+lossy mapping эквивалентным current behavior.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `contracts/response_schema.py`;
-- `tests/test_response_schema_contract.py`;
-- `docs/PRICE_SERVICE_ARCHITECTURE.md`;
-- 12 existing target offer files:
-  - `clients/demo/target_response/pricebook/services/all_on_4.jaw.*.json` (3);
-  - `clients/demo/target_response/pricebook/services/all_on_6.jaw.*.json` (3);
-  - `clients/demo/target_response/pricebook/services/classic.one_tooth.*.json` (3);
-  - `clients/demo/target_response/pricebook/services/one_stage.one_tooth.*.json` (3);
-- `tests/test_demo_target_price_offers.py`;
+- `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md` — новый audit artifact;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -77,193 +70,146 @@ S12 сохранил totals, packages и includes, но frozen S1 schema не и
 
 ## Protected / вне scope
 
-- current `clients/demo/pricebook/**` и остальные current client files;
-- остальные 19 target offer files, target services/brands/facts/doctors;
-- S2 loader, S4 index, S5/S8 doctor contracts/loaders, S10 context builder;
-- изменение price modes, totals, currency, billing units, package labels/includes,
-  fact refs, brand/option links или active flags;
-- stage percentages как отдельные числа, график дат/сроков, deposit, installment,
-  balance calculation, payment status и accounting;
-- сумма этапов как универсальный validator или автоматическое вычисление total;
-- strategy/marketing/CTA/cadence, stage selection и session state;
-- rendering, buttons/UI implementation, composer/verifier, routes/API/app;
-- adapters, dual-read, fallback, current runtime wiring и feature flags;
-- protected golden/eval fixtures;
-- весь A9 design/raw/frozen/harness/evidence и live re-audit;
+- `clients/demo/patient_playbook.yaml` и весь `clients/**`;
+- `contracts/**`, `core/**`, `orchestration/**`, routes/API/app/UI;
+- весь `clients/demo/target_response/**`;
+- tests/evals/golden/fixtures и существующие docs architecture contracts;
+- создание `clinic_strategy.yaml` или target `marketing.yaml`;
+- изменение S1 strategy/marketing models, S2 loader или S10 context;
+- выбор runtime rule precedence/merge algorithm;
+- перенос/удаление current playbook, adapters, dual-read или feature flags;
+- A9 design/raw/frozen/harness/evidence и live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Target contract extension
+## Exact source inventory
 
-В `contracts/response_schema.py` появляется:
+Audit обязан перечислить exact current `rules` IDs и не объединять их:
 
-```python
-class TargetPaymentStage(TargetSchemaModel):
-    label: NonBlankStr
-    amount: MoneyAmount
-    currency: NonBlankStr
-```
+1. `one_tooth_restore`;
+2. `extraction_then_implant_restore`;
+3. `few_teeth_restore`;
+4. `existing_implant_prosthetic_stage`;
+5. `full_arch_restore`;
+6. `upper_full_arch_with_bone_deficit`;
+7. `upper_full_arch_restore`;
+8. `bone_deficit_solution`.
 
-`TargetOffer` получает:
+Отдельно фиксируется единственный fallback key:
 
-```python
-payment_stages: list[TargetPaymentStage] | None = None
-```
+- `patient_situations.full_arch_missing`.
 
-Отсутствующий key и явный JSON `null` оба валидируются как `None`: source не задаёт
-поэтапную оплату. `model_dump(exclude_none=True)` удаляет key в обоих случаях.
+Audit показывает, что fallback дублирует основную full-arch конфигурацию по strategy,
+options и priorities, но не объявляет его удаляемым до runtime retirement checkpoint.
 
-Если передан list:
+## Field ownership matrix
 
-- list обязан быть non-empty;
-- общий contract допускает **один или больше** stages; `min_length=2` запрещён;
-- stage labels exact, non-blank и unique внутри offer;
-- amount — strict nonnegative integer; bool/float/string/negative запрещены;
-- currency обязательна у каждого stage и не наследуется скрыто;
-- authored order сохраняется;
-- extras запрещены через `TargetSchemaModel`.
+Audit обязан разобрать каждое семейство полей:
 
-Optional `None`, а не default empty list, сохраняет S12 wire compatibility: у 19 offers
-без stages key отсутствует, `model_dump(exclude_none=True)` exact равен raw.
+| Current field | Target disposition |
+|---|---|
+| `rules[].id` | кандидат на stable target rule id |
+| `match.extent`, `match.jaw` | прямые neutral target axes, после проверки semantics |
+| `match.kind`, `match.problem` | current classifier concepts; не копировать как target field |
+| `match.modifiers: bone_deficit` | кандидат `reported_context: reported_bone_deficit`, не автоматическая эквивалентность |
+| `match.intent` | planner/dialog concern, не strategy eligibility |
+| `max_options` | target strategy, но current `4` требует approved cap `3` и explicit acceptance |
+| `primary_cta` | target marketing/CTA policy, не clinic strategy |
+| `strategy` string | current runtime/telemetry label; нет автоматического target field |
+| `answer_style.max_options` | duplicate current limit, не второй target source |
+| `mention_consult_ct` | marketing/CTA/content policy, не ordering |
+| `avoid_single_winner`, `avoid_medical_promise` | общие product guardrails, не per-rule priority data |
+| `options[].service_id/priority` | кандидат target `service_priorities`, только после applicability filtering |
+| `options[].show_when` | target service/option selection owner; сверить с S11 |
+| `options[].role/positioning` | нет frozen target owner; запрещено молча терять или класть в strategy |
 
-Stable error tokens:
+## Per-rule audit requirements
 
-- explicit empty list → `offer_payment_stages_empty`;
-- duplicate stage labels → `offer_payment_stage_label_duplicate`.
+Для каждого из восьми rules документ содержит одну строку/секцию с:
 
-## Followup integrity law
+- exact current match;
+- exact ordered `service_id: priority`;
+- current `max_options`, CTA и strategy label;
+- какие eligibility facts уже представлены в S11 target service catalog;
+- candidate target match без утверждения runtime equivalence;
+- loss/risk/unresolved boundary.
 
-Если `TargetOffer.followups` содержит `id == "stages"`, `payment_stages` обязан быть
-non-empty. Иначе schema отклоняет offer token-ом
-`offer_stages_followup_requires_payment_stages`.
+Особо отметить:
 
-Обратное не обязательно: pack может хранить один или несколько stages, но не показывать
-отдельную кнопку.
-Это отделяет source data от будущей UI/cadence policy.
+- `one_stage.show_when=extraction_context` уже выражен через service selection stage;
+- `zygomatic_implants.show_when=bone_deficit_or_upper_jaw` заменён более строгими
+  target selection axes: full arch + upper jaw + reported bone deficit;
+- `existing_implant_prosthetic_stage` соответствует product-law «не продавать установку
+  повторно», но mapping `kind -> stage=implant_placed` должен проверяться отдельно;
+- `few_teeth_restore`, `full_arch_restore`, `upper_full_arch_restore`,
+  `upper_full_arch_with_bone_deficit` и fallback содержат четыре options, а target
+  primary result ограничен тремя;
+- `bone_deficit_solution` смешивает modifier и intent и не должен становиться
+  отдельным medical classifier/route.
 
-Другие followup IDs не меняются. S13 не вводит общий enum действий и не рендерит
-кнопку.
+## Already migrated / not yet migrated
 
-## Нет скрытой арифметической authority
+Audit явно разделяет:
 
-Общий contract **не** требует `sum(stage.amount) == offer total/min/range`:
+### Уже материализовано offline
 
-- stages могут описывать только часть оплаты;
-- будущая клиника может отдельно показывать депозит/остаток;
-- `from` total не равен гарантированному финальному итогу;
-- schema не рассчитывает проценты и не выводит пропущенные суммы.
+- canonical service IDs, family/roles, active and coarse selection (S11);
+- offers, units, exact prices, brands/facts (S12);
+- payment stages (S13);
+- doctors and service links (S7/S9);
+- pure exact-service common data context (S10).
 
-Demo acceptance отдельно доказывает, что для 12 current fixed offers exact authored
-stage sum совпадает с exact total. Это data fact demo, не универсальный schema law.
+### Ещё не материализовано
 
-## Exact demo materialization
+- demo target clinic strategy data;
+- target marketing policy data;
+- deterministic target strategy resolver and overlap law;
+- dialog-focus/product wiring and any authority;
+- explicit target ownership of current role/positioning signals;
+- current offer `recommended` projection into target strategy.
 
-Stages переносятся только для 12 variants четырёх services:
+## Required conclusions
 
-- `all_on_4` — три brand offers, два exact stages 60%/40%;
-- `all_on_6` — три brand offers, два exact stages 60%/40%;
-- `classic` — три brand offers, хирургический + ортопедический этап;
-- `one_stage` — три brand offers, удаление/хирургия + ортопедический этап.
+Audit не должен давать ложный вывод «можно просто скопировать YAML». Он обязан
+зафиксировать минимальный следующий шаг:
 
-Каждый из этих 12 demo offers имеет exact два stages. Это свойство current demo data,
-а не общий schema minimum.
+1. отдельный governance TASK для frozen target strategy resolution semantics
+   (default vs context rule, specificity/order/overlay, missing priority, stable tie);
+2. только после этого — materialization demo `clinic_strategy.yaml` из audited source;
+3. marketing/CTA migration остаётся отдельной задачей;
+4. current playbook остаётся единственным product consumer до отдельного wiring/authority
+   checkpoint.
 
-Для каждого target stage:
-
-- `label` = exact current `payment_stages[*].name`;
-- `amount` = exact current amount;
-- `currency` = exact parent current variant currency (`RUB`);
-- order exact current source.
-
-В каждом из 12 offers `followups` exact order соответствует current source:
-
-1. `stages` — exact label/action current stage followup;
-2. `includes` — уже materialized S12 followup.
-
-## Почему sinus_lift не входит
-
-Два current sinus variants технически содержат по одному `payment_stage`, равному всей
-variant price, но:
-
-- current source не содержит `stages` followup;
-- один элемент не является разбивкой оплаты на этапы;
-- owner-approved S12 price является `from` из-за зависимости от объёма/доступа;
-- перенос fixed single-stage amount рядом с `from` создал бы противоречивую границу.
-
-Поэтому оба target sinus offers и остальные 19 offers сохраняют отсутствие
-`payment_stages` key и отсутствие `stages` followup.
-
-## Architecture doc update
-
-`docs/PRICE_SERVICE_ARCHITECTURE.md` фиксирует:
-
-- `pricebook/services/*.json` владеет exact optional payment stages;
-- каждый stage явно хранит label/amount/currency;
-- stages followup допустим только при non-empty stage data;
-- отсутствие stages означает отсутствие утверждённой разбивки, а не право вычислить её;
-- percentages из текста label не парсятся;
-- суммы этапов/total не пересчитываются и не получают универсальное равенство.
-- общий contract допускает 1+ stages; отсутствие sinus materialization является только
-  решением по противоречивому demo source, не универсальным запретом одного stage.
-
-Example offer дополняется `payment_stages` и stages followup.
-
-## Contract tests
-
-`tests/test_response_schema_contract.py` минимально расширяется и доказывает:
-
-1. valid two-stage offer exact сохраняет labels/amounts/currency/order;
-2. `TargetPaymentStage` входит в `S1_MODEL_TYPES`, extra forbidden;
-3. missing key и explicit `null` дают `None`, а exclude-none dump удаляет key;
-4. valid single-stage data без followup принимается, доказывая schema minimum 1;
-5. empty explicit list отклоняется `offer_payment_stages_empty`, duplicate labels —
-   `offer_payment_stage_label_duplicate`;
-6. blank label/currency и invalid MoneyAmount отклоняются frozen validators;
-7. stages followup без data отклоняется;
-8. stages data без followup допустимы;
-9. deliberately non-equal stage sum/total допустим, доказывая no arithmetic authority;
-10. existing price modes/cross-refs и imports boundary не ослаблены.
-
-## Real-data acceptance update
-
-`tests/test_demo_target_price_offers.py` дополнительно требует:
-
-1. ровно 12 target offers имеют non-empty `payment_stages` и stages followup;
-2. exact service/offer set равен четырём current services и 12 variants;
-3. stage label/amount/order exact current, currency exact parent variant;
-4. sum exact stage amounts равен exact fixed total только для этих 12 demo offers;
-5. followup exact stages→includes order/label/action;
-6. 19 других offers, включая sinus/pulpitis, не имеют stage key/followup;
-7. S1 round-trip, 31 count, source price projection, facts/brands и S10 all-service
-   context остаются зелёными;
-8. before/after hashes и AST no-product-wiring audit остаются read-only.
+Если audit обнаружит, что frozen S1 contract уже однозначно задаёт resolution semantics,
+он должен привести точное доказательство из code/docs; иначе ambiguity остаётся явной.
 
 ## Verification
 
-До schema/data edits:
+До audit artifact:
 
-1. independent checker читает TASK, current stage sources, 12 target offers, frozen S1
-   contract/tests, S2/S10, S12 acceptance, architecture docs, checklist и guardrails;
-2. checker подтверждает optional wire, followup law, exact 12-offer scope, sinus boundary,
-   no arithmetic/runtime/A9 authority;
-3. при `❌`/`❓` TASK исправляется до кода.
+1. independent checker читает TASK, current playbook, current consumer/contracts/tests,
+   S1 strategy models, S11 target catalog, architecture docs, checklist и guardrails;
+2. checker подтверждает exact inventory, audit-only scope и отсутствие скрытого решения
+   strategy semantics;
+3. при `❌`/`❓` TASK исправляется до completion work.
 
-После реализации:
+После audit artifact:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py -q --basetemp=.pytest_tmp_s13_contract`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_price_offers.py -q --basetemp=.pytest_tmp_s13_data`;
-3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_loader.py tests/test_service_data_context.py -q --basetemp=.pytest_tmp_s13_neighbors`;
-4. `.venv/codex312/Scripts/python.exe -m pytest tests/test_pricebook_contract.py tests/test_pricebook_loader.py -q --basetemp=.pytest_tmp_s13_legacy`;
-5. `.venv/codex312/Scripts/python.exe scripts/lint_pricebook.py demo`;
-6. `git diff --check`, allowlist status; independent checker повторяет review/runs;
-7. live/LLM и полный pytest не запускаются.
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_patient_playbook.py -q --basetemp=.pytest_tmp_s14_current`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py -q --basetemp=.pytest_tmp_s14_target`;
+3. `git diff --check`, exact allowlist status и independent checker review;
+4. no live/LLM и no full pytest.
+
+Тесты read-only подтверждают, что current behavior и S11 data не менялись; они не
+доказывают target parity и не разрешают wiring.
 
 ## Definition of Done
 
-- target contract универсально хранит exact optional payment stages;
-- 12 demo top offers сохраняют exact stage data и safe followup;
-- sinus/остальные offers не получают invented breakdown;
-- no hidden sum/percentage/payment calculation authority появляется;
-- S2/S10 работают с расширенным frozen model без отдельного adapter-а;
-- runtime/answers/UI/session/A9/authority не изменены;
-- roadmap S13 offline status независимо проверен;
-- checker `✅`, governance/completion commits и push только в stage-a, дерево чистое.
+- владелец получает честный ответ, где находятся current priorities и почему это ещё
+  не target strategy file;
+- все восемь rules и fallback полностью учтены без выдуманных mappings;
+- уже перенесённые selection facts отделены от strategy/marketing/runtime debt;
+- спорные потери и rule-resolution gap явно зафиксированы;
+- client data, code, tests, answers, UI, A9 и authority не изменены;
+- roadmap S14 audit status независимо проверен;
+- checker `✅`, governance/completion commits и push только в `codex/stage-a`, дерево
+  чистое.

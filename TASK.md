@@ -79,12 +79,16 @@ consultation_value: >
 4. Переход по другому H3/chunk/follow-up того же документа не сбрасывает suppression.
 5. Новый session/reset очищает suppression; TTL не вводится.
 6. Прямой вопрос о консультации обходит только repeat suppression и остаётся обязан
-   соблюдать source fidelity и все safety boundaries.
+   иметь exact selected `content_ref`, соблюдать source fidelity, применимость source и
+   все safety boundaries. Такой ответ является основным content, а не автоматическим
+   marketing fact/amplifier.
 7. Manual-contact, spam/off-topic, pure clarify, active lead-flow и явный отказ от
    консультации/контакта не получают автоматическую подводку.
 8. `consultation_value` — текстовый selling accent, не новая CTA и не secondary UI.
-   Будущий composer/selector обязан уважать уже согласованный общий marketing limit и
-   не складывать поверх него лишний продающий блок.
+   При автоматическом включении он занимает ровно один из трёх marketing-fact slots и
+   ровно один из двух amplifier slots.
+9. Если соответствующий marketing или amplifier limit уже заполнен, автоматическая
+   подводка пропускается и её ref не записывается как показанный.
 
 S18 не реализует session state, selection, placement или cadence runtime. Эти правила
 фиксируются как acceptance для отдельного будущего authority/runtime checkpoint.

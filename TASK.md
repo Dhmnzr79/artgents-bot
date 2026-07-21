@@ -1,64 +1,59 @@
-# TASK — S16 Demo Target Clinic Strategy Materialization
+# TASK — S17 Demo Target Marketing/CTA Migration Audit
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `2795e0e feat: resolve target clinic strategy S15`
+**Baseline:** `9ae7557 data: materialize demo clinic strategy S16`
 
-**Серия / checkpoint:** `S16` — materialization проверенных current demo priorities в
-offline target `clinic_strategy.yaml`.
+**Серия / checkpoint:** `S17` — read-only аудит current demo marketing/CTA sources до
+materialization target marketing policy.
 
-**Режим:** demo target data/tests/docs only. Никаких current client-data changes,
-product consumers, ответов, routes/UI, live/LLM или product authority.
+**Режим:** governance + deterministic inventory tests + audit docs only. Никаких client
+data changes, target `marketing.yaml`, product consumers, ответов, routes/UI, live/LLM
+или product authority.
 
 ## Owner direction
 
-21 июля 2026 владелец подтвердил:
+21 июля 2026 владелец подтвердил, что marketing/CTA уже были согласованы на уровне
+архитектуры, и разрешил продолжить следующим безопасным шагом: сначала точный аудит
+миграции, а не повторный redesign и не немедленное подключение.
 
-- current `patient_playbook.yaml` действительно является источником приоритетов;
-- клиника должна задавать свои приоритеты конфигом без изменения общего кода;
-- правила нужны только для нескольких значимых ситуаций, а не под каждую фразу;
-- после завершения S15 владелец разрешил продолжать materialization;
-- после checker `❓` владелец отдельно одобрил перенос **семи** универсальных
-  стоматологических ситуаций и безопасное defer общего `bone_deficit_solution`.
-
-S16 переносит existing demo decisions. Новые медицинские/коммерческие предпочтения не
-придумываются.
+В demo нет live-клиентов. S17 не обязан сохранять legacy marketing copy ради continuity:
+он обязан честно определить, что source-backed переносится в target, что должно получить
+нового владельца, а что можно позднее удалить без compatibility adapters/fallbacks.
 
 ## Основание
 
-- S14 exact audit учёл 8 current rules + один duplicate fallback, разложил ownership и
-  зафиксировал шесть current `recommended=true` offers.
-- S15 добавил explicit baseline priorities и pure ordered first-match resolver.
-- S11 selection уже владеет applicability: stage/jaw/reported context/show_when не
-  должны дублироваться как medical logic в strategy.
-- Target strategy ещё не материализована; target marketing тоже отсутствует, поэтому
-  real target pack остаётся неполным и не подключённым.
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` уже фиксирует product/design law: общий limit
+  `3`, максимум `2` amplifiers и `2` scenarios, пять standard scenarios, source refs,
+  no-repeat/direct-question law и стабильную CTA по semantic context.
+- S1 уже реализовал frozen `TargetMarketingPolicy` models, а S2 loader требует
+  `marketing.yaml`; header architecture doc про полностью отсутствующую schema устарел.
+- S12 materialized шесть source-owned commercial facts.
+- S16 materialized clinic strategy, но real demo target pack всё ещё не загружается S2,
+  потому что target `marketing.yaml` отсутствует.
+- Current `clients/demo/marketing.yaml` — active legacy combined schema с free copy,
+  promo eligibility, classifier route/aspect gates и CTA keys.
+- CTA keys также распределены между current MD, pricebook, patient playbook, tone/UI и
+  marketing. Их нельзя механически скопировать в один target owner.
 
 ## Цель
 
-Создать:
+Создать точный read-only migration audit, который:
 
-- `clients/demo/target_response/clinic_strategy.yaml`;
-- `tests/test_demo_target_clinic_strategy.py`.
-
-Data обязана:
-
-1. пройти `TargetClinicStrategy` и `ResponseSchemaBundle` cross-refs;
-2. сохранить exact current ordered service priorities семи owner-approved rules;
-3. заменить current classifier match только audited neutral target axes;
-4. расположить specific exceptions выше general rules для S15 first-match;
-5. перенести шесть positive offer recommendation signals в baseline;
-6. ограничить current `max_options: 4` до approved target `3`, не удаляя services;
-7. не переносить CTA, answer style, roles, positioning, strategy labels или fallback;
-8. остаться offline/unwired.
+1. инвентаризирует current marketing и все current CTA owners;
+2. сопоставляет их с frozen target marketing/CTA ownership;
+3. отделяет уже materialized commercial facts от legacy routing/copy;
+4. проверяет, какие free marketing strings имеют exact KB source, а какие не имеют;
+5. фиксирует candidate source refs для пяти scenarios без утверждения их ranking;
+6. перечисляет owner decisions и contract gaps до materialization;
+7. предлагает минимальный следующий data/schema checkpoint, но ничего не реализует.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `clients/demo/target_response/clinic_strategy.yaml` — new target data;
-- `tests/test_demo_target_clinic_strategy.py` — new real-data acceptance;
-- `docs/PATIENT_PLAYBOOK_MIGRATION_AUDIT.md` — materialization status;
-- `docs/PRICE_SERVICE_ARCHITECTURE.md` — demo status only, no semantic redesign;
+- `docs/MARKETING_TARGET_MIGRATION_AUDIT.md` — new exact audit;
+- `tests/test_demo_target_marketing_migration_audit.py` — new read-only inventory tests;
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — status correction only;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -66,257 +61,209 @@ Data обязана:
 
 ## Protected / вне scope
 
-- current `clients/demo/patient_playbook.yaml`, current pricebook/marketing/catalog/MD;
-- остальные `clients/demo/target_response/**` files;
-- `contracts/**`, `core/**`, orchestration, routes/API/app/UI;
-- S15 resolver/contract/tests;
-- создание target `marketing.yaml` или перенос CTA/copy;
-- исправление двух current S14 test mismatches;
-- role/positioning ownership, current fallback retirement;
-- eligibility filtering, dialog focus/session, planner/TurnFrame;
-- response composition, price/doctor rendering, buttons;
+- весь `clients/demo/**`, включая current `marketing.yaml`, `tone.yaml`, `ui.yaml`, MD,
+  patient playbook, pricebook и весь `target_response/**`;
+- создание `clients/demo/target_response/marketing.yaml`;
+- `contracts/**`, `core/**`, orchestration, routes/API/app/UI/config;
+- изменение frozen marketing models, loader или reference validators;
+- переписывание/перенос 24 legacy free marketing strings в MD;
+- выбор exact initial block, scenario pool order или CTA context mapping;
+- selector, cadence/session, no-repeat, direct-question override и incompatibility code;
+- исправление current marketing/runtime или удаление legacy data;
 - adapters, dual-read, fallback, feature flags и product wiring;
 - protected golden/eval fixtures;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Exact target top-level data
+## Frozen exact inventory
 
-```yaml
-version: 1
-default_max_options: 3
-default_service_priorities: {}
-default_offer_priorities:
-  all_on_4.jaw.impro: 1
-  all_on_6.jaw.impro: 1
-  classic.one_tooth.impro: 1
-  one_stage.one_tooth.impro: 1
-  removable_dentures.jaw.partial: 1
-  sinus_lift.one_site.closed: 1
-rules: ...
-```
+S17 tests/audit обязаны проверить, а не предположить следующие source facts.
 
-`default_service_priorities` empty, потому что current playbook не содержит одного
-универсального service order вне ситуации.
+### Current marketing
 
-Positive current `recommended=true` проецируется в relative priority `1`; отсутствующий
-priority по S15 равен `0`. Это сохраняет только boolean order signal и не выдумывает
-дополнительный ranking между false offers. Все шесть target offer IDs обязаны существовать.
+`clients/demo/marketing.yaml`:
 
-Другие current variants с `recommended=false`/missing не добавляются в baseline map.
+- `version: 1`;
+- global `blocked_aspects_for_promo` exact:
+  `pain`, `contraindications`, `safety`, `complications`;
+- exact 13 `service_marketing` keys в authored order:
+  `classic`, `one_stage`, `all_on_4`, `all_on_6`, `temporary_teeth`, `benefits`,
+  `what_included`, `sinus_lift`, `pterygoid_implants`, `zygomatic_implants`,
+  `teeth_whitening`, `tooth_extraction`, `periodontitis`;
+- 11 `clinic_proof` strings;
+- 13 `consult_reasons` strings;
+- exact CTA distribution: `doctor: 10`, `consult: 3`;
+- 3 promo rules:
+  `free_implant_consult`, `implant_same_day_discount`,
+  `professional_whitening_discount`;
+- exact promo fact refs совпадают с rule IDs и уже существуют в target facts;
+- только `free_implant_consult` содержит legacy `cta_key: consult`.
 
-## Exact rules and authored order
+Из 13 marketing keys ровно 10 совпадают с canonical target service IDs. Три не
+совпадают:
 
-S16 materializes ровно семь rules в следующем owner-approved S15 first-match order:
+- `benefits` и `what_included` — content topics, не services;
+- `teeth_whitening` — legacy alias/name, target canonical ID
+  `professional_whitening`.
 
-### 1. `existing_implant_prosthetic_stage`
+Все 24 free strings (`11 + 13`) должны проверяться exact substring against current
+`clients/demo/md/*.md`. Frozen observed count exact matches — `0`. S17 не объявляет
+строки ложными: он доказывает только, что их нельзя механически превратить в target
+`kb:` refs без отдельной source-content миграции/решения владельца.
 
-```yaml
-match:
-  stage: implant_placed
-max_options: 3
-service_priorities:
-  implant_supported_prosthetics: 100
-  zirconia_crowns: 60
-  temporary_teeth: 40
-offer_priorities: {}
-```
+### Commercial facts
 
-Installed-implant stage идёт первым: strategy не должна ставить новые implant protocols
-выше протезирования на уже установленном импланте. Это ordering law, не eligibility
-filter: до будущего product wiring caller всё равно обязан передать candidates одного
-актуального treatment focus.
+Target `pricebook/facts.json` содержит exact шесть facts:
 
-### 2. `extraction_then_implant_restore`
+- `tax_deduction`;
+- `installment_12`;
+- `free_implant_consult`;
+- `implant_warranty`;
+- `implant_same_day_discount`;
+- `professional_whitening_discount`.
 
-```yaml
-match:
-  extent: one_tooth
-  stage: extraction_context
-max_options: 3
-service_priorities:
-  one_stage: 100
-  classic: 80
-  tooth_extraction: 40
-offer_priorities: {}
-```
+Три current promo fact refs уже входят в эти шесть. Active/date/service eligibility и
+exact text принадлежат target fact records, поэтому current `promo_rules` не являются
+вторым target source для этих fields.
 
-Правило intentionally сужено до owner-approved ситуации одного зуба. Оно стоит выше
-`one_tooth_restore` и закрывает обнаруженный S14 precedence gap только в target data.
-Current code/test не меняются. Full-arch context не удовлетворяет этому match.
+Для всех трёх promo rules exact `active`, optional `active_until` и **set** allowed
+service IDs совпадают с target facts. Authored list order совпадает только у whitening;
+у двух implant promo порядок отличается и не трактуется как priority/behavior signal.
 
-### 3. `upper_full_arch_with_bone_deficit`
+Legacy `allowed_routes`, `allowed_aspects`, `blocked_aspects`, global blocked list и
+promo-local CTA нельзя молча переносить: target architecture заменяет classifier gates
+common scenario/manual-contact/semantic-context laws.
 
-```yaml
-match:
-  extent: full_arch
-  jaw: upper
-  reported_context: reported_bone_deficit
-max_options: 3
-service_priorities:
-  zygomatic_implants: 100
-  all_on_4: 90
-  all_on_6: 80
-  removable_dentures: 40
-offer_priorities: {}
-```
+### CTA owners
 
-Current max `4` становится target `3`.
+- `tone.yaml` имеет exact шесть CTA variants:
+  `booking`, `consult`, `callback`, `plan`, `price`, `doctor`; здесь живут visible labels
+  и first lead-flow copy.
+- 54 MD files имеют CTA-key distribution:
+  `booking: 6`, `callback: 2`, `consult: 13`, `doctor: 6`, `plan: 25`, `price: 2`.
+- все 21 current pricebook service files имеют `cta_key: price`.
+- current patient playbook rules: `ct_consultation: 7`, `consult: 1`.
+- current service marketing: `doctor: 10`, `consult: 3`.
+- `ct_consultation` отсутствует среди tone CTA variants и требует explicit retirement
+  или mapping decision; S17 mapping не выбирает.
 
-### 4. `upper_full_arch_restore`
+Target `cta_contexts` materialized data отсутствует. Frozen model требует только
+nonblank keys/values и `default`, но не проверяет CTA value против `tone.yaml`; это
+contract/integration gap для следующего checkpoint, не разрешение менять S1 в S17.
 
-```yaml
-match:
-  extent: full_arch
-  jaw: upper
-max_options: 3
-service_priorities:
-  all_on_4: 100
-  all_on_6: 90
-  zygomatic_implants: 70
-  removable_dentures: 40
-offer_priorities: {}
-```
+### Target marketing boundary
 
-Current max `4` становится target `3`. Без reported deficit S11 не допускает zygomatic
-service; strategy map сама её не добавляет.
+- `clients/demo/target_response/marketing.yaml` отсутствует;
+- S2 `load_response_schema_bundle(real_demo_target_root)` fail-closed с
+  `required_path_missing` и relative path `marketing.yaml`;
+- frozen target scenarios exact:
+  `pain_fear`, `cost`, `time`, `doctor_trust`, `result_reliability`;
+- frozen limits допускают required target law `3/2/2`;
+- bundle проверяет `fact:` refs локально; exact `kb:`/`doctor:` refs требуют existing
+  S3/S4/S6 external integrity boundary;
+- frozen policy не содержит free amplifier text.
 
-### 5. `full_arch_restore`
+Architecture doc говорит, что client marketing policy хранит cadence policy, но frozen
+`TargetMarketingPolicy` не имеет cadence field. Audit обязан вынести это как явный gap:
+либо no-repeat/direct-question cadence является universal runtime law и удаляется из
+client-data ownership, либо schema требует отдельного будущего governance change.
 
-```yaml
-match:
-  extent: full_arch
-max_options: 3
-service_priorities:
-  all_on_4: 100
-  all_on_6: 90
-  removable_dentures: 50
-  zygomatic_implants: 40
-offer_priorities: {}
-```
+## Candidate map, not target data
 
-Current max `4` становится target `3`.
+Audit может перечислить только source-backed candidates:
 
-### 6. `one_tooth_restore`
+- `pain_fear`: exact chunks из `implantation__faq__pain.md`;
+- `cost`: `fact:` payment/promo/benefit refs и exact cost/payment chunks;
+- `time`: exact duration/steps/one-day chunks;
+- `doctor_trust`: exact `doctor:` refs и approved doctor/technology content;
+- `result_reliability`: exact osseointegration/warranty refs.
 
-```yaml
-match:
-  extent: one_tooth
-max_options: 2
-service_priorities:
-  classic: 100
-  one_stage: 80
-offer_priorities: {}
-```
+Каждый candidate обязан проходить проверку своего owner boundary: `fact:` — через real
+target `ResponseSchemaBundle`/local fact index, `kb:` — через S4-built KB index + S3
+external validation, `doctor:` — через S6-built doctor refs + S3 external validation.
+Candidate list не утверждает его включение, priority, service eligibility или automatic
+display. S17 не создаёт scenario pools и не переносит free strings.
 
-S11 `one_stage` applicability продолжает требовать extraction context; strategy не
-ослабляет это условие.
+## Owner decisions after audit
 
-### 7. `few_teeth_restore`
+Audit должен вынести владельцу отдельным коротким списком:
 
-```yaml
-match:
-  extent: few_teeth
-max_options: 3
-service_priorities:
-  implant_supported_prosthetics: 100
-  classic: 80
-  clasp_dentures: 50
-  removable_dentures: 40
-offer_priorities: {}
-```
+1. сохранить ли 24 legacy free strings через отдельную редактуру/source publication в
+   MD или удалить их при retirement legacy;
+2. exact semantic contexts и initial commercial blocks для demo;
+3. exact source refs/order для каждого из пяти scenario pools;
+4. CTA context map + clinic default и retirement/mapping `ct_consultation`;
+5. cadence ownership: universal runtime law или client schema data;
+6. нужен ли contract validator `cta_context value → tone CTA key` до materialization;
+7. status двух content-topic keys и canonical rename `teeth_whitening`.
 
-Current max `4` становится target `3`.
+Ни одно решение не должно быть принято Исполнителем внутри S17 audit.
 
-## Deliberately not migrated
+## Read-only acceptance
 
-- `match.problem`, `match.kind`, `match.intent`, current `modifiers` wire;
-- `primary_cta`;
-- current `strategy` labels;
-- `answer_style`;
-- option `role` and `positioning`;
-- `show_when` (owned by S11 selection);
-- duplicate `patient_situations.full_arch_missing` fallback;
-- generic `bone_deficit_solution`: current rule требует одновременно reported deficit
-  и `intent=choose_solution`, а frozen target strategy не получает intent;
-- negative/false offer recommendation entries.
+`tests/test_demo_target_marketing_migration_audit.py` обязан доказать:
 
-Отсутствие этих fields в strategy file является audited ownership split, а не потерей
-данных по невнимательности. Role/positioning и CTA остаются отдельно unresolved/deferred.
+1. exact current marketing inventory/counts/order выше;
+2. exact canonical/noncanonical service-key split;
+3. exact 24 free strings и zero exact MD matches;
+4. exact promo rules/refs, active/date и allowed-service set parity с target facts,
+   включая non-semantic list-order difference у двух implant promo;
+5. exact CTA variants/distributions и unresolved `ct_consultation` mismatch;
+6. target marketing absence + exact S2 fail-closed result;
+7. five frozen scenarios/limits/model boundary через contract introspection/validation,
+   без изменения contracts;
+8. candidate refs в audit doc реально существуют через exact owner boundaries:
+   `fact:` — real target bundle/local fact index, `kb:` — S4 KB index + S3 validation,
+   `doctor:` — S6 doctor refs + S3 validation;
+9. current/target source hashes unchanged;
+10. no new product/runtime wiring/imports; existing S1/S2/S3/S4/S6 offline
+    contracts/helpers may be imported for this audit; no writes, skip/xfail, live or LLM.
 
-## Real-data acceptance
+Tests не должны кодировать будущие выбранные pools/CTA map как approved expected data.
 
-`tests/test_demo_target_clinic_strategy.py` обязан доказать:
+## Audit document
 
-1. YAML top-level exact mapping, no duplicate keys and no unexpected files touched;
-2. `TargetClinicStrategy.model_validate(raw).model_dump(exclude_none=True) == raw`;
-3. exact rule count/order/IDs/matches/max/priorities равны frozen seven-rule target выше;
-4. exact service-priority numbers/order проецируют seven approved current rules;
-5. ровно четыре current rules с max `4` стали target `3`; other three preserve `2/3`;
-6. fallback и generic `bone_deficit_solution` не материализованы отдельными rules;
-7. exact six default offer keys равны variants с current `recommended=true` и имеют `1`;
-8. false/missing recommendations отсутствуют;
-9. all default/rule refs exist in target services/offers through a real
-   `ResponseSchemaBundle` with validation-only synthetic marketing;
-10. S15 resolver on real target IDs proves:
-    - implant placed + full arch + upper + reported deficit selects installed-implant
-      rule and puts implant-supported prosthetics first;
-    - extraction + one tooth selects extraction rule before one-tooth rule, including
-      when reported deficit is also present;
-    - extraction + full arch does not match one-tooth extraction rule;
-    - upper full arch + reported deficit selects upper-bone rule and orders
-      zygomatic → All-on-4 → All-on-6;
-    - few teeth caps exact top three while fourth remains a valid input candidate;
-    - selected recommended offer moves first without adding offers;
-11. client/current/target source hashes outside new strategy stay unchanged;
-12. AST/no-product-wiring audit stays read-only.
+`docs/MARKETING_TARGET_MIGRATION_AUDIT.md` обязан содержать:
 
-Expected real context results prove target data + already checked S15 resolver only. Они
-не доказывают current parity, language understanding или product behavior.
+- простое объяснение «design/models уже есть; real target data/runtime ещё нет»;
+- exact inventory и owner map;
+- таблицу current field → target owner/defer/retire;
+- five-scenario candidate refs с маркировкой `candidate, not approved`;
+- contract/doc gaps;
+- семь owner decisions выше;
+- минимальный recommended next checkpoint, не materialization без решений;
+- no-current/no-target-data/no-authority statement.
 
-## Documentation
-
-- S14 audit отмечает, что seven approved priorities и six recommendation signals
-  materialized, а generic bone rule safely deferred;
-- architecture doc отмечает demo strategy data exists offline, target marketing/wiring
-  still absent;
-- roadmap S16 pending/completed preserves known current `15 passed, 2 failed` and no
-  authority.
+`docs/MARKETING_SCENARIO_ARCHITECTURE.md` меняет только status: frozen schema models
+реализованы S1; demo target policy, selector/session/runtime и authority отсутствуют.
+Нормативные product rules не редактируются.
 
 ## Verification
 
-До data/test/docs edits:
+До audit/test/docs edits:
 
-1. independent checker читает TASK, S14 audit, current playbook/price recommendations,
-   target services/offers, S15 contract/resolver, architecture docs, checklist/guardrails;
-2. checker подтверждает exact seven-rule mapping, owner-approved overlap precedence,
-   generic bone defer, neutral axes, max 4→3, boolean recommendation projection and no
-   hidden product authority;
-3. при `❌`/`❓` TASK исправляется до data.
+1. independent checker читает TASK, current marketing/tone/UI/MD/playbook/pricebook,
+   target facts/pack, S1/S2/S3/S4/S6 contracts/helpers, architecture docs,
+   checklist/guardrails;
+2. checker подтверждает exact inventory, audit-only boundary, owner questions and no
+   hidden materialization/authority;
+3. при `❌`/`❓` TASK исправляется до audit implementation.
 
 После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_clinic_strategy.py -q --basetemp=.pytest_tmp_s16_data`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_target_strategy_resolution.py tests/test_response_schema_contract.py -q --basetemp=.pytest_tmp_s16_unit`;
-3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_loader.py tests/test_service_data_context.py -q --basetemp=.pytest_tmp_s16_neighbors`;
-4. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_service_catalog.py tests/test_demo_target_price_offers.py -q --basetemp=.pytest_tmp_s16_existing_data`;
-5. `git diff --check`, exact allowlist and independent checker repeat;
-6. no live/LLM and no full pytest.
-
-Known S14 current playbook result (`15 passed, 2 failed`) остаётся documented и не
-используется как green gate. S16 не меняет current files/tests и не заявляет current fix.
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_target_marketing_migration_audit.py -q --basetemp=.pytest_tmp_s17_audit`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_marketing_loader.py tests/test_response_schema_contract.py tests/test_response_schema_loader.py tests/test_response_schema_refs.py -q --basetemp=.pytest_tmp_s17_neighbors`;
+3. `git diff --check`, exact allowlist и independent checker repeat;
+4. no full pytest, no live/LLM.
 
 ## Definition of Done
 
-- demo target clinic strategy materializes seven owner-approved audited situations;
-- specific-first order resolves target extraction precedence without current edits;
-- installed-implant rule wins overlap ordering, while eligibility/focus remains outside
-  strategy and product wiring;
-- generic bone rule remains audited/deferred until exact choose-solution invocation exists;
-- four max-4 lists become approved max-3 without deleting services;
-- exact six offer recommendations preserved as relative baseline order;
-- all refs and representative real resolutions validated offline;
-- target marketing/product wiring/A9/authority absent;
-- known current mismatches visible and untouched;
-- roadmap S16 independently reviewed;
+- exact current marketing/CTA inventory independently verified;
+- already materialized facts separated from legacy combined schema;
+- 24 free strings and zero exact KB matches visible, not silently lost or copied;
+- five scenario candidate sources exist but are not falsely approved;
+- CTA mismatch and cadence/cross-ref gaps explicit;
+- owner receives bounded decisions before target data;
+- no client data, schema/code/runtime/A9/authority changes;
+- roadmap S17 independently reviewed;
 - checker `✅`, governance/completion commits and push only to `codex/stage-a`, tree clean.

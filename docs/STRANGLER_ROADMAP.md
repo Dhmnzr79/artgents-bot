@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S23 — active offer projection внутри одной выбранной услуги реализована и независимо проверена; product path не подключён** |
-| Ближайший рабочий фокус без live | **Отдельно определить следующий offline checkpoint; S23 не разрешает service/brand selection, session/runtime или authority** |
+| Отдельная S-series без live | **S24 — exact brand offer projection внутри одной выбранной услуги: governance pending, код ещё не начат** |
+| Ближайший рабочий фокус без live | **Проверить governance S24; до checker ✅ код не писать** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -137,6 +137,10 @@
   существующему S15 без изменения денег и payment stages. Independent completion review
   `✅`: target `30 passed`, S10/S15/S22 neighbors `63 passed`, skip/xfail нет.
   Service/brand selection, session/runtime, ответы и authority не подключены.
+- [ ] **S24 — exact brand offer projection** — governance подготовлен для pure-фильтра
+  exact brand ID внутри уже выбранной service с делегированием active/option/order/limit
+  существующему S23/S15. До независимого governance checker `✅` код не пишется;
+  recognition, runtime, ответы и authority не подключаются.
 
 ## Какой roadmap актуален
 

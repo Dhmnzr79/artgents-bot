@@ -1,56 +1,56 @@
-# TASK — S9 Demo Target Doctor Catalog Materialization
+# TASK — S10 Target Service Data Context Builder
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `6f12b16 feat: load strict doctor catalogs S8`
+**Baseline:** `ba6f843 data: materialize demo doctor catalog S9`
 
-**Серия / checkpoint:** `S9` — материализация одного final-wire
-`clients/demo/doctor_catalog.json` для шести утверждённых demo-врачей и offline
-доказательство его целостности через S4/S5/S6/S8.
+**Серия / checkpoint:** `S10` — pure read-only сборка target service data context по
+одному exact `service_id` из уже проверенных S1 и S5 моделей.
 
-**Режим:** client data materialization only. Никаких current runtime consumers,
+**Режим:** in-memory foundation only. Никаких filesystem/client loaders, query/session,
 routes/UI, live/LLM или product authority.
 
 ## Цель
 
-Создать один target-каталог врачей в окончательной S5 JSON-форме и отдельный read-only
-acceptance test, который доказывает:
+Добавить один изолированный builder:
 
-- S8 строго загружает реальный demo-файл;
-- все шесть записей дословно соответствуют утверждённым данным;
-- transitional MD metadata пока exact совпадает с JSON и не становится production
-  loader/adaptor;
-- все doctor→service/profile refs проходят S6 на реальном demo service catalog и S4
-  KB index;
-- `doctor:<id>` refs детерминированны;
-- единственная clinic-level услуга без врача — `tomography`.
+```python
+def build_service_data_context(
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    service_id: str,
+) -> ServiceDataContext: ...
+```
 
-S9 не подключает каталог к ответам. Он создаёт проверенный источник структурированных
-doctor facts, который следующий отдельный checkpoint сможет передать read-only
-service-context builder для цепочки «описание → цена → врач» по exact `service_id`.
+Он по одному exact `service_id` собирает рядом:
 
-## Почему JSON и MD временно содержат пересекающиеся поля
+- validated `TargetService` с `content_ref` для описания;
+- все связанные validated `TargetOffer` с точными price/package/fact/follow-up данными;
+- всех связанных врачей с `doctor_id`, именем, должностью, стажем и `profile_ref`.
 
-Target ownership уже определён:
+S10 реализует offline common-context law «описание → цена → врач», но не выбирает
+услугу по фразе пациента, не читает MD/JSON, не применяет eligibility/marketing и не
+формирует ответ.
 
-- JSON владеет `name`, `position`, `experience_years`, `service_ids` и `profile_ref`;
-- MD владеет продающим profile text.
+## Почему это следующий минимальный scope
 
-Текущие MD ещё содержат legacy/transitional frontmatter и текстовый стаж, потому что
-current local product path пока не заменён. В S9 они не считаются вторым target source:
-их читают только acceptance tests как migration evidence. Exact parity test не даёт
-копиям разойтись.
+S1 уже задаёт target services/offers, S5–S9 — target doctor catalog и его demo data.
+Архитектурный закон требует, чтобы короткие продолжения «сколько стоит?» и «кто
+делает?» использовали один semantic `service_id`, а не независимо угадывали тему.
 
-Удаление структурированных frontmatter-дублей и числового стажа из MD разрешается
-только после отдельного доказанного answer-context/product-wiring checkpoint, где
-JSON-стаж автоматически присутствует в каждом doctor answer. S9 ничего не сохраняет
-ради live-клиентов; это ограниченная последовательность миграции до готовой замены.
+Следующий безопасный boundary — pure join уже validated in-memory records. Реальный
+demo target service/offer pack ещё не материализован, поэтому S10 использует только
+synthetic target models. Отдельный следующий checkpoint сможет материализовать
+минимальный demo service/price slice и прогнать его вместе с S9 catalog. Product wiring,
+dialog focus и authority идут ещё позже.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `clients/demo/doctor_catalog.json` (new);
-- `tests/test_demo_doctor_catalog.py` (new);
+- `core/service_data_context.py` (new);
+- `tests/test_service_data_context.py` (new);
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — зафиксировать точную offline S10 boundary
+  без заявления product activation;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -58,182 +58,155 @@ JSON-стаж автоматически присутствует в каждо�
 
 ## Protected / вне scope
 
-- все существующие `clients/demo/**`, включая doctor MD, overview, service catalog,
-  pricebook, marketing и policies;
-- весь `clients/cesi/**` и `clients/nikadent/**`;
-- frozen S1–S8 contracts/loaders/index builders/tests;
-- S2 target-pack layout и `ResponseSchemaBundle`;
-- `doctors_lookup.py`, current loaders, retrieval, routing/orchestration и caches;
-- client discovery/default/fallback/dual-read и feature flags;
-- service→price→doctor context builder, selection, recommendation/ranking и rendering;
-- query recognition, follow-up/session logic, prompts, answers, CTA, UI/cards;
+- весь `clients/**`, включая S9 `doctor_catalog.json`, MD, service catalog и pricebook;
+- frozen S1–S9 contracts/loaders/index builders/tests;
+- изменение `ResponseSchemaBundle`, `TargetDoctorCatalog` или target-pack layout;
+- current service/price/doctor loaders и `doctors_lookup.py`;
+- filesystem, client discovery/default/fallback/dual-read, caches и feature flags;
+- query recognition, semantic resolution, follow-up/dialog-focus и session writes;
+- service applicability, strategy, active filtering, offer priority, recommendation,
+  ranking и max-options;
+- marketing/CTA selection, source-text loading, rendering/composer/verifier;
+- routes/API/app, prompts, answers, UI/cards;
 - booking, availability, schedule/calendar/CRM;
 - protected acceptance/golden/eval fixtures;
 - весь A9 design/raw/frozen/harness/evidence и A9 live re-audit;
 - live/LLM, merge, `main`, другие ветки и включение product authority.
 
-## Нормативный demo catalog
+## Нормативный output contract
 
-`clients/demo/doctor_catalog.json` — UTF-8 JSON с единственным top-level key
-`doctors`. Порядок doctor keys лексикографический и фиксирован:
+Новый `core/service_data_context.py` определяет frozen/slots dataclasses:
 
-1. `doctors__doctor__fedorova`;
-2. `doctors__doctor__grigoriev`;
-3. `doctors__doctor__kuznetsov`;
-4. `doctors__doctor__morozova`;
-5. `doctors__doctor__orlov`;
-6. `doctors__doctor__volkov`.
+```python
+@dataclass(frozen=True, slots=True)
+class ServiceDoctorContext:
+    doctor_id: str
+    name: str
+    position: str
+    experience_years: int
+    profile_ref: str
 
-Каждая запись содержит ровно пять обязательных S5-полей, без extras.
+@dataclass(frozen=True, slots=True)
+class ServiceDataContext:
+    service_id: str
+    service: TargetService
+    offers: tuple[TargetOffer, ...]
+    doctors: tuple[ServiceDoctorContext, ...]
+```
 
-### Фёдорова
+`ServiceDoctorContext` намеренно не содержит `active`, расписание, availability,
+рейтинг, роль/фазу, CTA или UI data. Стаж всегда присутствует в structured context и
+не зависит от отдельного вопроса пациента.
 
-- `name`: `Фёдорова Ирина Михайловна`;
-- `position`: `Врач-стоматолог-терапевт`;
-- `experience_years`: `16`;
-- `service_ids` exact order: `caries`, `pulpitis`, `teeth_treatment`,
-  `professional_whitening`, `veneers`, `zirconia_crowns`;
-- `profile_ref`: `kb:doctors__doctor__fedorova.md#korotko`.
+`service` и `offers` являются deep `model_copy` уже validated S1 records. Поэтому
+context не разделяет mutable nested state с input bundle. Wrapper dataclasses frozen;
+builder не создаёт вторую service/price schema и не повторно валидирует frozen models.
 
-### Григорьев
+## Exact join law
 
-- `name`: `Григорьев Павел Игоревич`;
-- `position`: `Врач-пародонтолог`;
-- `experience_years`: `12`;
-- `service_ids`: `periodontitis`;
-- `profile_ref`: `kb:doctors__doctor__grigoriev.md#korotko`.
+1. `service_id` обязан быть `str` и не whitespace-only. Иначе
+   `ServiceDataContextError.code == "service_id_invalid"`.
+2. Значение не trim/lower/normalize. Exact key отсутствует в `bundle.services` →
+   `code == "service_not_found"`.
+3. `ServiceDataContextError(ValueError)` хранит `code` и исходный `service_id`; текст
+   ошибки не является API. Tests обязаны отдельно подтвердить сам class, наследование
+   от `ValueError`, exact `code` и exact исходный `.service_id`, включая non-string и
+   строки с surrounding spaces.
+4. `service` берётся только из exact `bundle.services[service_id]`.
+5. `offers` включает все bundle offers с exact `offer.service_id == service_id` в
+   authored bundle order.
+6. `doctors` включает всех doctors, у которых exact `service_id` присутствует в
+   `doctor.service_ids`, в authored catalog mapping order.
+7. Doctor entry проецируется только в пять output fields; authored doctor service-list
+   order не используется для ranking.
+8. Наличие нескольких doctors означает равную data relevance; builder не выбирает
+   «лучшего» и не сортирует.
+9. `content_ref is None`, empty offers или empty doctors допустимы. Clinic-level
+   service без врача не является ошибкой; отсутствие offer означает только отсутствие
+   target price record в supplied bundle.
+10. `service.active` и `offer.active` копируются дословно, но не фильтруются и не
+    трактуются. Eligibility/availability/priority — не S10 authority.
+11. Builder не вызывает S6 автоматически и не проверяет KB filesystem: callers должны
+    передавать отдельно validated data/indexes.
 
-### Кузнецов
+## Determinism и side-effect invariants
 
-- `name`: `Кузнецов Дмитрий Андреевич`;
-- `position`: `Врач-стоматолог-ортопед`;
-- `experience_years`: `19`;
-- `service_ids` exact order: `zirconia_crowns`, `veneers`, `all_on_4`, `all_on_6`,
-  `temporary_teeth`, `classic`, `implant_supported_prosthetics`, `clasp_dentures`,
-  `removable_dentures`;
-- `profile_ref`: `kb:doctors__doctor__kuznetsov.md#korotko`.
-
-### Морозова
-
-- `name`: `Морозова Анна Сергеевна`;
-- `position`: `Врач-ортодонт`;
-- `experience_years`: `11`;
-- `service_ids`: `aligners`;
-- `profile_ref`: `kb:doctors__doctor__morozova.md#korotko`.
-
-### Орлов
-
-- `name`: `Орлов Никита Владимирович`;
-- `position`: `Врач-имплантолог`;
-- `experience_years`: `16`;
-- `service_ids` exact order: `classic`, `one_stage`, `sinus_lift`, `all_on_4`,
-  `all_on_6`, `temporary_teeth`, `implant_supported_prosthetics`;
-- `profile_ref`: `kb:doctors__doctor__orlov.md#korotko`.
-
-### Волков
-
-- `name`: `Волков Александр Сергеевич`;
-- `position`: `Главный врач, стоматолог-хирург, имплантолог`;
-- `experience_years`: `13`;
-- `service_ids` exact order: `classic`, `one_stage`, `sinus_lift`,
-  `zygomatic_implants`, `pterygoid_implants`, `all_on_4`, `all_on_6`,
-  `temporary_teeth`, `tooth_extraction`;
-- `profile_ref`: `kb:doctors__doctor__volkov.md#korotko`.
-
-Запрещены `version`, `active`, aliases, education/certificates, photo, schedule/slots,
-availability, rating/priority, roles/phases, CTA и UI/card fields.
-
-## Transitional parity law
-
-Новый test локально и read-only strict-parses шесть personal doctor MD frontmatters,
-игнорируя overview, и строит только migration-evidence projection:
-
-- mapping key = exact `doc_id`;
-- `name` = exact `name_full`;
-- `position` = exact `position`;
-- `experience_years` = exact `experience_years`;
-- `service_ids` = exact `services`, включая authored order;
-- `profile_ref` = `kb:<exact filename>#korotko`.
-
-Полученный plain mapping должен быть exact равен `catalog.model_dump()` из S8. Этот
-helper существует только в test module, не импортируется product code и не является
-compatibility adapter. Он будет удалён вместе с transitional MD metadata после
-отдельного wiring/cleanup governance.
-
-## External integrity law
-
-Acceptance test:
-
-1. читает service IDs как top-level keys реального
-   `clients/demo/service_catalog.json`;
-2. строит KB refs через frozen S4 из `clients/demo/md`;
-3. создаёт frozen S6 `DoctorCatalogExternalIndex`;
-4. требует `validate_doctor_catalog_external_refs(...) is None`;
-5. требует exact sorted `build_doctor_source_refs(...)` для шести IDs;
-6. union всех doctor `service_ids` exact равен service catalog IDs минус
-   `{"tomography"}`; неизвестных service IDs нет.
-
-Это доказывает doctor side общей `service_id` связи, но не объявляет current pricebook
-target price source и не строит answer context в S9.
+- builder не мутирует `bundle`, `doctor_catalog`, nested records или authored order;
+- output service/offers не alias input models благодаря `model_copy(deep=True)`;
+- два последовательных вызова независимы, global/cache state отсутствует;
+- нет filesystem, environment, network, logging или time/date dependency;
+- модуль импортирует только stdlib `dataclasses` и frozen S1/S5 model types;
+- нет current product/runtime imports и legacy adapters;
+- функция не читает source text, не форматирует деньги и не строит answer/UI;
+- S10 не подключается к product path и не меняет A9/product authority.
 
 ## Protected tests / честность
 
-- новый `tests/test_demo_doctor_catalog.py` читает только новый catalog, шесть personal
-  doctor MD, demo service catalog и demo MD-root через frozen S4;
-- overview не материализуется как doctor;
-- тест не импортирует current doctor/runtime/routes/session/price loaders;
-- source files до/после теста имеют exact одинаковые hashes;
+- новый `tests/test_service_data_context.py` использует только synthetic valid S1/S5
+  payloads;
+- `clients/**` не читается и не копируется;
 - frozen tests не меняются;
-- запрещены skip/xfail, conditional PASS, mocks product runtime и snapshot current
-  output.
+- запрещены skip/xfail, conditional PASS, runtime mocks и snapshot current output.
 
 ## Минимальные acceptance tests
 
 Compact module доказывает:
 
-1. S8 загружает real catalog как `TargetDoctorCatalog`, keys имеют exact order;
-2. `model_dump()` exact равен нормативному owner-approved payload для всех шести
-   записей и пяти полей;
-3. JSON содержит только `doctors`, каждая запись — только S5 fields, запрещённых extras
-   нет;
-4. exact transitional MD projection равна loaded target catalog;
-5. real service/KB index проходит S6 и exact doctor refs построены;
-6. service coverage exact, единственное missing — `tomography`;
-7. All-on-4 exact связан минимум с Кузнецовым, Орловым и Волковым; whitening — с
-   Фёдоровой; aligners — с Морозовой; periodontitis — с Григорьевым;
-8. before/after hashes catalog, six MD и service catalog идентичны;
-9. source/AST audit test module не импортирует current doctor/runtime/session/price
-   loaders и не вызывает filesystem write APIs.
+1. exact service context содержит исходный `service_id`, validated service/content ref,
+   минимум два полных связанных offer и всех связанных doctors; synthetic offers имеют
+   непустые `option_id`, `brand_id`, `fact_refs`, `followups`, authored `active`,
+   вложенные `price` и `package`, а test сравнивает exact полный
+   `TargetOffer.model_dump()` каждого offer;
+2. doctor context всегда содержит exact ID/name/position/experience/profile ref и
+   ровно пять полей;
+3. обе dataclass имеют exact объявленный набор и порядок полей; introspection доказывает
+   `frozen=True`, `slots=True` и отсутствие `__dict__` у instances;
+4. offer order и doctor mapping order сохраняются без sorting/ranking;
+5. offers/doctors другой услуги не попадают в context;
+6. service без content ref/offers/doctors успешно возвращает `None`, `()`, `()`;
+7. inactive service/offer остаются в context с authored flags: builder не является
+   eligibility selector;
+8. non-string и whitespace-only ID дают отдельные `service_id_invalid` cases; unknown,
+   case mismatch и surrounding spaces дают отдельные `service_not_found` cases. Каждый
+   case проверяет `ServiceDataContextError`, `ValueError`, exact `code` и exact исходный
+   `.service_id`; normalization отсутствует;
+9. `bundle.model_dump()` и `doctor_catalog.model_dump()` до/после builder идентичны;
+   output service/offers имеют другие object identities и их nested mutation не меняет
+   ни один input;
+10. dataclass wrappers frozen, sequential calls не делят state;
+11. source/AST audit подтверждает только allowed imports, отсутствие IO/client/current
+    loaders/session/query/selection/rendering/write/cache APIs и отсутствие второй
+    service/price schema или `model_validate`.
 
 ## Verification
 
-До data edits:
+До кода:
 
-1. independent read-only checker читает TASK, planned exact payload, six MD, service
-   catalog, S4/S5/S6/S8 contracts/tests, checklist и guardrails;
-2. checker подтверждает exact data, JSON ownership, временную parity law, conscious
-   tomography exception и отсутствие runtime/price/A9 claims;
-3. при `❌`/`❓` governance исправляется и повторно проверяется до data edits.
+1. independent read-only checker читает TASK, S1/S5/S6 contracts/tests, S9 catalog
+   acceptance, обе architecture docs, checklist и guardrails;
+2. checker подтверждает exact join/output/error laws, experience-by-default, отсутствие
+   ranking/active filtering/runtime/A9 authority и честный synthetic-only scope;
+3. при `❌`/`❓` governance исправляется и повторно проверяется до кода.
 
 После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_doctor_catalog.py -q --basetemp=.pytest_tmp_s9`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_doctor_schema_loader.py tests/test_doctor_schema_contract.py tests/test_doctor_schema_refs.py -q --basetemp=.pytest_tmp_s9_contracts`;
-3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_doctor_template.py tests/test_response_schema_kb_index.py -q --basetemp=.pytest_tmp_s9_neighbor`;
-4. `.venv/codex312/Scripts/python.exe scripts/lint_content.py --client demo`;
-5. `git diff --check`, `git status --short`, diff only по allowlist;
-6. independent read-only checker сначала читает data/test diff, затем сам запускает те
-   же команды;
-7. live/LLM и полный pytest не запускаются: product consumers не меняются.
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_service_data_context.py -q --basetemp=.pytest_tmp_s10`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_contract.py tests/test_doctor_schema_contract.py tests/test_doctor_schema_refs.py -q --basetemp=.pytest_tmp_s10_contracts`;
+3. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_doctor_catalog.py tests/test_response_schema_refs.py -q --basetemp=.pytest_tmp_s10_neighbor`;
+4. `git diff --check`, `git status --short`, diff only по allowlist;
+5. independent checker сначала читает test diff, затем implementation/docs diff и сам
+   запускает те же команды;
+6. live/LLM и полный pytest не запускаются: product consumers не меняются.
 
 ## Definition of Done
 
-- real demo target doctor catalog существует в final S5 wire shape;
-- exact owner-approved data и transitional MD parity доказаны;
-- real demo проходит S8 load и S4→S6 external integrity;
-- JSON владеет structured doctor facts, MD остаётся продающим content source;
-- service-price answer context и product wiring не реализованы и не объявлены;
-- current runtime, answers, routes, UI, session, A9 и authority не изменились;
-- roadmap отмечает S9 как offline demo materialization, не product activation;
+- one exact service ID pure-собирает service description pointer, full price offers и
+  doctor contexts с обязательным стажем;
+- authored values/order сохраняются, input не мутируется и output не alias input models;
+- builder не выполняет selection, eligibility, ranking, source loading или rendering;
+- `clients/**`, current runtime, answers, routes, UI, session, A9 и authority не
+  изменились;
+- architecture docs/roadmap отмечают S10 как offline context foundation, не product
+  activation;
 - checker `✅`, отдельные governance/completion commits и push только в
   `origin/codex/stage-a`, рабочее дерево чистое.

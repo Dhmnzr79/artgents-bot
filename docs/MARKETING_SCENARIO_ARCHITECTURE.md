@@ -1,8 +1,8 @@
 # Архитектура маркетинговых сценариев
 
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
-offline в S1, demo target policy материализована в S20. Selector/session runtime и
-authority отсутствуют.
+offline в S1, demo target policy материализована в S20, pure deterministic selector —
+в S21. Session/runtime wiring и authority отсутствуют.
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
@@ -322,6 +322,42 @@ CTA key берётся один раз для semantic context. Context-specific
 занимает marketing или navigation slots и не показывается в manual contact, spam/off-topic,
 pure clarify, после явного отказа или внутри активного lead-flow.
 
+### Offline selector S21
+
+S21 реализует только pure отбор автоматических ingredients из already-validated target
+models. Явные inputs: semantic context, optional already-selected service, ordered
+scenarios, explicit date, флаг initial block и read-only shown snapshots. Результат —
+immutable tuples refs/scenarios и CTA key; selector не читает client files, clock или
+session и не формирует текст.
+
+Exact порядок:
+
+1. scenarios фильтруются по exact allowed context, затем ограничиваются policy cap;
+2. до двух pools объединяются round-robin: по одному eligible ref на scenario за круг,
+   сохраняя pool order и пропуская ineligible/duplicate refs без потери хода;
+3. каждый scenario ref занимает один общий marketing slot и один amplifier slot;
+4. оставшиеся из максимум трёх marketing slots заполняются только exact initial block
+   текущего context, без fallback к чужому context;
+5. fact проходит active/inclusive-date/service/shown и bidirectional incompatibility
+   gates; KB/doctor ref должен существовать в explicit index, а doctor при выбранной
+   услуге — иметь exact service link;
+6. без service doctor ref разрешён только в exact general context `doctors`;
+7. CTA выбирается exact context → required default и не занимает slots.
+
+Missing optional external amplifier пропускается, но pack acceptance S3/S6 остаётся
+обязательной. Missing local `fact:` по-прежнему fail-closed отклоняет bundle до
+selector. При двух conflicting facts побеждает первый по фактическому authored order.
+
+Selector принимает shown snapshots, но не изменяет их: будущая session сможет отметить
+ref только после фактического включения в ответ. Direct fact question и automatic
+`consultation_value` не входят в S21. Для consultation close future evidence assembly
+должен отдельно проверить оставшиеся marketing/amplifier slots.
+
+На demo `cost + price + all_on_4` выбирает два ценовых amplifiers и CTA `price`; initial
+block `service` не подмешивается. В context `service` после тех же двух amplifiers может
+добавиться `fact:free_implant_consult`, а CTA будет `plan`. Это разные exact contexts,
+не скрытая эвристика.
+
 ## Что не нужно делать сейчас
 
 - наполнять demo десятками усилителей;
@@ -334,9 +370,10 @@ pure clarify, после явного отказа или внутри акти�
 ## Будущий runtime checkpoint
 
 Schema governance зафиксирован этим документом и
-[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), а demo policy
-материализована offline в S20. Ничего ещё не подключено к product path. Перед runtime
-реализацией нужны отдельные code TASK и checker-review.
+[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), demo policy
+материализована offline в S20, pure selector — в S21. Ничего ещё не подключено к
+product path. Перед session/evidence/runtime реализацией нужны отдельные TASK и
+checker-review.
 Они должны доказать:
 
 - schema и source-ref validation;

@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S17 — read-only marketing/CTA migration audit завершён и независимо проверен; target marketing data и product path не подключены** |
-| Ближайший рабочий фокус без live | **Закрыть семь owner decisions из S17 отдельным governance checkpoint до target marketing data** |
+| Отдельная S-series без live | **S18 — offline contract для same-MD `consultation_value` завершён и независимо проверен; demo content, session/runtime и product path не подключены** |
+| Ближайший рабочий фокус без live | **Отдельным governance checkpoint решить наполнение продающих service MD и target marketing data** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -107,6 +107,11 @@
   не создаёт `target_response/marketing.yaml`, selector/session/runtime или authority.
   Independent completion review `✅`: audit `7 passed`, neighbors `112 passed`,
   skip/xfail нет.
+- [x] **S18 — target service consultation value contract** — optional source value
+  формализован в frontmatter того же service MD с exact `content_ref` cross-ref и
+  universal once-per-document/session cadence law. Independent completion review `✅`:
+  contract `36 passed`, neighbors `83 passed`; skip/xfail нет. Demo MD, session/runtime,
+  composer и authority не подключены.
 
 ## Какой roadmap актуален
 

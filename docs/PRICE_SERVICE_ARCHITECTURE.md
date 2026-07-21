@@ -215,7 +215,7 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 | `pricebook/facts.json` | точный commercial fact, даты, eligibility, detail ref, `incompatible_with` | scenario order и CTA-copy |
 | `clinic_strategy.yaml` | priority уже допустимых services/offers, max 2–3, редкие context overrides | active, selection, деньги, fact text, CTA |
 | `marketing.yaml` | limits, scenario pools, ordered refs, cadence, CTA-key selection | дубли source text, dates и incompatibility |
-| KB/md | утверждённый содержательный ответ и сравнения | цена и runtime routing |
+| KB/md | утверждённый содержательный ответ и сравнения; optional `consultation_value` в frontmatter того же service-документа | цена, CTA и runtime routing |
 | doctor layer | имя, должность, стаж, связи с услугами и exact MD-ref общего продающего профиля | `active`, образование, фото, расписание, рейтинг, отдельная UI-card schema и готовый ответ сценария |
 | `ui.yaml` / `tone.yaml` | CTA label, clinic default и lead-flow copy | сценарные вступления и медицинские факты |
 | session | известные dialog facts, histories UI/facts, semantic CTA context, lead/refusal state | межклиентские defaults и новый source content |
@@ -280,6 +280,27 @@ Roles `protocol`, `advanced_protocol`, `supporting` отвечают на кат
 необязательны. Отсутствующие `active`/`content_ref` наследуются от parent service, а
 option-selection уточняет parent eligibility. Offer с `option_id` обязан ссылаться на
 option внутри своего `service_id`. Реальный бренд option не является.
+
+### Подводка к консультации в service Markdown
+
+Содержательное тело service MD остаётся основным утверждённым описанием услуги и может
+естественно объяснять реальные особенности клиники. Для одной специальной задачи у того
+же документа допускается optional scalar `consultation_value` в YAML frontmatter:
+
+```yaml
+consultation_value: >
+  Врач оценивает исходные данные и определяет, подходит ли пациенту этот метод.
+```
+
+Это source-факт о пользе консультации, а не готовая реплика, CTA или новый H3. Frontmatter
+не входит в общий FullContext body. После определения услуги значение разрешается только
+прямым lookup по exact service/option `content_ref`; это не vector/semantic retrieval и
+не поиск похожего чанка. Отдельный `service_accents` файл, priority facts и cadence в
+каждом service/client не создаются.
+
+Автоматическое включение и session-cadence определены в
+[`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Само наличие
+поля не даёт ему product authority.
 
 ### Минимальный словарь selection
 

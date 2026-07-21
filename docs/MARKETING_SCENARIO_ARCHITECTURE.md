@@ -158,12 +158,12 @@ price-ответе demo приоритет при наличии в `followups`:
 
 | Владелец | Что хранит |
 |---|---|
-| `clients/<client_id>/marketing.yaml` | Лимиты, scenario rules, упорядоченные amplifier refs, ограничения scenario/pool context, CTA key selection и cadence policy; без дублей текста и без source-fact eligibility |
+| `clients/<client_id>/marketing.yaml` | Лимиты, scenario rules, упорядоченные amplifier refs, ограничения scenario/pool context, CTA key selection и fact/scenario cadence policy; без дублей текста и без source-fact eligibility |
 | Pricebook/commercial facts | Консультация, рассрочка, скидка/подарок, вычет, гарантия как commercial fact, даты, точные условия и `incompatible_with` |
-| KB/md | Содержательный утверждённый контент и факты клиники |
+| KB/md | Содержательный утверждённый контент и факты клиники; optional `consultation_value` в frontmatter того же service-документа |
 | Doctor layer | Имя, должность, стаж и связи с услугами; общий продающий профиль хранится в exact MD chunk |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
-| Session state | `shown_fact_ids`, `shown_amplifier_ids`, текущая тема/услуга, lead/refusal state |
+| Session state | `shown_fact_ids`, `shown_amplifier_ids`, `shown_consultation_value_refs`, текущая тема/услуга, lead/refusal state |
 | Common planner/TurnFrame target | `marketing_scenarios` как общее структурированное понимание, а не отдельный regex/classifier на каждый сценарий |
 
 Полная target ownership услуг, offers, брендов и client strategy находится в
@@ -219,6 +219,35 @@ cta_contexts:
 Policy не содержит свободный amplifier text. Если source ref исчез или не проходит
 eligibility, он отбрасывается; модель не заменяет его похожим утверждением.
 
+### Service consultation close
+
+У нужного service Markdown допускается одно optional поле `consultation_value` в YAML
+frontmatter того же файла. Оно хранит утверждённый смысл пользы консультации по этой
+услуге, а не готовую фразу, CTA или follow-up. Основное тело MD может быть естественно
+продающим и clinic-specific без отдельной карточки приоритетных фактов.
+
+Frontmatter исключён из общего FullContext body. После exact выбора service/option
+будущий evidence assembly может получить значение только прямым lookup по его
+`content_ref` и передать composer с ролью `consultation_close`. Значения других
+документов не становятся selectable consultation material; отдельный retriever,
+`service_accents` или H3 `#consultation-value` не создаются.
+
+При автоматическом использовании `consultation_value`:
+
+1. он ставится только в заключение подходящего содержательного service-ответа;
+2. занимает один из трёх marketing-fact slots и один из двух amplifier slots;
+3. при заполнении любого лимита пропускается без записи shown-state;
+4. exact document ref показывается автоматически максимум один раз в текущем
+   `client_id + session_id`, независимо от H3/chunk/follow-up clicks;
+5. ref записывается только после фактического включения в ответ;
+6. manual-contact, spam/off-topic, pure clarify, active lead-flow и явный отказ от
+   консультации/контакта подавляют автопоказ.
+
+Прямой вопрос о консультации является основным source-backed content и не занимает
+automatic marketing/amplifier slots. Он обходит только repeat suppression: exact
+selected `content_ref`, применимость, source fidelity и safety boundaries обязательны.
+Новый session/reset очищает suppression; TTL и per-client cadence setting не вводятся.
+
 ### Минимальный doctor layer
 
 Doctor record содержит только стабильный ID, имя, должность, стаж, service links и
@@ -272,6 +301,7 @@ Target planner output содержит список `marketing_scenarios` из 0
 Target session изолирован по `client_id + session_id` и хранит:
 
 - `shown_fact_ids`, `shown_amplifier_ids`;
+- `shown_consultation_value_refs` для реально использованных automatic service closes;
 - показанные/нажатые content follow-up IDs;
 - показанные/нажатые price follow-up IDs;
 - `shown_video_ids`;

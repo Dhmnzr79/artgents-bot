@@ -308,6 +308,20 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую границу для любой текущей личной боли.
 8. `comparison_route` — catalog fast-path не перебивает comparison-md.
 
+### Target service consultation close
+
+S18 добавляет только offline source contract. Optional `consultation_value` находится в
+frontmatter того же service MD, исключён из общего FullContext body и разрешается exact
+lookup по выбранному service/option `content_ref`. Он не является H3, CTA, готовой
+репликой, новым retriever или отдельным тематическим route.
+
+Будущий runtime передаёт выбранное значение как `consultation_close`, автоматически
+использует exact document ref максимум один раз на `client_id + session_id` и отмечает
+shown-state только после фактического вывода. Автопоказ занимает один marketing slot и
+один amplifier slot; при заполнении любого лимита пропускается. Прямой вопрос о
+консультации остаётся основным content вне automatic slots. S18 не реализует selection,
+session, composer placement или authority.
+
 ---
 
 ## Что дальше
@@ -316,8 +330,8 @@ hard-stop и marketing rules. Реализация и parity текущего ru
    [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md) и
    [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md); runtime
    пока не мигрирован.
-2. Следующий code TASK должен выбрать безопасную вертикаль реализации, не подключая весь
-   schema сразу и не меняя A9 authority.
+2. S18 отдельно материализует offline source contract для `consultation_value`; demo
+   content, session/runtime wiring и authority остаются будущими checkpoint-ами.
 3. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
 4. Regression будущей реализации должен доказать no-repeat, direct-question override,
    межклиентскую изоляцию, hard-stop и точность source-owned facts.

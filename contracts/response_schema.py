@@ -355,10 +355,21 @@ class TargetStrategyRule(TargetSchemaModel):
     service_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
     offer_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def _match_is_not_empty(self) -> "TargetStrategyRule":
+        if all(
+            getattr(self.match, field) is None
+            for field in ("family", "extent", "stage", "jaw", "reported_context")
+        ):
+            raise ValueError("strategy_rule_match_empty")
+        return self
+
 
 class TargetClinicStrategy(TargetSchemaModel):
     version: Annotated[StrictInt, Field(ge=1)] = 1
     default_max_options: Annotated[StrictInt, Field(ge=2, le=3)] = 3
+    default_service_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
+    default_offer_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
     rules: list[TargetStrategyRule] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -462,6 +473,17 @@ class ResponseSchemaBundle(TargetSchemaModel):
                 raise ValueError("bundle_fact_service_missing")
             if any(fact_id not in self.facts for fact_id in fact.incompatible_with):
                 raise ValueError("bundle_fact_incompatible_missing")
+
+        if any(
+            service_id not in self.services
+            for service_id in self.strategy.default_service_priorities
+        ):
+            raise ValueError("bundle_strategy_service_missing")
+        if any(
+            offer_id not in offer_id_set
+            for offer_id in self.strategy.default_offer_priorities
+        ):
+            raise ValueError("bundle_strategy_offer_missing")
 
         for rule in self.strategy.rules:
             if any(service_id not in self.services for service_id in rule.service_priorities):

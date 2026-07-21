@@ -469,6 +469,24 @@ def test_fact_dates_are_exact_and_ordered(active_from: str, active_until: str, t
 
 
 def test_strategy_limits_and_priorities_are_strict() -> None:
+    strategy = TargetClinicStrategy.model_validate(
+        {"version": 1, "default_max_options": 3, "rules": []}
+    )
+    assert strategy.default_service_priorities == {}
+    assert strategy.default_offer_priorities == {}
+
+    strategy = TargetClinicStrategy.model_validate(
+        {
+            "version": 1,
+            "default_max_options": 3,
+            "default_service_priorities": {"low": -10, "neutral": 0, "high": 20},
+            "default_offer_priorities": {"offer": 30},
+            "rules": [],
+        }
+    )
+    assert strategy.default_service_priorities == {"low": -10, "neutral": 0, "high": 20}
+    assert strategy.default_offer_priorities == {"offer": 30}
+
     strategy = _valid_bundle_payload()["strategy"]
     strategy["default_max_options"] = 4
     assert "less_than_equal" in _error_text(TargetClinicStrategy, strategy)
@@ -484,6 +502,49 @@ def test_strategy_limits_and_priorities_are_strict() -> None:
     payload = _valid_bundle_payload()
     payload["strategy"]["rules"][0]["offer_priorities"] = {"missing": 10}
     assert "bundle_strategy_offer_missing" in _error_text(ResponseSchemaBundle, payload)
+
+    payload = _valid_bundle_payload()
+    payload["strategy"]["default_service_priorities"] = {"missing": 10}
+    assert "bundle_strategy_service_missing" in _error_text(ResponseSchemaBundle, payload)
+
+    payload = _valid_bundle_payload()
+    payload["strategy"]["default_offer_priorities"] = {"missing": 10}
+    assert "bundle_strategy_offer_missing" in _error_text(ResponseSchemaBundle, payload)
+
+
+@pytest.mark.parametrize("value", [True, 1.5, "10"])
+@pytest.mark.parametrize(
+    "field", ["default_service_priorities", "default_offer_priorities"]
+)
+def test_strategy_default_priorities_are_strict_integers(field: str, value: object) -> None:
+    strategy = {"version": 1, "default_max_options": 3, field: {"item": value}, "rules": []}
+    assert "int_type" in _error_text(TargetClinicStrategy, strategy)
+
+
+@pytest.mark.parametrize(
+    "match",
+    [
+        None,
+        {},
+        {
+            "family": None,
+            "extent": None,
+            "stage": None,
+            "jaw": None,
+            "reported_context": None,
+        },
+    ],
+)
+def test_strategy_context_rule_match_cannot_be_empty(match: object) -> None:
+    rule: dict[str, object] = {
+        "id": "catch_all",
+        "service_priorities": {},
+        "offer_priorities": {},
+    }
+    if match is not None:
+        rule["match"] = match
+    strategy = {"version": 1, "default_max_options": 3, "rules": [rule]}
+    assert "strategy_rule_match_empty" in _error_text(TargetClinicStrategy, strategy)
 
 
 def test_marketing_limits_scenarios_and_local_fact_refs_are_strict() -> None:

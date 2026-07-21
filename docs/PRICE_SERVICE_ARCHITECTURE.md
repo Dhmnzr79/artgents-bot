@@ -392,21 +392,45 @@ stage разрешён общей схемой; решение не перено
 ```yaml
 version: 1
 default_max_options: 3
+default_service_priorities:
+  all_on_4: 100
+  all_on_6: 80
+default_offer_priorities:
+  all_on_4.jaw.impro: 100
 rules:
-  - id: full_arch_implantology
+  - id: upper_full_arch_bone_deficit
     match:
-      family: implantology
       extent: full_arch
+      jaw: upper
+      reported_context: reported_bone_deficit
     max_options: 3
     service_priorities:
-      all_on_4: 100
-      all_on_6: 80
+      zygomatic_implants: 120
+      all_on_4: 90
     offer_priorities: {}
 ```
 
 Strategy применяется только после active/selection filtering. Она может менять порядок,
 но не делать услугу допустимой, создавать цену или перебивать явно названный service.
 Для другой клиники меняется client pack, а не общий код.
+
+`default_service_priorities` и `default_offer_priorities` задают обычный порядок клиники.
+В `rules` нужны только редкие context overrides, а не отдельное правило под каждую
+фразу или услугу. Полностью пустой `match` запрещён: baseline уже имеет отдельного owner.
+
+Rules читаются сверху вниз; применяется первое, у которого каждый заданный match-field
+exact совпал с neutral context. Неуказанное поле — wildcard, но неизвестный context не
+удовлетворяет обязательному полю rule. Specific exceptions располагаются выше general.
+Specificity score не вычисляется, несколько rules не merge-ятся.
+
+Selected rule обновляет только перечисленные default priorities. Отсутствующий priority
+равен `0`; большее число идёт раньше, равные значения сохраняют входной порядок. Явно
+названный service/offer pin-ится первым только если он уже входит в prefiltered
+candidates. После сортировки остаются 2–3 позиции по effective max. Strategy никогда не
+добавляет ID из priority map в candidates.
+
+Pure S15 resolver фиксирует эти semantics offline. Он не читает client/session, не
+проверяет применимость и пока не подключён к product path или A9 authority.
 
 ### Session state
 

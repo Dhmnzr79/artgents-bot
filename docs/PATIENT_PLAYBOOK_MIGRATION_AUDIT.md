@@ -299,16 +299,20 @@ playbook нужно отдельно определить expected behavior пр
 а не подогнать старые tests. Эти два несоответствия должны быть учтены в следующем
 strategy-semantics governance TASK.
 
-## Минимальный следующий checkpoint
+## S15 resolution status
 
-Следующий governance TASK должен быть **S15 — deterministic target strategy resolution
-semantics**, всё ещё offline и без product wiring. Он должен на synthetic data определить
-default/context layering, specificity/order, missing priority, stable ties и direct
-service precedence.
+S15 реализовал и независимо проверил недостающие semantics offline: explicit baseline
+priorities, одно первое matching context rule поверх baseline, missing priority `0`,
+stable ties и precedence явно названного уже допустимого candidate. Current specificity
+не переносится, rules не merge-ятся, пустой catch-all rule запрещён.
 
-Только после этого безопасно материализовать demo `clinic_strategy.yaml` из audited
-priorities и шести current offer recommendation signals. Target marketing/CTA migration
-остаётся отдельным этапом.
+Completion verification: resolver/contract `80 passed`, S2/S10 neighbors `38 passed`,
+target data `15 passed`; product wiring отсутствует.
+
+Это закрывает resolver gap, но ещё не материализует demo `clinic_strategy.yaml`, не
+исправляет два current mismatch и не подключает target data к ответам. Следующий data
+checkpoint сможет перенести audited service priorities и шесть current offer
+recommendation signals. Target marketing/CTA migration остаётся отдельным этапом.
 
 До отдельного authority checkpoint current `patient_playbook.yaml` продолжает управлять
 локальным demo; A9 остаётся shadow-only.

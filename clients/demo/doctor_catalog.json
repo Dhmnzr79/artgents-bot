@@ -1,0 +1,85 @@
+{
+  "doctors": {
+    "doctors__doctor__fedorova": {
+      "name": "Фёдорова Ирина Михайловна",
+      "position": "Врач-стоматолог-терапевт",
+      "experience_years": 16,
+      "service_ids": [
+        "caries",
+        "pulpitis",
+        "teeth_treatment",
+        "professional_whitening",
+        "veneers",
+        "zirconia_crowns"
+      ],
+      "profile_ref": "kb:doctors__doctor__fedorova.md#korotko"
+    },
+    "doctors__doctor__grigoriev": {
+      "name": "Григорьев Павел Игоревич",
+      "position": "Врач-пародонтолог",
+      "experience_years": 12,
+      "service_ids": [
+        "periodontitis"
+      ],
+      "profile_ref": "kb:doctors__doctor__grigoriev.md#korotko"
+    },
+    "doctors__doctor__kuznetsov": {
+      "name": "Кузнецов Дмитрий Андреевич",
+      "position": "Врач-стоматолог-ортопед",
+      "experience_years": 19,
+      "service_ids": [
+        "zirconia_crowns",
+        "veneers",
+        "all_on_4",
+        "all_on_6",
+        "temporary_teeth",
+        "classic",
+        "implant_supported_prosthetics",
+        "clasp_dentures",
+        "removable_dentures"
+      ],
+      "profile_ref": "kb:doctors__doctor__kuznetsov.md#korotko"
+    },
+    "doctors__doctor__morozova": {
+      "name": "Морозова Анна Сергеевна",
+      "position": "Врач-ортодонт",
+      "experience_years": 11,
+      "service_ids": [
+        "aligners"
+      ],
+      "profile_ref": "kb:doctors__doctor__morozova.md#korotko"
+    },
+    "doctors__doctor__orlov": {
+      "name": "Орлов Никита Владимирович",
+      "position": "Врач-имплантолог",
+      "experience_years": 16,
+      "service_ids": [
+        "classic",
+        "one_stage",
+        "sinus_lift",
+        "all_on_4",
+        "all_on_6",
+        "temporary_teeth",
+        "implant_supported_prosthetics"
+      ],
+      "profile_ref": "kb:doctors__doctor__orlov.md#korotko"
+    },
+    "doctors__doctor__volkov": {
+      "name": "Волков Александр Сергеевич",
+      "position": "Главный врач, стоматолог-хирург, имплантолог",
+      "experience_years": 13,
+      "service_ids": [
+        "classic",
+        "one_stage",
+        "sinus_lift",
+        "zygomatic_implants",
+        "pterygoid_implants",
+        "all_on_4",
+        "all_on_6",
+        "temporary_teeth",
+        "tooth_extraction"
+      ],
+      "profile_ref": "kb:doctors__doctor__volkov.md#korotko"
+    }
+  }
+}

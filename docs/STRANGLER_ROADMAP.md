@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S13 — structured payment stages реализованы offline и независимо проверены; product path не подключён** |
-| Ближайший рабочий фокус без live | **Следующий шаг S-series определить отдельным governance TASK; target strategy/marketing, product wiring и authority пока не разрешены** |
+| Отдельная S-series без live | **S14 — read-only аудит patient playbook завершён и независимо проверен; выявлены два current test mismatch, product path не менялся** |
+| Ближайший рабочий фокус без live | **S15 может отдельно формализовать offline target strategy resolution semantics; target data, product wiring и authority пока не разрешены** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -85,6 +85,12 @@
 - [x] **S13 — structured payment stages** — target contract расширен optional
   разбивкой оплаты; exact demo stages перенесены только в 12 top offers. Узкие tests и
   независимый completion review пройдены; runtime и authority не подключены.
+- [x] **S14 — patient playbook target migration audit** — действующий current playbook
+  инвентаризирован и разложен по target owners до создания clinic strategy. Completion
+  review `✅`; current tests честно дали `15 passed, 2 failed`: extraction rule проигрывает
+  one-tooth rule по specificity, а fallback test отключает только старую секцию, оставляя
+  main rules активными. Target catalog: `7 passed`. Client data, code, runtime и authority
+  не менялись.
 
 ## Какой roadmap актуален
 

@@ -244,6 +244,13 @@ Service link — простая связь врача с услугой. В targ
 pricebook и doctor catalog, а не через независимое угадывание темы. Это future common
 context law; его runtime wiring и authority требуют отдельного checkpoint.
 
+Offline boundary S10 материализует этот общий data context только из уже проверенных
+target-моделей: exact service record с `content_ref`, все authored offers той же услуги
+и всех связанных doctors с обязательными именем, должностью, стажем и `profile_ref`.
+Он сохраняет authored order и флаги, но не фильтрует `active`, не применяет eligibility,
+не ранжирует врачей, не читает source text и не формирует ответ. Подключение builder к
+dialog focus/product path и любая authority остаются отдельным checkpoint.
+
 ### Structured scenarios
 
 Target planner output содержит список `marketing_scenarios` из 0–2 стандартных значений:

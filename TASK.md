@@ -1,124 +1,86 @@
-# TASK — S18 Target Service Consultation Value Contract
+# TASK — S19 Demo Implantation Consultation Values
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `e03fb73 docs: audit target marketing migration S17`
+**Baseline:** `07613c5 feat: validate service consultation values S18`
 
-**Серия / checkpoint:** `S18` — минимальный offline contract для одной необязательной
-подводки к консультации в source Markdown услуги.
+**Серия / checkpoint:** `S19` — минимальное demo-наполнение трёх implantation service
+Markdown через уже проверенный S18 `consultation_value` contract.
 
-**Режим:** governance + isolated models/parser/validators + synthetic unit tests +
-architecture docs only. Никаких demo content changes, session/runtime wiring, ответов,
-routes/UI, live/LLM или product authority.
+**Режим:** governance + three source-data fields + narrow real-data acceptance tests.
+Никаких schema/code/runtime/session/answers/routes/UI/live/LLM или product authority.
 
 ## Owner direction
 
-21 июля 2026 владелец зафиксировал минимальную продуктовую схему:
+21 июля 2026 владелец разрешил Исполнителю самостоятельно подготовить 2–3 небольшие
+продающие подводки только для demo-услуг имплантации. Это тестовое demo-наполнение, а не
+универсальные тексты для реальных клиник. Для будущих клиентов содержание отдельно
+редактируется и утверждается по их базе.
 
-1. содержательная MD-база услуг должна быть естественно более продающей и описывать
-   реальные особенности клиники, а не оставаться медицинской энциклопедией;
-2. отдельная сложная карточка `service_accents`, priority facts и редактируемые лимиты
-   не нужны;
-3. у нужного service Markdown допускается только одно специальное необязательное поле
-   `consultation_value` в YAML frontmatter того же файла;
-4. это source-owned смысл пользы консультации, а не готовая реплика и не CTA-кнопка;
-5. composer в будущем может свободно связать слова, но не менять смысл/силу source;
-6. автоматическая подводка используется только в заключении подходящего
-   содержательного service-ответа;
-7. она автоматически показывается максимум один раз на exact Markdown document в
-   пределах `client_id + session_id`, независимо от числа H3/chunks/follow-up clicks;
-8. прямой вопрос о консультации может быть отвечен повторно как content question;
-9. частотность является universal runtime law и не редактируется в каждом client pack.
+Владелец не требует наполнять все услуги. S19 выбирает три репрезентативных документа:
 
-Demo не имеет live-клиентов. S18 не строит compatibility adapter и не подключает
-contract к текущему или будущему product path.
+- классическая имплантация;
+- одномоментная имплантация;
+- All-on-4.
 
-## Архитектурное решение
+## Основание
 
-### Source ownership
+- S18 зафиксировал optional `consultation_value` в YAML frontmatter того же service MD;
+- поле не входит в общий FullContext body и разрешается только exact lookup по
+  service/option `content_ref`;
+- automatic cadence/placement остаются unwired: максимум один раз на document/session,
+  один marketing slot + один amplifier slot, direct question вне automatic slots;
+- current demo `marketing.yaml` уже содержит consult-reason semantics для этих трёх
+  услуг, а их service MD подтверждают соответствующие diagnostic/selection facts;
+- S19 публикует три owner-approved demo source values и не переносит остальные legacy
+  marketing strings.
 
-`consultation_value` хранится в YAML frontmatter **того же** Markdown, на который
-target service/option ссылается через `content_ref`:
+## Exact approved data
 
-```md
----
-doc_id: implantation__service__example
-doc_type: service
-topic: implantation
-subtopic: example
-consultation_value: >
-  Врач оценивает исходные данные и определяет, подходит ли пациенту этот метод.
----
+В каждый файл добавляется ровно один YAML scalar `consultation_value` после `subtopic` и
+до `aliases`. Предпочтительная форма authoring — folded scalar `>-`.
 
-## Пример услуги
+### `implantation__service__classic.md`
+
+```yaml
+consultation_value: >-
+  На консультации врач оценит состояние кости и соседних зубов, сравнит подходящие системы имплантов и составит поэтапный план восстановления.
 ```
 
-Отдельный YAML/JSON с копией текста, H3 `#consultation-value`, `service_accents`,
-готовые CTA/реплики и per-service cadence settings запрещены.
+### `implantation__service__one_stage.md`
 
-### FullContext boundary
+```yaml
+consultation_value: >-
+  На консультации врач проверит, можно ли удалить зуб и установить имплант в один день именно в вашей ситуации.
+```
 
-- Основное тело всех разрешённых MD может оставаться cached FullContext background.
-- Frontmatter не входит в общий текст FullContext.
-- `consultation_value` разрешается только прямым exact lookup после выбора
-  service/option `content_ref`; это не vector/semantic retrieval и не поиск чанка.
-- В будущий answer material поле передаётся с ролью `consultation_close`; значения
-  других документов не передаются как selectable consultation material.
-- S18 только материализует offline source contract и не меняет существующий
-  `core/knowledge_base.py` или composer.
+### `implantation__service__all_on_4.md`
 
-### Universal cadence law
+```yaml
+consultation_value: >-
+  На консультации врач оценит КТ и поможет понять, подходит ли протокол All-on-4 или лучше рассмотреть другой вариант восстановления.
+```
 
-Будущий session state хранит exact document refs, реально использованные как
-автоматическая подводка, под именем `shown_consultation_value_refs`.
-
-1. Автопоказ разрешён только при exact selected `content_ref` и существующем значении.
-2. Один document ref автоматически используется максимум один раз в текущем
-   `client_id + session_id`.
-3. Ref отмечается только после фактического включения подводки в ответ.
-4. Переход по другому H3/chunk/follow-up того же документа не сбрасывает suppression.
-5. Новый session/reset очищает suppression; TTL не вводится.
-6. Прямой вопрос о консультации обходит только repeat suppression и остаётся обязан
-   иметь exact selected `content_ref`, соблюдать source fidelity, применимость source и
-   все safety boundaries. Такой ответ является основным content, а не автоматическим
-   marketing fact/amplifier.
-7. Manual-contact, spam/off-topic, pure clarify, active lead-flow и явный отказ от
-   консультации/контакта не получают автоматическую подводку.
-8. `consultation_value` — текстовый selling accent, не новая CTA и не secondary UI.
-   При автоматическом включении он занимает ровно один из трёх marketing-fact slots и
-   ровно один из двух amplifier slots.
-9. Если соответствующий marketing или amplifier limit уже заполнен, автоматическая
-   подводка пропускается и её ref не записывается как показанный.
-
-S18 не реализует session state, selection, placement или cadence runtime. Эти правила
-фиксируются как acceptance для отдельного будущего authority/runtime checkpoint.
+Эти значения являются source-backed demo meanings. Они не являются обязательным
+дословным output: future composer может связать слова свободно, не меняя смысл и силу.
 
 ## Цель
 
-Создать узкий offline contract, который:
-
-1. описывает одну immutable запись source metadata: exact relative `content_ref` и
-   nonblank `consultation_value`;
-2. детерминированно читает только explicit Markdown root;
-3. находит optional `consultation_value` только в YAML frontmatter;
-4. fail-closed отклоняет malformed frontmatter и неверный тип/пустое значение;
-5. fail-closed отклоняет поле у документа, чей `doc_type` не `service`;
-6. возвращает записи в стабильном lexical order, без cache, writes и client resolution;
-7. отдельно валидирует, что каждый найденный `content_ref` действительно принадлежит
-   хотя бы одному target service или option `content_ref` из переданного каталога;
-8. не меняет S1 `TargetService`, target pack loader или runtime.
+1. Добавить exact три поля выше в same-MD frontmatter.
+2. Не менять MD body, H2/H3, aliases, `suggest_h3`, CTA или situation metadata.
+3. Доказать через real-data test, что S18 reader находит ровно эти три значения.
+4. Доказать exact cross-ref к target service catalog для `classic`, `one_stage`,
+   `all_on_4`.
+5. Доказать, что значения не находятся в MD body и не создают H3/follow-up.
+6. Не подключать values к product answer/session/runtime.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `contracts/service_consultation.py` — new frozen metadata record + pure cross-ref
-  validation error/function;
-- `core/service_consultation_source.py` — new explicit-root offline frontmatter reader;
-- `tests/test_service_consultation_source.py` — new synthetic contract/parser tests;
-- `docs/PRICE_SERVICE_ARCHITECTURE.md` — same-MD ownership and exact `content_ref` link;
-- `docs/MARKETING_SCENARIO_ARCHITECTURE.md` — consultation-close role, global limit and
-  universal cadence law;
-- `docs/MARKETING_QUESTION_TECH.md` — target integration boundary/status only;
+- `clients/demo/md/implantation__service__classic.md`;
+- `clients/demo/md/implantation__service__one_stage.md`;
+- `clients/demo/md/implantation__service__all_on_4.md`;
+- `tests/test_demo_service_consultation_values.py` — new read-only real-data acceptance;
 - `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion
   checker `✅`.
 
@@ -126,110 +88,76 @@ S18 не реализует session state, selection, placement или cadence r
 
 ## Protected / вне scope
 
-- весь `clients/**`, включая demo MD, current/target marketing, pricebook, playbook,
-  doctors, tone/UI и `target_response/**`;
-- перенос или редактирование 24 legacy marketing strings;
-- добавление реальных `consultation_value` в demo;
-- изменение `contracts/response_schema.py`, frozen S1 models или S2/S3/S4 loaders;
-- изменение current FullContext corpus/composer/prompt/cache;
-- TurnFrame/ResponseSpec/evidence assembly/session state/selector/cadence implementation;
-- ответы, routes, API/app/UI/config, CTA, lead-flow и authority;
-- новый route/classifier/retriever/embed/vector/search layer;
-- готовые продающие реплики, automatic copy generation и semantic rewriting;
+- любые другие `clients/demo/md/*.md`, включая All-on-6 и advanced protocols;
+- body/content/H2/H3/aliases/suggest_h3/CTA/situation changes выбранных трёх MD;
+- current `clients/demo/marketing.yaml`, pricebook, playbook, doctors, tone/UI;
+- весь `clients/demo/target_response/**`;
+- перенос `clinic_proof`, promo, CTA или остальных `consult_reasons`;
+- `contracts/**`, `core/**`, orchestration, routes/API/app/UI/config;
+- изменение S18 schema/parser/cross-ref;
+- session state, cadence, selection, placement, composer prompt и FullContext assembly;
 - adapters, dual-read, fallback, feature flags и product wiring;
 - protected golden/eval fixtures;
 - A9 design/raw/frozen/harness/evidence и live re-audit;
 - live/LLM, merge, `main`, другие ветки и изменение product authority.
 
-## Exact contract
+## Frozen body preservation
 
-### `ServiceConsultationValue`
+После split outer frontmatter delimiters через `text.split("---", 2)[2]` exact SHA-256
+body обязан остаться:
 
-Frozen strict model:
+- classic: `cbd72f3339cfb91456a7ef19a5a87ea2b59214f732650253b454ca42658b6cb1`;
+- one_stage: `478ecab092824ef29b82433c0ee84a4bb59568a67a69290ddc9f19969bc09800`;
+- all_on_4: `efa435bafef8f5400a5b01f93ea5109b3d538ee0f64951d60edeb4107f43ec27`.
 
-- `content_ref`: nonblank exact relative POSIX Markdown path, без absolute path,
-  backslash, `.`/`..`, query/fragment и без расширения, отличного от lowercase `.md`;
-- `value`: strict string, который после удаления только внешних пробелов/переводов
-  строк остаётся непустым; внутренний source text не переписывается;
-- extra fields forbidden.
-
-Значение хранится как source text. S18 не пытается оценивать медицинскую истинность,
-тон, стиль или формировать из него готовый ответ.
-
-### Offline source reader
-
-`build_service_consultation_values(md_root: Path)`:
-
-- принимает только existing directory `pathlib.Path`;
-- рекурсивно читает только lowercase `*.md` в lexical relative-path order;
-- читает UTF-8 и никогда не пишет;
-- документ без frontmatter или без `consultation_value` игнорируется;
-- при наличии поля требует YAML mapping, exact `doc_type: service` и strict string value;
-- malformed YAML, duplicate YAML keys, invalid UTF-8 и invalid record получают typed
-  fail-closed error с code и exact relative path;
-- возвращает immutable tuple `ServiceConsultationValue` в lexical `content_ref` order;
-- не импортирует client resolver, current loaders, runtime, session или LLM.
-
-### Pure catalog cross-reference
-
-`validate_service_consultation_refs(records, services)`:
-
-- принимает уже validated records и `dict[str, TargetService]`;
-- собирает exact non-null `content_ref` из services и их options;
-- один ref может использоваться несколькими service/options;
-- все orphan consultation refs возвращаются одним deterministic sorted typed error;
-- ничего не фильтрует по `active`, не выбирает услугу и не читает source text;
-- не требует, чтобы каждый service имел `consultation_value`.
+Тест не resnapshot-ит эти hashes после реализации. Любое расхождение — stop/review.
 
 ## Acceptance tests
 
-`tests/test_service_consultation_source.py` обязан доказать:
+`tests/test_demo_service_consultation_values.py` обязан доказать:
 
-1. optional same-MD frontmatter field читается из root/nested service docs и возвращается
-   в exact lexical order;
-2. MD body, H2/H3 и `suggest_h3` не создают consultation values;
-3. документы без поля/frontmatter игнорируются;
-4. non-service document с полем fail-closed;
-5. empty/whitespace/non-string value, malformed YAML и duplicate key fail-closed с
-   deterministic code/path/cause; внешние пробелы нормализуются предсказуемо;
-6. invalid root/type, invalid UTF-8 и invalid content ref fail-closed;
-7. model strict/frozen/extra-forbid и path invariants;
-8. stateless repeated calls, nested lexical order и no writes;
-9. cross-ref принимает service/option refs, shared refs и optional absence;
-10. cross-ref одним sorted error возвращает все orphan refs;
-11. module import/AST boundary не содержит client/runtime/session/LLM/network/writes;
-12. нет skip/xfail, live/LLM и изменений client data.
+1. S18 explicit-root reader на real `clients/demo/md` возвращает ровно три records;
+2. exact `content_ref → value` равны approved data выше;
+3. каждый документ сохраняет exact `doc_id`, `doc_type: service`, `topic: implantation`,
+   subtopic и существующие `suggest_h3`/CTA/situation fields;
+4. exact body hashes выше не изменились;
+5. `consultation_value` отсутствует в body, а `consultation-value` отсутствует среди
+   H2/H3 anchors и `suggest_h3`;
+6. target `service_catalog.json` содержит `classic`, `one_stage`, `all_on_4` с exact
+   соответствующими `content_ref`;
+7. real records проходят S18 `validate_service_consultation_refs` against validated
+   target services;
+8. остальные demo service MD не получили field;
+9. no imports/wiring from product runtime, no writes, skip/xfail, live or LLM.
 
-Tests не кодируют demo `consultation_value`, готовую формулировку ответа или runtime
-cadence implementation.
+Test может читать real demo/target data, S18 contract/reader и frozen file metadata. Он
+не вызывает ответы, session, resolver, composer или LLM.
 
 ## Verification
 
-До contract/docs edits:
+До client-data/test edits:
 
 1. governance TASK коммитится отдельно;
-2. independent read-only checker читает TASK, target/current architecture docs,
-   service schema, KB index, FullContext assembly, checklist/guardrails;
-3. checker подтверждает same-MD/frontmatter ownership, FullContext compatibility,
-   once-per-document/session product law, minimality и no-runtime/no-authority boundary;
-4. при `❌`/`❓` TASK исправляется и повторно проверяется до implementation.
+2. independent checker читает exact TASK, три service MD, legacy consult reasons, S18
+   contract/tests, service catalog, architecture docs, checklist/guardrails;
+3. checker подтверждает factual support, bounded demo-only scope, exact texts/body
+   preservation и no-runtime/no-authority boundary;
+4. при `❌`/`❓` TASK исправляется до data implementation.
 
 После реализации:
 
-1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_service_consultation_source.py -q --basetemp=.pytest_tmp_s18_contract`;
-2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_response_schema_kb_index.py tests/test_response_schema_contract.py -q --basetemp=.pytest_tmp_s18_neighbors`;
-3. `git diff --check`, exact allowlist и отсутствие skip/xfail;
+1. `.venv/codex312/Scripts/python.exe -m pytest tests/test_demo_service_consultation_values.py -q --basetemp=.pytest_tmp_s19_data`;
+2. `.venv/codex312/Scripts/python.exe -m pytest tests/test_service_consultation_source.py tests/test_knowledge_base.py -q --basetemp=.pytest_tmp_s19_neighbors`;
+3. `git diff --check`, exact allowlist, exact body hashes и отсутствие skip/xfail;
 4. independent checker повторяет review и команды;
 5. no full pytest, no live/LLM.
 
 ## Definition of Done
 
-- owner-approved minimal same-MD `consultation_value` law записан без
-  `service_accents`/priority/per-client cadence complexity;
-- field не попадает в общий FullContext body и не требует отдельного документа;
-- deterministic explicit-root source contract и cross-ref independently verified;
-- once-per-document-per-session law, direct-question override и safety suppression
-  зафиксированы, но не подключены;
-- demo/client data, current runtime, target product path, A9 и authority не изменены;
-- roadmap S18 независимо проверен;
+- ровно три owner-approved demo consultation values опубликованы в same-MD frontmatter;
+- ни одно тело MD/H3/follow-up/CTA не изменено;
+- S18 reader/cross-ref проходят real demo data;
+- FullContext body не получает consultation values;
+- no client-wide rollout, runtime/session/answer/A9/authority changes;
+- roadmap S19 independently reviewed;
 - governance и completion commits/push только `codex/stage-a`, tree clean/synced.

@@ -18,6 +18,18 @@
       "куратор лечения"
     ]
   },
+  "payment_stages": [
+    {
+      "label": "Этап 1 — хирургия и временный протез (60%)",
+      "amount": 316800,
+      "currency": "RUB"
+    },
+    {
+      "label": "Этап 2 — постоянный протез (40%)",
+      "amount": 211200,
+      "currency": "RUB"
+    }
+  ],
   "fact_refs": [
     "free_implant_consult",
     "implant_warranty",
@@ -26,6 +38,11 @@
     "tax_deduction"
   ],
   "followups": [
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    },
     {
       "id": "includes",
       "label": "Что входит",

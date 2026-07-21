@@ -148,6 +148,7 @@ OPTION_IDS = {
     ("sinus_lift", "closed"): "closed",
     ("sinus_lift", "open"): "open",
 }
+PAYMENT_STAGE_SERVICES = {"all_on_4", "all_on_6", "classic", "one_stage"}
 
 
 def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -257,9 +258,13 @@ def test_all_15_simple_and_16_complex_offers_preserve_source_prices() -> None:
             []
             if service_id == "pulpitis"
             else [
-                {"id": "includes", "label": item["label"], "action": item["action"]}
+                {
+                    "id": item["aspect"],
+                    "label": item["label"],
+                    "action": item["action"],
+                }
                 for item in source.get("followups", [])
-                if item.get("aspect") == "includes"
+                if item.get("aspect") in {"stages", "includes"}
             ]
         )
         if source["price_model"] == "simple":
@@ -310,6 +315,66 @@ def test_all_15_simple_and_16_complex_offers_preserve_source_prices() -> None:
     }
 
 
+def test_exact_12_top_offers_preserve_authored_payment_stages() -> None:
+    target = {offer["offer_id"]: offer for offer in _target_offer_records()}
+    current = _current_price_records()
+    expected_offer_ids = {
+        variant["offer_id"]
+        for service_id in PAYMENT_STAGE_SERVICES
+        for variant in current[service_id]["variants"]
+    }
+    materialized_offer_ids = {
+        offer_id for offer_id, offer in target.items() if "payment_stages" in offer
+    }
+
+    assert len(expected_offer_ids) == 12
+    assert materialized_offer_ids == expected_offer_ids
+
+    for service_id in PAYMENT_STAGE_SERVICES:
+        source = current[service_id]
+        expected_followups = [
+            {
+                "id": item["aspect"],
+                "label": item["label"],
+                "action": item["action"],
+            }
+            for item in source["followups"]
+            if item["aspect"] in {"stages", "includes"}
+        ]
+        assert [followup["id"] for followup in expected_followups] == [
+            "stages",
+            "includes",
+        ]
+
+        for variant in source["variants"]:
+            offer = target[variant["offer_id"]]
+            assert offer["payment_stages"] == [
+                {
+                    "label": stage["name"],
+                    "amount": stage["amount"],
+                    "currency": variant["currency"],
+                }
+                for stage in variant["payment_stages"]
+            ]
+            assert len(offer["payment_stages"]) == 2
+            assert sum(stage["amount"] for stage in offer["payment_stages"]) == offer[
+                "price"
+            ]["amount"]
+            assert offer["followups"] == expected_followups
+
+    offers_without_stages = set(target) - materialized_offer_ids
+    assert len(offers_without_stages) == 19
+    assert {
+        "sinus_lift.one_site.closed",
+        "sinus_lift.one_site.open",
+        "pulpitis.default",
+    } <= offers_without_stages
+    for offer_id in offers_without_stages:
+        offer = target[offer_id]
+        assert "payment_stages" not in offer
+        assert all(followup["id"] != "stages" for followup in offer["followups"])
+
+
 def test_owner_units_labels_and_followups_have_no_legacy_dead_actions() -> None:
     offers = _target_offer_records()
 
@@ -318,10 +383,13 @@ def test_owner_units_labels_and_followups_have_no_legacy_dead_actions() -> None:
         unit, label = UNIT_LABELS[offer["service_id"]]
         assert offer["price"]["billing_unit"] == unit
         assert offer["package"]["label"] == label
-        assert all(followup["id"] == "includes" for followup in offer["followups"])
+        assert all(
+            followup["id"] in {"stages", "includes"}
+            for followup in offer["followups"]
+        )
         assert all(followup["action"] == "price_aspect" for followup in offer["followups"])
         assert not (
-            {"recommended", "payment_stages", "excludes", "note", "intro_text"}
+            {"recommended", "excludes", "note", "intro_text"}
             & set(offer)
         )
 

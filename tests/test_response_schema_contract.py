@@ -22,6 +22,7 @@ from contracts.response_schema import (
     TargetNoPublicPrice,
     TargetOffer,
     TargetOptionSelection,
+    TargetPaymentStage,
     TargetRangePrice,
     TargetService,
     TargetStrategyMatch,
@@ -291,6 +292,102 @@ def test_price_mode_shapes_reject_foreign_or_missing_fields(
 def test_money_is_strict_nonnegative_integer(amount: object, token: str) -> None:
     payload = {"mode": "fixed", "amount": amount, "currency": "RUB", "billing_unit": "unit"}
     assert token in _error_text(TargetFixedPrice, payload)
+
+
+def test_offer_preserves_authored_payment_stage_order_and_values() -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["payment_stages"] = [
+        {"label": "Surgery", "amount": 70_000, "currency": "RUB"},
+        {"label": "Prosthetics", "amount": 50_000, "currency": "RUB"},
+    ]
+    payload["followups"].insert(
+        0, {"id": "stages", "label": "Payment stages", "action": "price_aspect"}
+    )
+
+    offer = TargetOffer.model_validate(payload)
+
+    assert [stage.model_dump() for stage in offer.payment_stages or []] == [
+        {"label": "Surgery", "amount": 70_000, "currency": "RUB"},
+        {"label": "Prosthetics", "amount": 50_000, "currency": "RUB"},
+    ]
+
+
+def test_missing_and_null_payment_stages_mean_no_authored_breakdown() -> None:
+    missing_payload = _valid_bundle_payload()["offers"][0]
+    missing_offer = TargetOffer.model_validate(missing_payload)
+    assert missing_offer.payment_stages is None
+    assert "payment_stages" not in missing_offer.model_dump(exclude_none=True)
+
+    null_payload = _valid_bundle_payload()["offers"][0]
+    null_payload["payment_stages"] = None
+    null_offer = TargetOffer.model_validate(null_payload)
+    assert null_offer.payment_stages is None
+    assert "payment_stages" not in null_offer.model_dump(exclude_none=True)
+
+
+def test_single_payment_stage_without_followup_is_valid() -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["payment_stages"] = [
+        {"label": "Deposit", "amount": 10_000, "currency": "RUB"}
+    ]
+
+    offer = TargetOffer.model_validate(payload)
+
+    assert len(offer.payment_stages or []) == 1
+    assert [followup.id for followup in offer.followups] == ["includes"]
+
+
+def test_empty_and_duplicate_payment_stages_are_rejected() -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["payment_stages"] = []
+    assert "offer_payment_stages_empty" in _error_text(TargetOffer, payload)
+
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["payment_stages"] = [
+        {"label": "Same stage", "amount": 10, "currency": "RUB"},
+        {"label": "Same stage", "amount": 20, "currency": "RUB"},
+    ]
+    assert "offer_payment_stage_label_duplicate" in _error_text(TargetOffer, payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "token"),
+    [
+        ("label", "   ", "string_must_not_be_blank"),
+        ("currency", "   ", "string_must_not_be_blank"),
+        ("amount", True, "int_type"),
+        ("amount", 1.5, "int_type"),
+        ("amount", "10", "int_type"),
+        ("amount", -1, "greater_than_equal"),
+    ],
+)
+def test_payment_stage_fields_are_strict(field: str, value: object, token: str) -> None:
+    stage = {"label": "Stage", "amount": 10, "currency": "RUB"}
+    stage[field] = value
+    assert token in _error_text(TargetPaymentStage, stage)
+
+
+def test_stages_followup_requires_authored_payment_stages() -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["followups"].insert(
+        0, {"id": "stages", "label": "Payment stages", "action": "price_aspect"}
+    )
+    assert "offer_stages_followup_requires_payment_stages" in _error_text(
+        TargetOffer, payload
+    )
+
+
+def test_payment_stages_need_no_followup_or_sum_equality() -> None:
+    payload = _valid_bundle_payload()["offers"][0]
+    payload["payment_stages"] = [
+        {"label": "Partial payment", "amount": 1, "currency": "RUB"}
+    ]
+
+    offer = TargetOffer.model_validate(payload)
+
+    assert offer.price.amount == 120_000
+    assert sum(stage.amount for stage in offer.payment_stages or []) == 1
+    assert [followup.id for followup in offer.followups] == ["includes"]
 
 
 def test_range_order_and_no_public_numeric_fields_are_strict() -> None:

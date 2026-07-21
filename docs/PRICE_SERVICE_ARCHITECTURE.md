@@ -211,7 +211,7 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 |---|---|---|
 | `service_catalog.json` | semantic identity услуги и option, aliases, family/roles, active, KB refs, coarse selection | деньги, коммерческий порядок, CTA, рекламный текст |
 | `brand_catalog.json` | canonical brand name, country, aliases | цену, применимость услуги, медицинские преимущества |
-| `pricebook/services/*.json` | offers: service/option/brand, price state, unit, package, fact refs, price follow-ups | применимость услуги и приоритет клиники |
+| `pricebook/services/*.json` | offers: service/option/brand, price state, unit, package, optional payment stages, fact refs, price follow-ups | применимость услуги и приоритет клиники |
 | `pricebook/facts.json` | точный commercial fact, даты, eligibility, detail ref, `incompatible_with` | scenario order и CTA-copy |
 | `clinic_strategy.yaml` | priority уже допустимых services/offers, max 2–3, редкие context overrides | active, selection, деньги, fact text, CTA |
 | `marketing.yaml` | limits, scenario pools, ordered refs, cadence, CTA-key selection | дубли source text, dates и incompatibility |
@@ -331,8 +331,13 @@ option внутри своего `service_id`. Реальный бренд optio
     "label": "за один зуб под ключ",
     "includes": ["implant", "abutment", "crown"]
   },
+  "payment_stages": [
+    {"label": "Хирургический этап", "amount": 70000, "currency": "RUB"},
+    {"label": "Ортопедический этап", "amount": 50000, "currency": "RUB"}
+  ],
   "fact_refs": ["consultation_offer", "installment_offer"],
   "followups": [
+    {"id": "stages", "label": "Оплата по этапам", "action": "price_aspect"},
     {"id": "includes", "label": "Что входит", "action": "price_aspect"}
   ]
 }
@@ -349,6 +354,18 @@ marketing facts; кнопками становятся только `followups`.
 `both_jaws`, `procedure`, `unit`, `course` или отдельно утверждённая schema extension).
 `both_jaws` никогда не выводится из `jaw × 2`. Видимая формулировка единицы и состава
 берётся из offer/package, а не генерируется по имени ID.
+
+`payment_stages` — optional source-owned разбивка оплаты. Отсутствующий key или `null`
+означает, что утверждённой разбивки нет; один или несколько stages допустимы. Каждый
+stage хранит exact `label`, `amount` и `currency`, не наследуя валюту скрыто. Explicit
+empty list запрещён. Follow-up `stages` допустим только при non-empty data, но сами
+stages могут храниться без отдельной кнопки.
+
+Schema не требует равенства суммы stages и total/min/range, не вычисляет остаток и не
+парсит проценты из label. Такое равенство может отдельно проверяться как факт конкретного
+client pack. Отсутствие stages не даёт боту права делить total самостоятельно. Один
+stage разрешён общей схемой; решение не переносить single-stage demo sinus lift связано
+только с его `from` price и отсутствием authored stages-followup.
 
 ### Commercial fact
 

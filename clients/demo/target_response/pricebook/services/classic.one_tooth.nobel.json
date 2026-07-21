@@ -17,6 +17,18 @@
       "контрольные осмотры и куратор"
     ]
   },
+  "payment_stages": [
+    {
+      "label": "Хирургический этап",
+      "amount": 70200,
+      "currency": "RUB"
+    },
+    {
+      "label": "Ортопедический этап (коронка)",
+      "amount": 31000,
+      "currency": "RUB"
+    }
+  ],
   "fact_refs": [
     "free_implant_consult",
     "implant_warranty",
@@ -24,6 +36,11 @@
     "implant_same_day_discount"
   ],
   "followups": [
+    {
+      "id": "stages",
+      "label": "Оплата по этапам",
+      "action": "price_aspect"
+    },
     {
       "id": "includes",
       "label": "Что входит",

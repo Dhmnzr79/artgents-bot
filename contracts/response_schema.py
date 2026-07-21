@@ -265,6 +265,12 @@ class TargetPricePackage(TargetSchemaModel):
         return value
 
 
+class TargetPaymentStage(TargetSchemaModel):
+    label: NonBlankStr
+    amount: MoneyAmount
+    currency: NonBlankStr
+
+
 class TargetPriceFollowup(TargetSchemaModel):
     id: NonBlankStr
     label: NonBlankStr
@@ -279,8 +285,22 @@ class TargetOffer(TargetSchemaModel):
     active: bool = True
     price: TargetPrice
     package: TargetPricePackage
+    payment_stages: list[TargetPaymentStage] | None = None
     fact_refs: list[NonBlankStr] = Field(default_factory=list)
     followups: list[TargetPriceFollowup] = Field(default_factory=list)
+
+    @field_validator("payment_stages", mode="after")
+    @classmethod
+    def _payment_stages_are_non_empty_and_unique(
+        cls, value: list[TargetPaymentStage] | None
+    ) -> list[TargetPaymentStage] | None:
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("offer_payment_stages_empty")
+        if _duplicates([stage.label for stage in value]):
+            raise ValueError("offer_payment_stage_label_duplicate")
+        return value
 
     @model_validator(mode="after")
     def _unique_refs(self) -> "TargetOffer":
@@ -289,6 +309,8 @@ class TargetOffer(TargetSchemaModel):
         followup_ids = [followup.id for followup in self.followups]
         if _duplicates(followup_ids):
             raise ValueError("offer_followup_id_duplicate")
+        if "stages" in followup_ids and not self.payment_stages:
+            raise ValueError("offer_stages_followup_requires_payment_stages")
         return self
 
 
@@ -473,6 +495,7 @@ S1_MODEL_TYPES = (
     TargetRangePrice,
     TargetNoPublicPrice,
     TargetPricePackage,
+    TargetPaymentStage,
     TargetPriceFollowup,
     TargetOffer,
     TargetCommercialFact,

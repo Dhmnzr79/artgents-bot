@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S20 governance — exact demo target marketing policy зафиксирована; data/code ждут независимый checker-review** |
-| Ближайший рабочий фокус без live | **S20 — offline materialization marketing policy и проверка fact/KB/doctor/CTA refs** |
+| Отдельная S-series без live | **S20 — demo target marketing policy материализована и независимо проверена; selector/session/runtime и product path не подключены** |
+| Ближайший рабочий фокус без live | **Отдельно определить следующий offline checkpoint; S20 не разрешает runtime/authority** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -116,10 +116,11 @@
   опубликованы только в frontmatter classic/one-stage/All-on-4; тела MD и FullContext
   сохранены. Independent completion review `✅`: real data `5 passed`, neighbors
   `40 passed`; skip/xfail нет. Session/runtime, composer и authority не подключены.
-- [ ] **S20 — demo target marketing policy materialization** — exact limits, initial
-  commercial block, пять source-backed scenario pools и semantic CTA map зафиксированы
-  governance. До independent checker `✅` target data/contract не создаются; selector,
-  session/runtime, ответы и authority остаются вне scope.
+- [x] **S20 — demo target marketing policy materialization** — exact limits, initial
+  commercial block, пять source-backed scenario pools и semantic CTA map созданы в
+  offline target pack; fact/KB/doctor/CTA refs и полный real bundle независимо
+  проверены. Completion review `✅`: policy `24 passed`, frozen neighbors `148 passed`,
+  skip/xfail нет. Selector, session/runtime, ответы и authority не подключены.
 
 ## Какой roadmap актуален
 

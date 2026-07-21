@@ -1,7 +1,8 @@
 # Архитектура маркетинговых сценариев
 
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
-offline в S1, но demo target policy, selector/session runtime и authority отсутствуют.
+offline в S1, demo target policy материализована в S20. Selector/session runtime и
+authority отсутствуют.
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
@@ -9,7 +10,9 @@ offline в S1, но demo target policy, selector/session runtime и authority о
 current-runtime promo-ограничениями из `MARKETING_EDITING_GUIDE.md` и `PRICEBOOK_V2.md`.
 Он не утверждает, что current runtime уже соответствует target.
 
-Этот контракт описывает, как будущий бот-продавец собирает ответ из утверждённой базы, коммерческих фактов, сценарных усилителей и CTA. Он не задаёт готовые тексты ответов и не наполняет demo реальными pool усилителей.
+Этот контракт описывает, как будущий бот-продавец собирает ответ из утверждённой базы,
+коммерческих фактов, сценарных усилителей и CTA. Он не задаёт готовые тексты ответов.
+S20 наполняет demo только ordered source refs/contexts и не подключает их к ответам.
 
 ## Главные законы
 
@@ -331,8 +334,9 @@ pure clarify, после явного отказа или внутри акти�
 ## Будущий runtime checkpoint
 
 Schema governance зафиксирован этим документом и
-[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), но ничего ещё не
-подключено к product path. Перед реализацией нужны отдельные code TASK и checker-review.
+[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), а demo policy
+материализована offline в S20. Ничего ещё не подключено к product path. Перед runtime
+реализацией нужны отдельные code TASK и checker-review.
 Они должны доказать:
 
 - schema и source-ref validation;

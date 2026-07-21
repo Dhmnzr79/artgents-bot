@@ -3,8 +3,8 @@
 ## Итог простыми словами
 
 Маркетинговую архитектуру уже обсуждали и формализовали. Модели новой схемы тоже есть.
-Но реального `clients/demo/target_response/marketing.yaml` пока нет, поэтому target pack
-ещё не загружается целиком и ничем не управляет.
+На момент S17 реального `clients/demo/target_response/marketing.yaml` ещё не было,
+поэтому target pack не загружался целиком и ничем не управлял.
 
 Current `clients/demo/marketing.yaml` нельзя просто скопировать. В нём одновременно
 смешаны готовые продающие фразы, CTA, применимость акций и старые route/aspect gates.
@@ -13,6 +13,29 @@ marketing policy, tone/UI и общим runtime law.
 
 S17 ничего не переносит и не подключает. Он показывает точный состав источников и
 решения, которые нужны до target data.
+
+## S20 — решения и текущий статус
+
+S20 закрыл найденные здесь data/ownership gaps и материализовал offline target policy:
+
+- exact universal limits `3/2/2`;
+- initial `service` block из четырёх ordered `fact:` refs, чья применимость остаётся
+  только в commercial facts;
+- пять утверждённых source-backed scenario pools из candidate map S17;
+- semantic CTA map `service → plan`, `price → price`, `doctors → doctor`,
+  `default → callback`;
+- отдельная pure проверка всех CTA values против exact keys из tone config.
+
+`ct_consultation` не переносится в target и не получает неявного mapping; current
+legacy playbook остаётся неизменным до отдельного retirement. `benefits`,
+`what_included` и legacy alias `teeth_whitening` не становятся target marketing keys.
+Три consult-reason смысла опубликованы в S19 как same-MD `consultation_value`;
+остальные 21 free strings не копируются и уходят вместе с current
+combined-архитектурой, если не пройдут отдельную source publication.
+
+Real target pack теперь загружается offline. Selector, session cadence, response/UI
+wiring, marketing authority и A9 authority по-прежнему отсутствуют. Поэтому появление
+policy не меняет ни одного ответа demo.
 
 ## Что уже существует
 
@@ -24,7 +47,7 @@ S17 ничего не переносит и не подключает. Он по
 | External `kb:`/`doctor:` integrity | Реализована S3/S4/S6 |
 | Шесть commercial facts demo | Materialized в S12 |
 | Clinic strategy | Materialized в S16 |
-| Demo target marketing policy | Отсутствует |
+| Demo target marketing policy | Materialized offline в S20 |
 | Selector, session cadence, UI/product wiring | Отсутствуют |
 | Marketing/A9 authority | Отсутствует |
 
@@ -144,15 +167,15 @@ Target marketing model поддерживает:
 - allowed semantic contexts;
 - semantic `cta_contexts` с обязательным `default`.
 
-S2 real demo load сейчас fail-closed:
+S2 real demo load на момент S17 fail-closed:
 
 ```text
 required_path_missing marketing.yaml
 ```
 
-Это ожидаемо: target pack пока offline и неполон.
+Это было ожидаемо для S17. После S20 real pack загружается offline.
 
-До materialization остаются два contract/ownership gap:
+На момент S17 до materialization оставались два contract/ownership gap:
 
 1. `cta_contexts` проверяет nonblank/default, но не проверяет value против CTA keys из
    `tone.yaml`.
@@ -160,13 +183,14 @@ required_path_missing marketing.yaml
    `TargetMarketingPolicy` не имеет cadence field. Нужно выбрать: cadence — единый
    universal runtime law или future client-schema field.
 
-Документ до S17 неточно говорил, что schema полностью не реализована. S1 models уже
-существуют; отсутствуют demo target policy, selector/session/runtime и authority.
+Первый gap закрыт S20 pure CTA-reference validator. Второй закрыт S18: cadence
+`consultation_value` является universal runtime law и не дублируется в client policy.
+Selector/session/runtime и authority остаются будущими отдельными checkpoint-ами.
 
-## Candidate source map — не утверждённые pools
+## Candidate source map S17 — утверждена для demo в S20
 
-Следующие refs существуют и показывают, что для каждого standard scenario есть
-source-backed основа. Они **не утверждены** как состав, порядок или автоматический показ.
+Следующие refs были candidate map S17. S20 утвердил их exact состав и порядок для demo
+offline policy. Автоматический показ и authority этим не разрешены.
 
 ### `pain_fear`
 
@@ -208,29 +232,29 @@ source-backed основа. Они **не утверждены** как сост
 - `kb:` — S4 KB index + S3 external validation;
 - `doctor:` — S6 doctor refs + S3 external validation.
 
-Service applicability, source order и automatic-display decision здесь не заданы.
+На S17 service applicability, source order и automatic-display decision здесь ещё не
+были заданы. S20 зафиксировал exact order; применимость продолжает фильтроваться по
+source owners, а automatic display остаётся будущим runtime checkpoint.
 
-## Решения владельца до target data
+## Вопросы S17 — закрыты S18–S20
 
-1. Какие из 24 legacy free strings сохранять через отдельную публикацию в MD, а какие
-   удалить вместе с legacy.
-2. Exact semantic contexts и initial commercial blocks для demo.
-3. Exact source refs и order для каждого из пяти scenario pools.
-4. CTA context map, clinic default и судьба `ct_consultation`.
-5. Cadence/no-repeat — universal runtime law или client schema data.
-6. Нужна ли до materialization contract-проверка CTA key против `tone.yaml`.
-7. Retire/mapping для `benefits`, `what_included`, `teeth_whitening`.
+1. Три consult-reason смысла опубликованы S19; остальные 21 free strings не
+   переносятся без отдельной source publication.
+2. Exact semantic contexts и initial `service` block зафиксированы S20.
+3. Exact source refs и order пяти scenario pools зафиксированы S20.
+4. CTA map/default зафиксированы; `ct_consultation` не переносится в target и не
+   получает mapping, а current legacy остаётся неизменным до retirement.
+5. Consultation cadence зафиксирован S18 как universal law; S20 не дублирует его.
+6. S20 добавил pure contract-проверку CTA keys против tone index.
+7. `benefits`, `what_included`, `teeth_whitening` не получают target marketing mapping.
 
-## Рекомендованный следующий checkpoint
+## Граница после S20
 
-Сначала отдельный owner-decision/governance checkpoint должен закрыть семь вопросов
-выше и заморозить минимальные exact data. Только после checker-review можно создавать
-real target `marketing.yaml` и real bundle acceptance.
+Target policy и real bundle acceptance созданы offline. Selector, session cadence,
+response/UI wiring и authority остаются отдельными последующими checkpoint-ами и не
+следуют автоматически из S20. A9 остаётся на паузе; live/LLM не требуется.
 
-Selector, session cadence, response/UI wiring и authority должны оставаться отдельными
-последующими checkpoint-ами. A9 остаётся на паузе; live/LLM не требуется.
-
-## Verification
+## S17 verification (historical)
 
 Independent completion review `✅`:
 

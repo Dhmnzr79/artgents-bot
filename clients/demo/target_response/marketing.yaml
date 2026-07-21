@@ -1,0 +1,63 @@
+version: 1
+
+limits:
+  max_marketing_facts_per_turn: 3
+  max_amplifiers_per_turn: 2
+  max_scenarios_per_turn: 2
+
+initial_commercial_blocks:
+  service:
+    ordered_fact_refs:
+      - fact:free_implant_consult
+      - fact:installment_12
+      - fact:implant_same_day_discount
+      - fact:professional_whitening_discount
+
+scenario_rules:
+  pain_fear:
+    ordered_amplifier_refs:
+      - kb:implantation__faq__pain.md#korotko
+      - kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut
+    allowed_semantic_contexts:
+      - service
+  cost:
+    ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:implant_same_day_discount
+      - fact:tax_deduction
+      - kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee
+      - kb:clinic__info__payment_terms.md#korotko
+    allowed_semantic_contexts:
+      - service
+      - price
+  time:
+    ordered_amplifier_refs:
+      - kb:implantation__faq__duration.md#korotko
+      - kb:implantation__faq__duration.md#mozhno-li-uskorit-implantatsiyu
+      - kb:implantation__faq__tooth_one_day.md#korotko
+      - kb:implantation__info__steps.md#korotko
+    allowed_semantic_contexts:
+      - service
+  doctor_trust:
+    ordered_amplifier_refs:
+      - doctor:doctors__doctor__volkov
+      - doctor:doctors__doctor__orlov
+      - kb:doctors__doctor__overview.md#korotko
+      - kb:clinic__info__technology.md#korotko
+    allowed_semantic_contexts:
+      - service
+      - doctors
+  result_reliability:
+    ordered_amplifier_refs:
+      - fact:implant_warranty
+      - kb:implantation__faq__osseointegration.md#korotko
+      - kb:implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie
+      - kb:clinic__info__warranty.md#korotko
+    allowed_semantic_contexts:
+      - service
+
+cta_contexts:
+  service: plan
+  price: price
+  doctors: doctor
+  default: callback

@@ -8,7 +8,6 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, get_args
 
-import pytest
 import yaml
 
 from contracts.doctor_schema_refs import (
@@ -27,10 +26,6 @@ from contracts.response_schema_refs import (
 )
 from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
-from core.response_schema_loader import (
-    ResponseSchemaLoadError,
-    load_response_schema_bundle,
-)
 
 
 DEMO_ROOT = Path("clients/demo")
@@ -40,7 +35,6 @@ CURRENT_TONE = DEMO_ROOT / "tone.yaml"
 CURRENT_PLAYBOOK = DEMO_ROOT / "patient_playbook.yaml"
 CURRENT_PRICE_SERVICES = DEMO_ROOT / "pricebook/services"
 MD_ROOT = DEMO_ROOT / "md"
-TARGET_MARKETING = TARGET_ROOT / "marketing.yaml"
 TARGET_SERVICES = TARGET_ROOT / "service_catalog.json"
 TARGET_BRANDS = TARGET_ROOT / "brand_catalog.json"
 TARGET_FACTS = TARGET_ROOT / "pricebook/facts.json"
@@ -319,12 +313,10 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
     assert "ct_consultation" not in tone_keys
 
 
-def test_target_marketing_is_absent_and_frozen_contract_boundary_is_exact() -> None:
-    assert not TARGET_MARKETING.exists()
-    with pytest.raises(ResponseSchemaLoadError) as exc_info:
-        load_response_schema_bundle(TARGET_ROOT)
-    assert exc_info.value.code == "required_path_missing"
-    assert exc_info.value.path == Path("marketing.yaml")
+def test_s17_historical_absence_and_frozen_contract_boundary_are_recorded() -> None:
+    audit = AUDIT_DOC.read_text(encoding="utf-8")
+    assert "S2 real demo load на момент S17 fail-closed" in audit
+    assert "required_path_missing marketing.yaml" in audit
 
     policy = TargetMarketingPolicy.model_validate(_candidate_marketing())
     assert get_args(MarketingScenario) == EXPECTED_SCENARIOS

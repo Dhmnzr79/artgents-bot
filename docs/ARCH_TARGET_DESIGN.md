@@ -16,6 +16,64 @@
 
 Тон и промо — надстройки по тем же правилам. 🚩 Новый гейт/классификатор/обработчик под **тему** (а не под одну из трёх причин) = скат назад.
 
+## Owner law: FINAL_FULLCONTEXT_ONLY
+
+**Статус:** явное architecture decision владельца (2026). Бот **не в production**; живых клиентов и
+обязательства сохранять текущие legacy-ответы или widget compatibility **нет**. Цель — сразу
+чистая **финальная** cached FullContext-архитектура для базы порядка **150–200 небольших MD**.
+Временные response paths «на потом удалим» **не строим**.
+
+### Смысл закона
+
+1. **Финальный Composer** получает **весь валидированный MD-корпус клиента** через **cached FullContext**.
+2. **Scoped turn-specific primary evidence** (S35→S36) **дополняет** FullContext: усиливает и
+   проверяет exact facts, strict commercial facts, offer/doctor identities и grounding. Оно **не
+   заменяет** FullContext, **не скрывает** остальную MD-базу от Composer и **не является**
+   обязательным retriever-gate для обычных знаний.
+3. **Structured selectors** разрешены там, где нужна строгая точность и управление: услуги, цены
+   и этапы оплаты, врачи, marketing facts и CTA, safety policy, source provenance и verification.
+4. **`medical_handoff`** выбирает **режим безопасности**, а не отдельный MD-маршрут. Модель по-
+   прежнему видит **всю MD-базу**, но не может ставить диагноз, определять личную пригодность или
+   выбирать лечение.
+5. **`used_doc_ids` / source refs** — для аудита, follow-up и grounding verification, **не** как
+   предварительный RAG-router.
+
+### Запрещено по умолчанию
+
+- маршрутизация ответа по **отдельным MD** или тематическим document routers;
+- **vector retrieval**, **chunk retrieval** и любой retriever-gate перед Composer для обычных знаний;
+- **временные product response paths** и legacy fallback ради сохранения текущих ответов;
+- **shadow/runtime wiring**, создаваемый только как промежуточный мост без постоянной роли в
+  финальной цепочке;
+- **дублирование FullContext** отдельными таблицами тематических маршрутов или `(topic,aspect)`-
+  prompt tables как альтернативным источником знаний.
+
+### Исключения
+
+Любое исключение требует: **отдельного явного разрешения владельца**; доказательства, что
+механизм нужен именно **финальной** рабочей цепочке; описания его **постоянной** роли;
+объяснения, почему cached FullContext недостаточен.
+
+Если клиентская база **перестанет помещаться** в выбранный cached context — **СТОП** на
+отдельное architecture decision. **Нельзя** молча добавлять RAG/retriever.
+
+**Eval harness и offline checker** допустимы как измерительные инструменты, если они **не**
+становятся временным product response path.
+
+### Согласование с более ранними формулировками
+
+- Пункт «Evidence assembly — primary evidence тематически ограничен, полная база только фон» ниже
+  описывал **переходную** модель до этого решения. Под **FINAL_FULLCONTEXT_ONLY** финальный
+  Composer **всегда** видит cached FullContext целиком; scoped primary evidence — **надстройка
+  для точности и verifier**, не замена корпуса.
+- Offline S35/S36 **не противоречат** этому закону: они materialize **selected strict identities**
+  для verification и exact-fact enforcement, **не** подменяя cached FullContext как основной
+  knowledge input Composer.
+- Текущий legacy path, chunk_responder и retrieval в repo — **СЕЙЧАС**, не TARGET; не оправдание
+  для новых temporary bridges.
+
+---
+
 ## Цели → где живут
 
 | Цель | Где |
@@ -40,8 +98,16 @@ Boundary detection → TurnFrame → Boundary enforcement + Response policy → 
 1. **Boundary detection** — дешёвая ранняя детекция. **Полностью коротко замыкают до TurnFrame только** hard-stop, contacts, однозначный booking. **Цена и медзона здесь только детектятся** и ставят **обязательный флаг, который LLM не может отменить** — услугу/объём/форму часто видно лишь после TurnFrame.
 2. **TurnFrame** — **один логический контракт**: `topic`, `intent`, **`aspects[]` + `primary_aspect`**, `emotion`, `specificity`, `patient_scope`, **`service_id`**, `follow_up` + **confidence/provenance по каждому полю**. Один контракт ≠ обязательно один физический вызов; для серой зоны допустим узкий доп-resolver. (Составные вопросы — через `aspects[]`, без обходного слоя.)
 3. **Boundary enforcement + Response policy** — применяет обязательные флаги (цена→детерминированная price policy, медзона→`response_mode=medical_handoff`) и формирует **декларативный `ResponseSpec`**: тон, `allowed_topics`, `forbidden_topics`, обязательные факты, hand-off?, допустимые deterministic cards. **НЕ таблица тематических промптов.**
-4. **Evidence assembly** — **`primary evidence` ВСЕГДА тематически ограничен** (по topic/aspects + `ResponseSpec.allowed/forbidden`). Полная база — только **доп. фон для низкорисковых** ответов, не основа. `allowed/forbidden_topics` применяются **независимо от размера базы**. Композер формулирует по выделенному evidence, а не выбирает факты сам. **Это не возврат старого vector-search/router стека — это детерминированный evidence selection по TurnFrame + ResponseSpec.**
-   - **Fail-safe слоя evidence** (иначе он сам станет новым тихим fail-open): низкая уверенность в `topic` → уточнение **или** безопасный multi-topic scope; evidence не найден → **честный defer**; **запрещено молча расширять scope до всей базы**.
+4. **Evidence assembly** — под **FINAL_FULLCONTEXT_ONLY** (см. выше): **cached FullContext всего
+   валидированного MD-корпуса** — основной knowledge input финального Composer. **Scoped primary
+   evidence** для хода **дополняет** FullContext: selected strict identities, exact facts,
+   offers/doctors/commercial facts для verifier и grounding — **не заменяет** корпус и **не**
+   скрывает остальную базу. Structured selectors (услуги, pricebook, doctors, marketing, policy)
+   управляют точными данными и safety; они **не** являются thematic document routers.
+   - **Fail-safe:** низкая уверенность в policy/boundary → clarify/defer/handoff; **запрещено**
+     молча подменять FullContext chunk-retrieval или «только один MD» как product path.
+   - *(Переходная формулировка v4 до owner decision: «primary evidence тематически ограничен,
+     полная база только фон» — **снята** для финальной цепочки.)*
 5. **Composer** — только формулирует по spec + evidence.
 6. **Verifier** — числа, медзона-граница, тема, запрещённые/обязательные факты.
    - **Первый target-рантайм:** deterministic digit-number provenance + одна компактная
@@ -138,23 +204,26 @@ Permission ceilings нельзя расширять inclusion-запросом. 
 coverage пока не доказаны metadata текущего evidence, поэтому Composer/product wiring
 запрещены до следующего evidence-scope checkpoint.
 
-S35 строит из S34 отдельный закрытый identity-only evidence view. Он читает topic только
-у уже выбранных service/doctor/KB MD, не ищет и не ранжирует документы. Service-linked
-offers и commercial facts наследуют topic услуги; врачи сохраняют topic услуги и своего
-profile MD. Каждый factual ref обязан пересекаться с allowed topics и не пересекаться с
-forbidden topics. Required fact считается покрытым только выбранным commercial fact, а не
-его наличием среди raw candidates или offer fact_refs. Missing scope/fact/component
-завершается явной ошибкой без whole-base fallback. Composer/Verifier/product wiring всё
-ещё отсутствуют; medical_handoff prose safety остаётся их отдельной обязательной границей.
+S35 строит из S34 отдельный закрытый identity-only **scoped primary evidence** view. Он
+**дополняет** cached FullContext (см. **FINAL_FULLCONTEXT_ONLY**), а не заменяет его как
+knowledge input Composer. Topic scope применяется к **уже выбранным** service/doctor/KB
+identities, без document retrieval или ranking. Service-linked offers и commercial facts
+наследуют topic услуги; врачи сохраняют topic услуги и своего profile MD. Каждый factual
+ref обязан пересекаться с allowed topics и не пересекаться с forbidden topics. Required
+fact считается покрытым только выбранным commercial fact, а не его наличием среди raw
+candidates или offer fact_refs. Missing scope/fact/component завершается явной ошибкой без
+whole-base fallback. Composer/Verifier/product wiring всё ещё отсутствуют; medical_handoff
+prose safety остаётся их отдельной обязательной границей.
 
 S36 является последним offline-адаптером перед будущим Composer call: exact S35 identities
-дословно разворачиваются в immutable request blocks. Content получает только выбранное MD
-body без frontmatter; anchored KB/doctor refs — только точную секцию; offers — цену,
-package и payment stages без candidate fact_refs/follow-ups; doctors — только имя,
-должность, стаж и выбранный profile section; commercial fact/consultation копируются из
-точного source object. FullContext cache не перестраивается и не ищется. S36 ещё не
-вызывает модель и не создаёт ответ: Composer execution, live quality proof, Verifier и
-product wiring остаются отдельными gates.
+дословно разворачиваются в immutable request blocks **поверх** cached FullContext, не
+вместо него. Content получает только выбранное MD body без frontmatter; anchored KB/doctor
+refs — только точную секцию; offers — цену, package и payment stages без candidate
+fact_refs/follow-ups; doctors — только имя, должность, стаж и выбранный profile section;
+commercial fact/consultation копируются из точного source object. S36 **не** перестраивает и
+**не** ищет FullContext cache — он materialize strict blocks для verifier/exact-fact layer.
+S36 ещё не вызывает модель и не создаёт ответ: Composer execution, live quality proof,
+Verifier и product wiring остаются отдельными gates.
 
 S37 добавляет минимальную provider-neutral границу Composer execution. Она проверяет
 закрытую форму S36 request, детерминированно сериализует response directives и primary

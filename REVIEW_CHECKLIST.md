@@ -40,6 +40,20 @@
 - [ ] Продающие/успокаивающие формулировки **не выхолощены** осторожными правками.
 - [ ] **Clarify** не задаёт медицинских/диагностических переспросов.
 
+### C2. FINAL_FULLCONTEXT_ONLY (architecture law — жёсткий стоп при нарушении в target/final wiring → ❌)
+
+См. `docs/ARCH_TARGET_DESIGN.md` § «Owner law: FINAL_FULLCONTEXT_ONLY».
+
+- [ ] **Финальный Composer** получает **весь валидированный MD-корпус** через **cached FullContext**; scoped primary evidence **дополняет**, а **не заменяет** и **не скрывает** корпус.
+- [ ] Нет нового **per-MD routing**, thematic document routers, **vector/chunk retrieval** или retriever-gate для обычных знаний без явного owner exception.
+- [ ] Нет **временных product response paths**, legacy fallback ради сохранения текущих ответов, interim shadow bridges без постоянной роли, дублирования FullContext routing-таблицами.
+- [ ] **Structured selectors** используются только для strict domains (услуги, цены/этапы, врачи, marketing/CTA, safety policy, provenance) — не как thematic knowledge routers.
+- [ ] **`medical_handoff`** — safety mode, не отдельный MD-маршрут; **`used_doc_ids`/source refs** — audit/grounding, не pre-RAG router.
+- [ ] При corpus overflow или предложении RAG/retriever вместо FullContext — **СТОП**, эскалация владельцу; eval harness/offline checker не превращены в product path.
+- [ ] Любое исключение документировано: явное разрешение владельца, постоянная роль, доказательство недостаточности cached FullContext.
+
+---
+
 ### D. Тесты и evals прогнаны честно
 
 - [ ] Unit-тесты зелёные. Прогон с **канонным набором флагов** (`docs/FLAGS_AND_STATUS.md`), в чистом окружении (нет залипших `$env:` из прошлого прогона).
@@ -67,7 +81,7 @@
 ```
 ВЕРДИКТ: ✅ / ❌
 
-Слой 1 (инварианты): пройдено / нарушения: <список пунктов A–E>
+Слой 1 (инварианты): пройдено / нарушения: <список пунктов A–E, C2>
 Слой 2 (критерии TASK.md): пройдено / не выполнено: <какие критерии>
 
 Замечания Исполнителю (если ❌): <конкретика — файл:строка, что не так, что проверить>

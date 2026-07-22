@@ -31,6 +31,7 @@ alwaysApply: true
 - TASK противоречит `docs/ARCH_TARGET_DESIGN.md` или базе клиента;
 - для зелёного результата нужен `skip`, `xfail`, ослабление assert, resnapshot или мок, скрывающий реальный pipeline;
 - появляется новый route/classifier/handler под тему;
+- задача вводит per-MD routing, retrieval/RAG, временный product path или дублирование FullContext в target/final wiring без owner exception (**FINAL_FULLCONTEXT_ONLY**);
 - safe fallback меняет смысл, цену, medzone или booking;
 - live eval расходится с unit-тестом;
 - нельзя доказать сохранение UI parity;
@@ -52,6 +53,22 @@ alwaysApply: true
 - **Booking-flow:** никогда не подтверждать и не эхоить конкретную **дату ИЛИ время**. Нейтральное «администратор свяжется и уточнит» + сбор контакта.
 - **Бот — продавец, а не медик/юрист.** Не выхолащивать продающие и обезболивающе-успокаивающие формулировки осторожными правками. Цель хода — лид.
 - **Clarify не лезет в медзону.** Переспрос — только по осям, на которые пациент может ответить сам (allowlist), детерминированно.
+
+## 1.1. Owner law: FINAL_FULLCONTEXT_ONLY
+
+Явное architecture decision владельца (2026). Канон: `docs/ARCH_TARGET_DESIGN.md` § «Owner law: FINAL_FULLCONTEXT_ONLY».
+
+- **Финальный Composer** — **cached FullContext всего валидированного MD-корпуса** (целевой масштаб: 150–200 небольших MD). Бот не в production; widget compatibility и сохранность legacy-ответов не требуются.
+- **Scoped turn-specific primary evidence** (S35→S36) **дополняет** FullContext для exact facts/verifier — **не заменяет** корпус, **не скрывает** базу, **не** обязательный retriever-gate для обычных знаний.
+- **Structured selectors** разрешены для услуг, цен/этапов оплаты, врачей, marketing/CTA, safety policy, provenance/verification.
+- **`medical_handoff`** — режим безопасности, не MD-маршрут; модель видит всю MD-базу, но не диагностирует и не выбирает лечение.
+- **`used_doc_ids`/source refs** — audit/follow-up/grounding, не pre-RAG router.
+- **Запрещено по умолчанию:** per-MD routing, thematic document routers, vector/chunk retrieval, временные product paths, legacy fallback ради текущих ответов, interim shadow bridges без постоянной роли, дублирование FullContext routing-таблицами.
+- **Исключение** — только явное разрешение владельца + постоянная роль + доказательство, что cached FullContext недостаточен.
+- **Corpus overflow** → **СТОП** на architecture decision; **нельзя** молча добавлять RAG/retriever.
+- **Eval harness/offline checker** — OK как измерение, если не product response path.
+
+Исполнитель обязан **остановиться** (§0.1), если задача вводит запрещённый механизм в target/final wiring без owner exception.
 
 ## 2. Как гонять тесты/evals честно
 

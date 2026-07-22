@@ -1,6 +1,6 @@
 # Архитектурная миграция A1–A9 — roadmap для владельца продукта
 
-Этот документ показывает, как мы строим новое внутреннее понимание вопроса пациента в локальном demo. Production-клиентов пока нет: legacy используется временно как измерительный и контрольный контур, а не как продукт, который нужно сохранять ради действующих пользователей. Цель — проверенная новая архитектура, после чего ненужные legacy-ветви можно удалять.
+Этот документ показывает, как мы строим новое внутреннее понимание вопроса пациента в локальном demo. Production-клиентов нет; widget compatibility и сохранность legacy-ответов **не требуются**. Legacy и shadow сейчас — **измерительный контур**, не целевой product path. Целевая архитектура — **FINAL_FULLCONTEXT_ONLY** (см. ниже и [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md)): сразу чистая cached FullContext-цепочка для базы порядка 150–200 небольших MD, без временных response bridges «на потом удалим».
 
 ## Как читать чекбоксы
 
@@ -14,15 +14,45 @@
 
 - **Shadow** — новый механизм работает параллельно для измерения, но не управляет ответом.
 - **Authority** — право реально влиять на маршрут, факты, цену, текст или UI ответа.
-- **Legacy path** — текущий продуктовый путь, который пока продолжает отвечать пациенту.
+- **Legacy path** — текущий продуктовый путь в локальном demo (измерительный контур до замены на target FullContext chain; не целевой product path и не объект сохранения ответов).
 - **TurnFrame** — структурированная «карточка понимания» одного сообщения: тема, намерение, аспекты, ситуация пациента и другие поля.
+
+## Owner law: FINAL_FULLCONTEXT_ONLY
+
+**Статус:** явное architecture decision владельца (2026), зафиксировано docs-only checkpoint.
+Канон формулировок — [ARCH_TARGET_DESIGN.md](ARCH_TARGET_DESIGN.md) § «Owner law: FINAL_FULLCONTEXT_ONLY».
+
+Кратко для roadmap:
+
+- **Финальный Composer** получает **весь валидированный MD-корпус** через **cached FullContext**.
+- **Scoped turn-specific primary evidence** (S35→S36) **дополняет** FullContext для exact facts и
+  verifier — **не заменяет** корпус и **не скрывает** остальную MD-базу от Composer.
+- **Structured selectors** разрешены для услуг, цен/этапов оплаты, врачей, marketing/CTA, safety
+  policy, provenance/verification.
+- **`medical_handoff`** — режим безопасности, не отдельный MD-маршрут; модель видит всю MD-базу.
+- **`used_doc_ids` / source refs** — аудит и grounding, не pre-RAG router.
+- **Запрещено по умолчанию:** per-MD routing, thematic document routers, vector/chunk retrieval,
+  временные product paths, legacy fallback ради текущих ответов, interim shadow bridges без
+  постоянной роли, дублирование FullContext routing-таблицами.
+- **Исключение** — только явное разрешение владельца + постоянная роль + доказательство, что
+  cached FullContext недостаточен.
+- **Corpus overflow** → СТОП на architecture decision; **нельзя** молча добавлять RAG/retriever.
+- **Eval harness / offline checker** — OK как измерение, если не product response path.
+
+- [x] **Owner decision — FINAL_FULLCONTEXT_ONLY** — docs-only architecture law в
+  `ARCH_TARGET_DESIGN.md`, `STRANGLER_ROADMAP.md`, `REVIEW_CHECKLIST.md`, `.cursor/rules/00-guardrails.mdc`.
+  Противоречивые формулировки evidence assembly и S35/S36 согласованы: scoped primary evidence
+  **дополняет** FullContext, не заменяет. Код, TASK, matrix/harness и product authority не менялись.
+
+---
 
 ## Текущий статус
 
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
+| Последний завершённый checkpoint | **Owner decision — FINAL_FULLCONTEXT_ONLY** (docs-only architecture law) |
+| Предыдущий checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S43 — medical boundary live eval prep завершён** |
 | Ближайший рабочий focus без live | **Live medical boundary eval — только после отдельного разрешения владельца и утверждения thresholds** |
@@ -200,20 +230,22 @@
   `56 passed`, всего `77 passed`, skip/xfail нет. Topic scope и required-fact coverage
   ещё не доказаны, поэтому Composer/product wiring запрещены до следующего checkpoint.
 - [x] **S35 — scoped response evidence** — S34 consumable identities превращаются в
-  закрытый view без raw materials/candidates; topic берётся только из уже выбранных
-  service/doctor/KB MD, required facts покрываются только реально выбранными commercial
-  facts. Canonical S28 plan и S30 follow-up selection пересобираются и сравниваются exact,
-  поэтому candidate injection закрыт. Governance `84182a9`; independent completion review
-  `✅`: target/demo `15 passed`, S34/S31 neighbors `32 passed`, всего `47 passed`,
-  skip/xfail нет. Live/LLM, A9, Composer/Verifier и product authority не подключены.
+  закрытый **scoped primary evidence** view без raw materials/candidates; topic берётся только
+  из уже выбранных service/doctor/KB MD (без document retrieval/ranking). View **дополняет**
+  cached FullContext под **FINAL_FULLCONTEXT_ONLY**, не заменяет его как knowledge input Composer.
+  Required facts покрываются только реально выбранными commercial facts. Canonical S28 plan и
+  S30 follow-up selection пересобираются и сравниваются exact, поэтому candidate injection
+  закрыт. Governance `84182a9`; independent completion review `✅`: target/demo `15 passed`,
+  S34/S31 neighbors `32 passed`, всего `47 passed`, skip/xfail нет. Live/LLM, A9,
+  Composer/Verifier и product authority не подключены.
 - [x] **S36 — target Composer request materialization** — exact S35 scope records
-  разворачиваются один-к-одному в immutable model-ready blocks: выбранное MD body/section,
-  offers с payment stages без candidate refs, согласованные doctor fields/profile section,
-  commercial fact и consultation value. FullContext не ищется и не перестраивается;
-  provider/model call отсутствует. Governance `b0fe669`; independent completion review
-  `✅`: target/demo `25 passed`, S35/S34 neighbors `36 passed`, всего `61 passed`,
-  skip/xfail нет. Composer execution/live proof, Verifier, A9 и product authority не
-  подключены.
+  разворачиваются один-к-одному в immutable model-ready blocks **поверх** cached FullContext:
+  выбранное MD body/section, offers с payment stages без candidate refs, согласованные doctor
+  fields/profile section, commercial fact и consultation value. S36 materialize strict blocks
+  для verifier/exact-fact layer; **не** ищет и **не** подменяет FullContext cache. Provider/model
+  call отсутствует. Governance `b0fe669`; independent completion review `✅`: target/demo
+  `25 passed`, S35/S34 neighbors `36 passed`, всего `61 passed`, skip/xfail нет. Composer
+  execution/live proof, Verifier, A9 и product authority не подключены.
 - [x] **S37 — minimal target Composer executor** — exact S36 request проходит closed-shape
   validation, детерминированно превращается в stable policy + directives + primary evidence
   и передаётся одному injected backend ровно один раз. Follow-ups/CTA остаются sidecars и

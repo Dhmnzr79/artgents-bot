@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S30 — minimal follow-up source policy: governance pending, код не начат** |
-| Ближайший рабочий фокус без live | **Проверить governance S30; до checker ✅ код не писать** |
+| Отдельная S-series без live | **S30 — minimal follow-up source policy завершён offline** |
+| Ближайший рабочий фокус без live | **End-to-end offline response assembly; новые policy-слои только по конкретной необходимости** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -172,9 +172,11 @@
   completion review `✅`: target `37 passed`, четыре S27/S28 neighbors `44 passed`, всего
   `81 passed`, skip/xfail нет. UI merge, session suppression и product wiring не входят
   в checkpoint; следующий focus — минимальная UI-source policy над proven tuples.
-- [ ] **S30 — minimal follow-up source policy** — governance prepared: caller явно
-  задаёт `content`, `price` или отсутствие ссылок; policy сохраняет все candidates
-  выбранного типа без merge/ranking/fallback. До independent checker `✅` код не пишется.
+- [x] **S30 — minimal follow-up source policy** — caller явно задаёт `content`, `price`
+  или отсутствие ссылок; policy сохраняет exact tuple выбранного типа без inference,
+  merge/ranking/truncation/fallback. Governance `04a9f8b`; independent completion review
+  `✅`: target `23 passed`, S29 neighbors `37 passed`, всего `60 passed`, skip/xfail нет.
+  Следующий focus — end-to-end offline response assembly над proven components.
 
 ## Какой roadmap актуален
 

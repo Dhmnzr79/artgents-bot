@@ -105,6 +105,11 @@ candidates берутся из `suggest_h3` одного selected MD и разр
 Два tuple не смешиваются. S29 не выбирает UI source, не применяет session suppression и
 не подключён к product path; эти решения остаются следующей отдельной policy boundary.
 
+S30 принимает явно заданный будущим ResponseSpec/caller source `content`, `price` или
+`None` и пропускает соответствующий S29 tuple целиком. Policy не выводит фокус из порядка
+components, не смешивает, не ранжирует, не обрезает и не подставляет другую family при
+пустом результате. Widget/session/runtime и product path по-прежнему не подключены.
+
 ---
 
 ## Порядок работ — strangler, две кучи

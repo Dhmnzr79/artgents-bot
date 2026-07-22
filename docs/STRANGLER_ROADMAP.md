@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S27 — first vertical offline response materials assembly реализован и независимо проверен; product path не подключён** |
-| Ближайший рабочий фокус без live | **Минимальный ResponseSpec над proven S27 materials; не добавлять новый lookup/data layer** |
+| Отдельная S-series без live | **S28 — minimal target response materialization plan: governance pending, код ещё не начат** |
+| Ближайший рабочий фокус без live | **Проверить governance S28; до checker ✅ код не писать** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -157,7 +157,14 @@
   offers, linked doctors, marketing и consultation materials, не раскрывая unprojected
   offers. Governance `f98b8df`; independent completion review `✅`: target `18 passed`,
   required neighbors `191 passed`, skip/xfail нет. Product path не подключён; следующий
-  focus — minimal ResponseSpec, не новый lookup/data layer.
+  focus — minimal downstream materialization plan над proven materials; канонический
+  ResponsePolicy/ResponseSpec остаётся отдельной upstream boundary до evidence assembly.
+- [ ] **S28 — minimal target response materialization plan** — governance подготовлен для
+  identity-only декларации над S27 materials: explicit content/price/doctors components,
+  exact selected additions и fail-closed unfulfilled signal. До independent checker `✅`
+  код не пишется; MD/follow-up materialization и product wiring не входят в checkpoint.
+  Канонический upstream ResponsePolicy/ResponseSpec до evidence assembly остаётся
+  отдельной будущей границей и не переопределяется S28.
 
 ## Какой roadmap актуален
 

@@ -1,239 +1,252 @@
-# TASK — S27 First Vertical Offline Response Materials Assembly
+# TASK — S28 Minimal Target Response Materialization Plan
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `8bd8fe8 feat: resolve target service terms S26`
+**Baseline:** `4da1b4d feat: assemble vertical offline response materials S27`
 
-**Серия / checkpoint:** `S27` — первая vertical offline end-to-end сборка уже готовых
-target-компонентов: service/optional brand terms → exact identity → S22 evidence →
-S23/S24 eligible offers → один безопасный пакет материалов перед ResponseSpec/Composer.
+**Серия / checkpoint:** `S28` — минимальный downstream materialization plan над уже
+проверенным S27 material boundary. Он фиксирует, какие factual components передаются
+следующему слою, но не пишет ответ и не подключается к product path.
 
-**Режим:** governance + один new pure unwired facade + synthetic/real-data unit tests +
-architecture status. Никаких новых data/selector semantics, client changes,
-patient-scope authority, ResponseSpec, Composer/runtime/routes/UI или live/LLM.
+**Режим:** governance + один new pure unwired module + synthetic/real-data unit tests +
+target architecture status. Никаких client-data changes, MD parsing, UI materialization,
+Composer/runtime/routes/authority, A9 или live/LLM.
 
 ## Owner direction
 
-После S26 владелец подтвердил движение дальше и потребовал не скатываться в
-переусложнение. Поэтому S27 не добавляет очередной resolver. Он соединяет существующие
-S10/S21/S22/S23/S24/S25/S26 в первый вертикальный deterministic path и скрывает от
-следующего слоя все authored offers, которые ещё не прошли eligibility/brand projection.
+После S27 владелец подтвердил следующий шаг и отдельно уточнил ожидаемое будущее
+поведение: обычный информационный вопрос должен получать ответ по MD и тематические
+follow-up при их наличии; маркетинговые, price и doctor additions не должны превращать
+каждый ответ в перегруженную сборку.
 
-Вертикаль S27 начинается не с raw patient message, а с уже выделенных exact terms и
-явных context snapshots. Заканчивается готовыми factual materials до естественного
-текста. Это offline integration boundary, а не product wiring.
+S28 поэтому не создаёт ещё один selector. Он принимает уже готовые S27 materials и
+явный upstream список требуемых компонентов. Результат — компактный downstream plan для
+будущего materializer. Existing old `AnswerPacket` не переиспользуется и не
+ремонтируется: это legacy product contract с IO/config/runtime ownership.
+
+Канонический upstream `ResponseSpec` из `docs/ARCH_TARGET_DESIGN.md` остаётся отдельным
+будущим ResponsePolicy boundary **до** evidence assembly. Только он будет владеть tone,
+allowed/forbidden topics, required facts, handoff и allowed deterministic cards. S28 не
+использует это имя и не инвертирует target chain.
 
 ## Exact public API
 
-Создать `core/target_offline_response_assembly.py`:
+Создать `core/target_response_materialization_plan.py`:
 
 ```python
+from typing import Literal, TypeAlias
+
+TargetResponseComponent: TypeAlias = Literal["content", "price", "doctors"]
+
+
 @dataclass(frozen=True, slots=True)
-class TargetOfflineResponseMaterials:
+class TargetResponseMaterializationPlan:
     service_id: str
-    service: TargetService
     selected_brand_id: str | None
-    brand: TargetBrand | None
-    matched_rule_id: str | None
-    max_options: int
-    offers: tuple[TargetOffer, ...]
-    doctors: tuple[ServiceDoctorContext, ...]
-    selected_content_ref: str | None
-    marketing_selection: TargetMarketingSelection
-    commercial_facts: tuple[TargetCommercialFact, ...]
+    required_components: tuple[TargetResponseComponent, ...]
+    unfulfilled_components: tuple[TargetResponseComponent, ...]
+    primary_content_ref: str | None
+    offer_ids: tuple[str, ...]
+    doctor_ids: tuple[str, ...]
+    commercial_fact_ids: tuple[str, ...]
     external_source_refs: tuple[str, ...]
-    consultation_close: ServiceConsultationValue | None
-    marketing_slots_used: int
-    amplifier_slots_used: int
+    consultation_content_ref: str | None
+    cta_key: str
 
 
-def assemble_target_offline_response_materials(
-    bundle: ResponseSchemaBundle,
-    doctor_catalog: TargetDoctorCatalog,
-    external_index: ResponseSchemaExternalIndex,
-    consultation_values: Sequence[ServiceConsultationValue],
+def build_target_response_materialization_plan(
+    materials: TargetOfflineResponseMaterials,
     *,
-    service_term: str,
-    brand_term: str | None,
-    strategy_context: TargetStrategyMatch,
-    semantic_context: str,
-    today: date,
-    include_initial_block: bool,
-    include_consultation_close: bool,
-    marketing_scenarios: Sequence[str] = (),
-    shown_fact_ids: Sequence[str] = (),
-    shown_amplifier_refs: Sequence[str] = (),
-    shown_consultation_value_refs: Sequence[str] = (),
-) -> TargetOfflineResponseMaterials:
+    required_components: Sequence[str],
+) -> TargetResponseMaterializationPlan:
     ...
 ```
 
-Typed bundle/catalog/index/strategy context remain validated owner inputs. S27 validates
-only its own no-match boundary; downstream validators retain all existing errors.
+## Exact laws
 
-## Exact algorithm and ownership
+### 1. Input validation
 
-Order is fixed:
+- `materials` обязан быть exact `TargetOfflineResponseMaterials`; иначе
+  `TargetResponseMaterializationPlanError(
+  "materialization_plan_materials_invalid", materials)`;
+- `required_components` обязан быть `Sequence`, но не `str/bytes`;
+- каждый item обязан быть exact одним из `content`, `price`, `doctors`;
+- empty sequence запрещён;
+- duplicates запрещены, порядок caller сохраняется;
+- stable errors:
+  - `materialization_plan_components_invalid` с offending container/item;
+  - `materialization_plan_components_empty` с empty tuple;
+  - `materialization_plan_component_duplicate` с copied tuple;
+- error наследует `ValueError`, хранит `code`, `value`; exact message
+  `f"{code}: {value!r}"`.
 
-1. Call S26 `resolve_target_service_term(bundle.services, service_term)`.
-   - invalid/ambiguous errors propagate unchanged;
-   - `None` → `TargetOfflineResponseAssemblyError(
-     "offline_assembly_service_not_found", service_term)`.
-2. If `brand_term is None`, no brand resolution/filter.
-3. Otherwise call S25 `resolve_target_brand_term(bundle.brands, brand_term)`.
-   - invalid/ambiguous errors propagate unchanged;
-   - `None` → `TargetOfflineResponseAssemblyError(
-     "offline_assembly_brand_not_found", brand_term)`.
-4. Call S22 `build_target_response_evidence_package` with resolved service ID and
-   `selected_content_ref=service_resolution.service.content_ref`; pass all marketing,
-   date, shown-state and consultation inputs exact unchanged.
-5. Without brand call S23 `project_target_service_offers` on S22 service context with
-   `selected_option_id=None`, `explicit_offer_id=None`.
-6. With brand call S24 `project_target_service_brand_offers` with resolved brand ID and
-   the same explicit `strategy_context`; option/explicit offer remain `None`.
-7. Materialize one flat detached result only from S22 evidence plus S23/S24 projection.
+S28 не revalidates/repairs nested S27 models и не нормализует component strings.
 
-`TargetOfflineResponseAssemblyError(ValueError)` stores `code`, `value`; exact message
-`f"{code}: {value!r}"`. It introduces only the two not-found codes above and never wraps
-S21–S26 errors.
+### 2. Component projection
 
-## Final-material safety law
+Для каждого required component в caller order:
 
-- output `offers` contains only S23/S24 projected offers in clinic-strategy order/cap;
-- S22 all-authored `service_context.offers` is internal and is not exposed in result;
-- inactive/other-service/other-brand offers cannot be recovered from output;
-- no brand means eligible offers across brands/unbranded according to S23, not a guessed
-  brand;
-- known brand with no offer for service returns empty offers, no generic/other-brand
-  fallback;
-- service, brand, offers, commercial facts and consultation are detached/deep-copied;
-- doctors are frozen S10 value records in authored catalog order; S27 does not rank a
-  “best doctor”;
-- marketing selection/limits/CTA remain exact S21/S22 output;
-- price mode/amount/currency/unit/package/payment stages/fact refs/followups never change
-  or recalculate;
-- selected content ref is exact service-owned `content_ref`; S27 does not read MD body.
+- `content` fulfilled только если `materials.selected_content_ref is not None`;
+  тогда `primary_content_ref` — exact ref, иначе `None` и `content` добавляется в
+  `unfulfilled_components`;
+- `price` fulfilled только если `materials.offers` non-empty;
+  тогда `offer_ids` — exact projected S27 order, иначе empty и `price` unfulfilled;
+- `doctors` fulfilled только если `materials.doctors` non-empty;
+  тогда `doctor_ids` — exact authored S27 order, иначе empty и `doctors` unfulfilled;
+- не запрошенный component всегда даёт empty/`None` output и не считается unfulfilled.
 
-## Deliberate first-vertical limits
+`unfulfilled_components` сохраняет порядок `required_components`. Это fail-closed signal
+для будущего policy/materializer boundary. Сам materializer обязан surface/fail closed,
+не брать похожую цену, другой документ или врача другой услуги и не решать, нужно ли
+уточнение/defer. Такое решение принадлежит будущему upstream ResponsePolicy.
 
-S27 intentionally does not accept/select `selected_option_id` or `explicit_offer_id`.
-Those lower-level capabilities remain in S23/S24 but are not needed to prove the first
-named-service vertical slice. This prevents widening the facade before integration
-evidence exists.
+### 3. Automatic additions already selected by S21/S22
 
-S27 also does not:
+S28 не принимает отдельные marketing toggles и не повторяет policy:
 
-- parse raw patient text or repair typos;
-- apply patient scope/selection modes, diagnose or recommend treatment;
-- build a general service shortlist;
-- select/rank one doctor;
-- invent marketing copy or consultation text;
-- create ResponseSpec, prompt, natural-language answer, cards/buttons/UI;
-- read client files/session/clock or write shown state;
-- connect to planner/legacy matcher/Composer/routes/API/app/config;
-- change S1–S26 contracts/code/data or product authority;
-- touch/re-run A9 artifacts or live/LLM.
+- `commercial_fact_ids` — exact S27 fact order;
+- `external_source_refs` — exact S27 ref order;
+- `consultation_content_ref` — exact `consultation_close.content_ref` или `None`;
+- `cta_key` — exact `materials.marketing_selection.cta_key`.
+
+Эти fields — уже выбранные content identities, которые downstream не имеет права
+reselect/replace. Будущими остаются только exact payload materialization и форма
+отображения/UI. S28 не читает и не формулирует текст, не отмечает cadence state.
+
+### 4. Identity-only contract
+
+Plan содержит только identity/order/inclusion decisions. Он намеренно не копирует:
+
+- деньги, package, payment stages и price followups из offers;
+- doctor position/experience/profile text;
+- commercial fact text, consultation value и MD body.
+
+Следующий materializer получает plan вместе с S27 materials и может брать exact payload
+только по перечисленным IDs/refs. Это не второй источник правды и не потеря данных.
+
+## Follow-up boundary
+
+S28 не строит UI follow-ups:
+
+- price followups уже сохранены внутри S27 projected offers;
+- ordinary content navigation в demo сейчас authored как MD `suggest_h3`;
+- S28 сохраняет exact `primary_content_ref`, но не читает MD/frontmatter;
+- следующий отдельный materialization checkpoint должен разрешить suggestions только из
+  выбранного документа, сохранить authored order и не смешивать их с price followups;
+- до этого нельзя заявлять, что новый path уже воспроизводит follow-up UI.
+
+Итоговое target-поведение остаётся: обычный content answer + тематические follow-up при
+наличии; price/doctor/marketing добавляются только когда разрешены соответствующими
+upstream policy и material plan fields.
+
+## Deliberate S28 limits
+
+S28 не:
+
+- читает raw patient message, TurnFrame или session;
+- выбирает service/brand/offer/doctor/marketing заново;
+- исправляет опечатки и не применяет A9 patient scope;
+- читает MD, `suggest_h3`, price followups или profile body;
+- создаёт text blocks, prompt, natural-language answer, cards/buttons;
+- задаёт upstream ResponseSpec, tone, allowed/forbidden topics, required-fact policy,
+  handoff или deterministic-card policy;
+- вызывает old `AnswerPacket`, materializer, Composer, Verifier, FullContext;
+- подключается к planner/routes/API/app/UI/config;
+- меняет contracts S1–S27, clients, runtime, authority или A9 artifacts;
+- запускает live/LLM.
+
+Канонический ResponsePolicy/ResponseSpec (medical handoff, contacts, booking, lead,
+allowed/forbidden topics, tone, required facts/cards) остаётся будущим отдельным
+**upstream** boundary checkpoint до evidence assembly. Не раздувать S28 фиктивными
+режимами, которых текущая S27 vertical slice не может доказать.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `core/target_offline_response_assembly.py` — new pure facade;
-- `tests/test_target_offline_response_assembly.py` — new synthetic vertical contract;
-- `tests/test_demo_target_offline_response_assembly.py` — new real demo vertical acceptance;
-- `docs/PRICE_SERVICE_ARCHITECTURE.md` — S27 boundary;
-- `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, then `[x]` only after completion checker `✅`.
+- `core/target_response_materialization_plan.py` — new pure offline projection;
+- `tests/test_target_response_materialization_plan.py` — new synthetic contract;
+- `tests/test_demo_target_response_materialization_plan.py` — new real demo acceptance;
+- `docs/ARCH_TARGET_DESIGN.md` — честная S28 boundary/status note;
+- `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion checker `✅`.
 
 Любой другой файл — стоп и отдельное owner/architect decision.
 
 ## Protected / вне scope
 
-- весь `clients/**`, contracts и existing core modules S1–S26;
-- current/legacy planner, service matcher, price/marketing/composer/runtime paths;
-- option/explicit-offer facade expansion, service shortlist, doctor ranking;
-- ResponseSpec/materializer/Verifier/Composer/FullContext/session/routes/API/UI/config;
+- весь `clients/**`, `contracts/**` и existing core S1–S27;
+- old `contracts/answer_packet.py`, `core/answer_packet*.py`, Composer/runtime;
+- MD/frontmatter loaders and content/price followup resolution;
+- TurnFrame/A9, medical/contact/booking/lead boundaries;
+- Response materializer, prompt, natural language, Verifier, UI/session;
 - golden/live/eval fixtures;
 - A9 design/raw/frozen/harness/evidence/re-audit;
 - live/LLM, merge, `main`, other branches, product authority.
 
 ## Acceptance tests
 
-### Synthetic vertical contract
+### Synthetic contract
 
-`tests/test_target_offline_response_assembly.py` proves:
+`tests/test_target_response_materialization_plan.py` proves:
 
-1. exact API/result fields, frozen/slots shell, tuple outputs and detached nested models;
-2. service ID/name/alias enters via S26; unknown gets S27 not-found; invalid/ambiguous S26
-   errors propagate unchanged;
-3. `brand_term=None` uses S23, preserves eligible multi-brand/unbranded ordering/cap;
-4. brand ID/canonical/alias enters via S25 then S24; unknown gets S27 not-found;
-5. invalid/ambiguous S25 errors propagate unchanged;
-6. other-brand/unbranded/inactive offers never leak in branded result;
-7. known brand without service offer returns empty, no fallback;
-8. inactive parent service cannot resolve; inactive offers filtered;
-9. S15 first rule/priority/cap metadata preserved;
-10. exact service content ref drives S22 consultation close/cadence;
-11. marketing refs/facts/CTA/limits/shown snapshots preserved exact;
-12. linked doctors carried in authored order without ranking;
-13. fixed/from/range/no-public money/package/stages/followups unchanged;
-14. result exposes no S10 context/all-authored offer collection;
-15. repeated calls stateless/no input mutation;
-16. fixed error precedence is proven across boundaries:
-    - service invalid/ambiguous/not-found happens before any brand or S22 validation;
-    - once service is valid, brand invalid/ambiguous/not-found happens before S22;
-    - only after both identities are valid may evidence/marketing validation run;
-17. with valid identities, at least one representative S21 validation error and one
-    representative S22-only validation error propagate unchanged in exact exception
-    type, `code`, `value` and message; S27 never wraps them;
-18. source/API inspection proves S27 introduces/raises only
-    `offline_assembly_service_not_found` and `offline_assembly_brand_not_found`, has no
-    broad exception translation, and cannot invent other assembly error codes;
-19. imports only stdlib/contracts + pure S21–S26 facade dependencies; no IO/client/runtime.
+1. exact API/field order, frozen/slots shell and identity-only payload;
+2. invalid materials/container/item/empty/duplicate errors exact;
+3. component order preserved without normalization;
+4. content-only ordinary answer references only selected MD and no price/doctor IDs;
+5. price-only references only projected offer IDs in S27 order;
+6. doctors-only references exact linked doctor IDs in authored order;
+7. composite order preserved and all requested identities present;
+8. missing content/price/doctors marked unfulfilled without fallback;
+9. known brand with no service offer gives unfulfilled price, never generic offer;
+10. unrequested missing component is not reported unfulfilled;
+11. marketing fact/source/consultation/CTA identities pass exact without reselection;
+12. money/stages/followups/text/profile are absent from plan shape;
+13. repeated calls stateless and no S27 input mutation;
+14. imports only stdlib + S27 facade; no IO/client/contracts expansion/runtime;
+15. source has only four governed error codes, no broad exception translation.
 
-### Real demo vertical acceptance
+### Real demo acceptance
 
-`tests/test_demo_target_offline_response_assembly.py` proves read-only:
+`tests/test_demo_target_response_materialization_plan.py` proves read-only:
 
-1. real bundle/doctors/external index/consultations loaded through existing frozen tools;
-2. `All-on-4`, no brand, service semantic context returns exact service/content ref,
-   linked doctors, S16 order Impro→Implantium→Nobel, consultation close and limits;
-3. `All-on-4` + `нобель` returns only Nobel 428000 RUB/jaw with package/stages/followups;
-4. price/cost marketing selects exact commercial facts and blocks consultation when
-   S21/S22 amplifier limit is full;
-5. doctor-trust scenario carries exact doctor refs + initial fact, without doctor ranking;
-6. `caries`, no brand, returns its generic eligible offer and linked doctors/data;
-7. known demo brand with no caries offer returns empty, not caries generic price;
-8. unknown service/brand fail closed;
-9. source files unchanged; no product imports/writes/skip/xfail/live/LLM.
+1. real S27 All-on-4 materials load through existing frozen tools;
+2. content-only plan points to exact All-on-4 MD and contains no price/doctor IDs;
+3. price+doctors plan contains exact S27 projected offer order and linked doctor order;
+4. Nobel price plan contains only `all_on_4.jaw.nobel`;
+5. caries content plan points to exact MD; price contains only `caries.default`;
+6. caries+Nobel price is unfulfilled with no generic fallback;
+7. cost/doctor-trust/consultation identities and CTA pass exact from S27;
+8. client files unchanged; no product imports/writes/skip/xfail/live/LLM.
 
 ### Minimal neighbors
 
-- S22: `tests/test_target_response_evidence.py`, `tests/test_demo_target_response_evidence.py`;
-- S23/S24: `tests/test_target_offer_projection.py`,
-  `tests/test_demo_target_offer_projection.py`,
-  `tests/test_target_brand_offer_projection.py`,
-  `tests/test_demo_target_brand_offer_projection.py`;
-- S25/S26: `tests/test_target_brand_resolver.py`,
-  `tests/test_demo_target_brand_resolver.py`,
-  `tests/test_target_service_resolver.py`,
-  `tests/test_demo_target_service_resolver.py`.
+- `tests/test_target_offline_response_assembly.py`;
+- `tests/test_demo_target_offline_response_assembly.py`;
+- `tests/test_target_response_evidence.py`;
+- `tests/test_demo_target_response_evidence.py`;
+- `tests/test_target_offer_projection.py`;
+- `tests/test_target_brand_offer_projection.py`.
 
-No full suite, legacy runtime tests, A9 or live/LLM.
+Не запускать old AnswerPacket/Composer/runtime suites, full suite, A9 или live/LLM.
 
 ## Checker and git gates
 
-1. Governance TASK + roadmap pending; independent read-only checker `✅` before code.
-2. Commit `docs: govern vertical offline response assembly S27`; push only stage-a.
+1. Governance TASK + roadmap pending; independent checker `✅` before code.
+2. Commit `docs: govern target response materialization plan S28`; push only stage-a.
 3. Implement only allowlist; target then minimal neighbors.
 4. Independent completion checker `✅`; then roadmap `[x]`.
-5. Commit `feat: assemble vertical offline response materials S27`; push stage-a.
+5. Commit `feat: project target response materialization plans S28`; push stage-a.
 6. Final clean/synced.
 
 ## Definition of Done
 
-- S27 composes existing target components without duplicating their decisions;
-- final output hides all unprojected offers and preserves exact facts/money/limits;
+- S28 declaratively projects requested components from S27 without re-selection;
+- missing required material is explicit and fail-closed;
+- ordinary content-only plan stays clean; marketing identity remains policy-selected;
+- follow-up data remains in its owners and its materialization is not falsely claimed;
 - both checker gates `✅`, target/neighbors green, no skip/xfail;
-- no client/contracts/runtime/authority/A9/live changes;
+- no clients/contracts/runtime/authority/A9/live changes;
 - two commits pushed only stage-a, clean/synced;
-- next checkpoint evaluates minimal ResponseSpec over this proven material boundary,
-  not another data/lookup layer.
+- next checkpoint evaluates minimal identity-safe materialization (including selected-doc
+  content suggestions and selected-offer price followups), not another selector;
+- canonical upstream ResponsePolicy/ResponseSpec remains before evidence assembly and is
+  not duplicated or silently redefined by S28.

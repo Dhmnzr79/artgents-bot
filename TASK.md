@@ -1,141 +1,119 @@
-# TASK — S45 FullContext-grounded Service-optional Verified Response
+# TASK — S46 Boundary-enforced FullContext Verified Response
 
-**Branch / baseline:** `codex/stage-a` / `01dfa28 feat: wire cached FullContext into target Composer`
+**Branch / baseline:** `codex/stage-a` / `ab2fc69 feat: S45 FullContext service-optional verified response`
 
-**Goal:** один постоянный offline vertical slice: TurnFrame + envelope → **service-optional
-content response** → prebuilt cached FullContext как основной источник общих знаний → scoped
-primary evidence как strict sidecar → Composer → **FullContext-aware Verifier** → verified
-response. Исправить переходное противоречие S37/S38 «facts only from PRIMARY_EVIDENCE».
+**Read-only seam confirmation (pre-governance):**
 
-**No live/LLM. No runtime/UI/session/authority. No A9. No S43 changes.**
+- `enforce_target_medical_boundary_on_envelope(...)` вызывается **только** в
+  `tests/test_target_turn_frame_policy_envelope_enforcement.py` (S42 unit), **не** в demo/S45
+  chain.
+- Demo/S45 (`test_demo_target_turn_frame_bound_response.py`,
+  `test_target_fullcontext_content_response.py`) вызывают
+  `run_target_offline_turn_frame_bound_response(...)` с **вручную собранным**
+  `TargetTurnFramePolicyEnvelope` (`boundary_decision="none"|"medical_handoff"`), **минуя**
+  S42 enforcement.
+- Единого public entry `TurnFrame + TargetMedicalBoundaryResult → verified|terminal` **нет**.
+- Дубликата orchestrator в codebase нет → S46 **не STOP**.
 
-## Owner laws (source authority)
+**Goal:** один thin straight-line offline orchestrator над существующими public APIs:
 
-### FullContext — primary for general clinic MD content
+```
+TurnFrame + TargetMedicalBoundaryResult + explicit policy inputs + prebuilt FullContext
+→ enforce_target_medical_boundary_on_envelope (×1)
+→ terminal uncertain | run_target_offline_turn_frame_bound_response (×1)
+→ verified | terminal (existing unions)
+```
 
-Разрешён как основной источник для: общих информационных ответов; описаний услуг;
-клинико-информационных материалов; общих медицинских фактов клиники; успокаивающих ответов
-на страх лечения; другого содержательного MD-текста.
+**No live/LLM. No new inference/classifier/detector. No runtime/UI/session/authority. No A9.
+No S43 changes. No change to S45 FullContext vs structured authority.**
 
-### Primary evidence — strict sidecar only
+## Required behavior
 
-Authority только для: цен; этапов оплаты; скидок/акций/limited offers; marketing facts;
-consultation_value; CTA; exact doctor fields (имя, должность, стаж, service links); other
-strict/exact commercial facts.
+### Input
 
-### Conflict rule
+- готовый `TurnFrame`;
+- готовый `TargetMedicalBoundaryResult` (detector **не** вызывается);
+- explicit envelope policy kwargs (tone, topics, marketing permissions, confidence floors — as
+  S42 enforcement API);
+- все существующие S41/S45 assembly inputs (`bundle`, `doctor_catalog`, …,
+  `cached_full_context`, backends);
+- injected Composer + Verifier backends.
 
-Structured exact source wins; Composer must not mix values; Verifier fail-closed rejects
-conflicting answers.
+### Sequence (strict)
 
-### No document routing
+1. `enforce_target_medical_boundary_on_envelope(boundary, ...)` — **ровно один раз**.
+2. If `TargetMedicalBoundaryTerminalEnforcement` (`uncertain`):
+   - return as-is;
+   - **не** вызывать S41, Composer, Verifier.
+3. If `TargetMedicalBoundaryEnvelopeEnforcement`:
+   - `run_target_offline_turn_frame_bound_response(turn_frame, result.envelope, ...)` —
+     **ровно один раз**;
+   - return existing `TargetTurnFrameBoundMaterializeResponse |
+     TargetTurnFrameBoundTerminalResponse` без переписывания.
 
-Composer always sees entire cached FullContext; no pre-selected MD/chunk; scoped evidence
-does not hide corpus.
+### Errors
 
-## Service-optional materialization (permanent, not bridge)
+- Typed errors S42/S41/S40/S39/S37/S38 propagate unchanged; no catch/retry/fallback/repair.
+- Inconsistent boundary → existing `medical_boundary_result_inconsistent`.
+- Invalid policy inputs → existing S42 typed errors.
 
-Allow materialize **without `service_id`** only for safe general **content-only** path:
+### Semantics preserved
 
-- `response_mode`: `answer` or confident `medical_handoff`;
-- `required_components == ("content",)` only;
-- prebuilt `TargetCachedFullContext` injected (build once outside pipeline);
-- no service-scoped price/payment/doctors/offer requirements;
-- no service_id guessing.
+- `none` → ordinary answer path through S41/S45.
+- confident `medical_handoff` → safety mode + full grounded FullContext response (incl.
+  service_id=None pain path from S45).
+- `uncertain` → S42 terminal defer only.
+- urgent/manual-contact → upstream; **not** implemented in S46.
 
-Still forbidden without `service_id`: price; offer selection; service-specific doctor;
-service-specific marketing; bypassing structured selectors.
+## Public API
 
-Existing service-specific S34/S40/S41 paths **unchanged in meaning**.
+**Name:** `run_target_offline_boundary_enforced_fullcontext_response(...)`
 
-## Medical semantics (materialization targets)
+**Module:** `core/target_boundary_enforced_fullcontext_response.py`
 
-1. **Pain/reassurance** («Больно ли ставить имплант?»): materialize without service_id;
-   grounded from demo/synthetic FullContext (`implantation__faq__pain.md`); empathy allowed;
-   no personal pain-free promise; consultation close allowed; not terminal.
-2. **Known topic in corpus** (e.g. diabetes): neutral grounded answer + consultation; no
-   diagnosis/personal eligibility/treatment choice.
-3. **Missing topic in entire MD-base**: controlled materialized «нет в материалах клиники» +
-   consultation; **not** terminal defer; no model medical knowledge; no single hardcoded
-   template string.
-4. Only boundary **`uncertain`** → terminal defer.
-5. Urgent/manual-contact hard-stop unchanged and upstream.
+**Return union (no new heavy result model):**
 
-## FullContext-aware Verifier
+```python
+TargetMedicalBoundaryTerminalEnforcement
+| TargetTurnFrameBoundMaterializeResponse
+| TargetTurnFrameBoundTerminalResponse
+```
 
-- Receives same prebuilt `TargetCachedFullContext` as Composer; no rebuild; no per-turn FS.
-- Checks: general claims grounded in FullContext or allowed primary evidence; strict commercial
-  facts only in structured primary evidence; medical facts in clinic FullContext; no
-  diagnosis/differential/personal eligibility/treatment choice; missing-base without external
-  medical knowledge; topic/service-family scope; structured commercial numbers only from
-  primary evidence; allowable general MD numbers present in FullContext.
-- Replace misleading `grounded_in_primary_evidence` with semantically honest target contract
-  (no legacy compatibility).
-- No repair/retry/fallback; accept or reject only.
-
-## Composer policy (S37)
-
-Update system policy to match dual authority above. FullContext = primary knowledge input;
-primary evidence = strict structured sidecar. Allow empty primary evidence blocks only on
-verified FullContext content-only path (`service_id is None`, content-only components).
+Straight-line function: no branches beyond enforce → early return | S41 passthrough.
 
 ## Deliverables
 
-1. Service-optional content materialization in S34/S41 (and minimal package/scoped path).
-2. Updated Composer policy + invocation semantics (no «background only» for general facts).
-3. FullContext-aware Verifier contract + deterministic checks + semantic invocation payload.
-4. Pipeline propagation of `cached_full_context` into Verifier (S39/S40/S41 unchanged rebuild
-   rules from S44).
-5. Offline tests per acceptance below + neighbor regression.
-6. ARCH/ROADMAP status for S45 only.
+1. Thin orchestrator module (reuse S42 + S41 only; no duplicated S33–S45 logic).
+2. Offline acceptance tests per criteria below + neighbor regression.
+3. ARCH/ROADMAP S46 status only.
 
 ## Boundaries / allowlist
 
 - `TASK.md`
-- `contracts/target_response_verifier.py` (new semantic verification contract if split from core)
-- `core/target_composer_executor.py`
-- `core/target_composer_request.py`
-- `core/target_spec_offline_response_package.py`
-- `core/target_scoped_response_evidence.py`
-- `core/target_response_materialization_plan.py` (only if service_id optional for content-only)
-- `core/target_offline_response_assembly.py` (only if service_id optional typing)
-- `core/target_offline_response_package.py` (only if minimal content-only package helper)
-- `core/target_fullcontext_content_package.py` (new: minimal service-optional bound package)
-- `core/target_turn_frame_dispatch.py`
-- `core/target_response_verifier.py`
-- `core/target_verified_response_pipeline.py`
-- `tests/test_target_fullcontext_content_response.py` (new)
-- `tests/test_target_turn_frame_dispatch.py`
-- `tests/test_target_spec_offline_response_package.py`
-- `tests/test_target_scoped_response_evidence.py`
-- `tests/test_target_composer_executor.py`
-- `tests/test_target_response_verifier.py`
-- `tests/test_target_verified_response_pipeline.py`
-- `tests/test_demo_target_turn_frame_bound_response.py`
-- `tests/test_demo_target_verified_response_pipeline.py`
-- `tests/test_demo_target_policy_bound_verified_response_pipeline.py`
-- `tests/test_target_cached_full_context.py` (only if shared helpers)
-- `tests/test_target_policy_bound_verified_response_pipeline.py`
+- `core/target_boundary_enforced_fullcontext_response.py` (new)
+- `tests/test_target_boundary_enforced_fullcontext_response.py` (new)
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
-**Forbidden:** A9; S43 artifacts/matrix; runtime/UI/session/authority; live/LLM/providers;
-provider prompt caching; RAG/retriever/routing; legacy `knowledge_base.py`; hardcoded response
-templates; per-turn FullContext rebuild; new thematic classifier/router table; `used_doc_ids`
-product contract unless STOP escalation required.
+**Forbidden:** изменение `core/target_turn_frame_policy_envelope_enforcement.py`,
+`core/target_turn_frame_bound_response.py`, S45 core, S42 detector, A9, S43 artifacts,
+runtime/UI/session, live/LLM, new result contracts unless STOP escalation, RAG/routing,
+fallback/retry/repair, Verifier/authority weakening.
 
 ## Minimal protected acceptance (offline, no live)
 
-1. General service-less content: `service_id=None` materializes; Composer×1; Verifier×1.
-2. Pain/reassurance demo path: verified; grounded reassurance; no personal promise; not terminal.
-3. Known medical topic (diabetes): grounded passes; diagnosis/eligibility rejected.
-4. Missing topic synthetic: no-information + consultation passes; external medical fact rejected.
-5. Structured authority: price/marketing without evidence rejected; FullContext vs structured
-   conflict rejected; existing service-specific price/doctor path stays green.
-6. FullContext propagation: Composer + Verifier same prebuilt corpus; no builder/FS in pipeline.
-7. Boundary: uncertain terminal; confident medical_handoff materializes without service_id;
-   urgent path untouched.
-8. Neighbor regression: targeted S34/S37/S38/S39/S40/S41/S44 tests green; no skip/xfail.
+1. `boundary=none` + service-specific price: enforce×1, S41×1, Composer×1, Verifier×1 →
+   verified structured price.
+2. confident `medical_handoff` + `service_id=None` + pain: materialize, Composer×1,
+   Verifier×1, grounded reassurance, not terminal.
+3. confident `medical_handoff` + missing-base synthetic: controlled materialized response,
+   consultation, not defer; external medical fact rejected.
+4. `boundary=uncertain`: terminal defer; S41/Composer/Verifier not called.
+5. inconsistent boundary: typed fail-closed; downstream not called.
+6. topic/policy incompatibility: existing S41 typed error unchanged.
+7. same prebuilt `TargetCachedFullContext` for Composer + Verifier; no builder/FS in S46.
+8. Neighbor regression: targeted S42 enforcement, S41 dispatch/bound, S45 content response,
+   necessary S40/S39 neighbors; no skip/xfail.
 
 Run only listed targeted tests with external `--basetemp` and `-p no:cacheprovider`. **No full
 pytest. No live.**
@@ -143,20 +121,16 @@ pytest. No live.**
 ## Gates
 
 1. Independent **PRE-CODE** checker on governance TASK.
-2. Commit/push `docs: govern S45 FullContext service-optional verified response` (**TASK.md
+2. Commit/push `docs: govern S46 boundary-enforced FullContext verified response` (**TASK.md
    only**).
 3. Implement allowlist; run targeted offline tests.
 4. Independent **COMPLETION** checker.
 5. One completion commit; push; clean/synced.
 
-## STOP escalation (before coding)
-
-If mandatory new `used_doc_ids` product contract or other scope expansion emerges — STOP and
-report owner with minimal alternative.
-
 ## Explicitly out of scope
 
-- A9 / message→TurnFrame planner
-- Runtime / UI / session / product authority
-- Live Composer/Verifier quality proof
-- Provider prompt caching integration
+- Medical boundary detector / live classifier
+- message→TurnFrame planner (A9)
+- Runtime wiring / UI / session / product authority
+- Changes to FullContext vs structured authority (S45)
+- Provider prompt caching / legacy bridge

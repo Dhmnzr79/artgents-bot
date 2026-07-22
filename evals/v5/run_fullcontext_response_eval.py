@@ -294,7 +294,7 @@ def run_case(
         candidate_text=response_text,
         forbidden_claims=list(case["forbidden_claims"]),
         semantic_raw_payload=semantic_payload,
-        apply_semantic_assessment=False,
+        apply_semantic_assessment=True,
     )
     call_violation = provider_call_violation(
         expected_outcome=case["expected_outcome"],

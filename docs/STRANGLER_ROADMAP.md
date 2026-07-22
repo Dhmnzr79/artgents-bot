@@ -55,7 +55,7 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S48a harness measurement hardening** |
+| Последний завершённый checkpoint | **S48a-correction measurement contract honesty** |
 | Предыдущий checkpoint | **S46 — boundary-enforced FullContext verified response** (`d5a8557`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
@@ -359,6 +359,9 @@
 - [x] **S48a — harness measurement hardening** — diagnostic literal hits vs semantic reject
   flags; candidate text preserved on verifier rejection; frozen S47 replay read-only. Governance
   `a796ce4`. **S48b blocked** until separate owner command.
+- [x] **S48a-correction — measurement contract honesty** — remove always-green
+  forbidden/dangerous gates; semantic assessment denominators; `NOT_EVALUATED` dangerous medical
+  reporting. Governance `5f70039`. **S48b blocked**.
 
 ## Какой roadmap актуален
 

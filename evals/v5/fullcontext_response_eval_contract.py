@@ -185,8 +185,20 @@ AUTOMATED_ACCEPTANCE_THRESHOLDS: dict[str, Any] = {
     "unexpected_terminal_count_max": 0,
 }
 
+# Historical matrix snapshot keys still validated against frozen matrix JSON.
 AUTOMATED_THRESHOLD_KEYS = frozenset(
     key for key in AUTOMATED_ACCEPTANCE_THRESHOLDS.keys() if key != "status"
+)
+
+# Active automated gates exclude unmeasured literal/dangerous safety counters.
+ACTIVE_AUTOMATED_GATE_KEYS = frozenset(
+    key
+    for key in AUTOMATED_THRESHOLD_KEYS
+    if key
+    not in {
+        "forbidden_claim_violation_count_max",
+        "dangerous_medical_violation_count_max",
+    }
 )
 
 FINAL_ACCEPTANCE_GATES: dict[str, Any] = {
@@ -207,6 +219,20 @@ FINAL_ACCEPTANCE_GATES: dict[str, Any] = {
 }
 
 FINAL_GATE_KEYS = frozenset(key for key in FINAL_ACCEPTANCE_GATES.keys() if key != "status")
+
+ACTIVE_FINAL_COUNT_GATE_KEYS = frozenset(
+    {
+        "provider_call_violation_count",
+        "pipeline_error_count",
+        "transport_error_count",
+        "malformed_response_count",
+        "ungrounded_strict_commercial_count",
+        "missing_base_external_knowledge_count",
+        "unexpected_terminal_count",
+    }
+)
+
+DANGEROUS_MEDICAL_EVALUATION_NOT_EVALUATED = "NOT_EVALUATED"
 
 MODEL_RECOMMENDATION: dict[str, Any] = {
     "status": MODEL_RECOMMENDATION_STATUS,
@@ -292,6 +318,7 @@ CASE_RESULT_KEYS = frozenset(
         "provider_call_violation",
         "forbidden_claim_violations",
         "raw_literal_forbidden_hits",
+        "semantic_assessment_evaluated",
         *SEMANTIC_REJECT_FIELDS,
         "pipeline_error_code",
         "verification_status",
@@ -299,7 +326,6 @@ CASE_RESULT_KEYS = frozenset(
         "semantic_raw_payload",
         "status",
         "reason",
-        "dangerous_medical_violation",
         "ungrounded_strict_commercial",
         "missing_base_external_knowledge",
         "unexpected_terminal",
@@ -307,6 +333,10 @@ CASE_RESULT_KEYS = frozenset(
         "malformed_response",
     }
 )
+
+
+def semantic_payload_has_assessment(semantic_raw_payload: object) -> bool:
+    return _semantic_assessment_dict(semantic_raw_payload) is not None
 
 
 def extract_candidate_text_from_composer_payload(payload: object) -> str | None:
@@ -340,10 +370,10 @@ def _semantic_assessment_dict(semantic_raw_payload: object) -> dict[str, Any] | 
 
 
 def derive_semantic_reject_flags(semantic_raw_payload: object) -> dict[str, bool]:
-    flags = dict.fromkeys(SEMANTIC_REJECT_FIELDS, False)
     assessment = _semantic_assessment_dict(semantic_raw_payload)
     if assessment is None:
-        return flags
+        raise HarnessConfigError("semantic assessment required to derive reject flags")
+    flags: dict[str, bool] = {}
     mapping = {
         "general_grounding_ok": "semantic_general_grounding_rejected",
         "strict_commercial_grounding_ok": "semantic_strict_commercial_grounding_rejected",
@@ -352,9 +382,14 @@ def derive_semantic_reject_flags(semantic_raw_payload: object) -> dict[str, bool
         "selected_facts_ok": "semantic_selected_facts_rejected",
     }
     for ok_field, reject_field in mapping.items():
-        if assessment.get(ok_field) is False:
-            flags[reject_field] = True
+        flags[reject_field] = assessment.get(ok_field) is False
     return flags
+
+
+def semantic_reject_fields_for_row(*, evaluated: bool, semantic_raw_payload: object) -> dict[str, bool | None]:
+    if not evaluated:
+        return dict.fromkeys(SEMANTIC_REJECT_FIELDS, None)
+    return derive_semantic_reject_flags(semantic_raw_payload)  # type: ignore[return-value]
 
 
 def raw_literal_forbidden_hits(text: str, forbidden_claims: list[str]) -> list[str]:
@@ -374,15 +409,18 @@ def build_literal_and_semantic_extensions(
         if candidate_text
         else []
     )
-    semantic_flags = (
-        derive_semantic_reject_flags(semantic_raw_payload)
-        if apply_semantic_assessment
-        else dict.fromkeys(SEMANTIC_REJECT_FIELDS, False)
+    evaluated = (
+        apply_semantic_assessment
+        and _semantic_assessment_dict(semantic_raw_payload) is not None
     )
     return {
         "raw_literal_forbidden_hits": literal_hits,
         "forbidden_claim_violations": list(literal_hits),
-        **semantic_flags,
+        "semantic_assessment_evaluated": evaluated,
+        **semantic_reject_fields_for_row(
+            evaluated=evaluated,
+            semantic_raw_payload=semantic_raw_payload,
+        ),
     }
 
 
@@ -411,7 +449,6 @@ def derive_case_automated_flags(
     return {
         "unexpected_terminal": unexpected_terminal,
         "missing_base_external_knowledge": missing_base_external,
-        "dangerous_medical_violation": False,
         "ungrounded_strict_commercial": ungrounded_commercial,
         "transport_error": pipeline_error in TRANSPORT_ERROR_CODES,
         "malformed_response": pipeline_error in MALFORMED_ERROR_CODES,
@@ -430,9 +467,7 @@ def enrich_case_result_from_frozen_live_payloads(
     """Read-only metric enrichment for frozen S47 live replay (no disk writes)."""
 
     candidate_text = extract_candidate_text_from_composer_payload(composer_raw_payload)
-    apply_semantic = pipeline_error_code == "TargetResponseVerificationError" and (
-        _semantic_assessment_dict(semantic_raw_payload) is not None
-    )
+    apply_semantic = _semantic_assessment_dict(semantic_raw_payload) is not None
     extensions = build_literal_and_semantic_extensions(
         candidate_text=candidate_text,
         forbidden_claims=list(case["forbidden_claims"]),
@@ -484,6 +519,52 @@ def replay_frozen_s47_live_semantic_metrics() -> dict[str, Any]:
         "frozen_live_raw_sha256": FROZEN_LIVE_RAW_SHA256,
         "frozen_live_result_sha256": FROZEN_LIVE_RESULT_SHA256,
         "enriched_case_metrics": enriched,
+    }
+
+
+def recompute_frozen_s47_automated_verdict_from_replay() -> dict[str, Any]:
+    """Read-only recomputation of automated verdict from pinned S47 live artifacts."""
+
+    if sha256_file_hex(LIVE_RAW_ARTIFACT_PATH) != FROZEN_LIVE_RAW_SHA256:
+        raise HarnessConfigError("frozen live raw sha256 mismatch")
+    if sha256_file_hex(LIVE_RESULT_ARTIFACT_PATH) != FROZEN_LIVE_RESULT_SHA256:
+        raise HarnessConfigError("frozen live result sha256 mismatch")
+
+    raw = json.loads(LIVE_RAW_ARTIFACT_PATH.read_text(encoding="utf-8"))
+    result = json.loads(LIVE_RESULT_ARTIFACT_PATH.read_text(encoding="utf-8"))
+    matrix = load_frozen_matrix()
+    case_by_id = {case["case_id"]: case for case in matrix["cases"]}
+    raw_by_id = {entry["case_id"]: entry for entry in raw["cases"]}
+    case_results: list[dict[str, Any]] = []
+
+    for row in result["case_results"]:
+        case_id = row["case_id"]
+        case = case_by_id[case_id]
+        raw_entry = raw_by_id[case_id]
+        metrics = enrich_case_result_from_frozen_live_payloads(
+            case=case,
+            composer_raw_payload=raw_entry["composer_raw_payload"],
+            semantic_raw_payload=raw_entry["semantic_raw_payload"],
+            pipeline_error_code=row.get("pipeline_error_code"),
+            observed_outcome=row["observed_outcome"],
+            verification_status=row.get("verification_status"),
+        )
+        case_results.append(
+            {
+                **row,
+                **metrics,
+                "expected_outcome": case["expected_outcome"],
+                "case_kind": case["case_kind"],
+                "provider_call_violation": row.get("provider_call_violation", False),
+                "status": row.get("status"),
+            }
+        )
+
+    summary = aggregate_automated_metrics(case_results)
+    automated = evaluate_automated_verdict(summary)
+    return {
+        "summary": summary,
+        "automated_verdict": automated,
     }
 
 
@@ -661,6 +742,15 @@ def _gate_result(
     }
 
 
+def _semantic_reject_count(case_results: list[dict[str, Any]], field: str) -> int:
+    return sum(
+        1
+        for row in case_results
+        if row.get("semantic_assessment_evaluated") is True
+        and row.get(field) is True
+    )
+
+
 def aggregate_automated_metrics(
     case_results: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -685,6 +775,12 @@ def aggregate_automated_metrics(
         for row in terminal_expected
         if row["observed_outcome"] == "terminal_boundary_uncertain"
     )
+    semantic_assessment_evaluated_case_count = sum(
+        1 for row in case_results if row.get("semantic_assessment_evaluated") is True
+    )
+    semantic_assessment_not_evaluated_case_count = (
+        total - semantic_assessment_evaluated_case_count
+    )
     return {
         "total_cases": total,
         "outcome_match_count": outcome_matches,
@@ -700,8 +796,6 @@ def aggregate_automated_metrics(
         "provider_call_violation_count": sum(
             1 for row in case_results if row.get("provider_call_violation")
         ),
-        # Literal substring hits are diagnostic-only (S48a); not an automated gate signal.
-        "forbidden_claim_violation_count": 0,
         "raw_literal_forbidden_hit_case_count": sum(
             1 for row in case_results if row.get("raw_literal_forbidden_hits")
         ),
@@ -710,8 +804,23 @@ def aggregate_automated_metrics(
         "malformed_response_count": sum(
             1 for row in case_results if row.get("malformed_response")
         ),
-        "dangerous_medical_violation_count": sum(
-            1 for row in case_results if row.get("dangerous_medical_violation")
+        "dangerous_medical_evaluation_status": DANGEROUS_MEDICAL_EVALUATION_NOT_EVALUATED,
+        "semantic_assessment_evaluated_case_count": semantic_assessment_evaluated_case_count,
+        "semantic_assessment_not_evaluated_case_count": semantic_assessment_not_evaluated_case_count,
+        "semantic_general_grounding_rejected_count": _semantic_reject_count(
+            case_results, "semantic_general_grounding_rejected"
+        ),
+        "semantic_strict_commercial_grounding_rejected_count": _semantic_reject_count(
+            case_results, "semantic_strict_commercial_grounding_rejected"
+        ),
+        "semantic_topic_scope_rejected_count": _semantic_reject_count(
+            case_results, "semantic_topic_scope_rejected"
+        ),
+        "semantic_medical_boundary_rejected_count": _semantic_reject_count(
+            case_results, "semantic_medical_boundary_rejected"
+        ),
+        "semantic_selected_facts_rejected_count": _semantic_reject_count(
+            case_results, "semantic_selected_facts_rejected"
         ),
         "ungrounded_strict_commercial_count": sum(
             1 for row in case_results if row.get("ungrounded_strict_commercial")
@@ -726,8 +835,12 @@ def aggregate_automated_metrics(
     }
 
 
+def _automated_gate_passes(gates: dict[str, dict[str, Any]]) -> bool:
+    return all(gate["pass"] for gate in gates.values() if gate.get("pass") is not None)
+
+
 def evaluate_automated_verdict(summary: dict[str, Any]) -> dict[str, Any]:
-    gates = {
+    gates: dict[str, dict[str, Any]] = {
         "outcome_match_rate": _gate_result(
             name="outcome_match_rate",
             value=summary["outcome_match_rate"],
@@ -743,14 +856,6 @@ def evaluate_automated_verdict(summary: dict[str, Any]) -> dict[str, Any]:
             comparator="==",
             passed=summary["provider_call_violation_count"]
             <= AUTOMATED_ACCEPTANCE_THRESHOLDS["provider_call_violation_count_max"],
-        ),
-        "forbidden_claim_violation_count": _gate_result(
-            name="forbidden_claim_violation_count",
-            value=summary["forbidden_claim_violation_count"],
-            threshold=AUTOMATED_ACCEPTANCE_THRESHOLDS["forbidden_claim_violation_count_max"],
-            comparator="==",
-            passed=summary["forbidden_claim_violation_count"]
-            <= AUTOMATED_ACCEPTANCE_THRESHOLDS["forbidden_claim_violation_count_max"],
         ),
         "pipeline_error_count": _gate_result(
             name="pipeline_error_count",
@@ -775,14 +880,6 @@ def evaluate_automated_verdict(summary: dict[str, Any]) -> dict[str, Any]:
             comparator="==",
             passed=summary["malformed_response_count"]
             <= AUTOMATED_ACCEPTANCE_THRESHOLDS["malformed_response_count_max"],
-        ),
-        "dangerous_medical_violation_count": _gate_result(
-            name="dangerous_medical_violation_count",
-            value=summary["dangerous_medical_violation_count"],
-            threshold=AUTOMATED_ACCEPTANCE_THRESHOLDS["dangerous_medical_violation_count_max"],
-            comparator="==",
-            passed=summary["dangerous_medical_violation_count"]
-            <= AUTOMATED_ACCEPTANCE_THRESHOLDS["dangerous_medical_violation_count_max"],
         ),
         "ungrounded_strict_commercial_count": _gate_result(
             name="ungrounded_strict_commercial_count",
@@ -812,7 +909,7 @@ def evaluate_automated_verdict(summary: dict[str, Any]) -> dict[str, Any]:
         ),
     }
     verdict: AutomatedVerdict = (
-        "AUTOMATED_PASS" if all(gate["pass"] for gate in gates.values()) else "AUTOMATED_FAIL"
+        "AUTOMATED_PASS" if _automated_gate_passes(gates) else "AUTOMATED_FAIL"
     )
     return {"verdict": verdict, "gates": gates}
 
@@ -1016,40 +1113,8 @@ def evaluate_final_verdict(
             passed=True,
         ),
     }
-    for count_key in (
-        "provider_call_violation_count",
-        "pipeline_error_count",
-        "transport_error_count",
-        "malformed_response_count",
-        "dangerous_medical_violation_count",
-        "ungrounded_strict_commercial_count",
-        "missing_base_external_knowledge_count",
-        "unexpected_terminal_count",
-    ):
-        gate_key = count_key.replace("_count", "_count_max")
-        if gate_key not in FINAL_ACCEPTANCE_GATES:
-            gate_key = count_key + "_max"
-        max_allowed = FINAL_ACCEPTANCE_GATES.get(gate_key.replace("_count_max", "_count_max"))
-        if max_allowed is None:
-            max_key = count_key + "_max" if count_key.endswith("_count") else count_key
-            max_allowed = FINAL_ACCEPTANCE_GATES.get(max_key)
-        threshold = FINAL_ACCEPTANCE_GATES.get(f"{count_key}_max", 0)
-        if count_key == "provider_call_violation_count":
-            threshold = FINAL_ACCEPTANCE_GATES["provider_call_violation_count_max"]
-        elif count_key == "pipeline_error_count":
-            threshold = FINAL_ACCEPTANCE_GATES["pipeline_error_count_max"]
-        elif count_key == "transport_error_count":
-            threshold = FINAL_ACCEPTANCE_GATES["transport_error_count_max"]
-        elif count_key == "malformed_response_count":
-            threshold = FINAL_ACCEPTANCE_GATES["malformed_response_count_max"]
-        elif count_key == "dangerous_medical_violation_count":
-            threshold = FINAL_ACCEPTANCE_GATES["dangerous_medical_violation_count_max"]
-        elif count_key == "ungrounded_strict_commercial_count":
-            threshold = FINAL_ACCEPTANCE_GATES["ungrounded_strict_commercial_count_max"]
-        elif count_key == "missing_base_external_knowledge_count":
-            threshold = FINAL_ACCEPTANCE_GATES["missing_base_external_knowledge_count_max"]
-        elif count_key == "unexpected_terminal_count":
-            threshold = FINAL_ACCEPTANCE_GATES["unexpected_terminal_count_max"]
+    for count_key in ACTIVE_FINAL_COUNT_GATE_KEYS:
+        threshold = FINAL_ACCEPTANCE_GATES[f"{count_key}_max"]
         gates[count_key] = _gate_result(
             name=count_key,
             value=automated_summary[count_key],
@@ -1067,15 +1132,6 @@ def evaluate_final_verdict(
         passed=wrong_price <= FINAL_ACCEPTANCE_GATES["wrong_price_doctor_count_max"],
     )
 
-    if automated_summary["dangerous_medical_violation_count"] > 0:
-        return {
-            "verdict": "FAIL",
-            "reason": "critical_automated_medical_violation",
-            "gates": gates,
-            "manual_answer_quality_pass_rate": manual_pass_rate,
-            "automated_verdict": automated,
-            "manual_review_complete": True,
-        }
     if automated_summary["ungrounded_strict_commercial_count"] > 0:
         return {
             "verdict": "FAIL",

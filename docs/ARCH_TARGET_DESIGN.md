@@ -191,6 +191,13 @@ catch/fallback прекращает downstream. Verified text и sidecars воз
 Это structural offline entry point, а не готовый бот: TurnFrame/A9 authority, provider/live
 quality, routes/UI/session и product wiring остаются отдельными governed этапами.
 
+S41 добавляет deterministic TurnFrame dispatch boundary перед S40. Explicit envelope owns
+tone, topic scope, required facts, marketing permissions and `boundary_decision`; TurnFrame
+contributes only intent/aspects/topic/clarify/service_id mapping. Invalid metadata raises
+typed dispatch errors; successful dispatch returns only `materialize | terminal`. Materialize
+calls S40 once; clarify/defer/non-materializable medical handoff return payload-free
+`TargetResponseSpec` without S34/S40. `patient_scope` is not read.
+
 ---
 
 ## Порядок работ — strangler, две кучи

@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S40 — policy-bound offline verified response pipeline завершён** |
-| Ближайший рабочий фокус без live | **Следующий checkpoint только отдельным governance TASK; offline vertical от policy до verified response structurally complete** |
+| Отдельная S-series без live | **S41 — TurnFrame-bound offline response dispatch завершён** |
+| Ближайший рабочий фокус без live | **Следующий checkpoint только отдельным governance TASK; offline path TurnFrame → dispatch → verified response structurally complete** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -247,6 +247,15 @@
   neighbors `54 passed`, всего `68 passed`, skip/xfail нет. Это structural offline entry
   point от explicit policy request; TurnFrame/A9 authority, provider/live quality,
   runtime/UI/session и product authority остаются отдельными gates.
+
+- [x] **S41 — TurnFrame-bound offline response dispatch** — deterministic dispatch maps
+  `TurnFrame` + explicit envelope to `materialize | terminal` without reading
+  `patient_scope`; materialize calls public S40 once, while clarify/defer/non-materializable
+  medical handoff stop before S34/S40 with payload-free `TargetResponseSpec`. Owner mapping:
+  `payment → price`, `stages → content` always; valid confident topic must match envelope
+  scope. Governance `65c87bd`; independent completion review `✅`: S41 target/demo `22 passed`,
+  S40/S33 neighbors `31 passed`, всего `53 passed`, skip/xfail нет. Message→TurnFrame,
+  runtime/UI/session, live/LLM and product authority remain separate gates.
 
 ## Какой roadmap актуален
 

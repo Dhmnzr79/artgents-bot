@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S32 — canonical target ResponseSpec contract: governance pending, код не начат** |
-| Ближайший рабочий фокус без live | **Проверить governance S32; до checker ✅ код не писать** |
+| Отдельная S-series без live | **S32 — canonical target ResponseSpec contract завершён offline** |
+| Ближайший рабочий фокус без live | **Governance deterministic ResponsePolicy-builder из explicit non-A9 inputs** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -182,9 +182,12 @@
   Governance `729fdf9`; independent completion review `✅`: target `11 passed`, восемь
   S27–S30 neighbor files `104 passed`, всего `115 passed`, skip/xfail нет. Это не
   финальный bot path; следующий focus — минимальный канонический upstream ResponseSpec.
-- [ ] **S32 — canonical target ResponseSpec contract** — governance prepared для strict
-  immutable декларации режима, scope, required facts/components и permissions. Он не
-  строится из TurnFrame и не подключён к authority; до checker `✅` код не пишется.
+- [x] **S32 — canonical target ResponseSpec contract** — strict immutable декларация
+  режима, scope, required facts/components и permissions с обязательной семантикой
+  medical no-diagnosis boundary. Governance `77547d8`, protected-test correction
+  `ee930f1`; independent completion review `✅`: target `23 passed`, шесть S28/S30/S31
+  neighbor files `60 passed`, всего `83 passed`, skip/xfail нет. TurnFrame/A9 authority
+  и product path не подключены; следующий focus — deterministic offline ResponsePolicy.
 
 ## Какой roadmap актуален
 

@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
 
+from contracts.target_response_spec import TargetFollowupSource
 from core.target_response_followup_materializer import (
     TargetContentFollowup,
     TargetPriceFollowup,
     TargetResponseFollowups,
 )
 
-
-TargetFollowupSource: TypeAlias = Literal["content", "price"]
 
 _SOURCES = frozenset({"content", "price"})
 

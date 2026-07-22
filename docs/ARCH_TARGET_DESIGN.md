@@ -115,6 +115,13 @@ materials, plan, follow-up candidates и selected follow-ups. Он не меня
 перехватывает ошибки стадий. Это проверка сквозной совместимости текущего downstream
 участка, а не финальный target path и не замена upstream ResponseSpec.
 
+S32 вводит канонический immutable `TargetResponseSpec`: response mode, tone key,
+allowed/forbidden topic scope, required facts/components, follow-up family и permissions
+для marketing/consultation/CTA. `medical_handoff` сам является обязательной downstream
+границей no-diagnosis/differential/personal-eligibility/treatment-choice; forbidden topics
+лишь дополнительно сужают evidence. Manual-contact hard-stop происходит до ResponseSpec.
+S32 валидирует explicit spec offline, но ещё не строит его из TurnFrame и не имеет authority.
+
 ---
 
 ## Порядок работ — strangler, две кучи

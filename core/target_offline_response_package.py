@@ -11,6 +11,7 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
+from contracts.target_response_spec import TargetFollowupSource
 from core.target_offline_response_assembly import (
     TargetOfflineResponseMaterials,
     assemble_target_offline_response_materials,
@@ -20,7 +21,6 @@ from core.target_response_followup_materializer import (
     materialize_target_response_followups,
 )
 from core.target_response_followup_policy import (
-    TargetFollowupSource,
     TargetResponseFollowupSelection,
     select_target_response_followups,
 )

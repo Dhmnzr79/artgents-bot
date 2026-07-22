@@ -339,6 +339,7 @@ def test_exact_signature_four_error_codes_and_import_firewall() -> None:
     assert imported_modules <= {
         "__future__",
         "collections.abc",
+        "contracts.target_response_spec",
         "dataclasses",
         "typing",
         "core.target_offline_response_assembly",

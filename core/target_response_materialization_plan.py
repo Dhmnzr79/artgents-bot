@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
 
+from contracts.target_response_spec import TargetResponseComponent
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
 
-
-TargetResponseComponent: TypeAlias = Literal["content", "price", "doctors"]
 
 _COMPONENTS = frozenset({"content", "price", "doctors"})
 

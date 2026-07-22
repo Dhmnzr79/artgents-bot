@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S28 — minimal target response materialization plan: governance pending, код ещё не начат** |
-| Ближайший рабочий фокус без live | **Проверить governance S28; до checker ✅ код не писать** |
+| Отдельная S-series без live | **S28 — minimal target response materialization plan реализован и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Минимальная identity-safe материализация selected-doc suggestions и selected-offer followups; не новый selector** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -159,12 +159,13 @@
   required neighbors `191 passed`, skip/xfail нет. Product path не подключён; следующий
   focus — minimal downstream materialization plan над proven materials; канонический
   ResponsePolicy/ResponseSpec остаётся отдельной upstream boundary до evidence assembly.
-- [ ] **S28 — minimal target response materialization plan** — governance подготовлен для
-  identity-only декларации над S27 materials: explicit content/price/doctors components,
-  exact selected additions и fail-closed unfulfilled signal. До independent checker `✅`
-  код не пишется; MD/follow-up materialization и product wiring не входят в checkpoint.
-  Канонический upstream ResponsePolicy/ResponseSpec до evidence assembly остаётся
-  отдельной будущей границей и не переопределяется S28.
+- [x] **S28 — minimal target response materialization plan** — identity-only декларация
+  над S27 materials сохраняет explicit content/price/doctors components, exact selected
+  additions и fail-closed unfulfilled signal без fallback/reselection. Governance
+  `cc692ae`; independent completion review `✅`: target `26 passed`, required neighbors
+  `94 passed`, skip/xfail нет. MD/follow-up materialization и product wiring не входят в
+  checkpoint. Канонический upstream ResponsePolicy/ResponseSpec до evidence assembly
+  остаётся отдельной будущей границей и не переопределяется S28.
 
 ## Какой roadmap актуален
 

@@ -84,6 +84,21 @@ A0 не является задачей «сначала сделать legacy �
 
 Переход ownership на `TurnFrame` разрешён только отдельными последующими задачами после проверки telemetry; сам факт появления frame в ctx не означает переключение архитектуры.
 
+### Offline S28 downstream boundary
+
+S28 не реализует и не переопределяет канонический `ResponseSpec` из шага 3 target
+цепочки. Настоящий ResponsePolicy/ResponseSpec остаётся **до** evidence assembly и будет
+владеть tone, allowed/forbidden topics, required facts, handoff и допустимыми
+deterministic cards.
+
+Отдельный S28 `TargetResponseMaterializationPlan` находится **после** проверенной S27
+offline assembly. Он только проецирует identity уже выбранных материалов для будущего
+materializer: exact content ref, projected offer IDs, linked doctor IDs и уже выбранные
+marketing/consultation/CTA identities. Missing required component отмечается явно без
+fallback; S28 не решает clarify/defer, не читает MD/followups, не формирует текст и не
+подключён к product path. Такое разделение не меняет порядок target chain и не создаёт
+второго смысла для имени `ResponseSpec`.
+
 ---
 
 ## Порядок работ — strangler, две кучи

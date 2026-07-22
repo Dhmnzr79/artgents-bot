@@ -1,215 +1,239 @@
-# TASK — S26 Deterministic Active Service Term Resolution
+# TASK — S27 First Vertical Offline Response Materials Assembly
 
 **Ветка:** `codex/stage-a`
 
-**Baseline:** `c7baf96 feat: resolve target brand terms S25`
+**Baseline:** `8bd8fe8 feat: resolve target service terms S26`
 
-**Серия / checkpoint:** `S26` — последний минимальный dictionary lookup перед первой
-end-to-end сборкой: один уже выделенный service term → exact active target `service_id`.
+**Серия / checkpoint:** `S27` — первая vertical offline end-to-end сборка уже готовых
+target-компонентов: service/optional brand terms → exact identity → S22 evidence →
+S23/S24 eligible offers → один безопасный пакет материалов перед ResponseSpec/Composer.
 
-**Режим:** governance + один new pure unwired resolver + synthetic/real-data unit tests +
-price/service architecture status. Никаких client-data changes, patient-scope selection,
-лечебных рекомендаций, runtime/ответов/routes/UI/authority или live/LLM.
+**Режим:** governance + один new pure unwired facade + synthetic/real-data unit tests +
+architecture status. Никаких новых data/selector semantics, client changes,
+patient-scope authority, ResponseSpec, Composer/runtime/routes/UI или live/LLM.
 
 ## Owner direction
 
-После S25 владелец разрешил двигаться дальше и отдельно потребовал не наращивать
-архитектурные слои бесконечно. S26 закрывает только необходимый identity lookup услуги,
-чтобы уже готовые S10/S22/S23–S25 могли получить exact service ID без legacy catalog
-matcher. После S26 следующий рекомендуемый checkpoint — первая вертикальная offline
-end-to-end сборка существующих компонентов, а не новый справочник «на всякий случай».
+После S26 владелец подтвердил движение дальше и потребовал не скатываться в
+переусложнение. Поэтому S27 не добавляет очередной resolver. Он соединяет существующие
+S10/S21/S22/S23/S24/S25/S26 в первый вертикальный deterministic path и скрывает от
+следующего слоя все authored offers, которые ещё не прошли eligibility/brand projection.
 
-## Минимальная граница S26
+Вертикаль S27 начинается не с raw patient message, а с уже выделенных exact terms и
+явных context snapshots. Заканчивается готовыми factual materials до естественного
+текста. Это offline integration boundary, а не product wiring.
 
-Создать `core/target_service_resolver.py`:
+## Exact public API
+
+Создать `core/target_offline_response_assembly.py`:
 
 ```python
 @dataclass(frozen=True, slots=True)
-class TargetServiceResolution:
+class TargetOfflineResponseMaterials:
     service_id: str
     service: TargetService
+    selected_brand_id: str | None
+    brand: TargetBrand | None
+    matched_rule_id: str | None
+    max_options: int
+    offers: tuple[TargetOffer, ...]
+    doctors: tuple[ServiceDoctorContext, ...]
+    selected_content_ref: str | None
+    marketing_selection: TargetMarketingSelection
+    commercial_facts: tuple[TargetCommercialFact, ...]
+    external_source_refs: tuple[str, ...]
+    consultation_close: ServiceConsultationValue | None
+    marketing_slots_used: int
+    amplifier_slots_used: int
 
 
-def resolve_target_service_term(
-    services: dict[str, TargetService],
+def assemble_target_offline_response_materials(
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    external_index: ResponseSchemaExternalIndex,
+    consultation_values: Sequence[ServiceConsultationValue],
+    *,
     service_term: str,
-) -> TargetServiceResolution | None:
+    brand_term: str | None,
+    strategy_context: TargetStrategyMatch,
+    semantic_context: str,
+    today: date,
+    include_initial_block: bool,
+    include_consultation_close: bool,
+    marketing_scenarios: Sequence[str] = (),
+    shown_fact_ids: Sequence[str] = (),
+    shown_amplifier_refs: Sequence[str] = (),
+    shown_consultation_value_refs: Sequence[str] = (),
+) -> TargetOfflineResponseMaterials:
     ...
 ```
 
-`services` — already validated `ResponseSchemaBundle.services`. `service_term` — одна
-уже выделенная upstream строка. Resolver не получает TurnFrame, patient facts, полное
-сообщение как отдельную семантическую сущность или service family.
+Typed bundle/catalog/index/strategy context remain validated owner inputs. S27 validates
+only its own no-match boundary; downstream validators retain all existing errors.
 
-Result содержит exact dictionary key и deep-copied service record. Unknown или exact
-term только неактивной услуги возвращает `None` без похожей/активной подстановки.
+## Exact algorithm and ownership
 
-## Exact laws
+Order is fixed:
 
-### 1. Input validation
+1. Call S26 `resolve_target_service_term(bundle.services, service_term)`.
+   - invalid/ambiguous errors propagate unchanged;
+   - `None` → `TargetOfflineResponseAssemblyError(
+     "offline_assembly_service_not_found", service_term)`.
+2. If `brand_term is None`, no brand resolution/filter.
+3. Otherwise call S25 `resolve_target_brand_term(bundle.brands, brand_term)`.
+   - invalid/ambiguous errors propagate unchanged;
+   - `None` → `TargetOfflineResponseAssemblyError(
+     "offline_assembly_brand_not_found", brand_term)`.
+4. Call S22 `build_target_response_evidence_package` with resolved service ID and
+   `selected_content_ref=service_resolution.service.content_ref`; pass all marketing,
+   date, shown-state and consultation inputs exact unchanged.
+5. Without brand call S23 `project_target_service_offers` on S22 service context with
+   `selected_option_id=None`, `explicit_offer_id=None`.
+6. With brand call S24 `project_target_service_brand_offers` with resolved brand ID and
+   the same explicit `strategy_context`; option/explicit offer remain `None`.
+7. Materialize one flat detached result only from S22 evidence plus S23/S24 projection.
 
-- `services` обязан быть exact `dict`; иначе
-  `TargetServiceResolutionError("service_resolution_catalog_invalid", services)`;
-- каждый key обязан быть nonblank `str`, каждое value — `TargetService`; forged input
-  даёт `service_resolution_catalog_invalid` с offending key/value;
-- `service_term` обязан быть nonblank `str`; иначе
-  `TargetServiceResolutionError("service_resolution_term_invalid", original)`.
+`TargetOfflineResponseAssemblyError(ValueError)` stores `code`, `value`; exact message
+`f"{code}: {value!r}"`. It introduces only the two not-found codes above and never wraps
+S21–S26 errors.
 
-Error наследует `ValueError`, хранит `code`, `value`,
-`candidate_service_ids: tuple[str, ...] = ()`; message exact
-`f"{code}: {value!r}"`.
+## Final-material safety law
 
-Typed catalog records не revalidate/repair и не мутируются.
+- output `offers` contains only S23/S24 projected offers in clinic-strategy order/cap;
+- S22 all-authored `service_context.offers` is internal and is not exposed in result;
+- inactive/other-service/other-brand offers cannot be recovered from output;
+- no brand means eligible offers across brands/unbranded according to S23, not a guessed
+  brand;
+- known brand with no offer for service returns empty offers, no generic/other-brand
+  fallback;
+- service, brand, offers, commercial facts and consultation are detached/deep-copied;
+- doctors are frozen S10 value records in authored catalog order; S27 does not rank a
+  “best doctor”;
+- marketing selection/limits/CTA remain exact S21/S22 output;
+- price mode/amount/currency/unit/package/payment stages/fact refs/followups never change
+  or recalculate;
+- selected content ref is exact service-owned `content_ref`; S27 does not read MD body.
 
-### 2. Normalization and lookup
+## Deliberate first-vertical limits
 
-Единственная normalization input и authored labels:
+S27 intentionally does not accept/select `selected_option_id` or `explicit_offer_id`.
+Those lower-level capabilities remain in S23/S24 but are not needed to prove the first
+named-service vertical slice. This prevents widening the facade before integration
+evidence exists.
 
-```python
-value.strip().casefold()
-```
+S27 also does not:
 
-Для каждой `service.active is True` lookup values в authored order:
-
-1. dictionary `service_id`;
-2. `service.name`;
-3. `service.aliases`.
-
-Не выполняются punctuation removal, word splitting, substring/regex search, stemming,
-fuzzy/typo correction, transliteration, keyboard repair или LLM inference.
-
-Некоторые demo aliases намеренно имеют форму полного вопроса (`сколько стоит ...`). Они
-могут match только при exact совпадении всей переданной строки после
-`strip().casefold()`; произвольное сообщение не сканируется на содержащийся alias.
-
-### 3. Active/no-match/collision
-
-- inactive service labels не кандидаты;
-- ноль active candidates → `None`, без fallback на inactive, похожую, generic или другую
-  service;
-- несколько совпавших labels одного active service deduplicate;
-- два и более distinct active services → fail-closed error:
-  `code="service_resolution_ambiguous"`, original term в `value`, distinct IDs в
-  `candidate_service_ids` в catalog insertion order;
-- первый service, ID precedence или client strategy не разрешают collision.
-
-### 4. Result and composition
-
-- один active candidate → frozen/slots resolution;
-- `service_id` — exact authored key;
-- `service` — deep copy exact record вместе с aliases, selection, options/content refs;
-- repeated calls stateless, inputs/nested lists не мутируются.
-
-Caller может явно передать `resolution.service_id` в S10
-`build_service_data_context`, затем использовать S22/S23/S24. S26 сам ничего из них не
-импортирует/не вызывает и не выбирает brand/option/offer/doctor/marketing.
-
-## Что S26 сознательно не делает
-
-- не анализирует симптомы и не превращает их в диагноз/service;
-- не применяет `TargetServiceSelection` к extent/stage/jaw/reported_context;
-- не строит general shortlist и не ранжирует S15 strategy;
-- не разрешает service option и не выбирает метод лечения;
-- не исправляет опечатки; language layer сможет предложить canonical term позже, а
-  resolver только подтвердит catalog identity;
-- не читает files/client/session/clock и не пишет state;
-- не подключается к planner/legacy matcher/composer/routes/API/app/UI;
-- не меняет contracts, target/current client data или product authority;
-- не меняет/не перезапускает A9 artifacts и не запускает live/LLM.
+- parse raw patient text or repair typos;
+- apply patient scope/selection modes, diagnose or recommend treatment;
+- build a general service shortlist;
+- select/rank one doctor;
+- invent marketing copy or consultation text;
+- create ResponseSpec, prompt, natural-language answer, cards/buttons/UI;
+- read client files/session/clock or write shown state;
+- connect to planner/legacy matcher/Composer/routes/API/app/config;
+- change S1–S26 contracts/code/data or product authority;
+- touch/re-run A9 artifacts or live/LLM.
 
 ## Затрагиваемые файлы
 
 - `TASK.md`;
-- `core/target_service_resolver.py` — new pure offline resolver;
-- `tests/test_target_service_resolver.py` — new synthetic contract;
-- `tests/test_demo_target_service_resolver.py` — new real-data/composition acceptance;
-- `docs/PRICE_SERVICE_ARCHITECTURE.md` — S26 boundary;
-- `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion checker `✅`.
+- `core/target_offline_response_assembly.py` — new pure facade;
+- `tests/test_target_offline_response_assembly.py` — new synthetic vertical contract;
+- `tests/test_demo_target_offline_response_assembly.py` — new real demo vertical acceptance;
+- `docs/PRICE_SERVICE_ARCHITECTURE.md` — S27 boundary;
+- `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, then `[x]` only after completion checker `✅`.
 
-Любой другой файл требует остановки и отдельного решения владельца/Архитектора.
+Любой другой файл — стоп и отдельное owner/architect decision.
 
 ## Protected / вне scope
 
-- весь `clients/**`, включая target/current service catalogs/aliases/MD;
-- весь `contracts/**` и frozen S1 schema;
-- existing S10/S15/S21–S25 core modules/loaders;
-- legacy/current `query_selector.py`, `core/catalog_match.py`,
-  `core/service_selector_llm.py`, planner/service matching и tests;
-- patient scope, selection-mode logic, options, family shortlist, dialog/session;
-- ResponseSpec/composer/Verifier/FullContext/routes/API/app/UI/config;
-- protected golden/eval fixtures;
-- A9 design/raw/frozen/harness/evidence/live re-audit;
-- live/LLM, merge, `main`, другие ветки и product authority.
+- весь `clients/**`, contracts и existing core modules S1–S26;
+- current/legacy planner, service matcher, price/marketing/composer/runtime paths;
+- option/explicit-offer facade expansion, service shortlist, doctor ranking;
+- ResponseSpec/materializer/Verifier/Composer/FullContext/session/routes/API/UI/config;
+- golden/live/eval fixtures;
+- A9 design/raw/frozen/harness/evidence/re-audit;
+- live/LLM, merge, `main`, other branches, product authority.
 
 ## Acceptance tests
 
-### Synthetic
+### Synthetic vertical contract
 
-`tests/test_target_service_resolver.py` обязан доказать:
+`tests/test_target_offline_response_assembly.py` proves:
 
-1. exact API/result fields, frozen/slots shell, detached `TargetService` nested data;
-2. invalid catalog/keys/values/term дают stable exact errors;
-3. active ID, canonical name и каждый alias resolve exact ID;
-4. только outer whitespace + Unicode casefold нормализуются;
-5. phrase substring, punctuation, typo, morphology, transliteration и unknown → `None`;
-6. inactive exact ID/name/alias → `None`, без active fallback;
-7. same-service ID/name/alias collision deduplicates;
-8. cross-active-service collision fail-closed с stable catalog-order candidates;
-9. inactive colliding record не создаёт active ambiguity;
-10. selection/options/content refs возвращаются exact без применения;
-11. repeated calls stateless, inputs не мутируются;
-12. imports только stdlib + target service contract; нет IO/client/S10/runtime.
+1. exact API/result fields, frozen/slots shell, tuple outputs and detached nested models;
+2. service ID/name/alias enters via S26; unknown gets S27 not-found; invalid/ambiguous S26
+   errors propagate unchanged;
+3. `brand_term=None` uses S23, preserves eligible multi-brand/unbranded ordering/cap;
+4. brand ID/canonical/alias enters via S25 then S24; unknown gets S27 not-found;
+5. invalid/ambiguous S25 errors propagate unchanged;
+6. other-brand/unbranded/inactive offers never leak in branded result;
+7. known brand without service offer returns empty, no fallback;
+8. inactive parent service cannot resolve; inactive offers filtered;
+9. S15 first rule/priority/cap metadata preserved;
+10. exact service content ref drives S22 consultation close/cadence;
+11. marketing refs/facts/CTA/limits/shown snapshots preserved exact;
+12. linked doctors carried in authored order without ranking;
+13. fixed/from/range/no-public money/package/stages/followups unchanged;
+14. result exposes no S10 context/all-authored offer collection;
+15. repeated calls stateless/no input mutation;
+16. fixed error precedence is proven across boundaries:
+    - service invalid/ambiguous/not-found happens before any brand or S22 validation;
+    - once service is valid, brand invalid/ambiguous/not-found happens before S22;
+    - only after both identities are valid may evidence/marketing validation run;
+17. with valid identities, at least one representative S21 validation error and one
+    representative S22-only validation error propagate unchanged in exact exception
+    type, `code`, `value` and message; S27 never wraps them;
+18. source/API inspection proves S27 introduces/raises only
+    `offline_assembly_service_not_found` and `offline_assembly_brand_not_found`, has no
+    broad exception translation, and cannot invent other assembly error codes;
+19. imports only stdlib/contracts + pure S21–S26 facade dependencies; no IO/client/runtime.
 
-### Real demo
+### Real demo vertical acceptance
 
-`tests/test_demo_target_service_resolver.py` обязан read-only доказать:
+`tests/test_demo_target_offline_response_assembly.py` proves read-only:
 
-1. real S2 bundle/services грузятся через frozen boundary;
-2. все authored ID/name/aliases всех 21 active demo services разрешаются в свой exact ID;
-3. каталог содержит 199 lookup labels и ноль normalized cross-service collisions;
-4. case/outer whitespace работают для representative Cyrillic/Latin labels;
-5. unknown/typo/morphology/arbitrary containing phrase не match;
-6. exact authored full-question alias match допустим только целиком;
-7. explicit chain `All-on-4` → S26 service ID → S10 context → `нобель` через S25 →
-   S24 projection возвращает только `all_on_4.jaw.nobel`, exact 428000 RUB/jaw и stages;
-8. client files unchanged; no product imports/writes/skip/xfail/live/LLM.
+1. real bundle/doctors/external index/consultations loaded through existing frozen tools;
+2. `All-on-4`, no brand, service semantic context returns exact service/content ref,
+   linked doctors, S16 order Impro→Implantium→Nobel, consultation close and limits;
+3. `All-on-4` + `нобель` returns only Nobel 428000 RUB/jaw with package/stages/followups;
+4. price/cost marketing selects exact commercial facts and blocks consultation when
+   S21/S22 amplifier limit is full;
+5. doctor-trust scenario carries exact doctor refs + initial fact, without doctor ranking;
+6. `caries`, no brand, returns its generic eligible offer and linked doctors/data;
+7. known demo brand with no caries offer returns empty, not caries generic price;
+8. unknown service/brand fail closed;
+9. source files unchanged; no product imports/writes/skip/xfail/live/LLM.
 
-### Минимальные neighbors
+### Minimal neighbors
 
-- `tests/test_target_brand_resolver.py`;
-- `tests/test_demo_target_brand_resolver.py`;
-- `tests/test_service_data_context.py`;
-- `tests/test_target_brand_offer_projection.py`;
-- `tests/test_demo_target_brand_offer_projection.py`;
-- `tests/test_response_schema_contract.py`;
-- `tests/test_response_schema_loader.py`;
-- `tests/test_demo_target_service_catalog.py`.
+- S22: `tests/test_target_response_evidence.py`, `tests/test_demo_target_response_evidence.py`;
+- S23/S24: `tests/test_target_offer_projection.py`,
+  `tests/test_demo_target_offer_projection.py`,
+  `tests/test_target_brand_offer_projection.py`,
+  `tests/test_demo_target_brand_offer_projection.py`;
+- S25/S26: `tests/test_target_brand_resolver.py`,
+  `tests/test_demo_target_brand_resolver.py`,
+  `tests/test_target_service_resolver.py`,
+  `tests/test_demo_target_service_resolver.py`.
 
-Не запускать full suite, legacy service matcher tests, live/LLM или A9.
+No full suite, legacy runtime tests, A9 or live/LLM.
 
-## Checker gates
+## Checker and git gates
 
-До кода read-only checker должен подтвердить minimal exact-term scope, active/collision
-laws, отсутствие patient-scope/diagnosis/fuzzy semantics, прямую совместимость с S10 и
-что после S26 roadmap переводит фокус на vertical end-to-end assembly.
-
-После реализации checker повторяет target/neighbors и проверяет allowlist, честность
-tests, no mutation/wiring/authority/live.
-
-## Git protocol
-
-1. TASK + pending roadmap; checker `✅` до code/data.
-2. Commit `docs: govern target service resolution S26`; push only `codex/stage-a`.
-3. Implement allowlist; target + listed neighbor tests.
-4. Completion checker `✅`; roadmap `[x]` с next focus end-to-end assembly.
-5. Commit `feat: resolve target service terms S26`; push only `codex/stage-a`.
-6. Финал: clean tree, HEAD == origin.
+1. Governance TASK + roadmap pending; independent read-only checker `✅` before code.
+2. Commit `docs: govern vertical offline response assembly S27`; push only stage-a.
+3. Implement only allowlist; target then minimal neighbors.
+4. Independent completion checker `✅`; then roadmap `[x]`.
+5. Commit `feat: assemble vertical offline response materials S27`; push stage-a.
+6. Final clean/synced.
 
 ## Definition of Done
 
-- оба checker gate `✅`;
-- exact active service term resolver реализован и проверен;
-- target/neighbor tests green, no skip/xfail;
+- S27 composes existing target components without duplicating their decisions;
+- final output hides all unprojected offers and preserves exact facts/money/limits;
+- both checker gates `✅`, target/neighbors green, no skip/xfail;
 - no client/contracts/runtime/authority/A9/live changes;
-- два commits pushed only `codex/stage-a`, tree clean/synced;
-- следующий roadmap focus — первая end-to-end offline assembly, не новый lookup layer.
+- two commits pushed only stage-a, clean/synced;
+- next checkpoint evaluates minimal ResponseSpec over this proven material boundary,
+  not another data/lookup layer.

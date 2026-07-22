@@ -174,7 +174,8 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
     ]
     assert policy_positions == sorted(policy_positions)
     assert "CACHED_FULL_CONTEXT" in TARGET_COMPOSER_SYSTEM_POLICY
-    assert "Never diagnose" in TARGET_COMPOSER_SYSTEM_POLICY
+    assert "dry refusal" in TARGET_COMPOSER_SYSTEM_POLICY
+    assert "allow_cta" in TARGET_COMPOSER_SYSTEM_POLICY
 
 
 def test_executor_serializes_one_exact_immutable_invocation_and_keeps_sidecars_out() -> None:
@@ -199,7 +200,10 @@ def test_executor_serializes_one_exact_immutable_invocation_and_keeps_sidecars_o
         '{"response_mode":"answer","tone_key":"commercial_warm",'
         '"tone_instruction":"Отвечай доброжелательно и без давления.",'
         '"allowed_topics":["implantation"],"forbidden_topics":["diagnosis"],'
-        '"required_fact_ids":["fact_one"]}'
+        '"required_fact_ids":["fact_one"],'
+        '"allow_marketing_facts":true,'
+        '"allow_consultation_close":false,'
+        '"allow_cta":true}'
     )
     evidence = json.loads(invocation.primary_evidence_json)
     assert list(evidence[0]) == [
@@ -435,8 +439,37 @@ def test_medical_handoff_reaches_policy_but_remains_unverified() -> None:
     assert json.loads(backend.invocations[0].response_directives_json)[
         "response_mode"
     ] == "medical_handoff"
-    assert "Never diagnose" in backend.invocations[0].system_policy
+    assert "dry refusal" in backend.invocations[0].system_policy
     assert result.verification_status == "unverified"
+
+
+def test_medical_handoff_directives_include_cta_policy_flags() -> None:
+    spec = _spec(
+        response_mode="medical_handoff",
+        required_fact_ids=(),
+        required_components=(),
+        followup_source=None,
+        allow_marketing_facts=False,
+        allow_consultation_close=True,
+        allow_cta=False,
+    )
+    request = _request(
+        spec=spec,
+        evidence_blocks=(_request().evidence_blocks[0],),
+        selected_followups=TargetResponseFollowupSelection(source=None, content=(), price=()),
+        selected_cta_key=None,
+    )
+    backend = RecordingBackend("Ответ.")
+    execute_target_composer(
+        request,
+        backend,
+        tone=_tone(),
+        cached_full_context=_cached_context(),
+    )
+    directives = json.loads(backend.invocations[0].response_directives_json)
+    assert directives["allow_cta"] is False
+    assert directives["allow_consultation_close"] is True
+    assert directives["allow_marketing_facts"] is False
 
 
 def test_full_context_validation_fails_closed_before_backend() -> None:

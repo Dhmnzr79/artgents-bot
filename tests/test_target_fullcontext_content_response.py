@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -79,6 +80,16 @@ MISSING_TOPIC_TEXT = (
 EXTERNAL_MEDICAL_TEXT = (
     "В материалах клиники нет информации по этой теме. "
     "Системный красный волчанок — аутоиммунное заболевание соединительной ткани."
+)
+
+UNGROUNDED_EXTENSION_TEXT = (
+    "При компенсированном диабете имплантация возможна — под контролем врача. "
+    "Обычно полное заживление занимает около трёх месяцев."
+)
+
+CTA_FROM_CORPUS_TEXT = (
+    "Страх боли при имплантации — нормальная реакция. "
+    "Запишитесь по телефону +7 (495) 128-47-60."
 )
 
 
@@ -171,6 +182,27 @@ class RuleBasedSemanticBackend:
                 strict_commercial_grounding_ok=True,
                 topic_scope_ok=True,
                 medical_boundary_ok=False,
+                selected_facts_ok=True,
+            )
+        if self.mode == "ungrounded_extension":
+            grounded_core = "компенсирован" in text and "компенсирован" in corpus
+            ungrounded_addition = "трёх месяц" in text or "заживл" in text
+            return TargetSemanticVerification(
+                general_grounding_ok=grounded_core and not ungrounded_addition,
+                strict_commercial_grounding_ok=True,
+                topic_scope_ok=True,
+                medical_boundary_ok=True,
+                selected_facts_ok=True,
+            )
+        if self.mode == "cta_reject":
+            has_contact = "+7" in text or "whatsapp" in text
+            spec = json.loads(invocation.response_spec_json)
+            allowed = spec.get("allow_cta", True)
+            return TargetSemanticVerification(
+                general_grounding_ok=True,
+                strict_commercial_grounding_ok=not has_contact or allowed,
+                topic_scope_ok=True,
+                medical_boundary_ok=True,
                 selected_facts_ok=True,
             )
         raise AssertionError(f"unknown mode: {self.mode}")
@@ -290,6 +322,12 @@ def test_general_service_less_content_materializes_with_single_composer_and_veri
     assert len(semantic.invocations) == 1
     assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
     assert semantic.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    directives = json.loads(composer.invocations[0].response_directives_json)
+    spec_payload = json.loads(semantic.invocations[0].response_spec_json)
+    assert directives["allow_cta"] is False
+    assert directives["allow_consultation_close"] is True
+    assert spec_payload["allow_cta"] is False
+    assert spec_payload["allow_consultation_close"] is True
     assert result.verified.verification_status == "verified"
 
 
@@ -434,6 +472,92 @@ def test_missing_topic_rejects_external_medical_knowledge(tmp_path: Path) -> Non
             semantic_backend=RuleBasedSemanticBackend(mode="missing_reject"),
         )
     assert caught.value.code == "target_verifier_semantic_rejected"
+
+
+def test_ungrounded_medical_extension_is_rejected() -> None:
+    inputs = _pipeline_inputs()
+    spec = build_target_response_spec(_content_only_policy(response_mode="medical_handoff"))
+    bound = assemble_target_fullcontext_content_bound_package(spec)
+    request = materialize_target_composer_request(
+        bound,
+        inputs["bundle"],  # type: ignore[arg-type]
+        inputs["doctor_catalog"],  # type: ignore[arg-type]
+        inputs["consultation_values"],  # type: ignore[arg-type]
+        user_message="Можно ли ставить импланты при диабете?",
+        md_root=MD_ROOT,
+    )
+    unverified = TargetUnverifiedComposedResponse(
+        text=UNGROUNDED_EXTENSION_TEXT,
+        spec=request.spec,
+        selected_followups=request.selected_followups,
+        selected_cta_key=request.selected_cta_key,
+    )
+    with pytest.raises(TargetResponseVerificationError) as caught:
+        verify_target_composed_response(
+            request,
+            unverified,
+            cached_full_context=DEMO_FULL_CONTEXT,
+            semantic_backend=RuleBasedSemanticBackend(mode="ungrounded_extension"),
+        )
+    assert caught.value.code == "target_verifier_semantic_rejected"
+    assert "general_grounding_ok" in caught.value.value
+
+
+def test_cta_prose_from_corpus_rejected_when_allow_cta_false() -> None:
+    inputs = _pipeline_inputs()
+    spec = build_target_response_spec(
+        _content_only_policy(response_mode="medical_handoff", allow_cta=False)
+    )
+    bound = assemble_target_fullcontext_content_bound_package(spec)
+    request = materialize_target_composer_request(
+        bound,
+        inputs["bundle"],  # type: ignore[arg-type]
+        inputs["doctor_catalog"],  # type: ignore[arg-type]
+        inputs["consultation_values"],  # type: ignore[arg-type]
+        user_message="Больно ли ставить имплант?",
+        md_root=MD_ROOT,
+    )
+    unverified = TargetUnverifiedComposedResponse(
+        text=CTA_FROM_CORPUS_TEXT,
+        spec=request.spec,
+        selected_followups=request.selected_followups,
+        selected_cta_key=request.selected_cta_key,
+    )
+    with pytest.raises(TargetResponseVerificationError) as caught:
+        verify_target_composed_response(
+            request,
+            unverified,
+            cached_full_context=DEMO_FULL_CONTEXT,
+            semantic_backend=RuleBasedSemanticBackend(mode="cta_reject"),
+        )
+    assert caught.value.code == "target_verifier_semantic_rejected"
+    assert "strict_commercial_grounding_ok" in caught.value.value
+
+
+def test_consultation_close_without_contacts_stays_allowed() -> None:
+    composer = RecordingComposerBackend(MISSING_TOPIC_TEXT)
+    semantic = RuleBasedSemanticBackend(mode="missing_ok")
+    result = run_target_offline_turn_frame_bound_response(
+        _frame(aspects=["overview"], route="content"),
+        _envelope(
+            boundary_decision="medical_handoff",
+            required_fact_ids=(),
+            allow_marketing_facts=False,
+            allow_cta=False,
+            allow_consultation_close=True,
+        ),
+        **_pipeline_inputs(
+            user_message="Можно ли делать имплантацию при системной красной волчанке?",
+            include_cta=False,
+        ),  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.verified.verification_status == "verified"
+    assert "консультац" in result.verified.text.lower()
+    assert "+7" not in result.verified.text
+    assert "whatsapp" not in result.verified.text.lower()
 
 
 def test_price_without_structured_evidence_is_rejected() -> None:

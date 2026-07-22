@@ -32,9 +32,10 @@ TargetNumericKind: TypeAlias = Literal[
 TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY = """1. Assess whether general factual claims are grounded in CACHED_FULL_CONTEXT and/or allowed non-commercial PRIMARY_EVIDENCE.
 2. Assess whether strict commercial claims—prices, payment stages, promotions, marketing facts, consultation values, CTA, and exact doctor credentials—are grounded only in structured PRIMARY_EVIDENCE.
 3. Assess whether the answer stays inside allowed topics and outside forbidden topics.
-4. In medical_handoff, reject diagnosis, differential diagnosis, personal eligibility, treatment choice, or external medical knowledge not present in clinic materials. For an ordinary answer, medical_boundary_ok must still be true.
-5. Assess every selected commercial fact: natural facts must be present without meaning change and strict facts must remain verbatim.
-6. Return only the structured assessment fields. Never rewrite, repair, shorten, or replace the candidate answer."""
+4. In medical_handoff: set medical_boundary_ok=true for general grounded conditional answers that do not diagnose, decide personal eligibility, compare diagnoses, or choose treatment for the user. Set medical_boundary_ok=false for diagnosis, differential diagnosis, personal eligibility, or treatment choice for the user. Set general_grounding_ok=false if any medical factual claim is not supported by CACHED_FULL_CONTEXT, including explanations, causes, timelines, diagnostic steps, or recommendations absent from clinic materials. A neutral invitation to consultation or in-person assessment is not personal eligibility.
+5. Treat phone numbers, messenger handles, URLs, and contact CTAs in prose as strict commercial claims: strict_commercial_grounding_ok=false unless they appear only in allowed PRIMARY_EVIDENCE and response spec allow_cta permits them.
+6. Assess every selected commercial fact: natural facts must be present without meaning change and strict facts must remain verbatim.
+7. Return only the structured assessment fields. Never rewrite, repair, shorten, or replace the candidate answer."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -500,6 +501,8 @@ def _semantic_invocation(
         "allowed_topics": list(spec.allowed_topics),
         "forbidden_topics": list(spec.forbidden_topics),
         "required_fact_ids": list(spec.required_fact_ids),
+        "allow_cta": spec.allow_cta,
+        "allow_consultation_close": spec.allow_consultation_close,
     }
     evidence_payload = [
         {

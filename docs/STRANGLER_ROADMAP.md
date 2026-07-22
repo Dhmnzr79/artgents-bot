@@ -55,8 +55,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S48a-correction measurement contract honesty** |
-| Предыдущий checkpoint | **S46 — boundary-enforced FullContext verified response** (`d5a8557`) |
+| Последний завершённый checkpoint | **S48b — FullContext medical response semantic hardening** |
+| Предыдущий checkpoint | **S48a-correction measurement contract honesty** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
 | Ближайший рабочий focus без live | **Первый разрешённый live response eval — отдельное governance** |
@@ -362,6 +362,10 @@
 - [x] **S48a-correction — measurement contract honesty** — remove always-green
   forbidden/dangerous gates; semantic assessment denominators; `NOT_EVALUATED` dangerous medical
   reporting. Governance `5f70039`. **S48b blocked**.
+- [x] **S48b — FullContext medical response semantic hardening** — Composer/Verifier
+  universal medical grounding, missing-base, CTA/consultation directives; offline contract
+  tests only. Governance `6a377ad`. **No live** — model quality unproven until separate
+  approved re-eval.
 
 ## Какой roadmap актуален
 

@@ -266,6 +266,8 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
     assert "CACHED_FULL_CONTEXT" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "every selected commercial fact" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "Never rewrite" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "allow_cta" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "general_grounding_ok=false" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
 
 
 def test_success_calls_one_semantic_backend_and_preserves_exact_response() -> None:
@@ -289,6 +291,8 @@ def test_success_calls_one_semantic_backend_and_preserves_exact_response() -> No
         "allowed_topics",
         "forbidden_topics",
         "required_fact_ids",
+        "allow_cta",
+        "allow_consultation_close",
     ]
     evidence = json.loads(invocation.primary_evidence_json)
     assert list(evidence[0]) == [

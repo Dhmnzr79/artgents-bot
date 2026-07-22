@@ -90,6 +90,8 @@ Allowlist:
 - `core/target_response_followup_policy.py` (import ownership only)
 - `core/target_offline_response_package.py` (import ownership only)
 - `tests/test_target_response_spec.py`
+- `tests/test_target_response_materialization_plan.py` (protected firewall compatibility:
+  add only `contracts.target_response_spec` to its allowed import set)
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 

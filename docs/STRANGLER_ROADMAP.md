@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S27 — first vertical offline response materials assembly: governance pending, код ещё не начат** |
-| Ближайший рабочий фокус без live | **Проверить governance S27; до checker ✅ код не писать. После S27 — минимальный ResponseSpec над proven materials, не новый lookup/data layer** |
+| Отдельная S-series без live | **S27 — first vertical offline response materials assembly реализован и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Минимальный ResponseSpec над proven S27 materials; не добавлять новый lookup/data layer** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -152,11 +152,12 @@
   ID/name/authored alias без fuzzy, patient-scope selection или diagnosis. Independent
   completion review `✅`: target `51 passed`, required neighbors `185 passed`, skip/xfail
   нет. Следующий focus — vertical offline end-to-end assembly, не новый lookup layer.
-- [ ] **S27 — first vertical offline response materials assembly** — governance
-  подготовлен для одного pure facade над S26/S25→S22→S23/S24: exact service/optional
-  brand terms превращаются в projected offers, linked doctors, marketing и consultation
-  materials без unprojected offers. До independent checker `✅` код не пишется; после
-  S27 следующий focus — minimal ResponseSpec, не новый lookup/data layer.
+- [x] **S27 — first vertical offline response materials assembly** — один pure facade
+  над S26/S25→S22→S23/S24 превращает exact service/optional brand terms в projected
+  offers, linked doctors, marketing и consultation materials, не раскрывая unprojected
+  offers. Governance `f98b8df`; independent completion review `✅`: target `18 passed`,
+  required neighbors `191 passed`, skip/xfail нет. Product path не подключён; следующий
+  focus — minimal ResponseSpec, не новый lookup/data layer.
 
 ## Какой roadmap актуален
 

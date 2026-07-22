@@ -55,8 +55,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S43 correction — pre-live freeze & harness hardening** |
-| Предыдущий checkpoint | **Owner clarification — Medical question semantics** (`9549f58`) |
+| Последний завершённый checkpoint | **S43 first live eval audit capture** |
+| Предыдущий checkpoint | **S43 correction — pre-live freeze & harness hardening** (`33e2643`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S43 — medical boundary live eval prep завершён** |
 | Ближайший рабочий focus без live | **Live medical boundary eval — только после отдельного разрешения владельца и утверждения thresholds** |
@@ -321,6 +321,12 @@
   completion after independent checker `✅`. Matrix hash updated; tests `54 passed`.
   First live run still requires explicit delegate injection; existing live artifacts must not
   be overwritten.
+- [x] **S43 first live eval audit capture** — owner-authorized first live run captured
+  byte-identical: raw SHA-256 `3D32B768…`, result SHA-256 `F6B33E447…`, matrix blob
+  `7218e044…`, 26/26 calls, exit 0, verdict **PASS**, exact **25/26**, sole non-exact
+  `mb_border_01`. Eval-only `--live` wiring committed; audit manifest +
+  `medical_boundary_eval_live_audit_manifest.json`; offline CLI tests. **DO_NOT_RERUN**.
+  Governance `fe5d6ed`. A9/runtime/UI/session/product authority untouched.
 
 ## Какой roadmap актуален
 

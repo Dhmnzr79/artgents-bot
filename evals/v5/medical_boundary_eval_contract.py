@@ -13,7 +13,16 @@ FROZEN_MATRIX_HASH = "7218e044b2f34b1be5c71b385d407e9ee8fb759d"
 LIVE_ARTIFACTS_DIR = _REPO_ROOT / "evals" / "v5" / "artifacts"
 LIVE_RAW_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "medical_boundary_eval_live_raw.json"
 LIVE_RESULT_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "medical_boundary_eval_live_result.json"
+LIVE_AUDIT_MANIFEST_PATH = LIVE_ARTIFACTS_DIR / "medical_boundary_eval_live_audit_manifest.json"
 DEFAULT_LIVE_ARTIFACT_PATHS = (LIVE_RAW_ARTIFACT_PATH, LIVE_RESULT_ARTIFACT_PATH)
+
+FROZEN_LIVE_RAW_SHA256 = (
+    "3d32b7689262c2fcc868042cc8673d2124b790f05bef5b7213c44a342c0da723"
+)
+FROZEN_LIVE_RESULT_SHA256 = (
+    "f6b33e44786c9ae3148a619025bd58d181e1e0ed387781383931b333d9e75de1"
+)
+FIRST_LIVE_BASELINE_COMMIT = "33e2643c6942effaf9089efb7602cde939ad4805"
 
 MEASUREMENT_ID = "s43_medical_boundary_live_eval"
 
@@ -148,6 +157,30 @@ class LiveArtifactWriteError(HarnessConfigError):
 def git_blob_hash(data: bytes) -> str:
     header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()
+
+
+def sha256_file_hex(path: Path) -> str:
+    digest = hashlib.sha256()
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def validate_frozen_live_artifact_hashes(
+    *,
+    raw_path: Path = LIVE_RAW_ARTIFACT_PATH,
+    result_path: Path = LIVE_RESULT_ARTIFACT_PATH,
+) -> None:
+    raw_actual = sha256_file_hex(raw_path)
+    if raw_actual != FROZEN_LIVE_RAW_SHA256:
+        raise HarnessConfigError(
+            f"live raw sha256 mismatch expected={FROZEN_LIVE_RAW_SHA256} actual={raw_actual}"
+        )
+    result_actual = sha256_file_hex(result_path)
+    if result_actual != FROZEN_LIVE_RESULT_SHA256:
+        raise HarnessConfigError(
+            "live result sha256 mismatch "
+            f"expected={FROZEN_LIVE_RESULT_SHA256} actual={result_actual}"
+        )
 
 
 def canonical_git_blob_bytes(path: Path) -> bytes:

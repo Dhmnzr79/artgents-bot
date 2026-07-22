@@ -381,8 +381,11 @@ before first live; harness passes floors explicitly and evaluates deterministic 
 gates with correct rate denominators. Harness scores exact, uncertain, dangerous false-none,
 excessive false-medical-handoff (among expected=none), malformed/backend failures, and
 transport separately. First live raw/result artifacts require absent-before-run check and
-exclusive-create writes. **Scope:** boundary classification only — not medical answer content,
-Verifier, or FullContext integration. No live run in offline milestones.
+exclusive-create writes. **First live audit (2026):** owner-authorized run captured with
+immutable artifacts and audit manifest; verdict **PASS** 25/26, sole non-exact `mb_border_01`;
+model `qwen3.6-flash` provenance from run log only; **LIVE_ALREADY_RUN_ONCE / DO_NOT_RERUN**.
+**Scope:** boundary classification only — not medical answer content, Verifier, or FullContext
+integration.
 
 ---
 

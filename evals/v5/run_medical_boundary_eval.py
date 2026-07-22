@@ -17,12 +17,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from evals.v5.medical_boundary_eval_backend import (
+    MedicalBoundaryEvalBackendAdapter,
     MedicalBoundaryEvalRecordingBackend,
     MedicalBoundaryEvalTransportError,
 )
 from evals.v5.medical_boundary_eval_contract import (
     ACCEPTANCE_THRESHOLDS,
     CASE_RESULT_KEYS,
+    DEFAULT_LIVE_ARTIFACT_PATHS,
     LIVE_RAW_ARTIFACT_PATH,
     LIVE_RESULT_ARTIFACT_PATH,
     MEASUREMENT_ID,
@@ -296,6 +298,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Validate matrix only; do not execute cases",
     )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Run first permitted live eval with injected LLM delegate (artifacts exclusive-create)",
+    )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     try:
@@ -316,6 +323,47 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
         print(json.dumps(payload["summary"], ensure_ascii=False, indent=2))
         return 0
+
+    if args.live:
+        raw_path = Path(args.raw_output)
+        result_path = Path(args.output)
+        artifact_paths = tuple(dict.fromkeys((*DEFAULT_LIVE_ARTIFACT_PATHS, raw_path, result_path)))
+
+        def _live_factory(case: dict[str, Any]) -> MedicalBoundaryEvalBackendAdapter:
+            from evals.v5.medical_boundary_eval_live_backend import MedicalBoundaryEvalLiveBackend
+
+            _ = case
+            return MedicalBoundaryEvalBackendAdapter(delegate=MedicalBoundaryEvalLiveBackend())
+
+        try:
+            assert_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
+            payload = run_harness_with_backend_factory(
+                backend_factory=_live_factory,
+                matrix_path=Path(args.matrix),
+                artifact_paths=artifact_paths,
+            )
+            raw_artifact = {
+                "measurement_id": MEASUREMENT_ID,
+                "cases": [
+                    {
+                        "index": row["index"],
+                        "case_id": row["case_id"],
+                        "raw_backend_payload": row["raw_backend_payload"],
+                    }
+                    for row in payload["case_results"]
+                ],
+            }
+            write_json_exclusive(raw_path, raw_artifact)
+            write_json_exclusive(result_path, payload)
+        except (HarnessConfigError, LiveArtifactWriteError) as error:
+            print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+            return 2
+
+        summary = payload["summary"]
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        verdict = summary["threshold_verdict"]["verdict"]
+        print(f"THRESHOLD_VERDICT: {verdict}", file=sys.stderr)
+        return 0 if verdict == "PASS" else 4
 
     print(
         "LIVE_NOT_CONFIGURED: permitted live run requires explicit delegate backend injection",

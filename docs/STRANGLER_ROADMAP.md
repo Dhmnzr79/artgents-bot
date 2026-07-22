@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S45 — FullContext service-optional verified response** |
-| Предыдущий checkpoint | **S44 — cached FullContext Composer input** (`01dfa28`) |
+| Последний завершённый checkpoint | **S46 — boundary-enforced FullContext verified response** |
+| Предыдущий checkpoint | **S45 — FullContext service-optional verified response** (`ab2fc69`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S45 завершён**; offline target slice закрывает service-optional content path |
-| Ближайший рабочий focus без live | **Runtime wiring / live gates — только по отдельному governance** |
+| Отдельная S-series без live | **S46 завершён**; offline chain TurnFrame+boundary→verified structurally closed |
+| Ближайший рабочий focus без live | **Live quality proof / message→TurnFrame runtime — отдельное governance** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -341,6 +341,10 @@
   `general_grounding_ok` / `strict_commercial_grounding_ok`; Verifier получает тот же prebuilt
   `TargetCachedFullContext` без rebuild. Missing-base и pain/diabetes offline acceptance без
   live. Governance `e7c312c`. No live.
+- [x] **S46 — boundary-enforced FullContext verified response** — thin orchestrator
+  `run_target_offline_boundary_enforced_fullcontext_response`: готовый `TurnFrame` +
+  `TargetMedicalBoundaryResult` → S42 enforce×1 → uncertain terminal | S41/S45×1 → verified |
+  terminal. Без detector/live/новых слоёв. Governance `9ad4614`. No live.
 
 ## Какой roadmap актуален
 

@@ -411,6 +411,15 @@ exact facts win; Verifier fail-closes. Dispatch sanitizes envelope for content-o
 Verifier receives the same prebuilt `TargetCachedFullContext` as Composer. **S34/S40/S41
 service-specific paths unchanged in meaning.** No live/LLM. Governance `e7c312c`.
 
+S46 closes the last manual seam in the offline response chain (offline/unwired). Public API
+`run_target_offline_boundary_enforced_fullcontext_response` accepts ready `TurnFrame` +
+`TargetMedicalBoundaryResult` (detector **not** called), runs S42
+`enforce_target_medical_boundary_on_envelope` once, returns
+`TargetMedicalBoundaryTerminalEnforcement` for `uncertain` without S41/Composer/Verifier, else
+delegates to S41 `run_target_offline_turn_frame_bound_response` once. Return union uses
+existing types only. **No new inference, package builder, or authority change.** Governance
+`9ad4614`. No live/LLM.
+
 ---
 
 ## Порядок работ — strangler, две кучи

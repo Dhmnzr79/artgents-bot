@@ -144,6 +144,15 @@ forbidden topics. Required fact считается покрытым только
 завершается явной ошибкой без whole-base fallback. Composer/Verifier/product wiring всё
 ещё отсутствуют; medical_handoff prose safety остаётся их отдельной обязательной границей.
 
+S36 является последним offline-адаптером перед будущим Composer call: exact S35 identities
+дословно разворачиваются в immutable request blocks. Content получает только выбранное MD
+body без frontmatter; anchored KB/doctor refs — только точную секцию; offers — цену,
+package и payment stages без candidate fact_refs/follow-ups; doctors — только имя,
+должность, стаж и выбранный profile section; commercial fact/consultation копируются из
+точного source object. FullContext cache не перестраивается и не ищется. S36 ещё не
+вызывает модель и не создаёт ответ: Composer execution, live quality proof, Verifier и
+product wiring остаются отдельными gates.
+
 ---
 
 ## Порядок работ — strangler, две кучи

@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S35 — scoped response evidence завершён offline** |
-| Ближайший рабочий фокус без live | **Минимальный Composer над закрытым S35 evidence-view** |
+| Отдельная S-series без live | **S36 — target Composer request materialization завершён offline** |
+| Ближайший рабочий фокус без live | **Governance минимального Composer executor; live/LLM только отдельно** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -206,6 +206,14 @@
   поэтому candidate injection закрыт. Governance `84182a9`; independent completion review
   `✅`: target/demo `15 passed`, S34/S31 neighbors `32 passed`, всего `47 passed`,
   skip/xfail нет. Live/LLM, A9, Composer/Verifier и product authority не подключены.
+- [x] **S36 — target Composer request materialization** — exact S35 scope records
+  разворачиваются один-к-одному в immutable model-ready blocks: выбранное MD body/section,
+  offers с payment stages без candidate refs, согласованные doctor fields/profile section,
+  commercial fact и consultation value. FullContext не ищется и не перестраивается;
+  provider/model call отсутствует. Governance `b0fe669`; independent completion review
+  `✅`: target/demo `25 passed`, S35/S34 neighbors `36 passed`, всего `61 passed`,
+  skip/xfail нет. Composer execution/live proof, Verifier, A9 и product authority не
+  подключены.
 
 ## Какой roadmap актуален
 

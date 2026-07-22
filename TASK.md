@@ -1,157 +1,190 @@
-# TASK — S41 TurnFrame-bound Offline Response Dispatch
+# TASK — S42 Provider-neutral Target Medical Boundary Detector
 
-**Branch / baseline:** `codex/stage-a` / `04e3dac feat: compose policy-bound offline verified response pipeline S40`
+**Branch / baseline:** `codex/stage-a` / `7aade44 docs: fix S41 test breakdown in STRANGLER_ROADMAP`
 
-**Goal:** add one deterministic TurnFrame dispatch boundary and a thin orchestrator that
-materializes `TargetResponsePolicyRequest` from `TurnFrame` + explicit envelope, calls S40
-only on the materialize path, and returns separate terminal decisions for
-clarify/defer/non-materializable medical handoff. No runtime/UI/live wiring.
+**Goal:** add one offline provider-neutral medical-boundary classifier boundary with strict
+three-way semantics, deterministic envelope enforcement, and fail-closed uncertain handling.
+No runtime wiring, no live/LLM calls, no product authority.
 
 ## Owner laws
 
-- S41 adds dispatch + orchestration only. It does not read `patient_scope`, infer
-  medical_handoff from TurnFrame axes, load demo packs in core, parse model text, or create
-  another evidence/policy layer.
-- `medical_handoff` comes only from `envelope.boundary_decision == "medical_handoff"`.
-- Aspect mapping is fixed: `payment → price`; `stages → content` always; never map `stages`
-  to `price` by intent or other aspects. `price + stages → (content, price)`.
-- For `topic == "doctors"`, do not add `content` from `overview` alone. Valid confident
-  `topic` used in dispatch must intersect `envelope.allowed_topics` and not intersect
-  `envelope.forbidden_topics`; incompatibility is a typed fail-closed error.
-- Invalid input/metadata raises `TargetTurnFrameDispatchError`. Successful dispatch returns
-  only `materialize | terminal`; no `failed` union member and no optional verified field.
-- Terminal `clarify | defer | medical_handoff_nonmaterializable` stops before S34/S40.
-  Materializable `answer | medical_handoff` calls public S40 exactly once and returns exact
-  verified response unchanged.
-- Stage order on materialize path is strict `dispatch → S40`. No catch/rename/retry/fallback.
-- S41 is offline/unwired. Loaders facade in core, TurnFrame/A9 authority, routes/UI/session,
-  live/LLM and product authority require later explicit decisions.
+- S42 adds detector contract + executor + envelope enforcement only. No runtime `/ask` hook,
+  no live backend adapter, no Composer/Verifier, no ingress/TurnFrame/A9/patient_scope changes,
+  no regex phrase tables, no product routing authority.
+- Detector output is exactly one of `none | medical_handoff | uncertain`. Low confidence,
+  malformed backend output, backend failure, or ambiguity **never** become `none`.
+- `none` is allowed only for a confident ordinary informational/commercial question.
+- `medical_handoff` covers personal medical evaluation, treatment choice, personal eligibility,
+  current symptoms/complications, and other medical-boundary cases per classifier policy.
+- `uncertain` means insufficient confidence or unsafe classification; it must not authorize an
+  ordinary commercial answer path.
+- Envelope enforcement (fail-closed):
+  - confident `none` → `TargetTurnFramePolicyEnvelope.boundary_decision="none"`;
+  - `medical_handoff` → `boundary_decision="medical_handoff"`;
+  - `uncertain` → **terminal defer enforcement** (`terminal_mode="defer"`,
+    `reason_code="boundary_uncertain"`), not `boundary_decision="none"` and not silent
+    downgrade to commercial answer.
+- Telemetry uses canonical `reason_code` only; never store raw user medical text in detector
+  result or enforcement artifacts.
+- Recording test backends prove contract/call order only, not recognition quality. Detector
+  quality is **not proven** until a separately governed live eval with owner permission.
+- Stage order on executor path is strict `classify → validate → normalize`; no
+  catch/rename/retry/fallback that turns failure into `none`.
 
 ## Contract
 
-Add `contracts/target_turn_frame_policy_envelope.py`:
+Add `contracts/target_medical_boundary.py` with frozen models:
 
 ```python
-class TargetTurnFramePolicyEnvelope(BaseModel):
-    boundary_decision: Literal["none", "medical_handoff"]
-    tone_key: CanonicalToken
-    allowed_topics: tuple[CanonicalToken, ...]
-    forbidden_topics: tuple[CanonicalToken, ...] = ()
-    required_fact_ids: tuple[CanonicalToken, ...] = ()
-    allow_marketing_facts: bool = False
-    allow_consultation_close: bool = False
-    allow_cta: bool = False
-    min_topic_confidence: float = 0.0
-    min_service_confidence: float = 0.0
-    min_intent_confidence: float = 0.0
+TargetMedicalBoundaryDecision = Literal["none", "medical_handoff", "uncertain"]
+
+TargetMedicalBoundaryBackendLabel = Literal["none", "medical_handoff"]
+
+class TargetMedicalBoundaryResult(BaseModel):
+    decision: TargetMedicalBoundaryDecision
+    confidence: float  # 0..1
+    reason_code: CanonicalToken
+    source: Literal["backend", "fail_closed"]
+
+class TargetMedicalBoundaryTerminalEnforcement(BaseModel):
+    kind: Literal["terminal"] = "terminal"
+    terminal_mode: Literal["defer"] = "defer"
+    reason_code: CanonicalToken = "boundary_uncertain"
+
+class TargetMedicalBoundaryEnvelopeEnforcement(BaseModel):
+    kind: Literal["envelope"] = "envelope"
+    envelope: TargetTurnFramePolicyEnvelope
 ```
 
-Add `contracts/target_turn_frame_dispatch.py` with frozen dataclasses:
-
-- `TargetTurnFrameMaterializeDispatch(kind="materialize", policy_request=...)`
-- `TargetTurnFrameTerminalDispatch(kind="terminal", terminal_mode=..., spec=...)`
-- `TargetTurnFrameBoundMaterializeResponse(kind="materialize", dispatch=..., verified=...)`
-- `TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=...)`
-
-Add `core/target_turn_frame_dispatch.py`:
+Add `core/target_medical_boundary.py`:
 
 ```python
-class TargetTurnFrameDispatchError(ValueError): ...
+@dataclass(frozen=True, slots=True)
+class TargetMedicalBoundaryInvocation:
+    user_message: str
 
-def dispatch_target_turn_frame_response(
-    turn_frame: TurnFrame,
-    envelope: TargetTurnFramePolicyEnvelope,
-) -> TargetTurnFrameMaterializeDispatch | TargetTurnFrameTerminalDispatch: ...
-```
+class TargetMedicalBoundaryBackend(Protocol):
+    def classify(self, invocation: TargetMedicalBoundaryInvocation, /) -> object: ...
 
-Add `core/target_turn_frame_bound_response.py`:
+class TargetMedicalBoundaryError(ValueError):
+    """Typed fail-closed executor input/programmer failure only."""
 
-```python
-def run_target_offline_turn_frame_bound_response(
-    turn_frame: TurnFrame,
-    envelope: TargetTurnFramePolicyEnvelope,
-    bundle: ResponseSchemaBundle,
-    doctor_catalog: TargetDoctorCatalog,
-    external_index: ResponseSchemaExternalIndex,
-    consultation_values: Sequence[ServiceConsultationValue],
-    *,
-    brand_term: str | None,
-    strategy_context: TargetStrategyMatch,
-    semantic_context: str,
-    today: date,
-    md_root: Path,
-    include_initial_block: bool,
-    include_consultation_close: bool,
-    include_cta: bool,
+def execute_target_medical_boundary_classification(
     user_message: str,
-    tone: TargetComposerTone,
-    composer_backend: TargetComposerBackend,
-    semantic_backend: TargetSemanticVerifierBackend,
-    marketing_scenarios: Sequence[str] = (),
-    shown_fact_ids: Sequence[str] = (),
-    shown_amplifier_refs: Sequence[str] = (),
-    shown_consultation_value_refs: Sequence[str] = (),
-) -> TargetTurnFrameBoundMaterializeResponse | TargetTurnFrameBoundTerminalResponse: ...
+    *,
+    backend: TargetMedicalBoundaryBackend,
+    min_confidence_none: float = 0.0,
+    min_confidence_medical_handoff: float = 0.0,
+) -> TargetMedicalBoundaryResult: ...
 ```
 
-Exact orchestrator sequence:
+**Backend return shape (validate step):** backend must return an object with exactly two
+attributes accessible as mapping keys or attributes:
+
+- `decision`: `str` in `{"none", "medical_handoff"}` only (backend never returns `uncertain`);
+- `confidence`: numeric `0..1`.
+
+Any other shape, extra labels, missing fields, non-numeric confidence, or confidence outside
+`0..1` → normalize to `uncertain` + `source="fail_closed"` +
+`reason_code="boundary_uncertain_malformed_output"`. Backend exceptions → `uncertain` +
+`reason_code="boundary_uncertain_backend_failure"`. Never raise for backend failures; never map
+to `none`.
+
+**Normalize step:**
+
+- validated backend label `none` with `confidence >= min_confidence_none` → result `none`,
+  `reason_code="boundary_none_confident"`, `source="backend"`;
+- validated backend label `medical_handoff` with
+  `confidence >= min_confidence_medical_handoff` → result `medical_handoff`,
+  `reason_code="boundary_medical_handoff_confident"`, `source="backend"`;
+- validated label below its floor → `uncertain`, `reason_code="boundary_uncertain_low_confidence"`,
+  `source="fail_closed"`;
+- if backend payload contains conflicting duplicate decisions when coerced to mapping →
+  `uncertain`, `reason_code="boundary_uncertain_ambiguous"`, `source="fail_closed"`.
+
+**`TargetMedicalBoundaryError` raise only for** invalid executor inputs before backend call
+(empty/non-string `user_message`, non-numeric confidence floors outside `0..1`). Never raise
+for backend/runtime classification outcomes.
+
+Add `core/target_turn_frame_policy_envelope_enforcement.py`:
 
 ```python
-dispatch = dispatch_target_turn_frame_response(turn_frame, envelope)
-if dispatch.kind == "terminal":
-    return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
-return TargetTurnFrameBoundMaterializeResponse(
-    kind="materialize",
-    dispatch=dispatch,
-    verified=run_target_offline_policy_bound_verified_response_pipeline(
-        dispatch.policy_request,
-        ...,
-    ),
-)
+class TargetMedicalBoundaryEnforcementError(ValueError): ...
+
+def enforce_target_medical_boundary_on_envelope(
+    boundary: TargetMedicalBoundaryResult,
+    *,
+    tone_key: CanonicalToken,
+    allowed_topics: tuple[CanonicalToken, ...],
+    forbidden_topics: tuple[CanonicalToken, ...] = (),
+    required_fact_ids: tuple[CanonicalToken, ...] = (),
+    allow_marketing_facts: bool = False,
+    allow_consultation_close: bool = False,
+    allow_cta: bool = False,
+    min_topic_confidence: float = 0.0,
+    min_service_confidence: float = 0.0,
+    min_intent_confidence: float = 0.0,
+) -> TargetMedicalBoundaryEnvelopeEnforcement | TargetMedicalBoundaryTerminalEnforcement: ...
 ```
 
-No conditional branch beyond the dispatch kind check and no exception handler in the
-orchestrator function.
+Canonical reason codes (allowlist):
+
+- `boundary_none_confident`
+- `boundary_medical_handoff_confident`
+- `boundary_uncertain` (aggregate terminal enforcement only)
+- `boundary_uncertain_low_confidence`
+- `boundary_uncertain_malformed_output`
+- `boundary_uncertain_backend_failure`
+- `boundary_uncertain_ambiguous`
+
+Detector `TargetMedicalBoundaryResult` uses granular codes only. Terminal enforcement for any
+`uncertain` result always uses aggregate `reason_code="boundary_uncertain"`.
 
 ## Boundaries / allowlist
 
-No client data edits, loaders facade in core, old runtime path, live/LLM/provider SDK,
-A9/TurnFrame shadow wiring, routes/UI/session/cache, product authority, changes to S27–S40
-code/contracts/tests, or full suite.
+No runtime wiring, live/LLM/provider SDK calls, ingress contract edits, TurnFrame/A9 edits,
+patient_scope reads, frozen artifact changes, client data edits, S27–S41 code changes except
+docs, or full suite.
 
 - `TASK.md`
-- `contracts/target_turn_frame_policy_envelope.py`
-- `contracts/target_turn_frame_dispatch.py`
-- `core/target_turn_frame_dispatch.py`
-- `core/target_turn_frame_bound_response.py`
-- `tests/test_target_turn_frame_dispatch.py`
-- `tests/test_demo_target_turn_frame_bound_response.py`
+- `contracts/target_medical_boundary.py`
+- `core/target_medical_boundary.py`
+- `core/target_turn_frame_policy_envelope_enforcement.py`
+- `tests/test_target_medical_boundary.py`
+- `tests/test_target_turn_frame_policy_envelope_enforcement.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
 ## Minimal protected acceptance
 
-- fixed aspect mapping including owner correction: `payment → price`, `stages → content`
-  always; `price + stages → (content, price)`;
-- doctors-only path: valid confident `topic=doctors` with `overview` yields `(doctors,)`
-  without content;
-- valid confident topic used in dispatch must be envelope-compatible; incompatible topic
-  raises typed error;
-- `topic.field_meta.status == "invalid"` raises typed error;
-- `needs_clarification` valid → terminal `clarify` spec, S40 not called;
-- missing `service_id` on materialize path → terminal `defer`, S40 not called;
-- `boundary_decision=medical_handoff` with materializable inputs → S40 once with
-  `medical_handoff`; pure non-materializable handoff → terminal without S40;
-- orchestrator union forbids impossible combinations (`verified` only on materialize branch);
-- import firewall: no legacy/provider/live/runtime/cache/search/patient_scope reads, skip or
-  xfail.
+- backend returns confident `none` → result `none` with `boundary_none_confident`;
+- backend returns confident `medical_handoff` → result `medical_handoff` with
+  `boundary_medical_handoff_confident`;
+- low confidence on either label → `uncertain`, never `none`;
+- malformed backend payload / backend exception → `uncertain` with typed reason, never `none`;
+- ambiguous/conflicting backend labels → `uncertain`;
+- enforcement: confident `none` → envelope `boundary_decision="none"`;
+- enforcement: `medical_handoff` → envelope `boundary_decision="medical_handoff"`;
+- enforcement: `uncertain` → terminal defer enforcement, not envelope with `none`;
+- telemetry carries only canonical reason codes;
+- import firewall: no legacy/runtime/live/patient_scope/ingress/TurnFrame reads.
 
-Run only S41 target/demo plus S40 and S33 target/demo neighbors. No full suite.
+Run only S42 tests plus S41 dispatch neighbor:
+
+- `tests/test_target_medical_boundary.py`
+- `tests/test_target_turn_frame_policy_envelope_enforcement.py`
+- `tests/test_target_turn_frame_dispatch.py`
 
 ## Gates
 
 1. Independent governance checker before code.
-2. Commit/push `docs: govern TurnFrame-bound offline response dispatch S41` only to stage-a.
+2. Commit/push `docs: govern provider-neutral target medical boundary detector S42` only to stage-a.
 3. Implement only the allowlist and run minimal offline tests.
 4. Independent completion checker, then roadmap `[x]`.
-5. Commit/push `feat: dispatch TurnFrame-bound offline response S41`; final clean/synced.
+5. Commit/push `feat: add provider-neutral target medical boundary detector S42`; final clean/synced.
+
+## Docs draft (roadmap / ARCH)
+
+- S42 adds offline provider-neutral medical boundary detector with three-way semantics
+  (`none | medical_handoff | uncertain`), envelope enforcement, and explicit note that
+  recognition quality is unproven until separately permitted live eval.

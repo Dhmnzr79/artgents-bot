@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S39 — offline verified response pipeline завершён** |
-| Ближайший рабочий фокус без live | **Handoff в Cursor; следующий checkpoint только отдельным governance TASK** |
+| Отдельная S-series без live | **S40 — policy-bound offline verified response pipeline завершён** |
+| Ближайший рабочий фокус без live | **Следующий checkpoint только отдельным governance TASK; offline vertical от policy до verified response structurally complete** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -238,6 +238,15 @@
   `77 passed`, всего `88 passed`, skip/xfail нет. Это structural offline vertical от exact
   S34 package и точка handoff основной реализации в Cursor; TurnFrame/A9 authority,
   provider/live quality, runtime/UI/session и product authority остаются отдельными gates.
+
+- [x] **S40 — policy-bound offline verified response pipeline** — thin straight-line
+  orchestration вызывает public S33→S34→S39 по одному разу, передаёт exact policy request,
+  assembly inputs и pipeline backends/identities и напрямую возвращает exact verified
+  response. Existing typed failures short-circuit без catch/rename/retry/fallback.
+  Governance `5eea9ed`; independent completion review `✅`: target/demo `14 passed`, S39/S34/S33
+  neighbors `54 passed`, всего `68 passed`, skip/xfail нет. Это structural offline entry
+  point от explicit policy request; TurnFrame/A9 authority, provider/live quality,
+  runtime/UI/session и product authority остаются отдельными gates.
 
 ## Какой roadmap актуален
 

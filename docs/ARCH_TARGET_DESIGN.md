@@ -183,6 +183,14 @@ validation или error semantics: materializer, Composer и Verifier вызыв
 TurnFrame/A9 authority, provider/live quality, routes/UI/session и product wiring остаются
 отдельными governed этапами.
 
+S40 замыкает offline response-generation vertical от explicit `TargetResponsePolicyRequest`
+до verified response одной straight-line композицией `S33 → S34 → S39`. Он не добавляет
+новую policy, inference, validation или error semantics: spec builder, spec-bound package
+assembly и verified pipeline вызываются по одному разу, а любая typed failure без
+catch/fallback прекращает downstream. Verified text и sidecars возвращаются без пересборки.
+Это structural offline entry point, а не готовый бот: TurnFrame/A9 authority, provider/live
+quality, routes/UI/session и product wiring остаются отдельными governed этапами.
+
 ---
 
 ## Порядок работ — strangler, две кучи

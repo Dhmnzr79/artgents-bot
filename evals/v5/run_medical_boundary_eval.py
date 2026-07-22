@@ -9,7 +9,7 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any
 
 _EVAL_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _EVAL_DIR.parents[1]
@@ -21,13 +21,20 @@ from evals.v5.medical_boundary_eval_backend import (
     MedicalBoundaryEvalTransportError,
 )
 from evals.v5.medical_boundary_eval_contract import (
+    ACCEPTANCE_THRESHOLDS,
     CASE_RESULT_KEYS,
+    LIVE_RAW_ARTIFACT_PATH,
+    LIVE_RESULT_ARTIFACT_PATH,
     MEASUREMENT_ID,
     MATRIX_PATH,
-    PROPOSED_ACCEPTANCE_THRESHOLDS,
     QUALITY_BUCKETS,
+    THRESHOLDS_STATUS,
     TRANSPORT_BUCKET,
     HarnessConfigError,
+    LiveArtifactWriteError,
+    assert_live_artifacts_absent,
+    confidence_floors_from_matrix_spec,
+    evaluate_threshold_verdict,
     load_frozen_matrix,
 )
 from core.target_medical_boundary import (
@@ -91,6 +98,8 @@ def run_case(
     case: dict[str, Any],
     index: int,
     backend: MedicalBoundaryEvalRecordingBackend,
+    min_confidence_none: float,
+    min_confidence_medical_handoff: float,
 ) -> dict[str, Any]:
     expected_label = case["expected_label"]
     invocation = TargetMedicalBoundaryInvocation(user_message=str(case["question"]).strip())
@@ -117,6 +126,8 @@ def run_case(
         result = execute_target_medical_boundary_classification(
             str(case["question"]),
             backend=_FixedPayloadBackend(raw_payload),
+            min_confidence_none=min_confidence_none,
+            min_confidence_medical_handoff=min_confidence_medical_handoff,
         )
         bucket = classify_quality_bucket(
             expected_label=expected_label,
@@ -157,8 +168,15 @@ def run_case(
         }
 
 
+def _rate(count: int, denominator: int) -> float:
+    return 0.0 if denominator == 0 else round(count / denominator, 4)
+
+
 def summarize_results(case_results: Sequence[dict[str, Any]]) -> dict[str, Any]:
     total = len(case_results)
+    none_expected_count = sum(
+        1 for row in case_results if row["expected_label"] == "none"
+    )
     bucket_counts = Counter(row["quality_bucket"] for row in case_results)
     exact_count = bucket_counts["exact"]
     uncertain_count = bucket_counts["uncertain"]
@@ -167,13 +185,13 @@ def summarize_results(case_results: Sequence[dict[str, Any]]) -> dict[str, Any]:
     malformed_backend_error_count = bucket_counts["malformed_backend_error"]
     backend_failure_count = bucket_counts["backend_failure"]
     transport_error_count = bucket_counts[TRANSPORT_BUCKET]
+    quality_scored_cases = total - transport_error_count
 
-    def _rate(count: int) -> float:
-        return 0.0 if total == 0 else round(count / total, 4)
-
-    return {
+    summary = {
         "measurement_id": MEASUREMENT_ID,
         "total_cases": total,
+        "none_expected_count": none_expected_count,
+        "quality_scored_cases": quality_scored_cases,
         "exact_count": exact_count,
         "uncertain_count": uncertain_count,
         "dangerous_false_none_count": dangerous_false_none_count,
@@ -181,26 +199,65 @@ def summarize_results(case_results: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "malformed_backend_error_count": malformed_backend_error_count,
         "backend_failure_count": backend_failure_count,
         "transport_error_count": transport_error_count,
-        "exact_rate": _rate(exact_count),
-        "uncertain_rate": _rate(uncertain_count),
-        "excessive_false_medical_handoff_rate": _rate(excessive_false_medical_handoff_count),
+        "exact_rate": _rate(exact_count, quality_scored_cases),
+        "uncertain_rate": _rate(uncertain_count, quality_scored_cases),
+        "excessive_false_medical_handoff_rate": _rate(
+            excessive_false_medical_handoff_count,
+            none_expected_count,
+        ),
+        "rate_denominators": {
+            "exact_rate": "quality_scored_cases",
+            "uncertain_rate": "quality_scored_cases",
+            "excessive_false_medical_handoff_rate": "expected_none_cases",
+            "quality_scored_cases": "total_cases - transport_error_count",
+            "expected_none_cases": "cases where expected_label=none",
+        },
         "quality_bucket_counts": {bucket: bucket_counts[bucket] for bucket in QUALITY_BUCKETS},
         "transport_bucket_count": transport_error_count,
-        "proposed_acceptance_thresholds": dict(PROPOSED_ACCEPTANCE_THRESHOLDS),
-        "thresholds_status": "pending_owner_approval",
+        "acceptance_thresholds": dict(ACCEPTANCE_THRESHOLDS),
+        "thresholds_status": THRESHOLDS_STATUS,
     }
+    summary["threshold_verdict"] = evaluate_threshold_verdict(summary)
+    return summary
+
+
+def write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+    except FileExistsError as error:
+        raise LiveArtifactWriteError(
+            f"live artifact already exists; silent overwrite forbidden: {path}"
+        ) from error
 
 
 def run_harness_with_backend_factory(
     *,
     backend_factory: Callable[[dict[str, Any]], MedicalBoundaryEvalRecordingBackend],
     matrix_path: Path = MATRIX_PATH,
+    artifact_paths: Sequence[Path] | None = None,
 ) -> dict[str, Any]:
     spec = load_frozen_matrix(path=matrix_path)
+    min_confidence_none, min_confidence_medical_handoff = confidence_floors_from_matrix_spec(
+        spec
+    )
+    if artifact_paths is not None:
+        assert_live_artifacts_absent(tuple(artifact_paths))
+
     case_results: list[dict[str, Any]] = []
     for index, case in enumerate(spec["cases"]):
         backend = backend_factory(case)
-        case_results.append(run_case(case=case, index=index, backend=backend))
+        case_results.append(
+            run_case(
+                case=case,
+                index=index,
+                backend=backend,
+                min_confidence_none=min_confidence_none,
+                min_confidence_medical_handoff=min_confidence_medical_handoff,
+            )
+        )
 
     keys = frozenset(case_results[0].keys()) if case_results else CASE_RESULT_KEYS
     for row in case_results:
@@ -214,7 +271,7 @@ def run_harness_with_backend_factory(
 
 
 def _default_cli_output_path() -> Path:
-    return _REPO_ROOT / "evals" / "v5" / "artifacts" / "medical_boundary_eval_prep.json"
+    return LIVE_RESULT_ARTIFACT_PATH
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -227,7 +284,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--output",
         default=str(_default_cli_output_path()),
-        help="Output JSON path for offline prep artifact",
+        help="Output JSON path for live result artifact",
+    )
+    parser.add_argument(
+        "--raw-output",
+        default=str(LIVE_RAW_ARTIFACT_PATH),
+        help="Output JSON path for immutable first raw capture artifact",
     )
     parser.add_argument(
         "--dry-run",
@@ -248,11 +310,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "measurement_id": MEASUREMENT_ID,
                 "total_cases": len(spec["cases"]),
                 "dry_run": True,
-                "proposed_acceptance_thresholds": dict(PROPOSED_ACCEPTANCE_THRESHOLDS),
-                "thresholds_status": "pending_owner_approval",
+                "acceptance_thresholds": dict(ACCEPTANCE_THRESHOLDS),
+                "thresholds_status": THRESHOLDS_STATUS,
             }
         }
-        _write_json(Path(args.output), payload)
         print(json.dumps(payload["summary"], ensure_ascii=False, indent=2))
         return 0
 
@@ -261,11 +322,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         file=sys.stderr,
     )
     return 3
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":

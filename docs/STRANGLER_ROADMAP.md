@@ -55,8 +55,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **Owner clarification — Medical question semantics** (docs-only) |
-| Предыдущий checkpoint | **Owner decision — FINAL_FULLCONTEXT_ONLY** (`649b80c`) |
+| Последний завершённый checkpoint | **S43 correction — pre-live freeze & harness hardening** |
+| Предыдущий checkpoint | **Owner clarification — Medical question semantics** (`9549f58`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S43 — medical boundary live eval prep завершён** |
 | Ближайший рабочий focus без live | **Live medical boundary eval — только после отдельного разрешения владельца и утверждения thresholds** |
@@ -313,6 +313,14 @@
   independent completion review `✅`: matrix/harness `18 passed`, S42 neighbor `20 passed`, всего
   `38 passed`, skip/xfail нет. First live run requires explicit owner permission and
   threshold approval.
+- [x] **S43 correction — pre-live freeze & harness hardening** — owner-approved confidence
+  floors (`none` 0.80, `medical_handoff` 0.70) passed explicitly to S42 executor; acceptance
+  thresholds frozen; `excessive_false_medical_handoff_rate` denominator fixed (expected=none
+  only); `mb_noise_02` → `имплант цена?`; artifact absent-before-run + exclusive-create guards;
+  deterministic threshold PASS/FAIL evaluator. No live/LLM, no runtime. Governance `da8b835`;
+  completion after independent checker `✅`. Matrix hash updated; tests `54 passed`.
+  First live run still requires explicit delegate injection; existing live artifacts must not
+  be overwritten.
 
 ## Какой roadmap актуален
 

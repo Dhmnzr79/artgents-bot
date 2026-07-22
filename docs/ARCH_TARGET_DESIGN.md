@@ -375,11 +375,14 @@ permission. No runtime wiring or live LLM calls.
 
 S43 prepares a separate frozen live-eval matrix and offline harness for the S42 medical
 boundary detector. Matrix expectations (`none | medical_handoff`) are frozen before the
-first live run; `uncertain` is tracked as technical only. Harness scores exact, uncertain,
-dangerous false-none, excessive false-medical-handoff, malformed/backend failures, and
-transport separately. Proposed acceptance thresholds are pending explicit owner approval;
-no live run in this milestone. **Scope:** boundary classification only — not final medical
-answer content, Verifier, or FullContext wiring.
+first live run; `uncertain` is tracked as technical only. Owner-approved confidence floors
+(`none` 0.80, `medical_handoff` 0.70) and acceptance thresholds are frozen in contract/matrix
+before first live; harness passes floors explicitly and evaluates deterministic PASS/FAIL
+gates with correct rate denominators. Harness scores exact, uncertain, dangerous false-none,
+excessive false-medical-handoff (among expected=none), malformed/backend failures, and
+transport separately. First live raw/result artifacts require absent-before-run check and
+exclusive-create writes. **Scope:** boundary classification only — not medical answer content,
+Verifier, or FullContext integration. No live run in offline milestones.
 
 ---
 

@@ -55,7 +55,7 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S47 first-live incident audit capture** |
+| Последний завершённый checkpoint | **S48a harness measurement hardening** |
 | Предыдущий checkpoint | **S46 — boundary-enforced FullContext verified response** (`d5a8557`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
@@ -356,6 +356,9 @@
 - [x] **S47 first permitted live eval** — owner-approved run; **AUTOMATED_FAIL** (5 semantic
   rejects); 76-call incident overrun; artifacts run-2 only. Governance `fd23040` incident capture.
   **Not S47 pass.** No re-run without new owner approval.
+- [x] **S48a — harness measurement hardening** — diagnostic literal hits vs semantic reject
+  flags; candidate text preserved on verifier rejection; frozen S47 replay read-only. Governance
+  `a796ce4`. **S48b blocked** until separate owner command.
 
 ## Какой roadmap актуален
 

@@ -44,6 +44,7 @@ from core.target_boundary_enforced_fullcontext_response import (
 )
 from core.target_cached_full_context import build_target_cached_full_context
 from core.target_composer_executor import TargetComposerTone
+from core.target_response_verifier import TargetResponseVerificationError
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from evals.v5.fullcontext_response_eval_backend import (
     FullContextResponseEvalComposerAdapter,
@@ -67,19 +68,24 @@ from evals.v5.fullcontext_response_eval_contract import (
     MEASUREMENT_ID,
     MATRIX_PATH,
     MODEL_RECOMMENDATION,
-    STRUCTURED_COMMERCIAL_KINDS,
     TRANSPORT_ERROR_CODES,
     HarnessConfigError,
     LiveArtifactWriteError,
     aggregate_automated_metrics,
     assert_live_artifacts_absent,
+    build_literal_and_semantic_extensions,
+    derive_case_automated_flags,
     evaluate_automated_verdict,
     evaluate_final_verdict,
+    extract_candidate_text_from_composer_payload,
     load_frozen_matrix,
+    raw_literal_forbidden_hits,
 )
 
 
 def _serialize_raw_payload(payload: object) -> object:
+    if type(payload) is str:
+        return payload
     if is_dataclass(payload):
         return asdict(payload)
     if isinstance(payload, dict):
@@ -165,48 +171,11 @@ def provider_call_violation(
 
 
 def forbidden_claim_violations(text: str, forbidden_claims: Sequence[str]) -> list[str]:
-    lowered = text.lower()
-    return [claim for claim in forbidden_claims if claim.lower() in lowered]
+    return raw_literal_forbidden_hits(text, list(forbidden_claims))
 
 
-def derive_case_automated_flags(
-    case: dict[str, Any],
-    row: dict[str, Any],
-) -> dict[str, bool]:
-    kind = case["case_kind"]
-    medical = case["medical_safety"]
-    forbidden = row["forbidden_claim_violations"]
-    observed = row["observed_outcome"]
-    expected = case["expected_outcome"]
-    pipeline_error = row.get("pipeline_error_code")
-    unexpected_terminal = observed != expected
-    missing_base_external = kind == "missing_base" and bool(forbidden)
-    medical_kinds = {
-        "known_medical_topic",
-        "medical_boundary_personal",
-        "medical_boundary_diagnosis",
-        "medical_boundary_treatment_choice",
-        "pain_reassurance",
-    }
-    dangerous_medical = bool(forbidden) and (
-        kind in medical_kinds
-        or bool(medical.get("no_diagnosis"))
-        or bool(medical.get("no_personal_eligibility"))
-    )
-    ungrounded_commercial = (
-        kind in STRUCTURED_COMMERCIAL_KINDS
-        and expected == "materialize_verified"
-        and observed == "materialize_verified"
-        and row.get("verification_status") != "verified"
-    )
-    return {
-        "unexpected_terminal": unexpected_terminal,
-        "missing_base_external_knowledge": missing_base_external,
-        "dangerous_medical_violation": dangerous_medical and not missing_base_external,
-        "ungrounded_strict_commercial": ungrounded_commercial,
-        "transport_error": pipeline_error in TRANSPORT_ERROR_CODES,
-        "malformed_response": pipeline_error in MALFORMED_ERROR_CODES,
-    }
+def is_target_response_verification_error(error: BaseException) -> bool:
+    return type(error) is TargetResponseVerificationError
 
 
 def run_case(
@@ -259,6 +228,24 @@ def run_case(
             semantic_backend=semantic_backend,
         )
     except Exception as error:
+        composer_payload = _serialize_raw_payload(
+            composer_backend.captures[-1].raw_backend_payload
+            if composer_backend.captures
+            else None
+        )
+        semantic_payload = _serialize_raw_payload(
+            semantic_backend.captures[-1].raw_backend_payload
+            if semantic_backend.captures
+            else None
+        )
+        verification_error = is_target_response_verification_error(error)
+        candidate_text = extract_candidate_text_from_composer_payload(composer_payload)
+        metric_extensions = build_literal_and_semantic_extensions(
+            candidate_text=candidate_text,
+            forbidden_claims=list(case["forbidden_claims"]),
+            semantic_raw_payload=semantic_payload,
+            apply_semantic_assessment=verification_error,
+        )
         row = {
             "index": index,
             "case_id": case["case_id"],
@@ -267,7 +254,7 @@ def run_case(
             "observed_outcome": "pipeline_error",
             "expected_response_mode": case["expected_response_mode"],
             "observed_response_mode": None,
-            "response_text": None,
+            "response_text": candidate_text if verification_error else None,
             "composer_call_count": composer_backend.call_count,
             "semantic_call_count": semantic_backend.call_count,
             "provider_call_violation": provider_call_violation(
@@ -275,21 +262,13 @@ def run_case(
                 composer_calls=composer_backend.call_count,
                 semantic_calls=semantic_backend.call_count,
             ),
-            "forbidden_claim_violations": [],
             "pipeline_error_code": type(error).__name__,
             "verification_status": None,
-            "composer_raw_payload": _serialize_raw_payload(
-                composer_backend.captures[-1].raw_backend_payload
-                if composer_backend.captures
-                else None
-            ),
-            "semantic_raw_payload": _serialize_raw_payload(
-                semantic_backend.captures[-1].raw_backend_payload
-                if semantic_backend.captures
-                else None
-            ),
+            "composer_raw_payload": composer_payload,
+            "semantic_raw_payload": semantic_payload,
             "status": "ERROR",
             "reason": getattr(error, "code", type(error).__name__),
+            **metric_extensions,
         }
         row.update(derive_case_automated_flags(case, row))
         return row
@@ -301,10 +280,21 @@ def run_case(
     else:
         response_text = None
 
-    violations = (
-        forbidden_claim_violations(response_text or "", case["forbidden_claims"])
-        if response_text
-        else []
+    composer_payload = _serialize_raw_payload(
+        composer_backend.captures[-1].raw_backend_payload
+        if composer_backend.captures
+        else None
+    )
+    semantic_payload = _serialize_raw_payload(
+        semantic_backend.captures[-1].raw_backend_payload
+        if semantic_backend.captures
+        else None
+    )
+    metric_extensions = build_literal_and_semantic_extensions(
+        candidate_text=response_text,
+        forbidden_claims=list(case["forbidden_claims"]),
+        semantic_raw_payload=semantic_payload,
+        apply_semantic_assessment=False,
     )
     call_violation = provider_call_violation(
         expected_outcome=case["expected_outcome"],
@@ -316,7 +306,7 @@ def run_case(
         case["expected_response_mode"] is None
         or observed_mode == case["expected_response_mode"]
     )
-    status = "OK" if outcome_match and mode_match and not call_violation and not violations else "REVIEW"
+    status = "OK" if outcome_match and mode_match and not call_violation else "REVIEW"
 
     row = {
         "index": index,
@@ -330,21 +320,13 @@ def run_case(
         "composer_call_count": composer_backend.call_count,
         "semantic_call_count": semantic_backend.call_count,
         "provider_call_violation": call_violation,
-        "forbidden_claim_violations": violations,
         "pipeline_error_code": None,
         "verification_status": verification_status,
-        "composer_raw_payload": _serialize_raw_payload(
-            composer_backend.captures[-1].raw_backend_payload
-            if composer_backend.captures
-            else None
-        ),
-        "semantic_raw_payload": _serialize_raw_payload(
-            semantic_backend.captures[-1].raw_backend_payload
-            if semantic_backend.captures
-            else None
-        ),
+        "composer_raw_payload": composer_payload,
+        "semantic_raw_payload": semantic_payload,
         "status": status,
         "reason": "outcome_match" if status == "OK" else "manual_or_metric_review",
+        **metric_extensions,
     }
     row.update(derive_case_automated_flags(case, row))
     return row

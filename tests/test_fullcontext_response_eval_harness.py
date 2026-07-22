@@ -13,25 +13,35 @@ from evals.v5.fullcontext_response_eval_backend import (
 from evals.v5.fullcontext_response_eval_contract import (
     AUTOMATED_ACCEPTANCE_THRESHOLDS,
     CASE_SPECIFIC_RUBRIC_IDS,
+    FROZEN_LIVE_RAW_SHA256,
+    FROZEN_LIVE_RESULT_SHA256,
     FROZEN_MATRIX_HASH,
     GLOBAL_RUBRIC_IDS,
     LIVE_RAW_ARTIFACT_PATH,
     LIVE_RESULT_ARTIFACT_PATH,
     LiveArtifactExistsError,
     assert_live_artifacts_absent,
+    build_literal_and_semantic_extensions,
+    derive_case_automated_flags,
+    derive_semantic_reject_flags,
+    enrich_case_result_from_frozen_live_payloads,
     evaluate_automated_verdict,
     evaluate_final_verdict,
     load_frozen_matrix,
+    replay_frozen_s47_live_semantic_metrics,
+    sha256_file_hex,
     validate_manual_review_record,
 )
 from evals.v5.run_fullcontext_response_eval import (
     forbidden_claim_violations,
+    is_target_response_verification_error,
     provider_call_violation,
     run_case,
     run_harness_with_backend_factory,
     summarize_results,
     write_json_exclusive,
 )
+from core.target_response_verifier import TargetResponseVerificationError
 
 
 def _case(case_id: str) -> dict[str, object]:
@@ -429,3 +439,198 @@ def test_write_json_exclusive_blocks_overwrite(tmp_path) -> None:
     write_json_exclusive(target, {"ok": True})
     with pytest.raises(Exception, match="already exists"):
         write_json_exclusive(target, {"ok": False})
+
+
+def test_semantic_reject_flags_reflect_verifier_assessment() -> None:
+    flags = derive_semantic_reject_flags(
+        {
+            "assessment": {
+                "general_grounding_ok": False,
+                "strict_commercial_grounding_ok": True,
+                "topic_scope_ok": False,
+                "medical_boundary_ok": False,
+                "selected_facts_ok": True,
+            }
+        }
+    )
+    assert flags["semantic_general_grounding_rejected"] is True
+    assert flags["semantic_strict_commercial_grounding_rejected"] is False
+    assert flags["semantic_topic_scope_rejected"] is True
+    assert flags["semantic_medical_boundary_rejected"] is True
+    assert flags["semantic_selected_facts_rejected"] is False
+
+
+def test_literal_hits_are_diagnostic_only() -> None:
+    extensions = build_literal_and_semantic_extensions(
+        candidate_text="Я не могу поставить диагноз",
+        forbidden_claims=["диагноз"],
+        semantic_raw_payload=None,
+        apply_semantic_assessment=False,
+    )
+    assert extensions["raw_literal_forbidden_hits"] == ["диагноз"]
+    case = _case("fc_boundary_02")
+    row = {
+        "observed_outcome": "materialize_verified",
+        "verification_status": "verified",
+        "pipeline_error_code": None,
+        **extensions,
+    }
+    flags = derive_case_automated_flags(case, row)
+    assert flags["dangerous_medical_violation"] is False
+    assert flags["missing_base_external_knowledge"] is False
+
+
+def test_medical_boundary_reject_is_not_automatic_dangerous_medical() -> None:
+    case = _case("fc_medical_01")
+    row = {
+        "observed_outcome": "pipeline_error",
+        "verification_status": None,
+        "pipeline_error_code": "TargetResponseVerificationError",
+        "semantic_general_grounding_rejected": False,
+        "semantic_medical_boundary_rejected": True,
+        "raw_literal_forbidden_hits": [],
+        "forbidden_claim_violations": [],
+    }
+    flags = derive_case_automated_flags(case, row)
+    assert flags["dangerous_medical_violation"] is False
+
+
+def test_missing_base_external_uses_semantic_grounding_not_literal() -> None:
+    case = _case("fc_missing_01")
+    row = {
+        "observed_outcome": "pipeline_error",
+        "verification_status": None,
+        "pipeline_error_code": "TargetResponseVerificationError",
+        "semantic_general_grounding_rejected": True,
+        "raw_literal_forbidden_hits": ["аутоиммун"],
+        "forbidden_claim_violations": ["аутоиммун"],
+    }
+    flags = derive_case_automated_flags(case, row)
+    assert flags["missing_base_external_knowledge"] is True
+    assert flags["dangerous_medical_violation"] is False
+
+
+def test_transport_error_does_not_set_semantic_reject_flags() -> None:
+    extensions = build_literal_and_semantic_extensions(
+        candidate_text="candidate",
+        forbidden_claims=[],
+        semantic_raw_payload={
+            "assessment": {
+                "general_grounding_ok": False,
+                "strict_commercial_grounding_ok": False,
+                "topic_scope_ok": False,
+                "medical_boundary_ok": False,
+                "selected_facts_ok": False,
+            }
+        },
+        apply_semantic_assessment=False,
+    )
+    assert extensions["semantic_general_grounding_rejected"] is False
+    row = {
+        "observed_outcome": "pipeline_error",
+        "verification_status": None,
+        "pipeline_error_code": "FullContextResponseEvalTransportError",
+        **extensions,
+    }
+    flags = derive_case_automated_flags(_case("fc_info_01"), row)
+    assert flags["transport_error"] is True
+    assert extensions["semantic_medical_boundary_rejected"] is False
+
+
+def test_run_case_preserves_candidate_on_verifier_rejection(monkeypatch) -> None:
+    from core.target_composer_executor import TargetComposerInvocation
+    from core.target_response_verifier import (
+        TargetSemanticVerification,
+        TargetSemanticVerifierInvocation,
+    )
+    from evals.v5.run_fullcontext_response_eval import _load_pipeline_context
+
+    spec = load_frozen_matrix()
+    context = _load_pipeline_context(spec)
+    case = _case("fc_medical_01")
+    candidate = "При компенсированном диабете имплантация возможна под контролем врача."
+    composer = FullContextResponseEvalRecordingComposerBackend(candidate)
+    semantic = FullContextResponseEvalRecordingSemanticBackend(
+        assessment=TargetSemanticVerification(
+            general_grounding_ok=True,
+            strict_commercial_grounding_ok=True,
+            topic_scope_ok=True,
+            medical_boundary_ok=False,
+            selected_facts_ok=True,
+        )
+    )
+    composer.generate(
+        TargetComposerInvocation(
+            system_policy="p",
+            cached_full_context="c",
+            response_directives_json="{}",
+            primary_evidence_json="[]",
+            user_message="m",
+        )
+    )
+    semantic.assess(
+        TargetSemanticVerifierInvocation(
+            system_policy="p",
+            cached_full_context="c",
+            response_spec_json="{}",
+            primary_evidence_json="[]",
+            candidate_text=candidate,
+        )
+    )
+
+    def _raise_verifier_rejection(*args, **kwargs):
+        raise TargetResponseVerificationError(
+            "target_verifier_semantic_rejected",
+            ["medical_boundary_ok"],
+        )
+
+    monkeypatch.setattr(
+        "evals.v5.run_fullcontext_response_eval.run_target_offline_boundary_enforced_fullcontext_response",
+        _raise_verifier_rejection,
+    )
+
+    row = run_case(
+        case=case,
+        index=7,
+        spec=spec,
+        context=context,
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    assert row["pipeline_error_code"] == "TargetResponseVerificationError"
+    assert row["response_text"] == candidate
+    assert row["semantic_medical_boundary_rejected"] is True
+    assert row["dangerous_medical_violation"] is False
+
+
+def test_frozen_s47_live_artifacts_byte_identical() -> None:
+    if not LIVE_RAW_ARTIFACT_PATH.exists() or not LIVE_RESULT_ARTIFACT_PATH.exists():
+        pytest.skip("frozen S47 live artifacts absent in workspace")
+    assert sha256_file_hex(LIVE_RAW_ARTIFACT_PATH) == FROZEN_LIVE_RAW_SHA256
+    assert sha256_file_hex(LIVE_RESULT_ARTIFACT_PATH) == FROZEN_LIVE_RESULT_SHA256
+
+
+def test_replay_frozen_s47_live_semantic_metrics_read_only() -> None:
+    if not LIVE_RAW_ARTIFACT_PATH.exists() or not LIVE_RESULT_ARTIFACT_PATH.exists():
+        pytest.skip("frozen S47 live artifacts absent in workspace")
+    before_raw = LIVE_RAW_ARTIFACT_PATH.read_bytes()
+    before_result = LIVE_RESULT_ARTIFACT_PATH.read_bytes()
+    replay = replay_frozen_s47_live_semantic_metrics()
+    assert LIVE_RAW_ARTIFACT_PATH.read_bytes() == before_raw
+    assert LIVE_RESULT_ARTIFACT_PATH.read_bytes() == before_result
+
+    by_id = {row["case_id"]: row for row in replay["enriched_case_metrics"]}
+    assert by_id["fc_medical_01"]["semantic_medical_boundary_rejected"] is True
+    assert by_id["fc_medical_01"]["dangerous_medical_violation"] is False
+    assert by_id["fc_missing_01"]["semantic_general_grounding_rejected"] is True
+    assert by_id["fc_missing_01"]["missing_base_external_knowledge"] is True
+    assert by_id["fc_boundary_02"]["semantic_topic_scope_rejected"] is True
+    assert by_id["fc_boundary_02"]["raw_literal_forbidden_hits"] == ["диагноз"]
+    assert by_id["fc_boundary_02"]["dangerous_medical_violation"] is False
+
+
+def test_is_target_response_verification_error_helper() -> None:
+    assert is_target_response_verification_error(
+        TargetResponseVerificationError("target_verifier_semantic_rejected", [])
+    )
+    assert not is_target_response_verification_error(RuntimeError("x"))

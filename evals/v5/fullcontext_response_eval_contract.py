@@ -10,6 +10,12 @@ from typing import Any, Literal
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = _REPO_ROOT / "evals" / "v5" / "demo" / "fullcontext_response_eval_matrix.json"
 FROZEN_MATRIX_HASH = "14b1cbd4c3a8d906e0b19adb10ffaa60849803b3"
+FROZEN_LIVE_RAW_SHA256 = (
+    "0f4d4b93c53aaf4432d9187a4c2357d730b3c0ef1acbfd241cd38ad4367bc11f"
+)
+FROZEN_LIVE_RESULT_SHA256 = (
+    "83bff177f432d1c70639f1810ea0d85bfbd06c63691e65942abeb9ad36ad0eed"
+)
 
 LIVE_ARTIFACTS_DIR = _REPO_ROOT / "evals" / "v5" / "artifacts"
 LIVE_RAW_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "fullcontext_response_eval_live_raw.json"
@@ -263,6 +269,14 @@ MALFORMED_ERROR_CODES = frozenset(
     }
 )
 
+SEMANTIC_REJECT_FIELDS = (
+    "semantic_general_grounding_rejected",
+    "semantic_strict_commercial_grounding_rejected",
+    "semantic_topic_scope_rejected",
+    "semantic_medical_boundary_rejected",
+    "semantic_selected_facts_rejected",
+)
+
 CASE_RESULT_KEYS = frozenset(
     {
         "index",
@@ -277,6 +291,8 @@ CASE_RESULT_KEYS = frozenset(
         "semantic_call_count",
         "provider_call_violation",
         "forbidden_claim_violations",
+        "raw_literal_forbidden_hits",
+        *SEMANTIC_REJECT_FIELDS,
         "pipeline_error_code",
         "verification_status",
         "composer_raw_payload",
@@ -291,6 +307,184 @@ CASE_RESULT_KEYS = frozenset(
         "malformed_response",
     }
 )
+
+
+def extract_candidate_text_from_composer_payload(payload: object) -> str | None:
+    if isinstance(payload, dict):
+        text = payload.get("text")
+        if type(text) is str:
+            stripped = text.strip()
+            return stripped or None
+    if type(payload) is str:
+        stripped = payload.strip()
+        return stripped or None
+    return None
+
+
+def _semantic_assessment_dict(semantic_raw_payload: object) -> dict[str, Any] | None:
+    if not isinstance(semantic_raw_payload, dict):
+        return None
+    assessment = semantic_raw_payload.get("assessment")
+    if isinstance(assessment, dict):
+        return assessment
+    ok_fields = (
+        "general_grounding_ok",
+        "strict_commercial_grounding_ok",
+        "topic_scope_ok",
+        "medical_boundary_ok",
+        "selected_facts_ok",
+    )
+    if any(field in semantic_raw_payload for field in ok_fields):
+        return semantic_raw_payload
+    return None
+
+
+def derive_semantic_reject_flags(semantic_raw_payload: object) -> dict[str, bool]:
+    flags = dict.fromkeys(SEMANTIC_REJECT_FIELDS, False)
+    assessment = _semantic_assessment_dict(semantic_raw_payload)
+    if assessment is None:
+        return flags
+    mapping = {
+        "general_grounding_ok": "semantic_general_grounding_rejected",
+        "strict_commercial_grounding_ok": "semantic_strict_commercial_grounding_rejected",
+        "topic_scope_ok": "semantic_topic_scope_rejected",
+        "medical_boundary_ok": "semantic_medical_boundary_rejected",
+        "selected_facts_ok": "semantic_selected_facts_rejected",
+    }
+    for ok_field, reject_field in mapping.items():
+        if assessment.get(ok_field) is False:
+            flags[reject_field] = True
+    return flags
+
+
+def raw_literal_forbidden_hits(text: str, forbidden_claims: list[str]) -> list[str]:
+    lowered = text.lower()
+    return [claim for claim in forbidden_claims if claim.lower() in lowered]
+
+
+def build_literal_and_semantic_extensions(
+    *,
+    candidate_text: str | None,
+    forbidden_claims: list[str],
+    semantic_raw_payload: object,
+    apply_semantic_assessment: bool,
+) -> dict[str, Any]:
+    literal_hits = (
+        raw_literal_forbidden_hits(candidate_text, forbidden_claims)
+        if candidate_text
+        else []
+    )
+    semantic_flags = (
+        derive_semantic_reject_flags(semantic_raw_payload)
+        if apply_semantic_assessment
+        else dict.fromkeys(SEMANTIC_REJECT_FIELDS, False)
+    )
+    return {
+        "raw_literal_forbidden_hits": literal_hits,
+        "forbidden_claim_violations": list(literal_hits),
+        **semantic_flags,
+    }
+
+
+def derive_case_automated_flags(
+    case: dict[str, Any],
+    row: dict[str, Any],
+) -> dict[str, bool]:
+    kind = case["case_kind"]
+    observed = row["observed_outcome"]
+    expected = case["expected_outcome"]
+    pipeline_error = row.get("pipeline_error_code")
+    unexpected_terminal = observed != expected
+    missing_base_external = (
+        kind == "missing_base"
+        and row.get("semantic_general_grounding_rejected") is True
+    )
+    ungrounded_commercial = kind in STRUCTURED_COMMERCIAL_KINDS and expected == (
+        "materialize_verified"
+    ) and (
+        (
+            observed == "materialize_verified"
+            and row.get("verification_status") != "verified"
+        )
+        or row.get("semantic_strict_commercial_grounding_rejected") is True
+    )
+    return {
+        "unexpected_terminal": unexpected_terminal,
+        "missing_base_external_knowledge": missing_base_external,
+        "dangerous_medical_violation": False,
+        "ungrounded_strict_commercial": ungrounded_commercial,
+        "transport_error": pipeline_error in TRANSPORT_ERROR_CODES,
+        "malformed_response": pipeline_error in MALFORMED_ERROR_CODES,
+    }
+
+
+def enrich_case_result_from_frozen_live_payloads(
+    *,
+    case: dict[str, Any],
+    composer_raw_payload: object,
+    semantic_raw_payload: object,
+    pipeline_error_code: str | None,
+    observed_outcome: str,
+    verification_status: str | None,
+) -> dict[str, Any]:
+    """Read-only metric enrichment for frozen S47 live replay (no disk writes)."""
+
+    candidate_text = extract_candidate_text_from_composer_payload(composer_raw_payload)
+    apply_semantic = pipeline_error_code == "TargetResponseVerificationError" and (
+        _semantic_assessment_dict(semantic_raw_payload) is not None
+    )
+    extensions = build_literal_and_semantic_extensions(
+        candidate_text=candidate_text,
+        forbidden_claims=list(case["forbidden_claims"]),
+        semantic_raw_payload=semantic_raw_payload,
+        apply_semantic_assessment=apply_semantic,
+    )
+    row = {
+        "observed_outcome": observed_outcome,
+        "verification_status": verification_status,
+        "pipeline_error_code": pipeline_error_code,
+        **extensions,
+    }
+    return {
+        **extensions,
+        **derive_case_automated_flags(case, row),
+    }
+
+
+def replay_frozen_s47_live_semantic_metrics() -> dict[str, Any]:
+    """Re-derive S48a metrics from frozen live raw/result without mutating artifacts."""
+
+    if sha256_file_hex(LIVE_RAW_ARTIFACT_PATH) != FROZEN_LIVE_RAW_SHA256:
+        raise HarnessConfigError("frozen live raw sha256 mismatch")
+    if sha256_file_hex(LIVE_RESULT_ARTIFACT_PATH) != FROZEN_LIVE_RESULT_SHA256:
+        raise HarnessConfigError("frozen live result sha256 mismatch")
+
+    raw = json.loads(LIVE_RAW_ARTIFACT_PATH.read_text(encoding="utf-8"))
+    result = json.loads(LIVE_RESULT_ARTIFACT_PATH.read_text(encoding="utf-8"))
+    matrix = load_frozen_matrix()
+    case_by_id = {case["case_id"]: case for case in matrix["cases"]}
+    raw_by_id = {entry["case_id"]: entry for entry in raw["cases"]}
+    enriched: list[dict[str, Any]] = []
+
+    for row in result["case_results"]:
+        case_id = row["case_id"]
+        raw_entry = raw_by_id[case_id]
+        metrics = enrich_case_result_from_frozen_live_payloads(
+            case=case_by_id[case_id],
+            composer_raw_payload=raw_entry["composer_raw_payload"],
+            semantic_raw_payload=raw_entry["semantic_raw_payload"],
+            pipeline_error_code=row.get("pipeline_error_code"),
+            observed_outcome=row["observed_outcome"],
+            verification_status=row.get("verification_status"),
+        )
+        enriched.append({"case_id": case_id, **metrics})
+
+    return {
+        "measurement_id": MEASUREMENT_ID,
+        "frozen_live_raw_sha256": FROZEN_LIVE_RAW_SHA256,
+        "frozen_live_result_sha256": FROZEN_LIVE_RESULT_SHA256,
+        "enriched_case_metrics": enriched,
+    }
 
 
 class HarnessConfigError(Exception):
@@ -506,8 +700,10 @@ def aggregate_automated_metrics(
         "provider_call_violation_count": sum(
             1 for row in case_results if row.get("provider_call_violation")
         ),
-        "forbidden_claim_violation_count": sum(
-            1 for row in case_results if row.get("forbidden_claim_violations")
+        # Literal substring hits are diagnostic-only (S48a); not an automated gate signal.
+        "forbidden_claim_violation_count": 0,
+        "raw_literal_forbidden_hit_case_count": sum(
+            1 for row in case_results if row.get("raw_literal_forbidden_hits")
         ),
         "pipeline_error_count": sum(1 for row in case_results if row.get("status") == "ERROR"),
         "transport_error_count": sum(1 for row in case_results if row.get("transport_error")),

@@ -1,110 +1,109 @@
-# TASK — S50 Live Re-eval v2 Incident Audit Capture (Checkpoint A)
+# TASK — S50 Offline Harness Correction (Checkpoint B)
 
-**Baseline:** `codex/stage-a` / `848a7d7` · **NO LIVE** · **NO LLM** · **NO harness fix** · **NO manual review**
+**Baseline:** `codex/stage-a` / `f919d05` · **NO LIVE** · **NO LLM**
 
-**Goal:** Append-only governance capture of S50 live incident: 40-call overrun,
-diagnostic-only run-2 artifacts, corrected taxonomy, dirty harness provenance,
-restore `run_fullcontext_response_eval.py` to committed `848a7d7` state.
+**Goal:** Fix two confirmed S50 live harness defects offline: narrow audit-proxy
+`captures` delegation and post-marker artifact preflight (no `artifact_paths=None`).
+Harness reliability only — Verifier false negatives remain open.
+
+**Reference:** `evals/v5/artifacts/s50_live_harness_dirty_audit.patch` (diagnostic only;
+do not apply blindly — no broad `__getattr__`, no `artifact_paths=None`).
 
 ## Owner decisions (binding)
 
-1. **Actual cost:** 40 provider calls — attempt 1: 2 + abort; attempt 2: 38.
-2. **40 calls** = incident cost, **not** authorized precedent.
-3. **Run-2 artifacts** = diagnostic evidence only; **not** S50 pass.
-4. **Original marker/manifest/result** (`total_llm_calls: 38`) = historical but
-   **incomplete** accounting; **do not edit**; incident manifest explains gap.
-5. **Log** = authoritative full call ledger (40 `llm_usage` events).
-6. **Rerun forbidden** without new owner approval.
-7. **fc_missing_01**, **fc_medical_03** = confirmed Verifier false negatives.
-8. **No formal manual review** artifact in this checkpoint.
+1. S50 live artifacts, incident manifest/doc/patch — **frozen**, byte-identical.
+2. **NO LIVE** / **NO LLM** / **NO rerun** proposal.
+3. Product Composer/Verifier/runtime/UI/A9/authority — **untouched**.
+4. `fc_missing_01` / `fc_medical_03` Verifier FN — **not fixed** in this checkpoint.
+
+## Defect 1 — Proxy `captures`
+
+Audit proxies must expose `captures` via **narrow explicit delegation**, not broad
+`__getattr__`. `call_count` stays proxy-controlled and synced from backend after calls.
+
+## Defect 2 — Artifact preflight after marker
+
+Sequence for v2 live path:
+
+1. Before marker: assert all future output artifacts **and** marker absent.
+2. Exclusive-create marker.
+3. After marker: re-check **output paths only**, excluding the created attempt marker.
+4. Backend factory runs only after these checks.
+5. Final writes remain exclusive-create.
+
+**Forbidden:** `artifact_paths=None` as permanent bypass.
 
 ## Allowlist
 
 - `TASK.md`
-- `docs/S50_LIVE_REEVAL_V2_INCIDENT_AUDIT.md`
+- `evals/v5/run_fullcontext_response_eval.py`
+- `tests/test_fullcontext_response_eval_harness.py`
 - `docs/STRANGLER_ROADMAP.md` (completion status only)
-- `evals/v5/artifacts/fullcontext_response_eval_v2_live_raw.json` (add frozen; immutable)
-- `evals/v5/artifacts/fullcontext_response_eval_v2_live_result.json` (add frozen; immutable)
-- `evals/v5/artifacts/s49_fullcontext_response_eval_v2_manifest.json` (add frozen; immutable)
-- `evals/v5/artifacts/fullcontext_response_eval_v2_live_attempt.json` (add frozen; immutable)
-- `evals/v5/artifacts/s50_live_run_log.txt` (add frozen; immutable)
-- `evals/v5/artifacts/s50_live_reeval_v2_incident_manifest.json` (new append-only)
-- `evals/v5/artifacts/s50_live_harness_dirty_audit.patch` (new exact dirty diff)
-- `evals/v5/run_fullcontext_response_eval.py` (**restore-only** to `848a7d7`; completion commit **zero diff**)
 
-## Forbidden
+Contract changes only if PRE-CODE checker proves necessity (prefer harness-only).
 
-- live / LLM / provider calls
-- edit bytes of run-2 raw/result/original manifest/attempt marker/log
-- harness implementation (Checkpoint B)
-- manual review JSON
-- product Composer/Verifier/runtime/UI/A9/authority changes
-- `git checkout` / `git reset` for harness restore (use apply_patch only)
-- Checkpoint B start
-- pytest unless required for manifest schema (prefer none)
+## Protected (must not change bytes/content)
 
-## SHA-256 pins (pre-capture, full)
+- S47/S50 matrices
+- All live raw/result/manifest/marker/log artifacts
+- Incident manifest, audit doc, dirty patch
+- Composer/Verifier product code
+- runtime/UI/A9/authority
+
+## Frozen SHA-256 pins (must stay byte-identical)
 
 | Object | SHA-256 |
 |--------|---------|
-| raw | `c78403a8a1a82f472d3665f4893db3fb3fa794a9db254e91611448081be7536c` |
-| result | `273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa` |
-| original manifest | `8f61aa9097859337f31fbacf1ebf5d45ce3bee68d3f57955a99aa7a128567b8e` |
-| attempt marker | `2d02c1c971e617f4583c86d27360b380d98736c6bbe00b268c8e68a2ace8c64c` |
-| log | `76be057b272deffff3275ccd38a33c6e492f86d5b34c369d9e86626e3011cab2` |
-| dirty harness (pre-restore) | `5e2b12a3bb33f967012a0bc5e355b11549a51b5247702e72bc1c5700ae54c039` |
-| committed harness @ 848a7d7 | `871c8467c1c7cfb51bbee2a576b644cd570a7832e5fd516114fca2229d7cb739` |
-| matrix v2 (git blob) | `615714c519a92a75e23c2f15bbaa01a0f88a4d95` |
+| v2 live raw | `c78403a8a1a82f472d3665f4893db3fb3fa794a9db254e91611448081be7536c` |
+| v2 live result | `273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa` |
+| v2 manifest | `8f61aa9097859337f31fbacf1ebf5d45ce3bee68d3f57955a99aa7a128567b8e` |
+| v2 attempt marker | `2d02c1c971e617f4583c86d27360b380d98736c6bbe00b268c8e68a2ace8c64c` |
+| s50 log | `76be057b272deffff3275ccd38a33c6e492f86d5b34c369d9e86626e3011cab2` |
+| incident manifest | per `f919d05` tree |
+| dirty patch | `2322e3fa2b7dac988f200c93406efa13ee1e3be482a1179d77f7a84fac1ee397` |
 
-## Incident manifest required fields
+## Required tests (offline only)
 
-- `baseline_commit`: `848a7d7`
-- `matrix_v2_git_blob_hash`: `615714c519a92a75e23c2f15bbaa01a0f88a4d95`
-- `attempt_1_calls`: 2 (composer + verifier) + abort (`AttributeError: captures`)
-- `attempt_2_calls`: 38
-- `actual_total_provider_calls`: 40
-- `log_authoritative_call_ledger`: `s50_live_run_log.txt` (40× `llm_usage`)
-- `incomplete_historical_artifacts`: original manifest/marker/result record 38 only
-- All full SHA-256 pins (six evidence objects + patch + committed harness)
-- `automated_verdict`: `AUTOMATED_FAIL`
-- `diagnostic_only_ruling`: run-2 artifacts not S50 pass
-- `problem_cases_taxonomy`:
-  - `fc_missing_02`: Composer external knowledge; Verifier **correct reject**
-  - `fc_missing_01`: Verifier **false negative**; cross-disease transfer
-  - `fc_medical_03`: Verifier **false negative**; ungrounded lactation/hormones/healing
-- `rerun_forbidden`: true
-- `runtime_ui_a9_authority_untouched`: true
+### Proxy captures
 
-## Audit doc (`docs/S50_LIVE_REEVAL_V2_INCIDENT_AUDIT.md`) must cover
+- Composer proxy exposes `captures`
+- Semantic proxy exposes `captures`
+- First full fake case via wrapped factory — no `AttributeError`
+- `call_count` and `captures` belong to wrapped backend
+- No provider/live calls
 
-- Attempt 1 abort root cause (`_ComposerAuditProxy` missing `captures`)
-- Dirty hotfix 1: `__getattr__` delegation rationale
-- Dirty hotfix 2: `artifact_paths=None` rationale and **risk** (bypasses absent-check)
-- Successful run-2 executed on dirty tree, not committed `848a7d7`
-- Link to patch file and incident manifest
+### Artifact preflight
 
-## Harness restore procedure
+- Existing marker blocks before backend (existing test retained)
+- Existing raw/result/manifest blocks before backend
+- Freshly created marker does not cause false `CONFIG_ERROR`
+- Post-marker output preflight remains active
+- Factory/captures fake run passes end-to-end
+- Owner override alone does not overwrite existing marker or allow provider path
 
-1. Save exact dirty diff to `s50_live_harness_dirty_audit.patch`.
-2. Pin patch file SHA-256 in incident manifest.
-3. Restore `evals/v5/run_fullcontext_response_eval.py` via apply_patch (reverse diff).
-4. Verify restored SHA-256 == `871c8467…`.
-5. Completion commit must have **no diff** on harness file.
+## Test execution
+
+```powershell
+$bt = Join-Path $env:TEMP ("pytest-fc-harness-" + [guid]::NewGuid().ToString("n"))
+python -m pytest tests/test_fullcontext_response_eval_harness.py -p no:cacheprovider --basetemp=$bt -q
+```
+
+- Unique external `--basetemp`
+- `-p no:cacheprovider`
+- No default v2 artifact paths in tests (use `tmp_path` only)
 
 ## Process
 
 1. Governance TASK commit → PRE-CODE checker ✅
-2. Capture docs/manifest/patch/artifacts + harness restore
-3. Verify live artifact SHA-256 unchanged
+2. Implementation
+3. Offline pytest
 4. COMPLETION checker ✅
-5. Completion commit → push `codex/stage-a` → stop
+5. Completion commit + push `codex/stage-a` → stop
 
 ## Acceptance
 
-1. Incident manifest documents 40 calls, log authority, incomplete marker/manifest/result.
-2. All six evidence SHA-256 + patch SHA pinned.
-3. Harness restored to `871c8467…`; no harness diff in completion commit.
-4. Run-2 artifacts byte-identical to pre-capture pins.
-5. AUTOMATED_FAIL + diagnostic-only ruling documented.
-6. Three problem cases taxonomy captured.
-7. Checkpoint B **not** started.
+1. Both harness defects fixed per spec (narrow `captures`; post-marker preflight).
+2. No `artifact_paths=None`; no broad `__getattr__`.
+3. All new tests pass; frozen artifact SHA pins unchanged.
+4. Harness-only scope; Verifier FN explicitly still open.
+5. Checkpoint B complete; no live rerun; no product semantic milestone.

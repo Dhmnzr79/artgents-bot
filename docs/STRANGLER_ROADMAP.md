@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S41 — TurnFrame-bound offline response dispatch завершён** |
-| Ближайший рабочий фокус без live | **Следующий checkpoint только отдельным governance TASK; offline path TurnFrame → dispatch → verified response structurally complete** |
+| Отдельная S-series без live | **S42 — provider-neutral target medical boundary detector завершён** |
+| Ближайший рабочий focus без live | **Следующий checkpoint только отдельным governance TASK; dispatch-only runtime shadow после boundary enforcement** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -256,6 +256,15 @@
   scope. Governance `65c87bd`; independent completion review `✅`: S41 target/demo `17 passed`,
   S40/S33 neighbors `36 passed`, всего `53 passed`, skip/xfail нет. Message→TurnFrame,
   runtime/UI/session, live/LLM and product authority remain separate gates.
+
+- [x] **S42 — provider-neutral target medical boundary detector** — offline classifier
+  executor with injected backend, three-way semantics (`none | medical_handoff | uncertain`),
+  structured-output validation, canonical reason codes, and deterministic envelope enforcement.
+  Low confidence/malformed/backend failure/ambiguity never become `none`; `uncertain` maps to
+  terminal defer enforcement. Recognition quality unproven until separately permitted live eval.
+  Governance `4bd3411`; independent completion review `✅`: S42 target/enforcement `19 passed`,
+  S41 dispatch neighbor `12 passed`, всего `31 passed`, skip/xfail нет. Runtime wiring, live adapters,
+  dispatch-only shadow hook, and product authority remain separate gates.
 
 ## Какой roadmap актуален
 

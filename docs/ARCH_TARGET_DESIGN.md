@@ -198,6 +198,13 @@ typed dispatch errors; successful dispatch returns only `materialize | terminal`
 calls S40 once; clarify/defer/non-materializable medical handoff return payload-free
 `TargetResponseSpec` without S34/S40. `patient_scope` is not read.
 
+S42 adds an offline provider-neutral medical boundary detector with three-way semantics
+(`none | medical_handoff | uncertain`), structured-output validation, canonical reason codes,
+and deterministic envelope enforcement. Low confidence, malformed backend output, backend
+failure, or ambiguity never become `none`; `uncertain` maps to terminal defer enforcement,
+not commercial `boundary_decision="none"`. Recognition quality is **not proven** until a
+separately governed live eval with owner permission. No runtime wiring or live LLM calls.
+
 ---
 
 ## Порядок работ — strangler, две кучи

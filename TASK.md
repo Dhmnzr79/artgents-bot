@@ -1,99 +1,108 @@
-# TASK — S48a-correction Measurement Contract Honesty
+# TASK — S48b FullContext Medical Response Semantic Hardening
 
-**Baseline:** `codex/stage-a` / `a13460c` · **NO LIVE** · **NO LLM** · **NO product code**
+**Baseline:** `codex/stage-a` / `12c039c` · **NO LIVE** · **NO LLM** · **NO matrix/artifact edits**
 
-**Goal:** Remove always-green automated/final gates for unmeasured safety metrics.
-Keep literal hits diagnostic-only. Expose Verifier semantic reject counters with
-honest evaluated/not-evaluated denominators. Do not rewrite frozen S47 artifacts.
+**Goal:** Universal Composer/Verifier policy wiring fixes from S47 offline audit.
+Improve medical_handoff grounding, missing-base honesty, and CTA/consultation
+boundaries without dry refusals on known topics or regression on commercial paths.
 
 ## Owner decisions (binding)
 
-1. **fc_medical_01:** Verifier **false positive**. Manual review is required to
-   detect both Verifier **false positives** and **false negatives**.
-2. **Literal:** `raw_literal_forbidden_hits` + `raw_literal_forbidden_hit_case_count`
-   remain diagnostic-only; never semantic violation; no phrase tables/regex classifiers.
-3. **forbidden_claim_violation_count:** remove from **active** automated thresholds
-   and gates. Keep only `raw_literal_forbidden_hit_case_count` as diagnostic reporting.
-   Do not emit pseudo-gate `passed=true, value=0`.
-4. **dangerous_medical_violation_count:** **fully remove** from active automated
-   gates, active final gates, and early critical FAIL. No pseudo-gate with
-   `passed=true`. Reporting only:
-   `dangerous_medical_evaluation_status="NOT_EVALUATED"`.
-   Do not re-interpret or modify historical frozen artifacts.
-5. **semantic_*_rejected:** preserve case-level flags when semantic assessment
-   exists; add summary counters with honest denominator:
-   - `semantic_assessment_evaluated_case_count`
-   - `semantic_assessment_not_evaluated_case_count`
-   Absence of semantic payload must **not** become five `false` flags.
-   Transport/malformed/config cases = not evaluated; remain visible via their
-   own active gates.
-6. **Runtime safety:** fail-closed via Verifier/pipeline_error unchanged.
-7. **Frozen immutables:** S47 matrix `14b1cbd4…`, live raw `0f4d4b93…`,
-   live result `83bff177…` — byte-identical; artifact JSON not rewritten.
-   Matrix `proposed_*_thresholds` = historical snapshot in frozen matrix.
-8. **Offline replay:** must read old artifacts; additive/read-compatible schema.
-9. **Historical verdict:** re-summarizing frozen S47 run-2 metrics must remain
-   `AUTOMATED_FAIL`.
-10. **S48b / matrix v2 blocked.**
+1. **fc_medical_01:** owner-approved etalon — general grounded conditional fact from
+   FullContext + personal decision deferred to doctor; **not** dry refusal.
+2. **fc_medical_01 Verifier:** historical live reject = probable **false positive**;
+   manual review catches Verifier **FP and FN**.
+3. **Missing-base:** honest «нет в материалах клиники» for absent specific topic;
+   no cross-disease transfer; no external medical knowledge.
+4. **Grounding:** no causes/timelines/diagnostics/recommendations absent from FullContext
+   (fc_medical_03 class forbidden).
+5. **CTA:** phones/WhatsApp/contacts only via structured PRIMARY_EVIDENCE when
+   `allow_cta=true`; consultation close without contacts OK when
+   `allow_consultation_close=true`.
+6. **fc_boundary_02 / matrix v2:** **out of scope** — no production fix for narrow
+   fixture; frozen S47 matrix unchanged.
+7. **Model quality:** offline tests prove **policy/directive wiring only**; real
+   model behavior requires separate owner-approved live re-eval.
 
-## Scope
+## Scope (policy + wiring only)
 
-### Contract / aggregate / gates
-- Remove `forbidden_claim_violation_count` from active automated gates and from
-  gate verdict aggregation input.
-- Remove `dangerous_medical_violation_count` from active automated gates, active
-  final gates, and `critical_automated_medical_violation` early FAIL.
-- Summary reporting: `dangerous_medical_evaluation_status="NOT_EVALUATED"`.
-- Remove `dangerous_medical_violation: False` from `derive_case_automated_flags`.
-- Semantic payload present → derive five `semantic_*_rejected` flags from assessment.
-  Semantic payload absent → omit flags or explicit not-evaluated; never five false.
-- Add summary counters for five semantic reject fields + evaluated/not-evaluated counts.
-- Gate verdict: only gates with evaluable `pass: true|false` participate in
-  `AUTOMATED_PASS` / final automated stage.
+### Composer (`TARGET_COMPOSER_SYSTEM_POLICY` + directives)
+- Known medical: grounded general conditional facts from FullContext; defer personal
+  decision to doctor; keep useful content (fc_medical_01 semantics).
+- Missing-base: absent specific topic → controlled no-information + consultation if
+  allowed; no similar-disease transfer; no external knowledge.
+- Grounding: forbid medical additions not in FullContext.
+- Directives JSON: add `allow_cta`, `allow_consultation_close`, `allow_marketing_facts`
+  from `TargetResponseSpec`.
+- CTA prose ban when `allow_cta=false` even if contacts appear in corpus.
 
-### Preserved active gates
-- outcome_match_rate, provider_call_violation_count, pipeline_error_count,
-  transport_error_count, malformed_response_count,
-  ungrounded_strict_commercial_count, missing_base_external_knowledge_count,
-  unexpected_terminal_count (+ final manual gates unchanged).
+### Verifier (`TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY` + spec payload)
+- `medical_boundary_ok=true` for general grounded conditional answers without
+  personal verdict/diagnosis/treatment choice.
+- `medical_boundary_ok=false` for diagnosis, personal eligibility, treatment choice.
+- `general_grounding_ok=false` for any ungrounded medical claim vs FullContext.
+- Consultation invitation ≠ personal eligibility decision.
+- CTA/contact in prose = strict commercial; must match PRIMARY_EVIDENCE + allow_cta.
+- No repair/retry/fallback.
+- Verifier `response_spec_json`: include `allow_cta`, `allow_consultation_close`.
 
-### Replay compatibility
-- `replay_frozen_s47_live_semantic_metrics()` on pinned artifacts without disk writes.
-- Historical frozen live result JSON not re-interpreted or rewritten.
+## Blast-radius
+
+| Area | Risk | Mitigation |
+|------|------|------------|
+| medical_handoff content | Dry refusal / over-pruning | Explicit allow grounded general + doctor defer |
+| missing-base | False «нет информации» on known topics | Only when topic absent from entire corpus |
+| commercial/price/doctor | CTA rule bleed | Rules scoped to medical_handoff + allow_cta flag |
+| pain/general info | Policy length drift | No new routes/detectors; prompt-only |
 
 ## Allowlist
 
 - `TASK.md`
-- `evals/v5/fullcontext_response_eval_contract.py`
-- `tests/test_fullcontext_response_eval_harness.py`
+- `core/target_composer_executor.py`
+- `core/target_response_verifier.py`
+- `tests/test_target_composer_executor.py`
+- `tests/test_target_response_verifier.py`
+- `tests/test_target_fullcontext_content_response.py`
 - `docs/STRANGLER_ROADMAP.md` (completion status only)
 
 ## Forbidden
 
-- Live / LLM / product / runtime / UI / A9 / authority
-- Matrix / frozen artifact edits
-- Phrase tables, regex classifiers, new safety heuristics
-- S48b / matrix v2
-- Combined governance+implementation commits
-- `.pytest_basetemp_*` inside workspace (use temp dir outside repo)
+- case_id / disease names / eval phrases in production rules
+- regex / phrase tables / classifiers
+- per-MD routing, retriever, RAG, new detectors
+- matrix / frozen live raw/result edits
+- runtime / UI / session / A9 / authority
+- live / LLM calls
+- matrix v2 / fc_boundary_02 fixture fix
+- combined governance+implementation commits
+
+## Non-regression (offline pytest)
+
+- ordinary service description, price, payment stages, doctor-by-service
+- pain reassurance, known MD contraindication from FullContext
+- missing-base controlled response, consultation close
+- CTA allowed=true vs allowed=false
+- ordinary non-medical answer
+- S45–S48a harness neighbors green
+
+```text
+pytest tests/test_target_composer_executor.py tests/test_target_response_verifier.py tests/test_target_fullcontext_content_response.py tests/test_fullcontext_response_eval_harness.py tests/test_fullcontext_response_eval_matrix_contract.py -q -p no:cacheprovider --basetemp=$env:TEMP\pytest_basetemp_s48b_<runid>
+```
 
 ## Process
 
 1. Governance TASK commit → PRE-CODE checker ✅
 2. Implementation commit → COMPLETION checker ✅
-3. Offline tests:
-   `$env:TEMP\pytest_basetemp_s48a_correction_<runid> -p no:cacheprovider`
-4. Push `codex/stage-a` → clean/synced → stop
+3. Push `codex/stage-a` → clean/synced → **stop (NO LIVE)**
 
 ## Acceptance
 
-1. No active gate `passed=true` for unmeasured forbidden/dangerous metrics.
-2. `dangerous_medical_evaluation_status="NOT_EVALUATED"` in fresh summaries.
-3. Semantic denominators present; absent payload ≠ five false flags.
-4. Replay frozen S47: fc_medical_01 boundary reject, not dangerous; fc_missing_01
-   grounding reject + missing_base; fc_boundary_02 literal diagnostic only;
-   recomputed verdict `AUTOMATED_FAIL`.
-5. Frozen SHA pins byte-identical.
-6. `pytest tests/test_fullcontext_response_eval_harness.py tests/test_fullcontext_response_eval_matrix_contract.py -q` green.
+1. PRE-CODE ✅ on governance TASK.
+2. Composer directives include allow_cta / allow_consultation_close / allow_marketing_facts.
+3. Policy strings encode known-medical, missing-base, grounding, CTA rules (universal).
+4. Verifier spec payload includes allow_cta / allow_consultation_close.
+5. Targeted offline pytest green; frozen artifact SHA pins unchanged.
+6. COMPLETION ✅ → push → stop.
 
-**Stop. Do not start S48b.**
+**Completion report must state:** offline tests confirm contract/prompt wiring only;
+model quality not proven until separate approved live re-eval.

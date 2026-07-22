@@ -110,6 +110,11 @@ S30 принимает явно заданный будущим ResponseSpec/cal
 components, не смешивает, не ранжирует, не обрезает и не подставляет другую family при
 пустом результате. Widget/session/runtime и product path по-прежнему не подключены.
 
+S31 объединяет proven S27→S30 segment одним прозрачным offline facade и возвращает exact
+materials, plan, follow-up candidates и selected follow-ups. Он не меняет решений и не
+перехватывает ошибки стадий. Это проверка сквозной совместимости текущего downstream
+участка, а не финальный target path и не замена upstream ResponseSpec.
+
 ---
 
 ## Порядок работ — strangler, две кучи

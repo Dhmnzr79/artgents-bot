@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S31 — integrated offline response package: governance pending, код не начат** |
-| Ближайший рабочий фокус без live | **Проверить governance S31; до checker ✅ код не писать** |
+| Отдельная S-series без live | **S31 — integrated offline response package завершён offline** |
+| Ближайший рабочий фокус без live | **Отдельный governance минимального канонического upstream ResponseSpec** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -177,9 +177,11 @@
   merge/ranking/truncation/fallback. Governance `04a9f8b`; independent completion review
   `✅`: target `23 passed`, S29 neighbors `37 passed`, всего `60 passed`, skip/xfail нет.
   Следующий focus — end-to-end offline response assembly над proven components.
-- [ ] **S31 — integrated offline response package** — governance prepared для одного
-  offline-вызова через exact S27→S28→S29→S30 results. Это интеграция текущего сегмента,
-  не финальный bot path и не канонический ResponseSpec; до checker `✅` код не пишется.
+- [x] **S31 — integrated offline response package** — один прозрачный offline-вызов
+  возвращает exact S27→S28→S29→S30 results без новых решений или error wrapping.
+  Governance `729fdf9`; independent completion review `✅`: target `11 passed`, восемь
+  S27–S30 neighbor files `104 passed`, всего `115 passed`, skip/xfail нет. Это не
+  финальный bot path; следующий focus — минимальный канонический upstream ResponseSpec.
 
 ## Какой roadmap актуален
 

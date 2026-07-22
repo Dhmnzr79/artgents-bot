@@ -1,32 +1,26 @@
-# TASK — S32 Canonical Target ResponseSpec Contract
+# TASK — S33 Minimal Deterministic ResponsePolicy Builder
 
-**Branch / baseline:** `codex/stage-a` / `c14f941 feat: assemble offline response package S31`
+**Branch / baseline:** `codex/stage-a` / `644226d feat: define canonical response spec S32`
 
-**Goal:** define the smallest strict, immutable upstream `TargetResponseSpec` schema. This
-checkpoint validates an explicit spec only; it does not derive one from TurnFrame or govern
-the product response path.
+**Goal:** build one valid S32 `TargetResponseSpec` from a strict explicit non-A9 request.
+This first policy slice owns only follow-up family choice from exact component focus; all
+other policy decisions remain explicit inputs.
 
 ## Owner laws
 
-- ResponseSpec is a declarative safety/composition contract, never a topic prompt table.
-- It owns canonical response mode, topic scope, required facts/components and permissions.
-- It does not select evidence, facts, services, doctors, prices or wording.
-- `required_components` is the exact closed payload set: omitted components are forbidden.
-- Existing S28/S30 type aliases move to this upstream contract; behavior stays unchanged.
-- `medical_handoff` is a mandatory downstream safety restriction, not a descriptive label:
-  consumers may use only source-owned general facts and policy-permitted price/marketing/
-  CTA, never diagnosis, differential diagnosis, personal eligibility or treatment choice.
+- No raw text, TurnFrame object, patient_scope, inference, taxonomy or product authority.
+- Upstream explicitly supplies mode, scope, facts, requested components and permissions.
+- Builder derives only `followup_source` using the owner-approved component-focus rule.
+- Terminal normal payload and medical safety remain enforced by canonical S32 validation;
+  request-only terminal primary focus is rejected before S32.
+- Never catch/wrap S32 `ValidationError`, add fallback or silently repair invalid payload.
 
 ## Contract
 
-Add `contracts/target_response_spec.py` with canonical aliases:
+Add `contracts/target_response_policy.py`:
 
 ```python
-TargetResponseMode = Literal["answer", "clarify", "defer", "medical_handoff"]
-TargetResponseComponent = Literal["content", "price", "doctors"]
-TargetFollowupSource = Literal["content", "price"]
-
-class TargetResponseSpec(BaseModel):
+class TargetResponsePolicyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     response_mode: TargetResponseMode
@@ -35,88 +29,96 @@ class TargetResponseSpec(BaseModel):
     allowed_topics: tuple[CanonicalToken, ...]
     forbidden_topics: tuple[CanonicalToken, ...] = ()
     required_fact_ids: tuple[CanonicalToken, ...] = ()
-    required_components: tuple[TargetResponseComponent, ...]
-    followup_source: TargetFollowupSource | None = None
+    requested_components: tuple[TargetResponseComponent, ...]
+    primary_component: TargetResponseComponent | None = None
     allow_marketing_facts: bool = False
     allow_consultation_close: bool = False
     allow_cta: bool = False
 ```
 
-`CanonicalToken` is an exact non-empty string with no leading/trailing whitespace.
-Strict mode rejects coercion and list-for-tuple input. Each tuple must preserve authored
-order and be unique, with exact reason tokens:
+Request cross-validation order:
 
-- `allowed_topic_duplicate`
-- `forbidden_topic_duplicate`
-- `required_fact_id_duplicate`
-- `required_component_duplicate`
+1. `clarify`/`defer` with non-`None` `primary_component` →
+   `terminal_primary_component_forbidden`. This request-only field cannot be silently
+   discarded; this reason wins over any other terminal payload error.
+2. For terminal requests with no primary, skip remaining focus validation so canonical
+   S32 `terminal_response_payload_forbidden` remains owner of facts/components/allow flags.
+3. Non-terminal `primary_component` absent from `requested_components` →
+   `policy_primary_component_missing`.
+4. Non-terminal content+price with `primary_component=None` →
+   `policy_followup_source_ambiguous`.
 
-Cross-field validation order and exact reasons:
+Add `core/target_response_policy.py`:
 
-1. allowed/forbidden overlap → `response_topic_scope_overlap`;
-2. `answer` or `medical_handoff` with empty allowed topics → `response_scope_empty`;
-3. `answer` with no required components → `response_components_empty`;
-4. `clarify`/`defer` with required facts/components, follow-up source or any three allow
-   flags true → `terminal_response_payload_forbidden`;
-5. content/price follow-up without the same required component →
-   `followup_source_component_missing`;
-6. `medical_handoff` with empty forbidden topics → `medical_forbidden_topics_empty`.
+```python
+class TargetResponsePolicyBuildError(ValueError):
+    # stores code/value; exact message f"{code}: {value!r}"
 
-`medical_handoff` may be a pure safe handoff with empty `required_components`, or may allow
-source-owned content/price/doctors/marketing/CTA under future policy. `forbidden_topics`
-is an additional evidence-scope restriction; it is **not** the no-diagnosis mechanism.
-Manual-contact cases (current personal pain, active complication, complaint) hard-stop
-before ResponseSpec and cannot be represented by this sales-capable medical mode.
+def build_target_response_spec(
+    request: TargetResponsePolicyRequest,
+) -> TargetResponseSpec: ...
+```
 
-## Type ownership migration
+Wrong exact request type raises `response_policy_request_invalid`, value = original
+request. This is the only builder error code.
 
-- S28 imports `TargetResponseComponent` from the new contract and removes its local alias.
-- S30 imports `TargetFollowupSource` from the new contract and removes its local alias.
-- S31 imports `TargetFollowupSource` from the contract directly.
-- Existing public imports from S28/S30 must remain compatible because imported names are
-  still module attributes. No other S28–S31 code or behavior changes.
+Follow-up derivation for non-terminal requests:
+
+- primary `content`/`price` → same source;
+- primary `doctors` → `None`;
+- no primary and only content-capable family present → `content`;
+- no primary and only price-capable family present → `price`;
+- neither → `None`; content+price/no primary is rejected by request validation.
+
+For terminal requests builder passes `followup_source=None`; any requested facts,
+components or allow flags are then rejected by S32 with
+`terminal_response_payload_forbidden`. All request fields otherwise pass exactly into S32,
+with `requested_components` renamed to `required_components` and authored order preserved.
+
+Request-model focus validation necessarily precedes S32 construction. Therefore on a
+combined-invalid non-terminal request (including `medical_handoff`), primary-missing or
+ambiguous-focus reasons win over S32 scope/medical reasons. This is explicit fail-closed
+precedence; canonical S32 reasons propagate unchanged once request focus is valid.
 
 ## Boundaries
 
-No ResponsePolicy builder, TurnFrame/A9 read, manual-contact/booking handling, evidence
-selection, MD/JSON/client data, Composer, Verifier, runtime/UI/session, authority or
-live/LLM. No product flag. Do not edit clients or A9 artifacts.
+This does not decide response mode, topic scope, components, facts, tone or sales
+permissions. Manual-contact/booking still terminate before ResponseSpec. No evidence,
+selectors, S31 wiring, MD/JSON/client reads, Composer, Verifier, runtime/UI/session,
+authority or live/LLM. A9 remains shadow-only and is neither imported nor read.
 
 Allowlist:
 
 - `TASK.md`
-- `contracts/target_response_spec.py`
-- `core/target_response_materialization_plan.py` (import ownership only)
-- `core/target_response_followup_policy.py` (import ownership only)
-- `core/target_offline_response_package.py` (import ownership only)
-- `tests/test_target_response_spec.py`
-- `tests/test_target_response_materialization_plan.py` (protected firewall compatibility:
-  add only `contracts.target_response_spec` to its allowed import set)
+- `contracts/target_response_policy.py`
+- `core/target_response_policy.py`
+- `tests/test_target_response_policy.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
 ## Minimal tests
 
-- exact fields/defaults, strict/frozen/extra-forbid model and canonical aliases;
-- valid answer, medical_handoff, clarify and defer specs;
-- exact token, tuple uniqueness, scope and cross-field reason tokens/order;
-- medical mode is valid both as pure handoff and with source-owned sales data, always
-  carrying mandatory no-diagnosis semantics plus explicit additional forbidden scope;
-- terminal modes cannot leak normal response payload and their error precedes follow-up
-  source/component consistency;
-- source/component consistency and authored tuple order;
-- S28/S30 compatibility imports and S31 canonical ownership;
-- import firewall, no skip/xfail/client writes/live.
+- exact request fields/defaults and strict/frozen/extra-forbid shape;
+- exact builder signature/error class/message and sole code;
+- single content, single price, doctor-only and no-component focus;
+- composite content+price requires explicit primary; doctor primary selects no follow-up;
+- authored component/fact/topic order passes unchanged;
+- terminal primary focus has its exact request error; with no primary, terminal S32 error
+  wins over remaining focus ambiguity and no payload is repaired;
+- pure and sales-capable medical specs preserve mandatory S32 boundary;
+- combined-invalid medical focus proves request-focus precedence; focus-valid S32 reasons
+  propagate unchanged; input unchanged;
+- import firewall: no TurnFrame/patient_scope/A9/client/runtime/live, no skip/xfail.
 
-Run S32 tests plus S28, S30 and S31 target/demo neighbors only. No full suite, A9 or live.
+Run S33 target plus S32 target and S30/S31 target+demo neighbors only. No full suite/live.
 
 ## Gates
 
 1. Independent governance checker `✅` before code.
-2. Commit/push `docs: govern canonical response spec S32` only to `codex/stage-a`.
-3. Implement allowlist and run target + six neighbor files.
+2. Commit/push `docs: govern deterministic response policy S33` only to stage-a.
+3. Implement allowlist and run target + five neighbor files.
 4. Independent completion checker `✅`, roadmap `[x]`.
-5. Commit/push `feat: define canonical response spec S32`; final clean/synced.
+5. Commit/push `feat: build deterministic response spec S33`; final clean/synced.
 
-Next checkpoint: a separate deterministic ResponsePolicy builder from explicit non-A9
-inputs into this spec; no product authority transfer.
+Next checkpoint: integrate explicit S33 spec into the S31 offline package boundary. Do not
+add topic/aspect inference until that integration proves an exact missing contract.

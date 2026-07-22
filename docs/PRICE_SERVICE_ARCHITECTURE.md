@@ -532,6 +532,25 @@ Result содержит exact `brand_id` и deep-copied canonical brand record. 
 передать ID в S24, но S25 сам не выбирает service/offer, не проверяет наличие цены и не
 подключён к извлечению текста, FullContext, session/runtime или product authority.
 
+### Deterministic active service term resolution S26
+
+S26 закрывает последний dictionary lookup перед vertical end-to-end assembly: один уже
+выделенный service term сопоставляется только с active target service по exact dictionary
+ID, canonical `name` или authored alias. Единственная normalization —
+`strip().casefold()`; произвольное сообщение не сканируется, fuzzy/typo correction нет.
+
+Authored aliases в demo иногда сами являются полным ценовым вопросом. Такой alias может
+совпасть только целиком; содержащая его более длинная фраза не match. Inactive service
+не возвращается, unknown остаётся `None`, а cross-active collision даёт typed fail-closed
+error вместо первого случайного service.
+
+Result хранит exact service ID и deep-copied `TargetService`, включая selection/options,
+но не применяет их к patient facts. Caller может передать ID в S10; S26 сам не выбирает
+лечение, option, offer, врача или маркетинг и не подключён к runtime/authority.
+
+После S26 следующий архитектурный фокус — собрать существующие target-компоненты в
+первую offline end-to-end цепочку, а не добавлять ещё один lookup-слой заранее.
+
 ### Session state
 
 ```yaml

@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S26 — deterministic active service term resolution: governance pending, код ещё не начат** |
-| Ближайший рабочий фокус без live | **Проверить governance S26; до checker ✅ код не писать. После S26 — первая vertical offline end-to-end assembly** |
+| Отдельная S-series без live | **S26 — deterministic active service term resolution реализован и независимо проверен; product path не подключён** |
+| Ближайший рабочий фокус без live | **Первая vertical offline end-to-end assembly существующих target-компонентов; не добавлять новый lookup-слой без отдельного owner governance** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -147,10 +147,11 @@
   `strip().casefold()` и fail-closed обрабатывает cross-brand collision. Independent
   completion review `✅`: target `51 passed`, required neighbors `122 passed`, skip/xfail
   нет. Full-message recognition, runtime, ответы и authority не подключены.
-- [ ] **S26 — deterministic active service term resolution** — governance подготовлен
-  для последнего минимального lookup: один already-extracted term → exact active service
-  ID по ID/name/authored alias, без fuzzy, patient-scope selection или diagnosis. До
-  checker `✅` код не пишется; следующий focus после S26 — vertical end-to-end assembly.
+- [x] **S26 — deterministic active service term resolution** — последний минимальный
+  lookup разрешает один already-extracted term в exact active service ID по
+  ID/name/authored alias без fuzzy, patient-scope selection или diagnosis. Independent
+  completion review `✅`: target `51 passed`, required neighbors `185 passed`, skip/xfail
+  нет. Следующий focus — vertical offline end-to-end assembly, не новый lookup layer.
 
 ## Какой roadmap актуален
 

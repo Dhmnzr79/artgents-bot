@@ -153,6 +153,15 @@ package и payment stages без candidate fact_refs/follow-ups; doctors — т�
 вызывает модель и не создаёт ответ: Composer execution, live quality proof, Verifier и
 product wiring остаются отдельными gates.
 
+S37 добавляет минимальную provider-neutral границу Composer execution. Она проверяет
+закрытую форму S36 request, детерминированно сериализует response directives и primary
+evidence, передаёт их одному injected backend ровно один раз и возвращает только явно
+`unverified` текст. Stable policy запрещает user prompt расширять evidence, использовать
+невыбранные FullContext-факты, придумывать маркетинг или выводить UI-sidecars; для
+`medical_handoff` отдельно запрещены diagnosis/differential/personal eligibility/treatment
+choice. Follow-ups и CTA не передаются модели. Retry, repair, fallback, provider wiring,
+live quality proof, Verifier и product authority в S37 отсутствуют.
+
 ---
 
 ## Порядок работ — strangler, две кучи

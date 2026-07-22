@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S36 — target Composer request materialization завершён offline** |
-| Ближайший рабочий фокус без live | **Governance минимального Composer executor; live/LLM только отдельно** |
+| Отдельная S-series без live | **S37 — minimal target Composer executor завершён offline** |
+| Ближайший рабочий фокус без live | **Governance offline Verifier; live/LLM только после отдельного разрешения** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -214,6 +214,13 @@
   `✅`: target/demo `25 passed`, S35/S34 neighbors `36 passed`, всего `61 passed`,
   skip/xfail нет. Composer execution/live proof, Verifier, A9 и product authority не
   подключены.
+- [x] **S37 — minimal target Composer executor** — exact S36 request проходит closed-shape
+  validation, детерминированно превращается в stable policy + directives + primary evidence
+  и передаётся одному injected backend ровно один раз. Follow-ups/CTA остаются sidecars и
+  не попадают в invocation; retry/repair/fallback отсутствуют; результат всегда явно
+  `unverified`. Governance `c4c9502`; independent completion review `✅`: target/demo
+  `22 passed`, S36/S35 neighbors `40 passed`, всего `62 passed`, skip/xfail нет.
+  Provider/live quality proof, Verifier, A9, runtime/UI и product authority не подключены.
 
 ## Какой roadmap актуален
 

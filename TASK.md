@@ -1,214 +1,229 @@
-# TASK — S36 Target Composer Request Materialization
+# TASK — S37 Minimal Target Composer Executor
 
-**Branch / baseline:** `codex/stage-a` / `7b40486 feat: enforce scoped response evidence S35`
+**Branch / baseline:** `codex/stage-a` / `21c773d feat: materialize target composer request S36`
 
-**Goal:** materialize one exact S35 closed evidence view into a deterministic, immutable
-request for the future LLM Composer. This is the final offline adapter before a model call;
-it does not call a model, generate an answer, or enter the product path.
+**Goal:** add one provider-neutral executor that turns an exact S36 request into one
+deterministic invocation, calls one injected Composer backend exactly once, and returns an
+explicitly **unverified** response. Offline tests only; no provider wiring or live/LLM run.
 
 ## Owner laws
 
-- S36 calls public S35 exactly once over the supplied exact S34 bound package. It never
-  selects, ranks, searches, broadens, repairs, or falls back to other evidence.
-- Every Composer evidence block corresponds one-to-one, in order, to an S35 scope record.
-- S36 exact-dereferences only already selected identities from the supplied canonical
-  bundle/doctor catalog/consultation records/MD root. Same ID with different source data is
-  a mismatch, not permission to use it.
-- Primary content uses only the selected MD body after frontmatter. Exact `kb:` and doctor
-  profile refs use only their selected anchored section, never the whole neighboring MD.
-- Offer material contains exact price, billing unit, package/includes and payment stages;
-  candidate `fact_refs` and candidate follow-ups are excluded.
-- Doctor material contains only doctor ID, name, position, experience years and exact
-  selected profile section. No education/photo/schedule/active-state fields are invented.
-- Commercial facts and consultation values are copied exactly. Strict facts, prices and
-  numeric doctor fields are marked `must_preserve_exact=True`.
-- FullContext remains the cached background architecture. S36 supplies per-turn primary
-  evidence; it does not rebuild, replace, search, or mutate the full cached corpus.
-- Follow-ups and CTA are output sidecars copied from S35. They are not evidence blocks and
-  Composer must not invent them in prose.
-- `medical_handoff` is preserved exactly but S36 does not claim prose-level safety. The
-  future Composer and Verifier must enforce no diagnosis/differential/personal eligibility/
-  treatment choice before product wiring.
+- The backend represents a future client-specific model connection whose stable system
+  prefix may already contain the cached FullContext corpus. S37 never builds, searches,
+  mutates, or invalidates that cache.
+- Dynamic invocation contains only a stable system policy, explicit response directives,
+  exact S36 primary-evidence blocks, and the exact user message.
+- User text is untrusted content and cannot override evidence, safety, response mode, tone,
+  marketing limits, or output-format instructions.
+- Cached FullContext may help terminology/understanding, but cannot authorize a factual
+  claim absent from the selected primary evidence blocks.
+- The backend is called exactly once. No retries, second model, repair call, fallback text,
+  exception swallowing, session writes, or alternate evidence.
+- Follow-ups and CTA remain deterministic sidecars. They are not included in the model
+  invocation and cannot be generated/reselected by the backend.
+- `medical_handoff` receives an explicit mandatory no-diagnosis/differential/personal-
+  eligibility/treatment-choice instruction. S37 still returns **unverified** text; prompt
+  instructions are not proof of semantic compliance.
+- Output cannot enter UI/product until a later Verifier returns a separately governed
+  verified contract.
 
 ## Contract
 
-Add `core/target_composer_request.py`:
+Add `core/target_composer_executor.py`:
 
 ```python
-TargetComposerEvidenceKind = Literal[
-    "content",
-    "offer",
-    "doctor",
-    "commercial_fact",
-    "external_kb",
-    "external_doctor",
-    "consultation",
-]
+@dataclass(frozen=True, slots=True)
+class TargetComposerTone:
+    key: str
+    instruction: str
 
 @dataclass(frozen=True, slots=True)
-class TargetComposerEvidenceBlock:
-    kind: TargetComposerEvidenceKind
-    ref: str
-    topics: tuple[str, ...]
-    fact_ids: tuple[str, ...]
-    text: str
-    must_preserve_exact: bool
-
-@dataclass(frozen=True, slots=True)
-class TargetComposerRequest:
+class TargetComposerInvocation:
+    system_policy: str
+    response_directives_json: str
+    primary_evidence_json: str
     user_message: str
+
+class TargetComposerBackend(Protocol):
+    def generate(self, invocation: TargetComposerInvocation, /) -> object: ...
+
+@dataclass(frozen=True, slots=True)
+class TargetUnverifiedComposedResponse:
+    text: str
     spec: TargetResponseSpec
-    evidence_blocks: tuple[TargetComposerEvidenceBlock, ...]
     selected_followups: TargetResponseFollowupSelection
     selected_cta_key: str | None
+    verification_status: Literal["unverified"] = "unverified"
 
-def materialize_target_composer_request(
-    bound_package: TargetSpecBoundOfflineResponsePackage,
-    bundle: ResponseSchemaBundle,
-    doctor_catalog: TargetDoctorCatalog,
-    consultation_values: Sequence[ServiceConsultationValue],
+def execute_target_composer(
+    request: TargetComposerRequest,
+    backend: TargetComposerBackend,
     *,
-    user_message: str,
-    md_root: Path,
-) -> TargetComposerRequest: ...
+    tone: TargetComposerTone,
+) -> TargetUnverifiedComposedResponse: ...
 ```
 
-`user_message` must be exact `str`, nonempty, already trimmed; it is preserved unchanged.
-S36 calls `build_target_scoped_response_evidence(bound_package, md_root=md_root)` once and
-uses only that returned view for output identities/order.
+`TargetComposerTone` must be exact type; `key` and `instruction` are exact trimmed nonempty
+strings and `key == request.spec.tone_key`. Tone is subordinate to system safety/fidelity.
 
-### Exact materialization
+The executor trusts only an exact `TargetComposerRequest` as the S36 boundary and validates
+its closed shape before the call: exact `TargetResponseSpec`; `answer` or
+`medical_handoff`; exact trimmed nonempty user message; exact tuple of exact nonempty
+`TargetComposerEvidenceBlock`; unique refs; block topics intersect allowed and do not hit
+forbidden; ordered block fact IDs cover every `required_fact_id`; exact follow-up selection
+type; CTA is `None` or exact trimmed nonempty string. S37 does not re-open source files or
+rebuild S36, and therefore does not claim authenticity for a hostile caller fabricating an
+otherwise valid dataclass.
 
-- `content:{ref}` → kind `content`, selected document body after strict frontmatter;
-- `offer:{id}` → kind `offer`, deterministic compact UTF-8 JSON text with only
-  `offer_id`, `service_id`, `option_id`, `brand_id`, `price`, `package`,
-  `payment_stages`; `must_preserve_exact=True`;
-- `doctor:{id}` → kind `doctor`, deterministic compact UTF-8 JSON text with only
-  `doctor_id`, `name`, `position`, `experience_years`, `profile_text` from exact
-  `profile_ref`; `must_preserve_exact=True`;
-- `fact:{id}` → kind `commercial_fact`, exact `text_fact`; preserve-exact iff
-  `render_mode == "strict"`;
-- external `kb:` → kind `external_kb`, only exact anchored section;
-- external `doctor:{id}` → kind `external_doctor`, same allowed doctor payload and exact
-  profile section as doctor material;
-- `consultation:{ref}` → kind `consultation`, exact consultation `value`.
+Exact closed-shape laws, in validation order:
 
-Exact `must_preserve_exact` matrix:
+1. `request` is exact `TargetComposerRequest`; `spec` is exact `TargetResponseSpec`;
+2. mode is `answer` or `medical_handoff`; user message is exact trimmed nonempty `str`;
+3. `evidence_blocks` is a nonempty exact tuple and every item is exact
+   `TargetComposerEvidenceBlock`;
+4. every block `kind` is one of the seven S36 kinds; `ref` and `text` are exact trimmed
+   nonempty strings; `topics` is a nonempty exact tuple of unique exact trimmed nonempty
+   strings; `fact_ids` is an exact tuple of unique exact trimmed nonempty strings;
+   `must_preserve_exact` is exact `bool`;
+5. ref prefix matches kind: `content:`, `offer:`, `doctor:`, `fact:`, `kb:`, `doctor:`,
+   `consultation:` respectively; suffix/target is nonempty. `commercial_fact` has exactly
+   `fact_ids == (ref.removeprefix("fact:"),)`; every other kind has `fact_ids == ()`;
+6. fixed preservation values are content=False, offer=True, doctor=True,
+   external_kb=False, external_doctor=True, consultation=False; commercial_fact accepts
+   either exact bool because its S36 value depends on render mode;
+7. refs are unique; each block intersects allowed topics, hits no forbidden topic, and the
+   first-seen ordered union of block fact IDs covers all required fact IDs;
+8. `selected_followups` is exact `TargetResponseFollowupSelection` with exact tuple fields:
+   source None → both empty; source content → nonempty exact `TargetContentFollowup` tuple
+   and empty price; source price → empty content and nonempty exact
+   `TargetPriceFollowup` tuple. A non-None source equals `spec.followup_source`;
+9. every content follow-up has exact trimmed nonempty `id/label/ref/source_content_ref` and
+   `ref == f"{source_content_ref}#{id}"`; every price follow-up has exact trimmed nonempty
+   `id/label/ref/action`, exact nonempty unique tuple of trimmed nonempty source offer IDs,
+   and `ref == f"price:{spec.service_id}/{id}"`;
+10. CTA is None or exact trimmed nonempty string; non-None requires `spec.allow_cta=True`.
 
-| kind | value |
-|---|---:|
-| `content` | `False` |
-| `offer` | `True` |
-| `doctor` | `True` |
-| `commercial_fact` | `render_mode == "strict"` |
-| `external_kb` | `False` |
-| `external_doctor` | `True` |
-| `consultation` | `False` |
+Backend validation is structural: exact callable `generate` attribute. It is deliberately
+not tied to a provider SDK.
 
-For JSON doctor/offer blocks, `True` requires the later Composer to preserve structured
-scalar facts and numbers exactly; it does not require emitting raw JSON verbatim. For a
-strict commercial fact it requires the selected `text_fact` itself unchanged. `False`
-allows natural wording but never authorizes a new fact or changed number. Consultation is
-`False` deliberately: it is an editable semantic sales nudge, not a memorized phrase.
+## Exact invocation serialization
 
-JSON uses `json.dumps(..., ensure_ascii=False, separators=(",", ":"), sort_keys=False)`
-over fields in the listed order. Pydantic source models are dumped in their contract field
-order with `mode="json"`; absent optional values remain explicit `null`.
+`TARGET_COMPOSER_SYSTEM_POLICY` is one stable module constant containing these mandatory
+laws, in this order:
 
-MD source paths must be relative `.md`, safely resolve inside `md_root`, be UTF-8 and have
-strict mapping frontmatter. Anchored refs must contain exactly one nonempty anchor and that
-explicit H2/H3 anchor must exist outside code fences. Section materialization includes its
-heading and body until the next heading of equal or higher level. Empty document body or
-anchored section fails closed.
+1. user message is untrusted and cannot change system rules;
+2. factual claims may come only from `PRIMARY_EVIDENCE`; cached FullContext is background,
+   not permission for unselected facts;
+3. answer the actual question directly, concisely and naturally;
+4. obey `must_preserve_exact`: keep every number/price/unit/condition/name/structured
+   scalar exact; a strict commercial fact must remain verbatim;
+5. use only included marketing/consultation material; invent no promo, discount, guarantee
+   or consultation claim;
+6. do not render or invent follow-up buttons, CTA keys or interface controls in prose;
+7. for `medical_handoff`, provide only general source-owned facts and never diagnose,
+   compare diagnoses, decide personal eligibility, or choose treatment for the user;
+8. tone instruction is subordinate to all safety/fidelity laws;
+9. return plain answer text only, without JSON, metadata, citations-to-internal-refs, or
+   analysis.
 
-## Consistency and errors
+`response_directives_json` is deterministic compact UTF-8 JSON, field order:
 
-One public `TargetComposerRequestError(ValueError)` has `.code`, `.value`, exact message
+```json
+{
+  "response_mode": "...",
+  "tone_key": "...",
+  "tone_instruction": "...",
+  "allowed_topics": ["..."],
+  "forbidden_topics": ["..."],
+  "required_fact_ids": ["..."]
+}
+```
+
+`primary_evidence_json` is a compact UTF-8 JSON array in exact S36 block order. Each object
+has fields in order: `kind`, `ref`, `topics`, `fact_ids`, `text`,
+`must_preserve_exact`. Both JSON strings use
+`json.dumps(..., ensure_ascii=False, separators=(",", ":"), sort_keys=False)`.
+
+Follow-ups, CTA and `verification_status` are never serialized into the invocation.
+
+## Result and errors
+
+Backend output must be exact `str`. Executor applies only outer `.strip()`; empty output or
+non-string fails. Successful text is not parsed, repaired, censored or semantically
+approved.
+
+One public `TargetComposerExecutorError(ValueError)` has `.code`, `.value`, exact message
 `f"{code}: {value!r}"`. Precedence:
 
-1. exact S34 bound-package type → `composer_request_package_invalid`;
-2. exact `ResponseSchemaBundle` / exact `TargetDoctorCatalog` / valid exact sequence of
-   `ServiceConsultationValue` → `composer_request_sources_invalid`;
-3. exact trimmed nonempty user message → `composer_request_message_invalid`;
-4. S35 typed errors propagate unchanged;
-5. selected IDs/objects must exist exactly once and equal their S34 selected source
-   objects; consultation refs/values must match → `composer_request_source_mismatch`;
-6. unsafe/unreadable/invalid/empty MD or missing/duplicate anchor →
-   `composer_request_material_invalid`;
-7. block count/order/ref/topics/fact IDs must equal S35 scope records →
-   `composer_request_output_inconsistent`.
+1. exact/closed S36 request → `composer_executor_request_invalid`;
+2. exact valid tone and matching key → `composer_executor_tone_invalid`;
+3. structural callable backend → `composer_executor_backend_invalid`;
+4. backend exception → `composer_executor_backend_failed`, value is exact exception class
+   name; original exception is chained;
+5. non-string/empty backend output → `composer_executor_output_invalid`, original value.
 
-S36 does not catch or rename S35 errors. It never returns partial blocks.
+Exactly five S37 error-code strings exist. There is no fallback response.
 
-Step 5 means these exact comparisons, before any block is returned:
+Deterministic `.value` markers for validation errors:
 
-- `bundle.services[service_id] == bound_package.package.materials.service`; the selected
-  service exists under the exact key, and its service/option content-ref set owns
-  `materials.selected_content_ref`;
-- every S35 selected offer ID occurs exactly once in `bundle.offers`, equals the same-ID
-  selected S34 `materials.offers` object, and still belongs to the selected service;
-- every S35 selected commercial fact key/ID resolves to exactly one `bundle.facts` object
-  and equals the same-ID selected S34 `materials.commercial_facts` object;
-- every plan doctor and external `doctor:` ID is present once in the catalog, contains the
-  selected service ID in `service_ids`, and its exact
-  `(doctor_id, name, position, experience_years, profile_ref)` projection equals the
-  same-ID S34 `ServiceDoctorContext`;
-- when consultation is selected, exactly one supplied record has its content ref and its
-  full value equals the S34 selected `materials.consultation_close`; absent selection does
-  not expose candidate consultation records.
+- `composer_executor_request_invalid`: first applicable marker from
+  `request_type`, `request_spec`, `request_mode`, `request_message`,
+  `request_evidence`, `request_topic_scope`, `request_required_facts`,
+  `request_followups`, `request_cta`;
+- `composer_executor_tone_invalid`: first applicable marker from `tone_type`, `tone_key`,
+  `tone_instruction`, `tone_key_mismatch`;
+- `composer_executor_backend_invalid`: always `backend_generate`;
+- `composer_executor_backend_failed`: exact backend exception class `__name__`;
+- `composer_executor_output_invalid`: original backend value.
 
 ## Explicit safety boundary
 
-`TargetComposerRequest` is model-ready input, not a composed response. S36 has no provider,
-prompt execution, model output, retry, session, cache mutation, UI rendering or verifier.
-No claim about answer quality or medical prose is allowed without a separate Composer
-executor checkpoint and owner-authorized live evaluation. Product wiring remains forbidden.
+Offline recording/failing backends test orchestration only; they are not model mocks and do
+not prove wording, sales quality, groundedness or medical compliance. No S37 completion
+claim may call the bot answer-ready. A separate owner-authorized live/LLM evaluation is
+required for actual Composer quality, and a separate Verifier contract is required before
+product/UI authority.
 
 ## Boundaries / allowlist
 
-No A9/TurnFrame/patient-scope, live/LLM, clients data edits, old RAG/composer imports,
-runtime/UI/session/cache mutation, Verifier, authority, or full suite. Do not edit S27–S35
-contracts/tests.
+No provider SDK/import, network/live/LLM, prompt repair, old composer/RAG, client data,
+A9/TurnFrame/patient scope, runtime/routes/session/cache, Verifier, UI/product authority or
+full suite. Do not edit S27–S36 contracts/tests.
 
 - `TASK.md`
-- `core/target_composer_request.py`
-- `tests/test_target_composer_request.py`
-- `tests/test_demo_target_composer_request.py`
+- `core/target_composer_executor.py`
+- `tests/test_target_composer_executor.py`
+- `tests/test_demo_target_composer_executor.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
 ## Minimal protected acceptance
 
-- exact frozen shapes/signature/error codes and precedence;
-- S35 called once; exact spec/follow-up/CTA identities preserved;
-- one block per S35 record in exact order, with no raw package/candidates in output;
-- primary content body excludes frontmatter; external KB/profile refs cannot widen beyond
-  their exact anchored sections;
-- exact offer JSON includes price/package/payment stages and excludes fact_refs/followups;
-- exact doctor JSON includes only approved fields and excludes education/photo/schedule;
-- selected commercial fact and consultation value are exact; candidate-only values cannot
-  leak;
-- same-ID but changed bundle/catalog/consultation source fails closed;
-- protected mutations cover changed service content/object, offer/fact payload, doctor
-  profile or service linkage, and consultation value;
-- all seven evidence kinds have the exact `must_preserve_exact` matrix above;
-- missing/bad/escaping MD or anchor fails without fallback/partial output;
-- medical_handoff mode/spec is preserved without generated-prose safety claims;
-- real demo All-on-4 request covers content, prices with payment stages, doctors, one
-  selected commercial fact, consultation, follow-ups and CTA; no client writes;
-- import firewall proves no provider/legacy composer/runtime/cache/search and no
-  skip/xfail/live.
+- exact frozen shapes/signatures/constants/five errors and precedence;
+- closed-request structural validation rejects invalid mode/message/blocks/topic/fact/UI;
+- exact tone key/instruction validation; subordinate tone serialized exactly;
+- deterministic directive/evidence JSON field order and Unicode preservation;
+- backend receives one exact immutable invocation and is called once;
+- output uses only `.strip()` and preserves exact S36 spec/follow-up/CTA identities;
+- follow-up/CTA/unverified status absent from invocation;
+- exception/non-string/empty output fails with no retry/fallback/side effect;
+- medical_handoff exact mode and mandatory policy reach invocation, while result remains
+  explicitly unverified;
+- real demo All-on-4 S36 request reaches one recording backend with prices/payment stages,
+  doctors, selected fact and consultation; returned text remains unverified; no client
+  writes;
+- import firewall proves no provider/network/legacy composer/RAG/runtime/cache/search and
+  no skip/xfail/live.
 
-Run only S36 target/demo plus S35 and S34 target/demo neighbors. No full suite.
+Run only S37 target/demo plus S36 and S35 target/demo neighbors. No full suite.
 
 ## Gates
 
 1. Independent governance checker before code.
-2. Commit/push `docs: govern target composer request S36` only to stage-a.
-3. Implement only the allowlist and run minimal tests.
+2. Commit/push `docs: govern minimal target composer executor S37` only to stage-a.
+3. Implement only the allowlist and run minimal offline tests.
 4. Independent completion checker, then roadmap `[x]`.
-5. Commit/push `feat: materialize target composer request S36`; final clean/synced.
+5. Commit/push `feat: execute target composer request S37`; final clean/synced.
 
-Next checkpoint after S36: minimal Composer executor over this exact request. Any live/LLM
-evaluation still requires separate owner permission; Verifier and product wiring remain
-later independent gates.
+Next checkpoint after S37: either owner-authorized Composer live evaluation or an offline
+Verifier contract. Neither permission is implied by S37.

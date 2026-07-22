@@ -55,8 +55,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S48b — FullContext medical response semantic hardening** |
-| Предыдущий checkpoint | **S48a-correction measurement contract honesty** |
+| Последний завершённый checkpoint | **S49 — FullContext response re-eval v2 offline prep** |
+| Предыдущий checkpoint | **S48b — FullContext medical response semantic hardening** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
 | Ближайший рабочий focus без live | **Первый разрешённый live response eval — отдельное governance** |
@@ -366,6 +366,9 @@
   universal medical grounding, missing-base, CTA/consultation directives; offline contract
   tests only. Governance `6a377ad`. **No live** — model quality unproven until separate
   approved re-eval.
+- [x] **S49 — FullContext response re-eval v2 offline prep** — matrix v2 (fc_boundary_02
+  fixture scope), isolated v2 artifacts, attempt-marker pre-call block, S48a measurement
+  reuse. Governance `d63d69e`. **No live** — awaits separate owner approval.
 
 ## Какой roadmap актуален
 

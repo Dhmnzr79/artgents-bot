@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from evals.v5.fullcontext_response_eval_backend import (
     FullContextResponseEvalTransportError,
 )
 from evals.v5.fullcontext_response_eval_contract import (
+    ATTEMPT_MARKER_EXISTS_CODE,
     AUTOMATED_ACCEPTANCE_THRESHOLDS,
     CASE_SPECIFIC_RUBRIC_IDS,
     FROZEN_LIVE_RAW_SHA256,
@@ -20,14 +22,23 @@ from evals.v5.fullcontext_response_eval_contract import (
     LIVE_RAW_ARTIFACT_PATH,
     LIVE_RESULT_ARTIFACT_PATH,
     LiveArtifactExistsError,
+    MEASUREMENT_ID_V2,
+    AttemptMarkerExistsError,
+    V2_EXPECTED_LLM_CALLS,
+    V2_MATRIX_PATH,
     assert_live_artifacts_absent,
     build_literal_and_semantic_extensions,
+    build_v2_attempt_marker_payload,
+    create_v2_attempt_marker_exclusive,
     derive_case_automated_flags,
     derive_semantic_reject_flags,
     enrich_case_result_from_frozen_live_payloads,
     evaluate_automated_verdict,
     evaluate_final_verdict,
     load_frozen_matrix,
+    load_v2_attempt_marker,
+    load_v2_matrix,
+    prepare_json_artifact_payload,
     recompute_frozen_s47_automated_verdict_from_replay,
     replay_frozen_s47_live_semantic_metrics,
     sha256_file_hex,
@@ -38,6 +49,8 @@ from evals.v5.fullcontext_response_eval_contract import (
 from evals.v5.run_fullcontext_response_eval import (
     forbidden_claim_violations,
     is_target_response_verification_error,
+    main as run_fullcontext_response_eval_main,
+    prepare_v2_live_run,
     provider_call_violation,
     run_case,
     run_harness_with_backend_factory,
@@ -672,3 +685,144 @@ def test_is_target_response_verification_error_helper() -> None:
         TargetResponseVerificationError("target_verifier_semantic_rejected", [])
     )
     assert not is_target_response_verification_error(RuntimeError("x"))
+
+
+def test_v2_dry_run_smoke(capsys) -> None:
+    exit_code = run_fullcontext_response_eval_main(["--v2", "--dry-run"])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["measurement_id"] == MEASUREMENT_ID_V2
+    assert payload["total_cases"] == 20
+    assert payload["max_llm_calls"] == V2_EXPECTED_LLM_CALLS
+    assert payload["matrix_git_blob_hash"] == "615714c519a92a75e23c2f15bbaa01a0f88a4d95"
+    assert "attempt_marker" in payload["artifact_paths"]
+
+
+def test_v2_offline_harness_replay_stays_green() -> None:
+    payload = run_harness_with_backend_factory(
+        backend_factory=lambda case: (
+            FullContextResponseEvalRecordingComposerBackend(str(case["offline_composer_stub"])),
+            FullContextResponseEvalRecordingSemanticBackend(),
+        ),
+        matrix_path=V2_MATRIX_PATH,
+        measurement_id=MEASUREMENT_ID_V2,
+        matrix_hash="615714c519a92a75e23c2f15bbaa01a0f88a4d95",
+    )
+    assert payload["summary"]["measurement_id"] == MEASUREMENT_ID_V2
+    assert payload["summary"]["automated_verdict"]["verdict"] == "AUTOMATED_PASS"
+    assert payload["summary"]["dangerous_medical_evaluation_status"] == (
+        DANGEROUS_MEDICAL_EVALUATION_NOT_EVALUATED
+    )
+    assert payload["summary"]["semantic_assessment_evaluated_case_count"] == 19
+    assert payload["summary"]["semantic_assessment_not_evaluated_case_count"] == 1
+
+
+def test_existing_v2_attempt_marker_blocks_before_backend(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    create_v2_attempt_marker_exclusive(marker, build_v2_attempt_marker_payload())
+    factory_calls: list[str] = []
+
+    def _factory(case: dict[str, object]) -> tuple[object, object]:
+        factory_calls.append(str(case["case_id"]))
+        raise AssertionError("backend factory must not run when marker exists")
+
+    with pytest.raises(AttemptMarkerExistsError, match=ATTEMPT_MARKER_EXISTS_CODE):
+        prepare_v2_live_run(
+            attempt_marker_path=marker,
+            artifact_paths=(tmp_path / "raw.json", tmp_path / "result.json"),
+        )
+    assert factory_calls == []
+
+
+def test_v2_attempt_marker_created_before_backend_factory(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    order: list[str] = []
+
+    def _factory(case: dict[str, object]) -> tuple[object, object]:
+        order.append("factory")
+        assert marker.exists()
+        return (
+            FullContextResponseEvalRecordingComposerBackend(str(case["offline_composer_stub"])),
+            FullContextResponseEvalRecordingSemanticBackend(),
+        )
+
+    prepare_v2_live_run(
+        attempt_marker_path=marker,
+        artifact_paths=(tmp_path / "raw.json", tmp_path / "result.json"),
+    )
+    order.append("prepared")
+    run_harness_with_backend_factory(
+        backend_factory=_factory,
+        matrix_path=V2_MATRIX_PATH,
+        measurement_id=MEASUREMENT_ID_V2,
+        matrix_hash="615714c519a92a75e23c2f15bbaa01a0f88a4d95",
+    )
+    assert order[0] == "prepared"
+    assert "factory" in order
+    marker_payload = load_v2_attempt_marker(marker)
+    assert marker_payload["started_provider_calls"] == 0
+
+
+def test_write_json_exclusive_serializes_in_memory_before_open(tmp_path, monkeypatch) -> None:
+    import evals.v5.run_fullcontext_response_eval as harness_module
+
+    calls: list[str] = []
+
+    def _track_prepare(payload: dict[str, object]) -> dict[str, object]:
+        calls.append("prepare")
+        return prepare_json_artifact_payload(payload)
+
+    monkeypatch.setattr(harness_module, "prepare_json_artifact_payload", _track_prepare)
+    original_open = Path.open
+
+    def _track_open(self, *args, **kwargs):
+        calls.append("open")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _track_open)
+    write_json_exclusive(tmp_path / "artifact.json", {"value": 1})
+    assert calls == ["prepare", "open"]
+
+
+def test_live_backend_invocation_payloads_are_json_serializable() -> None:
+    from core.target_composer_executor import TargetComposerInvocation
+    from core.target_response_verifier import TargetSemanticVerifierInvocation
+    from evals.v5.fullcontext_response_eval_live_backend import (
+        build_composer_sdk_messages,
+        build_verifier_sdk_messages,
+        serialize_composer_invocation_for_sdk,
+        serialize_verifier_invocation_for_sdk,
+    )
+
+    composer_invocation = TargetComposerInvocation(
+        system_policy="policy",
+        cached_full_context="corpus",
+        response_directives_json="{}",
+        primary_evidence_json="[]",
+        user_message="question",
+    )
+    verifier_invocation = TargetSemanticVerifierInvocation(
+        system_policy="policy",
+        cached_full_context="corpus",
+        response_spec_json="{}",
+        primary_evidence_json="[]",
+        candidate_text="answer",
+    )
+    composer_payload = serialize_composer_invocation_for_sdk(composer_invocation)
+    verifier_payload = serialize_verifier_invocation_for_sdk(verifier_invocation)
+    json.dumps(composer_payload)
+    json.dumps(verifier_payload)
+    json.dumps(build_composer_sdk_messages(composer_invocation))
+    json.dumps(build_verifier_sdk_messages(verifier_invocation))
+
+
+def test_automated_fail_does_not_imply_pass_without_manual_review() -> None:
+    summary = {
+        **_clean_automated_summary(),
+        "outcome_match_rate": 0.5,
+    }
+    automated = evaluate_automated_verdict(summary)
+    assert automated["verdict"] == "AUTOMATED_FAIL"
+    final = evaluate_final_verdict(summary, None, matrix_spec=load_frozen_matrix())
+    assert final["verdict"] == "FAIL"
+    assert final["reason"] == "automated_fail"

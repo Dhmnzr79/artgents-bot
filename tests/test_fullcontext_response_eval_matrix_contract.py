@@ -17,9 +17,16 @@ from evals.v5.fullcontext_response_eval_contract import (
     MATRIX_PATH,
     MODEL_RECOMMENDATION,
     REQUIRED_CASE_KINDS,
+    V2_MATRIX_HASH,
+    V2_MATRIX_PATH,
+    V2_PARENT_MATRIX_HASH,
+    V2_SUITE_ID,
     HarnessConfigError,
+    assert_v1_v2_matrix_delta,
     load_frozen_matrix,
+    load_v2_matrix,
     validate_frozen_matrix_hash,
+    validate_v2_matrix_hash,
 )
 
 BASELINE_MATRIX_REF = "dcd8862:evals/v5/demo/fullcontext_response_eval_matrix.json"
@@ -156,3 +163,47 @@ def test_case_kind_distribution() -> None:
     assert counts["known_medical_topic"] == 3
     assert counts["medical_boundary_personal"] == 2
     assert counts["terminal_uncertain"] == 1
+
+
+def test_v2_matrix_hash_matches() -> None:
+    validate_v2_matrix_hash(path=V2_MATRIX_PATH)
+
+
+def test_v2_matrix_hash_constant_documented() -> None:
+    assert V2_MATRIX_HASH == "615714c519a92a75e23c2f15bbaa01a0f88a4d95"
+    assert V2_PARENT_MATRIX_HASH == FROZEN_MATRIX_HASH
+
+
+def test_v2_matrix_has_twenty_cases_and_required_kinds() -> None:
+    spec = load_v2_matrix()
+    assert spec["suite_id"] == V2_SUITE_ID
+    assert len(spec["cases"]) == 20
+    kinds = {case["case_kind"] for case in spec["cases"]}
+    assert kinds == REQUIRED_CASE_KINDS
+
+
+def test_v2_user_messages_match_v1() -> None:
+    v1 = load_frozen_matrix()
+    v2 = load_v2_matrix()
+    assert {case["case_id"]: case["user_message"] for case in v1["cases"]} == {
+        case["case_id"]: case["user_message"] for case in v2["cases"]
+    }
+
+
+def test_v2_delta_is_fc_boundary_02_allowed_topics_only() -> None:
+    assert_v1_v2_matrix_delta()
+
+
+def test_fc_boundary_02_v2_adds_treatment_without_changing_safety() -> None:
+    v1 = next(case for case in load_frozen_matrix()["cases"] if case["case_id"] == "fc_boundary_02")
+    v2 = next(case for case in load_v2_matrix()["cases"] if case["case_id"] == "fc_boundary_02")
+    assert v1["policy_envelope"]["allowed_topics"] == ["implantation", "doctors"]
+    assert v2["policy_envelope"]["allowed_topics"] == ["implantation", "doctors", "treatment"]
+    assert v1["medical_safety"] == v2["medical_safety"]
+    assert v1["forbidden_claims"] == v2["forbidden_claims"]
+    assert v1["user_message"] == v2["user_message"]
+
+
+def test_s47_matrix_file_unchanged() -> None:
+    validate_frozen_matrix_hash(path=MATRIX_PATH)
+    assert FROZEN_MATRIX_HASH == "14b1cbd4c3a8d906e0b19adb10ffaa60849803b3"

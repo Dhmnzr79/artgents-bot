@@ -25,7 +25,40 @@ LIVE_MANUAL_REVIEW_ARTIFACT_PATH = (
 )
 DEFAULT_LIVE_ARTIFACT_PATHS = (LIVE_RAW_ARTIFACT_PATH, LIVE_RESULT_ARTIFACT_PATH)
 
+V2_MATRIX_PATH = (
+    _REPO_ROOT / "evals" / "v5" / "demo" / "fullcontext_response_eval_matrix_v2.json"
+)
+V2_MATRIX_HASH = "615714c519a92a75e23c2f15bbaa01a0f88a4d95"
+V2_SUITE_ID = "s49_fullcontext_response_re_eval_v2_matrix"
+V2_PARENT_MATRIX_HASH = FROZEN_MATRIX_HASH
+
+V2_LIVE_RAW_ARTIFACT_PATH = (
+    LIVE_ARTIFACTS_DIR / "fullcontext_response_eval_v2_live_raw.json"
+)
+V2_LIVE_RESULT_ARTIFACT_PATH = (
+    LIVE_ARTIFACTS_DIR / "fullcontext_response_eval_v2_live_result.json"
+)
+V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH = (
+    LIVE_ARTIFACTS_DIR / "fullcontext_response_eval_v2_manual_review.json"
+)
+V2_RUN_MANIFEST_ARTIFACT_PATH = (
+    LIVE_ARTIFACTS_DIR / "s49_fullcontext_response_eval_v2_manifest.json"
+)
+V2_LIVE_ATTEMPT_MARKER_PATH = (
+    LIVE_ARTIFACTS_DIR / "fullcontext_response_eval_v2_live_attempt.json"
+)
+DEFAULT_V2_LIVE_ARTIFACT_PATHS = (
+    V2_LIVE_RAW_ARTIFACT_PATH,
+    V2_LIVE_RESULT_ARTIFACT_PATH,
+    V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+    V2_RUN_MANIFEST_ARTIFACT_PATH,
+    V2_LIVE_ATTEMPT_MARKER_PATH,
+)
+
 MEASUREMENT_ID = "s47_fullcontext_response_live_eval"
+MEASUREMENT_ID_V2 = "s49_fullcontext_response_re_eval_v2"
+V2_EXPECTED_LLM_CALLS = 38
+ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
 AUTOMATED_THRESHOLDS_STATUS = "proposed_before_first_live"
 FINAL_GATES_STATUS = "pending_owner_approval"
 MODEL_RECOMMENDATION_STATUS = "pending_owner_approval"
@@ -580,6 +613,10 @@ class LiveArtifactWriteError(HarnessConfigError):
     """Exclusive live artifact write failed."""
 
 
+class AttemptMarkerExistsError(HarnessConfigError):
+    """V2 live attempt marker already exists; rerun blocked without owner approval."""
+
+
 def git_blob_hash(data: bytes) -> str:
     header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()
@@ -601,6 +638,117 @@ def validate_frozen_matrix_hash(*, path: Path = MATRIX_PATH) -> None:
         raise HarnessConfigError(
             f"matrix hash mismatch expected={FROZEN_MATRIX_HASH} actual={actual}"
         )
+
+
+def validate_v2_matrix_hash(*, path: Path = V2_MATRIX_PATH) -> None:
+    actual = git_blob_hash(canonical_git_blob_bytes(path))
+    if actual != V2_MATRIX_HASH:
+        raise HarnessConfigError(
+            f"matrix hash mismatch expected={V2_MATRIX_HASH} actual={actual}"
+        )
+
+
+def prepare_json_artifact_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Round-trip through JSON so artifact bytes are fully serialized before write."""
+
+    return json.loads(json.dumps(payload, ensure_ascii=False))
+
+
+def build_v2_attempt_marker_payload(*, matrix_hash: str = V2_MATRIX_HASH) -> dict[str, Any]:
+    return {
+        "measurement_id": MEASUREMENT_ID_V2,
+        "matrix_git_blob_hash": matrix_hash,
+        "status": "in_progress",
+        "started_provider_calls": 0,
+        "max_llm_calls": V2_EXPECTED_LLM_CALLS,
+        "rerun_blocked_without_owner_approval": True,
+    }
+
+
+def create_v2_attempt_marker_exclusive(
+    path: Path,
+    payload: dict[str, Any],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = prepare_json_artifact_payload(payload)
+    body = json.dumps(serialized, ensure_ascii=False, indent=2) + "\n"
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(body)
+    except FileExistsError as error:
+        raise LiveArtifactWriteError(
+            f"live attempt marker already exists; silent overwrite forbidden: {path}"
+        ) from error
+
+
+def load_v2_attempt_marker(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise HarnessConfigError("attempt marker must be object")
+    return payload
+
+
+def persist_v2_attempt_marker(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
+    path.write_text(
+        json.dumps(serialized, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def record_v2_provider_call_started(path: Path) -> int:
+    marker = load_v2_attempt_marker(path)
+    started = int(marker.get("started_provider_calls", 0)) + 1
+    marker["started_provider_calls"] = started
+    persist_v2_attempt_marker(path, marker)
+    return started
+
+
+def assert_v2_attempt_marker_absent(
+    path: Path = V2_LIVE_ATTEMPT_MARKER_PATH,
+    *,
+    owner_override: bool = False,
+) -> None:
+    if owner_override:
+        return
+    if path.exists():
+        raise AttemptMarkerExistsError(
+            f"{ATTEMPT_MARKER_EXISTS_CODE}: v2 live attempt marker already exists: {path}"
+        )
+
+
+def assert_v1_v2_matrix_delta() -> None:
+    v1 = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
+    v2 = json.loads(V2_MATRIX_PATH.read_text(encoding="utf-8"))
+    if v1["suite_id"] == v2["suite_id"]:
+        raise HarnessConfigError("v1 and v2 suite_id must differ")
+    v1_messages = {case["case_id"]: case["user_message"] for case in v1["cases"]}
+    v2_messages = {case["case_id"]: case["user_message"] for case in v2["cases"]}
+    if v1_messages != v2_messages:
+        raise HarnessConfigError("v2 user_message set must match v1 exactly")
+    v1_by_id = {case["case_id"]: case for case in v1["cases"]}
+    v2_by_id = {case["case_id"]: case for case in v2["cases"]}
+    if set(v1_by_id) != set(v2_by_id):
+        raise HarnessConfigError("v2 case_id set must match v1")
+    boundary = v2_by_id["fc_boundary_02"]
+    expected_topics = ["implantation", "doctors", "treatment"]
+    if boundary["policy_envelope"]["allowed_topics"] != expected_topics:
+        raise HarnessConfigError("fc_boundary_02 allowed_topics delta mismatch")
+    for case_id, v1_case in v1_by_id.items():
+        v2_case = dict(v2_by_id[case_id])
+        if case_id == "fc_boundary_02":
+            v1_copy = dict(v1_case)
+            v2_topics = list(v2_case["policy_envelope"]["allowed_topics"])
+            v1_topics = list(v1_copy["policy_envelope"]["allowed_topics"])
+            if v2_topics != v1_topics + ["treatment"]:
+                raise HarnessConfigError("fc_boundary_02 allowed_topics must add treatment only")
+            v1_copy["policy_envelope"] = dict(v1_copy["policy_envelope"])
+            v1_copy["policy_envelope"]["allowed_topics"] = v2_topics
+            if v1_copy != v2_case:
+                raise HarnessConfigError(f"fc_boundary_02 changed beyond allowed_topics")
+            continue
+        if v1_case != v2_case:
+            raise HarnessConfigError(f"case {case_id} differs from v1 beyond allowed delta")
 
 
 def _require_exact_keys(payload: dict[str, Any], *, allowed: frozenset[str], label: str) -> None:
@@ -631,11 +779,15 @@ def _validate_manual_review_contract(contract: dict[str, Any]) -> None:
             raise HarnessConfigError(f"profile {profile_key} rubric ids mismatch")
 
 
-def validate_matrix_spec(spec: dict[str, Any]) -> None:
+def validate_matrix_spec(
+    spec: dict[str, Any],
+    *,
+    suite_id: str = "s47_fullcontext_response_live_eval_matrix",
+) -> None:
     _require_exact_keys(spec, allowed=TOP_LEVEL_KEYS, label="matrix top-level")
     if spec["schema_version"] != 1:
         raise HarnessConfigError("schema_version mismatch")
-    if spec["suite_id"] != "s47_fullcontext_response_live_eval_matrix":
+    if spec["suite_id"] != suite_id:
         raise HarnessConfigError("suite_id mismatch")
     if spec["client_id"] != "demo":
         raise HarnessConfigError("client_id mismatch")
@@ -714,6 +866,27 @@ def load_frozen_matrix(*, path: Path = MATRIX_PATH) -> dict[str, Any]:
         raise HarnessConfigError("matrix must be object")
     validate_matrix_spec(spec)
     return spec
+
+
+def validate_matrix_spec_v2(spec: dict[str, Any]) -> None:
+    validate_matrix_spec(spec, suite_id=V2_SUITE_ID)
+
+
+def load_v2_matrix(*, path: Path = V2_MATRIX_PATH) -> dict[str, Any]:
+    validate_v2_matrix_hash(path=path)
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(spec, dict):
+        raise HarnessConfigError("matrix must be object")
+    validate_matrix_spec_v2(spec)
+    return spec
+
+
+def load_matrix_by_path(*, path: Path) -> dict[str, Any]:
+    if path.resolve() == V2_MATRIX_PATH.resolve():
+        return load_v2_matrix(path=path)
+    if path.resolve() == MATRIX_PATH.resolve():
+        return load_frozen_matrix(path=path)
+    raise HarnessConfigError(f"unsupported matrix path: {path}")
 
 
 def assert_live_artifacts_absent(

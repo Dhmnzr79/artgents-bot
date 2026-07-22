@@ -49,6 +49,68 @@ _VERIFICATION_FIELDS = (
 )
 
 
+def serialize_composer_invocation_for_sdk(
+    invocation: TargetComposerInvocation,
+) -> dict[str, str]:
+    payload = {
+        "system_policy": invocation.system_policy,
+        "cached_full_context": invocation.cached_full_context,
+        "response_directives_json": invocation.response_directives_json,
+        "primary_evidence_json": invocation.primary_evidence_json,
+        "user_message": invocation.user_message,
+    }
+    return json.loads(json.dumps(payload, ensure_ascii=False))
+
+
+def serialize_verifier_invocation_for_sdk(
+    invocation: TargetSemanticVerifierInvocation,
+) -> dict[str, str]:
+    payload = {
+        "system_policy": invocation.system_policy,
+        "cached_full_context": invocation.cached_full_context,
+        "response_spec_json": invocation.response_spec_json,
+        "primary_evidence_json": invocation.primary_evidence_json,
+        "candidate_text": invocation.candidate_text,
+    }
+    return json.loads(json.dumps(payload, ensure_ascii=False))
+
+
+def build_composer_sdk_messages(
+    invocation: TargetComposerInvocation,
+) -> list[dict[str, str]]:
+    serialized = serialize_composer_invocation_for_sdk(invocation)
+    return [
+        {"role": "system", "content": serialized["system_policy"]},
+        {
+            "role": "user",
+            "content": _COMPOSER_USER_TEMPLATE.format(
+                cached_full_context=serialized["cached_full_context"],
+                response_directives_json=serialized["response_directives_json"],
+                primary_evidence_json=serialized["primary_evidence_json"],
+                user_message=serialized["user_message"],
+            ),
+        },
+    ]
+
+
+def build_verifier_sdk_messages(
+    invocation: TargetSemanticVerifierInvocation,
+) -> list[dict[str, str]]:
+    serialized = serialize_verifier_invocation_for_sdk(invocation)
+    return [
+        {"role": "system", "content": serialized["system_policy"]},
+        {
+            "role": "user",
+            "content": _VERIFIER_USER_TEMPLATE.format(
+                cached_full_context=serialized["cached_full_context"],
+                response_spec_json=serialized["response_spec_json"],
+                primary_evidence_json=serialized["primary_evidence_json"],
+                candidate_text=serialized["candidate_text"],
+            ),
+        },
+    ]
+
+
 def _serialize_usage(usage: object) -> object:
     if usage is None:
         return None
@@ -102,18 +164,7 @@ class FullContextResponseEvalLiveComposerBackend:
                 temperature=0,
                 max_completion_tokens=1024,
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
-                messages=[
-                    {"role": "system", "content": invocation.system_policy},
-                    {
-                        "role": "user",
-                        "content": _COMPOSER_USER_TEMPLATE.format(
-                            cached_full_context=invocation.cached_full_context,
-                            response_directives_json=invocation.response_directives_json,
-                            primary_evidence_json=invocation.primary_evidence_json,
-                            user_message=invocation.user_message,
-                        ),
-                    },
-                ],
+                messages=build_composer_sdk_messages(invocation),
             )
             log_llm_usage(
                 logger,
@@ -172,18 +223,7 @@ class FullContextResponseEvalLiveSemanticBackend:
                 max_completion_tokens=128,
                 response_format={"type": "json_object"},
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
-                messages=[
-                    {"role": "system", "content": invocation.system_policy},
-                    {
-                        "role": "user",
-                        "content": _VERIFIER_USER_TEMPLATE.format(
-                            cached_full_context=invocation.cached_full_context,
-                            response_spec_json=invocation.response_spec_json,
-                            primary_evidence_json=invocation.primary_evidence_json,
-                            candidate_text=invocation.candidate_text,
-                        ),
-                    },
-                ],
+                messages=build_verifier_sdk_messages(invocation),
             )
             log_llm_usage(
                 logger,

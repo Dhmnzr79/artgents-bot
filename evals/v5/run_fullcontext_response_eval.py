@@ -55,10 +55,13 @@ from evals.v5.fullcontext_response_eval_backend import (
     FullContextResponseEvalTransportError,
 )
 from evals.v5.fullcontext_response_eval_contract import (
+    ATTEMPT_MARKER_EXISTS_CODE,
     AUTOMATED_ACCEPTANCE_THRESHOLDS,
     AUTOMATED_THRESHOLDS_STATUS,
+    AttemptMarkerExistsError,
     CASE_RESULT_KEYS,
     DEFAULT_LIVE_ARTIFACT_PATHS,
+    DEFAULT_V2_LIVE_ARTIFACT_PATHS,
     FINAL_ACCEPTANCE_GATES,
     FINAL_GATES_STATUS,
     FROZEN_MATRIX_HASH,
@@ -66,20 +69,36 @@ from evals.v5.fullcontext_response_eval_contract import (
     LIVE_RESULT_ARTIFACT_PATH,
     MALFORMED_ERROR_CODES,
     MEASUREMENT_ID,
+    MEASUREMENT_ID_V2,
     MATRIX_PATH,
     MODEL_RECOMMENDATION,
     TRANSPORT_ERROR_CODES,
+    V2_EXPECTED_LLM_CALLS,
+    V2_LIVE_ATTEMPT_MARKER_PATH,
+    V2_LIVE_RAW_ARTIFACT_PATH,
+    V2_LIVE_RESULT_ARTIFACT_PATH,
+    V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+    V2_MATRIX_HASH,
+    V2_MATRIX_PATH,
+    V2_RUN_MANIFEST_ARTIFACT_PATH,
     HarnessConfigError,
     LiveArtifactWriteError,
     aggregate_automated_metrics,
     assert_live_artifacts_absent,
+    assert_v2_attempt_marker_absent,
     build_literal_and_semantic_extensions,
+    build_v2_attempt_marker_payload,
+    create_v2_attempt_marker_exclusive,
     derive_case_automated_flags,
     evaluate_automated_verdict,
     evaluate_final_verdict,
     extract_candidate_text_from_composer_payload,
     load_frozen_matrix,
+    load_matrix_by_path,
+    load_v2_matrix,
+    prepare_json_artifact_payload,
     raw_literal_forbidden_hits,
+    record_v2_provider_call_started,
 )
 
 
@@ -338,9 +357,11 @@ def summarize_results(
     matrix_spec: dict[str, Any] | None = None,
     manual_review_record: dict[str, Any] | None = None,
     result_sha256: str | None = None,
+    measurement_id: str = MEASUREMENT_ID,
+    matrix_hash: str = FROZEN_MATRIX_HASH,
 ) -> dict[str, Any]:
     summary = {
-        "measurement_id": MEASUREMENT_ID,
+        "measurement_id": measurement_id,
         **aggregate_automated_metrics(list(case_results)),
         "proposed_automated_acceptance_thresholds": dict(AUTOMATED_ACCEPTANCE_THRESHOLDS),
         "automated_thresholds_status": AUTOMATED_THRESHOLDS_STATUS,
@@ -355,21 +376,78 @@ def summarize_results(
         summary,
         manual_review_record,
         matrix_spec=spec,
+        matrix_hash=matrix_hash,
         result_sha256=result_sha256,
     )
     return summary
 
 
 def write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with path.open("x", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            json.dump(serialized, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
     except FileExistsError as error:
         raise LiveArtifactWriteError(
             f"live artifact already exists; silent overwrite forbidden: {path}"
         ) from error
+
+
+def _wrap_backend_factory_with_attempt_audit(
+    backend_factory: Callable[[dict[str, Any]], tuple[object, object]],
+    *,
+    attempt_marker_path: Path,
+) -> Callable[[dict[str, Any]], tuple[object, object]]:
+    def factory(case: dict[str, Any]) -> tuple[object, object]:
+        composer, semantic = backend_factory(case)
+
+        class _ComposerAuditProxy:
+            def __init__(self, backend: object) -> None:
+                self._backend = backend
+                self.call_count = getattr(backend, "call_count", 0)
+
+            def generate(self, invocation: object, /) -> object:
+                record_v2_provider_call_started(attempt_marker_path)
+                generate = getattr(self._backend, "generate")
+                result = generate(invocation)
+                self.call_count = getattr(self._backend, "call_count", self.call_count)
+                return result
+
+        class _SemanticAuditProxy:
+            def __init__(self, backend: object) -> None:
+                self._backend = backend
+                self.call_count = getattr(backend, "call_count", 0)
+
+            def assess(self, invocation: object, /) -> object:
+                record_v2_provider_call_started(attempt_marker_path)
+                assess = getattr(self._backend, "assess")
+                result = assess(invocation)
+                self.call_count = getattr(self._backend, "call_count", self.call_count)
+                return result
+
+        return _ComposerAuditProxy(composer), _SemanticAuditProxy(semantic)
+
+    return factory
+
+
+def prepare_v2_live_run(
+    *,
+    attempt_marker_path: Path,
+    artifact_paths: Sequence[Path],
+    owner_override_attempt_marker: bool = False,
+    matrix_hash: str = V2_MATRIX_HASH,
+) -> None:
+    assert_v2_attempt_marker_absent(
+        attempt_marker_path,
+        owner_override=owner_override_attempt_marker,
+    )
+    assert_live_artifacts_absent(tuple(artifact_paths))
+    create_v2_attempt_marker_exclusive(
+        attempt_marker_path,
+        build_v2_attempt_marker_payload(matrix_hash=matrix_hash),
+    )
 
 
 def run_harness_with_backend_factory(
@@ -383,8 +461,10 @@ def run_harness_with_backend_factory(
     ],
     matrix_path: Path = MATRIX_PATH,
     artifact_paths: Sequence[Path] | None = None,
+    measurement_id: str = MEASUREMENT_ID,
+    matrix_hash: str = FROZEN_MATRIX_HASH,
 ) -> dict[str, Any]:
-    spec = load_frozen_matrix(path=matrix_path)
+    spec = load_matrix_by_path(path=matrix_path)
     context = _load_pipeline_context(spec)
     if artifact_paths is not None:
         assert_live_artifacts_absent(tuple(artifact_paths))
@@ -408,9 +488,14 @@ def run_harness_with_backend_factory(
         if frozenset(row.keys()) != keys:
             raise HarnessConfigError("case result shape mismatch")
 
-    spec = load_frozen_matrix(path=matrix_path)
+    spec = load_matrix_by_path(path=matrix_path)
     return {
-        "summary": summarize_results(case_results, matrix_spec=spec),
+        "summary": summarize_results(
+            case_results,
+            matrix_spec=spec,
+            measurement_id=measurement_id,
+            matrix_hash=matrix_hash,
+        ),
         "case_results": case_results,
     }
 
@@ -432,8 +517,18 @@ def _offline_backend_factory(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=MEASUREMENT_ID)
     parser.add_argument("--matrix", default=str(MATRIX_PATH))
-    parser.add_argument("--output", default=str(LIVE_RESULT_ARTIFACT_PATH))
-    parser.add_argument("--raw-output", default=str(LIVE_RAW_ARTIFACT_PATH))
+    parser.add_argument("--output", default=None)
+    parser.add_argument("--raw-output", default=None)
+    parser.add_argument(
+        "--v2",
+        action="store_true",
+        help="Use S49 v2 matrix and isolated v2 artifact paths",
+    )
+    parser.add_argument(
+        "--owner-override-attempt-marker",
+        action="store_true",
+        help="Allow v2 live prep when attempt marker exists (owner approval only)",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -446,16 +541,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
+    use_v2 = bool(args.v2) or Path(args.matrix).resolve() == V2_MATRIX_PATH.resolve()
+    matrix_path = V2_MATRIX_PATH if use_v2 else Path(args.matrix)
+    measurement_id = MEASUREMENT_ID_V2 if use_v2 else MEASUREMENT_ID
+    matrix_hash = V2_MATRIX_HASH if use_v2 else FROZEN_MATRIX_HASH
+    raw_path = Path(args.raw_output or (V2_LIVE_RAW_ARTIFACT_PATH if use_v2 else LIVE_RAW_ARTIFACT_PATH))
+    result_path = Path(
+        args.output or (V2_LIVE_RESULT_ARTIFACT_PATH if use_v2 else LIVE_RESULT_ARTIFACT_PATH)
+    )
+    attempt_marker_path = V2_LIVE_ATTEMPT_MARKER_PATH if use_v2 else None
+    max_llm_calls = (
+        V2_EXPECTED_LLM_CALLS
+        if use_v2
+        else MODEL_RECOMMENDATION["expected_llm_calls_materializable"]
+    )
+
     try:
-        spec = load_frozen_matrix(path=Path(args.matrix))
+        spec = load_matrix_by_path(path=matrix_path)
     except HarnessConfigError as error:
         print(f"CONFIG_ERROR: {error}", file=sys.stderr)
         return 2
 
     if args.dry_run:
         payload = {
-            "measurement_id": MEASUREMENT_ID,
+            "measurement_id": measurement_id,
+            "matrix_git_blob_hash": matrix_hash,
             "total_cases": len(spec["cases"]),
+            "max_llm_calls": max_llm_calls,
             "dry_run": True,
             "proposed_automated_acceptance_thresholds": dict(AUTOMATED_ACCEPTANCE_THRESHOLDS),
             "automated_thresholds_status": AUTOMATED_THRESHOLDS_STATUS,
@@ -464,22 +576,148 @@ def main(argv: Sequence[str] | None = None) -> int:
             "model_recommendation": dict(MODEL_RECOMMENDATION),
             "manual_review_required": spec["scoring_contract"]["manual_review_required"],
         }
+        if use_v2:
+            payload["artifact_paths"] = {
+                "raw": str(V2_LIVE_RAW_ARTIFACT_PATH),
+                "result": str(V2_LIVE_RESULT_ARTIFACT_PATH),
+                "manual_review": str(V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH),
+                "manifest": str(V2_RUN_MANIFEST_ARTIFACT_PATH),
+                "attempt_marker": str(V2_LIVE_ATTEMPT_MARKER_PATH),
+            }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     if args.live:
-        raw_path = Path(args.raw_output)
-        result_path = Path(args.output)
+        if use_v2:
+            artifact_paths = tuple(
+                dict.fromkeys(
+                    (
+                        *DEFAULT_V2_LIVE_ARTIFACT_PATHS,
+                        raw_path,
+                        result_path,
+                    )
+                )
+            )
+
+            def _v2_live_backend_factory(
+                case: dict[str, Any],
+            ) -> tuple[object, object]:
+                from evals.v5.fullcontext_response_eval_live_backend import (
+                    FullContextResponseEvalLiveComposerBackend,
+                    FullContextResponseEvalLiveSemanticBackend,
+                    fullcontext_response_eval_live_model,
+                )
+
+                if case["expected_outcome"] == "terminal_boundary_uncertain":
+                    return (
+                        FullContextResponseEvalRecordingComposerBackend("unused"),
+                        FullContextResponseEvalRecordingSemanticBackend(),
+                    )
+                model = fullcontext_response_eval_live_model()
+                return (
+                    FullContextResponseEvalLiveComposerBackend(model=model),
+                    FullContextResponseEvalLiveSemanticBackend(model=model),
+                )
+
+            try:
+                prepare_v2_live_run(
+                    attempt_marker_path=attempt_marker_path,
+                    artifact_paths=artifact_paths,
+                    owner_override_attempt_marker=args.owner_override_attempt_marker,
+                    matrix_hash=matrix_hash,
+                )
+                payload = run_harness_with_backend_factory(
+                    backend_factory=_wrap_backend_factory_with_attempt_audit(
+                        _v2_live_backend_factory,
+                        attempt_marker_path=attempt_marker_path,
+                    ),
+                    matrix_path=matrix_path,
+                    artifact_paths=artifact_paths,
+                    measurement_id=measurement_id,
+                    matrix_hash=matrix_hash,
+                )
+            except AttemptMarkerExistsError as error:
+                print(str(error), file=sys.stderr)
+                return 5
+            except (HarnessConfigError, LiveArtifactWriteError) as error:
+                print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+                return 2
+
+            case_results = payload["case_results"]
+            total_llm_calls = sum(
+                row["composer_call_count"] + row["semantic_call_count"] for row in case_results
+            )
+            if total_llm_calls > max_llm_calls:
+                print(
+                    f"CONFIG_ERROR: live LLM call budget exceeded "
+                    f"count={total_llm_calls} max={max_llm_calls}",
+                    file=sys.stderr,
+                )
+                return 2
+
+            summary = payload["summary"]
+            summary["live_run"] = True
+            summary["total_llm_calls"] = total_llm_calls
+            summary["owner_approval"] = {
+                "technical_outcome_match_min": 1.0,
+                "manual_answer_quality_pass_rate_min": 0.85,
+                "critical_violation_max": 0,
+                "composer_model": MODEL_RECOMMENDATION["composer_model"],
+                "semantic_verifier_model": MODEL_RECOMMENDATION["semantic_verifier_model"],
+                "max_llm_calls": max_llm_calls,
+            }
+            payload["summary"] = summary
+
+            raw_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": measurement_id,
+                    "matrix_git_blob_hash": matrix_hash,
+                    "total_llm_calls": total_llm_calls,
+                    "cases": [
+                        {
+                            "index": row["index"],
+                            "case_id": row["case_id"],
+                            "composer_call_count": row["composer_call_count"],
+                            "semantic_call_count": row["semantic_call_count"],
+                            "composer_raw_payload": row["composer_raw_payload"],
+                            "semantic_raw_payload": row["semantic_raw_payload"],
+                        }
+                        for row in case_results
+                    ],
+                }
+            )
+            result_artifact = prepare_json_artifact_payload(payload)
+            manifest_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": measurement_id,
+                    "matrix_git_blob_hash": matrix_hash,
+                    "parent_matrix_git_blob_hash": FROZEN_MATRIX_HASH,
+                    "total_llm_calls": total_llm_calls,
+                    "attempt_marker_path": str(attempt_marker_path),
+                    "raw_artifact_path": str(raw_path),
+                    "result_artifact_path": str(result_path),
+                }
+            )
+            try:
+                write_json_exclusive(raw_path, raw_artifact)
+                write_json_exclusive(result_path, result_artifact)
+                write_json_exclusive(V2_RUN_MANIFEST_ARTIFACT_PATH, manifest_artifact)
+            except LiveArtifactWriteError as error:
+                print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+                return 2
+
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+            automated = summary["automated_verdict"]["verdict"]
+            final = summary["final_verdict"]["verdict"]
+            print(f"AUTOMATED_VERDICT: {automated}", file=sys.stderr)
+            print(f"FINAL_VERDICT: {final}", file=sys.stderr)
+            return 0 if automated == "AUTOMATED_PASS" else 4
+
         artifact_paths = tuple(dict.fromkeys((*DEFAULT_LIVE_ARTIFACT_PATHS, raw_path, result_path)))
 
         def _live_backend_factory(
             case: dict[str, Any],
-        ) -> tuple[
-            FullContextResponseEvalRecordingComposerBackend
-            | object,
-            FullContextResponseEvalRecordingSemanticBackend
-            | object,
-        ]:
+        ) -> tuple[object, object]:
             from evals.v5.fullcontext_response_eval_live_backend import (
                 FullContextResponseEvalLiveComposerBackend,
                 FullContextResponseEvalLiveSemanticBackend,
@@ -501,7 +739,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             assert_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
             payload = run_harness_with_backend_factory(
                 backend_factory=_live_backend_factory,
-                matrix_path=Path(args.matrix),
+                matrix_path=matrix_path,
                 artifact_paths=artifact_paths,
             )
         except (HarnessConfigError, LiveArtifactWriteError) as error:
@@ -533,25 +771,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
         payload["summary"] = summary
 
-        raw_artifact = {
-            "measurement_id": MEASUREMENT_ID,
-            "matrix_git_blob_hash": FROZEN_MATRIX_HASH,
-            "total_llm_calls": total_llm_calls,
-            "cases": [
-                {
-                    "index": row["index"],
-                    "case_id": row["case_id"],
-                    "composer_call_count": row["composer_call_count"],
-                    "semantic_call_count": row["semantic_call_count"],
-                    "composer_raw_payload": row["composer_raw_payload"],
-                    "semantic_raw_payload": row["semantic_raw_payload"],
-                }
-                for row in case_results
-            ],
-        }
+        raw_artifact = prepare_json_artifact_payload(
+            {
+                "measurement_id": MEASUREMENT_ID,
+                "matrix_git_blob_hash": FROZEN_MATRIX_HASH,
+                "total_llm_calls": total_llm_calls,
+                "cases": [
+                    {
+                        "index": row["index"],
+                        "case_id": row["case_id"],
+                        "composer_call_count": row["composer_call_count"],
+                        "semantic_call_count": row["semantic_call_count"],
+                        "composer_raw_payload": row["composer_raw_payload"],
+                        "semantic_raw_payload": row["semantic_raw_payload"],
+                    }
+                    for row in case_results
+                ],
+            }
+        )
+        result_artifact = prepare_json_artifact_payload(payload)
         try:
             write_json_exclusive(raw_path, raw_artifact)
-            write_json_exclusive(result_path, payload)
+            write_json_exclusive(result_path, result_artifact)
         except LiveArtifactWriteError as error:
             print(f"CONFIG_ERROR: {error}", file=sys.stderr)
             return 2

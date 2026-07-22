@@ -55,8 +55,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S50 — live re-eval v2 incident audit capture** |
-| Предыдущий checkpoint | **S49 — FullContext response re-eval v2 offline prep** |
+| Последний завершённый checkpoint | **S50b — offline harness correction (Checkpoint B)** |
+| Предыдущий checkpoint | **S50 — live re-eval v2 incident audit capture** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
 | Ближайший рабочий focus без live | **Первый разрешённый live response eval — отдельное governance** |
@@ -371,7 +371,11 @@
   reuse. Governance `d63d69e`. **No live** — awaits separate owner approval.
 - [x] **S50 — live re-eval v2 incident audit capture** — 40-call incident (2+38),
   diagnostic-only run-2 artifacts, Verifier FN taxonomy, harness dirty patch archived.
-  **AUTOMATED_FAIL**; rerun forbidden. Governance `ec829d1`. Checkpoint B blocked.
+  **AUTOMATED_FAIL**; rerun forbidden. Governance `ec829d1`.
+- [x] **S50b — offline harness correction (Checkpoint B)** — narrow audit-proxy
+  `captures` delegation; post-marker output preflight (`preflight_exclude_paths`).
+  Harness reliability only; Verifier FN (`fc_missing_01`/`fc_medical_03`) still open.
+  **NO LIVE**. Governance `85e64ce`.
 
 ## Какой roadmap актуален
 

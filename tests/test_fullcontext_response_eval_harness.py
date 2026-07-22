@@ -25,6 +25,10 @@ from evals.v5.fullcontext_response_eval_contract import (
     MEASUREMENT_ID_V2,
     AttemptMarkerExistsError,
     V2_EXPECTED_LLM_CALLS,
+    V2_LIVE_ATTEMPT_MARKER_PATH,
+    V2_LIVE_RAW_ARTIFACT_PATH,
+    V2_LIVE_RESULT_ARTIFACT_PATH,
+    V2_RUN_MANIFEST_ARTIFACT_PATH,
     V2_MATRIX_PATH,
     assert_live_artifacts_absent,
     build_literal_and_semantic_extensions,
@@ -56,6 +60,8 @@ from evals.v5.run_fullcontext_response_eval import (
     run_harness_with_backend_factory,
     summarize_results,
     write_json_exclusive,
+    _load_pipeline_context,
+    _wrap_backend_factory_with_attempt_audit,
 )
 from core.target_response_verifier import TargetResponseVerificationError
 
@@ -761,6 +767,255 @@ def test_v2_attempt_marker_created_before_backend_factory(tmp_path) -> None:
     assert "factory" in order
     marker_payload = load_v2_attempt_marker(marker)
     assert marker_payload["started_provider_calls"] == 0
+
+
+FROZEN_V2_LIVE_RAW_SHA256 = (
+    "c78403a8a1a82f472d3665f4893db3fb3fa794a9db254e91611448081be7536c"
+)
+FROZEN_V2_LIVE_RESULT_SHA256 = (
+    "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa"
+)
+FROZEN_V2_MANIFEST_SHA256 = (
+    "8f61aa9097859337f31fbacf1ebf5d45ce3bee68d3f57955a99aa7a128567b8e"
+)
+FROZEN_V2_ATTEMPT_MARKER_SHA256 = (
+    "2d02c1c971e617f4583c86d27360b380d98736c6bbe00b268c8e68a2ace8c64c"
+)
+FROZEN_S50_LOG_SHA256 = (
+    "76be057b272deffff3275ccd38a33c6e492f86d5b34c369d9e86626e3011cab2"
+)
+V2_MATRIX_HASH = "615714c519a92a75e23c2f15bbaa01a0f88a4d95"
+
+
+def _v2_tmp_artifact_paths(tmp_path: Path, marker: Path) -> tuple[Path, ...]:
+    return (
+        tmp_path / "raw.json",
+        tmp_path / "result.json",
+        tmp_path / "manifest.json",
+        marker,
+    )
+
+
+def _offline_v2_backend_factory(
+    case: dict[str, object],
+) -> tuple[FullContextResponseEvalRecordingComposerBackend, FullContextResponseEvalRecordingSemanticBackend]:
+    return (
+        FullContextResponseEvalRecordingComposerBackend(str(case["offline_composer_stub"])),
+        FullContextResponseEvalRecordingSemanticBackend(),
+    )
+
+
+def test_v2_audit_proxy_composer_exposes_captures(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    create_v2_attempt_marker_exclusive(marker, build_v2_attempt_marker_payload())
+    composer_backend = FullContextResponseEvalRecordingComposerBackend("stub-text")
+    wrapped_factory = _wrap_backend_factory_with_attempt_audit(
+        lambda case: (composer_backend, FullContextResponseEvalRecordingSemanticBackend()),
+        attempt_marker_path=marker,
+    )
+    composer, _semantic = wrapped_factory({"case_id": "probe"})
+    assert composer.captures is composer_backend.captures
+
+
+def test_v2_audit_proxy_semantic_exposes_captures(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    create_v2_attempt_marker_exclusive(marker, build_v2_attempt_marker_payload())
+    semantic_backend = FullContextResponseEvalRecordingSemanticBackend()
+    wrapped_factory = _wrap_backend_factory_with_attempt_audit(
+        lambda case: (
+            FullContextResponseEvalRecordingComposerBackend("stub-text"),
+            semantic_backend,
+        ),
+        attempt_marker_path=marker,
+    )
+    _composer, semantic = wrapped_factory({"case_id": "probe"})
+    assert semantic.captures is semantic_backend.captures
+
+
+def test_v2_wrapped_factory_first_case_no_attribute_error(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    create_v2_attempt_marker_exclusive(marker, build_v2_attempt_marker_payload())
+    spec = load_v2_matrix()
+    case = spec["cases"][0]
+    context = _load_pipeline_context(spec)
+    wrapped_factory = _wrap_backend_factory_with_attempt_audit(
+        _offline_v2_backend_factory,
+        attempt_marker_path=marker,
+    )
+    composer, semantic = wrapped_factory(case)
+    row = run_case(
+        case=case,
+        index=0,
+        spec=spec,
+        context=context,
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    assert row["pipeline_error_code"] is None
+    assert len(composer.captures) == 1
+    assert len(semantic.captures) == 1
+
+
+def test_v2_audit_proxy_call_count_and_captures_from_backend(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    create_v2_attempt_marker_exclusive(marker, build_v2_attempt_marker_payload())
+    composer_backend = FullContextResponseEvalRecordingComposerBackend("stub-text")
+    semantic_backend = FullContextResponseEvalRecordingSemanticBackend()
+    wrapped_factory = _wrap_backend_factory_with_attempt_audit(
+        lambda case: (composer_backend, semantic_backend),
+        attempt_marker_path=marker,
+    )
+    composer, semantic = wrapped_factory({"case_id": "probe"})
+    assert composer.call_count == 0
+    assert semantic.call_count == 0
+    assert composer.captures == []
+    assert semantic.captures == []
+
+    from core.target_composer_executor import TargetComposerInvocation
+    from core.target_response_verifier import TargetSemanticVerifierInvocation
+
+    composer.generate(
+        TargetComposerInvocation(
+            system_policy="policy",
+            cached_full_context="corpus",
+            response_directives_json="{}",
+            primary_evidence_json="[]",
+            user_message="question",
+        )
+    )
+    semantic.assess(
+        TargetSemanticVerifierInvocation(
+            system_policy="policy",
+            cached_full_context="corpus",
+            response_spec_json="{}",
+            primary_evidence_json="[]",
+            candidate_text="answer",
+        )
+    )
+    assert composer.call_count == composer_backend.call_count == 1
+    assert semantic.call_count == semantic_backend.call_count == 1
+    assert len(composer.captures) == 1
+    assert len(semantic.captures) == 1
+
+
+def test_existing_v2_output_artifact_blocks_before_marker(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    artifact_paths = _v2_tmp_artifact_paths(tmp_path, marker)
+    (tmp_path / "raw.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(LiveArtifactExistsError, match="backend call blocked"):
+        prepare_v2_live_run(
+            attempt_marker_path=marker,
+            artifact_paths=artifact_paths,
+        )
+    assert not marker.exists()
+
+
+def test_v2_fresh_marker_does_not_false_config_error(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    artifact_paths = _v2_tmp_artifact_paths(tmp_path, marker)
+    prepare_v2_live_run(
+        attempt_marker_path=marker,
+        artifact_paths=artifact_paths,
+        matrix_hash=V2_MATRIX_HASH,
+    )
+    payload = run_harness_with_backend_factory(
+        backend_factory=_offline_v2_backend_factory,
+        matrix_path=V2_MATRIX_PATH,
+        artifact_paths=artifact_paths,
+        preflight_exclude_paths=(marker,),
+        measurement_id=MEASUREMENT_ID_V2,
+        matrix_hash=V2_MATRIX_HASH,
+    )
+    assert payload["summary"]["total_cases"] == 20
+
+
+def test_v2_post_marker_output_preflight_remains_active(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    artifact_paths = _v2_tmp_artifact_paths(tmp_path, marker)
+    prepare_v2_live_run(
+        attempt_marker_path=marker,
+        artifact_paths=artifact_paths,
+        matrix_hash=V2_MATRIX_HASH,
+    )
+    (tmp_path / "raw.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(LiveArtifactExistsError, match="backend call blocked"):
+        run_harness_with_backend_factory(
+            backend_factory=_offline_v2_backend_factory,
+            matrix_path=V2_MATRIX_PATH,
+            artifact_paths=artifact_paths,
+            preflight_exclude_paths=(marker,),
+            measurement_id=MEASUREMENT_ID_V2,
+            matrix_hash=V2_MATRIX_HASH,
+        )
+
+
+def test_v2_prepare_and_wrapped_fake_run_passes(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    artifact_paths = _v2_tmp_artifact_paths(tmp_path, marker)
+    factory_calls: list[str] = []
+
+    def _factory(case: dict[str, object]) -> tuple[object, object]:
+        factory_calls.append(str(case["case_id"]))
+        return _offline_v2_backend_factory(case)
+
+    prepare_v2_live_run(
+        attempt_marker_path=marker,
+        artifact_paths=artifact_paths,
+        matrix_hash=V2_MATRIX_HASH,
+    )
+    payload = run_harness_with_backend_factory(
+        backend_factory=_wrap_backend_factory_with_attempt_audit(
+            _factory,
+            attempt_marker_path=marker,
+        ),
+        matrix_path=V2_MATRIX_PATH,
+        artifact_paths=artifact_paths,
+        preflight_exclude_paths=(marker,),
+        measurement_id=MEASUREMENT_ID_V2,
+        matrix_hash=V2_MATRIX_HASH,
+    )
+    assert factory_calls
+    assert payload["summary"]["automated_verdict"]["verdict"] == "AUTOMATED_PASS"
+
+
+def test_v2_owner_override_does_not_overwrite_marker_or_allow_run(tmp_path) -> None:
+    marker = tmp_path / "attempt.json"
+    artifact_paths = _v2_tmp_artifact_paths(tmp_path, marker)
+    create_v2_attempt_marker_exclusive(
+        marker,
+        build_v2_attempt_marker_payload(matrix_hash="owner-marker-pin"),
+    )
+    before = marker.read_bytes()
+    factory_calls: list[str] = []
+
+    def _factory(case: dict[str, object]) -> tuple[object, object]:
+        factory_calls.append("blocked")
+        raise AssertionError("backend factory must not run")
+
+    with pytest.raises(LiveArtifactExistsError, match="backend call blocked"):
+        prepare_v2_live_run(
+            attempt_marker_path=marker,
+            artifact_paths=artifact_paths,
+            owner_override_attempt_marker=True,
+            matrix_hash=V2_MATRIX_HASH,
+        )
+    assert marker.read_bytes() == before
+    assert factory_calls == []
+
+
+def test_frozen_s50_live_artifacts_byte_identical() -> None:
+    log_path = Path("evals/v5/artifacts/s50_live_run_log.txt")
+    required = (
+        (V2_LIVE_RAW_ARTIFACT_PATH, FROZEN_V2_LIVE_RAW_SHA256),
+        (V2_LIVE_RESULT_ARTIFACT_PATH, FROZEN_V2_LIVE_RESULT_SHA256),
+        (V2_RUN_MANIFEST_ARTIFACT_PATH, FROZEN_V2_MANIFEST_SHA256),
+        (V2_LIVE_ATTEMPT_MARKER_PATH, FROZEN_V2_ATTEMPT_MARKER_SHA256),
+        (log_path, FROZEN_S50_LOG_SHA256),
+    )
+    if not all(path.exists() for path, _sha in required):
+        pytest.skip("frozen S50 live artifacts absent in workspace")
+    for path, expected_sha in required:
+        assert sha256_file_hex(path) == expected_sha
 
 
 def test_write_json_exclusive_serializes_in_memory_before_open(tmp_path, monkeypatch) -> None:

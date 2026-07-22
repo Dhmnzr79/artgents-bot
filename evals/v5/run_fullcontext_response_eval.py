@@ -408,6 +408,10 @@ def _wrap_backend_factory_with_attempt_audit(
                 self._backend = backend
                 self.call_count = getattr(backend, "call_count", 0)
 
+            @property
+            def captures(self) -> object:
+                return self._backend.captures
+
             def generate(self, invocation: object, /) -> object:
                 record_v2_provider_call_started(attempt_marker_path)
                 generate = getattr(self._backend, "generate")
@@ -419,6 +423,10 @@ def _wrap_backend_factory_with_attempt_audit(
             def __init__(self, backend: object) -> None:
                 self._backend = backend
                 self.call_count = getattr(backend, "call_count", 0)
+
+            @property
+            def captures(self) -> object:
+                return self._backend.captures
 
             def assess(self, invocation: object, /) -> object:
                 record_v2_provider_call_started(attempt_marker_path)
@@ -461,13 +469,18 @@ def run_harness_with_backend_factory(
     ],
     matrix_path: Path = MATRIX_PATH,
     artifact_paths: Sequence[Path] | None = None,
+    preflight_exclude_paths: Sequence[Path] | None = None,
     measurement_id: str = MEASUREMENT_ID,
     matrix_hash: str = FROZEN_MATRIX_HASH,
 ) -> dict[str, Any]:
     spec = load_matrix_by_path(path=matrix_path)
     context = _load_pipeline_context(spec)
     if artifact_paths is not None:
-        assert_live_artifacts_absent(tuple(artifact_paths))
+        excluded = {path.resolve() for path in (preflight_exclude_paths or ())}
+        preflight_paths = tuple(
+            path for path in artifact_paths if path.resolve() not in excluded
+        )
+        assert_live_artifacts_absent(preflight_paths)
 
     case_results: list[dict[str, Any]] = []
     for index, case in enumerate(spec["cases"]):
@@ -633,6 +646,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     ),
                     matrix_path=matrix_path,
                     artifact_paths=artifact_paths,
+                    preflight_exclude_paths=(attempt_marker_path,),
                     measurement_id=measurement_id,
                     matrix_hash=matrix_hash,
                 )

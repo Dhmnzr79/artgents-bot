@@ -1,27 +1,48 @@
-# TASK — S47 First Permitted Live Run (Owner Approved)
+# TASK — S47 First-Live Failure / Incident Audit Capture
 
-**Baseline:** `codex/stage-a` / `0cb22c3` · clean/synced
+**Baseline:** `codex/stage-a` / `5b2bf32` · NO LIVE · NO product code
 
-**Owner approval (this session):**
-- automated technical outcome: 100% (`outcome_match_rate_min` 1.0)
-- manual answer quality: ≥ 85%
-- critical violations: 0
-- Composer + Semantic Verifier: `qwen3.7-plus`
-- **One** live run, max **38** LLM calls
-- artifacts exclusive-create (no overwrite)
+**Goal:** governance-only capture of S47 first live incident, owner decisions,
+corrected causal taxonomy, audit SHA pins. **Frozen raw/result byte-identical.**
 
-**Forbidden:** A9, runtime, UI, product authority, S42–S46 core changes, matrix question edits.
+## Owner decisions (binding for this checkpoint)
 
-**Allowlist:**
-- `TASK.md`
-- `evals/v5/fullcontext_response_eval_live_backend.py` (new)
-- `evals/v5/run_fullcontext_response_eval.py`
+1. **Run-2 artifacts:** diagnostic evidence + manual inspection material only;
+   **not** S47 pass proof, **not** AUTOMATED_PASS input. Full manual quality
+   verdict not required (automated stage = FAIL).
+2. **76-call overrun:** incident cost, **not** retroactive approval, **not**
+   precedent. Any re-run needs new owner approval.
+3. **fc_medical_01:** owner manual ruling — acceptable grounded general medical
+   answer; Verifier reject = probable FP for offline investigation.
 
-**Deliverables:**
-1. Live backend module (eval-only, injected via `--live`).
-2. CLI `--live` writes raw + result artifacts once; asserts ≤38 provider calls.
-3. Result records owner approval metadata; final verdict stays `PENDING_MANUAL_REVIEW`.
+## Non-regression principle (for future offline milestone — document only)
 
-**Gates:** PRE-CODE → governance commit → implement → run live once → COMPLETION → push.
+- No disease-name / case_id / exact-question special-casing.
+- Universal rules: grounded+consultation | missing-base honest | no personal med verdict.
+- Blast-radius before each change; compact regression set + S45–S47 neighbors green.
+- No dry-refusal regression on commercial/informational paths.
 
-**NO re-run if artifacts exist.**
+## Deliverables (governance/docs only)
+
+1. `docs/S47_FIRST_LIVE_INCIDENT_AUDIT.md` — full incident report.
+2. `evals/v5/artifacts/s47_first_live_incident_manifest.json` — SHA pins, verdicts, taxonomy.
+3. `evals/v5/artifacts/s47_first_live_run1_audit.log` — copy of run-1 log (append-only capture).
+4. `docs/STRANGLER_ROADMAP.md` — S47 live status note (incident captured, not passed).
+
+## Forbidden
+
+- Live / LLM calls; product/runtime/UI/A9 changes.
+- **Any modification** to `fullcontext_response_eval_live_raw.json`,
+  `fullcontext_response_eval_live_result.json` (byte-identical).
+- Matrix hash / harness / verifier / composer code changes.
+- Offline-fix milestone implementation.
+
+## Acceptance
+
+1. PRE-CODE ✅ → governance commit (TASK only).
+2. Incident docs + manifest + run1 log capture committed.
+3. SHA-256 verification: raw `0f4d4b93…`, result `83bff177…`, matrix `14b1cbd4…` unchanged.
+4. `pytest tests/test_fullcontext_response_eval_matrix_contract.py -q` green.
+5. COMPLETION ✅ → push `codex/stage-a` → clean/synced.
+
+**Stop after push. Do not start offline-fix milestone.**

@@ -128,6 +128,13 @@ topic scope, facts, components, tone и sales permissions остаются яв�
 Terminal request-only focus не отбрасывается молча; S32 safety errors не оборачиваются.
 TurnFrame/patient_scope, product authority и runtime не подключены.
 
+S34 связывает explicit spec с S31 composition offline. Raw materials и follow-up
+candidates остаются внутренними: потребителю разрешены только spec-projected plan
+identities, selected follow-ups и отдельно gated `selected_cta_key`; plan CTA — кандидат.
+Permission ceilings нельзя расширять inclusion-запросом. Topic allow/forbid и required-fact
+coverage пока не доказаны metadata текущего evidence, поэтому Composer/product wiring
+запрещены до следующего evidence-scope checkpoint.
+
 ---
 
 ## Порядок работ — strangler, две кучи

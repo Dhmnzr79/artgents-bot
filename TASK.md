@@ -1,112 +1,99 @@
-# TASK — S48a Post-Live Offline Harness / Measurement Hardening
+# TASK — S48a-correction Measurement Contract Honesty
 
-**Baseline:** `codex/stage-a` / `2b75e48` · **NO LIVE** · **NO LLM** · **NO product code**
+**Baseline:** `codex/stage-a` / `a13460c` · **NO LIVE** · **NO LLM** · **NO product code**
 
-**Goal:** Fix S47 eval measurement blind spots. Preserve candidate text and exact
-semantic reject flags on verifier failure. Literal substring hits are diagnostic
-only. Zero Composer/Verifier/runtime/UI/A9/authority changes.
+**Goal:** Remove always-green automated/final gates for unmeasured safety metrics.
+Keep literal hits diagnostic-only. Expose Verifier semantic reject counters with
+honest evaluated/not-evaluated denominators. Do not rewrite frozen S47 artifacts.
 
 ## Owner decisions (binding)
 
-1. **S48 split:** S48a (this TASK) → S48b blocked until separate owner command.
-2. **fc_medical_01:** acceptable grounded general medical answer; Verifier
-   `medical_boundary_ok=false` = probable FP — **not** automatic dangerous answer.
-3. **fc_boundary_02 (future S48 matrix v2 gate, not S48a):** multi-topic fixture
-   mismatch (implantation + treatment/pulpitis). Matrix path B — fix envelope in
-   **separate subsequent gate**. Do **not** add Composer dry-defer rule for narrow
-   envelope. **Frozen S47 matrix byte-identical** in S48a.
-4. **S47 live artifacts:** `fullcontext_response_eval_live_raw.json` and
-   `fullcontext_response_eval_live_result.json` **immutable** (byte-identical).
-5. **No safe-negation phrase filter:** no template table for «не могу поставить
-   диагноз» or other phrase exceptions. Literal hits may contain forbidden
-   substrings inside safe negation — that is normal and diagnostic-only.
+1. **fc_medical_01:** Verifier **false positive**. Manual review is required to
+   detect both Verifier **false positives** and **false negatives**.
+2. **Literal:** `raw_literal_forbidden_hits` + `raw_literal_forbidden_hit_case_count`
+   remain diagnostic-only; never semantic violation; no phrase tables/regex classifiers.
+3. **forbidden_claim_violation_count:** remove from **active** automated thresholds
+   and gates. Keep only `raw_literal_forbidden_hit_case_count` as diagnostic reporting.
+   Do not emit pseudo-gate `passed=true, value=0`.
+4. **dangerous_medical_violation_count:** **fully remove** from active automated
+   gates, active final gates, and early critical FAIL. No pseudo-gate with
+   `passed=true`. Reporting only:
+   `dangerous_medical_evaluation_status="NOT_EVALUATED"`.
+   Do not re-interpret or modify historical frozen artifacts.
+5. **semantic_*_rejected:** preserve case-level flags when semantic assessment
+   exists; add summary counters with honest denominator:
+   - `semantic_assessment_evaluated_case_count`
+   - `semantic_assessment_not_evaluated_case_count`
+   Absence of semantic payload must **not** become five `false` flags.
+   Transport/malformed/config cases = not evaluated; remain visible via their
+   own active gates.
+6. **Runtime safety:** fail-closed via Verifier/pipeline_error unchanged.
+7. **Frozen immutables:** S47 matrix `14b1cbd4…`, live raw `0f4d4b93…`,
+   live result `83bff177…` — byte-identical; artifact JSON not rewritten.
+   Matrix `proposed_*_thresholds` = historical snapshot in frozen matrix.
+8. **Offline replay:** must read old artifacts; additive/read-compatible schema.
+9. **Historical verdict:** re-summarizing frozen S47 run-2 metrics must remain
+   `AUTOMATED_FAIL`.
+10. **S48b / matrix v2 blocked.**
 
-## Scope (S48a only)
+## Scope
 
-### Harness exception path
-1. On `TargetResponseVerificationError` with code
-   `target_verifier_semantic_rejected`, preserve candidate text in `response_text`
-   from `composer_raw_payload.text`.
-2. Do **not** hardcode `forbidden_claim_violations=[]` while candidate text exists;
-   populate `raw_literal_forbidden_hits` from candidate text + matrix
-   `forbidden_claims` (diagnostic only).
-3. Transport / config / malformed exceptions: **no** semantic reject flags; candidate
-   text not treated as semantic rejection.
+### Contract / aggregate / gates
+- Remove `forbidden_claim_violation_count` from active automated gates and from
+  gate verdict aggregation input.
+- Remove `dangerous_medical_violation_count` from active automated gates, active
+  final gates, and `critical_automated_medical_violation` early FAIL.
+- Summary reporting: `dangerous_medical_evaluation_status="NOT_EVALUATED"`.
+- Remove `dangerous_medical_violation: False` from `derive_case_automated_flags`.
+- Semantic payload present → derive five `semantic_*_rejected` flags from assessment.
+  Semantic payload absent → omit flags or explicit not-evaluated; never five false.
+- Add summary counters for five semantic reject fields + evaluated/not-evaluated counts.
+- Gate verdict: only gates with evaluable `pass: true|false` participate in
+  `AUTOMATED_PASS` / final automated stage.
 
-### Metric separation
-4. **`raw_literal_forbidden_hits[]`** — diagnostic/audit only:
-   - not a semantic violation;
-   - does not block response status by itself;
-   - does not auto-increment `dangerous_medical_violation_count`.
-5. Preserve exact semantic reject flags (from verifier assessment when present):
-   - `semantic_general_grounding_rejected`
-   - `semantic_strict_commercial_grounding_rejected`
-   - `semantic_topic_scope_rejected`
-   - `semantic_medical_boundary_rejected`
-   - `semantic_selected_facts_rejected`
-6. `derive_case_automated_flags`:
-   - `missing_base_external_knowledge` ← `missing_base` case_kind AND
-     `semantic_general_grounding_rejected`;
-   - `dangerous_medical_violation` ← **never** from literal hits or
-     `semantic_medical_boundary_rejected` alone (fc_medical_01 FP rule);
-   - transport/malformed flags unchanged.
-7. Case `status` must not fail solely on literal hits.
+### Preserved active gates
+- outcome_match_rate, provider_call_violation_count, pipeline_error_count,
+  transport_error_count, malformed_response_count,
+  ungrounded_strict_commercial_count, missing_base_external_knowledge_count,
+  unexpected_terminal_count (+ final manual gates unchanged).
 
-### Offline replay (read-only)
-8. Helper to re-derive semantic/literal metrics from **frozen S47 raw/result**
-   in memory only — no artifact rewrite, no LLM calls.
-9. Additive case-result schema: old S47 result rows remain readable (new fields
-   optional on read paths).
+### Replay compatibility
+- `replay_frozen_s47_live_semantic_metrics()` on pinned artifacts without disk writes.
+- Historical frozen live result JSON not re-interpreted or rewritten.
 
 ## Allowlist
 
 - `TASK.md`
-- `evals/v5/run_fullcontext_response_eval.py`
 - `evals/v5/fullcontext_response_eval_contract.py`
 - `tests/test_fullcontext_response_eval_harness.py`
-- `tests/test_fullcontext_response_eval_matrix_contract.py` (only if compatibility test needed)
 - `docs/STRANGLER_ROADMAP.md` (completion status only)
 
 ## Forbidden
 
-- Live / LLM / runtime / UI / A9 / authority changes
-- `core/target_composer_executor.py`, `core/target_response_verifier.py`
-- Any edit to frozen S47 live raw/result artifacts
-- S47 matrix hash / matrix file changes
-- Safe-negation phrase filter / template tables
-- S48b implementation
+- Live / LLM / product / runtime / UI / A9 / authority
+- Matrix / frozen artifact edits
+- Phrase tables, regex classifiers, new safety heuristics
+- S48b / matrix v2
 - Combined governance+implementation commits
+- `.pytest_basetemp_*` inside workspace (use temp dir outside repo)
 
 ## Process
 
-1. **Governance commit** (this TASK only) → independent PRE-CODE checker ✅
-2. **Implementation commit** (allowlist code/tests) → independent COMPLETION checker ✅
-3. Push `codex/stage-a` → clean/synced → **stop** (do not start S48b)
-
-## Tests (offline)
-
-Use unique `--basetemp` and `-p no:cacheprovider`.
-
-Verify:
-- rejected candidate preserved on `TargetResponseVerificationError`;
-- semantic flags reflect verifier assessment exactly;
-- literal hits diagnostic-only (no status/dangerous_medical auto-fail);
-- transport/malformed do not set semantic reject flags;
-- frozen S47 artifacts byte-identical;
-- matrix/contract tests green.
-
-```text
-pytest tests/test_fullcontext_response_eval_harness.py tests/test_fullcontext_response_eval_matrix_contract.py -q -p no:cacheprovider --basetemp=.pytest_basetemp_s48a
-```
+1. Governance TASK commit → PRE-CODE checker ✅
+2. Implementation commit → COMPLETION checker ✅
+3. Offline tests:
+   `$env:TEMP\pytest_basetemp_s48a_correction_<runid> -p no:cacheprovider`
+4. Push `codex/stage-a` → clean/synced → stop
 
 ## Acceptance
 
-1. PRE-CODE checker ✅ on governance TASK commit.
-2. Exception-path rows: candidate text + semantic flags when verifier rejected.
-3. Frozen S47 raw replay (in-memory): semantic counters truthful for known rejects;
-   artifacts on disk unchanged.
-4. SHA-256 unchanged: live raw `0f4d4b93…`, live result `83bff177…`, matrix `14b1cbd4…`.
-5. Pytest command above green.
-6. COMPLETION checker ✅ → push → stop.
+1. No active gate `passed=true` for unmeasured forbidden/dangerous metrics.
+2. `dangerous_medical_evaluation_status="NOT_EVALUATED"` in fresh summaries.
+3. Semantic denominators present; absent payload ≠ five false flags.
+4. Replay frozen S47: fc_medical_01 boundary reject, not dangerous; fc_missing_01
+   grounding reject + missing_base; fc_boundary_02 literal diagnostic only;
+   recomputed verdict `AUTOMATED_FAIL`.
+5. Frozen SHA pins byte-identical.
+6. `pytest tests/test_fullcontext_response_eval_harness.py tests/test_fullcontext_response_eval_matrix_contract.py -q` green.
 
-**Next (blocked):** S48b composer+verifier; S48 matrix v2 (fc_boundary_02 path B).
+**Stop. Do not start S48b.**

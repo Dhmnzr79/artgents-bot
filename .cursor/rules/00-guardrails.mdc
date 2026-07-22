@@ -76,8 +76,8 @@ alwaysApply: true
 
 - **Urgent / manual-contact hard-stop** — **раньше** обычного ответа, `medical_handoff` и Composer; при срочности лучше звонить.
 - **`medical_handoff`** — safety mode, **не** MD-маршрут и **не** автоматический отказ: grounded content из согласованных MD разрешён без диагноза, personal eligibility и treatment choice; CTA на консультацию допустим.
-- **Темы нет в базе** — честно сообщить; не дополнять model knowledge.
-- **Только `uncertain` (S42)** → terminal defer. Confident `medical_handoff` materializable при grounded facts.
+- **Темы нет в базе** — controlled materialized «нет в материалах» + консультация; **не** terminal defer; без model knowledge.
+- **Только `uncertain` (S42)** → terminal defer. Confident `medical_handoff` **всегда** materializable (grounded content **или** missing-base controlled response).
 - **Verifier (TARGET):** grounding, service-family scope, no-diagnosis, no personal eligibility, no treatment choice, honest missing-base behavior.
 - **Противопоказания в client pack** — по клинически различающимся service families (content organization, не runtime routing).
 - S42/S43 — **классификация границы only**; matrix/harness/thresholds не менять без отдельного governance.

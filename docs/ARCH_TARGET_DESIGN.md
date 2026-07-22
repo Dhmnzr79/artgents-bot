@@ -102,6 +102,7 @@
 
 Если болезнь или тема **отсутствуют** во всей утверждённой MD-базе:
 
+- **controlled materialized response** (это **не** terminal defer);
 - бот **честно** сообщает, что в материалах клиники такой информации нет;
 - предлагает уточнить на консультации;
 - **не** дополняет ответ медицинскими знаниями модели.
@@ -111,11 +112,17 @@
 | Outcome | Смысл | Product path |
 |---|---|---|
 | `none` | коммерческий/информационный ход без medical safety mode | materialize по policy |
-| `medical_handoff` (confident) | medical safety mode; ответ из базы **разрешён** | **materialize** с `response_mode=medical_handoff`, если есть grounded facts |
+| `medical_handoff` (confident) | medical safety mode; ответ **materialize**, не terminal defer | **materialize** с `response_mode=medical_handoff`: grounded content из clinic MD **или** controlled «нет в материалах клиники» + консультация |
 | `uncertain` | низкая уверенность / malformed / ambiguity | **только** terminal **defer** (fail-closed) |
 
-**Только `uncertain`** означает terminal defer. Confident `medical_handoff` **materializable**,
-когда в базе есть разрешённые grounded facts и policy допускает ход.
+**Только `uncertain`** означает terminal defer. Confident `medical_handoff` **всегда
+materializable** (не terminal defer):
+
+- **тема есть в базе** — grounded neutral ответ из clinic MD + допустимое приглашение на
+  консультацию;
+- **темы нет во всей clinic MD-base** — controlled materialized response: «в материалах
+  клиники такой информации нет» + предложение консультации; **запрещено** дополнять model
+  medical knowledge.
 
 S42/S43 **проверяют классификацию границы**; финальное медицинское содержание ответа,
 FullContext integration и Verifier enforcement — **отдельные** downstream gates (ещё не product).
@@ -129,12 +136,14 @@ safety mode независимо от узкого `service_id` gate.
 
 Verifier будущего медицинского ответа обязан проверять:
 
-- наличие источника в базе клиники (grounding / provenance);
-- соответствие нужному **семейству услуг** (service/topic scope), не per-MD routing;
+- **при наличии темы в базе:** grounding / provenance в clinic MD; соответствие нужному
+  **семейству услуг** (service/topic scope), не per-MD routing;
+- **при отсутствии темы во всей базе:** controlled materialized «в материалах клиники такой
+  информации нет» + предложение консультации — **не** terminal defer; **без** model medical
+  knowledge;
 - отсутствие диагноза и differential;
 - отсутствие персонального вывода о пригодности пациента;
-- отсутствие самостоятельного выбора лечения;
-- корректное поведение при **отсутствии** информации в базе (честный defer без model knowledge).
+- отсутствие самостоятельного выбора лечения.
 
 Offline S38 уже закладывает semantic assessment по medical boundary и selected facts; полный
 checklist выше — **TARGET** для финальной medical-handoff verification.

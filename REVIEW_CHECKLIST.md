@@ -58,8 +58,8 @@
 
 - [ ] **Urgent/manual-contact hard-stop** обрабатывается **раньше** обычного ответа и `medical_handoff`.
 - [ ] **`medical_handoff`** — safety mode, не MD-route и не автоматический отказ; grounded neutral content из clinic MD разрешён без diagnosis/personal eligibility/treatment choice.
-- [ ] **Темы нет в базе** → честное «в материалах клиники нет» + консультация; без model medical knowledge.
-- [ ] **Только `uncertain`** → terminal defer; confident `medical_handoff` materializable при grounded facts.
+- [ ] **Темы нет в базе** → controlled materialized «в материалах клиники нет» + консультация; **не** terminal defer; без model medical knowledge.
+- [ ] **Только `uncertain`** → terminal defer; confident `medical_handoff` **всегда** materializable (grounded content **или** missing-base controlled response).
 - [ ] **Verifier (TARGET)** проверяет grounding, service-family scope, medical safety checklist и missing-base behavior.
 - [ ] **Противопоказания** — content organization по service families, не per-MD runtime routing.
 - [ ] S42/S43 contracts/matrix/harness/thresholds **не** менялись без отдельного governance.

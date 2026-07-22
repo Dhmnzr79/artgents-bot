@@ -99,6 +99,12 @@ fallback; S28 не решает clarify/defer, не читает MD/followups, �
 подключён к product path. Такое разделение не меняет порядок target chain и не создаёт
 второго смысла для имени `ResponseSpec`.
 
+S29 materializes follow-up candidates только из уже выбранных S28/S27 sources. Content
+candidates берутся из `suggest_h3` одного selected MD и разрешаются в explicit H3 того
+же документа; price candidates — только из projected offers с сохранением provenance.
+Два tuple не смешиваются. S29 не выбирает UI source, не применяет session suppression и
+не подключён к product path; эти решения остаются следующей отдельной policy boundary.
+
 ---
 
 ## Порядок работ — strangler, две кучи

@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S29 — selected-source follow-up materialization: governance pending, код ещё не начат** |
-| Ближайший рабочий фокус без live | **Проверить компактный governance S29; до checker ✅ код не писать** |
+| Отдельная S-series без live | **S29 — selected-source follow-up materialization завершён offline** |
+| Ближайший рабочий фокус без live | **Минимальная UI-source policy над раздельными content/price candidates; без product wiring** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -166,10 +166,12 @@
   `94 passed`, skip/xfail нет. MD/follow-up materialization и product wiring не входят в
   checkpoint. Канонический upstream ResponsePolicy/ResponseSpec до evidence assembly
   остаётся отдельной будущей границей и не переопределяется S28.
-- [ ] **S29 — selected-source follow-up materialization** — governance prepared для
-  отдельных content candidates только из selected MD `suggest_h3` и price candidates
-  только из selected offers. До independent checker `✅` код не пишется; UI merge,
-  session suppression и product wiring не входят в checkpoint.
+- [x] **S29 — selected-source follow-up materialization** — отдельные content candidates
+  строятся только из selected MD `suggest_h3`, price candidates — только из selected
+  offers, с сохранением порядка и provenance. Governance `b91ff4e`; independent
+  completion review `✅`: target `37 passed`, четыре S27/S28 neighbors `44 passed`, всего
+  `81 passed`, skip/xfail нет. UI merge, session suppression и product wiring не входят
+  в checkpoint; следующий focus — минимальная UI-source policy над proven tuples.
 
 ## Какой roadmap актуален
 

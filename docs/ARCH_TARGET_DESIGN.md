@@ -135,6 +135,15 @@ Permission ceilings нельзя расширять inclusion-запросом. 
 coverage пока не доказаны metadata текущего evidence, поэтому Composer/product wiring
 запрещены до следующего evidence-scope checkpoint.
 
+S35 строит из S34 отдельный закрытый identity-only evidence view. Он читает topic только
+у уже выбранных service/doctor/KB MD, не ищет и не ранжирует документы. Service-linked
+offers и commercial facts наследуют topic услуги; врачи сохраняют topic услуги и своего
+profile MD. Каждый factual ref обязан пересекаться с allowed topics и не пересекаться с
+forbidden topics. Required fact считается покрытым только выбранным commercial fact, а не
+его наличием среди raw candidates или offer fact_refs. Missing scope/fact/component
+завершается явной ошибкой без whole-base fallback. Composer/Verifier/product wiring всё
+ещё отсутствуют; medical_handoff prose safety остаётся их отдельной обязательной границей.
+
 ---
 
 ## Порядок работ — strangler, две кучи

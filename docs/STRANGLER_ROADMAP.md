@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S34 — spec-bound offline package integration завершён offline** |
-| Ближайший рабочий фокус без live | **Canonical evidence topic/fact-coverage enforcement до Composer** |
+| Отдельная S-series без live | **S35 — scoped response evidence завершён offline** |
+| Ближайший рабочий фокус без live | **Минимальный Composer над закрытым S35 evidence-view** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -199,6 +199,13 @@
   independent completion review `✅`: target/demo `21 passed`, S33/S32/S31 neighbors
   `56 passed`, всего `77 passed`, skip/xfail нет. Topic scope и required-fact coverage
   ещё не доказаны, поэтому Composer/product wiring запрещены до следующего checkpoint.
+- [x] **S35 — scoped response evidence** — S34 consumable identities превращаются в
+  закрытый view без raw materials/candidates; topic берётся только из уже выбранных
+  service/doctor/KB MD, required facts покрываются только реально выбранными commercial
+  facts. Canonical S28 plan и S30 follow-up selection пересобираются и сравниваются exact,
+  поэтому candidate injection закрыт. Governance `84182a9`; independent completion review
+  `✅`: target/demo `15 passed`, S34/S31 neighbors `32 passed`, всего `47 passed`,
+  skip/xfail нет. Live/LLM, A9, Composer/Verifier и product authority не подключены.
 
 ## Какой roadmap актуален
 

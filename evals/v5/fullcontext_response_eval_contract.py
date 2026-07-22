@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = _REPO_ROOT / "evals" / "v5" / "demo" / "fullcontext_response_eval_matrix.json"
-FROZEN_MATRIX_HASH = "c0b2b4cd364b2013cfbe68651eaf43e8bdb3626c"
+FROZEN_MATRIX_HASH = "14b1cbd4c3a8d906e0b19adb10ffaa60849803b3"
 
 LIVE_ARTIFACTS_DIR = _REPO_ROOT / "evals" / "v5" / "artifacts"
 LIVE_RAW_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "fullcontext_response_eval_live_raw.json"

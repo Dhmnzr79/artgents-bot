@@ -1,124 +1,146 @@
-# TASK — S33 Minimal Deterministic ResponsePolicy Builder
+# TASK — S34 Spec-bound Offline Package Integration
 
-**Branch / baseline:** `codex/stage-a` / `644226d feat: define canonical response spec S32`
+**Branch / baseline:** `codex/stage-a` / `c949571 feat: build deterministic response spec S33`
 
-**Goal:** build one valid S32 `TargetResponseSpec` from a strict explicit non-A9 request.
-This first policy slice owns only follow-up family choice from exact component focus; all
-other policy decisions remain explicit inputs.
+**Goal:** bind one explicit S33/S32 spec to the proven S31 offline package for the
+composition fields that current contracts can enforce. Offline/unwired and not yet safe
+for Composer because topic-scope/required-fact evidence enforcement is still absent.
 
 ## Owner laws
 
-- No raw text, TurnFrame object, patient_scope, inference, taxonomy or product authority.
-- Upstream explicitly supplies mode, scope, facts, requested components and permissions.
-- Builder derives only `followup_source` using the owner-approved component-focus rule.
-- Terminal normal payload and medical safety remain enforced by canonical S32 validation;
-  request-only terminal primary focus is rejected before S32.
-- Never catch/wrap S32 `ValidationError`, add fallback or silently repair invalid payload.
+- Spec owns service ID, required components, follow-up family and permission ceilings.
+- Caller explicitly requests actual inclusion of initial marketing, consultation close and
+  CTA; a request may be narrower than spec permission, never wider.
+- S34 calls public S31 once and passes spec-owned composition values unchanged.
+- It does not pretend current evidence has topic tags or complete required-fact coverage.
+- No terminal/payload-free spec is materialized through service-centric S31.
 
 ## Contract
 
-Add `contracts/target_response_policy.py`:
+Add `core/target_spec_offline_response_package.py`:
 
 ```python
-class TargetResponsePolicyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+@dataclass(frozen=True, slots=True)
+class TargetSpecBoundOfflineResponsePackage:
+    spec: TargetResponseSpec
+    package: TargetOfflineResponsePackage
+    selected_cta_key: str | None
 
-    response_mode: TargetResponseMode
-    service_id: CanonicalToken | None = None
-    tone_key: CanonicalToken
-    allowed_topics: tuple[CanonicalToken, ...]
-    forbidden_topics: tuple[CanonicalToken, ...] = ()
-    required_fact_ids: tuple[CanonicalToken, ...] = ()
-    requested_components: tuple[TargetResponseComponent, ...]
-    primary_component: TargetResponseComponent | None = None
-    allow_marketing_facts: bool = False
-    allow_consultation_close: bool = False
-    allow_cta: bool = False
+def assemble_target_spec_offline_response_package(
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    external_index: ResponseSchemaExternalIndex,
+    consultation_values: Sequence[ServiceConsultationValue],
+    *,
+    spec: TargetResponseSpec,
+    brand_term: str | None,
+    strategy_context: TargetStrategyMatch,
+    semantic_context: str,
+    today: date,
+    md_root: Path,
+    include_initial_block: bool,
+    include_consultation_close: bool,
+    include_cta: bool,
+    marketing_scenarios: Sequence[str] = (),
+    shown_fact_ids: Sequence[str] = (),
+    shown_amplifier_refs: Sequence[str] = (),
+    shown_consultation_value_refs: Sequence[str] = (),
+) -> TargetSpecBoundOfflineResponsePackage: ...
 ```
 
-Request cross-validation order:
+Validation order, one public `TargetSpecOfflineResponsePackageError(ValueError)` with
+`.code`, `.value`, exact message `f"{code}: {value!r}"`:
 
-1. `clarify`/`defer` with non-`None` `primary_component` →
-   `terminal_primary_component_forbidden`. This request-only field cannot be silently
-   discarded; this reason wins over any other terminal payload error.
-2. For terminal requests with no primary, skip remaining focus validation so canonical
-   S32 `terminal_response_payload_forbidden` remains owner of facts/components/allow flags.
-3. Non-terminal `primary_component` absent from `requested_components` →
-   `policy_primary_component_missing`.
-4. Non-terminal content+price with `primary_component=None` →
-   `policy_followup_source_ambiguous`.
+1. exact `TargetResponseSpec` → `spec_package_spec_invalid`, original value;
+2. each include flag in signature order must be exact bool →
+   `spec_package_selection_invalid`, `(field_name, original_value)`;
+3. only `answer` or evidence-bearing `medical_handoff` with non-None `service_id` and
+   nonempty required components is materializable → `spec_package_not_materializable`,
+   `(response_mode, service_id, required_components)`;
+4. initial marketing or nonempty/non-tuple marketing scenarios while
+   `allow_marketing_facts=False` → `spec_package_permission_forbidden`,
+   `"marketing_facts"`;
+5. requested consultation while disallowed → same code, `"consultation_close"`;
+6. requested CTA while disallowed → same code, `"cta"`.
 
-Add `core/target_response_policy.py`:
+Exactly four error-code strings exist. After these gates, S31 and downstream typed errors
+propagate unchanged.
 
-```python
-class TargetResponsePolicyBuildError(ValueError):
-    # stores code/value; exact message f"{code}: {value!r}"
+S31 mapping:
 
-def build_target_response_spec(
-    request: TargetResponsePolicyRequest,
-) -> TargetResponseSpec: ...
-```
+- `service_term=spec.service_id`;
+- `required_components=spec.required_components`;
+- `followup_source=spec.followup_source`;
+- `include_initial_block` and `include_consultation_close` pass to S31 unchanged;
+- `include_cta` is consumed only by S34 and is never forwarded to S31;
+- all remaining caller inputs pass unchanged;
+- result preserves exact spec/package identities;
+- `selected_cta_key=package.plan.cta_key` only when `include_cta=True`, otherwise `None`.
 
-Wrong exact request type raises `response_policy_request_invalid`, value = original
-request. This is the only builder error code.
+The internal S31 package may retain a CTA candidate identity; consumers of S34 must use
+only `selected_cta_key`. No facts/components/followups are rebuilt or reselected.
 
-Follow-up derivation for non-terminal requests:
+`package.materials` and `package.followup_candidates` remain **internal candidate evidence**
+and may contain content/offers/doctors not permitted by the exact closed
+`spec.required_components`. They are never an allowed response payload. The only
+consumable composition view is:
 
-- primary `content`/`price` → same source;
-- primary `doctors` → `None`;
-- no primary and only content-capable family present → `content`;
-- no primary and only price-capable family present → `price`;
-- neither → `None`; content+price/no primary is rejected by request validation.
+- component identities from `package.plan` (`primary_content_ref`, `offer_ids`,
+  `doctor_ids`) as projected by the spec-owned component tuple;
+- selected marketing identities from `package.plan` (`commercial_fact_ids`,
+  `external_source_refs`) only when marketing permission + requested inclusion allowed S31
+  to select them;
+- `package.plan.consultation_content_ref` only when consultation permission + requested
+  inclusion allowed S31 to select it;
+- `package.selected_followups`;
+- S34 `selected_cta_key`.
 
-For terminal requests builder passes `followup_source=None`; any requested facts,
-components or allow flags are then rejected by S32 with
-`terminal_response_payload_forbidden`. All request fields otherwise pass exactly into S32,
-with `requested_components` renamed to `required_components` and authored order preserved.
+`package.plan.cta_key` remains an internal candidate and is not consumable directly.
 
-Request-model focus validation necessarily precedes S32 construction. Therefore on a
-combined-invalid non-terminal request (including `medical_handoff`), primary-missing or
-ambiguous-focus reasons win over S32 scope/medical reasons. This is explicit fail-closed
-precedence; canonical S32 reasons propagate unchanged once request focus is valid.
+Tests must prove omitted content/price/doctors can remain inside candidate materials while
+their corresponding plan identity is `None`/empty and therefore not consumable.
 
-## Boundaries
+## Explicit incomplete safety boundary
 
-This does not decide response mode, topic scope, components, facts, tone or sales
-permissions. Manual-contact/booking still terminate before ResponseSpec. No evidence,
-selectors, S31 wiring, MD/JSON/client reads, Composer, Verifier, runtime/UI/session,
-authority or live/LLM. A9 remains shadow-only and is neither imported nor read.
+S34 carries `allowed_topics`, `forbidden_topics` and `required_fact_ids` inside the exact
+spec but **does not enforce them against evidence**: current S31 evidence lacks canonical
+topic/fact coverage metadata. Therefore S34 output must not feed Composer, Verifier, UI or
+product path. The next checkpoint must close this evidence-scope gap rather than add more
+response-policy inference.
 
-Allowlist:
+## Boundaries / allowlist
+
+No TurnFrame/A9/raw inference, terminal rendering, MD/data changes, Composer/Verifier,
+runtime/UI/session, authority or live/LLM. Do not edit S27–S33 or clients.
 
 - `TASK.md`
-- `contracts/target_response_policy.py`
-- `core/target_response_policy.py`
-- `tests/test_target_response_policy.py`
+- `core/target_spec_offline_response_package.py`
+- `tests/test_target_spec_offline_response_package.py`
+- `tests/test_demo_target_spec_offline_response_package.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
 ## Minimal tests
 
-- exact request fields/defaults and strict/frozen/extra-forbid shape;
-- exact builder signature/error class/message and sole code;
-- single content, single price, doctor-only and no-component focus;
-- composite content+price requires explicit primary; doctor primary selects no follow-up;
-- authored component/fact/topic order passes unchanged;
-- terminal primary focus has its exact request error; with no primary, terminal S32 error
-  wins over remaining focus ambiguity and no payload is repaired;
-- pure and sales-capable medical specs preserve mandatory S32 boundary;
-- combined-invalid medical focus proves request-focus precedence; focus-valid S32 reasons
-  propagate unchanged; input unchanged;
-- import firewall: no TurnFrame/patient_scope/A9/client/runtime/live, no skip/xfail.
+- exact frozen shape/signature/defaults/four errors and validation precedence;
+- permission requests cannot widen spec; narrower selection is accepted;
+- exact spec values map once into S31 and identities/errors are preserved;
+- content-only/price-only/doctors-only plans are the sole closed component view even while
+  omitted candidates remain in internal materials;
+- terminal, pure-medical and service-less specs fail before S31;
+- real demo All-on-4 content/price/doctors/follow-ups, marketing/consultation/CTA gating;
+- CTA consumers get only selected_cta_key; no client writes;
+- explicit proof that topic/fact scope remains carried but unenforced/unwired;
+- import firewall and no skip/xfail/live.
 
-Run S33 target plus S32 target and S30/S31 target+demo neighbors only. No full suite/live.
+Run S34 target/demo plus S33, S32 and S31 target/demo neighbors only. No full suite/live.
 
 ## Gates
 
 1. Independent governance checker `✅` before code.
-2. Commit/push `docs: govern deterministic response policy S33` only to stage-a.
-3. Implement allowlist and run target + five neighbor files.
+2. Commit/push `docs: govern spec-bound offline package S34` only to stage-a.
+3. Implement allowlist and run target + four neighbor files.
 4. Independent completion checker `✅`, roadmap `[x]`.
-5. Commit/push `feat: build deterministic response spec S33`; final clean/synced.
+5. Commit/push `feat: bind response spec to offline package S34`; final clean/synced.
 
-Next checkpoint: integrate explicit S33 spec into the S31 offline package boundary. Do not
-add topic/aspect inference until that integration proves an exact missing contract.
+Next checkpoint: canonical evidence topic/fact-coverage enforcement before Composer.

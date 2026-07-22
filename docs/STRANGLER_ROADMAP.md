@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S33 — deterministic ResponsePolicy builder завершён offline** |
-| Ближайший рабочий фокус без live | **Интегрировать explicit S33 spec в S31 offline package boundary** |
+| Отдельная S-series без live | **S34 — spec-bound offline package integration: governance pending, код не начат** |
+| Ближайший рабочий фокус без live | **Проверить governance S34; до checker ✅ код не писать** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -193,6 +193,9 @@
   focus без repair/fallback. Governance `a2caf08`; independent completion review `✅`:
   target `22 passed`, S32 + S30/S31 neighbors `57 passed`, всего `79 passed`, skip/xfail
   нет. Следующий focus — прямая S33→S31 offline-интеграция, не новый inference layer.
+- [ ] **S34 — spec-bound offline package integration** — governance prepared для
+  composition-полей S33/S32→S31. Topic scope и required-fact coverage ещё не доказаны,
+  поэтому Composer/product wiring запрещены; до checker `✅` код не пишется.
 
 ## Какой roadmap актуален
 

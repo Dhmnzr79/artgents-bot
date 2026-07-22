@@ -1,93 +1,100 @@
-# TASK — S30 Minimal Follow-up Source Policy
+# TASK — S31 Integrated Offline Response Package
 
-**Branch / baseline:** `codex/stage-a` / `6d81fac feat: materialize selected-source followups S29`
+**Branch / baseline:** `codex/stage-a` / `0d1ebc7 feat: select followup source S30`
 
-**Goal:** offline/unwired policy that exposes exactly one already-materialized S29
-follow-up family (`content`, `price`) or none. It does not decide the answer focus.
+**Goal:** one offline/unwired facade over the proven S27→S28→S29→S30 segment. This is
+not the final bot path and does not implement canonical ResponseSpec, text or UI.
 
 ## Owner laws
 
-- The future ResponseSpec/caller explicitly supplies `content`, `price` or `None`.
-- `content` returns all S29 content candidates in exact authored order.
-- `price` returns all S29 price candidates in exact authored order.
-- Empty requested family returns no source and no candidates.
-- Never merge, rank, truncate, deduplicate or fall back to the other family.
+- Call the four public stages once and in order: materials, plan, candidates, selection.
+- Future ResponseSpec inputs remain explicit: `required_components` and `followup_source`.
+- Return every stage result with exact object identity; do not rebuild or reinterpret it.
+- Propagate every existing typed error unchanged; add no error class/code/fallback.
+- Do not infer focus, merge links, select other services/offers or widen evidence.
 
 ## Contract
 
-Add `core/target_response_followup_policy.py`:
+Add `core/target_offline_response_package.py`:
 
 ```python
-TargetFollowupSource = Literal["content", "price"]
-
 @dataclass(frozen=True, slots=True)
-class TargetResponseFollowupSelection:
-    source: TargetFollowupSource | None
-    content: tuple[TargetContentFollowup, ...]
-    price: tuple[TargetPriceFollowup, ...]
+class TargetOfflineResponsePackage:
+    materials: TargetOfflineResponseMaterials
+    plan: TargetResponseMaterializationPlan
+    followup_candidates: TargetResponseFollowups
+    selected_followups: TargetResponseFollowupSelection
 
-class TargetResponseFollowupPolicyError(ValueError):
-    def __init__(self, code: str, value: object) -> None:
-        self.code = code
-        self.value = value
-        super().__init__(f"{code}: {value!r}")
-
-def select_target_response_followups(
-    followups: TargetResponseFollowups,
+def assemble_target_offline_response_package(
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    external_index: ResponseSchemaExternalIndex,
+    consultation_values: Sequence[ServiceConsultationValue],
     *,
-    source: TargetFollowupSource | None,
-) -> TargetResponseFollowupSelection: ...
+    service_term: str,
+    brand_term: str | None,
+    strategy_context: TargetStrategyMatch,
+    semantic_context: str,
+    today: date,
+    include_initial_block: bool,
+    include_consultation_close: bool,
+    required_components: Sequence[str],
+    followup_source: TargetFollowupSource | None,
+    md_root: Path,
+    marketing_scenarios: Sequence[str] = (),
+    shown_fact_ids: Sequence[str] = (),
+    shown_amplifier_refs: Sequence[str] = (),
+    shown_consultation_value_refs: Sequence[str] = (),
+) -> TargetOfflineResponsePackage: ...
 ```
 
-Validation order:
+Exact stage flow:
 
-Both failures raise `TargetResponseFollowupPolicyError` with the governed `.code`,
-`.value` and exact message `f"{code}: {value!r}"`:
+1. Call S27 with its inputs unchanged.
+2. Call S28 with the exact S27 object and `required_components` unchanged.
+3. Call S29 with exact S28/S27 objects and `md_root` unchanged.
+4. Call S30 with exact S29 object and `source=followup_source` unchanged.
+5. Return those exact four objects in the frozen package.
 
-1. `followups` must be exact `TargetResponseFollowups`; its fields must be exact tuples
-   containing only exact S29 item types. Otherwise
-   `followup_policy_candidates_invalid`, value = original `followups`.
-2. `source` must be exact string `content`/`price` or `None`. Otherwise
-   `followup_policy_source_invalid`, value = original `source`.
-
-Selection is a shallow immutable projection: preserve exact item identities and order.
-If the requested tuple is empty, return `(source=None, content=(), price=())`.
+Stage order defines error precedence. Do not catch/wrap existing exceptions or prevalidate
+later-stage inputs locally. Sequence defaults and supplied sequences are forwarded, not
+mutated. S27 remains the owner of its own copying/validation.
 
 ## Boundaries
 
-No TurnFrame/A9/raw text inference, ResponseSpec implementation, MD/JSON/client reads,
-widget rendering, button limits, session shown/clicked state, Composer, Verifier, runtime,
-product authority or live/LLM. Do not edit S29 or `clients/**`.
+This integrates only the current offline segment. No TurnFrame/A9/raw inference, canonical
+ResponsePolicy/ResponseSpec, answer text, MD body evidence rendering, widget/session,
+Composer, Verifier, runtime/product authority or live/LLM. Do not edit S27–S30 or clients.
 
 Allowlist:
 
 - `TASK.md`
-- `core/target_response_followup_policy.py`
-- `tests/test_target_response_followup_policy.py`
-- `tests/test_demo_target_response_followup_policy.py`
+- `core/target_offline_response_package.py`
+- `tests/test_target_offline_response_package.py`
+- `tests/test_demo_target_offline_response_package.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
 ## Minimal tests
 
-- exact signatures, frozen/slots schema, public error class/inheritance, `.code`, `.value`,
-  exact message and source containing exactly the two governed codes;
-- invalid outer/inner candidate state and validation precedence;
-- content, price and `None` select only the requested family;
-- empty requested family has no fallback;
-- exact order and item identity are preserved; inputs are unchanged;
-- real demo All-on-4 content and price candidates follow the same rules;
-- import firewall and no client writes/product imports/live.
+- exact frozen/slots shape, signature/defaults and import firewall;
+- four public stages called once/in exact order with identity-preserving handoff;
+- all stage outputs preserved by identity; inputs not mutated;
+- S27, S28, S29 and S30 typed errors propagate as the same exception object;
+- real demo All-on-4 produces coherent service/material/plan/content-followup package;
+- real price focus selects only price links; `None` selects none;
+- real unfulfilled price remains empty without fallback; demo files unchanged;
+- no test suppression, clients/product imports/writes/live.
 
-Run only S30 target/demo plus S29 target/demo neighbors. No full suite, A9 or live/LLM.
+Run S31 target/demo plus S27–S30 target/demo neighbors only. No full suite, A9 or live.
 
 ## Gates
 
 1. Independent governance checker `✅` before code.
-2. Commit/push `docs: govern followup source policy S30` only to `codex/stage-a`.
-3. Implement allowlist and run target + two S29 neighbors.
+2. Commit/push `docs: govern integrated offline package S31` only to `codex/stage-a`.
+3. Implement allowlist and run target + eight neighbor files.
 4. Independent completion checker `✅`, roadmap `[x]`.
-5. Commit/push `feat: select followup source S30`; final clean/synced.
+5. Commit/push `feat: assemble offline response package S31`; final clean/synced.
 
-Next checkpoint: end-to-end offline response assembly over proven components; do not add
-another policy layer unless that vertical integration exposes a concrete missing contract.
+After S31, use the integrated boundary to specify the smallest real upstream ResponseSpec
+contract; do not add another downstream policy brick without a demonstrated gap.

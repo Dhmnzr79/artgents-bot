@@ -175,6 +175,14 @@ assessment: grounding (включая числа словами и unit/context)
 success сохраняет exact S37 text и sidecars. Provider/live quality proof, runtime/UI и
 product authority всё ещё отсутствуют.
 
+S39 замыкает response-generation vertical от exact S34 upstream package до verified
+response одной straight-line композицией `S36 → S37 → S38`. Он не добавляет новую policy,
+validation или error semantics: materializer, Composer и Verifier вызываются по одному разу,
+а любая typed failure без catch/fallback прекращает downstream. Verified text и sidecars
+возвращаются без пересборки. Это structural offline milestone для handoff, а не готовый бот:
+TurnFrame/A9 authority, provider/live quality, routes/UI/session и product wiring остаются
+отдельными governed этапами.
+
 ---
 
 ## Порядок работ — strangler, две кучи

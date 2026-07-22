@@ -60,6 +60,7 @@ from evals.v5.fullcontext_response_eval_contract import (
     DEFAULT_LIVE_ARTIFACT_PATHS,
     FINAL_ACCEPTANCE_GATES,
     FINAL_GATES_STATUS,
+    FROZEN_MATRIX_HASH,
     LIVE_RAW_ARTIFACT_PATH,
     LIVE_RESULT_ARTIFACT_PATH,
     MALFORMED_ERROR_CODES,
@@ -485,11 +486,100 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.live:
-        print(
-            "LIVE_NOT_CONFIGURED: S47 prepared harness only; live delegate not implemented",
-            file=sys.stderr,
+        raw_path = Path(args.raw_output)
+        result_path = Path(args.output)
+        artifact_paths = tuple(dict.fromkeys((*DEFAULT_LIVE_ARTIFACT_PATHS, raw_path, result_path)))
+
+        def _live_backend_factory(
+            case: dict[str, Any],
+        ) -> tuple[
+            FullContextResponseEvalRecordingComposerBackend
+            | object,
+            FullContextResponseEvalRecordingSemanticBackend
+            | object,
+        ]:
+            from evals.v5.fullcontext_response_eval_live_backend import (
+                FullContextResponseEvalLiveComposerBackend,
+                FullContextResponseEvalLiveSemanticBackend,
+                fullcontext_response_eval_live_model,
+            )
+
+            if case["expected_outcome"] == "terminal_boundary_uncertain":
+                return (
+                    FullContextResponseEvalRecordingComposerBackend("unused"),
+                    FullContextResponseEvalRecordingSemanticBackend(),
+                )
+            model = fullcontext_response_eval_live_model()
+            return (
+                FullContextResponseEvalLiveComposerBackend(model=model),
+                FullContextResponseEvalLiveSemanticBackend(model=model),
+            )
+
+        try:
+            assert_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
+            payload = run_harness_with_backend_factory(
+                backend_factory=_live_backend_factory,
+                matrix_path=Path(args.matrix),
+                artifact_paths=artifact_paths,
+            )
+        except (HarnessConfigError, LiveArtifactWriteError) as error:
+            print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+            return 2
+
+        case_results = payload["case_results"]
+        total_llm_calls = sum(
+            row["composer_call_count"] + row["semantic_call_count"] for row in case_results
         )
-        return 3
+        if total_llm_calls > MODEL_RECOMMENDATION["expected_llm_calls_materializable"]:
+            print(
+                f"CONFIG_ERROR: live LLM call budget exceeded "
+                f"count={total_llm_calls} max={MODEL_RECOMMENDATION['expected_llm_calls_materializable']}",
+                file=sys.stderr,
+            )
+            return 2
+
+        summary = payload["summary"]
+        summary["live_run"] = True
+        summary["total_llm_calls"] = total_llm_calls
+        summary["owner_approval"] = {
+            "technical_outcome_match_min": 1.0,
+            "manual_answer_quality_pass_rate_min": 0.85,
+            "critical_violation_max": 0,
+            "composer_model": MODEL_RECOMMENDATION["composer_model"],
+            "semantic_verifier_model": MODEL_RECOMMENDATION["semantic_verifier_model"],
+            "max_llm_calls": MODEL_RECOMMENDATION["expected_llm_calls_materializable"],
+        }
+        payload["summary"] = summary
+
+        raw_artifact = {
+            "measurement_id": MEASUREMENT_ID,
+            "matrix_git_blob_hash": FROZEN_MATRIX_HASH,
+            "total_llm_calls": total_llm_calls,
+            "cases": [
+                {
+                    "index": row["index"],
+                    "case_id": row["case_id"],
+                    "composer_call_count": row["composer_call_count"],
+                    "semantic_call_count": row["semantic_call_count"],
+                    "composer_raw_payload": row["composer_raw_payload"],
+                    "semantic_raw_payload": row["semantic_raw_payload"],
+                }
+                for row in case_results
+            ],
+        }
+        try:
+            write_json_exclusive(raw_path, raw_artifact)
+            write_json_exclusive(result_path, payload)
+        except LiveArtifactWriteError as error:
+            print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+            return 2
+
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        automated = summary["automated_verdict"]["verdict"]
+        final = summary["final_verdict"]["verdict"]
+        print(f"AUTOMATED_VERDICT: {automated}", file=sys.stderr)
+        print(f"FINAL_VERDICT: {final}", file=sys.stderr)
+        return 0 if automated == "AUTOMATED_PASS" else 4
 
     print(
         "LIVE_NOT_CONFIGURED: permitted live run requires explicit delegate backend injection",

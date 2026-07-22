@@ -55,10 +55,10 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S47 correction — manual review verdict semantics** |
+| Последний завершённый checkpoint | **S47 first-live incident audit capture** |
 | Предыдущий checkpoint | **S46 — boundary-enforced FullContext verified response** (`d5a8557`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S47 завершён**; frozen matrix + offline harness для первого live response eval |
+| Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
 | Ближайший рабочий focus без live | **Первый разрешённый live response eval — отдельное governance** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
@@ -353,6 +353,9 @@
   mandatory append-only manual review artifact; global + case-specific rubrics; proposed final
   gates + model recommendation (`pending_owner_approval`); matrix hash update before first live.
   Governance `643be1c`. No live.
+- [x] **S47 first permitted live eval** — owner-approved run; **AUTOMATED_FAIL** (5 semantic
+  rejects); 76-call incident overrun; artifacts run-2 only. Governance `fd23040` incident capture.
+  **Not S47 pass.** No re-run without new owner approval.
 
 ## Какой roadmap актуален
 

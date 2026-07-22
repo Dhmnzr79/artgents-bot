@@ -249,6 +249,18 @@ def test_live_not_configured_adapter_raises() -> None:
         adapter.generate(invocation)
 
 
+def test_s47_has_no_legacy_threshold_pass_api() -> None:
+    import evals.v5.fullcontext_response_eval_contract as contract
+
+    assert not hasattr(contract, "evaluate_threshold_verdict")
+    summary = _clean_automated_summary()
+    automated = evaluate_automated_verdict(summary)
+    assert automated["verdict"] == "AUTOMATED_PASS"
+    final = evaluate_final_verdict(summary, None, matrix_spec=load_frozen_matrix())
+    assert final["verdict"] == "PENDING_MANUAL_REVIEW"
+    assert final["verdict"] != "PASS"
+
+
 def test_automated_pass_without_manual_is_pending_not_pass() -> None:
     summary = _clean_automated_summary()
     automated = evaluate_automated_verdict(summary)

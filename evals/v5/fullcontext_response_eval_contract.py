@@ -621,13 +621,6 @@ def evaluate_automated_verdict(summary: dict[str, Any]) -> dict[str, Any]:
     return {"verdict": verdict, "gates": gates}
 
 
-def evaluate_threshold_verdict(summary: dict[str, Any]) -> dict[str, Any]:
-    """Deprecated alias: returns automated verdict under legacy key shape."""
-    automated = evaluate_automated_verdict(summary)
-    legacy_verdict = "PASS" if automated["verdict"] == "AUTOMATED_PASS" else "FAIL"
-    return {"verdict": legacy_verdict, "gates": automated["gates"]}
-
-
 def _manual_case_passes(review_case: dict[str, Any], matrix_case: dict[str, Any]) -> bool:
     if review_case.get("critical_violation"):
         return False

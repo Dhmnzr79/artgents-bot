@@ -420,6 +420,14 @@ delegates to S41 `run_target_offline_turn_frame_bound_response` once. Return uni
 existing types only. **No new inference, package builder, or authority change.** Governance
 `9ad4614`. No live/LLM.
 
+S47 prepares the first permitted live eval of the **full response chain** (offline/unwired only
+in S47). Frozen matrix `evals/v5/demo/fullcontext_response_eval_matrix.json` (20 cases) carries
+explicit `TurnFrame`, `TargetMedicalBoundaryResult`, policy envelope, semantic rubric, and
+audit refs — **not** verbatim expected prose. Harness `run_fullcontext_response_eval.py` calls
+S46 with injected recording Composer/Verifier backends; terminal uncertain → 0 provider calls;
+materializable → Composer×1 + Verifier×1. `--live` blocked until separate governance. S43
+boundary eval unchanged. Governance `5c96d54`. No live.
+
 ---
 
 ## Порядок работ — strangler, две кучи

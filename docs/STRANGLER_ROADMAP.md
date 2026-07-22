@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S46 — boundary-enforced FullContext verified response** |
-| Предыдущий checkpoint | **S45 — FullContext service-optional verified response** (`ab2fc69`) |
+| Последний завершённый checkpoint | **S47 — FullContext response quality eval preparation** |
+| Предыдущий checkpoint | **S46 — boundary-enforced FullContext verified response** (`d5a8557`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S46 завершён**; offline chain TurnFrame+boundary→verified structurally closed |
-| Ближайший рабочий focus без live | **Live quality proof / message→TurnFrame runtime — отдельное governance** |
+| Отдельная S-series без live | **S47 завершён**; frozen matrix + offline harness для первого live response eval |
+| Ближайший рабочий focus без live | **Первый разрешённый live response eval — отдельное governance** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -345,6 +345,10 @@
   `run_target_offline_boundary_enforced_fullcontext_response`: готовый `TurnFrame` +
   `TargetMedicalBoundaryResult` → S42 enforce×1 → uncertain terminal | S41/S45×1 → verified |
   terminal. Без detector/live/новых слоёв. Governance `9ad4614`. No live.
+- [x] **S47 — FullContext response quality eval preparation** — frozen 20-case matrix +
+  provider-neutral offline harness (`run_fullcontext_response_eval.py`) для будущего одного
+  permitted live прогона S46→Composer→Verifier; semantic rubric без verbatim prose;
+  `--dry-run` validate; default/`--live` → `LIVE_NOT_CONFIGURED`. Governance `5c96d54`. No live.
 
 ## Какой roadmap актуален
 

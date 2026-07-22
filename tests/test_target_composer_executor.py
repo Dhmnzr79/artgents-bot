@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import re
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import (
     TARGET_COMPOSER_SYSTEM_POLICY,
@@ -42,6 +44,26 @@ class FailingBackend:
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.calls += 1
         raise RuntimeError("provider detail must not become fallback text")
+
+
+def _cached_context(
+    text: str = (
+        "---BEGIN DOC:service_one.md---\n"
+        "---\n"
+        "id: service_one\n"
+        "title: Service\n"
+        "---\n\n"
+        "# Service\n"
+        "Corpus background.\n"
+        "---END DOC:service_one.md---"
+    ),
+) -> TargetCachedFullContext:
+    return TargetCachedFullContext(
+        corpus_text=text,
+        document_count=1,
+        document_paths=("service_one.md",),
+        sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    )
 
 
 def _spec(**updates: object) -> TargetResponseSpec:
@@ -120,6 +142,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
     ]
     assert [field.name for field in fields(TargetComposerInvocation)] == [
         "system_policy",
+        "cached_full_context",
         "response_directives_json",
         "primary_evidence_json",
         "user_message",
@@ -135,11 +158,13 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "request",
         "backend",
         "tone",
+        "cached_full_context",
     ]
     source = Path("core/target_composer_executor.py").read_text(encoding="utf-8")
     assert set(re.findall(r'"(composer_executor_[a-z_]+)"', source)) == {
         "composer_executor_request_invalid",
         "composer_executor_tone_invalid",
+        "composer_executor_full_context_invalid",
         "composer_executor_backend_invalid",
         "composer_executor_backend_failed",
         "composer_executor_output_invalid",
@@ -156,7 +181,9 @@ def test_executor_serializes_one_exact_immutable_invocation_and_keeps_sidecars_o
     request = _request()
     backend = RecordingBackend()
 
-    result = execute_target_composer(request, backend, tone=_tone())
+    result = execute_target_composer(
+        request, backend, tone=_tone(), cached_full_context=_cached_context()
+    )
 
     assert result.text == "Готовый ответ."
     assert result.spec is request.spec
@@ -166,6 +193,7 @@ def test_executor_serializes_one_exact_immutable_invocation_and_keeps_sidecars_o
     assert len(backend.invocations) == 1
     invocation = backend.invocations[0]
     assert invocation.system_policy is TARGET_COMPOSER_SYSTEM_POLICY
+    assert invocation.cached_full_context == _cached_context().corpus_text
     assert invocation.user_message is request.user_message
     assert invocation.response_directives_json == (
         '{"response_mode":"answer","tone_key":"commercial_warm",'
@@ -183,7 +211,13 @@ def test_executor_serializes_one_exact_immutable_invocation_and_keeps_sidecars_o
         "must_preserve_exact",
     ]
     assert "ё" in invocation.primary_evidence_json
-    combined = invocation.response_directives_json + invocation.primary_evidence_json
+    assert "Подробнее" not in invocation.cached_full_context
+    assert '"plan"' not in invocation.cached_full_context
+    combined = (
+        invocation.response_directives_json
+        + invocation.primary_evidence_json
+        + invocation.cached_full_context
+    )
     assert "Подробнее" not in combined
     assert '"plan"' not in combined
     assert "selected_followups" not in combined
@@ -240,7 +274,9 @@ def test_request_validation_fails_closed_with_stable_markers(
     marker: str,
 ) -> None:
     error = _error(
-        lambda: execute_target_composer(candidate, RecordingBackend(), tone=_tone())
+        lambda: execute_target_composer(
+            candidate, RecordingBackend(), tone=_tone(), cached_full_context=_cached_context()
+        )
     )
     assert (error.code, error.value, str(error)) == (
         "composer_executor_request_invalid",
@@ -258,7 +294,10 @@ def test_nested_block_invariants_are_checked_before_backend() -> None:
     backend = RecordingBackend()
     error = _error(
         lambda: execute_target_composer(
-            replace(valid, evidence_blocks=invalid_blocks), backend, tone=_tone()
+            replace(valid, evidence_blocks=invalid_blocks),
+            backend,
+            tone=_tone(),
+            cached_full_context=_cached_context(),
         )
     )
     assert (error.code, error.value, backend.invocations) == (
@@ -272,7 +311,12 @@ def test_hostile_spec_field_fails_with_typed_request_error_before_backend() -> N
     spec = _spec().model_copy(update={"followup_source": []})
     backend = RecordingBackend()
     error = _error(
-        lambda: execute_target_composer(_request(spec=spec), backend, tone=_tone())
+        lambda: execute_target_composer(
+            _request(spec=spec),
+            backend,
+            tone=_tone(),
+            cached_full_context=_cached_context(),
+        )
     )
     assert (error.code, error.value, backend.invocations) == (
         "composer_executor_request_invalid",
@@ -296,6 +340,7 @@ def test_duplicate_ref_precedes_topic_scope_error() -> None:
             ),
             backend,
             tone=_tone(),
+            cached_full_context=_cached_context(),
         )
     )
     assert (error.code, error.value, backend.invocations) == (
@@ -316,14 +361,24 @@ def test_duplicate_ref_precedes_topic_scope_error() -> None:
 )
 def test_tone_validation_has_stable_markers(tone: object, marker: str) -> None:
     error = _error(
-        lambda: execute_target_composer(_request(), RecordingBackend(), tone=tone)  # type: ignore[arg-type]
+        lambda: execute_target_composer(
+            _request(),
+            RecordingBackend(),
+            tone=tone,  # type: ignore[arg-type]
+            cached_full_context=_cached_context(),
+        )
     )
     assert (error.code, error.value) == ("composer_executor_tone_invalid", marker)
 
 
 def test_backend_validation_failure_and_output_failure_have_no_retry_or_fallback() -> None:
     invalid = _error(
-        lambda: execute_target_composer(_request(), object(), tone=_tone())  # type: ignore[arg-type]
+        lambda: execute_target_composer(
+            _request(),
+            object(),
+            tone=_tone(),  # type: ignore[arg-type]
+            cached_full_context=_cached_context(),
+        )
     )
     assert (invalid.code, invalid.value) == (
         "composer_executor_backend_invalid",
@@ -331,7 +386,11 @@ def test_backend_validation_failure_and_output_failure_have_no_retry_or_fallback
     )
 
     failing = FailingBackend()
-    failed = _error(lambda: execute_target_composer(_request(), failing, tone=_tone()))
+    failed = _error(
+        lambda: execute_target_composer(
+            _request(), failing, tone=_tone(), cached_full_context=_cached_context()
+        )
+    )
     assert (failed.code, failed.value, failing.calls) == (
         "composer_executor_backend_failed",
         "RuntimeError",
@@ -341,7 +400,11 @@ def test_backend_validation_failure_and_output_failure_have_no_retry_or_fallback
 
     for output in (None, 1, " \n "):
         backend = RecordingBackend(output)
-        error = _error(lambda: execute_target_composer(_request(), backend, tone=_tone()))
+        error = _error(
+            lambda: execute_target_composer(
+                _request(), backend, tone=_tone(), cached_full_context=_cached_context()
+            )
+        )
         assert error.code == "composer_executor_output_invalid"
         assert error.value is output
         assert len(backend.invocations) == 1
@@ -363,12 +426,40 @@ def test_medical_handoff_reaches_policy_but_remains_unverified() -> None:
         selected_cta_key=None,
     )
     backend = RecordingBackend("Общая информация и рекомендация обратиться к врачу.")
-    result = execute_target_composer(request, backend, tone=_tone())
+    result = execute_target_composer(
+        request,
+        backend,
+        tone=_tone(),
+        cached_full_context=_cached_context(),
+    )
     assert json.loads(backend.invocations[0].response_directives_json)[
         "response_mode"
     ] == "medical_handoff"
     assert "Never diagnose" in backend.invocations[0].system_policy
     assert result.verification_status == "unverified"
+
+
+def test_full_context_validation_fails_closed_before_backend() -> None:
+    broken = TargetCachedFullContext(
+        corpus_text="---BEGIN DOC:a.md---\nbody\n---END DOC:a.md---",
+        document_count=1,
+        document_paths=("a.md",),
+        sha256="deadbeef",
+    )
+    backend = RecordingBackend()
+    error = _error(
+        lambda: execute_target_composer(
+            _request(),
+            backend,
+            tone=_tone(),
+            cached_full_context=broken,
+        )
+    )
+    assert (error.code, error.value, backend.invocations) == (
+        "composer_executor_full_context_invalid",
+        "full_context_sha256",
+        [],
+    )
 
 
 def test_import_firewall_has_no_provider_legacy_runtime_or_live_hooks() -> None:
@@ -381,7 +472,6 @@ def test_import_firewall_has_no_provider_legacy_runtime_or_live_hooks() -> None:
         "retriev",
         "router",
         "session",
-        "cache",
         "requests",
         "httpx",
     )
@@ -389,5 +479,7 @@ def test_import_firewall_has_no_provider_legacy_runtime_or_live_hooks() -> None:
         line for line in source.splitlines() if line.startswith(("import ", "from "))
     ).lower()
     assert all(token not in import_lines for token in forbidden)
+    assert " import cache" not in import_lines
+    assert " from cache" not in import_lines
     assert "pytest.skip" not in source
     assert "xfail" not in source

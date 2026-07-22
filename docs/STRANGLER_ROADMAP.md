@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S43 first live eval audit capture** |
-| Предыдущий checkpoint | **S43 correction — pre-live freeze & harness hardening** (`33e2643`) |
+| Последний завершённый checkpoint | **S44 — cached FullContext Composer input** |
+| Предыдущий checkpoint | **S43 first live eval audit capture** (`f14be0a`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S43 — medical boundary live eval prep завершён** |
-| Ближайший рабочий focus без live | **Live medical boundary eval — только после отдельного разрешения владельца и утверждения thresholds** |
+| Отдельная S-series без live | **S44 завершён**; следующий offline focus — service-optional FullContext materialization |
+| Ближайший рабочий focus без live | **Service-optional FullContext materialization + missing-base + medical grounding verification** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -327,6 +327,13 @@
   `mb_border_01`. Eval-only `--live` wiring committed; audit manifest +
   `medical_boundary_eval_live_audit_manifest.json`; offline CLI tests. **DO_NOT_RERUN**.
   Governance `fe5d6ed`. A9/runtime/UI/session/product authority untouched.
+- [x] **S44 — deterministic cached FullContext Composer input** — bootstrap builder
+  `build_target_cached_full_context(md_root)` создаёт immutable `TargetCachedFullContext`
+  (все 54 demo `.md` включая doctors, stable order, explicit boundaries, SHA-256); тот же
+  prebuilt объект inject/reuse через S37/S39/S40/S41 без per-turn rebuild. Composer invocation
+  разделяет `cached_full_context` и scoped `primary_evidence_json`. Provider prompt caching —
+  **не** реализован (отдельный live gate). **S34/S41 service_id gate не менялся.** Следующий
+  offline focus — service-optional FullContext materialization. Governance `3ce09f8`. No live.
 
 ## Какой roadmap актуален
 

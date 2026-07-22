@@ -26,6 +26,7 @@ from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
 from core.service_consultation_source import build_service_consultation_values
+from core.target_cached_full_context import build_target_cached_full_context
 from core.target_composer_executor import (
     TargetComposerInvocation,
     TargetComposerTone,
@@ -42,6 +43,7 @@ from core.turn_frame_from_raw import build_turn_frame_from_raw
 DEMO_ROOT = Path("clients/demo")
 TARGET_ROOT = DEMO_ROOT / "target_response"
 MD_ROOT = DEMO_ROOT / "md"
+DEMO_FULL_CONTEXT = build_target_cached_full_context(MD_ROOT)
 VALID_TEXT = (
     "All-on-4 в клинике стоит от 318 000 рублей за одну челюсть. "
     "Можно пройти бесплатную консультацию: врач посмотрит снимки и поможет "
@@ -143,6 +145,7 @@ def _pipeline_inputs() -> dict[str, object]:
         "semantic_context": "service",
         "today": date(2026, 7, 22),
         "md_root": MD_ROOT,
+        "cached_full_context": DEMO_FULL_CONTEXT,
         "include_initial_block": False,
         "include_consultation_close": True,
         "include_cta": True,
@@ -178,6 +181,7 @@ def test_real_materialize_path_crosses_dispatch_and_s40_once() -> None:
     assert result.dispatch.policy_request.response_mode == "answer"
     assert result.dispatch.policy_request.requested_components == ("content", "price")
     assert len(composer.invocations) == 1
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
     assert len(semantic.invocations) == 1
     assert result.verified.verification_status == "verified"
     assert {path: _sha256(path) for path in paths} == before
@@ -234,6 +238,54 @@ def test_materializable_medical_handoff_crosses_s40_once() -> None:
     assert result.dispatch.policy_request.requested_components == ("content",)
     assert len(composer.invocations) == 1
     assert len(semantic.invocations) == 1
+
+
+class TurnAwareComposerBackend:
+    def __init__(self, texts: tuple[str, ...]) -> None:
+        self.texts = texts
+        self.invocations: list[TargetComposerInvocation] = []
+
+    def generate(self, invocation: TargetComposerInvocation, /) -> object:
+        self.invocations.append(invocation)
+        return self.texts[len(self.invocations) - 1]
+
+
+def test_prebuilt_full_context_is_identical_across_two_materialize_turns() -> None:
+    composer = TurnAwareComposerBackend((VALID_TEXT, DOCTORS_TEXT))
+    semantic = RecordingSemanticBackend()
+    inputs = _pipeline_inputs()
+    first = run_target_offline_turn_frame_bound_response(
+        _frame(),
+        _envelope(),
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    second = run_target_offline_turn_frame_bound_response(
+        _frame(
+            topic="doctors",
+            topic_confidence=0.95,
+            aspects=["overview"],
+            primary_aspect="overview",
+        ),
+        _envelope(),
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    assert isinstance(first, TargetTurnFrameBoundMaterializeResponse)
+    assert isinstance(second, TargetTurnFrameBoundMaterializeResponse)
+    assert len(composer.invocations) == 2
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[1].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert (
+        composer.invocations[0].cached_full_context
+        == composer.invocations[1].cached_full_context
+    )
+    assert (
+        composer.invocations[0].primary_evidence_json
+        != composer.invocations[1].primary_evidence_json
+    )
 
 
 def test_real_incompatible_topic_raises_before_s40() -> None:

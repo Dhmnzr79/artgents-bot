@@ -10,6 +10,7 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
+from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from core.target_composer_executor import (
     TargetComposerBackend,
@@ -40,6 +41,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     semantic_context: str,
     today: date,
     md_root: Path,
+    cached_full_context: TargetCachedFullContext,
     include_initial_block: bool,
     include_consultation_close: bool,
     include_cta: bool,
@@ -81,6 +83,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
         consultation_values,
         user_message=user_message,
         md_root=md_root,
+        cached_full_context=cached_full_context,
         tone=tone,
         composer_backend=composer_backend,
         semantic_backend=semantic_backend,

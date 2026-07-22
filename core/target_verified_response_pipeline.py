@@ -8,6 +8,7 @@ from pathlib import Path
 from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.service_consultation import ServiceConsultationValue
+from contracts.target_cached_full_context import TargetCachedFullContext
 from core.target_composer_executor import (
     TargetComposerBackend,
     TargetComposerTone,
@@ -32,6 +33,7 @@ def run_target_offline_verified_response_pipeline(
     *,
     user_message: str,
     md_root: Path,
+    cached_full_context: TargetCachedFullContext,
     tone: TargetComposerTone,
     composer_backend: TargetComposerBackend,
     semantic_backend: TargetSemanticVerifierBackend,
@@ -50,6 +52,7 @@ def run_target_offline_verified_response_pipeline(
         request,
         composer_backend,
         tone=tone,
+        cached_full_context=cached_full_context,
     )
     return verify_target_composed_response(
         request,

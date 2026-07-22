@@ -6,6 +6,9 @@ import json
 from dataclasses import dataclass
 from typing import Literal, NoReturn, Protocol
 
+import hashlib
+
+from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
@@ -38,6 +41,7 @@ class TargetComposerTone:
 @dataclass(frozen=True, slots=True)
 class TargetComposerInvocation:
     system_policy: str
+    cached_full_context: str
     response_directives_json: str
     primary_evidence_json: str
     user_message: str
@@ -265,6 +269,25 @@ def _validate_request(request: object) -> TargetComposerRequest:
     return validated
 
 
+def _validate_cached_full_context(value: object) -> TargetCachedFullContext:
+    if type(value) is not TargetCachedFullContext:
+        _error("composer_executor_full_context_invalid", "full_context_type")
+    if not _canonical(value.corpus_text):
+        _error("composer_executor_full_context_invalid", "full_context_empty")
+    if value.document_count <= 0:
+        _error("composer_executor_full_context_invalid", "full_context_document_count")
+    if len(value.document_paths) != value.document_count:
+        _error("composer_executor_full_context_invalid", "full_context_document_paths")
+    if not all(_canonical(path) for path in value.document_paths):
+        _error("composer_executor_full_context_invalid", "full_context_document_paths")
+    if len(value.document_paths) != len(set(value.document_paths)):
+        _error("composer_executor_full_context_invalid", "full_context_document_paths")
+    digest = hashlib.sha256(value.corpus_text.encode("utf-8")).hexdigest()
+    if value.sha256 != digest:
+        _error("composer_executor_full_context_invalid", "full_context_sha256")
+    return value
+
+
 def _validate_tone(tone: object, request: TargetComposerRequest) -> TargetComposerTone:
     if type(tone) is not TargetComposerTone:
         _error("composer_executor_tone_invalid", "tone_type")
@@ -284,6 +307,7 @@ def _compact_json(value: object) -> str:
 def _invocation(
     request: TargetComposerRequest,
     tone: TargetComposerTone,
+    cached_full_context: TargetCachedFullContext,
 ) -> TargetComposerInvocation:
     directives = {
         "response_mode": request.spec.response_mode,
@@ -306,6 +330,7 @@ def _invocation(
     ]
     return TargetComposerInvocation(
         system_policy=TARGET_COMPOSER_SYSTEM_POLICY,
+        cached_full_context=cached_full_context.corpus_text,
         response_directives_json=_compact_json(directives),
         primary_evidence_json=_compact_json(evidence),
         user_message=request.user_message,
@@ -317,18 +342,20 @@ def execute_target_composer(
     backend: TargetComposerBackend,
     *,
     tone: TargetComposerTone,
+    cached_full_context: TargetCachedFullContext,
 ) -> TargetUnverifiedComposedResponse:
     """Call one injected backend without retries, fallback, or semantic approval."""
 
     validated_request = _validate_request(request)
     validated_tone = _validate_tone(tone, validated_request)
+    validated_full_context = _validate_cached_full_context(cached_full_context)
     try:
         generate = getattr(backend, "generate")
     except Exception:
         _error("composer_executor_backend_invalid", "backend_generate")
     if not callable(generate):
         _error("composer_executor_backend_invalid", "backend_generate")
-    invocation = _invocation(validated_request, validated_tone)
+    invocation = _invocation(validated_request, validated_tone, validated_full_context)
     try:
         output = generate(invocation)
     except Exception as exc:

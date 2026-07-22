@@ -21,6 +21,7 @@ from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
 from core.service_consultation_source import build_service_consultation_values
+from core.target_cached_full_context import build_target_cached_full_context
 from core.target_composer_executor import (
     TargetComposerInvocation,
     TargetComposerTone,
@@ -36,6 +37,7 @@ from core.target_spec_offline_response_package import (
 DEMO_ROOT = Path("clients/demo")
 TARGET_ROOT = DEMO_ROOT / "target_response"
 MD_ROOT = DEMO_ROOT / "md"
+DEMO_FULL_CONTEXT = build_target_cached_full_context(MD_ROOT)
 
 
 class RecordingBackend:
@@ -126,10 +128,12 @@ def test_real_demo_all_on_4_reaches_one_backend_without_ui_or_client_writes() ->
             key="commercial_warm",
             instruction="Отвечай доброжелательно и без давления.",
         ),
+        cached_full_context=DEMO_FULL_CONTEXT,
     )
 
     assert len(backend.invocations) == 1
     invocation = backend.invocations[0]
+    assert invocation.cached_full_context == DEMO_FULL_CONTEXT.corpus_text
     evidence = json.loads(invocation.primary_evidence_json)
     assert [item["kind"] for item in evidence] == [
         "content",

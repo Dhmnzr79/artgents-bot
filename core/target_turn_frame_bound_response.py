@@ -10,6 +10,7 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
+from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.turn_frame import TurnFrame
 from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameBoundMaterializeResponse,
@@ -40,6 +41,7 @@ def run_target_offline_turn_frame_bound_response(
     semantic_context: str,
     today: date,
     md_root: Path,
+    cached_full_context: TargetCachedFullContext,
     include_initial_block: bool,
     include_consultation_close: bool,
     include_cta: bool,
@@ -71,6 +73,7 @@ def run_target_offline_turn_frame_bound_response(
             semantic_context=semantic_context,
             today=today,
             md_root=md_root,
+            cached_full_context=cached_full_context,
             include_initial_block=include_initial_block,
             include_consultation_close=include_consultation_close,
             include_cta=include_cta,

@@ -22,6 +22,7 @@ from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
 from core.service_consultation_source import build_service_consultation_values
+from core.target_cached_full_context import build_target_cached_full_context
 from core.target_composer_executor import (
     TargetComposerExecutorError,
     TargetComposerInvocation,
@@ -43,6 +44,7 @@ from core.target_spec_offline_response_package import TargetSpecOfflineResponseP
 DEMO_ROOT = Path("clients/demo")
 TARGET_ROOT = DEMO_ROOT / "target_response"
 MD_ROOT = DEMO_ROOT / "md"
+DEMO_FULL_CONTEXT = build_target_cached_full_context(MD_ROOT)
 VALID_TEXT = (
     "All-on-4 в клинике стоит от 318 000 рублей за одну челюсть. "
     "Кузнецов Дмитрий Андреевич — врач со стажем 19 лет. "
@@ -129,6 +131,7 @@ def _real_inputs() -> dict[str, object]:
         "semantic_context": "service",
         "today": date(2026, 7, 22),
         "md_root": MD_ROOT,
+        "cached_full_context": DEMO_FULL_CONTEXT,
         "include_initial_block": True,
         "include_consultation_close": True,
         "include_cta": True,
@@ -164,6 +167,8 @@ def test_real_demo_pipeline_crosses_s33_s34_s39_once_and_preserves_sidecars() ->
     assert composer.invocations[0].primary_evidence_json == (
         semantic.invocations[0].primary_evidence_json
     )
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].primary_evidence_json
     assert composer.invocations[0].user_message == inputs["user_message"]
     assert semantic.invocations[0].candidate_text is composer.text
     assert result.text is composer.text

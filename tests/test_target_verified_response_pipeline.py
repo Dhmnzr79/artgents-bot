@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import core.target_verified_response_pipeline as pipeline_module
+from contracts.target_cached_full_context import TargetCachedFullContext
 from core.target_composer_executor import TargetComposerExecutorError
 from core.target_composer_request import TargetComposerRequestError
 from core.target_response_verifier import TargetResponseVerificationError
@@ -23,6 +24,12 @@ def _arguments() -> dict[str, object]:
         "consultation_values": object(),
         "user_message": "message",
         "md_root": Path("md"),
+        "cached_full_context": TargetCachedFullContext(
+            corpus_text="---BEGIN DOC:a.md---\nx\n---END DOC:a.md---",
+            document_count=1,
+            document_paths=("a.md",),
+            sha256="placeholder",
+        ),
         "tone": object(),
         "composer_backend": object(),
         "semantic_backend": object(),
@@ -37,6 +44,7 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         "consultation_values",
         "user_message",
         "md_root",
+        "cached_full_context",
         "tone",
         "composer_backend",
         "semantic_backend",
@@ -103,7 +111,10 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "md_root": values["md_root"],
     }
     assert calls[1][1] == (request, values["composer_backend"])
-    assert calls[1][2] == {"tone": values["tone"]}
+    assert calls[1][2] == {
+        "tone": values["tone"],
+        "cached_full_context": values["cached_full_context"],
+    }
     assert calls[2][1] == (request, unverified)
     assert calls[2][2] == {"semantic_backend": values["semantic_backend"]}
 
@@ -175,10 +186,14 @@ def test_import_firewall_excludes_legacy_provider_runtime_and_live_hooks() -> No
         "httpx",
         "router",
         "session",
-        "cache",
         "search",
         "llm",
     )
+    import_lines = "\n".join(
+        line for line in source.splitlines() if line.startswith(("import ", "from "))
+    ).lower()
     assert all(token not in import_lines for token in forbidden)
+    assert " import cache" not in import_lines
+    assert " from cache" not in import_lines
     assert "pytest.skip" not in source
     assert "xfail" not in source

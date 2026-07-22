@@ -387,6 +387,19 @@ model `qwen3.6-flash` provenance from run log only; **LIVE_ALREADY_RUN_ONCE / DO
 **Scope:** boundary classification only — not medical answer content, Verifier, or FullContext
 integration.
 
+S44 adds deterministic cached FullContext as the **primary knowledge input** for target
+Composer (offline/unwired). `build_target_cached_full_context(md_root)` runs once as bootstrap
+and returns immutable `TargetCachedFullContext`: all valid `.md` under explicit client
+`md_root` (including doctors MD), stable relative-path order, explicit document boundaries,
+SHA-256 of `corpus_text`. The same prebuilt object is injected through S39/S40/S41 into
+S37; pipelines **do not** rescan `md_root` or rebuild corpus per turn. `TargetComposerInvocation`
+separately carries `cached_full_context`, turn-specific directives, and scoped
+`primary_evidence_json`. Provider prompt caching is **not** implemented — only a stable
+corpus/prefix candidate for a future live gate. **S34/S41 `service_id` gate unchanged:**
+after S44 Composer sees the full corpus, but service_id-free general/medical answer is still
+not end-to-end. Next offline focus: one vertical slice for service-optional FullContext
+materialization, missing-base response, and medical grounding verification.
+
 ---
 
 ## Порядок работ — strangler, две кучи

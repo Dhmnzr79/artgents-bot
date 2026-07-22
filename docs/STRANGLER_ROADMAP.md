@@ -253,8 +253,8 @@
   `patient_scope`; materialize calls public S40 once, while clarify/defer/non-materializable
   medical handoff stop before S34/S40 with payload-free `TargetResponseSpec`. Owner mapping:
   `payment → price`, `stages → content` always; valid confident topic must match envelope
-  scope. Governance `65c87bd`; independent completion review `✅`: S41 target/demo `22 passed`,
-  S40/S33 neighbors `31 passed`, всего `53 passed`, skip/xfail нет. Message→TurnFrame,
+  scope. Governance `65c87bd`; independent completion review `✅`: S41 target/demo `17 passed`,
+  S40/S33 neighbors `36 passed`, всего `53 passed`, skip/xfail нет. Message→TurnFrame,
   runtime/UI/session, live/LLM and product authority remain separate gates.
 
 ## Какой roadmap актуален

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 import core.target_medical_boundary as boundary_module
 from contracts.target_medical_boundary import TargetMedicalBoundaryResult
@@ -139,6 +140,94 @@ def test_backend_dict_payload_is_supported() -> None:
     )
     assert result.decision == "none"
     assert result.reason_code == "boundary_none_confident"
+
+
+def test_backend_payload_with_extra_field_becomes_malformed_not_none() -> None:
+    result = execute_target_medical_boundary_classification(
+        "Сколько стоит?",
+        backend=RecordingBackend(
+            {"decision": "none", "confidence": 0.9, "label": "extra"},
+        ),
+    )
+    assert result.decision == "uncertain"
+    assert result.reason_code == "boundary_uncertain_malformed_output"
+
+
+class ExplodingPayload:
+    decision = "none"
+    confidence = 0.9
+
+    def __getitem__(self, key: str) -> object:
+        raise RuntimeError("payload_read_failed")
+
+
+def test_payload_read_exception_becomes_uncertain_backend_failure() -> None:
+    result = execute_target_medical_boundary_classification(
+        "Сколько стоит?",
+        backend=RecordingBackend(ExplodingPayload()),
+    )
+    assert result.decision == "uncertain"
+    assert result.reason_code == "boundary_uncertain_backend_failure"
+
+
+def test_boolean_confidence_floor_is_rejected_before_backend() -> None:
+    backend = RecordingBackend(BackendPayload(decision="none", confidence=0.9))
+    with pytest.raises(TargetMedicalBoundaryError) as caught:
+        execute_target_medical_boundary_classification(
+            "Сколько стоит?",
+            backend=backend,
+            min_confidence_none=True,  # type: ignore[arg-type]
+        )
+    assert caught.value.code == "medical_boundary_confidence_floor_invalid"
+    assert backend.invocations == []
+
+
+def test_inconsistent_none_reason_rejected_by_result_contract() -> None:
+    with pytest.raises(ValidationError):
+        TargetMedicalBoundaryResult.model_validate(
+            {
+                "decision": "none",
+                "confidence": 0.9,
+                "reason_code": "boundary_medical_handoff_confident",
+                "source": "backend",
+            }
+        )
+
+
+def test_inconsistent_none_source_rejected_by_result_contract() -> None:
+    with pytest.raises(ValidationError):
+        TargetMedicalBoundaryResult.model_validate(
+            {
+                "decision": "none",
+                "confidence": 0.9,
+                "reason_code": "boundary_none_confident",
+                "source": "fail_closed",
+            }
+        )
+
+
+def test_aggregate_boundary_uncertain_rejected_in_detector_result() -> None:
+    with pytest.raises(ValidationError):
+        TargetMedicalBoundaryResult.model_validate(
+            {
+                "decision": "uncertain",
+                "confidence": 0.0,
+                "reason_code": "boundary_uncertain",
+                "source": "fail_closed",
+            }
+        )
+
+
+def test_uncertain_requires_granular_reason_and_fail_closed_source() -> None:
+    with pytest.raises(ValidationError):
+        TargetMedicalBoundaryResult.model_validate(
+            {
+                "decision": "uncertain",
+                "confidence": 0.0,
+                "reason_code": "boundary_none_confident",
+                "source": "fail_closed",
+            }
+        )
 
 
 class ConflictPayload:

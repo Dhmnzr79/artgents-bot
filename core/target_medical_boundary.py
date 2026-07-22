@@ -7,10 +7,8 @@ from typing import Literal, NoReturn, Protocol
 
 from contracts.target_medical_boundary import (
     TargetMedicalBoundaryBackendLabel,
-    TargetMedicalBoundaryDecision,
-    TargetMedicalBoundaryReasonCode,
     TargetMedicalBoundaryResult,
-    TargetMedicalBoundarySource,
+    TargetMedicalBoundaryResultReasonCode,
 )
 
 TARGET_MEDICAL_BOUNDARY_SYSTEM_POLICY = """1. Classify whether the user message requires a personal medical boundary.
@@ -19,6 +17,8 @@ TARGET_MEDICAL_BOUNDARY_SYSTEM_POLICY = """1. Classify whether the user message 
 4. medical_handoff — personal medical evaluation, treatment choice, personal eligibility, current symptoms, complications, or similar medical-boundary cases.
 5. Return structured output with decision and confidence from 0.0 to 1.0 only.
 6. Do not include diagnosis, free-text medical reasoning, or user medical details in the output."""
+
+_BACKEND_FIELD_NAMES = frozenset({"decision", "confidence"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,29 +48,34 @@ def _valid_user_message(user_message: str) -> bool:
 
 
 def _valid_confidence_floor(value: float) -> bool:
+    if isinstance(value, bool):
+        return False
     return isinstance(value, (int, float)) and 0.0 <= float(value) <= 1.0
 
 
-def _mapping_get(payload: object, field_name: str) -> object | None:
+def _read_payload_field(payload: object, field_name: str) -> object:
     if isinstance(payload, dict):
-        return payload.get(field_name)
+        return payload[field_name]
     getter = getattr(payload, "__getitem__", None)
-    if getter is None:
-        return None
-    try:
+    if getter is not None:
         return getter(field_name)
-    except (KeyError, TypeError, IndexError):
-        return None
+    if hasattr(payload, field_name):
+        return getattr(payload, field_name)
+    raise KeyError(field_name)
 
 
-def _read_field(payload: object, field_name: str) -> object | None | Literal["conflict"]:
-    mapping_value = _mapping_get(payload, field_name)
-    attr_value = getattr(payload, field_name, None) if hasattr(payload, field_name) else None
-    if mapping_value is not None and attr_value is not None and mapping_value != attr_value:
-        return "conflict"
-    if mapping_value is not None:
-        return mapping_value
-    return attr_value
+def _payload_field_names(payload: object) -> frozenset[str] | None:
+    if isinstance(payload, dict):
+        return frozenset(payload.keys())
+    dataclass_fields = getattr(payload, "__dataclass_fields__", None)
+    if isinstance(dataclass_fields, dict):
+        return frozenset(dataclass_fields.keys())
+    payload_dict = getattr(payload, "__dict__", None)
+    if isinstance(payload_dict, dict) and payload_dict:
+        return frozenset(payload_dict.keys())
+    if all(hasattr(payload, field_name) for field_name in _BACKEND_FIELD_NAMES):
+        return _BACKEND_FIELD_NAMES
+    return None
 
 
 def _coerce_confidence(value: object) -> float | None:
@@ -96,7 +101,7 @@ def _coerce_backend_label(value: object) -> TargetMedicalBoundaryBackendLabel | 
 
 def _uncertain_result(
     *,
-    reason_code: TargetMedicalBoundaryReasonCode,
+    reason_code: TargetMedicalBoundaryResultReasonCode,
 ) -> TargetMedicalBoundaryResult:
     return TargetMedicalBoundaryResult(
         decision="uncertain",
@@ -106,18 +111,37 @@ def _uncertain_result(
     )
 
 
-def _validate_backend_payload(payload: object) -> tuple[TargetMedicalBoundaryBackendLabel, float] | TargetMedicalBoundaryReasonCode:
+def _validate_backend_payload(payload: object) -> tuple[TargetMedicalBoundaryBackendLabel, float] | TargetMedicalBoundaryResultReasonCode:
     if payload is None:
         return "boundary_uncertain_malformed_output"
 
-    decision_raw = _read_field(payload, "decision")
-    confidence_raw = _read_field(payload, "confidence")
+    field_names = _payload_field_names(payload)
+    if field_names != _BACKEND_FIELD_NAMES:
+        return "boundary_uncertain_malformed_output"
 
-    if decision_raw == "conflict" or confidence_raw == "conflict":
+    try:
+        decision_raw = _read_payload_field(payload, "decision")
+        confidence_raw = _read_payload_field(payload, "confidence")
+    except (AttributeError, KeyError, TypeError, IndexError, ValueError, RuntimeError):
+        return "boundary_uncertain_backend_failure"
+
+    mapping_decision = decision_raw
+    attr_decision = getattr(payload, "decision", None) if hasattr(payload, "decision") else None
+    if (
+        mapping_decision is not None
+        and attr_decision is not None
+        and mapping_decision != attr_decision
+    ):
         return "boundary_uncertain_ambiguous"
 
-    if decision_raw is None or confidence_raw is None:
-        return "boundary_uncertain_malformed_output"
+    mapping_confidence = confidence_raw
+    attr_confidence = getattr(payload, "confidence", None) if hasattr(payload, "confidence") else None
+    if (
+        mapping_confidence is not None
+        and attr_confidence is not None
+        and mapping_confidence != attr_confidence
+    ):
+        return "boundary_uncertain_ambiguous"
 
     label = _coerce_backend_label(decision_raw)
     if label == "ambiguous":
@@ -182,9 +206,13 @@ def execute_target_medical_boundary_classification(
     except Exception:
         return _uncertain_result(reason_code="boundary_uncertain_backend_failure")
 
-    validated = _validate_backend_payload(backend_payload)
+    try:
+        validated = _validate_backend_payload(backend_payload)
+    except Exception:
+        return _uncertain_result(reason_code="boundary_uncertain_backend_failure")
+
     if type(validated) is str:
-        return _uncertain_result(reason_code=validated)  # type: ignore[arg-type]
+        return _uncertain_result(reason_code=validated)
 
     label, confidence = validated
     return _normalize_validated_backend(

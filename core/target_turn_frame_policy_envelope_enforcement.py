@@ -38,6 +38,20 @@ def _valid_token_tuple(value: object, *, nonempty: bool) -> bool:
     )
 
 
+def _assert_boundary_result_consistent(boundary: TargetMedicalBoundaryResult) -> None:
+    if boundary.decision == "none":
+        if boundary.reason_code != "boundary_none_confident" or boundary.source != "backend":
+            _fail("medical_boundary_result_inconsistent", boundary.model_dump())
+    elif boundary.decision == "medical_handoff":
+        if (
+            boundary.reason_code != "boundary_medical_handoff_confident"
+            or boundary.source != "backend"
+        ):
+            _fail("medical_boundary_result_inconsistent", boundary.model_dump())
+    elif boundary.source != "fail_closed" or boundary.reason_code == "boundary_uncertain":
+        _fail("medical_boundary_result_inconsistent", boundary.model_dump())
+
+
 def enforce_target_medical_boundary_on_envelope(
     boundary: TargetMedicalBoundaryResult,
     *,
@@ -64,6 +78,8 @@ def enforce_target_medical_boundary_on_envelope(
         _fail("medical_boundary_envelope_forbidden_topics_invalid", forbidden_topics)
     if not _valid_token_tuple(required_fact_ids, nonempty=False):
         _fail("medical_boundary_envelope_required_fact_ids_invalid", required_fact_ids)
+
+    _assert_boundary_result_consistent(boundary)
 
     if boundary.decision == "uncertain":
         return TargetMedicalBoundaryTerminalEnforcement()

@@ -98,6 +98,36 @@ def test_empty_allowed_topics_raises() -> None:
     assert caught.value.code == "medical_boundary_envelope_allowed_topics_invalid"
 
 
+def test_inconsistent_none_result_cannot_build_envelope_with_boundary_none() -> None:
+    inconsistent = TargetMedicalBoundaryResult.model_construct(
+        decision="none",
+        confidence=0.9,
+        reason_code="boundary_medical_handoff_confident",
+        source="backend",
+    )
+    with pytest.raises(TargetMedicalBoundaryEnforcementError) as caught:
+        enforce_target_medical_boundary_on_envelope(
+            inconsistent,
+            **_envelope_kwargs(),
+        )
+    assert caught.value.code == "medical_boundary_result_inconsistent"
+
+
+def test_inconsistent_uncertain_aggregate_reason_blocked_by_enforcement() -> None:
+    inconsistent = TargetMedicalBoundaryResult.model_construct(
+        decision="uncertain",
+        confidence=0.0,
+        reason_code="boundary_uncertain",
+        source="fail_closed",
+    )
+    with pytest.raises(TargetMedicalBoundaryEnforcementError) as caught:
+        enforce_target_medical_boundary_on_envelope(
+            inconsistent,
+            **_envelope_kwargs(),
+        )
+    assert caught.value.code == "medical_boundary_result_inconsistent"
+
+
 def test_import_firewall_has_no_legacy_runtime_reads() -> None:
     source = Path(inspect.getfile(enforcement_module)).read_text(encoding="utf-8")
     tree = ast.parse(source)

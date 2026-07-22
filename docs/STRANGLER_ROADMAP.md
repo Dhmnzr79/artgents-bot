@@ -43,6 +43,10 @@
   `ARCH_TARGET_DESIGN.md`, `STRANGLER_ROADMAP.md`, `REVIEW_CHECKLIST.md`, `.cursor/rules/00-guardrails.mdc`.
   Противоречивые формулировки evidence assembly и S35/S36 согласованы: scoped primary evidence
   **дополняет** FullContext, не заменяет. Код, TASK, matrix/harness и product authority не менялись.
+- [x] **Owner clarification — Medical question semantics** — docs-only уточнение в каноне:
+  urgent hard-stop раньше обычного ответа; `medical_handoff` = safety mode с grounded content
+  из MD (не отказ); только `uncertain` → terminal defer; Verifier checklist и организация
+  противопоказаний по service families (content, не routing). S42/S43/matrix/harness не менялись.
 
 ---
 
@@ -51,8 +55,8 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **Owner decision — FINAL_FULLCONTEXT_ONLY** (docs-only architecture law) |
-| Предыдущий checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
+| Последний завершённый checkpoint | **Owner clarification — Medical question semantics** (docs-only) |
+| Предыдущий checkpoint | **Owner decision — FINAL_FULLCONTEXT_ONLY** (`649b80c`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S43 — medical boundary live eval prep завершён** |
 | Ближайший рабочий focus без live | **Live medical boundary eval — только после отдельного разрешения владельца и утверждения thresholds** |
@@ -282,27 +286,31 @@
 
 - [x] **S41 — TurnFrame-bound offline response dispatch** — deterministic dispatch maps
   `TurnFrame` + explicit envelope to `materialize | terminal` without reading
-  `patient_scope`; materialize calls public S40 once, while clarify/defer/non-materializable
-  medical handoff stop before S34/S40 with payload-free `TargetResponseSpec`. Owner mapping:
-  `payment → price`, `stages → content` always; valid confident topic must match envelope
-  scope. Governance `65c87bd`; independent completion review `✅`: S41 target/demo `17 passed`,
-  S40/S33 neighbors `36 passed`, всего `53 passed`, skip/xfail нет. Message→TurnFrame,
-  runtime/UI/session, live/LLM and product authority remain separate gates.
+  `patient_scope`; materialize calls public S40 once. Confident `medical_handoff` may
+  materialize when `service_id` usable; otherwise terminal `medical_handoff_nonmaterializable`
+  (offline gap до FullContext path — см. ARCH § Medical question semantics). Clarify/defer —
+  terminal modes. Owner mapping: `payment → price`, `stages → content` always; valid confident
+  topic must match envelope scope. Governance `65c87bd`; independent completion review `✅`:
+  S41 target/demo `17 passed`, S40/S33 neighbors `36 passed`, всего `53 passed`, skip/xfail нет.
+  Message→TurnFrame, runtime/UI/session, live/LLM and product authority remain separate gates.
 
 - [x] **S42 — provider-neutral target medical boundary detector** — offline classifier
   executor with injected backend, three-way semantics (`none | medical_handoff | uncertain`),
   structured-output validation, canonical reason codes, and deterministic envelope enforcement.
-  Low confidence/malformed/backend failure/ambiguity never become `none`; `uncertain` maps to
-  terminal defer enforcement. Recognition quality unproven until separately permitted live eval.
-  Governance `4bd3411`; independent completion review `✅`: S42 target/enforcement `19 passed`,
-  S41 dispatch neighbor `12 passed`, всего `31 passed`, skip/xfail нет. Runtime wiring, live adapters,
-  dispatch-only shadow hook, and product authority remain separate gates.
+  Low confidence/malformed/backend failure/ambiguity never become `none`; **only `uncertain`**
+  maps to terminal defer enforcement. Confident `medical_handoff` sets safety mode (content from
+  clinic MD allowed under ARCH § Medical question semantics); does not implement answer content.
+  Recognition quality unproven until separately permitted live eval. Governance `4bd3411`;
+  independent completion review `✅`: S42 target/enforcement `19 passed`, S41 dispatch neighbor
+  `12 passed`, всего `31 passed`, skip/xfail нет. Runtime wiring, live adapters, dispatch-only
+  shadow hook, and product authority remain separate gates.
 
 - [x] **S43 — medical boundary live eval preparation** — separate frozen matrix (26 cases,
   8 kinds), offline harness with immutable raw capture, isolated eval backend adapter,
   separate quality/transport buckets, and proposed acceptance thresholds pending owner
-  approval. No A9 reuse, no live/LLM, no runtime. Governance `1262fb1`; independent
-  completion review `✅`: matrix/harness `18 passed`, S42 neighbor `20 passed`, всего
+  approval. **Scope:** S42 boundary classification only — not medical answer content, Verifier,
+  or FullContext integration. No A9 reuse, no live/LLM, no runtime. Governance `1262fb1`;
+  independent completion review `✅`: matrix/harness `18 passed`, S42 neighbor `20 passed`, всего
   `38 passed`, skip/xfail нет. First live run requires explicit owner permission and
   threshold approval.
 

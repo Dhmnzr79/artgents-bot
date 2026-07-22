@@ -35,7 +35,7 @@
 
 ### C. Инварианты продукта
 
-- [ ] **Медзона:** нет диагнозов/differential; только факты базы + ценовой якорь + CTA на консультацию; спорное → тёплый hand-off.
+- [ ] **Медзона:** нет диагнозов/differential; только факты базы + ценовой якорь + CTA на консультацию; `medical_handoff` ≠ отказ — grounded content из MD разрешён (ARCH § Medical question semantics); текущая личная боль → urgent/manual-contact hard-stop, не content path.
 - [ ] **Booking:** нигде не подтверждается/эхоится конкретная дата ИЛИ время; нейтральный ответ + сбор контакта.
 - [ ] Продающие/успокаивающие формулировки **не выхолощены** осторожными правками.
 - [ ] **Clarify** не задаёт медицинских/диагностических переспросов.
@@ -51,6 +51,18 @@
 - [ ] **`medical_handoff`** — safety mode, не отдельный MD-маршрут; **`used_doc_ids`/source refs** — audit/grounding, не pre-RAG router.
 - [ ] При corpus overflow или предложении RAG/retriever вместо FullContext — **СТОП**, эскалация владельцу; eval harness/offline checker не превращены в product path.
 - [ ] Любое исключение документировано: явное разрешение владельца, постоянная роль, доказательство недостаточности cached FullContext.
+
+### C3. Medical question semantics (owner clarification — жёсткий стоп при нарушении в target/final wiring → ❌)
+
+См. `docs/ARCH_TARGET_DESIGN.md` § «Medical question semantics».
+
+- [ ] **Urgent/manual-contact hard-stop** обрабатывается **раньше** обычного ответа и `medical_handoff`.
+- [ ] **`medical_handoff`** — safety mode, не MD-route и не автоматический отказ; grounded neutral content из clinic MD разрешён без diagnosis/personal eligibility/treatment choice.
+- [ ] **Темы нет в базе** → честное «в материалах клиники нет» + консультация; без model medical knowledge.
+- [ ] **Только `uncertain`** → terminal defer; confident `medical_handoff` materializable при grounded facts.
+- [ ] **Verifier (TARGET)** проверяет grounding, service-family scope, medical safety checklist и missing-base behavior.
+- [ ] **Противопоказания** — content organization по service families, не per-MD runtime routing.
+- [ ] S42/S43 contracts/matrix/harness/thresholds **не** менялись без отдельного governance.
 
 ---
 
@@ -81,7 +93,7 @@
 ```
 ВЕРДИКТ: ✅ / ❌
 
-Слой 1 (инварианты): пройдено / нарушения: <список пунктов A–E, C2>
+Слой 1 (инварианты): пройдено / нарушения: <список пунктов A–E, C2, C3>
 Слой 2 (критерии TASK.md): пройдено / не выполнено: <какие критерии>
 
 Замечания Исполнителю (если ❌): <конкретика — файл:строка, что не так, что проверить>

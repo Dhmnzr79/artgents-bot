@@ -72,6 +72,85 @@
 - Текущий legacy path, chunk_responder и retrieval в repo — **СЕЙЧАС**, не TARGET; не оправдание
   для новых temporary bridges.
 
+## Owner clarification: Medical question semantics
+
+**Статус:** уточнение существующей архитектуры владельца (2026). **Не** новый параллельный
+механизм. Дополняет **FINAL_FULLCONTEXT_ONLY** и не отменяет urgent/manual-contact hard-stop.
+
+### Порядок и приоритеты
+
+1. **Срочные обращения** — существующий **urgent / manual-contact hard-stop** **раньше**
+   обычного ответа, TurnFrame, medical_handoff и Composer: связаться с администратором; при
+   срочности лучше **звонить**. Текущая личная боль, активное осложнение и жалоба — **не**
+   medical_handoff-content path.
+2. **Общие медицинские вопросы без текущей личной боли** — `response_mode=medical_handoff`
+   (**режим безопасности**, не MD-маршрут). Модель видит **cached FullContext всего корпуса**.
+
+### Смысл `medical_handoff` (не отказ от ответа)
+
+`medical_handoff` **не означает** автоматический отказ от ответа.
+
+Если медицинская тема **есть** в согласованных MD клиники, бот **может** дать **общий,
+нейтральный** ответ:
+
+- **только** на основании материалов клиники (FullContext + scoped primary evidence для
+  verifier);
+- **без** диагноза и differential;
+- **без** вывода, подходит ли лечение конкретному человеку;
+- **без** самостоятельного выбора лечения за врача;
+- в конце допустимо пригласить на консультацию (если policy разрешает).
+
+Если болезнь или тема **отсутствуют** во всей утверждённой MD-базе:
+
+- бот **честно** сообщает, что в материалах клиники такой информации нет;
+- предлагает уточнить на консультации;
+- **не** дополняет ответ медицинскими знаниями модели.
+
+### Boundary outcomes (S42) vs materialization
+
+| Outcome | Смысл | Product path |
+|---|---|---|
+| `none` | коммерческий/информационный ход без medical safety mode | materialize по policy |
+| `medical_handoff` (confident) | medical safety mode; ответ из базы **разрешён** | **materialize** с `response_mode=medical_handoff`, если есть grounded facts |
+| `uncertain` | низкая уверенность / malformed / ambiguity | **только** terminal **defer** (fail-closed) |
+
+**Только `uncertain`** означает terminal defer. Confident `medical_handoff` **materializable**,
+когда в базе есть разрешённые grounded facts и policy допускает ход.
+
+S42/S43 **проверяют классификацию границы**; финальное медицинское содержание ответа,
+FullContext integration и Verifier enforcement — **отдельные** downstream gates (ещё не product).
+
+**S41 offline (СЕЙЧАС):** materialize при confident `medical_handoff` возможен, когда
+`service_id` usable; иначе — terminal `medical_handoff_nonmaterializable` без Composer. Это
+**offline wiring gap**, не финальная product-семантика: TARGET — FullContext Composer path с
+safety mode независимо от узкого `service_id` gate.
+
+### Verifier (TARGET) для медицинского ответа
+
+Verifier будущего медицинского ответа обязан проверять:
+
+- наличие источника в базе клиники (grounding / provenance);
+- соответствие нужному **семейству услуг** (service/topic scope), не per-MD routing;
+- отсутствие диагноза и differential;
+- отсутствие персонального вывода о пригодности пациента;
+- отсутствие самостоятельного выбора лечения;
+- корректное поведение при **отсутствии** информации в базе (честный defer без model knowledge).
+
+Offline S38 уже закладывает semantic assessment по medical boundary и selected facts; полный
+checklist выше — **TARGET** для финальной medical-handoff verification.
+
+### Организация контента: противопоказания (не routing)
+
+Противопоказания предпочтительно хранить по **клинически различающимся семействам** топ-услуг:
+
+- отдельный MD для семейства **имплантации**; общий документ для классической имплантации,
+  All-on-4/All-on-6, если содержание **действительно общее**;
+- отдельный — для **протезирования**;
+- отдельный — для **виниров**, если клиническое содержание **действительно отличается**.
+
+Это **организация client pack**, не runtime routing и **не** требование MD на каждую
+микроуслугу. Composer по-прежнему получает **весь корпус** через cached FullContext.
+
 ---
 
 ## Цели → где живут
@@ -104,12 +183,17 @@ Boundary detection → TurnFrame → Boundary enforcement + Response policy → 
    offers/doctors/commercial facts для verifier и grounding — **не заменяет** корпус и **не**
    скрывает остальную базу. Structured selectors (услуги, pricebook, doctors, marketing, policy)
    управляют точными данными и safety; они **не** являются thematic document routers.
-   - **Fail-safe:** низкая уверенность в policy/boundary → clarify/defer/handoff; **запрещено**
-     молча подменять FullContext chunk-retrieval или «только один MD» как product path.
+   - **Fail-safe:** низкая уверенность в **boundary** → только **`uncertain` → terminal defer**
+     (S42); низкая уверенность в policy/turn understanding → clarify/defer по policy.
+     Confident `medical_handoff` **не** равен terminal defer. **Запрещено** молча подменять
+     FullContext chunk-retrieval или «только один MD» как product path.
    - *(Переходная формулировка v4 до owner decision: «primary evidence тематически ограничен,
      полная база только фон» — **снята** для финальной цепочки.)*
 5. **Composer** — только формулирует по spec + evidence.
-6. **Verifier** — числа, медзона-граница, тема, запрещённые/обязательные факты.
+6. **Verifier** — числа, медзона-граница, тема, запрещённые/обязательные факты; для
+   `medical_handoff` — grounding в базе, service-family scope, no-diagnosis, no personal
+   eligibility, no treatment choice, honest «нет в материалах клиники» при отсутствии темы
+   (см. § Medical question semantics).
    - **Первый target-рантайм:** deterministic digit-number provenance + одна компактная
      semantic assessment на каждый ответ. Accuracy-first решение владельца закрывает
      numbers-as-words, grounding, topic/medzone и selected facts до накопления live-данных.
@@ -264,22 +348,29 @@ S41 добавляет deterministic TurnFrame dispatch boundary перед S40.
 tone, topic scope, required facts, marketing permissions and `boundary_decision`; TurnFrame
 contributes only intent/aspects/topic/clarify/service_id mapping. Invalid metadata raises
 typed dispatch errors; successful dispatch returns only `materialize | terminal`. Materialize
-calls S40 once; clarify/defer/non-materializable medical handoff return payload-free
-`TargetResponseSpec` without S34/S40. `patient_scope` is not read.
+calls S40 once. **Только `uncertain` (S42) → terminal defer.** Confident `medical_handoff`
+**materialize**, когда offline dispatch имеет usable `service_id` и components; иначе S41
+возвращает terminal `medical_handoff_nonmaterializable` — **offline gap** до FullContext
+Composer path (см. § Medical question semantics). Clarify/defer — отдельные terminal modes.
+`patient_scope` is not read.
 
 S42 adds an offline provider-neutral medical boundary detector with three-way semantics
 (`none | medical_handoff | uncertain`), structured-output validation, canonical reason codes,
 and deterministic envelope enforcement. Low confidence, malformed backend output, backend
-failure, or ambiguity never become `none`; `uncertain` maps to terminal defer enforcement,
-not commercial `boundary_decision="none"`. Recognition quality is **not proven** until a
-separately governed live eval with owner permission. No runtime wiring or live LLM calls.
+failure, or ambiguity never become `none`; **`uncertain` only** maps to terminal defer
+enforcement, not commercial `boundary_decision="none"`. Confident `medical_handoff` sets
+safety mode and **allows** grounded content answers from clinic MD (see § Medical question
+semantics); S42/S43 do **not** implement response content or FullContext integration.
+Recognition quality is **not proven** until a separately governed live eval with owner
+permission. No runtime wiring or live LLM calls.
 
 S43 prepares a separate frozen live-eval matrix and offline harness for the S42 medical
 boundary detector. Matrix expectations (`none | medical_handoff`) are frozen before the
 first live run; `uncertain` is tracked as technical only. Harness scores exact, uncertain,
 dangerous false-none, excessive false-medical-handoff, malformed/backend failures, and
 transport separately. Proposed acceptance thresholds are pending explicit owner approval;
-no live run in this milestone.
+no live run in this milestone. **Scope:** boundary classification only — not final medical
+answer content, Verifier, or FullContext wiring.
 
 ---
 

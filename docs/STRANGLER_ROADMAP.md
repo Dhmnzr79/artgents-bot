@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S42 — provider-neutral target medical boundary detector завершён** |
-| Ближайший рабочий focus без live | **Следующий checkpoint только отдельным governance TASK; dispatch-only runtime shadow после boundary enforcement** |
+| Отдельная S-series без live | **S43 — medical boundary live eval prep завершён** |
+| Ближайший рабочий focus без live | **Live medical boundary eval — только после отдельного разрешения владельца и утверждения thresholds** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -265,6 +265,14 @@
   Governance `4bd3411`; independent completion review `✅`: S42 target/enforcement `19 passed`,
   S41 dispatch neighbor `12 passed`, всего `31 passed`, skip/xfail нет. Runtime wiring, live adapters,
   dispatch-only shadow hook, and product authority remain separate gates.
+
+- [x] **S43 — medical boundary live eval preparation** — separate frozen matrix (26 cases,
+  8 kinds), offline harness with immutable raw capture, isolated eval backend adapter,
+  separate quality/transport buckets, and proposed acceptance thresholds pending owner
+  approval. No A9 reuse, no live/LLM, no runtime. Governance `1262fb1`; independent
+  completion review `✅`: matrix/harness `18 passed`, S42 neighbor `20 passed`, всего
+  `38 passed`, skip/xfail нет. First live run requires explicit owner permission and
+  threshold approval.
 
 ## Какой roadmap актуален
 

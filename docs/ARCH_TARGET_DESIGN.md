@@ -205,6 +205,13 @@ failure, or ambiguity never become `none`; `uncertain` maps to terminal defer en
 not commercial `boundary_decision="none"`. Recognition quality is **not proven** until a
 separately governed live eval with owner permission. No runtime wiring or live LLM calls.
 
+S43 prepares a separate frozen live-eval matrix and offline harness for the S42 medical
+boundary detector. Matrix expectations (`none | medical_handoff`) are frozen before the
+first live run; `uncertain` is tracked as technical only. Harness scores exact, uncertain,
+dangerous false-none, excessive false-medical-handoff, malformed/backend failures, and
+transport separately. Proposed acceptance thresholds are pending explicit owner approval;
+no live run in this milestone.
+
 ---
 
 ## Порядок работ — strangler, две кучи

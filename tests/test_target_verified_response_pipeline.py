@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import inspect
 from pathlib import Path
 
@@ -28,7 +29,9 @@ def _arguments() -> dict[str, object]:
             corpus_text="---BEGIN DOC:a.md---\nx\n---END DOC:a.md---",
             document_count=1,
             document_paths=("a.md",),
-            sha256="placeholder",
+            sha256=hashlib.sha256(
+                "---BEGIN DOC:a.md---\nx\n---END DOC:a.md---".encode("utf-8")
+            ).hexdigest(),
         ),
         "tone": object(),
         "composer_backend": object(),
@@ -116,7 +119,10 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "cached_full_context": values["cached_full_context"],
     }
     assert calls[2][1] == (request, unverified)
-    assert calls[2][2] == {"semantic_backend": values["semantic_backend"]}
+    assert calls[2][2] == {
+        "cached_full_context": values["cached_full_context"],
+        "semantic_backend": values["semantic_backend"],
+    }
 
 
 @pytest.mark.parametrize(

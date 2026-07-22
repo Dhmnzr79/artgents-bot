@@ -14,7 +14,7 @@ _COMPONENTS = frozenset({"content", "price", "doctors"})
 
 @dataclass(frozen=True, slots=True)
 class TargetResponseMaterializationPlan:
-    service_id: str
+    service_id: str | None
     selected_brand_id: str | None
     required_components: tuple[TargetResponseComponent, ...]
     unfulfilled_components: tuple[TargetResponseComponent, ...]

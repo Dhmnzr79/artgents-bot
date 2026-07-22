@@ -18,6 +18,7 @@ from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
 from core.service_data_context import ServiceDoctorContext
 from core.target_response_followup_policy import TargetResponseFollowupSelection
+from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_scoped_response_evidence import (
     TargetEvidenceScopeRecord,
     TargetScopedResponseEvidence,
@@ -481,6 +482,14 @@ def materialize_target_composer_request(
         _error("composer_request_message_invalid", user_message)
 
     scoped = build_target_scoped_response_evidence(bound_package, md_root=md_root)
+    if is_fullcontext_content_only_spec(scoped.spec):
+        return TargetComposerRequest(
+            user_message=user_message,
+            spec=scoped.spec,
+            evidence_blocks=(),
+            selected_followups=scoped.selected_followups,
+            selected_cta_key=scoped.selected_cta_key,
+        )
     offers, doctors, facts, consultations_by_ref = _exact_sources(
         scoped,
         bound_package,

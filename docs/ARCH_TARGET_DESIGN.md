@@ -358,9 +358,9 @@ tone, topic scope, required facts, marketing permissions and `boundary_decision`
 contributes only intent/aspects/topic/clarify/service_id mapping. Invalid metadata raises
 typed dispatch errors; successful dispatch returns only `materialize | terminal`. Materialize
 calls S40 once. **Только `uncertain` (S42) → terminal defer.** Confident `medical_handoff`
-**materialize**, когда offline dispatch имеет usable `service_id` и components; иначе S41
-возвращает terminal `medical_handoff_nonmaterializable` — **offline gap** до FullContext
-Composer path (см. § Medical question semantics). Clarify/defer — отдельные terminal modes.
+**materialize**, когда offline dispatch имеет usable `service_id` и components **или** confident
+`medical_handoff` / `answer` с content-only components без `service_id` (S45 FullContext path).
+Иначе S41 возвращает terminal defer / `medical_handoff_nonmaterializable`. Clarify/defer — отдельные terminal modes.
 `patient_scope` is not read.
 
 S42 adds an offline provider-neutral medical boundary detector with three-way semantics
@@ -399,6 +399,17 @@ corpus/prefix candidate for a future live gate. **S34/S41 `service_id` gate unch
 after S44 Composer sees the full corpus, but service_id-free general/medical answer is still
 not end-to-end. Next offline focus: one vertical slice for service-optional FullContext
 materialization, missing-base response, and medical grounding verification.
+
+S45 closes the offline vertical slice for **service-optional content-only** responses
+(offline/unwired). Dual source authority: **cached FullContext** is the primary knowledge
+input for general clinic MD (informational, reassuring, approved medical facts); **structured
+primary evidence** remains strict authority for prices, payment stages, promotions,
+marketing/consultation values, CTA, and exact doctor credentials. On conflict structured
+exact facts win; Verifier fail-closes. Dispatch sanitizes envelope for content-only path
+(`required_fact_ids=()`, no marketing/CTA). `TargetSemanticVerification` replaces misleading
+`grounded_in_primary_evidence` with `general_grounding_ok` + `strict_commercial_grounding_ok`.
+Verifier receives the same prebuilt `TargetCachedFullContext` as Composer. **S34/S40/S41
+service-specific paths unchanged in meaning.** No live/LLM. Governance `e7c312c`.
 
 ---
 

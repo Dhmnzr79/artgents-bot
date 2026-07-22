@@ -9,8 +9,10 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Literal, NoReturn, Protocol, TypeAlias
 
+from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import TargetUnverifiedComposedResponse
+from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
     TargetComposerRequest,
@@ -27,11 +29,12 @@ TargetNumericKind: TypeAlias = Literal[
     "generic",
 ]
 
-TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY = """1. Assess whether every factual claim, including numbers written with digits or words and their units and context, is grounded in PRIMARY_EVIDENCE.
-2. Assess whether the answer stays inside allowed topics and outside forbidden topics.
-3. In medical_handoff, reject diagnosis, differential diagnosis, personal eligibility, or treatment choice. For an ordinary answer, medical_boundary_ok must still be true.
-4. Assess every selected commercial fact, not only required_fact_ids: natural facts must be present without meaning change and strict facts must remain verbatim.
-5. Return only the four-field structured assessment. Never rewrite, repair, shorten, or replace the candidate answer."""
+TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY = """1. Assess whether general factual claims are grounded in CACHED_FULL_CONTEXT and/or allowed non-commercial PRIMARY_EVIDENCE.
+2. Assess whether strict commercial claims—prices, payment stages, promotions, marketing facts, consultation values, CTA, and exact doctor credentials—are grounded only in structured PRIMARY_EVIDENCE.
+3. Assess whether the answer stays inside allowed topics and outside forbidden topics.
+4. In medical_handoff, reject diagnosis, differential diagnosis, personal eligibility, treatment choice, or external medical knowledge not present in clinic materials. For an ordinary answer, medical_boundary_ok must still be true.
+5. Assess every selected commercial fact: natural facts must be present without meaning change and strict facts must remain verbatim.
+6. Return only the structured assessment fields. Never rewrite, repair, shorten, or replace the candidate answer."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +46,7 @@ class TargetNumericClaim:
 @dataclass(frozen=True, slots=True)
 class TargetSemanticVerifierInvocation:
     system_policy: str
+    cached_full_context: str
     response_spec_json: str
     primary_evidence_json: str
     candidate_text: str
@@ -50,7 +54,8 @@ class TargetSemanticVerifierInvocation:
 
 @dataclass(frozen=True, slots=True)
 class TargetSemanticVerification:
-    grounded_in_primary_evidence: bool
+    general_grounding_ok: bool
+    strict_commercial_grounding_ok: bool
     topic_scope_ok: bool
     medical_boundary_ok: bool
     selected_facts_ok: bool
@@ -143,8 +148,12 @@ def _validated_inputs(
     ):
         _error("target_verifier_input_invalid", "identity")
     blocks = request.evidence_blocks
-    if type(blocks) is not tuple or not blocks:
+    if type(blocks) is not tuple:
         _error("target_verifier_input_invalid", "evidence")
+    if not blocks and not is_fullcontext_content_only_spec(spec):
+        _error("target_verifier_input_invalid", "evidence")
+    if not blocks:
+        return request, response
     refs: list[str] = []
     commercial: dict[str, int] = {}
     for index, block in enumerate(blocks):
@@ -430,6 +439,38 @@ def _doctor_claims(block: TargetComposerEvidenceBlock) -> tuple[TargetNumericCla
     return tuple(claims)
 
 
+def _structured_commercial_whitelist(
+    blocks: tuple[TargetComposerEvidenceBlock, ...],
+) -> frozenset[TargetNumericClaim]:
+    claims: list[TargetNumericClaim] = []
+    for block in blocks:
+        if block.kind == "offer":
+            claims.extend(_offer_claims(block))
+        elif block.kind == "commercial_fact":
+            claims.extend(_numeric_claims(block.text))
+        elif block.kind in {"doctor", "external_doctor"}:
+            claims.extend(_doctor_claims(block))
+    return frozenset(claims)
+
+
+def _general_numeric_whitelist(
+    blocks: tuple[TargetComposerEvidenceBlock, ...],
+    corpus_text: str,
+) -> frozenset[TargetNumericClaim]:
+    claims: list[TargetNumericClaim] = []
+    for block in blocks:
+        if block.kind not in {"offer", "commercial_fact", "doctor", "external_doctor"}:
+            claims.extend(_numeric_claims(block.text))
+    claims.extend(_numeric_claims(corpus_text))
+    return frozenset(claims)
+
+
+def _claim_in_corpus(claim: TargetNumericClaim, corpus_text: str) -> bool:
+    if claim.kind in {"money", "percent"}:
+        return False
+    return claim.value in corpus_text or claim.value.replace(".", ",") in corpus_text
+
+
 def _evidence_whitelist(
     blocks: tuple[TargetComposerEvidenceBlock, ...],
 ) -> frozenset[TargetNumericClaim]:
@@ -451,6 +492,7 @@ def _compact_json(value: object) -> str:
 def _semantic_invocation(
     request: TargetComposerRequest,
     response: TargetUnverifiedComposedResponse,
+    cached_full_context: TargetCachedFullContext,
 ) -> TargetSemanticVerifierInvocation:
     spec = request.spec
     spec_payload = {
@@ -472,24 +514,46 @@ def _semantic_invocation(
     ]
     return TargetSemanticVerifierInvocation(
         system_policy=TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY,
+        cached_full_context=cached_full_context.corpus_text,
         response_spec_json=_compact_json(spec_payload),
         primary_evidence_json=_compact_json(evidence_payload),
         candidate_text=response.text,
     )
 
 
+def _validate_cached_full_context(value: object) -> TargetCachedFullContext:
+    if type(value) is not TargetCachedFullContext:
+        _error("target_verifier_full_context_invalid", "full_context_type")
+    if not _canonical(value.corpus_text):
+        _error("target_verifier_full_context_invalid", "full_context_empty")
+    return value
+
+
 def verify_target_composed_response(
     request: TargetComposerRequest,
     response: TargetUnverifiedComposedResponse,
     *,
+    cached_full_context: TargetCachedFullContext,
     semantic_backend: TargetSemanticVerifierBackend,
 ) -> TargetVerifiedComposedResponse:
     """Verify one adjacent S37 response without modifying or repairing its text."""
 
     request, response = _validated_inputs(request, response)
-    whitelist = _evidence_whitelist(request.evidence_blocks)
+    validated_context = _validate_cached_full_context(cached_full_context)
+    structured_whitelist = _structured_commercial_whitelist(request.evidence_blocks)
+    general_whitelist = _general_numeric_whitelist(
+        request.evidence_blocks,
+        validated_context.corpus_text,
+    )
     for claim in _numeric_claims(response.text):
-        if claim not in whitelist:
+        if claim.kind == "money":
+            if claim not in structured_whitelist:
+                _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
+        elif (
+            claim not in structured_whitelist
+            and claim not in general_whitelist
+            and not _claim_in_corpus(claim, validated_context.corpus_text)
+        ):
             _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
     for block in request.evidence_blocks:
         if (
@@ -504,7 +568,7 @@ def verify_target_composed_response(
         _error("target_verifier_backend_invalid", "semantic_assess")
     if not callable(assess):
         _error("target_verifier_backend_invalid", "semantic_assess")
-    invocation = _semantic_invocation(request, response)
+    invocation = _semantic_invocation(request, response, validated_context)
     try:
         assessment = assess(invocation)
     except Exception as exc:
@@ -512,7 +576,8 @@ def verify_target_composed_response(
     if type(assessment) is not TargetSemanticVerification or not all(
         type(getattr(assessment, name)) is bool
         for name in (
-            "grounded_in_primary_evidence",
+            "general_grounding_ok",
+            "strict_commercial_grounding_ok",
             "topic_scope_ok",
             "medical_boundary_ok",
             "selected_facts_ok",
@@ -522,7 +587,8 @@ def verify_target_composed_response(
     failed = tuple(
         name
         for name in (
-            "grounded_in_primary_evidence",
+            "general_grounding_ok",
+            "strict_commercial_grounding_ok",
             "topic_scope_ok",
             "medical_boundary_ok",
             "selected_facts_ok",

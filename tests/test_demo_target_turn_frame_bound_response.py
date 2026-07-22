@@ -74,7 +74,8 @@ class RecordingSemanticBackend:
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
         return TargetSemanticVerification(
-            grounded_in_primary_evidence=True,
+            general_grounding_ok=True,
+            strict_commercial_grounding_ok=True,
             topic_scope_ok=True,
             medical_boundary_ok=True,
             selected_facts_ok=True,

@@ -170,10 +170,34 @@ def _terminal_spec(
     )
 
 
+def _materialize_fullcontext_content_policy_request(
+    *,
+    response_mode: TargetResponseMode,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> TargetResponsePolicyRequest:
+    if response_mode == "medical_handoff" and not envelope.forbidden_topics:
+        _fail("dispatch_medical_forbidden_empty", envelope.forbidden_topics)
+    return TargetResponsePolicyRequest.model_validate(
+        {
+            "response_mode": response_mode,
+            "service_id": None,
+            "tone_key": envelope.tone_key,
+            "allowed_topics": envelope.allowed_topics,
+            "forbidden_topics": envelope.forbidden_topics,
+            "required_fact_ids": (),
+            "requested_components": ("content",),
+            "primary_component": None,
+            "allow_marketing_facts": False,
+            "allow_consultation_close": envelope.allow_consultation_close,
+            "allow_cta": False,
+        }
+    )
+
+
 def _materialize_policy_request(
     *,
     response_mode: TargetResponseMode,
-    service_id: str,
+    service_id: str | None,
     components: tuple[TargetResponseComponent, ...],
     primary_component: TargetResponseComponent | None,
     envelope: TargetTurnFramePolicyEnvelope,
@@ -195,6 +219,13 @@ def _materialize_policy_request(
             "allow_cta": envelope.allow_cta,
         }
     )
+
+
+def _is_fullcontext_content_only_components(
+    components: tuple[TargetResponseComponent, ...],
+    response_mode: TargetResponseMode,
+) -> bool:
+    return response_mode in {"answer", "medical_handoff"} and components == ("content",)
 
 
 def dispatch_target_turn_frame_response(
@@ -230,6 +261,15 @@ def dispatch_target_turn_frame_response(
         return _terminal_spec(response_mode="defer", envelope=envelope)
 
     if not _service_id_is_usable(turn_frame, envelope):
+        if _is_fullcontext_content_only_components(components, response_mode):
+            policy_request = _materialize_fullcontext_content_policy_request(
+                response_mode=response_mode,
+                envelope=envelope,
+            )
+            return TargetTurnFrameMaterializeDispatch(
+                kind="materialize",
+                policy_request=policy_request,
+            )
         if response_mode == "medical_handoff":
             return _terminal_spec(response_mode="medical_handoff", envelope=envelope)
         return _terminal_spec(response_mode="defer", envelope=envelope)

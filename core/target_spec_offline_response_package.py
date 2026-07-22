@@ -18,6 +18,10 @@ from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
+from core.target_fullcontext_content_package import (
+    assemble_target_fullcontext_content_bound_package,
+    is_fullcontext_content_only_spec,
+)
 from core.target_offline_response_package import (
     TargetOfflineResponsePackage,
     assemble_target_offline_response_package,
@@ -75,6 +79,17 @@ def assemble_target_spec_offline_response_package(
     ):
         if type(value) is not bool:
             _error("spec_package_selection_invalid", (field_name, value))
+    if is_fullcontext_content_only_spec(spec):
+        if brand_term is not None or include_initial_block or marketing_scenarios != ():
+            _error("spec_package_permission_forbidden", "marketing_facts")
+        if include_consultation_close and not spec.allow_consultation_close:
+            _error("spec_package_permission_forbidden", "consultation_close")
+        if include_cta:
+            _error("spec_package_permission_forbidden", "cta")
+        return assemble_target_fullcontext_content_bound_package(
+            spec,
+            selected_cta_key=None,
+        )
     if (
         spec.response_mode not in {"answer", "medical_handoff"}
         or spec.service_id is None

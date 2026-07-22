@@ -151,14 +151,18 @@ def test_medical_boundary_without_forbidden_topics_raises_error() -> None:
     assert caught.value.code == "dispatch_medical_forbidden_empty"
 
 
-def test_non_materializable_medical_handoff_returns_terminal() -> None:
+def test_medical_handoff_without_service_id_materializes_content_only() -> None:
     result = dispatch_target_turn_frame_response(
-        _frame(service_id=None, aspects=["overview"], primary_aspect=None),
+        _frame(service_id=None, aspects=["pain"], primary_aspect=None, route="content"),
         _envelope(boundary_decision="medical_handoff"),
     )
-    assert result.kind == "terminal"
-    assert result.terminal_mode == "medical_handoff_nonmaterializable"
-    assert result.spec.response_mode == "medical_handoff"
+    assert result.kind == "materialize"
+    assert result.policy_request.response_mode == "medical_handoff"  # type: ignore[union-attr]
+    assert result.policy_request.service_id is None  # type: ignore[union-attr]
+    assert result.policy_request.requested_components == ("content",)  # type: ignore[union-attr]
+    assert result.policy_request.required_fact_ids == ()  # type: ignore[union-attr]
+    assert result.policy_request.allow_marketing_facts is False  # type: ignore[union-attr]
+    assert result.policy_request.allow_cta is False  # type: ignore[union-attr]
 
 
 def test_public_dispatch_signature_is_single_entrypoint() -> None:

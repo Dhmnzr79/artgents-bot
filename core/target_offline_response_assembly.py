@@ -28,8 +28,8 @@ from core.target_service_resolver import resolve_target_service_term
 
 @dataclass(frozen=True, slots=True)
 class TargetOfflineResponseMaterials:
-    service_id: str
-    service: TargetService
+    service_id: str | None
+    service: TargetService | None
     selected_brand_id: str | None
     brand: TargetBrand | None
     matched_rule_id: str | None

@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S44 — cached FullContext Composer input** |
-| Предыдущий checkpoint | **S43 first live eval audit capture** (`f14be0a`) |
+| Последний завершённый checkpoint | **S45 — FullContext service-optional verified response** |
+| Предыдущий checkpoint | **S44 — cached FullContext Composer input** (`01dfa28`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S44 завершён**; следующий offline focus — service-optional FullContext materialization |
-| Ближайший рабочий focus без live | **Service-optional FullContext materialization + missing-base + medical grounding verification** |
+| Отдельная S-series без live | **S45 завершён**; offline target slice закрывает service-optional content path |
+| Ближайший рабочий focus без live | **Runtime wiring / live gates — только по отдельному governance** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -334,6 +334,13 @@
   разделяет `cached_full_context` и scoped `primary_evidence_json`. Provider prompt caching —
   **не** реализован (отдельный live gate). **S34/S41 service_id gate не менялся.** Следующий
   offline focus — service-optional FullContext materialization. Governance `3ce09f8`. No live.
+- [x] **S45 — FullContext-grounded service-optional verified response** — dual authority:
+  cached FullContext для общих MD/medical content; structured primary evidence для strict
+  commercial facts. `service_id=None` + content-only materialize через dispatch envelope
+  sanitization и minimal bound package; Composer policy и Verifier contract честно разделяют
+  `general_grounding_ok` / `strict_commercial_grounding_ok`; Verifier получает тот же prebuilt
+  `TargetCachedFullContext` без rebuild. Missing-base и pain/diabetes offline acceptance без
+  live. Governance `e7c312c`. No live.
 
 ## Какой roadmap актуален
 

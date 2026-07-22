@@ -12,6 +12,7 @@ from pydantic import TypeAdapter, ValidationError
 from yaml.nodes import MappingNode
 
 from contracts.target_response_spec import CanonicalToken, TargetResponseSpec
+from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
 from core.target_offline_response_package import TargetOfflineResponsePackage
 from core.target_response_followup_policy import (
@@ -46,7 +47,7 @@ class TargetEvidenceScopeRecord:
 @dataclass(frozen=True, slots=True)
 class TargetScopedResponseEvidence:
     spec: TargetResponseSpec
-    service_id: str
+    service_id: str | None
     primary_content_ref: str | None
     offer_ids: tuple[str, ...]
     doctor_ids: tuple[str, ...]
@@ -184,6 +185,24 @@ def build_target_scoped_response_evidence(
     root = _resolved_root(md_root)
 
     spec = bound_package.spec
+    if is_fullcontext_content_only_spec(spec):
+        if bound_package.selected_cta_key is not None:
+            _error("scoped_evidence_package_inconsistent", "selected_cta_key")
+        return TargetScopedResponseEvidence(
+            spec=spec,
+            service_id=None,
+            primary_content_ref=None,
+            offer_ids=(),
+            doctor_ids=(),
+            commercial_fact_ids=(),
+            external_source_refs=(),
+            consultation_content_ref=None,
+            selected_followups=bound_package.package.selected_followups,
+            selected_cta_key=None,
+            scope_records=(),
+            covered_fact_ids=(),
+        )
+
     package = bound_package.package
     if (
         type(spec) is not TargetResponseSpec

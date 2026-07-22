@@ -157,7 +157,7 @@ def test_selection_flags_are_exact_and_ordered(field: str, value: object) -> Non
             required_components=(),
             followup_source=None,
         ),
-        _spec(service_id=None),
+        _spec(service_id=None, required_fact_ids=("fact",)),
     ],
 )
 def test_nonmaterializable_specs_fail_before_s31(

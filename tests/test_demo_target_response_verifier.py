@@ -24,6 +24,7 @@ from core.service_consultation_source import build_service_consultation_values
 from core.target_composer_executor import TargetUnverifiedComposedResponse
 from core.target_composer_request import materialize_target_composer_request
 from core.target_response_policy import build_target_response_spec
+from core.target_cached_full_context import build_target_cached_full_context
 from core.target_response_verifier import (
     TargetSemanticVerification,
     TargetSemanticVerifierInvocation,
@@ -46,7 +47,8 @@ class RecordingSemanticBackend:
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
         return TargetSemanticVerification(
-            grounded_in_primary_evidence=True,
+            general_grounding_ok=True,
+            strict_commercial_grounding_ok=True,
             topic_scope_ok=True,
             medical_boundary_ok=True,
             selected_facts_ok=True,
@@ -140,6 +142,7 @@ def test_real_demo_all_on_4_response_reaches_one_offline_semantic_assessment() -
     result = verify_target_composed_response(
         request,
         unverified,
+        cached_full_context=build_target_cached_full_context(MD_ROOT),
         semantic_backend=backend,
     )
 

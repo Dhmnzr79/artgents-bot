@@ -80,7 +80,8 @@ class RecordingSemanticBackend:
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
         return TargetSemanticVerification(
-            grounded_in_primary_evidence=self.accepted,
+            general_grounding_ok=self.accepted,
+            strict_commercial_grounding_ok=self.accepted,
             topic_scope_ok=True,
             medical_boundary_ok=True,
             selected_facts_ok=True,
@@ -277,7 +278,7 @@ def test_real_semantic_rejection_returns_no_partial_verified_response() -> None:
         )
     assert (caught.value.code, caught.value.value) == (
         "target_verifier_semantic_rejected",
-        ("grounded_in_primary_evidence",),
+        ("general_grounding_ok", "strict_commercial_grounding_ok"),
     )
     assert len(composer.invocations) == 1
     assert len(semantic.invocations) == 1

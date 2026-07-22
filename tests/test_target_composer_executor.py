@@ -173,7 +173,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         TARGET_COMPOSER_SYSTEM_POLICY.index(f"{number}.") for number in range(1, 10)
     ]
     assert policy_positions == sorted(policy_positions)
-    assert "Cached FullContext" in TARGET_COMPOSER_SYSTEM_POLICY
+    assert "CACHED_FULL_CONTEXT" in TARGET_COMPOSER_SYSTEM_POLICY
     assert "Never diagnose" in TARGET_COMPOSER_SYSTEM_POLICY
 
 

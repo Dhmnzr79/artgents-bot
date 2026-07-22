@@ -57,5 +57,6 @@ def run_target_offline_verified_response_pipeline(
     return verify_target_composed_response(
         request,
         unverified,
+        cached_full_context=cached_full_context,
         semantic_backend=semantic_backend,
     )

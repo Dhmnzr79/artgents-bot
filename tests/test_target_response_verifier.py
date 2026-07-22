@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import re
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import TargetUnverifiedComposedResponse
 from core.target_composer_request import (
@@ -29,7 +31,8 @@ from core.target_response_verifier import (
 class RecordingBackend:
     def __init__(self, assessment: object | None = None) -> None:
         self.assessment = assessment or TargetSemanticVerification(
-            grounded_in_primary_evidence=True,
+            general_grounding_ok=True,
+            strict_commercial_grounding_ok=True,
             topic_scope_ok=True,
             medical_boundary_ok=True,
             selected_facts_ok=True,
@@ -48,6 +51,17 @@ class FailingBackend:
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.calls += 1
         raise RuntimeError("semantic provider detail")
+
+
+def _cached_context(
+    text: str = "corpus service_one offer 318000 19 doctor profile",
+) -> TargetCachedFullContext:
+    return TargetCachedFullContext(
+        corpus_text=text,
+        document_count=1,
+        document_paths=("service_one.md",),
+        sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    )
 
 
 def _spec(**updates: object) -> TargetResponseSpec:
@@ -213,12 +227,14 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
     ]
     assert [field.name for field in fields(TargetSemanticVerifierInvocation)] == [
         "system_policy",
+        "cached_full_context",
         "response_spec_json",
         "primary_evidence_json",
         "candidate_text",
     ]
     assert [field.name for field in fields(TargetSemanticVerification)] == [
-        "grounded_in_primary_evidence",
+        "general_grounding_ok",
+        "strict_commercial_grounding_ok",
         "topic_scope_ok",
         "medical_boundary_ok",
         "selected_facts_ok",
@@ -233,6 +249,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
     assert list(inspect.signature(verify_target_composed_response).parameters) == [
         "request",
         "response",
+        "cached_full_context",
         "semantic_backend",
     ]
     source = Path("core/target_response_verifier.py").read_text(encoding="utf-8")
@@ -244,8 +261,9 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "target_verifier_backend_failed",
         "target_verifier_semantic_output_invalid",
         "target_verifier_semantic_rejected",
+        "target_verifier_full_context_invalid",
     }
-    assert "numbers written with digits or words" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "CACHED_FULL_CONTEXT" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "every selected commercial fact" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "Never rewrite" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
 
@@ -258,6 +276,7 @@ def test_success_calls_one_semantic_backend_and_preserves_exact_response() -> No
     result = verify_target_composed_response(
         request,
         response,
+        cached_full_context=_cached_context(),
         semantic_backend=backend,
     )
 
@@ -314,6 +333,7 @@ def test_common_currency_prefix_postfix_forms_match_structured_money(rendered: s
     result = verify_target_composed_response(
         request,
         _response(request, text),
+        cached_full_context=_cached_context(),
         semantic_backend=backend,
     )
     assert result.verification_status == "verified"
@@ -330,6 +350,7 @@ def test_price_only_all_on_4_name_is_semantic_but_standalone_four_blocks() -> No
     accepted = verify_target_composed_response(
         request,
         _response(request, "All-on-4 стоит 100 000 рублей."),
+        cached_full_context=_cached_context(),
         semantic_backend=backend,
     )
     assert accepted.verification_status == "verified"
@@ -340,6 +361,7 @@ def test_price_only_all_on_4_name_is_semantic_but_standalone_four_blocks() -> No
         lambda: verify_target_composed_response(
             request,
             _response(request, "Есть 4 варианта по 100 000 рублей."),
+            cached_full_context=_cached_context(),
             semantic_backend=blocked_backend,
         )
     )
@@ -391,6 +413,7 @@ def test_all_price_modes_authorize_only_their_exact_numeric_sources(
     result = verify_target_composed_response(
         request,
         _response(request, candidate),
+        cached_full_context=_cached_context(),
         semantic_backend=RecordingBackend(),
     )
     assert result.verification_status == "verified"
@@ -412,6 +435,7 @@ def test_package_stage_and_doctor_profile_text_contribute_without_ids() -> None:
     result = verify_target_composed_response(
         request,
         _response(request, text),
+        cached_full_context=_cached_context(),
         semantic_backend=RecordingBackend(),
     )
     assert result.verification_status == "verified"
@@ -426,6 +450,7 @@ def test_digit_ranges_percent_decimals_and_time_are_typed() -> None:
     result = verify_target_composed_response(
         request,
         _response(request, accepted),
+        cached_full_context=_cached_context(),
         semantic_backend=RecordingBackend(),
     )
     assert result.verification_status == "verified"
@@ -434,6 +459,7 @@ def test_digit_ranges_percent_decimals_and_time_are_typed() -> None:
         lambda: verify_target_composed_response(
             request,
             _response(request, "Срок 1–4 дня. Строгий факт 5 лет."),
+            cached_full_context=_cached_context(),
             semantic_backend=RecordingBackend(),
         )
     )
@@ -447,7 +473,8 @@ def test_number_words_are_delegated_to_mandatory_semantic_assessment() -> None:
     request = _request()
     backend = RecordingBackend(
         TargetSemanticVerification(
-            grounded_in_primary_evidence=False,
+            general_grounding_ok=False,
+            strict_commercial_grounding_ok=True,
             topic_scope_ok=True,
             medical_boundary_ok=True,
             selected_facts_ok=True,
@@ -457,13 +484,14 @@ def test_number_words_are_delegated_to_mandatory_semantic_assessment() -> None:
         lambda: verify_target_composed_response(
             request,
             _response(request, "Цена — сто тысяч рублей. Строгий факт 5 лет."),
+            cached_full_context=_cached_context(),
             semantic_backend=backend,
         )
     )
     assert len(backend.invocations) == 1
     assert (error.code, error.value) == (
         "target_verifier_semantic_rejected",
-        ("grounded_in_primary_evidence",),
+        ("general_grounding_ok",),
     )
 
 
@@ -504,6 +532,7 @@ def test_hostile_adjacent_inputs_fail_typed_before_backend(mutator, marker: str)
         lambda: verify_target_composed_response(
             candidate_request,
             candidate_response,
+            cached_full_context=_cached_context(),
             semantic_backend=backend,
         )
     )
@@ -548,7 +577,8 @@ def test_malformed_structured_offer_invariants_fail_before_backend() -> None:
             lambda: verify_target_composed_response(
                 request,
                 _response(request, "Цена уточняется."),
-                semantic_backend=backend,
+                cached_full_context=_cached_context(),
+            semantic_backend=backend,
             )
         )
         assert (error.code, error.value, backend.invocations) == (
@@ -577,6 +607,7 @@ def test_malformed_structured_offer_invariants_fail_before_backend() -> None:
         lambda: verify_target_composed_response(
             request,
             _response(request, "Цена уточняется."),
+            cached_full_context=_cached_context(),
             semantic_backend=RecordingBackend(),
         )
     )
@@ -590,6 +621,7 @@ def test_numeric_and_strict_fact_fail_before_semantic_backend_without_repair() -
         lambda: verify_target_composed_response(
             request,
             _response(request, "Цена 999 999 рублей. Строгий факт 5 лет."),
+            cached_full_context=_cached_context(),
             semantic_backend=numeric_backend,
         )
     )
@@ -605,6 +637,7 @@ def test_numeric_and_strict_fact_fail_before_semantic_backend_without_repair() -
         lambda: verify_target_composed_response(
             request,
             _response(request, original),
+            cached_full_context=_cached_context(),
             semantic_backend=strict_backend,
         )
     )
@@ -623,6 +656,7 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
         lambda: verify_target_composed_response(
             request,
             response,
+            cached_full_context=_cached_context(),
             semantic_backend=object(),  # type: ignore[arg-type]
         )
     )
@@ -636,6 +670,7 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
         lambda: verify_target_composed_response(
             request,
             response,
+            cached_full_context=_cached_context(),
             semantic_backend=failing,
         )
     )
@@ -646,11 +681,12 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
     )
     assert isinstance(failed.__cause__, RuntimeError)
 
-    malformed_backend = RecordingBackend({"grounded_in_primary_evidence": True})
+    malformed_backend = RecordingBackend(object())
     malformed = _caught(
         lambda: verify_target_composed_response(
             request,
             response,
+            cached_full_context=_cached_context(),
             semantic_backend=malformed_backend,
         )
     )
@@ -658,7 +694,8 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
 
     rejected_backend = RecordingBackend(
         TargetSemanticVerification(
-            grounded_in_primary_evidence=True,
+            general_grounding_ok=True,
+            strict_commercial_grounding_ok=True,
             topic_scope_ok=False,
             medical_boundary_ok=False,
             selected_facts_ok=False,
@@ -668,6 +705,7 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
         lambda: verify_target_composed_response(
             request,
             response,
+            cached_full_context=_cached_context(),
             semantic_backend=rejected_backend,
         )
     )
@@ -680,6 +718,75 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
     assert len(rejected_backend.invocations) == 1
 
 
+def test_content_only_spec_accepts_empty_evidence_blocks() -> None:
+    spec = _spec(
+        service_id=None,
+        required_fact_ids=(),
+        required_components=("content",),
+        allow_marketing_facts=False,
+        allow_cta=False,
+    )
+    request = TargetComposerRequest(
+        user_message="Общий вопрос",
+        spec=spec,
+        evidence_blocks=(),
+        selected_followups=TargetResponseFollowupSelection(
+            source=None,
+            content=(),
+            price=(),
+        ),
+        selected_cta_key=None,
+    )
+    result = verify_target_composed_response(
+        request,
+        TargetUnverifiedComposedResponse(
+            text="Общий ответ из материалов клиники без чисел.",
+            spec=spec,
+            selected_followups=request.selected_followups,
+            selected_cta_key=None,
+        ),
+        cached_full_context=_cached_context("corpus general clinic answer"),
+        semantic_backend=RecordingBackend(),
+    )
+    assert result.verification_status == "verified"
+
+
+def test_content_only_money_claim_is_rejected_without_structured_evidence() -> None:
+    spec = _spec(
+        service_id=None,
+        required_fact_ids=(),
+        required_components=("content",),
+        allow_marketing_facts=False,
+        allow_cta=False,
+    )
+    request = TargetComposerRequest(
+        user_message="Сколько стоит?",
+        spec=spec,
+        evidence_blocks=(),
+        selected_followups=TargetResponseFollowupSelection(
+            source=None,
+            content=(),
+            price=(),
+        ),
+        selected_cta_key=None,
+    )
+    error = _caught(
+        lambda: verify_target_composed_response(
+            request,
+            TargetUnverifiedComposedResponse(
+                text="Имплантация стоит 100 000 рублей.",
+                spec=spec,
+                selected_followups=request.selected_followups,
+                selected_cta_key=None,
+            ),
+            cached_full_context=_cached_context("corpus without prices"),
+            semantic_backend=RecordingBackend(),
+        )
+    )
+    assert error.code == "target_verifier_numeric_ungrounded"
+    assert error.value[0] == "money"
+
+
 def test_medical_handoff_also_gets_one_mandatory_semantic_check() -> None:
     spec = _spec(response_mode="medical_handoff")
     request = _request(spec=spec)
@@ -687,6 +794,7 @@ def test_medical_handoff_also_gets_one_mandatory_semantic_check() -> None:
     result = verify_target_composed_response(
         request,
         _response(request),
+        cached_full_context=_cached_context(),
         semantic_backend=backend,
     )
     assert result.verification_status == "verified"
@@ -699,8 +807,11 @@ def test_medical_handoff_also_gets_one_mandatory_semantic_check() -> None:
 
 def test_import_firewall_excludes_legacy_provider_runtime_and_live_hooks() -> None:
     source = Path("core/target_response_verifier.py").read_text(encoding="utf-8")
-    import_lines = "\n".join(
-        line for line in source.splitlines() if line.startswith(("import ", "from "))
+    filtered_import_lines = "\n".join(
+        line
+        for line in source.splitlines()
+        if line.startswith(("import ", "from "))
+        and "target_cached_full_context" not in line
     ).lower()
     forbidden = (
         "numeric_fact_gate",
@@ -714,6 +825,6 @@ def test_import_firewall_excludes_legacy_provider_runtime_and_live_hooks() -> No
         "cache",
         "search",
     )
-    assert all(token not in import_lines for token in forbidden)
+    assert all(token not in filtered_import_lines for token in forbidden)
     assert "pytest.skip" not in source
     assert "xfail" not in source

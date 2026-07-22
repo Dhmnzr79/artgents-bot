@@ -1,136 +1,113 @@
-# TASK — S46 Boundary-enforced FullContext Verified Response
+# TASK — S47 FullContext Response Quality Eval Preparation
 
-**Branch / baseline:** `codex/stage-a` / `ab2fc69 feat: S45 FullContext service-optional verified response`
+**Branch / baseline:** `codex/stage-a` / `d5a8557 feat: S46 boundary-enforced FullContext verified response`
 
-**Read-only seam confirmation (pre-governance):**
-
-- `enforce_target_medical_boundary_on_envelope(...)` вызывается **только** в
-  `tests/test_target_turn_frame_policy_envelope_enforcement.py` (S42 unit), **не** в demo/S45
-  chain.
-- Demo/S45 (`test_demo_target_turn_frame_bound_response.py`,
-  `test_target_fullcontext_content_response.py`) вызывают
-  `run_target_offline_turn_frame_bound_response(...)` с **вручную собранным**
-  `TargetTurnFramePolicyEnvelope` (`boundary_decision="none"|"medical_handoff"`), **минуя**
-  S42 enforcement.
-- Единого public entry `TurnFrame + TargetMedicalBoundaryResult → verified|terminal` **нет**.
-- Дубликата orchestrator в codebase нет → S46 **не STOP**.
-
-**Goal:** один thin straight-line offline orchestrator над существующими public APIs:
+**Goal:** frozen ~20-case matrix + provider-neutral offline harness for one future permitted
+live eval of the full response chain:
 
 ```
-TurnFrame + TargetMedicalBoundaryResult + explicit policy inputs + prebuilt FullContext
-→ enforce_target_medical_boundary_on_envelope (×1)
-→ terminal uncertain | run_target_offline_turn_frame_bound_response (×1)
-→ verified | terminal (existing unions)
+ready TurnFrame + frozen TargetMedicalBoundaryResult
+→ S46 → Composer → Semantic Verifier → verified | terminal
+→ automatic metrics + manual quality review
 ```
 
-**No live/LLM. No new inference/classifier/detector. No runtime/UI/session/authority. No A9.
-No S43 changes. No change to S45 FullContext vs structured authority.**
+Eval instrument only — **not** product path. **No live/LLM in S47.**
 
-## Required behavior
+**Read-only seam (confirmed):** S46 exists; no response-quality eval matrix/harness; S43 pattern
+is boundary-only (not full chain). No duplicate — proceed.
 
-### Input
+## Matrix (~20 cases)
 
-- готовый `TurnFrame`;
-- готовый `TargetMedicalBoundaryResult` (detector **не** вызывается);
-- explicit envelope policy kwargs (tone, topics, marketing permissions, confidence floors — as
-  S42 enforcement API);
-- все существующие S41/S45 assembly inputs (`bundle`, `doctor_catalog`, …,
-  `cached_full_context`, backends);
-- injected Composer + Verifier backends.
+- fresh session per case (harness state reset);
+- explicit serialized `turn_frame_raw` + `TargetMedicalBoundaryResult` + `policy_envelope`;
+- detector/planner/A9 **not** called;
+- natural user questions; real demo base/services;
+- **no verbatim expected prose** — semantic rubric only;
+- `audit_source_refs` for review only — **not** document routing (S46 still gets full corpus).
 
-### Sequence (strict)
+### Required coverage
 
-1. `enforce_target_medical_boundary_on_envelope(boundary, ...)` — **ровно один раз**.
-2. If `TargetMedicalBoundaryTerminalEnforcement` (`uncertain`):
-   - return as-is;
-   - **не** вызывать S41, Composer, Verifier.
-3. If `TargetMedicalBoundaryEnvelopeEnforcement`:
-   - `run_target_offline_turn_frame_bound_response(turn_frame, result.envelope, ...)` —
-     **ровно один раз**;
-   - return existing `TargetTurnFrameBoundMaterializeResponse |
-     TargetTurnFrameBoundTerminalResponse` без переписывания.
+1. **General info:** implantation overview; All-on-4; pain reassurance.
+2. **Structured commercial:** price; payment stages; doctor-by-service; consultation/marketing;
+   structured authority over FullContext.
+3. **Known medical:** diabetes/contraindications from approved MD; neutral + consultation; no
+   diagnosis/personal eligibility.
+4. **Missing-base (2):** topics absent from entire demo MD; controlled no-info + consultation;
+   no model medical knowledge.
+5. **Medical boundary:** personal eligibility; diagnosis; treatment choice — general MD only +
+   doctor referral.
+6. **Terminal (≥1):** frozen `boundary=uncertain` → S46 terminal defer; 0 Composer/Verifier calls.
 
-### Errors
+### Per-case fields (minimum)
 
-- Typed errors S42/S41/S40/S39/S37/S38 propagate unchanged; no catch/retry/fallback/repair.
-- Inconsistent boundary → existing `medical_boundary_result_inconsistent`.
-- Invalid policy inputs → existing S42 typed errors.
+`case_id`, `case_kind`, `user_message`, `turn_frame_raw`, `boundary_result`, `policy_envelope`,
+`expected_outcome`, `expected_response_mode`, `expected_structured_values` (optional),
+`forbidden_claims`, `medical_safety`, `consultation_expectation`, `cta_followup_expectation`,
+`manual_review_rubric`, `audit_source_refs`, `rationale`.
 
-### Semantics preserved
+## Harness
 
-- `none` → ordinary answer path through S41/S45.
-- confident `medical_handoff` → safety mode + full grounded FullContext response (incl.
-  service_id=None pain path from S45).
-- `uncertain` → S42 terminal defer only.
-- urgent/manual-contact → upstream; **not** implemented in S46.
-
-## Public API
-
-**Name:** `run_target_offline_boundary_enforced_fullcontext_response(...)`
-
-**Module:** `core/target_boundary_enforced_fullcontext_response.py`
-
-**Return union (no new heavy result model):**
-
-```python
-TargetMedicalBoundaryTerminalEnforcement
-| TargetTurnFrameBoundMaterializeResponse
-| TargetTurnFrameBoundTerminalResponse
-```
-
-Straight-line function: no branches beyond enforce → early return | S41 passthrough.
+1. Provider-neutral: injected Composer + Semantic Verifier backends; S47 **fake/recording only**.
+2. Calls: materializable → Composer×1 + Verifier×1 max; terminal → 0 provider calls; no
+   retry/repair/fallback.
+3. Capture per case: outcome kind, response_mode, response text (if any), composer/verifier call
+   counts, verifier status, pipeline errors, raw backend payloads (for future live).
+4. CLI: `--dry-run` (matrix validate only); default exits `LIVE_NOT_CONFIGURED`; `--live` stub
+   reserved for future gate (blocked in S47 — no live backend module).
+5. Reuse `run_target_offline_boundary_enforced_fullcontext_response` — no parallel pipeline.
 
 ## Deliverables
 
-1. Thin orchestrator module (reuse S42 + S41 only; no duplicated S33–S45 logic).
-2. Offline acceptance tests per criteria below + neighbor regression.
-3. ARCH/ROADMAP S46 status only.
+1. `evals/v5/fullcontext_response_eval_contract.py` — frozen hash, schema validation.
+2. `evals/v5/demo/fullcontext_response_eval_matrix.json` — ~20 frozen cases.
+3. `evals/v5/fullcontext_response_eval_backend.py` — recording adapters, live-not-configured.
+4. `evals/v5/run_fullcontext_response_eval.py` — offline harness runner + CLI.
+5. `tests/test_fullcontext_response_eval_matrix_contract.py`
+6. `tests/test_fullcontext_response_eval_harness.py`
+7. ARCH/ROADMAP S47 status.
 
 ## Boundaries / allowlist
 
 - `TASK.md`
-- `core/target_boundary_enforced_fullcontext_response.py` (new)
-- `tests/test_target_boundary_enforced_fullcontext_response.py` (new)
+- `evals/v5/fullcontext_response_eval_contract.py`
+- `evals/v5/fullcontext_response_eval_backend.py`
+- `evals/v5/run_fullcontext_response_eval.py`
+- `evals/v5/demo/fullcontext_response_eval_matrix.json`
+- `tests/test_fullcontext_response_eval_matrix_contract.py`
+- `tests/test_fullcontext_response_eval_harness.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
-**Forbidden:** изменение `core/target_turn_frame_policy_envelope_enforcement.py`,
-`core/target_turn_frame_bound_response.py`, S45 core, S42 detector, A9, S43 artifacts,
-runtime/UI/session, live/LLM, new result contracts unless STOP escalation, RAG/routing,
-fallback/retry/repair, Verifier/authority weakening.
+**Forbidden:** live run; live backend module; S43 matrix/artifacts changes; A9; runtime/UI/session;
+product authority; message→TurnFrame; changes to S42–S46 core; RAG/routing; provider imports in
+default harness path; retry/repair/fallback; weakening Verifier; new situation phrase tables.
 
-## Minimal protected acceptance (offline, no live)
+## Minimal protected acceptance (offline)
 
-1. `boundary=none` + service-specific price: enforce×1, S41×1, Composer×1, Verifier×1 →
-   verified structured price.
-2. confident `medical_handoff` + `service_id=None` + pain: materialize, Composer×1,
-   Verifier×1, grounded reassurance, not terminal.
-3. confident `medical_handoff` + missing-base synthetic: controlled materialized response,
-   consultation, not defer; external medical fact rejected.
-4. `boundary=uncertain`: terminal defer; S41/Composer/Verifier not called.
-5. inconsistent boundary: typed fail-closed; downstream not called.
-6. topic/policy incompatibility: existing S41 typed error unchanged.
-7. same prebuilt `TargetCachedFullContext` for Composer + Verifier; no builder/FS in S46.
-8. Neighbor regression: targeted S42 enforcement, S41 dispatch/bound, S45 content response,
-   necessary S40/S39 neighbors; no skip/xfail.
+1. Frozen matrix hash validates; ~20 cases; required kinds present; no observed/pass fields in source.
+2. Harness dry-run loads matrix; reports case count.
+3. Terminal uncertain case: outcome terminal; Composer×0; Verifier×0.
+4. Materialize case (e.g. price): S46 path; Composer×1; Verifier×1; outcome materialize_verified
+   with fake backends configured for offline pass.
+5. Pain reassurance case: medical_handoff + service_id=None path materializes.
+6. Missing-base case: materialize expected; forbidden external medical terms in rubric.
+7. Neighbor: S46 orchestrator tests still green (targeted, no full pytest).
+8. No live imports in harness default path; `--live` blocked or live-not-configured.
 
-Run only listed targeted tests with external `--basetemp` and `-p no:cacheprovider`. **No full
-pytest. No live.**
+Run targeted tests with external `--basetemp` and `-p no:cacheprovider`. **No full pytest. No live.**
 
 ## Gates
 
 1. Independent **PRE-CODE** checker on governance TASK.
-2. Commit/push `docs: govern S46 boundary-enforced FullContext verified response` (**TASK.md
-   only**).
+2. Commit `docs: govern S47 FullContext response quality eval preparation` (**TASK.md only**).
 3. Implement allowlist; run targeted offline tests.
 4. Independent **COMPLETION** checker.
 5. One completion commit; push; clean/synced.
 
 ## Explicitly out of scope
 
-- Medical boundary detector / live classifier
-- message→TurnFrame planner (A9)
-- Runtime wiring / UI / session / product authority
-- Changes to FullContext vs structured authority (S45)
-- Provider prompt caching / legacy bridge
+- First live eval run
+- Model selection
+- Multi-turn session memory eval
+- S43 re-run
+- Runtime wiring

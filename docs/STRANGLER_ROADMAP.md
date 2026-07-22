@@ -24,8 +24,8 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **A9 Frozen Matrix/Harness v2 Review** (governance `71aa405`, completion `8700721`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S29 — selected-source follow-up materialization завершён offline** |
-| Ближайший рабочий фокус без live | **Минимальная UI-source policy над раздельными content/price candidates; без product wiring** |
+| Отдельная S-series без live | **S30 — minimal follow-up source policy: governance pending, код не начат** |
+| Ближайший рабочий фокус без live | **Проверить governance S30; до checker ✅ код не писать** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -172,6 +172,9 @@
   completion review `✅`: target `37 passed`, четыре S27/S28 neighbors `44 passed`, всего
   `81 passed`, skip/xfail нет. UI merge, session suppression и product wiring не входят
   в checkpoint; следующий focus — минимальная UI-source policy над proven tuples.
+- [ ] **S30 — minimal follow-up source policy** — governance prepared: caller явно
+  задаёт `content`, `price` или отсутствие ссылок; policy сохраняет все candidates
+  выбранного типа без merge/ranking/fallback. До independent checker `✅` код не пишется.
 
 ## Какой roadmap актуален
 

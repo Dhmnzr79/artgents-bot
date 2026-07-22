@@ -44,8 +44,11 @@ Boundary detection → TurnFrame → Boundary enforcement + Response policy → 
    - **Fail-safe слоя evidence** (иначе он сам станет новым тихим fail-open): низкая уверенность в `topic` → уточнение **или** безопасный multi-topic scope; evidence не найден → **честный defer**; **запрещено молча расширять scope до всей базы**.
 5. **Composer** — только формулирует по spec + evidence.
 6. **Verifier** — числа, медзона-граница, тема, запрещённые/обязательные факты.
-   - **Рантайм:** числа, медзона (дёшево и критично) — каждый ход.
-   - **Тематическая протечка:** eval-слой **+ рантайм для high-risk режимов или sampling** (не каждый ход — из-за латентности, но и не только eval, иначе новые формулировки протекут).
+   - **Первый target-рантайм:** deterministic digit-number provenance + одна компактная
+     semantic assessment на каждый ответ. Accuracy-first решение владельца закрывает
+     numbers-as-words, grounding, topic/medzone и selected facts до накопления live-данных.
+   - **Будущая оптимизация:** high-risk/sampling вместо каждого semantic check допустимы
+     только отдельным governance-решением после измерений качества, задержки и стоимости.
 
 ## Сквозные законы
 
@@ -162,6 +165,16 @@ evidence, передаёт их одному injected backend ровно оди�
 choice. Follow-ups и CTA не передаются модели. Retry, repair, fallback, provider wiring,
 live quality proof, Verifier и product authority в S37 отсутствуют.
 
+S38 добавляет fail-closed target Verifier. Digit-form numeric claims сверяются по типу и
+значению только с exact selected evidence; structured offer/doctor JSON раскрывает цены,
+этапы, package/profile text без сканирования IDs, а lexical names вроде `All-on-4` уходят в
+semantic grounding. Каждый selected strict commercial fact обязан присутствовать verbatim.
+После deterministic checks каждый ответ получает ровно одну provider-neutral semantic
+assessment: grounding (включая числа словами и unit/context), topic scope, medical boundary
+и все selected facts. Verifier не чинит и не сокращает текст: mismatch/failure блокирует,
+success сохраняет exact S37 text и sidecars. Provider/live quality proof, runtime/UI и
+product authority всё ещё отсутствуют.
+
 ---
 
 ## Порядок работ — strangler, две кучи
@@ -185,7 +198,8 @@ A должна быть **самодостаточной**: её собстве�
 2. Единый `TurnFrame` + декларативный `ResponseSpec` как контракт (снять `(topic,aspect)`-таблицу целиком).
 3. **Каркас `Evidence assembly`** (общий, с полным fail-safe).
 4. Field-level валидация — **общий механизм** с provenance по полям.
-5. `Verifier` как **компонент** (рантайм: числа/медзона + high-risk протечка; eval: остальное).
+5. `Verifier` как **компонент** (первый target-рантайм: deterministic digits + semantic
+   assessment каждого ответа; сужение до high-risk/sampling — только после измерений).
 6. Перенос ownership по осям (aspects → dialog_focus → patient_scope), затем удаление legacy. **Метрики:** per-axis accuracy, semantic pass rate, planner degraded rate, число LLM-вызовов, p50/p95, стоимость хода.
 7. **Trust/P3 — только после** общего evidence/policy механизма.
 

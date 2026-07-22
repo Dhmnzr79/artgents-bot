@@ -1,252 +1,162 @@
-# TASK — S28 Minimal Target Response Materialization Plan
+# TASK — S29 Selected-source Follow-up Materialization
 
-**Ветка:** `codex/stage-a`
+**Branch / baseline:** `codex/stage-a` / `5612dba feat: project target response materialization plans S28`
 
-**Baseline:** `4da1b4d feat: assemble vertical offline response materials S27`
+**Goal:** materialize candidate follow-ups only from the S28-selected MD document and
+S27-selected offers. Offline/unwired; no UI merge, session filtering, Composer or authority.
 
-**Серия / checkpoint:** `S28` — минимальный downstream materialization plan над уже
-проверенным S27 material boundary. Он фиксирует, какие factual components передаются
-следующему слою, но не пишет ответ и не подключается к product path.
+## Owner laws
 
-**Режим:** governance + один new pure unwired module + synthetic/real-data unit tests +
-target architecture status. Никаких client-data changes, MD parsing, UI materialization,
-Composer/runtime/routes/authority, A9 или live/LLM.
+- ordinary content answer may expose authored `suggest_h3` from its selected document;
+- price answer may expose authored followups from its selected offers;
+- content and price navigation stay separate and preserve source order;
+- no fallback to another document/offer/service;
+- this checkpoint creates structured candidates, not widget buttons or natural text.
 
-## Owner direction
+## Exact API
 
-После S27 владелец подтвердил следующий шаг и отдельно уточнил ожидаемое будущее
-поведение: обычный информационный вопрос должен получать ответ по MD и тематические
-follow-up при их наличии; маркетинговые, price и doctor additions не должны превращать
-каждый ответ в перегруженную сборку.
-
-S28 поэтому не создаёт ещё один selector. Он принимает уже готовые S27 materials и
-явный upstream список требуемых компонентов. Результат — компактный downstream plan для
-будущего materializer. Existing old `AnswerPacket` не переиспользуется и не
-ремонтируется: это legacy product contract с IO/config/runtime ownership.
-
-Канонический upstream `ResponseSpec` из `docs/ARCH_TARGET_DESIGN.md` остаётся отдельным
-будущим ResponsePolicy boundary **до** evidence assembly. Только он будет владеть tone,
-allowed/forbidden topics, required facts, handoff и allowed deterministic cards. S28 не
-использует это имя и не инвертирует target chain.
-
-## Exact public API
-
-Создать `core/target_response_materialization_plan.py`:
+Create `core/target_response_followup_materializer.py`:
 
 ```python
-from typing import Literal, TypeAlias
-
-TargetResponseComponent: TypeAlias = Literal["content", "price", "doctors"]
+@dataclass(frozen=True, slots=True)
+class TargetContentFollowup:
+    id: str
+    label: str
+    ref: str
+    source_content_ref: str
 
 
 @dataclass(frozen=True, slots=True)
-class TargetResponseMaterializationPlan:
-    service_id: str
-    selected_brand_id: str | None
-    required_components: tuple[TargetResponseComponent, ...]
-    unfulfilled_components: tuple[TargetResponseComponent, ...]
-    primary_content_ref: str | None
-    offer_ids: tuple[str, ...]
-    doctor_ids: tuple[str, ...]
-    commercial_fact_ids: tuple[str, ...]
-    external_source_refs: tuple[str, ...]
-    consultation_content_ref: str | None
-    cta_key: str
+class TargetPriceFollowup:
+    id: str
+    label: str
+    ref: str
+    action: str
+    source_offer_ids: tuple[str, ...]
 
 
-def build_target_response_materialization_plan(
+@dataclass(frozen=True, slots=True)
+class TargetResponseFollowups:
+    content: tuple[TargetContentFollowup, ...]
+    price: tuple[TargetPriceFollowup, ...]
+
+
+def materialize_target_response_followups(
+    plan: TargetResponseMaterializationPlan,
     materials: TargetOfflineResponseMaterials,
     *,
-    required_components: Sequence[str],
-) -> TargetResponseMaterializationPlan:
+    md_root: Path,
+) -> TargetResponseFollowups:
     ...
 ```
 
-## Exact laws
+## Fixed validation order and laws
 
-### 1. Input validation
+Stable `TargetResponseFollowupMaterializationError(code, value)` stores `code`, `value`,
+message `f"{code}: {value!r}"`. Validation order is fixed:
 
-- `materials` обязан быть exact `TargetOfflineResponseMaterials`; иначе
-  `TargetResponseMaterializationPlanError(
-  "materialization_plan_materials_invalid", materials)`;
-- `required_components` обязан быть `Sequence`, но не `str/bytes`;
-- каждый item обязан быть exact одним из `content`, `price`, `doctors`;
-- empty sequence запрещён;
-- duplicates запрещены, порядок caller сохраняется;
-- stable errors:
-  - `materialization_plan_components_invalid` с offending container/item;
-  - `materialization_plan_components_empty` с empty tuple;
-  - `materialization_plan_component_duplicate` с copied tuple;
-- error наследует `ValueError`, хранит `code`, `value`; exact message
-  `f"{code}: {value!r}"`.
+1. `plan` exact type, then `materials` exact type.
+2. `md_root`: `isinstance(value, Path)`, `resolve(strict=True)`, existing directory.
+3. Rebuild canonical expected S28 plan with `materials` + `plan.required_components`.
+   If S28 rejects forged component state, raise `followup_plan_invalid(plan)`. Compare the
+   **whole** dataclass, including required/unfulfilled and all identities. Difference is
+   `followup_plan_materials_mismatch((plan, expected))`; no partial materialization.
+4. Content branch, then price branch. An earlier error always wins.
 
-S28 не revalidates/repairs nested S27 models и не нормализует component strings.
+Content branch runs only when `content` is required and fulfilled:
 
-### 2. Component projection
+- ref must be a canonical relative POSIX `.md` path: no `#`, backslash, absolute path,
+  empty/`.`/`..` part. Candidate uses `resolve(strict=True)` and must be a file whose
+  resolved path is `is_relative_to(resolved_root)`; symlink escape is invalid;
+- missing/unreadable/non-UTF-8 candidate is read-failed; only this selected file is read;
+- require opening/closing `---` frontmatter delimiters and a mapping. Strict SafeLoader
+  rejects duplicate and YAML merge keys;
+- optional `suggest_h3`: missing/empty means no content candidates; otherwise exact list
+  of unique nonblank strings, no normalization;
+- scan body only, outside fenced code. Recognize exact line grammar
+  `### <nonblank label> {#<id>}` with ID `[A-Za-z0-9_-]+`; headings without an explicit
+  ID are not candidates. Duplicate explicit H3 ID fails before suggestion lookup;
+- every suggested ID must exist in that same body. Preserve `suggest_h3` order; label is
+  exact heading text, ref is `<primary_content_ref>#<id>`.
 
-Для каждого required component в caller order:
+Price branch runs only when `price` is required and fulfilled. Full plan equality already
+proves every ID in `plan.offer_ids` exists in selected S27 offers. Traverse plan offer order, then
+authored followup order. Duplicate ID becomes one first-position record and accumulates
+`source_offer_ids` in offer order; label/action must match or conflict. Ref is exact
+`price:<service_id>/<id>`. No generic/other-brand lookup.
 
-- `content` fulfilled только если `materials.selected_content_ref is not None`;
-  тогда `primary_content_ref` — exact ref, иначе `None` и `content` добавляется в
-  `unfulfilled_components`;
-- `price` fulfilled только если `materials.offers` non-empty;
-  тогда `offer_ids` — exact projected S27 order, иначе empty и `price` unfulfilled;
-- `doctors` fulfilled только если `materials.doctors` non-empty;
-  тогда `doctor_ids` — exact authored S27 order, иначе empty и `doctors` unfulfilled;
-- не запрошенный component всегда даёт empty/`None` output и не считается unfulfilled.
+Unrequested/unfulfilled branch returns its empty tuple without source read/fallback.
+Content and price remain separate; no ranking, mutation, shown-state or click handling.
 
-`unfulfilled_components` сохраняет порядок `required_components`. Это fail-closed signal
-для будущего policy/materializer boundary. Сам materializer обязан surface/fail closed,
-не брать похожую цену, другой документ или врача другой услуги и не решать, нужно ли
-уточнение/defer. Такое решение принадлежит будущему upstream ResponsePolicy.
+| Code | Condition | Exact `value` |
+|---|---|---|
+| `followup_plan_invalid` | wrong type or S28 rejects forged component state | original `plan` |
+| `followup_materials_invalid` | wrong type | original `materials` |
+| `followup_md_root_invalid` | wrong type/unresolvable/not directory | original `md_root` |
+| `followup_plan_materials_mismatch` | whole plan differs from rebuilt expected | `(plan, expected)` |
+| `followup_content_ref_invalid` | ref grammar, containment or symlink escape | ref |
+| `followup_content_read_failed` | missing/not-file/read/UTF-8 failure | ref |
+| `followup_frontmatter_invalid` | delimiters/YAML/mapping/duplicate/merge invalid | ref |
+| `followup_suggestions_invalid` | invalid container/item; duplicate uses copied tuple | offending value |
+| `followup_anchor_duplicate` | duplicate explicit body H3 ID | ID |
+| `followup_suggestion_not_found` | suggested ID absent from explicit body H3s | ID |
+| `followup_price_conflict` | same ID has different payload | `(id, first_label, first_action, conflicting_label, conflicting_action)` |
 
-### 3. Automatic additions already selected by S21/S22
+## Explicit boundaries
 
-S28 не принимает отдельные marketing toggles и не повторяет policy:
+S29 does not change `clients/**`, existing contracts/core, S27/S28 decisions, MD files or
+prices. It does not create widget quick replies, choose one UI source, suppress an active
+or already-clicked followup, mark session state, read raw text/TurnFrame/A9, or call
+ResponsePolicy/ResponseSpec/Composer/Verifier/runtime. No live/LLM.
 
-- `commercial_fact_ids` — exact S27 fact order;
-- `external_source_refs` — exact S27 ref order;
-- `consultation_content_ref` — exact `consultation_close.content_ref` или `None`;
-- `cta_key` — exact `materials.marketing_selection.cta_key`.
+The future UI policy must choose/limit one source family per turn and apply shown/clicked
+state. S29 only proves source-safe candidate materialization.
 
-Эти fields — уже выбранные content identities, которые downstream не имеет права
-reselect/replace. Будущими остаются только exact payload materialization и форма
-отображения/UI. S28 не читает и не формулирует текст, не отмечает cadence state.
-
-### 4. Identity-only contract
-
-Plan содержит только identity/order/inclusion decisions. Он намеренно не копирует:
-
-- деньги, package, payment stages и price followups из offers;
-- doctor position/experience/profile text;
-- commercial fact text, consultation value и MD body.
-
-Следующий materializer получает plan вместе с S27 materials и может брать exact payload
-только по перечисленным IDs/refs. Это не второй источник правды и не потеря данных.
-
-## Follow-up boundary
-
-S28 не строит UI follow-ups:
-
-- price followups уже сохранены внутри S27 projected offers;
-- ordinary content navigation в demo сейчас authored как MD `suggest_h3`;
-- S28 сохраняет exact `primary_content_ref`, но не читает MD/frontmatter;
-- следующий отдельный materialization checkpoint должен разрешить suggestions только из
-  выбранного документа, сохранить authored order и не смешивать их с price followups;
-- до этого нельзя заявлять, что новый path уже воспроизводит follow-up UI.
-
-Итоговое target-поведение остаётся: обычный content answer + тематические follow-up при
-наличии; price/doctor/marketing добавляются только когда разрешены соответствующими
-upstream policy и material plan fields.
-
-## Deliberate S28 limits
-
-S28 не:
-
-- читает raw patient message, TurnFrame или session;
-- выбирает service/brand/offer/doctor/marketing заново;
-- исправляет опечатки и не применяет A9 patient scope;
-- читает MD, `suggest_h3`, price followups или profile body;
-- создаёт text blocks, prompt, natural-language answer, cards/buttons;
-- задаёт upstream ResponseSpec, tone, allowed/forbidden topics, required-fact policy,
-  handoff или deterministic-card policy;
-- вызывает old `AnswerPacket`, materializer, Composer, Verifier, FullContext;
-- подключается к planner/routes/API/app/UI/config;
-- меняет contracts S1–S27, clients, runtime, authority или A9 artifacts;
-- запускает live/LLM.
-
-Канонический ResponsePolicy/ResponseSpec (medical handoff, contacts, booking, lead,
-allowed/forbidden topics, tone, required facts/cards) остаётся будущим отдельным
-**upstream** boundary checkpoint до evidence assembly. Не раздувать S28 фиктивными
-режимами, которых текущая S27 vertical slice не может доказать.
-
-## Затрагиваемые файлы
+## Allowlist
 
 - `TASK.md`;
-- `core/target_response_materialization_plan.py` — new pure offline projection;
-- `tests/test_target_response_materialization_plan.py` — new synthetic contract;
-- `tests/test_demo_target_response_materialization_plan.py` — new real demo acceptance;
-- `docs/ARCH_TARGET_DESIGN.md` — честная S28 boundary/status note;
-- `docs/STRANGLER_ROADMAP.md` — pending `[ ]`, затем `[x]` только после completion checker `✅`.
+- `core/target_response_followup_materializer.py` (new);
+- `tests/test_target_response_followup_materializer.py` (new);
+- `tests/test_demo_target_response_followup_materializer.py` (new);
+- `docs/ARCH_TARGET_DESIGN.md`;
+- `docs/STRANGLER_ROADMAP.md`.
 
-Любой другой файл — стоп и отдельное owner/architect decision.
+Everything else is protected, including `clients/**`, `contracts/**`, old
+`answer_packet*`, `md_chunks.py`, UI/runtime/session/A9/live artifacts.
 
-## Protected / вне scope
+## Acceptance
 
-- весь `clients/**`, `contracts/**` и existing core S1–S27;
-- old `contracts/answer_packet.py`, `core/answer_packet*.py`, Composer/runtime;
-- MD/frontmatter loaders and content/price followup resolution;
-- TurnFrame/A9, medical/contact/booking/lead boundaries;
-- Response materializer, prompt, natural language, Verifier, UI/session;
-- golden/live/eval fixtures;
-- A9 design/raw/frozen/harness/evidence/re-audit;
-- live/LLM, merge, `main`, other branches, product authority.
+Synthetic target proves:
 
-## Acceptance tests
+- exact frozen shapes/signature/errors/import firewall;
+- input and canonical whole-plan rebuild/match, including forged component state;
+- content: selected file only, exact order/labels/refs, empty/malformed/traversal/missing/
+  duplicate/unknown-anchor fail-closed cases;
+- price: selected offers only, exact order, stable duplicate aggregation/conflict,
+  exact action/ref/provenance;
+- component gates perform no unnecessary MD read and never fallback/merge;
+- repeated calls stateless/read-only; no skip/xfail/hacks.
 
-### Synthetic contract
+Real demo proves:
 
-`tests/test_target_response_materialization_plan.py` proves:
+- All-on-4 content gives exact three authored `suggest_h3` refs/labels;
+- caries content has no suggestions;
+- All-on-4 price gives `stages`, then `includes`, each sourced by all three selected offers;
+- Nobel price gives the same two IDs sourced only by Nobel;
+- caries price has none; caries+Nobel unfulfilled price has none;
+- content-only does not expose price and price-only does not read content suggestions;
+- demo files unchanged; no product imports/writes/live.
 
-1. exact API/field order, frozen/slots shell and identity-only payload;
-2. invalid materials/container/item/empty/duplicate errors exact;
-3. component order preserved without normalization;
-4. content-only ordinary answer references only selected MD and no price/doctor IDs;
-5. price-only references only projected offer IDs in S27 order;
-6. doctors-only references exact linked doctor IDs in authored order;
-7. composite order preserved and all requested identities present;
-8. missing content/price/doctors marked unfulfilled without fallback;
-9. known brand with no service offer gives unfulfilled price, never generic offer;
-10. unrequested missing component is not reported unfulfilled;
-11. marketing fact/source/consultation/CTA identities pass exact without reselection;
-12. money/stages/followups/text/profile are absent from plan shape;
-13. repeated calls stateless and no S27 input mutation;
-14. imports only stdlib + S27 facade; no IO/client/contracts expansion/runtime;
-15. source has only four governed error codes, no broad exception translation.
+Minimal neighbors: S28 target/demo and S27 target/demo only. No full suite, legacy UI,
+A9 or live/LLM.
 
-### Real demo acceptance
+## Gates / commits
 
-`tests/test_demo_target_response_materialization_plan.py` proves read-only:
+1. Governance checker `✅` before code.
+2. Commit/push `docs: govern selected-source followups S29` only stage-a.
+3. Implement allowlist; target + four neighbors.
+4. Completion checker `✅`; roadmap `[x]`.
+5. Commit/push `feat: materialize selected-source followups S29`; final clean/synced.
 
-1. real S27 All-on-4 materials load through existing frozen tools;
-2. content-only plan points to exact All-on-4 MD and contains no price/doctor IDs;
-3. price+doctors plan contains exact S27 projected offer order and linked doctor order;
-4. Nobel price plan contains only `all_on_4.jaw.nobel`;
-5. caries content plan points to exact MD; price contains only `caries.default`;
-6. caries+Nobel price is unfulfilled with no generic fallback;
-7. cost/doctor-trust/consultation identities and CTA pass exact from S27;
-8. client files unchanged; no product imports/writes/skip/xfail/live/LLM.
-
-### Minimal neighbors
-
-- `tests/test_target_offline_response_assembly.py`;
-- `tests/test_demo_target_offline_response_assembly.py`;
-- `tests/test_target_response_evidence.py`;
-- `tests/test_demo_target_response_evidence.py`;
-- `tests/test_target_offer_projection.py`;
-- `tests/test_target_brand_offer_projection.py`.
-
-Не запускать old AnswerPacket/Composer/runtime suites, full suite, A9 или live/LLM.
-
-## Checker and git gates
-
-1. Governance TASK + roadmap pending; independent checker `✅` before code.
-2. Commit `docs: govern target response materialization plan S28`; push only stage-a.
-3. Implement only allowlist; target then minimal neighbors.
-4. Independent completion checker `✅`; then roadmap `[x]`.
-5. Commit `feat: project target response materialization plans S28`; push stage-a.
-6. Final clean/synced.
-
-## Definition of Done
-
-- S28 declaratively projects requested components from S27 without re-selection;
-- missing required material is explicit and fail-closed;
-- ordinary content-only plan stays clean; marketing identity remains policy-selected;
-- follow-up data remains in its owners and its materialization is not falsely claimed;
-- both checker gates `✅`, target/neighbors green, no skip/xfail;
-- no clients/contracts/runtime/authority/A9/live changes;
-- two commits pushed only stage-a, clean/synced;
-- next checkpoint evaluates minimal identity-safe materialization (including selected-doc
-  content suggestions and selected-offer price followups), not another selector;
-- canonical upstream ResponsePolicy/ResponseSpec remains before evidence assembly and is
-  not duplicated or silently redefined by S28.
+Next checkpoint: minimal UI-source policy over proven separate candidate tuples, not a
+new selector and not product authority.

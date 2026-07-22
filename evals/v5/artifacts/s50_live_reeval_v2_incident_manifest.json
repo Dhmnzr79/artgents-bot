@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "incident_id": "s50_live_reeval_v2_incident_2026-07-22",
+  "status": "incident_captured_not_passed",
+  "baseline_commit": "848a7d7",
+  "matrix_v2_git_blob_hash": "615714c519a92a75e23c2f15bbaa01a0f88a4d95",
+  "parent_matrix_git_blob_hash": "14b1cbd4c3a8d906e0b19adb10ffaa60849803b3",
+  "model": "qwen3.7-plus",
+  "live_budget": {
+    "owner_approved_max_calls": 38,
+    "owner_approved_runs": 1,
+    "attempt_1_calls": 2,
+    "attempt_1_outcome": "abort_attribute_error_composer_audit_proxy_captures",
+    "attempt_2_calls": 38,
+    "actual_total_provider_calls": 40,
+    "log_authoritative_call_ledger": {
+      "path": "evals/v5/artifacts/s50_live_run_log.txt",
+      "composer_usage_events": 20,
+      "verifier_usage_events": 20,
+      "total_llm_usage_events": 40
+    },
+    "overrun_status": "incident_cost_not_retroactive_approval_not_precedent"
+  },
+  "incomplete_historical_accounting": {
+    "note": "Run-2 marker/manifest/result record total_llm_calls=38 only; omit abort attempt +2",
+    "paths": [
+      "evals/v5/artifacts/fullcontext_response_eval_v2_live_attempt.json",
+      "evals/v5/artifacts/s49_fullcontext_response_eval_v2_manifest.json",
+      "evals/v5/artifacts/fullcontext_response_eval_v2_live_result.json"
+    ],
+    "recorded_calls": 38,
+    "authoritative_total": 40
+  },
+  "artifact_pins": {
+    "run2_raw": {
+      "path": "evals/v5/artifacts/fullcontext_response_eval_v2_live_raw.json",
+      "sha256": "c78403a8a1a82f472d3665f4893db3fb3fa794a9db254e91611448081be7536c",
+      "bytes": 54919,
+      "immutable": true,
+      "note": "Run 2 only; diagnostic evidence"
+    },
+    "run2_result": {
+      "path": "evals/v5/artifacts/fullcontext_response_eval_v2_live_result.json",
+      "sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "bytes": 113269,
+      "immutable": true,
+      "note": "Run 2 only; diagnostic evidence"
+    },
+    "original_manifest": {
+      "path": "evals/v5/artifacts/s49_fullcontext_response_eval_v2_manifest.json",
+      "sha256": "8f61aa9097859337f31fbacf1ebf5d45ce3bee68d3f57955a99aa7a128567b8e",
+      "bytes": 639,
+      "immutable": true,
+      "note": "Historical; incomplete call accounting"
+    },
+    "attempt_marker": {
+      "path": "evals/v5/artifacts/fullcontext_response_eval_v2_live_attempt.json",
+      "sha256": "2d02c1c971e617f4583c86d27360b380d98736c6bbe00b268c8e68a2ace8c64c",
+      "bytes": 270,
+      "immutable": true,
+      "note": "Historical; started_provider_calls=38 only"
+    },
+    "full_log": {
+      "path": "evals/v5/artifacts/s50_live_run_log.txt",
+      "sha256": "76be057b272deffff3275ccd38a33c6e492f86d5b34c369d9e86626e3011cab2",
+      "bytes": 47594,
+      "immutable": true,
+      "note": "Authoritative 40-call ledger including attempt 1 abort"
+    },
+    "dirty_harness_pre_restore": {
+      "path": "evals/v5/run_fullcontext_response_eval.py",
+      "sha256": "5e2b12a3bb33f967012a0bc5e355b11549a51b5247702e72bc1c5700ae54c039",
+      "bytes": 33918,
+      "note": "Working tree during successful run 2; not committed"
+    },
+    "committed_harness_baseline": {
+      "path": "evals/v5/run_fullcontext_response_eval.py",
+      "commit": "848a7d7",
+      "sha256": "871c8467c1c7cfb51bbee2a576b644cd570a7832e5fd516114fca2229d7cb739",
+      "bytes": 32889
+    },
+    "dirty_audit_patch": {
+      "path": "evals/v5/artifacts/s50_live_harness_dirty_audit.patch",
+      "sha256": "2322e3fa2b7dac988f200c93406efa13ee1e3be482a1179d77f7a84fac1ee397",
+      "bytes": 1649
+    }
+  },
+  "live_verdicts_run2": {
+    "automated_verdict": "AUTOMATED_FAIL",
+    "final_verdict": "FAIL",
+    "outcome_match_count": 19,
+    "total_cases": 20,
+    "outcome_match_rate": 0.95,
+    "pipeline_error_count": 1,
+    "total_llm_calls_recorded_in_result": 38,
+    "diagnostic_only_ruling": true,
+    "s50_pass_proof": false
+  },
+  "owner_decisions": {
+    "actual_total_calls": 40,
+    "incident_cost_not_precedent": true,
+    "run2_artifacts_use": "diagnostic_evidence_only_not_s50_pass",
+    "formal_manual_review_required_now": false,
+    "rerun_forbidden_without_new_owner_approval": true,
+    "runtime_ui_a9_authority_untouched": true
+  },
+  "problem_cases_taxonomy": [
+    {
+      "case_id": "fc_missing_02",
+      "primary_cause": "composer_fault_external_medical_knowledge",
+      "verifier_ruling": "correct_reject",
+      "verifier_flags": {
+        "general_grounding_ok": false,
+        "medical_boundary_ok": false,
+        "selected_facts_ok": false
+      },
+      "composer_fault_example": "Псориаз относится к аутоиммунным заболеваниям"
+    },
+    {
+      "case_id": "fc_missing_01",
+      "primary_cause": "verifier_false_negative",
+      "secondary_cause": "composer_cross_disease_transfer",
+      "verifier_ruling": "false_negative_all_semantic_pass",
+      "composer_fault_example": "аутоиммунных заболеваний, таких как волчанка — not in FullContext"
+    },
+    {
+      "case_id": "fc_medical_03",
+      "primary_cause": "verifier_false_negative",
+      "secondary_cause": "composer_ungrounded_extensions",
+      "verifier_ruling": "false_negative_all_semantic_pass",
+      "composer_fault_example": "грудного вскармливания; гормональные изменения; заживления — absent from clinic MD (only беременность listed)"
+    }
+  ],
+  "positive_observations": {
+    "fc_medical_01": "acceptable_grounded_answer_s48b_calibration_worked",
+    "fc_boundary_02": "matrix_v2_fixture_fix_worked_no_patient_diagnosis"
+  },
+  "harness_dirty_hotfixes": {
+    "patch_path": "evals/v5/artifacts/s50_live_harness_dirty_audit.patch",
+    "hotfix_1": "__getattr__ delegation on audit proxy (fix captures AttributeError)",
+    "hotfix_2": "artifact_paths=None after marker creation (bypass re-preflight)",
+    "successful_run2_executed_on_dirty_tree": true,
+    "checkpoint_b_required": true
+  },
+  "next_milestone": "s50_harness_correction_checkpoint_b_blocked_until_governance"
+}

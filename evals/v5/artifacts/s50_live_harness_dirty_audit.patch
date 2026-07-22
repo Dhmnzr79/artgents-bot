@@ -1,0 +1,33 @@
+diff --git a/evals/v5/run_fullcontext_response_eval.py b/evals/v5/run_fullcontext_response_eval.py
+index 0b90fb6..bb2a35e 100644
+--- a/evals/v5/run_fullcontext_response_eval.py
++++ b/evals/v5/run_fullcontext_response_eval.py
+@@ -408,6 +408,9 @@ def _wrap_backend_factory_with_attempt_audit(
+                 self._backend = backend
+                 self.call_count = getattr(backend, "call_count", 0)
+ 
++            def __getattr__(self, name: str) -> object:
++                return getattr(self._backend, name)
++
+             def generate(self, invocation: object, /) -> object:
+                 record_v2_provider_call_started(attempt_marker_path)
+                 generate = getattr(self._backend, "generate")
+@@ -420,6 +423,9 @@ def _wrap_backend_factory_with_attempt_audit(
+                 self._backend = backend
+                 self.call_count = getattr(backend, "call_count", 0)
+ 
++            def __getattr__(self, name: str) -> object:
++                return getattr(self._backend, name)
++
+             def assess(self, invocation: object, /) -> object:
+                 record_v2_provider_call_started(attempt_marker_path)
+                 assess = getattr(self._backend, "assess")
+@@ -632,7 +638,7 @@ def main(argv: Sequence[str] | None = None) -> int:
+                         attempt_marker_path=attempt_marker_path,
+                     ),
+                     matrix_path=matrix_path,
+-                    artifact_paths=artifact_paths,
++                    artifact_paths=None,
+                     measurement_id=measurement_id,
+                     matrix_hash=matrix_hash,
+                 )

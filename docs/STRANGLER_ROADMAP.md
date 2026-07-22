@@ -55,7 +55,7 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S47 — FullContext response quality eval preparation** |
+| Последний завершённый checkpoint | **S47 correction — manual review verdict semantics** |
 | Предыдущий checkpoint | **S46 — boundary-enforced FullContext verified response** (`d5a8557`) |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 завершён**; frozen matrix + offline harness для первого live response eval |
@@ -349,6 +349,10 @@
   provider-neutral offline harness (`run_fullcontext_response_eval.py`) для будущего одного
   permitted live прогона S46→Composer→Verifier; semantic rubric без verbatim prose;
   `--dry-run` validate; default/`--live` → `LIVE_NOT_CONFIGURED`. Governance `5c96d54`. No live.
+- [x] **S47 correction — manual review verdict semantics** — automated vs final verdict split;
+  mandatory append-only manual review artifact; global + case-specific rubrics; proposed final
+  gates + model recommendation (`pending_owner_approval`); matrix hash update before first live.
+  Governance `643be1c`. No live.
 
 ## Какой roadmap актуален
 

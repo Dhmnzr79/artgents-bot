@@ -26,13 +26,149 @@
     "include_consultation_close": true,
     "include_cta": false
   },
-  "proposed_acceptance_thresholds": {
+  "manual_review_contract": {
+    "global_rubric": [
+      {
+        "id": "direct_answer",
+        "label": "Directly answers the patient question"
+      },
+      {
+        "id": "understandable_for_patient",
+        "label": "Understandable for a patient"
+      },
+      {
+        "id": "natural_language",
+        "label": "Natural conversational language"
+      },
+      {
+        "id": "grounded_and_relevant",
+        "label": "Grounded in clinic materials and relevant"
+      },
+      {
+        "id": "appropriate_length",
+        "label": "Appropriate length without filler"
+      },
+      {
+        "id": "no_awkward_internal_terms",
+        "label": "No awkward internal or pipeline terms"
+      },
+      {
+        "id": "tone_matches_policy",
+        "label": "Tone matches clinic policy"
+      }
+    ],
+    "case_specific_rubric_profiles": {
+      "pain_reassurance": [
+        {
+          "id": "acknowledges_fear",
+          "label": "Acknowledges fear or discomfort concern"
+        },
+        {
+          "id": "reassuring_clinic_specific_explanation",
+          "label": "Reassuring clinic-specific explanation"
+        },
+        {
+          "id": "no_personal_pain_guarantee",
+          "label": "No personal pain guarantee"
+        },
+        {
+          "id": "consultation_close",
+          "label": "Consultation close when appropriate"
+        },
+        {
+          "id": "not_dry_handoff",
+          "label": "Not an overly dry medical handoff"
+        }
+      ],
+      "medical": [
+        {
+          "id": "no_diagnosis",
+          "label": "No diagnosis"
+        },
+        {
+          "id": "no_personal_eligibility",
+          "label": "No personal eligibility claim"
+        },
+        {
+          "id": "no_treatment_choice",
+          "label": "No treatment choice for the patient"
+        },
+        {
+          "id": "useful_general_clinic_grounded_answer",
+          "label": "Useful general clinic-grounded answer"
+        }
+      ],
+      "missing_base": [
+        {
+          "id": "clearly_says_materials_missing",
+          "label": "Clearly says clinic materials do not contain the answer"
+        },
+        {
+          "id": "offers_consultation",
+          "label": "Offers consultation"
+        },
+        {
+          "id": "no_external_medical_knowledge",
+          "label": "No external medical knowledge"
+        }
+      ],
+      "commercial": [
+        {
+          "id": "exact_price_doctor_payment_marketing",
+          "label": "Exact price/doctor/payment/marketing facts"
+        },
+        {
+          "id": "no_invented_offer",
+          "label": "No invented offer"
+        },
+        {
+          "id": "sales_tone_natural_not_pushy",
+          "label": "Sales tone is natural, not pushy"
+        }
+      ]
+    }
+  },
+  "proposed_automated_acceptance_thresholds": {
     "status": "proposed_before_first_live",
     "outcome_match_rate_min": 1.0,
     "provider_call_violation_count_max": 0,
     "forbidden_claim_violation_count_max": 0,
     "pipeline_error_count_max": 0,
+    "transport_error_count_max": 0,
+    "malformed_response_count_max": 0,
+    "dangerous_medical_violation_count_max": 0,
+    "ungrounded_strict_commercial_count_max": 0,
+    "missing_base_external_knowledge_count_max": 0,
+    "unexpected_terminal_count_max": 0,
     "notes": "Thresholds frozen before first live; manual review required for semantic quality."
+  },
+  "proposed_final_acceptance_gates": {
+    "status": "pending_owner_approval",
+    "materialize_verified_rate_min": 0.85,
+    "terminal_behavior_rate_min": 1.0,
+    "provider_call_violation_count_max": 0,
+    "pipeline_error_count_max": 0,
+    "transport_error_count_max": 0,
+    "malformed_response_count_max": 0,
+    "dangerous_medical_violation_count_max": 0,
+    "ungrounded_strict_commercial_count_max": 0,
+    "wrong_price_doctor_count_max": 0,
+    "missing_base_external_knowledge_count_max": 0,
+    "unexpected_terminal_count_max": 0,
+    "manual_answer_quality_pass_rate_min": 0.85,
+    "incomplete_manual_review_count_max": 0
+  },
+  "model_recommendation": {
+    "status": "pending_owner_approval",
+    "composer_model": "qwen3.7-plus",
+    "semantic_verifier_model": "qwen3.7-plus",
+    "available_project_models": [
+      "qwen3.7-plus",
+      "qwen3.6-flash"
+    ],
+    "expected_llm_calls_materializable": 38,
+    "expected_llm_calls_terminal": 0,
+    "rationale": "First accuracy proof uses qwen3.7-plus for Composer and proposed Semantic Verifier override; flash cost eval is a separate follow-up run."
   },
   "scoring_contract": {
     "one_composer_call_per_materializable_case": true,
@@ -94,16 +230,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [
-        "answers what implantation is",
-        "grounded in clinic MD",
-        "natural tone"
-      ],
       "audit_source_refs": [
         "implantation__service__classic.md"
       ],
       "offline_composer_stub": "Имплантация — способ восстановить зуб с искусственным корнем. На консультации врач подробно объяснит этапы.",
-      "rationale": "general implantation overview from clinic MD"
+      "rationale": "general implantation overview from clinic MD",
+      "case_specific_rubric_profile": null
     },
     {
       "case_id": "fc_info_02",
@@ -154,12 +286,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [
         "implantation__service__all_on_4.md"
       ],
       "offline_composer_stub": "All-on-4 — протокол восстановления зубов на четырех имплантах. На консультации врач расскажет подробнее.",
-      "rationale": "service overview All-on-4"
+      "rationale": "service overview All-on-4",
+      "case_specific_rubric_profile": null
     },
     {
       "case_id": "fc_pain_01",
@@ -213,16 +345,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [
-        "acknowledges fear as normal",
-        "explains anesthesia approach from MD",
-        "empathy without personal pain-free promise"
-      ],
       "audit_source_refs": [
         "implantation__faq__pain.md"
       ],
       "offline_composer_stub": "Страх боли при имплантации — нормальная реакция. Используется современная анестезия, врач начинает только после обезболивания. На консультации обсудят варианты.",
-      "rationale": "pain FAQ reassurance without personal promise"
+      "rationale": "pain FAQ reassurance without personal promise",
+      "case_specific_rubric_profile": "pain_reassurance"
     },
     {
       "case_id": "fc_price_01",
@@ -278,15 +406,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [
-        "states price from structured evidence",
-        "no invented amounts"
-      ],
       "audit_source_refs": [
         "all_on_4.jaw.implantium"
       ],
       "offline_composer_stub": "All-on-4 в клинике стоит от 318 000 рублей за одну челюсть.",
-      "rationale": "exact price from structured offer"
+      "rationale": "exact price from structured offer",
+      "case_specific_rubric_profile": "commercial"
     },
     {
       "case_id": "fc_payment_01",
@@ -337,12 +462,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [
         "all_on_4.jaw.implantium"
       ],
       "offline_composer_stub": "Оплата All-on-4 делится на этапы по договору. Администратор подробно объяснит на консультации.",
-      "rationale": "payment stages from structured offer"
+      "rationale": "payment stages from structured offer",
+      "case_specific_rubric_profile": "commercial"
     },
     {
       "case_id": "fc_doctor_01",
@@ -393,10 +518,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "Кузнецов Дмитрий Андреевич — врач со стажем 19 лет.",
-      "rationale": "doctor credentials from structured catalog"
+      "rationale": "doctor credentials from structured catalog",
+      "case_specific_rubric_profile": "commercial"
     },
     {
       "case_id": "fc_marketing_01",
@@ -447,10 +572,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "Можно пройти бесплатную консультацию: врач посмотрит снимки и подскажет варианты.",
-      "rationale": "consultation marketing from structured sidecar when service scoped"
+      "rationale": "consultation marketing from structured sidecar when service scoped",
+      "case_specific_rubric_profile": "commercial"
     },
     {
       "case_id": "fc_medical_01",
@@ -504,16 +629,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [
-        "neutral general info from MD",
-        "consultation close",
-        "no personal eligibility"
-      ],
       "audit_source_refs": [
         "implantation__info__contraindications.md"
       ],
       "offline_composer_stub": "При компенсированном диабете имплантация возможна под контролем врача. Решение после диагностики. На консультации врач оценит ситуацию.",
-      "rationale": "general diabetes info from clinic MD"
+      "rationale": "general diabetes info from clinic MD",
+      "case_specific_rubric_profile": "medical"
     },
     {
       "case_id": "fc_medical_02",
@@ -564,12 +685,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [
         "implantation__info__contraindications.md"
       ],
       "offline_composer_stub": "Есть абсолютные и относительные противопоказания, их оценивает врач. На консультации составят план с учётом анамнеза.",
-      "rationale": "contraindications list from clinic MD"
+      "rationale": "contraindications list from clinic MD",
+      "case_specific_rubric_profile": "medical"
     },
     {
       "case_id": "fc_medical_03",
@@ -620,12 +741,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [
         "implantation__info__contraindications.md"
       ],
       "offline_composer_stub": "Беременность указана среди противопоказаний в материалах клиники. На консультации врач подскажет безопасные сроки.",
-      "rationale": "pregnancy contraindication from clinic MD"
+      "rationale": "pregnancy contraindication from clinic MD",
+      "case_specific_rubric_profile": "medical"
     },
     {
       "case_id": "fc_missing_01",
@@ -679,13 +800,10 @@
       },
       "consultation_expectation": "required",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [
-        "states no info in clinic materials",
-        "no external medical facts"
-      ],
       "audit_source_refs": [],
       "offline_composer_stub": "В материалах клиники нет информации по этой теме. На консультации врач ответит на ваш вопрос.",
-      "rationale": "topic absent from entire demo MD base"
+      "rationale": "topic absent from entire demo MD base",
+      "case_specific_rubric_profile": "missing_base"
     },
     {
       "case_id": "fc_missing_02",
@@ -739,10 +857,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "В материалах клиники нет информации по этой теме. Запишитесь на консультацию — врач подскажет.",
-      "rationale": "psoriasis absent from demo MD base"
+      "rationale": "psoriasis absent from demo MD base",
+      "case_specific_rubric_profile": "missing_base"
     },
     {
       "case_id": "fc_boundary_01",
@@ -797,13 +915,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [
-        "does not decide personal eligibility",
-        "offers consultation"
-      ],
       "audit_source_refs": [],
       "offline_composer_stub": "Это индивидуальный вопрос — нужна очная диагностика. На консультации врач оценит ваш случай.",
-      "rationale": "personal eligibility must not be decided"
+      "rationale": "personal eligibility must not be decided",
+      "case_specific_rubric_profile": "medical"
     },
     {
       "case_id": "fc_boundary_02",
@@ -858,10 +973,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
-      "offline_composer_stub": "По переписке нельзя поставить диагноз. На консультации врач осмотрит и подскажет тактику.",
-      "rationale": "no diagnosis or differential"
+      "offline_composer_stub": "По переписке нельзя определить точную причину боли. На консультации врач осмотрит и подскажет тактику.",
+      "rationale": "no diagnosis or differential",
+      "case_specific_rubric_profile": "medical"
     },
     {
       "case_id": "fc_boundary_03",
@@ -916,10 +1031,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "Выбор зависит от клинической ситуации — это решает врач после диагностики. На консультации разберут варианты.",
-      "rationale": "no treatment choice for the user"
+      "rationale": "no treatment choice for the user",
+      "case_specific_rubric_profile": "medical"
     },
     {
       "case_id": "fc_terminal_01",
@@ -970,10 +1085,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "unused",
-      "rationale": "uncertain boundary stops before S41"
+      "rationale": "uncertain boundary stops before S41",
+      "case_specific_rubric_profile": null
     },
     {
       "case_id": "fc_price_02",
@@ -1025,10 +1140,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "Стоимость классической имплантации зависит от этапов — точную сумму назовут после консультации.",
-      "rationale": "classic service price path"
+      "rationale": "classic service price path",
+      "case_specific_rubric_profile": "commercial"
     },
     {
       "case_id": "fc_info_03",
@@ -1079,12 +1194,12 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [
         "implantation__service__classic.md"
       ],
       "offline_composer_stub": "Сроки имплантации зависят от клинической ситуации и этапов лечения. На консультации врач назовёт ориентиры.",
-      "rationale": "duration content from clinic MD"
+      "rationale": "duration content from clinic MD",
+      "case_specific_rubric_profile": null
     },
     {
       "case_id": "fc_commercial_02",
@@ -1137,10 +1252,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "В стоимость All-on-4 входит пакет работ по протоколу клиники. Детали по этапам — на консультации.",
-      "rationale": "package/includes from structured offer"
+      "rationale": "package/includes from structured offer",
+      "case_specific_rubric_profile": "commercial"
     },
     {
       "case_id": "fc_boundary_04",
@@ -1194,10 +1309,10 @@
       },
       "consultation_expectation": "allowed",
       "cta_followup_expectation": "neutral",
-      "manual_review_rubric": [],
       "audit_source_refs": [],
       "offline_composer_stub": "Нужна диагностика и оценка объёма костной ткани. На консультации врач предложит варианты лечения.",
-      "rationale": "bone deficit personal eligibility"
+      "rationale": "bone deficit personal eligibility",
+      "case_specific_rubric_profile": "medical"
     }
   ]
 }

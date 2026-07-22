@@ -428,6 +428,13 @@ S46 with injected recording Composer/Verifier backends; terminal uncertain → 0
 materializable → Composer×1 + Verifier×1. `--live` blocked until separate governance. S43
 boundary eval unchanged. Governance `5c96d54`. No live.
 
+**S47 correction** (governance before first live): automated verdict (`AUTOMATED_PASS` /
+`AUTOMATED_FAIL`) is separate from final verdict; until append-only manual review artifact
+binds result SHA-256 + matrix hash for all cases, final verdict stays
+`PENDING_MANUAL_REVIEW` (never `PASS`). Global manual rubric + case-specific profiles in
+matrix; proposed final acceptance gates and model recommendation remain
+`pending_owner_approval`. No live.
+
 ---
 
 ## Порядок работ — strangler, две кучи

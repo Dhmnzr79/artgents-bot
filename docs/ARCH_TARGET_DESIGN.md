@@ -122,6 +122,12 @@ allowed/forbidden topic scope, required facts/components, follow-up family и pe
 лишь дополнительно сужают evidence. Manual-contact hard-stop происходит до ResponseSpec.
 S32 валидирует explicit spec offline, но ещё не строит его из TurnFrame и не имеет authority.
 
+S33 строит S32 spec из strict explicit non-A9 request и принимает только одно policy-
+решение: выбирает content/price/no follow-up по requested + primary component. Mode,
+topic scope, facts, components, tone и sales permissions остаются явными входами.
+Terminal request-only focus не отбрасывается молча; S32 safety errors не оборачиваются.
+TurnFrame/patient_scope, product authority и runtime не подключены.
+
 ---
 
 ## Порядок работ — strangler, две кучи

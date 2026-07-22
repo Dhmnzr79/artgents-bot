@@ -1,37 +1,75 @@
-# TASK — S40 Policy-bound Offline Verified Response Pipeline
+# TASK — S41 TurnFrame-bound Offline Response Dispatch
 
-**Branch / baseline:** `codex/stage-a` / `8fe1fc3 feat: compose offline verified response pipeline S39`
+**Branch / baseline:** `codex/stage-a` / `04e3dac feat: compose policy-bound offline verified response pipeline S40`
 
-**Goal:** compose the proven S33 ResponsePolicy builder, S34 spec-bound package assembly and
-S39 verified response pipeline into one minimal provider-neutral offline entry point that
-returns only an exact verified response from an explicit policy request. No runtime/UI/live
-wiring.
+**Goal:** add one deterministic TurnFrame dispatch boundary and a thin orchestrator that
+materializes `TargetResponsePolicyRequest` from `TurnFrame` + explicit envelope, calls S40
+only on the materialize path, and returns separate terminal decisions for
+clarify/defer/non-materializable medical handoff. No runtime/UI/live wiring.
 
 ## Owner laws
 
-- S40 adds orchestration only. It does not select services/facts/doctors, rebuild evidence,
-  duplicate validators, parse model text, infer policy fields, or create another policy layer.
-- Call public S33 exactly once with the exact supplied `TargetResponsePolicyRequest`.
-- Call public S34 exactly once with that exact spec and the exact supplied assembly inputs.
-- Call public S39 exactly once with that exact bound package and the exact supplied pipeline
-  inputs/backends. Return that exact verified result unchanged.
-- Stage order is strict `S33 → S34 → S39`. No downstream call occurs after an upstream
-  failure.
-- Every existing typed error propagates unchanged. S40 adds no error type, catch, rename,
-  retry, repair, fallback, partial response, logging/session/cache write or side effect.
-- Follow-ups/CTA remain exact sidecars through S39 law; S40 neither renders nor reselects them.
-- Recording Composer/semantic backends prove orchestration only. S40 does not prove answer
-  wording, semantic verifier quality, latency/cost, or product readiness.
-- S40 is still offline/unwired. Provider/live/LLM, TurnFrame/A9 authority, routes/UI/session
-  and product authority require later explicit decisions.
+- S41 adds dispatch + orchestration only. It does not read `patient_scope`, infer
+  medical_handoff from TurnFrame axes, load demo packs in core, parse model text, or create
+  another evidence/policy layer.
+- `medical_handoff` comes only from `envelope.boundary_decision == "medical_handoff"`.
+- Aspect mapping is fixed: `payment → price`; `stages → content` always; never map `stages`
+  to `price` by intent or other aspects. `price + stages → (content, price)`.
+- For `topic == "doctors"`, do not add `content` from `overview` alone. Valid confident
+  `topic` used in dispatch must intersect `envelope.allowed_topics` and not intersect
+  `envelope.forbidden_topics`; incompatibility is a typed fail-closed error.
+- Invalid input/metadata raises `TargetTurnFrameDispatchError`. Successful dispatch returns
+  only `materialize | terminal`; no `failed` union member and no optional verified field.
+- Terminal `clarify | defer | medical_handoff_nonmaterializable` stops before S34/S40.
+  Materializable `answer | medical_handoff` calls public S40 exactly once and returns exact
+  verified response unchanged.
+- Stage order on materialize path is strict `dispatch → S40`. No catch/rename/retry/fallback.
+- S41 is offline/unwired. Loaders facade in core, TurnFrame/A9 authority, routes/UI/session,
+  live/LLM and product authority require later explicit decisions.
 
 ## Contract
 
-Add `core/target_policy_bound_verified_response_pipeline.py`:
+Add `contracts/target_turn_frame_policy_envelope.py`:
 
 ```python
-def run_target_offline_policy_bound_verified_response_pipeline(
-    policy_request: TargetResponsePolicyRequest,
+class TargetTurnFramePolicyEnvelope(BaseModel):
+    boundary_decision: Literal["none", "medical_handoff"]
+    tone_key: CanonicalToken
+    allowed_topics: tuple[CanonicalToken, ...]
+    forbidden_topics: tuple[CanonicalToken, ...] = ()
+    required_fact_ids: tuple[CanonicalToken, ...] = ()
+    allow_marketing_facts: bool = False
+    allow_consultation_close: bool = False
+    allow_cta: bool = False
+    min_topic_confidence: float = 0.0
+    min_service_confidence: float = 0.0
+    min_intent_confidence: float = 0.0
+```
+
+Add `contracts/target_turn_frame_dispatch.py` with frozen dataclasses:
+
+- `TargetTurnFrameMaterializeDispatch(kind="materialize", policy_request=...)`
+- `TargetTurnFrameTerminalDispatch(kind="terminal", terminal_mode=..., spec=...)`
+- `TargetTurnFrameBoundMaterializeResponse(kind="materialize", dispatch=..., verified=...)`
+- `TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=...)`
+
+Add `core/target_turn_frame_dispatch.py`:
+
+```python
+class TargetTurnFrameDispatchError(ValueError): ...
+
+def dispatch_target_turn_frame_response(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> TargetTurnFrameMaterializeDispatch | TargetTurnFrameTerminalDispatch: ...
+```
+
+Add `core/target_turn_frame_bound_response.py`:
+
+```python
+def run_target_offline_turn_frame_bound_response(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
     bundle: ResponseSchemaBundle,
     doctor_catalog: TargetDoctorCatalog,
     external_index: ResponseSchemaExternalIndex,
@@ -53,86 +91,67 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
-) -> TargetVerifiedComposedResponse: ...
+) -> TargetTurnFrameBoundMaterializeResponse | TargetTurnFrameBoundTerminalResponse: ...
 ```
 
-Exact implementation sequence:
+Exact orchestrator sequence:
 
 ```python
-spec = build_target_response_spec(policy_request)
-bound_package = assemble_target_spec_offline_response_package(
-    bundle,
-    doctor_catalog,
-    external_index,
-    consultation_values,
-    spec=spec,
-    brand_term=brand_term,
-    strategy_context=strategy_context,
-    semantic_context=semantic_context,
-    today=today,
-    md_root=md_root,
-    include_initial_block=include_initial_block,
-    include_consultation_close=include_consultation_close,
-    include_cta=include_cta,
-    marketing_scenarios=marketing_scenarios,
-    shown_fact_ids=shown_fact_ids,
-    shown_amplifier_refs=shown_amplifier_refs,
-    shown_consultation_value_refs=shown_consultation_value_refs,
-)
-return run_target_offline_verified_response_pipeline(
-    bound_package,
-    bundle,
-    doctor_catalog,
-    consultation_values,
-    user_message=user_message,
-    md_root=md_root,
-    tone=tone,
-    composer_backend=composer_backend,
-    semantic_backend=semantic_backend,
+dispatch = dispatch_target_turn_frame_response(turn_frame, envelope)
+if dispatch.kind == "terminal":
+    return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
+return TargetTurnFrameBoundMaterializeResponse(
+    kind="materialize",
+    dispatch=dispatch,
+    verified=run_target_offline_policy_bound_verified_response_pipeline(
+        dispatch.policy_request,
+        ...,
+    ),
 )
 ```
 
-No conditional branch or exception handler is allowed in the pipeline function.
+No conditional branch beyond the dispatch kind check and no exception handler in the
+orchestrator function.
 
 ## Boundaries / allowlist
 
-No client data edits, old RAG/composer/verifier, live/LLM/provider SDK, A9/TurnFrame/patient
-scope, runtime/routes/UI/session/cache, product authority, new data model/policy/error, or
-full suite. Do not edit S27–S39 code/contracts/tests.
+No client data edits, loaders facade in core, old runtime path, live/LLM/provider SDK,
+A9/TurnFrame shadow wiring, routes/UI/session/cache, product authority, changes to S27–S40
+code/contracts/tests, or full suite.
 
 - `TASK.md`
-- `core/target_policy_bound_verified_response_pipeline.py`
-- `tests/test_target_policy_bound_verified_response_pipeline.py`
-- `tests/test_demo_target_policy_bound_verified_response_pipeline.py`
+- `contracts/target_turn_frame_policy_envelope.py`
+- `contracts/target_turn_frame_dispatch.py`
+- `core/target_turn_frame_dispatch.py`
+- `core/target_turn_frame_bound_response.py`
+- `tests/test_target_turn_frame_dispatch.py`
+- `tests/test_demo_target_turn_frame_bound_response.py`
 - `docs/ARCH_TARGET_DESIGN.md`
 - `docs/STRANGLER_ROADMAP.md`
 
 ## Minimal protected acceptance
 
-- exact public signature/return annotation and source-level straight-line sequence;
-- S33, S34 and S39 each reached exactly once on success, in order;
-- exact S33 spec is passed to S34; exact S34 bound package is passed to S39;
-- verified result/text/spec/follow-up/CTA identities returned unchanged;
-- S33 request failure calls neither S34 nor S39 and propagates exact error;
-- S34 permission/material failure calls no S39 backend and propagates exact error;
-- S39 downstream failures propagate unchanged with S39 short-circuit semantics;
-- real demo All-on-4 crosses S33→S34→S39 with exact price/doctor/natural fact, one recording
-  Composer and one recording semantic backend, verified sidecars and no client writes;
-- recording outputs are explicitly orchestration fixtures, not answer-quality mocks;
-- import firewall proves no legacy/provider/live/runtime/cache/search, skip or xfail.
+- fixed aspect mapping including owner correction: `payment → price`, `stages → content`
+  always; `price + stages → (content, price)`;
+- doctors-only path: valid confident `topic=doctors` with `overview` yields `(doctors,)`
+  without content;
+- valid confident topic used in dispatch must be envelope-compatible; incompatible topic
+  raises typed error;
+- `topic.field_meta.status == "invalid"` raises typed error;
+- `needs_clarification` valid → terminal `clarify` spec, S40 not called;
+- missing `service_id` on materialize path → terminal `defer`, S40 not called;
+- `boundary_decision=medical_handoff` with materializable inputs → S40 once with
+  `medical_handoff`; pure non-materializable handoff → terminal without S40;
+- orchestrator union forbids impossible combinations (`verified` only on materialize branch);
+- import firewall: no legacy/provider/live/runtime/cache/search/patient_scope reads, skip or
+  xfail.
 
-Run only S40 target/demo plus S39, S34 and S33 target/demo neighbors. No full suite.
+Run only S41 target/demo plus S40 and S33 target/demo neighbors. No full suite.
 
 ## Gates
 
 1. Independent governance checker before code.
-2. Commit/push `docs: govern policy-bound offline verified response pipeline S40` only to
-   stage-a.
+2. Commit/push `docs: govern TurnFrame-bound offline response dispatch S41` only to stage-a.
 3. Implement only the allowlist and run minimal offline tests.
 4. Independent completion checker, then roadmap `[x]`.
-5. Commit/push `feat: compose policy-bound offline verified response pipeline S40`; final
-   clean/synced.
-
-After S40, the target response-generation vertical is structurally complete offline from an
-explicit policy request through verified response. Live provider quality, upstream
-TurnFrame/authority and product wiring remain separate governed work.
+5. Commit/push `feat: dispatch TurnFrame-bound offline response S41`; final clean/synced.

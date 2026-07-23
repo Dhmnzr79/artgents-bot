@@ -132,3 +132,21 @@ def record_turn_frame_shadow(
     ctx[_CTX_STATUS] = SHADOW_STATUS_OK
     ctx.pop(_CTX_REASON, None)
     return frame
+
+
+def get_turn_frame_shadow_status() -> str | None:
+    ctx = _ctx()
+    if ctx is None:
+        return None
+    status = ctx.get(_CTX_STATUS)
+    return str(status) if status is not None else None
+
+
+def get_turn_frame_shadow_snapshot() -> dict[str, object] | None:
+    ctx = _ctx()
+    if ctx is None:
+        return None
+    snapshot = ctx.get(_CTX_SHADOW)
+    if not isinstance(snapshot, dict):
+        return None
+    return snapshot

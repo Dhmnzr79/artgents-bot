@@ -42,7 +42,9 @@ from session import (
     is_active_lead_flow,
     record_last_bot_payload,
 )
+from config import TARGET_FULLCONTEXT_DEV
 from orchestration.ask_turn import orchestrate_routing_after_resolver
+from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn
 from orchestration.helpers import get_last_content_ui_payload_compat
 from orchestration.lead_flow import build_service_payload, lead_flow_orchestration_result
 from orchestration.policy_compat import apply_response_policy_compat
@@ -414,6 +416,14 @@ def _orchestrate_ask_turn(data: dict):
         st=pre.st,
         enqueue_resolver_trace=_enqueue_v5_resolver_trace,
     )
+
+    if TARGET_FULLCONTEXT_DEV:
+        return orchestrate_target_fullcontext_turn(
+            q=pre.q,
+            sid=pre.sid,
+            client_id=pre.client_id,
+            data=pre.data,
+        )
 
     return orchestrate_routing_after_resolver(
         q=pre.q,

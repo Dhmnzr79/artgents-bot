@@ -92,6 +92,13 @@ FULLCTX_ON = os.getenv("FULLCTX_ON", "1").lower() in (
     "yes",
 )
 
+# --- Target FullContext product path (S61; default OFF — dev gate before authority) ---
+TARGET_FULLCONTEXT_DEV = os.getenv("TARGET_FULLCONTEXT_DEV", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 # --- Living copy for deterministic price group overviews (stage 5.5d) ---
 LIVING_OVERVIEW_ON = os.getenv("LIVING_OVERVIEW_ON", "0").lower() in (
     "1",

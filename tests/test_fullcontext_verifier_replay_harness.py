@@ -15,7 +15,9 @@ from evals.v5.fullcontext_verifier_replay_backend import (
 )
 from evals.v5.fullcontext_verifier_replay_contract import (
     BLAST_RADIUS_GROUPS,
+    DEFAULT_LIVE_ARTIFACT_PATHS,
     EXPECTED_BLOCK_CASE_IDS,
+    LIVE_ATTEMPT_MARKER_PATH,
     AttemptMarkerExistsError,
     HarnessConfigError,
     load_candidate_text,
@@ -30,6 +32,28 @@ from evals.v5.run_fullcontext_verifier_replay import (
     run_offline_replay_harness,
     run_replay_case,
 )
+import evals.v5.run_fullcontext_verifier_replay as replay_runner
+
+
+@pytest.fixture
+def isolated_live_artifact_paths(tmp_path, monkeypatch):
+    paths = {
+        "attempt": tmp_path / "attempt.json",
+        "raw": tmp_path / "raw.json",
+        "result": tmp_path / "result.json",
+        "ledger": tmp_path / "ledger.jsonl",
+        "manifest": tmp_path / "manifest.json",
+        "manual": tmp_path / "manual.json",
+    }
+    artifact_paths = tuple(paths.values())
+    monkeypatch.setattr(replay_runner, "LIVE_ATTEMPT_MARKER_PATH", paths["attempt"])
+    monkeypatch.setattr(replay_runner, "LIVE_RAW_ARTIFACT_PATH", paths["raw"])
+    monkeypatch.setattr(replay_runner, "LIVE_RESULT_ARTIFACT_PATH", paths["result"])
+    monkeypatch.setattr(replay_runner, "LIVE_CALL_LEDGER_PATH", paths["ledger"])
+    monkeypatch.setattr(replay_runner, "LIVE_MANIFEST_ARTIFACT_PATH", paths["manifest"])
+    monkeypatch.setattr(replay_runner, "LIVE_MANUAL_REVIEW_ARTIFACT_PATH", paths["manual"])
+    monkeypatch.setattr(replay_runner, "DEFAULT_LIVE_ARTIFACT_PATHS", artifact_paths)
+    return paths
 
 
 def _replay_case(case_id: str) -> dict[str, object]:
@@ -249,21 +273,47 @@ def test_blast_radius_summary_covers_mass_selling_groups() -> None:
         assert summary[group]["false_block_count"] == 0
 
 
-def test_cli_dry_run_validates_matrix(capsys) -> None:
+def test_cli_dry_run_validates_matrix(capsys, isolated_live_artifact_paths) -> None:
     assert run_replay_main(["--dry-run"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["dry_run"] is True
     assert out["materializable_case_count"] == 19
 
 
-def test_default_cli_live_not_configured(capsys) -> None:
+def test_default_cli_live_not_configured(capsys, isolated_live_artifact_paths) -> None:
     assert run_replay_main([]) == 3
     assert "LIVE_NOT_CONFIGURED" in capsys.readouterr().err
 
 
-def test_live_flag_live_not_configured(capsys) -> None:
-    assert run_replay_main(["--live"]) == 3
-    assert "LIVE_NOT_CONFIGURED" in capsys.readouterr().err
+def test_default_cli_blocked_when_attempt_marker_exists(capsys) -> None:
+    assert run_replay_main([]) == 4
+    assert "ATTEMPT_MARKER_EXISTS" in capsys.readouterr().err
+
+
+def test_live_flag_requires_owner_approved_wiring(
+    monkeypatch,
+    isolated_live_artifact_paths,
+) -> None:
+    monkeypatch.setattr(
+        "evals.v5.run_fullcontext_verifier_replay.prepare_replay_live_run",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "evals.v5.run_fullcontext_verifier_replay.run_replay_harness",
+        lambda **kwargs: {
+            "summary": {"automated_verdict": {"verdict": "AUTOMATED_PASS"}},
+            "case_results": [],
+        },
+    )
+    monkeypatch.setattr(
+        "evals.v5.run_fullcontext_verifier_replay.write_json_exclusive",
+        lambda path, payload: None,
+    )
+    monkeypatch.setattr(
+        "evals.v5.run_fullcontext_verifier_replay.sha256_file_hex",
+        lambda path: "deadbeef",
+    )
+    assert run_replay_main(["--live"]) == 0
 
 
 def test_semantic_adapter_requires_delegate() -> None:

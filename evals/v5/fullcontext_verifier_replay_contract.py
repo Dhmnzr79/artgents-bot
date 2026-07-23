@@ -62,7 +62,9 @@ DEFAULT_LIVE_ARTIFACT_PATHS = (
 )
 
 MEASUREMENT_ID = "s52_fullcontext_verifier_replay"
+MEASUREMENT_ID_LIVE = "s53_fullcontext_verifier_replay_live"
 SUITE_ID = "s52_fullcontext_verifier_replay"
+OWNER_APPROVED_SEMANTIC_MODEL = "qwen3.7-plus"
 TERMINAL_CONTROL_CASE_ID = "fc_terminal_01"
 
 ExpectedDecision = Literal["pass", "block"]
@@ -149,7 +151,7 @@ CASE_KEYS = frozenset(
 )
 
 AUTOMATED_ACCEPTANCE_GATES = {
-    "status": "pending_owner_approval",
+    "status": "owner_approved",
     "decision_match_rate_min": 1.0,
     "false_block_count_max": 0,
     "missed_block_count_max": 0,
@@ -164,7 +166,7 @@ AUTOMATED_ACCEPTANCE_GATES = {
 }
 
 MODEL_RECOMMENDATION = {
-    "status": "pending_owner_approval",
+    "status": "owner_approved",
     "semantic_verifier_model": "qwen3.7-plus",
     "expected_verifier_provider_calls_materializable": 19,
     "expected_composer_provider_calls_materializable": 0,
@@ -393,6 +395,128 @@ def assert_attempt_marker_absent(
         raise AttemptMarkerExistsError(
             f"{ATTEMPT_MARKER_EXISTS_CODE}: replay live attempt marker already exists: {path}"
         )
+
+
+def load_attempt_marker(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise HarnessConfigError("attempt marker must be object")
+    return payload
+
+
+def persist_attempt_marker(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
+    path.write_text(
+        json.dumps(serialized, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def record_replay_provider_call_started(path: Path) -> int:
+    marker = load_attempt_marker(path)
+    started = int(marker.get("started_provider_calls", 0)) + 1
+    marker["started_provider_calls"] = started
+    persist_attempt_marker(path, marker)
+    return started
+
+
+def append_call_ledger_entry(path: Path, entry: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = prepare_json_artifact_payload(entry)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(serialized, ensure_ascii=False) + "\n")
+
+
+def prepare_replay_live_run(
+    *,
+    attempt_marker_path: Path = LIVE_ATTEMPT_MARKER_PATH,
+    artifact_paths: tuple[Path, ...] = DEFAULT_LIVE_ARTIFACT_PATHS,
+    owner_override_attempt_marker: bool = False,
+    matrix_hash: str = REPLAY_MATRIX_HASH,
+) -> None:
+    assert_attempt_marker_absent(
+        attempt_marker_path,
+        owner_override=owner_override_attempt_marker,
+    )
+    assert_replay_live_artifacts_absent(artifact_paths)
+    create_attempt_marker_exclusive(
+        attempt_marker_path,
+        build_attempt_marker_payload(matrix_hash=matrix_hash),
+    )
+
+
+def _extract_semantic_issues(semantic_payload: object) -> list[dict[str, Any]]:
+    if not isinstance(semantic_payload, dict):
+        return []
+    assessment_payload = semantic_payload.get("assessment")
+    if isinstance(assessment_payload, dict):
+        raw_issues = assessment_payload.get("issues")
+    else:
+        raw_issues = semantic_payload.get("issues")
+    if isinstance(raw_issues, (list, tuple)):
+        return [issue for issue in raw_issues if isinstance(issue, dict)]
+    return []
+
+
+def build_manual_review_seed(
+    *,
+    case_results: list[dict[str, Any]],
+    result_sha256: str,
+    matrix_hash: str = REPLAY_MATRIX_HASH,
+) -> dict[str, Any]:
+    cases = []
+    for row in case_results:
+        if row.get("terminal_control"):
+            cases.append(
+                {
+                    "case_id": row["case_id"],
+                    "review_status": "not_applicable",
+                    "expected_decision": None,
+                    "observed_decision": row.get("observed_decision"),
+                    "semantic_issues": [],
+                    "blocking_issue_kinds": [],
+                    "offending_spans": [],
+                    "decision_match": row.get("decision_match"),
+                    "notes": "terminal control",
+                }
+            )
+            continue
+        semantic_payload = row.get("semantic_raw_payload")
+        issues = _extract_semantic_issues(semantic_payload)
+        blocking_kinds = [
+            issue.get("kind")
+            for issue in issues
+            if issue.get("kind")
+            in {
+                "unsupported_clinic_claim",
+                "personal_medical_conclusion",
+                "material_external_medical_claim",
+            }
+        ]
+        spans = [str(issue.get("offending_span", "")) for issue in issues if issue.get("offending_span")]
+        cases.append(
+            {
+                "case_id": row["case_id"],
+                "review_status": "pending",
+                "expected_decision": row.get("expected_decision"),
+                "observed_decision": row.get("observed_decision"),
+                "semantic_issues": issues,
+                "blocking_issue_kinds": blocking_kinds,
+                "offending_spans": spans,
+                "decision_match": row.get("decision_match"),
+                "blocking_kind_match": row.get("blocking_kind_match"),
+                "notes": "",
+            }
+        )
+    return {
+        "measurement_id": MEASUREMENT_ID_LIVE,
+        "matrix_git_blob_hash": matrix_hash,
+        "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
+        "result_sha256": result_sha256,
+        "reviewer": "pending",
+        "reviewed_at": None,
+        "cases": cases,
+    }
 
 
 def replay_provider_call_violation(

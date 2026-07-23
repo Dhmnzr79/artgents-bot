@@ -29,15 +29,21 @@ from evals.v5.fullcontext_verifier_replay_backend import (
     IssueBasedFakeSemanticBackend,
     owner_label_fake_assessment,
 )
-from core.target_response_verifier import TargetSemanticAssessment, TargetSemanticIssue
 from evals.v5.fullcontext_verifier_replay_contract import (
     ATTEMPT_MARKER_EXISTS_CODE,
     AUTOMATED_ACCEPTANCE_GATES,
     DEFAULT_LIVE_ARTIFACT_PATHS,
     FROZEN_SOURCE_RESULT_SHA256,
     LIVE_ATTEMPT_MARKER_PATH,
+    LIVE_CALL_LEDGER_PATH,
+    LIVE_MANIFEST_ARTIFACT_PATH,
+    LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+    LIVE_RAW_ARTIFACT_PATH,
+    LIVE_RESULT_ARTIFACT_PATH,
     MEASUREMENT_ID,
+    MEASUREMENT_ID_LIVE,
     MODEL_RECOMMENDATION,
+    OWNER_APPROVED_SEMANTIC_MODEL,
     REPLAY_MATRIX_HASH,
     REPLAY_MATRIX_PATH,
     TERMINAL_CONTROL_CASE_ID,
@@ -47,17 +53,18 @@ from evals.v5.fullcontext_verifier_replay_contract import (
     aggregate_replay_metrics,
     assert_attempt_marker_absent,
     assert_replay_live_artifacts_absent,
-    build_attempt_marker_payload,
+    build_manual_review_seed,
     classify_replay_decision,
-    create_attempt_marker_exclusive,
     evaluate_automated_verdict,
     evaluate_final_verdict,
+    _extract_semantic_issues,
     load_candidate_text,
     load_replay_matrix,
-    load_v2_case,
     prepare_json_artifact_payload,
+    prepare_replay_live_run,
     replay_case_by_id,
     replay_provider_call_violation,
+    sha256_file_hex,
     validate_frozen_source_pins,
 )
 from evals.v5.run_fullcontext_response_eval import _load_pipeline_context
@@ -88,15 +95,11 @@ def _required_blocking_kinds_satisfied(
     required = replay_case.get("required_blocking_issue_kinds") or []
     if observed_decision != "block":
         return not required
-    if not isinstance(semantic_payload, dict):
-        return False
-    issues = semantic_payload.get("issues")
-    if not isinstance(issues, (list, tuple)):
-        return False
+    issues = _extract_semantic_issues(semantic_payload)
     blocking_kinds = {
         issue.get("kind")
         for issue in issues
-        if isinstance(issue, dict) and issue.get("kind") in {
+        if issue.get("kind") in {
             "unsupported_clinic_claim",
             "personal_medical_conclusion",
             "material_external_medical_claim",
@@ -139,7 +142,8 @@ def run_replay_case(
     v2_spec: dict[str, Any],
     context: dict[str, object],
     composer_backend: FrozenCandidateComposerBackend,
-    semantic_backend: IssueBasedFakeSemanticBackend,
+    semantic_backend: object,
+    offline_mode: bool = True,
 ) -> dict[str, Any]:
     is_terminal = v2_case["case_id"] == TERMINAL_CONTROL_CASE_ID
     allowlist = v2_spec["turn_frame_allowlist"]
@@ -214,15 +218,17 @@ def run_replay_case(
     )
     false_block = bool(metrics.false_block) if metrics else False
     missed_block = bool(metrics.missed_block or (metrics and not blocking_kind_match and expected_decision == "block")) if metrics else False
-    composer_provider_calls = composer_backend.provider_call_count
-    verifier_provider_calls = semantic_backend.provider_call_count
+    composer_provider_calls = getattr(composer_backend, "provider_call_count", 0)
+    verifier_provider_calls = getattr(semantic_backend, "provider_call_count", 0)
+    composer_invocations = getattr(composer_backend, "invocation_count", 0)
+    semantic_invocations = getattr(semantic_backend, "invocation_count", 0)
     provider_violation = replay_provider_call_violation(
         is_terminal=is_terminal,
         composer_provider_calls=composer_provider_calls,
         verifier_provider_calls=verifier_provider_calls,
-        composer_invocations=composer_backend.invocation_count,
-        verifier_invocations=semantic_backend.invocation_count,
-        offline_mode=True,
+        composer_invocations=composer_invocations,
+        verifier_invocations=semantic_invocations,
+        offline_mode=offline_mode,
     )
     response_text: str | None = None
     if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
@@ -248,8 +254,8 @@ def run_replay_case(
         "blocking_kind_match": blocking_kind_match,
         "false_block": false_block,
         "missed_block": missed_block,
-        "composer_invocation_count": composer_backend.invocation_count,
-        "semantic_invocation_count": semantic_backend.invocation_count,
+        "composer_invocation_count": composer_invocations,
+        "semantic_invocation_count": semantic_invocations,
         "composer_provider_call_count": composer_provider_calls,
         "verifier_provider_call_count": verifier_provider_calls,
         "provider_call_violation": provider_violation,
@@ -267,8 +273,8 @@ def run_replay_case(
         "invalid_offending_span": reason_code == "target_verifier_semantic_output_invalid",
         "retry_count": max(
             0,
-            composer_backend.invocation_count - 1,
-            semantic_backend.invocation_count - 1,
+            composer_invocations - 1,
+            semantic_invocations - 1,
         ),
         "status": "OK"
         if decision_match and not provider_violation
@@ -303,15 +309,46 @@ def _owner_label_backend_factory(
     return factory
 
 
-def run_offline_replay_harness(
+def _live_backend_factory(
+    replay_spec: dict[str, Any],
     *,
-    backend_factory: Callable[
-        [dict[str, Any]],
-        tuple[FrozenCandidateComposerBackend, IssueBasedFakeSemanticBackend],
-    ],
+    call_ledger_path: Path,
+    attempt_marker_path: Path,
+) -> Callable[[dict[str, Any]], tuple[FrozenCandidateComposerBackend, object]]:
+    from evals.v5.fullcontext_verifier_replay_live_backend import (
+        FullContextVerifierReplayLiveSemanticBackend,
+    )
+
+    def factory(v2_case: dict[str, Any]) -> tuple[FrozenCandidateComposerBackend, object]:
+        case_id = v2_case["case_id"]
+        if case_id == TERMINAL_CONTROL_CASE_ID:
+            return (
+                FrozenCandidateComposerBackend("unused"),
+                IssueBasedFakeSemanticBackend(),
+            )
+        replay_case = replay_case_by_id(replay_spec, case_id)
+        candidate_text = load_candidate_text(case_id=case_id, replay_case=replay_case)
+        return (
+            FrozenCandidateComposerBackend(candidate_text),
+            FullContextVerifierReplayLiveSemanticBackend(
+                case_id=case_id,
+                model=OWNER_APPROVED_SEMANTIC_MODEL,
+                call_ledger_path=call_ledger_path,
+                attempt_marker_path=attempt_marker_path,
+            ),
+        )
+
+    return factory
+
+
+def run_replay_harness(
+    *,
+    backend_factory: Callable[[dict[str, Any]], tuple[FrozenCandidateComposerBackend, object]],
     replay_spec: dict[str, Any] | None = None,
     artifact_paths: Sequence[Path] | None = None,
     preflight_exclude_paths: Sequence[Path] | None = None,
+    offline_mode: bool = True,
+    measurement_id: str = MEASUREMENT_ID,
 ) -> dict[str, Any]:
     replay = replay_spec or load_replay_matrix()
     from evals.v5.fullcontext_response_eval_contract import load_v2_matrix
@@ -350,26 +387,54 @@ def run_offline_replay_harness(
                 context=context,
                 composer_backend=composer,
                 semantic_backend=semantic,
+                offline_mode=offline_mode,
             )
         )
 
-    summary = summarize_replay_results(case_results, replay_spec=replay)
+    summary = summarize_replay_results(
+        case_results,
+        replay_spec=replay,
+        measurement_id=measurement_id,
+        live_run=not offline_mode,
+    )
     return {"summary": summary, "case_results": case_results}
+
+
+def run_offline_replay_harness(
+    *,
+    backend_factory: Callable[
+        [dict[str, Any]],
+        tuple[FrozenCandidateComposerBackend, IssueBasedFakeSemanticBackend],
+    ],
+    replay_spec: dict[str, Any] | None = None,
+    artifact_paths: Sequence[Path] | None = None,
+    preflight_exclude_paths: Sequence[Path] | None = None,
+) -> dict[str, Any]:
+    return run_replay_harness(
+        backend_factory=backend_factory,
+        replay_spec=replay_spec,
+        artifact_paths=artifact_paths,
+        preflight_exclude_paths=preflight_exclude_paths,
+        offline_mode=True,
+    )
 
 
 def summarize_replay_results(
     case_results: Sequence[dict[str, Any]],
     *,
     replay_spec: dict[str, Any],
+    measurement_id: str = MEASUREMENT_ID,
+    live_run: bool = False,
 ) -> dict[str, Any]:
     metrics = aggregate_replay_metrics(list(case_results))
     summary = {
-        "measurement_id": MEASUREMENT_ID,
+        "measurement_id": measurement_id,
         "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
         "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
         **metrics,
         "proposed_automated_acceptance_gates": dict(AUTOMATED_ACCEPTANCE_GATES),
         "model_recommendation": dict(MODEL_RECOMMENDATION),
+        "live_run": live_run,
     }
     automated = evaluate_automated_verdict(summary)
     summary["automated_verdict"] = automated
@@ -445,8 +510,106 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.live:
-        print("LIVE_NOT_CONFIGURED", file=sys.stderr)
-        return 3
+        artifact_paths = DEFAULT_LIVE_ARTIFACT_PATHS
+        try:
+            prepare_replay_live_run(
+                attempt_marker_path=LIVE_ATTEMPT_MARKER_PATH,
+                artifact_paths=artifact_paths,
+                owner_override_attempt_marker=args.owner_override_attempt_marker,
+            )
+            payload = run_replay_harness(
+                backend_factory=_live_backend_factory(
+                    replay_spec,
+                    call_ledger_path=LIVE_CALL_LEDGER_PATH,
+                    attempt_marker_path=LIVE_ATTEMPT_MARKER_PATH,
+                ),
+                replay_spec=replay_spec,
+                artifact_paths=artifact_paths,
+                preflight_exclude_paths=(LIVE_ATTEMPT_MARKER_PATH,),
+                offline_mode=False,
+                measurement_id=MEASUREMENT_ID_LIVE,
+            )
+        except AttemptMarkerExistsError as error:
+            print(str(error), file=sys.stderr)
+            return 5
+        except (HarnessConfigError, LiveArtifactWriteError) as error:
+            print(f"CONFIG_ERROR: {error}", file=sys.stderr)
+            return 2
+
+        case_results = payload["case_results"]
+        verifier_calls = sum(
+            row.get("verifier_provider_call_count", 0)
+            for row in case_results
+            if not row.get("terminal_control")
+        )
+        if verifier_calls > 19:
+            print(
+                f"CONFIG_ERROR: verifier provider call budget exceeded count={verifier_calls}",
+                file=sys.stderr,
+            )
+            return 2
+
+        summary = payload["summary"]
+        summary["owner_approval"] = {
+            "semantic_verifier_model": OWNER_APPROVED_SEMANTIC_MODEL,
+            "max_verifier_provider_calls": 19,
+            "max_composer_provider_calls": 0,
+            "automated_gates_status": "owner_approved",
+        }
+        payload["summary"] = summary
+
+        raw_artifact = prepare_json_artifact_payload(
+            {
+                "measurement_id": MEASUREMENT_ID_LIVE,
+                "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
+                "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
+                "verifier_provider_call_count": verifier_calls,
+                "cases": [
+                    {
+                        "index": row["index"],
+                        "case_id": row["case_id"],
+                        "composer_provider_call_count": row["composer_provider_call_count"],
+                        "verifier_provider_call_count": row["verifier_provider_call_count"],
+                        "composer_raw_payload": row["composer_raw_payload"],
+                        "semantic_raw_payload": row["semantic_raw_payload"],
+                    }
+                    for row in case_results
+                ],
+            }
+        )
+        result_artifact = prepare_json_artifact_payload(payload)
+        manifest_artifact = prepare_json_artifact_payload(
+            {
+                "measurement_id": MEASUREMENT_ID_LIVE,
+                "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
+                "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
+                "verifier_provider_call_count": verifier_calls,
+                "attempt_marker_path": str(LIVE_ATTEMPT_MARKER_PATH),
+                "call_ledger_path": str(LIVE_CALL_LEDGER_PATH),
+                "raw_artifact_path": str(LIVE_RAW_ARTIFACT_PATH),
+                "result_artifact_path": str(LIVE_RESULT_ARTIFACT_PATH),
+                "manual_review_artifact_path": str(LIVE_MANUAL_REVIEW_ARTIFACT_PATH),
+            }
+        )
+        try:
+            write_json_exclusive(LIVE_RAW_ARTIFACT_PATH, raw_artifact)
+            write_json_exclusive(LIVE_RESULT_ARTIFACT_PATH, result_artifact)
+            write_json_exclusive(LIVE_MANIFEST_ARTIFACT_PATH, manifest_artifact)
+            result_sha256 = sha256_file_hex(LIVE_RESULT_ARTIFACT_PATH)
+            manual_review = build_manual_review_seed(
+                case_results=list(case_results),
+                result_sha256=result_sha256,
+            )
+            write_json_exclusive(
+                LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+                prepare_json_artifact_payload(manual_review),
+            )
+        except LiveArtifactWriteError as error:
+            print(f"ARTIFACT_WRITE_ERROR: {error}", file=sys.stderr)
+            return 6
+
+        print(json.dumps(result_artifact, ensure_ascii=False, indent=2))
+        return 0
 
     print("LIVE_NOT_CONFIGURED", file=sys.stderr)
     return 3

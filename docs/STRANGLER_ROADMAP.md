@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S52 — Verifier-only replay prep (offline harness on frozen S50 candidates)** |
-| Предыдущий checkpoint | **S51 correction — stale neighbor test + ARCH sync** |
+| Последний завершённый checkpoint | **S53 — verifier-only live replay (19 calls, AUTOMATED_FAIL)** |
+| Предыдущий checkpoint | **S52 — Verifier-only replay prep (offline harness)** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **Один verifier-only live run (19 calls) — только после отдельного owner approval model/gates/budget** |
+| Ближайший рабочий focus без live | **Verifier tuning / gate review после S53 AUTOMATED_FAIL (3 false blocks, 1 missed block)** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -388,6 +388,10 @@
   candidate texts; replay matrix metadata-only; frozen Composer injection + fake
   issue-based semantic backend; future-live artifact paths and gates pinned
   `pending_owner_approval`. **NO LIVE**. Governance `33b08fc`/`2ac1e72`.
+- [x] **S53 — verifier-only live replay** — one owner-approved live run:
+  `qwen3.7-plus`, 19 Verifier / 0 Composer calls; immutable artifacts +
+  manual review. **AUTOMATED_FAIL** (decision_match 13/19; false blocks on
+  fc_boundary_01–03; missed block fc_missing_01). Governance `2a9f3b1`.
 
 ## Какой roadmap актуален
 

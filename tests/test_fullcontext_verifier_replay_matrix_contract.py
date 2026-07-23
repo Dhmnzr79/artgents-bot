@@ -82,6 +82,8 @@ def test_model_and_gates_pending_owner_approval() -> None:
     spec = load_replay_matrix()
     assert spec["model_recommendation"]["status"] == "pending_owner_approval"
     assert spec["proposed_automated_acceptance_gates"]["status"] == "pending_owner_approval"
+    assert MODEL_RECOMMENDATION["status"] == "owner_approved"
+    assert AUTOMATED_ACCEPTANCE_GATES["status"] == "owner_approved"
     assert MODEL_RECOMMENDATION["expected_verifier_provider_calls_materializable"] == 19
     assert AUTOMATED_ACCEPTANCE_GATES["composer_provider_call_count_max"] == 0
 

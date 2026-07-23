@@ -1,0 +1,11 @@
+{
+  "measurement_id": "s53_fullcontext_verifier_replay_live",
+  "matrix_git_blob_hash": "a273a58d96b00a76fd22b4d6fc9b97791df4f6d1",
+  "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+  "verifier_provider_call_count": 19,
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_verifier_replay_live_attempt.json",
+  "call_ledger_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_verifier_replay_live_call_ledger.jsonl",
+  "raw_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_verifier_replay_live_raw.json",
+  "result_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_verifier_replay_live_result.json",
+  "manual_review_artifact_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\fullcontext_verifier_replay_manual_review.json"
+}

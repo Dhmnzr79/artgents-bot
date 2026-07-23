@@ -36,6 +36,7 @@ from core.target_composer_executor import (
     TargetComposerInvocation,
     TargetComposerTone,
 )
+from tests.s59_semantic_policy_backend import S59SemanticPolicyBackend
 from core.target_response_verifier import (
     TargetSemanticAssessment,
     TargetSemanticIssue,
@@ -72,6 +73,9 @@ MISSING_TOPIC_TEXT = (
 EXTERNAL_MEDICAL_TEXT = (
     "В материалах клиники нет информации по этой теме. "
     "Системный красный волчанок — аутоиммунное заболевание соединительной ткани."
+)
+PERSONAL_MEDICAL_REJECT_TEXT = (
+    "У вас волчанка, поэтому вам нельзя ставить импланты."
 )
 
 
@@ -118,18 +122,17 @@ class RuleBasedSemanticBackend:
                 issues += (_issue("personal_medical_conclusion", "вам не будет больно"),)
             return TargetSemanticAssessment(issues=issues)
         if self.mode == "missing_ok":
-            no_external = "волчан" not in text and "аутоиммун" not in text
             mentions_gap = "материал" in text and "нет" in text
             issues: tuple[TargetSemanticIssue, ...] = ()
             if not mentions_gap:
                 issues += (_issue("unsupported_clinic_claim", "материал"),)
-            if not no_external:
-                issues += (_issue("material_external_medical_claim", "аутоиммун"),)
-            return TargetSemanticAssessment(issues=issues)
-        if self.mode == "missing_reject":
-            return TargetSemanticAssessment(
-                issues=(_issue("material_external_medical_claim", "аутоиммун"),)
+            assessment = S59SemanticPolicyBackend().assess(invocation)
+            blocking = tuple(
+                issue for issue in assessment.issues if issue.kind != "minor_external_detail"
             )
+            return TargetSemanticAssessment(issues=issues + blocking)
+        if self.mode == "missing_reject":
+            return S59SemanticPolicyBackend().assess(invocation)
         raise AssertionError(f"unknown mode: {self.mode}")
 
 
@@ -421,7 +424,7 @@ def test_confident_medical_handoff_missing_base_materializes_not_defer(
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.verified.verification_status == "verified"
 
-    reject_composer = RecordingComposerBackend(EXTERNAL_MEDICAL_TEXT)
+    reject_composer = RecordingComposerBackend(PERSONAL_MEDICAL_REJECT_TEXT)
     reject_semantic = RuleBasedSemanticBackend(mode="missing_reject")
     with pytest.raises(Exception) as caught:
         run_target_offline_boundary_enforced_fullcontext_response(

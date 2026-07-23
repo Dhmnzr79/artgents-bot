@@ -49,10 +49,8 @@ class _CapturingSemanticAdapter:
 
 
 def _semantic_backend_for_case(case_id: str) -> object:
-    if case_id == "s57_missing_01":
-        return _CapturingSemanticAdapter(RuleBasedSemanticBackend(mode="fc_missing_01"))
-    if case_id == "s57_medical_02":
-        return _CapturingSemanticAdapter(RuleBasedSemanticBackend(mode="fc_medical_03"))
+    if case_id in {"s57_missing_01", "s57_medical_02"}:
+        return _CapturingSemanticAdapter(RuleBasedSemanticBackend(mode="s59"))
     return FullContextResponseEvalRecordingSemanticBackend()
 
 
@@ -106,11 +104,9 @@ def test_consult_case_includes_free_implant_consult_in_primary_evidence() -> Non
     )
 
 
-def test_missing_base_rejects_cross_disease_transfer() -> None:
+def test_missing_base_allows_cross_disease_transfer_under_s59() -> None:
     row = _run_single_case("s57_missing_01", composer_text=FC_MISSING_01_TEXT)
-    assert row["observed_outcome"] == "pipeline_error"
-    assert row["pipeline_error_code"] == "TargetResponseVerificationError"
-    assert row["reason"] == "target_verifier_semantic_rejected"
+    assert row["verification_status"] == "verified"
 
 
 def test_known_diabetes_stays_verified() -> None:
@@ -118,15 +114,13 @@ def test_known_diabetes_stays_verified() -> None:
     assert result["verification_status"] == "verified"
 
 
-def test_pregnancy_external_extension_rejected_by_fake_semantic() -> None:
+def test_pregnancy_external_extension_non_blocking_under_s59() -> None:
     bad_text = (
         "Беременность указана среди противопоказаний в материалах клиники. "
         "В период лактации гормональный фон замедляет заживление."
     )
     row = _run_single_case("s57_medical_02", composer_text=bad_text)
-    assert row["observed_outcome"] == "pipeline_error"
-    assert row["pipeline_error_code"] == "TargetResponseVerificationError"
-    assert row["reason"] == "target_verifier_semantic_rejected"
+    assert row["verification_status"] == "verified"
 
 
 @pytest.mark.parametrize(

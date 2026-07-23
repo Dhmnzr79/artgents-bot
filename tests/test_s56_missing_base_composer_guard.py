@@ -50,24 +50,24 @@ def test_composer_policy_forbids_missing_base_transfer_and_classification() -> N
     assert "immune-system" in lowered
 
 
-def test_missing_base_lupus_path_rejects_cross_disease_transfer() -> None:
+def test_missing_base_lupus_path_verifies_general_external_context() -> None:
     composer = RecordingComposerBackend(FC_MISSING_01_TEXT)
     semantic = RuleBasedSemanticBackend(mode="fc_missing_01")
-    with pytest.raises(TargetResponseVerificationError) as caught:
-        run_target_offline_turn_frame_bound_response(
-            _frame(aspects=["overview"], route="content"),
-            _envelope(
-                boundary_decision="medical_handoff",
-                required_fact_ids=(),
-                allow_marketing_facts=False,
-            ),
-            **_pipeline_inputs(
-                user_message="Можно ли делать имплантацию при системной красной волчанке?"
-            ),  # type: ignore[arg-type]
-            composer_backend=composer,
-            semantic_backend=semantic,
-        )
-    assert caught.value.code == "target_verifier_semantic_rejected"
+    result = run_target_offline_turn_frame_bound_response(
+        _frame(aspects=["overview"], route="content"),
+        _envelope(
+            boundary_decision="medical_handoff",
+            required_fact_ids=(),
+            allow_marketing_facts=False,
+        ),
+        **_pipeline_inputs(
+            user_message="Можно ли делать имплантацию при системной красной волчанке?"
+        ),  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.verified.verification_status == "verified"
 
 
 def test_known_diabetes_topic_stays_verified() -> None:

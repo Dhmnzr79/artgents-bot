@@ -59,10 +59,13 @@
 | Последний завершённый checkpoint | **S58 — one controlled S57 end-to-end live run (AUTOMATED_FAIL 7/9)** |
 | Последний завершённый checkpoint | **S61 — target FullContext runtime path (dev flag OFF)** |
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
-| Текущий S-series checkpoint | **Owner-approved local live runtime test / authority switch (not started)** |
+| Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
+| Текущий S-series checkpoint | **S64 — FullContext authority audit (read-only, complete)** |
+| Следующий gate | **S65 — minimal product authority switch (owner approval required)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Owner-approved local live test with `TARGET_FULLCONTEXT_DEV=1`; then authority switch** |
-| Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
+| Ближайший рабочий focus | **Owner decision on S65 authority switch (`TARGET_FULLCONTEXT_DEV` default flip + kill-switch)** |
+| Что сейчас отвечает в локальном demo | **Legacy product path** (`TARGET_FULLCONTEXT_DEV=0`); target path proven live under flag ON only |
+| FullContext authority | **NOT transferred** — dev flag default OFF |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -433,7 +436,16 @@
   Post-live audit (`396a226`): stdout capture SHA-pinned, frozen artifacts immutable, `RERUN_BLOCKED`.
   Offline correction: session hydration for doctors/price/payment follow-ups, CTA widget mapping, harness gates/ledger accounting.
   **NO LIVE / NO RERUN**.
-- [ ] **S63 — delta target FullContext HTTP live runtime test (offline prep)** — 3-turn isolated harness validating S62-B fixes only (CTA, follow-up ref, doctors hydration). Budget 15 provider calls. Artifacts `s63_*`. **OFFLINE ONLY / NO LIVE**.
+- [x] **S63 — delta target FullContext HTTP live runtime test** — OWNER APPROVED, **one attempt** (`520e34a`):
+  3 HTTP turns, `TARGET_FULLCONTEXT_DEV=1`, real providers; **AUTOMATED_PASS**, **manual PASS**;
+  3/3 `target_fullcontext_materialized`, legacy/RAG/chunk = 0, 14/15 provider calls, retry = 0,
+  FullContext build = 1. Artifacts `evals/v5/artifacts/s63_*`. **RERUN_BLOCKED**.
+- [x] **S64 — FullContext authority audit (read-only)** — code-traced audit of `/ask` + `/ask/stream`
+  OFF/ON chains, pre-target short-circuits, legacy component matrix, blockers, S65 minimal plan,
+  rollback semantics. Deliverable: `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md`. **NO product code / NO authority switch**.
+- [ ] **S65 — minimal product authority switch** — owner-approved default ON for target FullContext path;
+  emergency kill-switch via env flip between requests (no in-turn legacy fallback); offline tests only.
+  Legacy deletion **not** in S65 scope.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

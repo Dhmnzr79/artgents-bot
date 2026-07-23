@@ -29,9 +29,13 @@
 
 | Флаг | Что делает | Дефолт |
 |---|---|---|
-| `TARGET_FULLCONTEXT_DEV` | При `1` — `/ask` идёт только через target FullContext (S46); legacy RAG/chunk path не вызывается и не используется как fallback. При `0` — без изменений legacy path; target bootstrap не вызывается. | **OFF (`0`)** |
+| `TARGET_FULLCONTEXT_DEV` | При `1` — `/ask` и `/ask/stream` идут только через target FullContext (S46); legacy RAG/chunk/resolver routing не вызывается и **не** используется как fallback в том же ходе. При `0` — legacy product path; target bootstrap для ответов не вызывается. | **OFF (`0`)** |
 
-**S61:** не включать в реальном локальном процессе без отдельного owner approval. Offline tests используют fake/recording backends.
+**S61–S63:** target path проверен live под `=1` (S63: 3/3 materialized, legacy hits = 0). **Authority не передана** — дефолт OFF остаётся единственной причиной, почему в обычном локальном процессе отвечает legacy.
+
+**S64 audit:** `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md`. Emergency rollback = смена env **между** запросами (`=0` → legacy), не автоматический откат внутри одного turn.
+
+**S61:** offline tests используют fake/recording backends.
 
 ---
 

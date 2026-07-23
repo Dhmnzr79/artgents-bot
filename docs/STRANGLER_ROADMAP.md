@@ -379,7 +379,8 @@
 - [x] **S51 — lightweight risk-based semantic Verifier** — replace active five-boolean
   `TargetSemanticVerification` with issue-based `TargetSemanticAssessment`; deterministic
   numeric/strict-fact layer unchanged; historical five-boolean readers for frozen S47/S50
-  replay only. Offline contract/wiring tests only — **NO LIVE**. Governance `1231742`.
+  replay only. Offline contract/wiring tests only — **NO LIVE**. Governance `1231742`;
+  implementation `a2596f9`.
 
 ## Какой roadmap актуален
 

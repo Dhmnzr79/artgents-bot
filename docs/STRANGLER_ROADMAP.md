@@ -433,6 +433,7 @@
   Post-live audit (`396a226`): stdout capture SHA-pinned, frozen artifacts immutable, `RERUN_BLOCKED`.
   Offline correction: session hydration for doctors/price/payment follow-ups, CTA widget mapping, harness gates/ledger accounting.
   **NO LIVE / NO RERUN**.
+- [ ] **S63 — delta target FullContext HTTP live runtime test (offline prep)** — 3-turn isolated harness validating S62-B fixes only (CTA, follow-up ref, doctors hydration). Budget 15 provider calls. Artifacts `s63_*`. **OFFLINE ONLY / NO LIVE**.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

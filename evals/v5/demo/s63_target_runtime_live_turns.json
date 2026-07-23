@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "suite_id": "s63_target_runtime_live",
+  "client_id": "demo",
+  "turns": [
+    {
+      "turn": 1,
+      "turn_id": "s63_turn_01_all_on_4_info",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Что такое All-on-4?"
+      }
+    },
+    {
+      "turn": 2,
+      "turn_id": "s63_turn_02_followup_ref",
+      "endpoint": "/ask",
+      "request_kind": "followup_ref_from_turn_1",
+      "fallback_request": {
+        "q": "Кому подходит All-on-4?"
+      }
+    },
+    {
+      "turn": 3,
+      "turn_id": "s63_turn_03_doctors",
+      "endpoint": "/ask",
+      "request": {
+        "q": "А кто делает?"
+      }
+    }
+  ]
+}

@@ -55,10 +55,10 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S56 — topic-scoped consultation facts + missing-base Composer guard (OFFLINE)** |
-| Текущий S-series checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
-| Предыдущий checkpoint | **S55 — verifier-only live replay v2 (19 calls, AUTOMATED_FAIL 17/19)** |
-| Ближайший рабочий focus без live | **S57 matrix + harness; future live pending owner approval** |
+| Последний завершённый checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
+| Текущий S-series checkpoint | **S57 complete; future live pending owner approval** |
+| Предыдущий checkpoint | **S56 — topic-scoped consultation facts + missing-base Composer guard (OFFLINE)** |
+| Ближайший рабочий focus без live | **Owner approval for S57 live (9 Composer + 9 Verifier = 18 calls)** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -403,6 +403,11 @@
   optional `allowed_topics` on commercial facts; topic-scoped consultation selector for
   `service_id=None` FullContext path; PRIMARY_EVIDENCE wiring; minimal Composer rule 7 strengthen.
   Verifier unchanged. Targeted pytest 142 passed. **NO LIVE**.
+- [x] **S57 — compact end-to-end quality eval offline prep** — OFFLINE ONLY:
+  9-case matrix `s57_fullcontext_quality_eval_matrix` (frozen hash `89616cb…`);
+  harness reuses S47 `run_case` + single cached FullContext; fail-closed live CLI;
+  18 future LLM budget (9 Composer + 9 Verifier). Targeted pytest 47 passed.
+  **NO LIVE / NO LLM** — real model quality not yet measured.
 
 ## Какой roadmap актуален
 

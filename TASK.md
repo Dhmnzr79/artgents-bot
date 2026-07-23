@@ -1,6 +1,6 @@
 # TASK — S57 compact end-to-end quality eval (offline prep)
 
-**Baseline:** `codex/stage-a` / `f8d55f5` · **OFFLINE ONLY · NO LIVE**
+**Baseline:** `codex/stage-a` · **OFFLINE ONLY · NO LIVE · COMPLETE**
 
 ## Goal
 

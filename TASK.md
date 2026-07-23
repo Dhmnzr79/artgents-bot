@@ -37,7 +37,7 @@ Remove **provably dead** post-S69 legacy residue from active product/offline cod
 | Symbol / file | Active product callers | Offline tooling callers | Historical callers | Action |
 |---------------|------------------------|-------------------------|-------------------|--------|
 | `core/md_chunks.py` | none on target path | `build_index.split_md_to_chunks`; tests `get_chunk_by_ref` | deleted `price_flow`/`catalog_flow`/`answer_packet_*` | **PRUNE_SYMBOLS** `find_chunk_by_topic_aspect`; **KEEP** `split_md_to_chunks`, `get_chunk_by_ref`, `CONTACTS_CHUNK_REF` |
-| `core/catalog_resolution.py` | `clarify_state._md_korotko_ref` only | tests | deleted `catalog_flow`; dead `ux_builder` price resolution | **DELETE_NOW** file; **MOVE** `_md_korotko_ref` → `core/clarify_state.py` |
+| `core/catalog_resolution.py` | `clarify_state._md_korotko_ref` only | `tests/test_price_resolution.py` | deleted `catalog_flow`; dead `ux_builder.build_price_resolution_payload` | **DELETE_NOW** file; **MOVE** `_md_korotko_ref` → `core/clarify_state.py`; **PRUNE** `ux_builder.build_price_resolution_payload` + `fallback_reason_to_resolution`/`service_content_snippet` chain; **DELETE** `tests/test_price_resolution.py` |
 | `llm.py` retrieval rewrite | none (no callers) | `tests/test_rewrite_*` | deleted chunk path | **PRUNE_SYMBOLS** `rewrite_query_for_retrieval`, `validated_retrieval_rewrite`, `_REWRITE_SYSTEM`, `_norm_rewrite_compare` |
 | `llm.py` packet/chunk composer | none | deleted tests (already removed) | deleted `composer_flow` | **PRUNE_SYMBOLS** `build_messages_for_packet_composer*`, `generate_answer_from_packet*`, `generate_answer_stream`, `build_messages_for_gpt`, `generate_answer`, `generate_facts_card_answer`, `_format_composer_card_blocks`, `_consult_nudge_addon` usage in dead paths |
 | `core/rewrite_policy.py` | none | `tests/test_rewrite_policy.py` | `llm.rewrite_query_for_retrieval` | **DELETE_NOW** |
@@ -56,8 +56,8 @@ Remove **provably dead** post-S69 legacy residue from active product/offline cod
 | `core/knowledge_base.py` | none | `tests/test_knowledge_base.py` | deleted `composer_flow`, `living_frame` | **DELETE_NOW** |
 | `core/living_frame.py` | none | tests | deleted `patient_playbook_flow` | **DELETE_NOW** |
 | `core/price_brand_money.py` | none | `tests/test_price_brand_money.py` | deleted `price_flow`/`ask_turn` | **DELETE_NOW** |
-| `core/price_symptom_consult.py` | none | `tests/test_price_symptom_consult.py` | deleted `price_flow`/`composer_flow` | **DELETE_NOW** |
-| `core/price_group_overview.py` | none (answer builder) | `tests/test_price_group_overview.py` partial | deleted `price_flow`/`ux_builder` payloads | **DELETE_NOW** module; **KEEP** `query_selector` `group_overview` *routing mode* (no answer builder) |
+| `core/price_symptom_consult.py` | none | `tests/test_price_symptom_consult.py`; dead import in `tests/test_s61_correction_target_runtime.py` | deleted `price_flow`/`composer_flow` | **DELETE_NOW**; remove unused `CONSULT_SYMPTOM_DETAILS_REF` import from `test_s61_correction_target_runtime.py` |
+| `core/price_group_overview.py` | none (answer builder) | `tests/test_price_group_overview.py`; `tests/test_pricebook_golden.py` (overview sections); `tests/test_price_ref_routing.py` (quick replies); `core/price_offers.py` unit-clarify helpers | deleted `price_flow`/`ux_builder` payloads | **DELETE_NOW** module; **PRUNE** `price_offers` unit-clarify helpers + related tests; **KEEP** `query_selector` `group_overview` *routing mode* only |
 | `core/consult_nudge.py` | `app._service_reply`/`_sse_service_reply` `reset_consult_nudge_on_route` | tests | dead `ux_builder` catalog_facts writer | **KEEP_ACTIVE** |
 | `core/clarify_state.py` | `turn_planner_llm`, planner tests | tests | deleted composer clarify writer | **KEEP_ACTIVE**; absorb `_md_korotko_ref` |
 | `core/answer_planner.py` | `attribute_followup.detect_aspects` | tests | deleted `ask_turn` plan publish | **KEEP_ACTIVE** (shared selector; not C2 TurnFrame adapter) |
@@ -67,11 +67,11 @@ Remove **provably dead** post-S69 legacy residue from active product/offline cod
 | `session.last_subject`/`pending_clarify` | planner/focus readers | tests | deleted writers | **MOVE_TO_C2** map only — **do not change** |
 | `core/dialog_focus.py` legacy compat | shared selectors/focus | tests | — | **MOVE_TO_C2** map only — **do not change** |
 | `core/routing_loader.py` / `core/turn_timing.py` | ingress/resolver/finalize/app | eval harness | — | **KEEP_ACTIVE** |
-| `ux_builder.py` legacy payloads | none on target path | tests | deleted orchestration | **PRUNE_SYMBOLS** dead builders (`build_service_facts_card_payload`, `build_clarify_payload`, `build_price_*` legacy paths, `build_price_symptom_consult_*`, `build_price_group_overview_payload`, `build_price_unit_clarify_payload`, `build_price_concern_payload` chain); **KEEP** app/pre_resolver helpers |
+| `ux_builder.py` legacy payloads | none on target path | tests | deleted orchestration | **PRUNE_SYMBOLS** dead builders (`build_service_facts_card_payload`, `build_clarify_payload`, `build_price_resolution_payload`, `build_price_symptom_consult_*`, `build_price_group_overview_payload`, `build_price_unit_clarify_payload`, `build_price_concern_payload` chain); **KEEP** app/pre_resolver helpers (`empty_question_response`, `normalize_policy_payload`, `reset_session_response`, `internal_error_response`, `format_price_answer_from_item` if still referenced) |
 
 ### C2 mapping obligation (docs only)
 
-`docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` must answer owner sections 1–13 using **real call sites** from: `core/turn_planner_llm.py`, `core/turn_frame_from_raw.py`, `core/turn_frame_adapter.py`, `core/turn_frame_shadow.py`, `orchestration/resolver_turn.py`, `resolver.py`, `core/target_runtime_turn_frame_hydration.py`, `session.py`, `core/dialog_focus.py`, pricebook/patient playbook loaders — **no C2 code**.
+`docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` must answer owner Cleanup-series C2 spec sections 1–13 (legacy_plan → TurnFrame wiring, resolver fallback, session field migration, C2 allowlist/stop conditions) using **real call sites** from: `core/turn_planner_llm.py`, `core/turn_frame_from_raw.py`, `core/turn_frame_adapter.py`, `core/turn_frame_shadow.py`, `orchestration/resolver_turn.py`, `resolver.py`, `core/target_runtime_turn_frame_hydration.py`, `session.py`, `core/dialog_focus.py`, pricebook/patient playbook loaders — **no C2 code**.
 
 ---
 
@@ -108,10 +108,15 @@ Remove **provably dead** post-S69 legacy residue from active product/offline cod
 | `tests/test_price_group_overview.py` | **delete** (routing covered by `test_price_scope_router.py`) |
 | `tests/test_rewrite_policy.py` | **delete** |
 | `tests/test_rewrite_validation.py` | **delete** |
-| `tests/test_s69_legacy_deleted_offline.py` | extend forbidden imports list for C1 deletions |
+| `tests/test_s69_legacy_deleted_offline.py` | extend `DELETED_MODULES` + forbidden imports for C1 deletions (`catalog_resolution`, `knowledge_base`, `living_frame`, `price_brand_money`, `price_symptom_consult`, `price_group_overview`, `rewrite_policy`, `contracts.answer_packet`) |
 | `tests/test_s69_checkpoint_a_offline.py` | update if import assertions reference pruned symbols |
 | `tests/test_metadata_first_observability.py` | adjust only if pruned symbols removed |
-| `tests/test_price_offers.py` | remove tests for pruned dead helpers only |
+| `tests/test_price_offers.py` | remove tests for pruned unit-clarify/group-overview helpers only |
+| `tests/test_price_resolution.py` | **delete** (legacy price resolution payload) |
+| `tests/test_price_scope_router.py` | remove `build_price_resolution_payload` case only; keep routing tests |
+| `tests/test_price_ref_routing.py` | remove `group_overview_quick_replies` case; keep ref-routing tests |
+| `tests/test_pricebook_golden.py` | remove `test_s3_group_overview_from_manifest` and jaw overview sections only |
+| `tests/test_s61_correction_target_runtime.py` | remove unused `CONSULT_SYMPTOM_DETAILS_REF` import only |
 | `tests/test_finalize_metadata_first_hook.py` | adjust only if hook signatures change |
 | `docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` | **new** — C2 plan deliverable |
 | `docs/C1_LEGACY_RESIDUE_REPORT.md` | **new** — post-`rg` classification report |

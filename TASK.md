@@ -19,7 +19,7 @@ Fix four S61 runtime gaps before any live test. No new architecture, no Verifier
 | PRE-CODE checker | **❓ escalation** (not ✅) | CTA boundary + missing acceptance criteria + duplicate scope |
 | Implementation | started **before** PRE-CODE gate closed | Commits `4ed1e16`, `7e13fa6` on `codex/stage-a` |
 | Owner CTA ratification | **post-code** | Только CTA clamp; остальное — по критериям ниже |
-| Final acceptance | **depends on COMPLETION checker** | Independent read-only review on diff `8d7463f…HEAD` |
+| Final acceptance | **COMPLETION ✅** (`8d7463f…7c5fb13`, checker `drafts/checker_last.md`) | Independent read-only review after allowlist fix `7c5fb13` |
 
 PRE-CODE **не** считается ✅. Цепочка: PRE-CODE escalation → owner CTA ratification → governance correction → COMPLETION verdict.
 
@@ -146,4 +146,4 @@ Push only to `origin/codex/stage-a`.
 ## PRE-CODE / COMPLETION checker
 
 - PRE-CODE: **❓ escalation** — see «Governance / checker process» above.
-- COMPLETION: required on diff `8d7463f…HEAD`; final acceptance only after COMPLETION ✅.
+- COMPLETION: **✅** on diff `8d7463f…7c5fb13` (report: `drafts/checker_last.md`).

@@ -54,18 +54,22 @@ from evals.v5.fullcontext_verifier_replay_contract import (
     assert_attempt_marker_absent,
     assert_replay_live_artifacts_absent,
     build_manual_review_seed,
-    classify_replay_decision,
     evaluate_automated_verdict,
     evaluate_final_verdict,
-    _extract_semantic_issues,
     load_candidate_text,
     load_replay_matrix,
+    load_replay_matrix_v2,
     prepare_json_artifact_payload,
     prepare_replay_live_run,
     replay_case_by_id,
     replay_provider_call_violation,
+    score_replay_case,
     sha256_file_hex,
     validate_frozen_source_pins,
+    DEFAULT_V2_LIVE_ARTIFACT_PATHS,
+    REPLAY_MATRIX_V2_HASH,
+    REPLAY_MATRIX_V2_PATH,
+    MEASUREMENT_ID_V2,
 )
 from evals.v5.run_fullcontext_response_eval import _load_pipeline_context
 
@@ -84,28 +88,6 @@ def _serialize_raw_payload(payload: object) -> object:
             if not key.startswith("_")
         }
     return repr(payload)
-
-
-def _required_blocking_kinds_satisfied(
-    *,
-    replay_case: dict[str, Any],
-    semantic_payload: object,
-    observed_decision: str,
-) -> bool:
-    required = replay_case.get("required_blocking_issue_kinds") or []
-    if observed_decision != "block":
-        return not required
-    issues = _extract_semantic_issues(semantic_payload)
-    blocking_kinds = {
-        issue.get("kind")
-        for issue in issues
-        if issue.get("kind") in {
-            "unsupported_clinic_claim",
-            "personal_medical_conclusion",
-            "material_external_medical_claim",
-        }
-    }
-    return any(kind in blocking_kinds for kind in required)
 
 
 def _semantic_payload_from_backend(semantic_backend: object) -> object:
@@ -197,27 +179,23 @@ def run_replay_case(
     )
     expected_decision = replay_case["expected_decision"] if not is_terminal else None
     semantic_payload = _semantic_payload_from_backend(semantic_backend)
-    metrics = (
-        classify_replay_decision(observed=observed_decision, expected=expected_decision)  # type: ignore[arg-type]
+    score = (
+        score_replay_case(
+            replay_case=replay_case,
+            observed_decision=observed_decision,
+            semantic_payload=semantic_payload,
+        )
         if not is_terminal
         else None
     )
-    blocking_kind_match = (
-        _required_blocking_kinds_satisfied(
-            replay_case=replay_case,
-            semantic_payload=semantic_payload,
-            observed_decision=observed_decision,
-        )
-        if not is_terminal
-        else True
-    )
     decision_match = (
-        bool(metrics.decision_match and blocking_kind_match)
-        if metrics is not None
+        score.decision_match
+        if score is not None
         else observed_decision == "terminal_boundary_uncertain"
     )
-    false_block = bool(metrics.false_block) if metrics else False
-    missed_block = bool(metrics.missed_block or (metrics and not blocking_kind_match and expected_decision == "block")) if metrics else False
+    false_block = score.false_block if score is not None else False
+    missed_block = score.missed_block if score is not None else False
+    blocking_kind_match = score.blocking_kind_match if score is not None else True
     composer_provider_calls = getattr(composer_backend, "provider_call_count", 0)
     verifier_provider_calls = getattr(semantic_backend, "provider_call_count", 0)
     composer_invocations = getattr(composer_backend, "invocation_count", 0)
@@ -425,11 +403,12 @@ def summarize_replay_results(
     replay_spec: dict[str, Any],
     measurement_id: str = MEASUREMENT_ID,
     live_run: bool = False,
+    matrix_hash: str = REPLAY_MATRIX_HASH,
 ) -> dict[str, Any]:
     metrics = aggregate_replay_metrics(list(case_results))
     summary = {
         "measurement_id": measurement_id,
-        "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
+        "matrix_git_blob_hash": matrix_hash,
         "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
         **metrics,
         "proposed_automated_acceptance_gates": dict(AUTOMATED_ACCEPTANCE_GATES),
@@ -461,6 +440,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=MEASUREMENT_ID)
     parser.add_argument("--matrix", default=str(REPLAY_MATRIX_PATH))
     parser.add_argument(
+        "--matrix-v2",
+        action="store_true",
+        help="Use S54 replay matrix v2 (owner-approved label corrections)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate matrix and artifact guards only; no pipeline execution",
@@ -479,10 +463,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         validate_frozen_source_pins()
-        replay_spec = load_replay_matrix(path=Path(args.matrix))
+        if args.matrix_v2:
+            replay_spec = load_replay_matrix_v2()
+            matrix_hash = REPLAY_MATRIX_V2_HASH
+            artifact_paths = DEFAULT_V2_LIVE_ARTIFACT_PATHS
+            measurement_id = MEASUREMENT_ID_V2
+        else:
+            replay_spec = load_replay_matrix(path=Path(args.matrix))
+            matrix_hash = REPLAY_MATRIX_HASH
+            artifact_paths = DEFAULT_LIVE_ARTIFACT_PATHS
+            measurement_id = MEASUREMENT_ID
     except HarnessConfigError as error:
         print(f"CONFIG_ERROR: {error}", file=sys.stderr)
         return 2
+
+    if args.matrix_v2 and args.live:
+        print("V2_LIVE_PENDING_OWNER_APPROVAL", file=sys.stderr)
+        return 3
 
     try:
         assert_attempt_marker_absent(
@@ -490,22 +487,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             owner_override=args.owner_override_attempt_marker,
         )
         assert_replay_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
+        if args.matrix_v2:
+            assert_replay_live_artifacts_absent(DEFAULT_V2_LIVE_ARTIFACT_PATHS)
     except (AttemptMarkerExistsError, LiveArtifactWriteError) as error:
         print(f"ARTIFACT_GUARD: {error}", file=sys.stderr)
         return 4
 
     if args.dry_run:
         payload = {
-            "measurement_id": MEASUREMENT_ID,
-            "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
+            "measurement_id": measurement_id,
+            "matrix_git_blob_hash": matrix_hash,
             "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
             "materializable_case_count": 19,
             "terminal_control_case_id": TERMINAL_CONTROL_CASE_ID,
             "dry_run": True,
+            "matrix_v2": args.matrix_v2,
             "proposed_automated_acceptance_gates": dict(AUTOMATED_ACCEPTANCE_GATES),
             "model_recommendation": dict(MODEL_RECOMMENDATION),
-            "artifact_paths": {path.name: str(path) for path in DEFAULT_LIVE_ARTIFACT_PATHS},
+            "artifact_paths": {path.name: str(path) for path in artifact_paths},
         }
+        if args.matrix_v2:
+            payload["v2_live_status"] = "pending_owner_approval"
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
@@ -599,6 +601,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             manual_review = build_manual_review_seed(
                 case_results=list(case_results),
                 result_sha256=result_sha256,
+                replay_spec=replay_spec,
             )
             write_json_exclusive(
                 LIVE_MANUAL_REVIEW_ARTIFACT_PATH,

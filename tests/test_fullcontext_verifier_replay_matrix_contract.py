@@ -9,15 +9,20 @@ from evals.v5.fullcontext_verifier_replay_contract import (
     AUTOMATED_ACCEPTANCE_GATES,
     BLAST_RADIUS_GROUPS,
     EXPECTED_BLOCK_CASE_IDS,
+    EXPECTED_BLOCK_CASE_IDS_V2,
     FROZEN_SOURCE_RESULT_SHA256,
     MATERIALIZABLE_CASE_IDS,
     MODEL_RECOMMENDATION,
     REPLAY_MATRIX_HASH,
     REPLAY_MATRIX_PATH,
+    REPLAY_MATRIX_V2_HASH,
+    REPLAY_MATRIX_V2_PATH,
     TERMINAL_CONTROL_CASE_ID,
+    V2_CHANGED_CASE_IDS,
     HarnessConfigError,
     load_candidate_text,
     load_replay_matrix,
+    load_replay_matrix_v2,
     validate_frozen_source_pins,
     validate_replay_matrix_hash,
 )
@@ -95,6 +100,34 @@ def test_terminal_control_case_id_pinned() -> None:
 
 def test_replay_matrix_hash_constant_documented() -> None:
     assert REPLAY_MATRIX_HASH == "a273a58d96b00a76fd22b4d6fc9b97791df4f6d1"
+
+
+def test_replay_matrix_v2_hash_and_counts() -> None:
+    spec = load_replay_matrix_v2()
+    assert spec["parent_replay_matrix_git_blob_hash"] == REPLAY_MATRIX_HASH
+    assert REPLAY_MATRIX_V2_HASH == "009977fca3a3e2a37b5c865f74c55c49c00de669"
+    decisions = Counter(case["expected_decision"] for case in spec["cases"])
+    assert decisions["pass"] == 14
+    assert decisions["block"] == 5
+    block_ids = {case["case_id"] for case in spec["cases"] if case["expected_decision"] == "block"}
+    assert block_ids == EXPECTED_BLOCK_CASE_IDS_V2
+
+
+def test_replay_matrix_v2_delta_only_boundary_cases() -> None:
+    v1 = load_replay_matrix()
+    v2 = load_replay_matrix_v2()
+    v1_by = {case["case_id"]: case for case in v1["cases"]}
+    v2_by = {case["case_id"]: case for case in v2["cases"]}
+    changed = [case_id for case_id in v1_by if v1_by[case_id] != v2_by[case_id]]
+    assert set(changed) == V2_CHANGED_CASE_IDS
+    for case_id in v1_by:
+        if case_id in V2_CHANGED_CASE_IDS:
+            continue
+        assert v1_by[case_id] == v2_by[case_id]
+
+
+def test_replay_matrix_v2_path_pinned() -> None:
+    assert REPLAY_MATRIX_V2_PATH.name == "fullcontext_verifier_replay_matrix_v2.json"
 
 
 def test_duplicate_case_id_rejected(tmp_path) -> None:

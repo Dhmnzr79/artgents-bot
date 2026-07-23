@@ -449,7 +449,10 @@ verbatim `must_preserve_exact`; semantic backend not called after deterministic 
 **Non-blocking:** `minor_external_detail` (warning only). No model pass boolean; verdict derived
 from validated blocking kinds. Conversational empathy, consultation invitations, and faithful
 paraphrase are not violations. Old five-boolean fields remain **only** for historical frozen
-S47/S50 replay readers — not active product schema. FullContext, structured authority, and
+S47/S50 replay readers — not active product schema. **S54** clarified policy text only:
+`personal_medical_conclusion` excludes neutral doctor-will-decide-after-exam wording;
+missing-base forbids cross-condition contraindication/risk transfer when topic absent (no
+runtime disease lists). FullContext, structured authority, and
 FINAL_FULLCONTEXT_ONLY unchanged. Governance `1231742` / `a2596f9`. No live/LLM.
 
 ---

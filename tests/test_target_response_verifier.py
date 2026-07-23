@@ -260,6 +260,9 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
     assert "unsupported_clinic_claim" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "Never rewrite" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "minor_external_detail" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "NOT AN ISSUE" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "doctor will decide after examination" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "disclaimer that exact rules are unavailable" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
 
 
 def test_success_calls_one_semantic_backend_and_preserves_exact_response() -> None:

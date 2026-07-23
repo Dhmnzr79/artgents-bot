@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S53 — verifier-only live replay (19 calls, AUTOMATED_FAIL)** |
-| Предыдущий checkpoint | **S52 — Verifier-only replay prep (offline harness)** |
+| Последний завершённый checkpoint | **S54 — S53 post-live audit + verifier offline calibration (NO LIVE)** |
+| Предыдущий checkpoint | **S53 — verifier-only live replay (19 calls, AUTOMATED_FAIL)** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **Verifier tuning / gate review после S53 AUTOMATED_FAIL (3 false blocks, 1 missed block)** |
+| Ближайший рабочий focus без live | **S55 v2 verifier-only live replay — pending owner approval (model/budget)** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -392,6 +392,10 @@
   `qwen3.7-plus`, 19 Verifier / 0 Composer calls; immutable artifacts +
   manual review. **AUTOMATED_FAIL** (decision_match 13/19; false blocks on
   fc_boundary_01–03; missed block fc_missing_01). Governance `2a9f3b1`.
+- [x] **S54 — S53 post-live audit + verifier offline calibration** — frozen S53 artifacts
+  byte-identical; canonical replay issue parser fix; honest causal taxonomy (v1 15/19, v2 17/19
+  diagnostic recompute, frozen FAIL unchanged); replay matrix v2 (14 pass / 5 block); minimal
+  semantic policy clarification; future v2 live paths wired `pending_owner_approval`. **NO LIVE**.
 
 ## Какой roadmap актуален
 

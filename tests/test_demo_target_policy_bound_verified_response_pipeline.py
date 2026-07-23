@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import date
 from pathlib import Path
 
@@ -200,12 +201,38 @@ def test_real_s33_failure_reaches_neither_s34_nor_s39_backends() -> None:
     assert semantic.invocations == []
 
 
-def test_real_s34_failure_reaches_no_s39_backends() -> None:
+def test_real_s34_cta_clamp_continues_without_cta() -> None:
     inputs = _real_inputs()
     inputs["include_cta"] = True
     policy_request = inputs["policy_request"]
     assert isinstance(policy_request, TargetResponsePolicyRequest)
     inputs["policy_request"] = policy_request.model_copy(update={"allow_cta": False})
+    composer = RecordingComposerBackend()
+    semantic = RecordingSemanticBackend()
+
+    result = run_target_offline_policy_bound_verified_response_pipeline(
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+
+    assert len(composer.invocations) == 1
+    assert len(semantic.invocations) == 1
+    directives = json.loads(composer.invocations[0].response_directives_json)
+    assert directives["allow_cta"] is False
+    spec_json = json.loads(semantic.invocations[0].response_spec_json)
+    assert spec_json["allow_cta"] is False
+    assert result.selected_cta_key is None
+
+
+def test_real_s34_marketing_widen_forbidden_reaches_no_s39_backends() -> None:
+    inputs = _real_inputs()
+    inputs["include_initial_block"] = True
+    policy_request = inputs["policy_request"]
+    assert isinstance(policy_request, TargetResponsePolicyRequest)
+    inputs["policy_request"] = policy_request.model_copy(
+        update={"allow_marketing_facts": False}
+    )
     composer = RecordingComposerBackend()
     semantic = RecordingSemanticBackend()
     with pytest.raises(TargetSpecOfflineResponsePackageError) as caught:
@@ -215,6 +242,29 @@ def test_real_s34_failure_reaches_no_s39_backends() -> None:
             semantic_backend=semantic,
         )
     assert caught.value.code == "spec_package_permission_forbidden"
+    assert caught.value.value == "marketing_facts"
+    assert composer.invocations == []
+    assert semantic.invocations == []
+
+
+def test_real_s34_consultation_widen_forbidden_reaches_no_s39_backends() -> None:
+    inputs = _real_inputs()
+    inputs["include_consultation_close"] = True
+    policy_request = inputs["policy_request"]
+    assert isinstance(policy_request, TargetResponsePolicyRequest)
+    inputs["policy_request"] = policy_request.model_copy(
+        update={"allow_consultation_close": False}
+    )
+    composer = RecordingComposerBackend()
+    semantic = RecordingSemanticBackend()
+    with pytest.raises(TargetSpecOfflineResponsePackageError) as caught:
+        run_target_offline_policy_bound_verified_response_pipeline(
+            **inputs,  # type: ignore[arg-type]
+            composer_backend=composer,
+            semantic_backend=semantic,
+        )
+    assert caught.value.code == "spec_package_permission_forbidden"
+    assert caught.value.value == "consultation_close"
     assert composer.invocations == []
     assert semantic.invocations == []
 

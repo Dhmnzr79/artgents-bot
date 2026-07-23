@@ -58,7 +58,7 @@
 | Последний завершённый checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
 | Последний завершённый checkpoint | **S58 — one controlled S57 end-to-end live run (AUTOMATED_FAIL 7/9)** |
 | Последний завершённый checkpoint | **S61 — target FullContext runtime path (dev flag OFF)** |
-| Последний завершённый checkpoint | **S61 correction — ingress/CTA/session/strategy (COMPLETION ✅, OFFLINE)** |
+| Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Текущий S-series checkpoint | **Owner-approved local live runtime test / authority switch (not started)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
 | Ближайший рабочий focus | **Owner-approved local live test with `TARGET_FULLCONTEXT_DEV=1`; then authority switch** |
@@ -424,6 +424,7 @@
   TurnFrame bridge + widget materializer + session bridge. **OFFLINE ONLY / NO LIVE in S61**.
 - [x] **S61 correction** — target-only ingress precedence, effective CTA clamp (`client_cta_capability AND spec.allow_cta`), session frequency IDs,
   service-derived strategy context, HTTP `/ask`/`/ask/stream` integration tests. **OFFLINE ONLY**. COMPLETION checker ✅ on diff `8d7463f…7c5fb13`.
+- [x] **S61 test-hardening (pre-live)** — stale CTA pipeline test, session/frequency, legacy-bypass coverage, HTTP follow-up + two-turn session. **OFFLINE ONLY**.
 
 ## Какой roadmap актуален
 

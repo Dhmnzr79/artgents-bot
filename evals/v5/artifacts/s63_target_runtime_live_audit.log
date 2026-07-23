@@ -1,0 +1,34 @@
+{
+  "technical": {
+    "http_turns_completed": 3,
+    "target_answer_path": 3,
+    "legacy_hits": [],
+    "fullcontext_build_count": 1,
+    "followup_ref_pass": true,
+    "turn1_followup_visible": true,
+    "cta_widget_ok": true,
+    "doctors_materialized": true,
+    "session_continuity_ok": true,
+    "all_materialized": true,
+    "no_failure_routes": true
+  },
+  "provider": {
+    "total_calls": 14,
+    "role_totals": {
+      "composer": 3,
+      "ingress": 2,
+      "medical_boundary": 3,
+      "planner": 3,
+      "semantic_verifier": 3
+    },
+    "retries": 0,
+    "ledger_complete": true,
+    "ledger_balanced": true
+  },
+  "automated_verdict": "AUTOMATED_PASS",
+  "final_verdict": "PENDING_MANUAL_REVIEW",
+  "rerun_blocked_without_owner_approval": true,
+  "baseline_live_commit": "ca456073d35cf32fc0177417c19939f28ff3b8b6",
+  "sid": "s63-live-1d3b25e2eb6c",
+  "live_run": true
+}

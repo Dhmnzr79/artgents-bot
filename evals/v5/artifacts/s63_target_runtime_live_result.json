@@ -1,0 +1,496 @@
+{
+  "summary": {
+    "technical": {
+      "http_turns_completed": 3,
+      "target_answer_path": 3,
+      "legacy_hits": [],
+      "fullcontext_build_count": 1,
+      "followup_ref_pass": true,
+      "turn1_followup_visible": true,
+      "cta_widget_ok": true,
+      "doctors_materialized": true,
+      "session_continuity_ok": true,
+      "all_materialized": true,
+      "no_failure_routes": true
+    },
+    "provider": {
+      "total_calls": 14,
+      "role_totals": {
+        "composer": 3,
+        "ingress": 2,
+        "medical_boundary": 3,
+        "planner": 3,
+        "semantic_verifier": 3
+      },
+      "retries": 0,
+      "ledger_complete": true,
+      "ledger_balanced": true
+    },
+    "automated_verdict": "AUTOMATED_PASS",
+    "final_verdict": "PENDING_MANUAL_REVIEW",
+    "rerun_blocked_without_owner_approval": true,
+    "baseline_live_commit": "ca456073d35cf32fc0177417c19939f28ff3b8b6",
+    "sid": "s63-live-1d3b25e2eb6c",
+    "live_run": true
+  },
+  "turn_results": [
+    {
+      "turn": 1,
+      "turn_id": "s63_turn_01_all_on_4_info",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Что такое All-on-4?"
+      },
+      "followup_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\n**Как это работает:**\n*   **Быстрый результат:** Полный протокол лечения обычно занимает **1–3 дня**. В день операции вам фиксируют несъёмный временный протез, поэтому вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Даже при нехватке кости:** Метод позволяет обойти участки атрофии за счёт особого угла установки задних имплантов, что часто помогает избежать сложной костной пластики.\n*   **Надёжность:** Четыре опоры равномерно распределяют жевательную нагрузку. Постоянный протез устанавливается через **3–6 месяцев** после полного приживления имплантов.\n*   **Долгий срок службы:** При правильном уходе и соблюдении рекомендаций (в первые **2–3 месяца** — мягкая пища, тщательная гигиена) конструкция служит **15–20 лет** и более.\n\nЭтот вариант подходит, если у вас полностью или почти полностью отсутствуют зубы, либо оставшиеся зубы невозможно сохранить.\n\nЧтобы понять, подходит ли именно вам протокол All-on-4 или лучше рассмотреть другой вариант (например, All-on-6), врач должен оценить объём и плотность костной ткани по КТ. Приглашаем вас на бесплатную консультацию, где мы составим понятный план лечения и ответим на все вопросы.",
+        "cta": {
+          "action": "lead",
+          "key": "plan",
+          "text": "Составить план лечения"
+        },
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "cta_action": "lead",
+          "cta_key": "plan",
+          "followups": [
+            {
+              "label": "Кому подходит All-on-4",
+              "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+            },
+            {
+              "label": "Как работает метод All-on-4",
+              "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+            }
+          ],
+          "intent": "content",
+          "matched_service_id": "all_on_4",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 3,
+            "quick_replies_before_ui_source_policy": 3,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 1,
+          "sid": "s63-live-1d3b25e2eb6c",
+          "turn_count": 1,
+          "ui_dropped": [
+            "followups_over_limit",
+            "suggest_refs_over_limit"
+          ],
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\n**Как это работает:**\n*   **Быстрый результат:** Полный протокол лечения обычно занимает **1–3 дня**. В день операции вам фиксируют несъёмный временный протез, поэтому вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Даже при нехватке кости:** Метод позволяет обойти участки атрофии за счёт особого угла установки задних имплантов, что часто помогает избежать сложной костной пластики.\n*   **Надёжность:** Четыре опоры равномерно распределяют жевательную нагрузку. Постоянный протез устанавливается через **3–6 месяцев** после полного приживления имплантов.\n*   **Долгий срок службы:** При правильном уходе и соблюдении рекомендаций (в первые **2–3 месяца** — мягкая пища, тщательная гигиена) конструкция служит **15–20 лет** и более.\n\nЭтот вариант подходит, если у вас полностью или почти полностью отсутствуют зубы, либо оставшиеся зубы невозможно сохранить.\n\nЧтобы понять, подходит ли именно вам протокол All-on-4 или лучше рассмотреть другой вариант (например, All-on-6), врач должен оценить объём и плотность костной ткани по КТ. Приглашаем вас на бесплатную консультацию, где мы составим понятный план лечения и ответим на все вопросы.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "cta_action": "lead",
+        "cta_key": "plan",
+        "followups": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          },
+          {
+            "label": "Как работает метод All-on-4",
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+          }
+        ],
+        "intent": "content",
+        "matched_service_id": "all_on_4",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 3,
+          "quick_replies_before_ui_source_policy": 3,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 1,
+        "sid": "s63-live-1d3b25e2eb6c",
+        "turn_count": 1,
+        "ui_dropped": [
+          "followups_over_limit",
+          "suggest_refs_over_limit"
+        ],
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Кому подходит All-on-4",
+          "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+        }
+      ],
+      "cta": {
+        "action": "lead",
+        "key": "plan",
+        "text": "Составить план лечения"
+      },
+      "session_before": {
+        "last_service_id": null,
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [],
+        "followups": []
+      },
+      "session_after": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+            "label": "Кому подходит All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4",
+            "label": "Как работает метод All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#ogranicheniya-i-uhod",
+            "label": "Ограничения и уход"
+          }
+        ]
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_defer": true,
+          "cta_widget_present": true,
+          "followup_visible": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 2,
+      "turn_id": "s63_turn_02_followup_ref",
+      "endpoint": "/ask",
+      "request": {
+        "q": "",
+        "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+      },
+      "followup_ref_used": true,
+      "followup_ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+      "followup_label": "Кому подходит All-on-4",
+      "status_code": 200,
+      "body": {
+        "answer": "Протокол All-on-4 обычно рассматривают в следующих ситуациях:\n\n*   **Полное или почти полное отсутствие зубов** на одной или обеих челюстях.\n*   **Невозможность сохранить оставшиеся зубы**, когда их лечение нецелесообразно.\n*   **Недостаток костной ткани** для классической имплантации (метод часто позволяет обойтись без сложной костной пластики).\n*   **Необходимость быстрого восстановления**: важно быстро вернуть эстетику и жевательную функцию.\n\nТочное решение принимается только после диагностики (КТ), так как метод требует достаточной плотности и объёма костной ткани в зонах установки имплантов.",
+        "cta": {
+          "action": "lead",
+          "key": "plan",
+          "text": "Составить план лечения"
+        },
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "cta_action": "lead",
+          "cta_key": "plan",
+          "followups": [
+            {
+              "label": "Кому подходит All-on-4",
+              "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+            },
+            {
+              "label": "Как работает метод All-on-4",
+              "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+            }
+          ],
+          "intent": "content",
+          "matched_service_id": "all_on_4",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 3,
+            "quick_replies_before_ui_source_policy": 3,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 2,
+          "sid": "s63-live-1d3b25e2eb6c",
+          "turn_count": 2,
+          "ui_dropped": [
+            "followups_over_limit",
+            "suggest_refs_over_limit"
+          ],
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Протокол All-on-4 обычно рассматривают в следующих ситуациях:\n\n*   **Полное или почти полное отсутствие зубов** на одной или обеих челюстях.\n*   **Невозможность сохранить оставшиеся зубы**, когда их лечение нецелесообразно.\n*   **Недостаток костной ткани** для классической имплантации (метод часто позволяет обойтись без сложной костной пластики).\n*   **Необходимость быстрого восстановления**: важно быстро вернуть эстетику и жевательную функцию.\n\nТочное решение принимается только после диагностики (КТ), так как метод требует достаточной плотности и объёма костной ткани в зонах установки имплантов.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "cta_action": "lead",
+        "cta_key": "plan",
+        "followups": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          },
+          {
+            "label": "Как работает метод All-on-4",
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+          }
+        ],
+        "intent": "content",
+        "matched_service_id": "all_on_4",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 3,
+          "quick_replies_before_ui_source_policy": 3,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 2,
+        "sid": "s63-live-1d3b25e2eb6c",
+        "turn_count": 2,
+        "ui_dropped": [
+          "followups_over_limit",
+          "suggest_refs_over_limit"
+        ],
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Кому подходит All-on-4",
+          "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+        }
+      ],
+      "cta": {
+        "action": "lead",
+        "key": "plan",
+        "text": "Составить план лечения"
+      },
+      "session_before": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+            "label": "Кому подходит All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4",
+            "label": "Как работает метод All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#ogranicheniya-i-uhod",
+            "label": "Ограничения и уход"
+          }
+        ]
+      },
+      "session_after": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+            "label": "Кому подходит All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4",
+            "label": "Как работает метод All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#ogranicheniya-i-uhod",
+            "label": "Ограничения и уход"
+          }
+        ]
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_defer": true,
+          "followup_ref_used": true,
+          "target_nav_no_legacy": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    },
+    {
+      "turn": 3,
+      "turn_id": "s63_turn_03_doctors",
+      "endpoint": "/ask",
+      "request": {
+        "q": "А кто делает?"
+      },
+      "followup_ref_used": false,
+      "status_code": 200,
+      "body": {
+        "answer": "Имплантацию и протезирование в нашей клинике проводит команда опытных специалистов, которые ведут пациента от диагностики до финального результата.\n\n**Хирургический этап (установка имплантов):**\n*   **Волков Александр Сергеевич** — главный врач, стоматолог-хирург и имплантолог с опытом **13 лет**. Специализируется на сложных случаях, включая скуловую и птеригоидную имплантацию, синус-лифтинг и одномоментные протоколы.\n*   **Орлов Никита Владимирович** — врач-имплантолог с опытом **16 лет**. Выполняет классическую и одномоментную имплантацию, костную пластику и работает по цифровым протоколам планирования.\n\n**Ортопедический этап (коронки, виниры, протезы):**\n*   **Кузнецов Дмитрий Андреевич** — врач-стоматолог-ортопед с опытом **19 лет**. Занимается эстетическим протезированием, реабилитацией по протоколам All-on-4 / All-on-6 и изготовлением коронок из диоксида циркония.\n\nВсе врачи работают совместно: хирург устанавливает опору, а ортопед подбирает форму и цвет будущей улыбки, чтобы результат был не только функциональным, но и естественным.",
+        "cta": {
+          "action": "lead",
+          "key": "plan",
+          "text": "Составить план лечения"
+        },
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "cta_action": "lead",
+          "cta_key": "plan",
+          "followups": [],
+          "intent": "content",
+          "matched_service_id": "all_on_4",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 0,
+            "quick_replies_before_ui_source_policy": 0,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "doctors",
+          "session_turn_count": 3,
+          "sid": "s63-live-1d3b25e2eb6c",
+          "turn_count": 3,
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "Имплантацию и протезирование в нашей клинике проводит команда опытных специалистов, которые ведут пациента от диагностики до финального результата.\n\n**Хирургический этап (установка имплантов):**\n*   **Волков Александр Сергеевич** — главный врач, стоматолог-хирург и имплантолог с опытом **13 лет**. Специализируется на сложных случаях, включая скуловую и птеригоидную имплантацию, синус-лифтинг и одномоментные протоколы.\n*   **Орлов Никита Владимирович** — врач-имплантолог с опытом **16 лет**. Выполняет классическую и одномоментную имплантацию, костную пластику и работает по цифровым протоколам планирования.\n\n**Ортопедический этап (коронки, виниры, протезы):**\n*   **Кузнецов Дмитрий Андреевич** — врач-стоматолог-ортопед с опытом **19 лет**. Занимается эстетическим протезированием, реабилитацией по протоколам All-on-4 / All-on-6 и изготовлением коронок из диоксида циркония.\n\nВсе врачи работают совместно: хирург устанавливает опору, а ортопед подбирает форму и цвет будущей улыбки, чтобы результат был не только функциональным, но и естественным.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "cta_action": "lead",
+        "cta_key": "plan",
+        "followups": [],
+        "intent": "content",
+        "matched_service_id": "all_on_4",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 0,
+          "quick_replies_before_ui_source_policy": 0,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "doctors",
+        "session_turn_count": 3,
+        "sid": "s63-live-1d3b25e2eb6c",
+        "turn_count": 3,
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [],
+      "cta": {
+        "action": "lead",
+        "key": "plan",
+        "text": "Составить план лечения"
+      },
+      "session_before": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": [
+          {
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4",
+            "label": "Кому подходит All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4",
+            "label": "Как работает метод All-on-4"
+          },
+          {
+            "ref": "implantation__service__all_on_4.md#ogranicheniya-i-uhod",
+            "label": "Ограничения и уход"
+          }
+        ]
+      },
+      "session_after": {
+        "last_service_id": "all_on_4",
+        "shown_fact_ids": [],
+        "shown_amplifier_refs": [],
+        "shown_consultation_value_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "followups": []
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "no_error_route": true,
+          "no_terminal_defer": true,
+          "doctors_materialized": true,
+          "session_service_all_on_4": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    }
+  ]
+}

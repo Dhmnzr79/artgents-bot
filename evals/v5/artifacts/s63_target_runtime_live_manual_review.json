@@ -1,0 +1,72 @@
+{
+  "measurement_id": "s63_target_runtime_live",
+  "baseline_live_commit": "ca456073d35cf32fc0177417c19939f28ff3b8b6",
+  "turns_git_blob_hash": "df7e9f4fca3bb04d0affb99f619bc09ff5cec0be1c24bedff569eb3a5b299e06",
+  "result_sha256": "503acb431f30042c482fd51c4d414639815a7c955c0e957adac28ccec741cd59",
+  "provider_ledger_sha256": "9b284604d67e1b90bf636a11b645e91e540552d75e607ec7e451b5090d4808a8",
+  "sid": "s63-live-1d3b25e2eb6c",
+  "automated_verdict": "AUTOMATED_PASS",
+  "final_verdict": "PASS",
+  "rerun_blocked_without_owner_approval": true,
+  "manual_review_completed_at_utc": "2026-07-23T19:10:00Z",
+  "manual_review_summary": {
+    "turn_1": "PASS — target materialized; authored CTA «Составить план лечения» (key=plan); follow-up «Кому подходит All-on-4» visible (widget limit shows 1 of 3 session followups).",
+    "turn_2": "PASS — actual ref click on displayed follow-up; target navigation restored label; materialized answer; no legacy routing.",
+    "turn_3": "PASS — session hydration preserved all_on_4; materialized doctors from catalog (Волков, Орлов, Кузнецов); no terminal defer.",
+    "overall": "PASS — S62-B delta criteria met (CTA widget, follow-up ref, doctors continuity)."
+  },
+  "non_blocking_observations": [
+    "Turn 2 ref-navigation path used 0 ingress calls (14 total vs 15 budget max); ledger complete for all five roles present in run.",
+    "Turn 3 shadow frame logged service_id=null but runtime hydration restored all_on_4 before materialize (matched_service_id=all_on_4 in response).",
+    "UI policy dropped extra followups to single quick_reply button (followups_over_limit) — expected widget behavior."
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "turn_id": "s63_turn_01_all_on_4_info",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Что такое All-on-4?"
+      },
+      "answer_text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\n**Как это работает:**\n*   **Быстрый результат:** Полный протокол лечения обычно занимает **1–3 дня**. В день операции вам фиксируют несъёмный временный протез, поэтому вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Даже при нехватке кости:** Метод позволяет обойти участки атрофии за счёт особого угла установки задних имплантов, что часто помогает избежать сложной костной пластики.\n*   **Надёжность:** Четыре опоры равномерно распределяют жевательную нагрузку. Постоянный протез устанавливается через **3–6 месяцев** после полного приживления имплантов.\n*   **Долгий срок службы:** При правильном уходе и соблюдении рекомендаций (в первые **2–3 месяца** — мягкая пища, тщательная гигиена) конструкция служит **15–20 лет** и более.\n\nЭтот вариант подходит, если у вас полностью или почти полностью отсутствуют зубы, либо оставшиеся зубы невозможно сохранить.\n\nЧтобы понять, подходит ли именно вам протокол All-on-4 или лучше рассмотреть другой вариант (например, All-on-6), врач должен оценить объём и плотность костной ткани по КТ. Приглашаем вас на бесплатную консультацию, где мы составим понятный план лечения и ответим на все вопросы.",
+      "cta": {
+        "action": "lead",
+        "key": "plan",
+        "text": "Составить план лечения"
+      },
+      "displayed_followup": {
+        "label": "Кому подходит All-on-4",
+        "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PASS"
+    },
+    {
+      "turn": 2,
+      "turn_id": "s63_turn_02_followup_ref",
+      "endpoint": "/ask",
+      "request": {
+        "q": "",
+        "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+      },
+      "answer_text": "Протокол All-on-4 обычно рассматривают в следующих ситуациях:\n\n*   **Полное или почти полное отсутствие зубов** на одной или обеих челюстях.\n*   **Невозможность сохранить оставшиеся зубы**, когда их лечение нецелесообразно.\n*   **Недостаток костной ткани** для классической имплантации (метод часто позволяет обойтись без сложной костной пластики).\n*   **Необходимость быстрого восстановления**: важно быстро вернуть эстетику и жевательную функцию.\n\nТочное решение принимается только после диагностики (КТ), так как метод требует достаточной плотности и объёма костной ткани в зонах установки имплантов.",
+      "followup_ref_used": true,
+      "followup_label": "Кому подходит All-on-4",
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PASS"
+    },
+    {
+      "turn": 3,
+      "turn_id": "s63_turn_03_doctors",
+      "endpoint": "/ask",
+      "request": {
+        "q": "А кто делает?"
+      },
+      "answer_text": "Имплантацию и протезирование в нашей клинике проводит команда опытных специалистов, которые ведут пациента от диагностики до финального результата.\n\n**Хирургический этап (установка имплантов):**\n*   **Волков Александр Сергеевич** — главный врач, стоматолог-хирург и имплантолог с опытом **13 лет**. Специализируется на сложных случаях, включая скуловую и птеригоидную имплантацию, синус-лифтинг и одномоментные протоколы.\n*   **Орлов Никита Владимирович** — врач-имплантолог с опытом **16 лет**. Выполняет классическую и одномоментную имплантацию, костную пластику и работает по цифровым протоколам планирования.\n\n**Ортопедический этап (коронки, виниры, протезы):**\n*   **Кузнецов Дмитрий Андреевич** — врач-стоматолог-ортопед с опытом **19 лет**. Занимается эстетическим протезированием, реабилитацией по протоколам All-on-4 / All-on-6 и изготовлением коронок из диоксида циркония.\n\nВсе врачи работают совместно: хирург устанавливает опору, а ортопед подбирает форму и цвет будущей улыбки, чтобы результат был не только функциональным, но и естественным.",
+      "matched_service_id": "all_on_4",
+      "service_route": "target_fullcontext_materialized",
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PASS"
+    }
+  ]
+}

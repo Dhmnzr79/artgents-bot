@@ -1,0 +1,24 @@
+{
+  "measurement_id": "s63_target_runtime_live",
+  "turns_git_blob_hash": "df7e9f4fca3bb04d0affb99f619bc09ff5cec0be1c24bedff569eb3a5b299e06",
+  "status": "attempt_completed",
+  "baseline_commit": "ca456073d35cf32fc0177417c19939f28ff3b8b6",
+  "ingress_model": "qwen3.6-flash",
+  "planner_model": "qwen3.6-flash",
+  "boundary_model": "qwen3.7-plus",
+  "composer_model": "qwen3.7-plus",
+  "verifier_model": "qwen3.7-plus",
+  "max_provider_calls": 15,
+  "max_http_turns": 3,
+  "retry_count_max": 0,
+  "rerun_blocked_without_owner_approval": true,
+  "started_provider_calls": 14,
+  "role_counts": {
+    "composer": 3,
+    "ingress": 2,
+    "medical_boundary": 3,
+    "planner": 3,
+    "semantic_verifier": 3
+  },
+  "completed_provider_calls": 14
+}

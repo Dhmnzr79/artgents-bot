@@ -1,54 +1,90 @@
-# TASK — S65 FullContext authority switch (offline) — COMPLETE
+# TASK — S66 default FullContext authority live verification
 
-**Baseline:** `codex/stage-a` / `9dddd9f`
-**Governance commit:** `b6ce887`
-**Status:** **COMPLETE** · **PRODUCT AUTHORITY SWITCHED OFFLINE** · **NO LIVE / NO LLM**
+**Baseline:** `codex/stage-a` / `04ad2f7` · **OWNER APPROVED — ONE LIVE ATTEMPT**
 
-## Goal (done)
+## Goal
 
-Default product authority = target FullContext for `/ask` and `/ask/stream`. Legacy = manual kill-switch `TARGET_FULLCONTEXT_DEV=0` at process start. No in-turn legacy fallback.
+Single live HTTP turn proving S65 default authority: **no `TARGET_FULLCONTEXT_DEV` env**, config default ON, target materialized, legacy/RAG/chunk = 0, ≤5 provider calls.
 
-## Changes
+**Not** S62/S63 repeat. **Not** quality eval.
+
+## Live constraints
+
+| Rule | Value |
+|------|-------|
+| Env `TARGET_FULLCONTEXT_DEV` | **must be absent** (fail if set to any value) |
+| Setting `=1` or `=0` | **forbidden** |
+| HTTP turns | 1 (`POST /ask`, new sid) |
+| Question | `Что такое All-on-4?` |
+| Provider budget | ≤5 total; ≤1 per role; retry=0; hard stop before 6th |
+| Models | ingress/planner `qwen3.6-flash`; boundary/composer/verifier `qwen3.7-plus` |
+| Rerun | **blocked** after first provider call |
+
+## Authority proof (artifact fields)
+
+- `env_present=false`
+- `config_default_resolved=true`
+- `authority_source="config_default"`
+
+## S66 artifacts (exclusive paths)
+
+| Artifact | Path |
+|----------|------|
+| Attempt | `evals/v5/artifacts/s66_default_authority_live_attempt.json` |
+| Ledger | `evals/v5/artifacts/s66_default_authority_live_call_ledger.jsonl` |
+| Raw | `evals/v5/artifacts/s66_default_authority_live_raw.json` |
+| Result | `evals/v5/artifacts/s66_default_authority_live_result.json` |
+| Manifest | `evals/v5/artifacts/s66_default_authority_live_manifest.json` |
+| Manual review | `evals/v5/artifacts/s66_default_authority_live_manual_review.json` |
+| Audit log | `evals/v5/artifacts/s66_default_authority_live_audit.log` |
+
+## Allowlist — prep (offline)
 
 | File | Change |
 |------|--------|
-| `config.py` | `TARGET_FULLCONTEXT_DEV` default `"0"` → `"1"` |
-| `tests/test_s65_authority_switch_offline.py` | new — acceptance A–H (19 tests) |
-| `tests/test_s61_target_fullcontext_runtime.py` | `test_default_flag_on_in_config` |
-| `docs/FLAGS_AND_STATUS.md` | default ON, kill-switch semantics |
-| `docs/STRANGLER_ROADMAP.md` | S65 complete, S66 gate |
+| `TASK.md` | governance + completion |
+| `evals/v5/s66_default_authority_live_contract.py` | contract + S62/S63 pin guards |
+| `evals/v5/s66_default_authority_live_provider_audit.py` | 5-call budget audit |
+| `evals/v5/s66_default_authority_live_harness.py` | HTTP harness |
+| `evals/v5/run_s66_default_authority_live.py` | CLI |
+| `tests/test_s66_default_authority_live_harness.py` | offline tests |
+| `docs/STRANGLER_ROADMAP.md` | S66 status |
+| `docs/FLAGS_AND_STATUS.md` | optional note |
 
-`app.py` — **not changed** (gate already sufficient).
+## Allowlist — post-live (second commit)
 
-## Acceptance (COMPLETION)
+| File | Change |
+|------|--------|
+| `evals/v5/artifacts/s66_*` | live artifacts (7 files) |
+| `TASK.md`, `docs/*` | closeout |
 
-- [x] PRE-CODE checker ✅ (`b6ce887`)
-- [x] `config.py` default ON
-- [x] Targeted pytest: **19 passed**
-- [x] S62 frozen artifacts unchanged
-- [x] `git diff --check` clean
-- [x] Allowlist-only diff
-- [x] COMPLETION checker ✅
-- [x] Completion commit + push `origin/codex/stage-a`
+**Forbidden:** `TARGET_FULLCONTEXT_DEV` env in live, default authority change, second live attempt, retry, S62/S63 artifact edits, product code changes, A9, legacy delete, merge to main.
 
-## Commands run
+## Automated gates (18)
+
+1. env absent 2. config default authority 3. single HTTP response 4. materialized route 5. verified materialized 6. authored CTA 7. target widget 8–11. no legacy orchestrator/routing/chunk/composer 12. FC build=1 13. ledger complete 14. calls≤5 15. retry=0 16. errors=0 17. fail→AUTOMATED_FAIL 18. pass→PENDING_MANUAL_REVIEW
+
+## Commands
 
 ```powershell
-$bt = Join-Path $env:TEMP ("s65_pytest_" + [guid]::NewGuid().ToString("n"))
-python -m pytest -p no:cacheprovider --basetemp $bt `
-  tests/test_s65_authority_switch_offline.py `
-  tests/test_s61_target_fullcontext_runtime.py::test_default_flag_on_in_config `
-  -q
+# Prep (NO LIVE)
+$bt = Join-Path $env:TEMP ("s66_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt tests/test_s66_default_authority_live_harness.py -q
+python evals/v5/run_s66_default_authority_live.py --dry-run
 
-git diff --check
-python -c "from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); print('S62 frozen OK')"
+# Live (ONE attempt; env must not contain TARGET_FULLCONTEXT_DEV)
+python evals/v5/run_s66_default_authority_live.py --live
 ```
 
-## Checker
+## Acceptance
 
-| Checkpoint | Verdict |
-|---|---|
-| PRE-CODE (`b6ce887`) | ✅ |
-| COMPLETION | ✅ |
+- [ ] PRE-CODE ✅
+- [ ] Offline pytest green
+- [ ] `--dry-run` exits 0
+- [ ] S62+S63 frozen unchanged (pre/post live)
+- [ ] ONE live attempt
+- [ ] Manual review artifact
+- [ ] POST-LIVE checker ✅
+- [ ] Commits + push `origin/codex/stage-a`
 
-**STOP — no post-switch live run. Next: S66 (owner approval).**
+**STOP after S66 — no legacy isolation without owner decision.**

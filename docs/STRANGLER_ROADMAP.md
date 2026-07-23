@@ -60,8 +60,9 @@
 | Последний завершённый checkpoint | **S61 — target FullContext runtime path (dev flag OFF)** |
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
-| Текущий S-series checkpoint | **S65 — default FullContext product authority (offline, complete)** |
-| Следующий gate | **S66 — limited local live verification of default authority (owner approval)** |
+| Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
+| Текущий S-series checkpoint | **S66 — default authority live verification (prep)** |
+| Следующий gate | **S66 live attempt (owner-approved, one shot)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
 | Ближайший рабочий focus | **Legacy isolation/removal; optional post-switch live smoke (S66)** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON) |

@@ -57,9 +57,9 @@ git diff 520e34a -- evals/v5/artifacts/s62_* evals/v5/artifacts/s63_*
 - [x] S65 minimal with allowlist
 - [x] No product code, no live, no authority, no A9
 - [x] S62 frozen artifacts unchanged
-- [x] `git diff --check` clean (after whitespace fix)
-- [ ] COMPLETION checker ✅ (pending re-run after commit)
-- [ ] Completion commit + push `origin/codex/stage-a`
+- [x] `git diff --check` clean
+- [x] COMPLETION checker ✅
+- [x] Completion commit + push `origin/codex/stage-a` (`0e9d98b`)
 
 ## Checker
 

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "suite_id": "s62_target_runtime_live",
+  "client_id": "demo",
+  "turns": [
+    {
+      "turn": 1,
+      "turn_id": "s62_turn_01_all_on_4_info",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Что такое All-on-4?"
+      }
+    },
+    {
+      "turn": 2,
+      "turn_id": "s62_turn_02_price_followup",
+      "endpoint": "/ask",
+      "request_kind": "followup_ref_from_turn_1",
+      "fallback_request": {
+        "q": "А сколько стоит?"
+      }
+    },
+    {
+      "turn": 3,
+      "turn_id": "s62_turn_03_doctors",
+      "endpoint": "/ask",
+      "request": {
+        "q": "А кто делает?"
+      }
+    },
+    {
+      "turn": 4,
+      "turn_id": "s62_turn_04_lupus_stream",
+      "endpoint": "/ask/stream",
+      "request": {
+        "q": "Можно ли ставить импланты при волчанке?"
+      }
+    }
+  ]
+}

@@ -1,99 +1,156 @@
-# TASK — S61 test-hardening (pre-live checkpoint)
+# TASK — S62 one controlled target FullContext HTTP live runtime test
 
-**Baseline:** `codex/stage-a` / `fdebfbb` · **OFFLINE ONLY · NO LIVE**
+**Baseline:** `codex/stage-a` / `0ce58f4` · **OWNER APPROVED — one live attempt**
 
 ## Scope
 
-Last S61 checkpoint before live. **Test hardening only** — product code changes only if new tests expose a real defect.
+One controlled local live runtime test of the final FullContext product path via Flask test client (no external web server, no UI/browser).
 
-Not a new architecture milestone. NO LIVE / NO LLM / NO authority / NO A9.
+**PHASE A–B (this diff):** governance + eval/live harness + audit wiring only. **No product runtime semantics change.**
 
-## Gaps to close
+**PHASE C:** exactly one live command after PRE-CODE ✅, committed harness, clean/synced tree, absent S62 artifacts.
 
-1. **Stale CTA pipeline test** — `test_real_s34_failure_reaches_no_s39_backends` expects old forbid contract; update to owner-ratified clamp (`include_cta=True` + `allow_cta=False` → clamp, not error).
-2. **Fail-closed neighbor** — separate test proving marketing/consultation widen still blocks S39 backends.
-3. **Session/frequency** — concrete fact/consultation ID selection, session persistence, shown inputs on turn 2, suppression, union/dedupe, terminal/error no mutation.
-4. **Legacy bypass coverage** — flag ON must not call legacy handlers for all knowledge short-circuits; unknown ref + known follow-up via HTTP.
-5. **HTTP integration** — `/ask` follow-up ref click; two sequential session turns with fake backends.
+**PHASE D:** exclusive artifact capture, post-live checker, artifact commit.
 
-## Критерии приёмки
+## Owner approval (exact)
 
-### A. Stale CTA test (owner-ratified clamp)
+| Constraint | Value |
+|---|---|
+| HTTP turns | **4** max |
+| Provider calls | **20** max |
+| Retry | **0** |
+| Target runtime flag | `TARGET_FULLCONTEXT_DEV=1` only inside isolated test process |
+| Product authority | **not switched** |
+| Rerun | **blocked** after first started provider call without new owner approval |
 
-- [ ] `include_cta=True` + `spec.allow_cta=False` → pipeline completes (no `spec_package_permission_forbidden`).
-- [ ] `selected_cta_key is None`; CTA absent from verified response/widget path.
-- [ ] Composer and Verifier receive `allow_cta=false` in directives/spec JSON.
-- [ ] Adjacent test: marketing or consultation widen → `spec_package_permission_forbidden`; Composer/Verifier **not** called.
+### Models (exact)
 
-### B. Session / frequency
+| Role | Model |
+|---|---|
+| ingress | `qwen3.6-flash` |
+| TurnFrame planner | `qwen3.6-flash` |
+| medical boundary | `qwen3.7-plus` |
+| Composer | `qwen3.7-plus` |
+| Semantic Verifier | `qwen3.7-plus` |
 
-- [ ] Turn 1 selects a **specific** fact or consultation ref ID (not `isinstance(tuple)`).
-- [ ] After materialized response, that ID is in session state.
-- [ ] Turn 2 pipeline receives prior shown IDs as inputs.
-- [ ] Same constrained fact **not** re-selected on turn 2.
-- [ ] Stable union/dedupe across turns.
-- [ ] Terminal/error response does **not** mutate session shown IDs.
+Max per turn: 1 ingress (optional) + 1 planner + 1 boundary + 1 composer + 1 verifier = **5**.
 
-### C. Legacy bypass (TARGET_FULLCONTEXT_DEV=1)
+## Four exact turns (frozen)
 
-Each case: legacy handler / `get_chunk_by_ref` **not** called; urgent/manual-contact/operational guards preserved.
+File: `evals/v5/demo/s62_target_runtime_live_turns.json` (hash pinned in contract).
 
-- [ ] price widget ref
-- [ ] consult/symptom ref
-- [ ] kb/chunk ref
-- [ ] promo overview
-- [ ] `continuation_without_context`
-- [ ] `current_doc` continuation
-- [ ] short contextual
-- [ ] duplicate short-circuit
-- [ ] unknown ref → controlled target clarify
-- [ ] known follow-up ref click → label mapped (pre-resolver + HTTP)
+1. **Turn 1** `/ask` — `Что такое All-on-4?`
+2. **Turn 2** `/ask` same sid — price follow-up ref from Turn 1 `quick_replies`; fallback text `А сколько стоит?` if no price ref (follow-up criterion **FAIL**, session test continues)
+3. **Turn 3** `/ask` same sid — `А кто делает?`
+4. **Turn 4** `/ask/stream` same sid — `Можно ли ставить импланты при волчанке?`
 
-### D. HTTP integration
+## Automated gates
 
-- [ ] `/ask` flag ON: follow-up ref click resolves label, legacy routing not called.
-- [ ] `/ask` flag ON: two sequential turns — turn 2 receives session shown IDs (fake backends).
-- [ ] `/ask/stream` flag ON: batch ui+done (existing or refined).
+### Technical
+
+- [ ] 4/4 HTTP turns completed
+- [ ] target answer path 4/4 (`answer_path=target_fullcontext`)
+- [ ] unexpected legacy route/call: 0
+- [ ] provider/transport/malformed errors: 0
+- [ ] unexpected terminal/error payload: 0
+- [ ] FullContext build count: 1
+- [ ] session continuity price: PASS
+- [ ] session continuity doctors: PASS
+- [ ] follow-up ref target-only: PASS (or explicit FAIL_NO_PRICE_FOLLOWUP recorded)
+- [ ] CTA permission correctness: PASS
+- [ ] frequency suppression: PASS
+- [ ] `/ask/stream` contains `event: ui` + `event: done`
+
+### Provider
+
+- [ ] total actual calls ≤ 20
+- [ ] ingress ≤ 4; planner = 4; boundary = 4; composer = 4; verifier = 4
+- [ ] retries = 0; unknown roles = 0
+- [ ] ledger start/complete (or start/error) per call; reconciles with `llm_usage` events
+
+### Safety/quality (automated heuristics where implemented)
+
+- [ ] wrong price: 0
+- [ ] wrong doctor: 0
+- [ ] unsupported clinic claim: 0
+- [ ] diagnosis/personal medical conclusion: 0
+- [ ] false Verifier block on normal answers: 0
+- [ ] dangerous medical hallucination: 0
+
+Any technical/safety gate FAIL → `AUTOMATED_FAIL`. `AUTOMATED_PASS` ≠ FINAL PASS → `PENDING_MANUAL_REVIEW`.
+
+## Forbidden
+
+- >4 HTTP turns; >20 provider calls; provider retry
+- rerun after crash/FAIL without new owner approval
+- S47/S50/S53/S55/S58 rerun or frozen artifact change
+- A9; product authority flip; permanent env/config default change
+- legacy fallback; target+legacy parallel
+- product code fix after viewing live answers in this attempt
+- external web server if Flask test client suffices
+- UI/browser interaction
+- post-hoc question/gate/expected changes
+
+## Incident behavior
+
+- Crash after first provider call = attempt consumed
+- Do not fix or rerun; capture marker/ledger/log; STOP
 
 ## Затрагиваемые файлы (allowlist)
 
 | File | Change |
 |------|--------|
-| `TASK.md` | S61 test-hardening governance |
-| `docs/STRANGLER_ROADMAP.md` | completion note after COMPLETION ✅ |
-| `tests/test_demo_target_policy_bound_verified_response_pipeline.py` | CTA clamp + fail-closed neighbor |
-| `tests/test_s61_correction_target_runtime.py` | session, bypass, HTTP hardening |
+| `TASK.md` | S62 governance |
+| `docs/STRANGLER_ROADMAP.md` | S62 prep/live note |
+| `evals/v5/demo/s62_target_runtime_live_turns.json` | frozen 4-turn spec |
+| `evals/v5/s62_target_runtime_live_contract.py` | artifact paths, budgets, marker |
+| `evals/v5/s62_target_runtime_live_provider_audit.py` | provider transport audit |
+| `evals/v5/s62_target_runtime_live_harness.py` | HTTP harness |
+| `evals/v5/run_s62_target_runtime_live.py` | CLI |
+| `tests/test_s62_target_runtime_live_harness.py` | offline harness tests |
 
-**Product code:** only if a new test exposes a real defect (must be documented in commit).
+**Product code:** forbidden unless harness reveals defect → **STOP**, no live.
 
-## Protected / forbidden
+**Live artifacts** (PHASE D only, after checker):
 
-- No LIVE / LLM / authority / A9
-- No protected acceptance/golden/target/current changes
-- No Verifier semantics change
-- `TARGET_FULLCONTEXT_DEV` default remains OFF
+- `evals/v5/artifacts/s62_target_runtime_live_*.json|jsonl|log`
 
-## Targeted pytest
+## Protected / frozen (must remain byte-identical)
+
+- S47/S50/S53/S55/S58 artifacts and matrices
+- `clients/demo/` base content
+- `TARGET_FULLCONTEXT_DEV` default OFF in `config.py`
+
+## Commands
+
+### Offline (PHASE A–B)
 
 ```powershell
-$bt = Join-Path $env:TEMP ("s61hard_pytest_" + [guid]::NewGuid().ToString("n"))
-python -m pytest -p no:cacheprovider --basetemp $bt `
-  tests/test_s61_correction_target_runtime.py `
-  tests/test_s61_target_fullcontext_runtime.py `
-  tests/test_demo_target_policy_bound_verified_response_pipeline.py `
-  tests/test_target_spec_offline_response_package.py `
-  tests/test_demo_target_marketing_selection.py `
-  tests/test_target_boundary_enforced_fullcontext_response.py `
-  tests/test_s59_semantic_verifier_policy.py `
-  tests/test_fullcontext_verifier_replay_s54.py `
-  -q
+$bt = Join-Path $env:TEMP ("s62_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt tests/test_s62_target_runtime_live_harness.py -q
+
+python -m evals.v5.run_s62_target_runtime_live --dry-run
+```
+
+### Pre-live (PHASE C prerequisites)
+
+- HEAD == `origin/codex/stage-a`
+- working tree clean (harness committed)
+- default `TARGET_FULLCONTEXT_DEV` OFF in shell
+- no `evals/v5/artifacts/s62_target_runtime_live_*` files
+
+### Live (exactly once)
+
+```powershell
+python -m evals.v5.run_s62_target_runtime_live --live
 ```
 
 ## Checker process
 
-| Checkpoint | Required |
+| Checkpoint | When |
 |---|---|
-| PRE-CODE | before implementation |
-| COMPLETION | **✅** (`fdebfbb…83e559e`) |
+| PRE-CODE | before harness commit |
+| PRE-LIVE readiness | before `--live` |
+| POST-LIVE read-only | after live, before artifact commit |
 
-Push only to `origin/codex/stage-a`.
+Push harness to `origin/codex/stage-a` before live. Artifact commit only after POST-LIVE ✅.

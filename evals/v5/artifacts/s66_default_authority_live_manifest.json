@@ -1,0 +1,14 @@
+{
+  "measurement_id": "s66_default_authority_live",
+  "baseline_live_commit": "f8541eb03e2c7a003dc02ba46177ec50dac3e40b",
+  "authority_proof": {
+    "env_present": false,
+    "config_default_resolved": true,
+    "authority_source": "config_default"
+  },
+  "result_sha256": "24afce2a33a415a6fe62f778a38abdd6070bbf94afd16814659d457a3bf0d020",
+  "provider_ledger_sha256": "70617b0787ce4c3a69de0aef3181d6050a1cc1ce3a34a6870ea2c308b5cd4249",
+  "attempt_marker_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\s66_default_authority_live_attempt.json",
+  "call_ledger_path": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\s66_default_authority_live_call_ledger.jsonl",
+  "rerun_blocked_without_owner_approval": true
+}

@@ -1,0 +1,36 @@
+{
+  "technical": {
+    "authority_proof": {
+      "env_present": false,
+      "config_default_resolved": true,
+      "authority_source": "config_default"
+    },
+    "http_turns_completed": 1,
+    "target_answer_path": 1,
+    "legacy_hits": [],
+    "fullcontext_build_count": 0,
+    "materialized": true,
+    "cta_authored_match": true,
+    "target_widget_present": true
+  },
+  "provider": {
+    "total_calls": 5,
+    "role_totals": {
+      "composer": 1,
+      "ingress": 1,
+      "medical_boundary": 1,
+      "planner": 1,
+      "semantic_verifier": 1
+    },
+    "retries": 0,
+    "transport_errors": 0,
+    "ledger_complete": true,
+    "ledger_balanced": true
+  },
+  "automated_verdict": "AUTOMATED_FAIL",
+  "final_verdict": "FAIL",
+  "rerun_blocked_without_owner_approval": true,
+  "baseline_live_commit": "f8541eb03e2c7a003dc02ba46177ec50dac3e40b",
+  "sid": "s66-live-ffb83280cdad",
+  "live_run": true
+}

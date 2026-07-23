@@ -1,0 +1,30 @@
+{
+  "measurement_id": "s66_default_authority_live",
+  "status": "attempt_completed",
+  "baseline_commit": "f8541eb03e2c7a003dc02ba46177ec50dac3e40b",
+  "authority_proof": {
+    "env_present": false,
+    "config_default_resolved": true,
+    "authority_source": "config_default"
+  },
+  "live_question": "Что такое All-on-4?",
+  "live_endpoint": "/ask",
+  "ingress_model": "qwen3.6-flash",
+  "planner_model": "qwen3.6-flash",
+  "boundary_model": "qwen3.7-plus",
+  "composer_model": "qwen3.7-plus",
+  "verifier_model": "qwen3.7-plus",
+  "max_provider_calls": 5,
+  "max_http_turns": 1,
+  "retry_count_max": 0,
+  "rerun_blocked_without_owner_approval": true,
+  "started_provider_calls": 5,
+  "role_counts": {
+    "composer": 1,
+    "ingress": 1,
+    "medical_boundary": 1,
+    "planner": 1,
+    "semantic_verifier": 1
+  },
+  "completed_provider_calls": 5
+}

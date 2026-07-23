@@ -1,0 +1,41 @@
+{
+  "measurement_id": "s66_default_authority_live",
+  "baseline_live_commit": "f8541eb03e2c7a003dc02ba46177ec50dac3e40b",
+  "authority_proof": {
+    "env_present": false,
+    "config_default_resolved": true,
+    "authority_source": "config_default"
+  },
+  "result_sha256": "24afce2a33a415a6fe62f778a38abdd6070bbf94afd16814659d457a3bf0d020",
+  "provider_ledger_sha256": "70617b0787ce4c3a69de0aef3181d6050a1cc1ce3a34a6870ea2c308b5cd4249",
+  "automated_verdict": "AUTOMATED_FAIL",
+  "automated_fail_reason": "fullcontext_build_count=0 (harness counter missed cached build; composer prompt_tokens=32334 proves FullContext was used)",
+  "final_verdict": "PASS",
+  "reviewer_notes": {
+    "answers_question": true,
+    "natural_language": true,
+    "no_wrong_clinic_facts_observed": true,
+    "cta_appropriate": true,
+    "no_technical_jargon": true,
+    "default_authority_confirmed": true,
+    "legacy_path_observed": false
+  },
+  "turn": {
+    "endpoint": "/ask",
+    "request": {
+      "q": "Что такое All-on-4?"
+    },
+    "answer_text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\nГлавное преимущество протокола в скорости и комфорте:\n*   **Несъёмный протез в день операции.** Вы уходите из клиники уже с новыми зубами, которые можно использовать для мягкой пищи.\n*   **Быстрый результат.** Полный протокол на одну челюсть обычно занимает **1–3 дня**.\n*   **Меньше хирургии.** Метод часто позволяет обойтись без сложной костной пластики даже при значительной атрофии кости, так как задние импланты устанавливаются под углом для лучшей стабильности.\n\nПостоянный протез фиксируется через **3–6 месяцев** после полного приживления имплантов. При правильном уходе и соблюдении рекомендаций (в первые **2–3 месяца** — мягкая пища, тщательная гигиена) конструкция служит **15–20 лет** и более.\n\nЧтобы понять, подходит ли вам именно этот протокол или лучше рассмотреть другой вариант (например, All-on-6), врач должен оценить объём и плотность костной ткани по КТ.\n\nПриглашаем вас на бесплатную консультацию до **31 декабря 2026**. На приёме доктор составит понятный план лечения, объяснит этапы и предложит варианты под ваш бюджет.",
+    "service_route": "target_fullcontext_materialized",
+    "cta": {
+      "action": "lead",
+      "key": "plan",
+      "text": "Составить план лечения"
+    },
+    "automated_turn_verdict": "PASS",
+    "recommended_manual_review": "COMPLETE"
+  },
+  "official_measurement_ruling": "S66_NOT_PASSED",
+  "product_authority_ruling": "DEFAULT_FULLCONTEXT_AUTHORITY_LIVE_VERIFIED",
+  "rerun_blocked_without_owner_approval": true
+}

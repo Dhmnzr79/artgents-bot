@@ -1,0 +1,175 @@
+{
+  "summary": {
+    "technical": {
+      "authority_proof": {
+        "env_present": false,
+        "config_default_resolved": true,
+        "authority_source": "config_default"
+      },
+      "http_turns_completed": 1,
+      "target_answer_path": 1,
+      "legacy_hits": [],
+      "fullcontext_build_count": 0,
+      "materialized": true,
+      "cta_authored_match": true,
+      "target_widget_present": true
+    },
+    "provider": {
+      "total_calls": 5,
+      "role_totals": {
+        "composer": 1,
+        "ingress": 1,
+        "medical_boundary": 1,
+        "planner": 1,
+        "semantic_verifier": 1
+      },
+      "retries": 0,
+      "transport_errors": 0,
+      "ledger_complete": true,
+      "ledger_balanced": true
+    },
+    "automated_verdict": "AUTOMATED_FAIL",
+    "final_verdict": "FAIL",
+    "rerun_blocked_without_owner_approval": true,
+    "baseline_live_commit": "f8541eb03e2c7a003dc02ba46177ec50dac3e40b",
+    "sid": "s66-live-ffb83280cdad",
+    "live_run": true
+  },
+  "authority_proof": {
+    "env_present": false,
+    "config_default_resolved": true,
+    "authority_source": "config_default"
+  },
+  "turn_results": [
+    {
+      "turn": 1,
+      "turn_id": "s66_turn_01_default_authority_all_on_4",
+      "endpoint": "/ask",
+      "request": {
+        "q": "Что такое All-on-4?"
+      },
+      "status_code": 200,
+      "body": {
+        "answer": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\nГлавное преимущество протокола в скорости и комфорте:\n*   **Несъёмный протез в день операции.** Вы уходите из клиники уже с новыми зубами, которые можно использовать для мягкой пищи.\n*   **Быстрый результат.** Полный протокол на одну челюсть обычно занимает **1–3 дня**.\n*   **Меньше хирургии.** Метод часто позволяет обойтись без сложной костной пластики даже при значительной атрофии кости, так как задние импланты устанавливаются под углом для лучшей стабильности.\n\nПостоянный протез фиксируется через **3–6 месяцев** после полного приживления имплантов. При правильном уходе и соблюдении рекомендаций (в первые **2–3 месяца** — мягкая пища, тщательная гигиена) конструкция служит **15–20 лет** и более.\n\nЧтобы понять, подходит ли вам именно этот протокол или лучше рассмотреть другой вариант (например, All-on-6), врач должен оценить объём и плотность костной ткани по КТ.\n\nПриглашаем вас на бесплатную консультацию до **31 декабря 2026**. На приёме доктор составит понятный план лечения, объяснит этапы и предложит варианты под ваш бюджет.",
+        "cta": {
+          "action": "lead",
+          "key": "plan",
+          "text": "Составить план лечения"
+        },
+        "meta": {
+          "answer_path": "target_fullcontext",
+          "client_id": "demo",
+          "cta_action": "lead",
+          "cta_key": "plan",
+          "followups": [
+            {
+              "label": "Кому подходит All-on-4",
+              "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+            },
+            {
+              "label": "Как работает метод All-on-4",
+              "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+            }
+          ],
+          "intent": "content",
+          "matched_service_id": "all_on_4",
+          "policy_decision": {
+            "followups_before_ui_source_policy": 3,
+            "quick_replies_before_ui_source_policy": 3,
+            "ui_source_dropped": [],
+            "ui_source_family_effective": "md_navigation",
+            "ui_source_family_in": "target_fullcontext",
+            "ui_source_route": "target_fullcontext_materialized"
+          },
+          "service_route": "target_fullcontext_materialized",
+          "service_topic": "implantation",
+          "session_turn_count": 1,
+          "sid": "s66-live-ffb83280cdad",
+          "turn_count": 1,
+          "ui_dropped": [
+            "followups_over_limit",
+            "suggest_refs_over_limit"
+          ],
+          "ui_source_family": "md_navigation"
+        },
+        "offer": null,
+        "quick_replies": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          }
+        ],
+        "situation": {
+          "mode": "normal",
+          "show": false
+        },
+        "video": null
+      },
+      "answer_text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью всего четырёх имплантов.\n\nГлавное преимущество протокола в скорости и комфорте:\n*   **Несъёмный протез в день операции.** Вы уходите из клиники уже с новыми зубами, которые можно использовать для мягкой пищи.\n*   **Быстрый результат.** Полный протокол на одну челюсть обычно занимает **1–3 дня**.\n*   **Меньше хирургии.** Метод часто позволяет обойтись без сложной костной пластики даже при значительной атрофии кости, так как задние импланты устанавливаются под углом для лучшей стабильности.\n\nПостоянный протез фиксируется через **3–6 месяцев** после полного приживления имплантов. При правильном уходе и соблюдении рекомендаций (в первые **2–3 месяца** — мягкая пища, тщательная гигиена) конструкция служит **15–20 лет** и более.\n\nЧтобы понять, подходит ли вам именно этот протокол или лучше рассмотреть другой вариант (например, All-on-6), врач должен оценить объём и плотность костной ткани по КТ.\n\nПриглашаем вас на бесплатную консультацию до **31 декабря 2026**. На приёме доктор составит понятный план лечения, объяснит этапы и предложит варианты под ваш бюджет.",
+      "meta": {
+        "answer_path": "target_fullcontext",
+        "client_id": "demo",
+        "cta_action": "lead",
+        "cta_key": "plan",
+        "followups": [
+          {
+            "label": "Кому подходит All-on-4",
+            "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+          },
+          {
+            "label": "Как работает метод All-on-4",
+            "ref": "implantation__service__all_on_4.md#kak-rabotaet-metod-all-on-4"
+          }
+        ],
+        "intent": "content",
+        "matched_service_id": "all_on_4",
+        "policy_decision": {
+          "followups_before_ui_source_policy": 3,
+          "quick_replies_before_ui_source_policy": 3,
+          "ui_source_dropped": [],
+          "ui_source_family_effective": "md_navigation",
+          "ui_source_family_in": "target_fullcontext",
+          "ui_source_route": "target_fullcontext_materialized"
+        },
+        "service_route": "target_fullcontext_materialized",
+        "service_topic": "implantation",
+        "session_turn_count": 1,
+        "sid": "s66-live-ffb83280cdad",
+        "turn_count": 1,
+        "ui_dropped": [
+          "followups_over_limit",
+          "suggest_refs_over_limit"
+        ],
+        "ui_source_family": "md_navigation"
+      },
+      "quick_replies": [
+        {
+          "label": "Кому подходит All-on-4",
+          "ref": "implantation__service__all_on_4.md#komu-podhodit-all-on-4"
+        }
+      ],
+      "cta": {
+        "action": "lead",
+        "key": "plan",
+        "text": "Составить план лечения"
+      },
+      "gates": {
+        "flags": {
+          "http_completed": true,
+          "single_http_response": true,
+          "target_answer_path": true,
+          "no_legacy_route": true,
+          "materialized": true,
+          "verified_materialized": true,
+          "no_error_route": true,
+          "no_terminal_defer": true,
+          "cta_authored_match": true,
+          "target_widget_present": true
+        },
+        "automated_turn_verdict": "PASS"
+      },
+      "automated_turn_verdict": "PASS",
+      "recommended_manual_review": "PENDING"
+    }
+  ]
+}

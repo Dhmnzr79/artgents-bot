@@ -61,12 +61,12 @@
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
 | Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
-| Текущий S-series checkpoint | **S66 — default authority live verification (prep)** |
-| Следующий gate | **S66 live attempt (owner-approved, one shot)** |
+| Текущий S-series checkpoint | **S66 — default authority live verification (one attempt, RERUN_BLOCKED)** |
+| Следующий gate | **Legacy isolation/removal (owner decision)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Legacy isolation/removal; optional post-switch live smoke (S66)** |
+| Ближайший рабочий focus | **Harness FC build counter fix (offline); legacy isolation planning** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON) |
-| FullContext authority | **Transferred (S65 offline)** — legacy kill-switch: `TARGET_FULLCONTEXT_DEV=0` + process restart |
+| FullContext authority | **Transferred (S65 default ON; S66 live product path verified)** |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -447,7 +447,12 @@
 - [x] **S65 — default FullContext product authority (offline)** — `TARGET_FULLCONTEXT_DEV` default ON;
   `=0` manual legacy kill-switch at process start; fail-closed target errors without in-turn legacy fallback;
   offline acceptance tests A–H (`tests/test_s65_authority_switch_offline.py`). **NO LIVE / legacy not deleted**.
-- [ ] **S66 — limited local live verification of default authority** — owner approval required; not started.
+- [x] **S66 — default authority live verification** — OWNER APPROVED, **one attempt** (`f8541eb` prep):
+  1 HTTP turn `/ask` «Что такое All-on-4?» without `TARGET_FULLCONTEXT_DEV` env;
+  authority_proof `config_default`; route `target_fullcontext_materialized`; legacy hits=0; 5/5 provider calls;
+  manual PASS on product authority. **AUTOMATED_FAIL** sole gate: `fullcontext_build_count=0` (harness counter bug;
+  composer 32334 prompt tokens). **Official: S66_NOT_PASSED** on automated gate; product authority live verified.
+  **RERUN_BLOCKED**.
 - [ ] **Legacy isolation / removal** — separate milestone after post-switch verification.
 ## Какой roadmap актуален
 

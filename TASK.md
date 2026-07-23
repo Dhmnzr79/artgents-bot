@@ -94,6 +94,6 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | Checkpoint | Required |
 |---|---|
 | PRE-CODE | before implementation |
-| COMPLETION | on diff `fdebfbb…HEAD`; final acceptance only after COMPLETION ✅ |
+| COMPLETION | **✅** (`fdebfbb…83e559e`) |
 
 Push only to `origin/codex/stage-a`.

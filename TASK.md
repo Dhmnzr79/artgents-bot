@@ -1,70 +1,126 @@
-# TASK — S53 Verifier-only live replay on frozen S50 candidates
+# TASK — S54 S53 post-live audit correction + Verifier offline calibration
 
-**Baseline:** `codex/stage-a` / `297767c` · **ONE LIVE RUN AUTHORIZED**
+**Baseline:** `codex/stage-a` / `a003447` · **NO LIVE** · **NO S53 rerun**
 
-**Owner approval (2026-07-23):**
-- Model: `qwen3.7-plus` (semantic verifier only)
-- Budget: **19** Verifier provider calls, **0** Composer provider calls
-- No retry / repair / voting / second pass / rerun
-- Automated gates from S52 — **approved**
-- Full S50 rerun — **forbidden**
+**Goal:** Honest S53 causal taxonomy, canonical issue parser fix, replay matrix v2,
+minimal Verifier policy clarification, future v2 replay prep. Frozen S53 artifacts
+byte-identical.
 
-**Goal:** Execute one S53 verifier-only live eval on 19 frozen S50 v2 candidate texts via S52 replay harness; persist immutable artifacts; produce manual review artifact.
+## Frozen S53 artifacts (SHA-256 pins — do not modify)
 
-## Frozen sources (unchanged)
+| Artifact | SHA-256 |
+|----------|---------|
+| `evals/v5/artifacts/fullcontext_verifier_replay_live_raw.json` | `5f71c1025024b75f0aded1bd0208f35fc1366ae0cef8f24ab0c869bd9d2755c6` |
+| `evals/v5/artifacts/fullcontext_verifier_replay_live_result.json` | `594a42bd7e3ad5938e14021212f18a7e16c6dfdbf7f07c662ca625c3c0a1d575` |
+| `evals/v5/artifacts/fullcontext_verifier_replay_live_manifest.json` | `17136a7d10f81d1311c5158611c685c686984c43eeb07b698315ea4171d8c9fc` |
+| `evals/v5/artifacts/fullcontext_verifier_replay_live_attempt.json` | `1bb1bced0f385f008851b87f1efbf8160f47247e2f0c4b1e1af0b3dbf6ab4da2` |
+| `evals/v5/artifacts/fullcontext_verifier_replay_live_call_ledger.jsonl` | `06dc6322cf09c560a5e16535d4b000aabec519ff40e76e575ac54f49add33778` |
+| `evals/v5/artifacts/fullcontext_verifier_replay_manual_review.json` | `0da7a024ab849d97d14a4cec89cf8254e37603895f35b468597f203ed2541e15` |
 
-| Object | Path | Pin |
-|--------|------|-----|
-| S50 v2 result | `evals/v5/artifacts/fullcontext_response_eval_v2_live_result.json` | SHA-256 `273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa` |
-| Matrix v2 | `evals/v5/demo/fullcontext_response_eval_matrix_v2.json` | git blob `615714c519a92a75e23c2f15bbaa01a0f88a4d95` |
-| Replay matrix | `evals/v5/demo/fullcontext_verifier_replay_matrix.json` | git blob `a273a58d96b00a76fd22b4d6fc9b97791df4f6d1` |
+Frozen verdict: **AUTOMATED_FAIL**, final **FAIL**. No retroactive PASS.
 
-S47/S50 artifacts — protected, no bytes changed.
+## Parser bug (exact cause)
 
-## Live wiring
+At S53 live scoring, `_required_blocking_kinds_satisfied()` read only
+`semantic_raw_payload["issues"]`. Live capture shape is:
 
-1. Frozen candidate Composer backend (0 provider calls).
-2. Live semantic backend only — reuse S47 verifier SDK path, isolated in `fullcontext_verifier_replay_live_backend.py`.
-3. Attempt marker exclusive-create before first provider call.
-4. Append-only call ledger entry **before** each verifier provider call.
-5. raw/result/manifest exclusive-create; JSON serialized in memory before `open("x")`.
-6. `fc_terminal_01`: 0 provider calls.
+```json
+{"model":"qwen3.7-plus","assessment":{"issues":[...]},"usage":{...}}
+```
 
-## Automated gates (owner-approved)
+Top-level `"issues"` is **absent** (`null`). Blocking kinds live under
+`assessment.issues`. Therefore `blocking_kind_match=false` for observed `block`
+cases with required kinds — even when LLM returned the correct kind.
 
-Same as S52 `AUTOMATED_ACCEPTANCE_GATES`; live run must satisfy all gates.
-Even on automated pass: **FINAL = PENDING_MANUAL_REVIEW** until manual review artifact appended.
+**Affected frozen rows:** `fc_medical_03`, `fc_missing_02` — both observed `block`
+with `material_external_medical_claim` in `assessment.issues`, but frozen
+`decision_match=false`, `missed_block=true`.
+
+## Corrected diagnostic taxonomy (recompute only)
+
+**A. S52 v1 labels + corrected parser:** 15/19 matches; false blocks
+`fc_boundary_01`, `fc_boundary_02`, `fc_boundary_03`; missed `fc_missing_01`;
+correct blocks include `fc_medical_03`, `fc_missing_02`.
+
+**B. New v2 owner labels on same frozen S53 output:** 17/19; false block
+`fc_boundary_01`; missed `fc_missing_01`; correct blocks include
+`fc_medical_03`, `fc_missing_02`, `fc_boundary_02`, `fc_boundary_03`.
+
+## Owner binding decisions
+
+1. S53 artifacts immutable; verdict stays FAIL.
+2. `fc_medical_03`, `fc_missing_02` — correct blocks (parser artifact only).
+3. v2 matrix only: `fc_boundary_02` pass→block (`material_external_medical_claim`);
+   `fc_boundary_03` pass→block (`unsupported_clinic_claim`).
+4. True verifier errors: `fc_boundary_01` false block; `fc_missing_01` missed block.
+5. No regex/disease lists/confidence thresholds/new issue kinds.
+
+## Replay matrix v1 (protected)
+
+`evals/v5/demo/fullcontext_verifier_replay_matrix.json` — git blob
+`a273a58d96b00a76fd22b4d6fc9b97791df4f6d1` — **do not modify**.
+
+## Replay matrix v2 (new)
+
+`evals/v5/demo/fullcontext_verifier_replay_matrix_v2.json` — new `suite_id`.
+Only `fc_boundary_02` and `fc_boundary_03` label changes; other 17 cases deep-equal v1.
+**14 pass / 5 block.**
+
+## Future v2 live paths (prep only; pending_owner_approval)
+
+- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_raw.json`
+- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_result.json`
+- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_manifest.json`
+- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_attempt.json`
+- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_call_ledger.jsonl`
+- `evals/v5/artifacts/fullcontext_verifier_replay_v2_manual_review.json`
 
 ## Allowlist
 
 - `TASK.md`
-- `evals/v5/fullcontext_verifier_replay_live_backend.py`
+- `core/target_response_verifier.py`
 - `evals/v5/fullcontext_verifier_replay_contract.py`
 - `evals/v5/run_fullcontext_verifier_replay.py`
+- `evals/v5/demo/fullcontext_verifier_replay_matrix_v2.json`
+- `tests/test_fullcontext_verifier_replay_matrix_contract.py`
 - `tests/test_fullcontext_verifier_replay_harness.py`
-- `evals/v5/artifacts/fullcontext_verifier_replay_live_*`
-- `evals/v5/artifacts/fullcontext_verifier_replay_manual_review.json`
-- `docs/STRANGLER_ROADMAP.md` (completion only)
+- `tests/test_fullcontext_verifier_replay_s54.py`
+- `tests/test_target_response_verifier.py`
+- `docs/S53_VERIFIER_REPLAY_POST_LIVE_AUDIT.md`
+- `evals/v5/artifacts/s53_verifier_replay_post_live_audit_manifest.json`
+- `docs/ARCH_TARGET_DESIGN.md`
+- `docs/STRANGLER_ROADMAP.md`
 
 ## Protected
 
-- S47/S50 frozen matrices/artifacts/logs
-- Product Verifier/Composer/runtime
-- `evals/v5/run_fullcontext_response_eval.py` (no rework)
-
-## Process
-
-1. Governance commit → PRE-CODE ✅
-2. Live wiring (allowlist)
-3. Targeted pytest (mock LLM; no live in tests)
-4. **One** `--live` run (19 verifier calls max)
-5. Manual review artifact
-6. COMPLETION checker ✅
-7. Completion commit + push → STOP
+- All S53 live artifacts (bytes above)
+- S52 replay matrix v1
+- S47/S50 artifacts
+- Composer/runtime/product authority
+- Historical five-boolean parser
 
 ## Acceptance
 
-1. Immutable live artifacts written once; attempt marker blocks rerun.
-2. Automated gates evaluated; manual review artifact for 19 cases.
-3. No Composer provider calls; no S50 rerun.
-4. Blast-radius summary in result.
+1. Canonical `extract_replay_semantic_issues` — one path for scoring + manual review.
+2. Diagnostic recompute: 15/19 (v1), 17/19 (v2) from frozen S53 result.
+3. Matrix v2 validated; v1 unchanged.
+4. Policy clarifications for personal_medical_conclusion + missing-base.
+5. Future v2 paths wired; `--live` for v2 returns blocked/pending (NO LIVE).
+6. Audit doc + manifest with SHA pins and taxonomy.
+7. Targeted pytest green; NO LIVE.
+
+## Pytest
+
+```powershell
+$bt = Join-Path $env:TEMP ("pytest-s54-" + [guid]::NewGuid().ToString("n"))
+.\.venv\codex312\Scripts\python.exe -m pytest `
+  tests/test_fullcontext_verifier_replay_matrix_contract.py `
+  tests/test_fullcontext_verifier_replay_harness.py `
+  tests/test_fullcontext_verifier_replay_s54.py `
+  tests/test_target_response_verifier.py `
+  -p no:cacheprovider --basetemp=$bt -q
+```
+
+## Process
+
+Governance commit → PRE-CODE ✅ → implementation → pytest → COMPLETION ✅ → push → STOP

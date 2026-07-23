@@ -1,97 +1,80 @@
-# TASK — S59 final semantic Verifier medical policy simplification
+# TASK — S61 target FullContext runtime path (dev flag OFF by default)
 
-**Baseline:** `codex/stage-a` / `269885f` · **OFFLINE ONLY · NO LIVE**
+**Baseline:** `codex/stage-a` / `8f98cc2` · **OFFLINE ONLY · NO LIVE**
 
 ## Owner decision
 
-Lightweight Verifier — not heavy medical guardrails.
-
-Semantic Verifier blocks only:
-1. diagnosis in bot's name;
-2. personal medical conclusion, eligibility, treatment choice or advice;
-3. clearly dangerous, absurd, or corpus-contradicting medical fantasy.
-
-Plausible general medical additions absent from base:
-- do **not** block;
-- may return non-blocking `minor_external_detail`;
-- missing grounding alone is **not** a block reason.
-
-No runtime logging system now (future admin stage). Non-blocking issues stay in assessment output.
-
-Deterministic price/number/doctor/strict clinic fact checks **unchanged**.
+Wire S39–S59 target FullContext chain into real `/ask` runtime behind one off-by-default dev flag. Flag ON = target-only (no legacy RAG, no fallback). Flag OFF = unchanged legacy path. No product authority flip in S61.
 
 ## Scope
 
-Minimal change to `TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY` in `core/target_response_verifier.py` only.
-Four existing issue kinds preserved; blocking kinds unchanged in code.
+- `TARGET_FULLCONTEXT_DEV=0` default in `config.py`
+- Product runtime bootstrap (client pack + cached FullContext, once per client/process)
+- TurnFrame bridge from planner shadow ctx (no second planner call)
+- Medical boundary + S46 entry point with injected backends
+- Product LLM backend module (promoted from eval pattern; no `evals/` import in product)
+- Widget materializer + minimal session bridge
+- `/ask` + `/ask/stream` routing when flag ON (batch final payload for stream)
+- Fail-closed controlled responses on block/error (no legacy fallback)
 
-## Boundaries
+## Do NOT
 
-| Kind | S59 boundary |
-|------|----------------|
-| `personal_medical_conclusion` | blocking |
-| `unsupported_clinic_claim` | blocking (unchanged) |
-| `material_external_medical_claim` | blocking only dangerous/absurd/corpus-contradicting |
-| `minor_external_detail` | non-blocking plausible general addition |
-
-## Do NOT add
-
-New issue kinds, confidence thresholds, disease lists, medical regex, voting, retry/repair, second Verifier, fallback, runtime logging, new live matrices.
-
-## S58 historical note
-
-Frozen S58 verdict/artifacts stay FAIL under old policy. Offline tests confirm S58 blocked classes would be non-blocking under S59 policy text + simulator.
+- LIVE / LLM in S61 tests or process
+- Enable dev flag in real local server
+- Product authority ON
+- A9 authority / frozen A9 artifacts
+- Runtime logging / admin UI
+- Parallel target+legacy execution
+- Legacy fallback after target selected
+- New Verifier milestone / RAG / retriever / per-MD routing
+- Change frozen S47/S50/S53/S55/S58 artifacts
 
 ## Затрагиваемые файлы (allowlist)
 
 | File | Change |
 |------|--------|
-| `TASK.md` | S59 governance |
-| `docs/STRANGLER_ROADMAP.md` | S59 checkpoint |
-| `core/target_response_verifier.py` | semantic policy text only |
-| `tests/s59_semantic_policy_backend.py` | **new** offline S59 policy simulator |
-| `tests/test_s59_semantic_verifier_policy.py` | **new** acceptance tests |
-| `tests/test_target_fullcontext_content_response.py` | update RuleBasedSemanticBackend + neighbor tests |
-| `tests/test_target_boundary_enforced_fullcontext_response.py` | missing_ok S59 alignment |
-| `tests/test_s56_missing_base_composer_guard.py` | S59 expectation |
-| `tests/test_fullcontext_quality_eval_harness.py` | S59 S58-class expectations |
-| `tests/test_target_response_verifier.py` | policy assertion update |
+| `TASK.md` | S61 governance |
+| `docs/STRANGLER_ROADMAP.md` | S61 checkpoint |
+| `docs/FLAGS_AND_STATUS.md` | flag doc |
+| `config.py` | `TARGET_FULLCONTEXT_DEV` |
+| `core/target_runtime_client_context.py` | **new** bootstrap |
+| `core/target_runtime_turn_frame_bridge.py` | **new** TurnFrame from ctx |
+| `core/target_runtime_llm_messages.py` | **new** shared prompt builders |
+| `core/target_runtime_llm_backends.py` | **new** product Composer/Verifier/Boundary backends |
+| `core/target_runtime_turn.py` | **new** S46 runtime entry |
+| `core/target_runtime_widget.py` | **new** widget payload mapper |
+| `core/target_runtime_session.py` | **new** session bridge |
+| `core/turn_frame_shadow.py` | runtime TurnFrame getter |
+| `orchestration/target_fullcontext_turn.py` | **new** ask orchestration hook |
+| `app.py` | flag branch in `_orchestrate_ask_turn` |
+| `tests/test_s61_target_fullcontext_runtime.py` | **new** acceptance tests |
 
 ## Protected / forbidden
 
-- Do **not** change frozen S47/S50/S53/S55/S58 artifacts or matrices
-- Do **not** change numeric/strict-fact verifier logic
-- NO LIVE / NO LLM / NO runtime / NO authority / NO A9
-
-## Offline acceptance tests
-
-PASS / non-blocking: lupus+immune general, pregnancy/hormones/lactation general, pain, diabetes grounded, price/payment/doctors/info, S56 free consult, S58 two previously blocked classes.
-
-BLOCK: personal diagnosis/eligibility/treatment choice, absurd/dangerous claim, corpus contradiction, invented clinic facts (semantic + numeric).
+- Frozen eval artifacts unchanged
+- Verifier S59 semantics unchanged
+- No import of `evals/` from product modules
 
 ## Targeted pytest
 
 ```powershell
-$bt = Join-Path $env:TEMP ("s59_pytest_" + [guid]::NewGuid().ToString("n"))
+$bt = Join-Path $env:TEMP ("s61_pytest_" + [guid]::NewGuid().ToString("n"))
 python -m pytest -p no:cacheprovider --basetemp $bt `
-  tests/test_s59_semantic_verifier_policy.py `
-  tests/test_target_response_verifier.py `
-  tests/test_target_fullcontext_content_response.py `
-  tests/test_s56_topic_scoped_consultation_facts.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_target_boundary_enforced_fullcontext_response.py `
   tests/test_s56_missing_base_composer_guard.py `
-  tests/test_fullcontext_quality_eval_harness.py `
-  tests/test_fullcontext_quality_eval_matrix_contract.py `
-  tests/test_fullcontext_verifier_replay_harness.py::test_blast_radius_summary_covers_mass_selling_groups `
+  tests/test_s59_semantic_verifier_policy.py `
+  tests/test_target_turn_frame_dispatch.py `
   -q
 ```
 
 ## Commits
 
-1. Governance: TASK.md, STRANGLER
-2. Implementation: policy + tests
+1. Governance: TASK.md, STRANGLER, FLAGS
+2. Implementation: runtime modules + app wiring + tests
 
 Push only to `origin/codex/stage-a`.
 
 ## PRE-CODE / COMPLETION checker
 
-Required before/after implementation respectively.
+Required before/after implementation.

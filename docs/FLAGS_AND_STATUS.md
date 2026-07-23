@@ -25,6 +25,16 @@
 
 ---
 
+## Target FullContext dev gate (S61)
+
+| Флаг | Что делает | Дефолт |
+|---|---|---|
+| `TARGET_FULLCONTEXT_DEV` | При `1` — `/ask` идёт только через target FullContext (S46); legacy RAG/chunk path не вызывается и не используется как fallback. При `0` — без изменений legacy path; target bootstrap не вызывается. | **OFF (`0`)** |
+
+**S61:** не включать в реальном локальном процессе без отдельного owner approval. Offline tests используют fake/recording backends.
+
+---
+
 ## Выключено по умолчанию — по причине, а не «недоделано»
 
 ### Проверенные гварды — включены по умолчанию (флип 2026-07-09/10)

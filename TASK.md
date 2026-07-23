@@ -1,54 +1,83 @@
-# TASK — S66 default authority live verification — COMPLETE (governance correction)
+# TASK — S67 legacy answer path isolation
 
-**Baseline:** `codex/stage-a` / `04ad2f7`
-**Governance commit:** `0d4d92a`
-**Prep commit:** `f8541eb`
-**Live artifacts commit:** `c23d00f`
-**Governance correction:** docs-only (this update)
+**Baseline:** `codex/stage-a` / `d558efb` · **NO LIVE / NO LEGACY DELETE**
 
-## Governance gate (honest record)
+## Goal
 
-| Checkpoint | Commit | Verdict |
-|------------|--------|---------|
-| PRE-CODE | `0d4d92a` | **❌** — TASK incomplete; WIP harness before approval |
-| Implementation + live | `f8541eb` → `c23d00f` | proceeded **despite PRE-CODE ❌** |
-| Retroactive PRE-CODE PASS | — | **none** |
-| POST-LIVE docs correction | pending | this commit |
+Isolate legacy RAG/chunk/composer answer-production stack from default FullContext path loading/execution. Legacy remains available **only** via manual kill-switch `TARGET_FULLCONTEXT_DEV=0` (process restart). **Isolation, not deletion.**
 
-See `docs/S66_GOVERNANCE_CORRECTION_AUDIT.md`.
+## Seam audit (read-only, `app.py` @ `d558efb`)
 
-## Official verdict
+| Seam | Current | S67 change |
+|------|---------|------------|
+| Top-level `from orchestration.ask_turn import orchestrate_routing_after_resolver` | Eager; pulls `source_routing`, `composer_flow`, `answer_planner`, `md_chunks` | **Lazy** inside `TARGET_FULLCONTEXT_DEV=0` branch only |
+| Top-level `from chunk_responder import ...` | Eager | **Lazy** inside `chunk`/`composer` dispatch only |
+| `_orchestrate_ask_turn` | Target branch before legacy | **Unchanged** semantics |
+| `_service_reply` | `answer_plan_from_ctx` + plan append for `price_lookup`/`catalog_facts` routes | **Skip** legacy plan block for `target_fullcontext_*` routes |
+| `_sse_service_reply` | No answer-plan block | **Unchanged** (already target-safe) |
+| Shared: ingress, flows, resolver, target turn, finalize_ask, UI policy | Pre-target / delivery | **Keep** |
 
-**S66_NOT_PASSED** — unchanged.
+**Shared (not legacy):** `pre_resolver_turn`, `resolver_turn`, `target_fullcontext_turn`, `lead_flow`, `finalize_ask`, `apply_ui_source_policy`, `policy_compat`.
 
-- `automated_verdict`: **AUTOMATED_FAIL** (gate #12 `fullcontext_build_count=0`)
-- `manual_verdict`: **PASS** — does **not** upgrade automated or official verdict
-- Process/measurement incident (harness counter miss), **not** proven product failure
+## Allowlist
 
-## Product authority evidence (live, separate from official verdict)
+| File | Change |
+|------|--------|
+| `TASK.md` | governance + completion |
+| `app.py` | lazy legacy imports; target `_service_reply` guard |
+| `tests/test_s67_legacy_isolation_offline.py` | acceptance A–J |
+| `docs/STRANGLER_ROADMAP.md` | S67 status |
+| `docs/FLAGS_AND_STATUS.md` | kill-switch lazy legacy note |
 
-| Evidence | Value |
-|----------|-------|
-| sid | `s66-live-ffb83280cdad` |
-| env_present | `false` |
-| authority_source | `config_default` |
-| route | `target_fullcontext_materialized` |
-| provider calls | 5/5; retry=0; legacy hits=0 |
-| FC build counter (harness) | 0 (miss; composer 32334 tokens) |
+**Forbidden:** legacy file deletion, kill-switch removal, fallback, FullContext policy changes, S66 counter fix, frozen artifact edits, A9, live/LLM.
 
-**Default FullContext authority live verified** by product evidence above. Official measurement remains **NOT_PASSED**.
+## Legacy modules (import firewall check list)
 
-## Commits
+Eager load **forbidden** on default `import app`:
 
-- `0d4d92a` governance TASK
-- `f8541eb` harness prep
-- `c23d00f` live artifacts (immutable)
-- governance correction (docs-only)
+- `orchestration.ask_turn`
+- `chunk_responder`
+- `source_routing`
+- `orchestration.composer_flow`
 
-## Policy
+## Offline tests (`test_s67_legacy_isolation_offline.py`)
 
-- S66 artifacts **not rewritten**
-- **RERUN_BLOCKED** — no rerun needed or permitted
-- S62 + S63 frozen unchanged ✅
+| ID | Requirement |
+|----|-------------|
+| A | Subprocess import app; legacy modules not in `sys.modules` |
+| B | Default `/ask` — target only; legacy spies = 0 |
+| C | Default `/ask/stream` — same + SSE |
+| D | Target error — no legacy activation |
+| E | Target ref-click — no `get_chunk_by_ref` |
+| F | Kill-switch subprocess `=0` — legacy orchestrator called; target not |
+| G | Ingress hard-stop; lead flow; planner path |
+| H | Session/CTA; no legacy post-processing on target route |
+| I | S62+S63+S66 frozen byte-identical |
+| J | Target modules don't import legacy stack |
 
-**STOP**
+Also run: `tests/test_s65_authority_switch_offline.py` (subset), `tests/test_s61_correction_target_runtime.py` HTTP tests if green.
+
+## Commands
+
+```powershell
+$bt = Join-Path $env:TEMP ("s67_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_s67_legacy_isolation_offline.py `
+  tests/test_s65_authority_switch_offline.py `
+  -q
+
+git diff --check
+python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_suite_unchanged; from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged; assert_frozen_suite_unchanged(); print('frozen OK')"
+```
+
+## Acceptance
+
+- [ ] PRE-CODE checker ✅
+- [ ] Default path lazy isolation
+- [ ] Kill-switch `=0` works
+- [ ] Targeted pytest green
+- [ ] Frozen artifacts unchanged
+- [ ] COMPLETION checker ✅
+- [ ] Push `origin/codex/stage-a`
+
+**STOP after S67 — deletion inventory is separate milestone.**

@@ -99,6 +99,7 @@ No product WIP before PRE-CODE ✅. No checkpoint advance on checker ❌.
 | `last_subject` read | `turn_planner_llm`, `dialog_focus`, `follow_up_rewrite`, `query_selector`, `answer_planner` | tests | **REMOVE** product reads (C2c); remove dual-write (C2c) |
 | `set_last_subject` write | `target_runtime_session.py:134` | tests | **DELETE** dual-write (C2c) |
 | `pending_clarify` | read: `turn_planner_llm`, `ask_turn`; write: `composer_flow` only | tests | **DELETE** planner reads + session API if dead (C2c) |
+| `turn_plan_from_ctx` / `publish_turn_plan` | `ask_turn.py`, `composer_flow.py` (not `/ask` target) | tests | **KEEP** dead legacy modules; **no** C2b edits unless import break |
 | `DecisionFrame` target authority | `resolver_turn` → `record_decision_frame_ctx` | contracts, evals | **REMOVE** product authority (C2b); contract **KEEP** |
 | `prices.json` / `price_offers.json` fallback | `query_selector.py`, `core/price_offers.py`, `startup_check.py` | scripts | **AUDIT** C2d; delete only if no active target caller |
 | `core/patient_playbook.py` loader fallbacks | startup / target selectors | tests | **AUDIT** C2d |
@@ -192,6 +193,7 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | `tests/test_s69_checkpoint_a_offline.py` | no resolver on planner failure |
 | `tests/test_s65_authority_switch_offline.py` | update mocks (`run_planner_turn`) |
 | `tests/test_s67_legacy_isolation_offline.py` | update if imports reference resolver_turn |
+| `tests/test_s61_correction_target_runtime.py` | update `resolver_turn` → `planner_turn` mocks/imports |
 | `tests/test_turn_plan_protocol_guard.py` | **delete** or move to historical — guards removed |
 
 ### C2b hard gates
@@ -239,6 +241,7 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 
 | File | Change |
 |------|--------|
+| `core/turn_planner_llm.py` | remove residual `_session_focus_service_id`, `_pending_clarify_prompt_block` if any remain after C2b |
 | `core/target_runtime_session.py` | remove dual-write |
 | `core/target_runtime_turn_frame_hydration.py` | verify session-only inputs |
 | `session.py` | prune legacy focus/clarify product API |
@@ -387,7 +390,7 @@ STOP and escalate to owner if:
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | |
+| PRE-CODE | ❌ (`548b9a6` — allowlist gaps G1/G2) → correction pending |
 | C2a checker | |
 | C2b checker | |
 | C2c checker | |

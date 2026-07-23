@@ -1,0 +1,27 @@
+{
+  "technical": {
+    "http_turns_completed": 4,
+    "target_answer_path": 4,
+    "legacy_hits": [],
+    "fullcontext_build_count": 1,
+    "followup_ref_pass": false
+  },
+  "provider": {
+    "total_calls": 10,
+    "role_totals": {
+      "composer": 3,
+      "ingress": 0,
+      "medical_boundary": 4,
+      "planner": 0,
+      "semantic_verifier": 3
+    },
+    "retries": 0
+  },
+  "automated_verdict": "AUTOMATED_PASS",
+  "final_verdict": "PENDING_MANUAL_REVIEW",
+  "rerun_blocked_without_owner_approval": true,
+  "followup_ref_pass": false,
+  "baseline_live_commit": "c00fa4dc9f8437fc95847189577e5d2e49c43213",
+  "sid": "s62-live-dc4b1a02a42d",
+  "live_run": true
+}

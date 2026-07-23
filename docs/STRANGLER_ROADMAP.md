@@ -425,10 +425,12 @@
 - [x] **S61 correction** — target-only ingress precedence, effective CTA clamp (`client_cta_capability AND spec.allow_cta`), session frequency IDs,
   service-derived strategy context, HTTP `/ask`/`/ask/stream` integration tests. **OFFLINE ONLY**. COMPLETION checker ✅ on diff `8d7463f…7c5fb13`.
 - [x] **S61 test-hardening (pre-live)** — stale CTA pipeline test, session/frequency, legacy-bypass coverage, HTTP follow-up + two-turn session. **OFFLINE ONLY**.
-- [ ] **S62 — one controlled target FullContext HTTP live runtime test** — OWNER APPROVED: 4 HTTP turns, max 20 provider calls,
-  `TARGET_FULLCONTEXT_DEV=1` only in isolated process; Flask test client + real providers; harness/audit wiring in prep.
-  **One live attempt; RERUN_BLOCKED without new owner approval.**
-
+- [x] **S62 — one controlled target FullContext HTTP live runtime test** — OWNER APPROVED, **one attempt**:
+  4 HTTP turns via Flask test client, `TARGET_FULLCONTEXT_DEV=1` in isolated process only;
+  real providers (`qwen3.6-flash` ingress/planner, `qwen3.7-plus` boundary/composer/verifier);
+  **18 actual LLM calls** (10 audited in target-runtime ledger; ingress/planner via separate transport frames).
+  Harness `AUTOMATED_PASS`; **follow-up ref FAIL** (no price quick reply in Turn 1); Turn 3 `terminal_defer` on doctors.
+  Turn 4 medical stream materialized. Artifacts committed. **RERUN_BLOCKED** without new owner approval.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

@@ -29,9 +29,27 @@ Permanently delete legacy product answer chain (routing → RAG/source routing �
 
 **Legacy-only tests (delete in B after module gone):**
 
-`tests/test_composer_flow.py`, `test_composer_wiring.py`, `test_composer_display_chunk.py`, `test_contacts_routing.py`, `test_doctor_route_order.py`, `test_source_routing_golden.py`, `test_clarify_state.py`, `test_md_clean.py`, `test_verifier_trigger.py`, `test_price_layer_parity.py`
+- `tests/test_composer_flow.py`
+- `tests/test_composer_wiring.py`
+- `tests/test_composer_display_chunk.py`
+- `tests/test_contacts_routing.py`
+- `tests/test_doctor_route_order.py`
+- `tests/test_source_routing_golden.py`
+- `tests/test_clarify_state.py`
+- `tests/test_md_clean.py`
+- `tests/test_verifier_trigger.py`
+- `tests/test_price_layer_parity.py`
+- `tests/test_situation_price_overview.py` — imports `patient_playbook_flow` (S68 §C)
+- `tests/test_answer_packet.py` — legacy answer_packet product path (S68 §C)
+- `tests/test_answer_packet_composer.py` — legacy answer_packet/composer path (S68 §C)
+- `tests/test_answer_packet_snapshot.py` — legacy answer_packet snapshot path (S68 §C)
 
-**Session/plan (delete in B if no readers):** `core/answer_plan_apply.py`, `core/answer_packet.py`, `core/answer_packet_materialize.py`, `core/answer_packet_snapshot.py` — only after `rg` confirms no target/shared importer.
+**Session/plan (delete in B if no readers after `rg`):**
+
+- `core/answer_plan_apply.py`
+- `core/answer_packet.py`
+- `core/answer_packet_materialize.py`
+- `core/answer_packet_snapshot.py`
 
 ## Modify list
 
@@ -56,11 +74,14 @@ Permanently delete legacy product answer chain (routing → RAG/source routing �
 | File | Change |
 |------|--------|
 | Delete list modules | Physical delete after `rg` clean |
-| Delete list tests | Physical delete |
-| `session.py` | Remove `pending_clarify` helpers if no readers |
+| Delete list tests | Physical delete (full list above) |
+| `session.py` | Remove `pending_clarify` helpers; prune `last_aspect` writers if orphaned; **investigate** `current_doc_id` / `last_catalog_service` readers — delete only after `rg` shows no target/shared reader (S68 §E) |
+| `core/follow_up_rewrite.py` | Remove legacy-only functions (`persist_focus_from_service_turn` etc.) if orphaned; **keep** `focus_from_legacy_session` while `dialog_focus` reads it (S68 §C/F) |
+| `core/answer_planner.py` | **KEEP_SHARED** — planner unit tests and TurnFrame shadow; remove only legacy product-only exports if orphaned after B (`rg` gate) |
 | `tests/test_dialog_focus_baseline.py` | Remove `route_source` sections |
 | `tests/test_turn_planner_wiring.py` | Remove `composer_flow` mock sections |
 | `tests/test_price_ref_routing.py` | Keep parse tests; drop orchestrate tests |
+| `tests/test_price_brand_money.py` | Remove `price_flow` imports/tests; keep shared price logic covered elsewhere (S68 §C) |
 | `tests/test_s69_legacy_deleted_offline.py` | **new** — import audit + no legacy dispatch |
 | `docs/FLAGS_AND_STATUS.md` | Kill-switch removed; unconditional FullContext |
 | `docs/STRANGLER_ROADMAP.md` | S69 completed |
@@ -69,7 +90,7 @@ Permanently delete legacy product answer chain (routing → RAG/source routing �
 
 ## Keep list (must not delete)
 
-`orchestration/resolver_turn.py`, `orchestration/target_fullcontext_turn.py`, `orchestration/lead_flow.py` (service_reply path), `orchestration/finalize_turn.py`, `orchestration/helpers.py`, `orchestration/route_guards.py`, `core/target_*`, `core/dialog_focus.py`, `core/turn_planner_llm.py`, `query_selector.py`, `core/md_chunks.py` (tooling/lead until proven unused), `llm.py` (shared providers), `evals/v5/**` artifacts, A9 shadow, frozen pin guards.
+`orchestration/resolver_turn.py`, `orchestration/target_fullcontext_turn.py`, `orchestration/lead_flow.py` (service_reply path), `orchestration/finalize_turn.py`, `orchestration/helpers.py`, `orchestration/route_guards.py`, `core/target_*`, `core/dialog_focus.py`, `core/answer_planner.py` (planner unit + shadow — not legacy product path), `core/turn_planner_llm.py`, `query_selector.py`, `core/md_chunks.py` (tooling until proven unused), `core/follow_up_rewrite.py` (partial — dialog_focus reader), `llm.py` (shared providers), `evals/v5/**` artifacts, A9 shadow, frozen pin guards.
 
 ## Checkpoint A — scope detail
 
@@ -114,7 +135,7 @@ rg -n "TARGET_FULLCONTEXT_DEV|orchestrate_routing_after_resolver|kind=.chunk|kin
 ## Checkpoint B — scope detail
 
 1. Delete 7 legacy modules (delete list) — `rg` before each
-2. Session/plan cleanup per S68 E (pending_clarify, answer_plan_apply, answer_packet* if orphaned)
+2. Session/plan cleanup per S68 §E/H phase 5: `pending_clarify`, `answer_plan_apply`, `answer_packet*` if orphaned; partial `follow_up_rewrite`; session field prune per `rg`
 3. Delete legacy-only tests; modify mixed tests
 4. Product import audit — **zero** imports/calls of deleted stack in active product `.py` (excl. `evals/`, `tests/`, `docs/`, `archive/`)
 
@@ -165,7 +186,7 @@ Live/LLM, FullContext/Planner/Composer/Verifier/boundary policy changes, frozen 
 
 ## Acceptance
 
-- [ ] PRE-CODE checker ✅
+- [ ] PRE-CODE checker ✅ (retry after governance correction `6d43f2e` → …)
 - [ ] Checkpoint A complete + CHECKPOINT-A ✅
 - [ ] Checkpoint B complete + COMPLETION ✅
 - [ ] Legacy import audit clean

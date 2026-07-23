@@ -1,35 +1,54 @@
-# TASK — S66 default authority live verification — COMPLETE
+# TASK — S66 default authority live verification — COMPLETE (governance correction)
 
 **Baseline:** `codex/stage-a` / `04ad2f7`
+**Governance commit:** `0d4d92a`
 **Prep commit:** `f8541eb`
-**Live artifacts commit:** pending
-**Status:** **COMPLETE (one live attempt)** · **RERUN_BLOCKED**
+**Live artifacts commit:** `c23d00f`
+**Governance correction:** docs-only (this update)
 
-## Live result
+## Governance gate (honest record)
 
-| Field | Value |
-|-------|-------|
+| Checkpoint | Commit | Verdict |
+|------------|--------|---------|
+| PRE-CODE | `0d4d92a` | **❌** — TASK incomplete; WIP harness before approval |
+| Implementation + live | `f8541eb` → `c23d00f` | proceeded **despite PRE-CODE ❌** |
+| Retroactive PRE-CODE PASS | — | **none** |
+| POST-LIVE docs correction | pending | this commit |
+
+See `docs/S66_GOVERNANCE_CORRECTION_AUDIT.md`.
+
+## Official verdict
+
+**S66_NOT_PASSED** — unchanged.
+
+- `automated_verdict`: **AUTOMATED_FAIL** (gate #12 `fullcontext_build_count=0`)
+- `manual_verdict`: **PASS** — does **not** upgrade automated or official verdict
+- Process/measurement incident (harness counter miss), **not** proven product failure
+
+## Product authority evidence (live, separate from official verdict)
+
+| Evidence | Value |
+|----------|-------|
 | sid | `s66-live-ffb83280cdad` |
 | env_present | `false` |
 | authority_source | `config_default` |
 | route | `target_fullcontext_materialized` |
-| CTA | `Составить план лечения` (key `plan`) |
-| provider calls | 5/5 (ingress 1, planner 1, boundary 1, composer 1, verifier 1) |
-| retry | 0 |
-| legacy hits | 0 |
-| fullcontext_build_count (harness) | 0 (counter miss; composer 32334 tokens) |
-| automated_verdict | **AUTOMATED_FAIL** |
-| manual_verdict | **PASS** |
-| official ruling | **S66_NOT_PASSED** (automated gate 12); product authority **live verified** |
+| provider calls | 5/5; retry=0; legacy hits=0 |
+| FC build counter (harness) | 0 (miss; composer 32334 tokens) |
+
+**Default FullContext authority live verified** by product evidence above. Official measurement remains **NOT_PASSED**.
 
 ## Commits
 
-- `0d4d92a` governance
+- `0d4d92a` governance TASK
 - `f8541eb` harness prep
-- post-live artifacts + docs (this closeout)
+- `c23d00f` live artifacts (immutable)
+- governance correction (docs-only)
 
-## Frozen protection
+## Policy
 
-S62 + S63 artifacts byte-identical pre/post live ✅
+- S66 artifacts **not rewritten**
+- **RERUN_BLOCKED** — no rerun needed or permitted
+- S62 + S63 frozen unchanged ✅
 
-**STOP — no rerun, no legacy isolation without owner decision.**
+**STOP**

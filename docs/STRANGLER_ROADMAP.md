@@ -66,7 +66,7 @@
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
 | Ближайший рабочий focus | **Harness FC build counter fix (offline); legacy isolation planning** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON) |
-| FullContext authority | **Transferred (S65 default ON; S66 live product path verified)** |
+| FullContext authority | **Transferred (S65 default ON; S66 product evidence live verified; official S66_NOT_PASSED)** |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -447,12 +447,12 @@
 - [x] **S65 — default FullContext product authority (offline)** — `TARGET_FULLCONTEXT_DEV` default ON;
   `=0` manual legacy kill-switch at process start; fail-closed target errors without in-turn legacy fallback;
   offline acceptance tests A–H (`tests/test_s65_authority_switch_offline.py`). **NO LIVE / legacy not deleted**.
-- [x] **S66 — default authority live verification** — OWNER APPROVED, **one attempt** (`f8541eb` prep):
-  1 HTTP turn `/ask` «Что такое All-on-4?» without `TARGET_FULLCONTEXT_DEV` env;
-  authority_proof `config_default`; route `target_fullcontext_materialized`; legacy hits=0; 5/5 provider calls;
-  manual PASS on product authority. **AUTOMATED_FAIL** sole gate: `fullcontext_build_count=0` (harness counter bug;
-  composer 32334 prompt tokens). **Official: S66_NOT_PASSED** on automated gate; product authority live verified.
-  **RERUN_BLOCKED**.
+- [x] **S66 — default authority live verification** — OWNER APPROVED, **one attempt** (`f8541eb` prep → `c23d00f` artifacts):
+  PRE-CODE on `0d4d92a` = **❌**; implementation/live continued without retroactive PRE-CODE PASS (governance incident).
+  1 HTTP turn without `TARGET_FULLCONTEXT_DEV` env; `authority_source=config_default`; route `target_fullcontext_materialized`;
+  legacy=0; 5/5 provider calls. **AUTOMATED_FAIL** (harness `fullcontext_build_count=0` counter miss; composer 32334 tokens).
+  Manual PASS does not upgrade official verdict. **Official: S66_NOT_PASSED**; product authority live verified separately.
+  Process/measurement incident, not proven product failure. **RERUN_BLOCKED**. Audit: `docs/S66_GOVERNANCE_CORRECTION_AUDIT.md`.
 - [ ] **Legacy isolation / removal** — separate milestone after post-switch verification.
 ## Какой roadmap актуален
 

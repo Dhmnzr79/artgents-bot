@@ -10,7 +10,6 @@ from flask import Flask, request
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.response_schema import TargetStrategyMatch
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundMaterializeResponse
-from core.price_symptom_consult import CONSULT_SYMPTOM_DETAILS_REF
 from core.target_response_verifier import TargetSemanticAssessment, TargetSemanticIssue
 from core.target_runtime_client_context import load_target_runtime_client_context
 from core.target_runtime_followup_nav import (

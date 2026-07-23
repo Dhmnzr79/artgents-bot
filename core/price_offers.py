@@ -280,29 +280,6 @@ def resolve_implant_group_overview(q: str) -> str | None:
     return detect_price_scope(q).group_id
 
 
-def should_offer_unit_clarify(q: str, match: dict[str, Any]) -> bool:
-    """Generic implant price → group overview from manifest (legacy name kept)."""
-    _ = match
-    return resolve_implant_group_overview(q) is not None
-
-
-def build_unit_clarify_answer(client_id: str | None, *, group_id: str = "implantation") -> str | None:
-    from core.price_group_overview import build_group_overview_answer
-
-    answer, _, _ = build_group_overview_answer(client_id, group_id=group_id)
-    return answer
-
-
-def unit_clarify_quick_replies(
-    client_id: str | None = None,
-    *,
-    group_id: str = "implantation",
-) -> list[dict[str, str]]:
-    from core.price_group_overview import group_overview_quick_replies
-
-    return group_overview_quick_replies(client_id, group_id=group_id)
-
-
 def get_price_offers(
     client_id: str | None,
     service_id: str,

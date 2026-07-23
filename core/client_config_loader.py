@@ -477,10 +477,6 @@ def consult_nudge_enabled(client_id: str | None) -> bool:
 
 
 def price_symptom_consult_enabled(client_id: str | None) -> bool:
-    from config import PRICE_SYMPTOM_CONSULT_ON
-
-    if not PRICE_SYMPTOM_CONSULT_ON:
-        return False
     return feature_flag(client_id, "price_symptom_consult", "enabled", default=False)
 
 

@@ -223,26 +223,6 @@ def match_catalog_for_implant_group_overview(q: str, *, client_id: str | None) -
     return {**m, "containment_eligible": False}
 
 
-def compute_retrieval_scope_with_conflict_guard(
-    *,
-    scope_topic_candidate: str | None,
-    q: str,
-    client_id: str | None,
-    decision: Any | None = None,
-) -> tuple[str | None, str]:
-    """Legacy no-op after embed retrieval removal."""
-    raw = (scope_topic_candidate or "").strip().lower()
-    if not raw or raw == "unknown":
-        return None, "none"
-
-    q0 = (q or "").strip()
-    match = match_service_from_catalog(q0, client_id=client_id)
-    if match.get("containment_eligible"):
-        return None, "catalog_match"
-    _ = decision
-    return raw, "none"
-
-
 def _service_from_session_context(sid: str | None, client_id: str | None) -> dict | None:
     """Ищет услугу в каталоге по current_doc_id или last_catalog_service_id из сессии.
 

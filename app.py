@@ -381,9 +381,6 @@ def ask():
                     "answer_chars": 0,
                     "latency_ms": None,
                     "fallback_reason": "ask_failed",
-                    "retrieval_scope_topic": None,
-                    "retrieval_scope_guard_reason": "none",
-                    "retrieval_scope_widen_fallback": False,
                     "legacy_intent": None,
                     "effective_intent": "",
                 },
@@ -535,9 +532,6 @@ def ask_stream():
                     "answer_chars": 0,
                     "latency_ms": None,
                     "fallback_reason": "ask_stream_failed",
-                    "retrieval_scope_topic": None,
-                    "retrieval_scope_guard_reason": "none",
-                    "retrieval_scope_widen_fallback": False,
                     "legacy_intent": None,
                     "effective_intent": "",
                 },
@@ -549,14 +543,6 @@ def ask_stream():
             details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
         )
         return safe_jsonify(internal_error_response()), 200
-
-@app.get("/__debug/retrieval")
-def dbg():
-    if APP_ENV == "prod":
-        return jsonify({"error": "not_found"}), 404
-    if request.headers.get("X-Debug-Token") != DEBUG_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
-    return jsonify({"error": "retrieval_removed", "message": "Embed search debug endpoint is retired."}), 410
 
 
 @app.get("/api/video-catalog")

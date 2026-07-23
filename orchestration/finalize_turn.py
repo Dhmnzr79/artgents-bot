@@ -164,13 +164,6 @@ def finalize_ask(
                 "fallback_reason": pmeta.get("fallback_reason"),
                 "resolver_used": bool(request.ctx.get("resolver_used")),
                 "safety_net_used": bool(request.ctx.get("safety_net_used")),
-                "retrieval_scope_topic": request.ctx.get("retrieval_scope_topic"),
-                "retrieval_scope_guard_reason": str(
-                    request.ctx.get("retrieval_scope_guard_reason") or "none"
-                ),
-                "retrieval_scope_widen_fallback": bool(
-                    request.ctx.get("retrieval_scope_widen_fallback")
-                ),
                 **metadata_first_turn_details(),
                 "legacy_intent": request.ctx.get("legacy_intent"),
                 "effective_intent": str(request.ctx.get("effective_intent") or ""),

@@ -16,7 +16,6 @@ from price_query_cases import (
     UPPER_JAW_CASES,
 )
 from query_selector import select_price_service_route
-from ux_builder import build_price_resolution_payload
 
 
 @pytest.fixture(autouse=True)
@@ -126,18 +125,6 @@ def test_basal_implantation_price_service_alternative_defer():
     assert route.get("mode") == "clarify"
     assert route.get("fallback_reason") == "service_not_offered"
     assert route.get("mode") != "group_overview"
-    payload = build_price_resolution_payload(
-        sid="svc-alt-basal",
-        client_id="demo",
-        intent="price_lookup",
-        resolution_reason=str(route.get("fallback_reason") or ""),
-        service_id=str(route.get("matched_service_id") or "") or None,
-        service=route.get("service") or {},
-        match_score=float(route.get("match_score") or 0.0),
-        question=q,
-    )
-    assert "базальн" in payload.get("answer", "").lower()
-    assert payload.get("meta", {}).get("service_status") == "not_offered"
 
 
 def test_generic_implantation_stays_group_overview_d1():

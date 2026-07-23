@@ -132,29 +132,6 @@ def test_complex_plan_no_stages_in_first_blocks(demo_client):
     assert "includes" not in plan.blocks
 
 
-def test_s3_group_overview_from_manifest(demo_client):
-    from core.price_group_overview import build_group_overview_answer
-
-    answer, quick, meta = build_group_overview_answer(demo_client, group_id="implantation")
-    assert answer
-    assert "76 200" in answer
-    assert "318 000" in answer
-    assert meta.get("pricebook_scenario") == "overview"
-    assert len(quick) == 5
-    assert quick[0]["label"] == "Классическая"
-
-
-def test_s3_full_jaw_overview_from_manifest(demo_client):
-    from core.price_group_overview import build_group_overview_answer
-
-    answer, quick, meta = build_group_overview_answer(demo_client, group_id="full_jaw")
-    assert answer
-    assert "318 000" in answer
-    assert "398 000" in answer
-    assert "76 200" not in answer
-    assert meta.get("pricebook_group_id") == "full_jaw"
-    assert len(quick) == 2
-
 
 def test_merge_price_quick_replies_fact_button_not_duplicated(demo_client):
     from core.price_answer_assembler import merge_price_quick_replies

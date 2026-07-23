@@ -42,7 +42,6 @@ def chat_provider_is_qwen() -> bool:
     )
 
 RESOLVER_MODEL = (os.getenv("MODEL_RESOLVER") or "").strip() or QWEN_PLUS_MODEL
-QUERY_REWRITE_MODEL = (os.getenv("MODEL_QUERY_REWRITE") or "").strip() or QWEN_FLASH_MODEL
 LEAD_NAME_CLASSIFY_MODEL = (os.getenv("MODEL_LEAD_NAME") or "").strip() or QWEN_FLASH_MODEL
 DIALOG_FOCUS_LLM_CLASSIFY_ON = os.getenv("DIALOG_FOCUS_LLM_CLASSIFY", "1").lower() in (
     "1",
@@ -69,48 +68,6 @@ ASPECT_PLANNER_LLM_ON = os.getenv("ASPECT_PLANNER_LLM_ON", "0").lower() in (
 )
 ASPECT_PLANNER_LLM_MODEL = (
     (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
-)
-
-# --- Answer packet assembler (composer roadmap phase 2) ---
-ANSWER_PACKET_ASSEMBLER_ON = os.getenv("ANSWER_PACKET_ASSEMBLER_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Packet composer (composer roadmap phase 3) ---
-COMPOSER_ON = os.getenv("COMPOSER_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Full-context composer content (step 1: whole md base, not chunk refs) ---
-FULLCTX_ON = os.getenv("FULLCTX_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Living copy for deterministic price group overviews (stage 5.5d) ---
-LIVING_OVERVIEW_ON = os.getenv("LIVING_OVERVIEW_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Situation-level price overview through unified map (stage 5.5) ---
-SITUATION_PRICE_ON = os.getenv("SITUATION_PRICE_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Symptom-only price → consult gate (medzone; default on, env "0" = kill-switch) ---
-PRICE_SYMPTOM_CONSULT_ON = os.getenv("PRICE_SYMPTOM_CONSULT_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
 )
 
 # --- Lead booking date defer (no slot confirmation without schedule; default on, env "0" = kill-switch) ---
@@ -188,21 +145,6 @@ SAFETY_CLASSIFY_MODEL = (os.getenv("MODEL_SAFETY_CLASSIFY") or "").strip() or QW
 SAFETY_RED_CONFIDENCE_THRESHOLD = float(os.getenv("SAFETY_RED_CONFIDENCE_THRESHOLD", "0.8"))
 COMPLAINT_CLASSIFY_MODEL = (os.getenv("MODEL_COMPLAINT_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
 INGRESS_CLASSIFY_MODEL = (os.getenv("MODEL_INGRESS_CLASSIFY") or "").strip() or QWEN_FLASH_MODEL
-QUERY_REWRITE_ON = os.getenv("QUERY_REWRITE_ON", "1").lower() in ("1", "true", "yes")
-QUERY_REWRITE_MAX_MESSAGES = int(os.getenv("QUERY_REWRITE_MAX_MESSAGES", "10"))
-# Подстроки в ответе rewrite → отбросить (утечка инструкции / мусор). Разделитель |
-_rewrite_reject_raw = os.getenv(
-    "REWRITE_REJECT_SUBSTRINGS",
-    "врач, процедура, симптом, зуб, материал|ключевые сущности",
-)
-REWRITE_REJECT_SUBSTRINGS: tuple[str, ...] = tuple(
-    x.strip().lower() for x in _rewrite_reject_raw.split("|") if x.strip()
-)
-QUERY_REWRITE_VALIDATE_OVERLAP = os.getenv("QUERY_REWRITE_VALIDATE_OVERLAP", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
 
 # --- HTTP / app ---
 PORT = int(os.getenv("PORT", "9000"))

@@ -2,8 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from core.catalog_resolution import _md_korotko_ref
 from core.service_selector_llm import _read_service_catalog
+
+
+def _md_korotko_ref(md_entry_ref: str) -> str:
+    raw = (md_entry_ref or "").strip()
+    if not raw:
+        return ""
+    base = raw if raw.lower().endswith(".md") else f"{raw}.md"
+    if "#" in base:
+        stem, anchor = base.split("#", 1)
+        if not stem.lower().endswith(".md"):
+            stem = f"{stem}.md"
+        return f"{stem}#{anchor or 'korotko'}"
+    return f"{base}#korotko"
 
 CLARIFY_ALLOW_INSTRUCTION = (
     "Если без уточнения ответ будет вслепую — вместо ответа верни clarify: один короткий дружелюбный вопрос "

@@ -27,6 +27,14 @@ DELETED_MODULES = (
     "core.answer_packet",
     "core.answer_packet_materialize",
     "core.answer_packet_snapshot",
+    "core.catalog_resolution",
+    "core.knowledge_base",
+    "core.living_frame",
+    "core.price_brand_money",
+    "core.price_symptom_consult",
+    "core.price_group_overview",
+    "core.rewrite_policy",
+    "contracts.answer_packet",
 )
 
 FORBIDDEN_SYMBOLS = (
@@ -61,6 +69,14 @@ import_patterns = [
     re.compile(r"^\\s*from\\s+core\\.answer_packet\\b"),
     re.compile(r"^\\s*from\\s+core\\.answer_packet_materialize\\b"),
     re.compile(r"^\\s*from\\s+core\\.answer_packet_snapshot\\b"),
+    re.compile(r"^\\s*from\\s+core\\.catalog_resolution\\b"),
+    re.compile(r"^\\s*from\\s+core\\.knowledge_base\\b"),
+    re.compile(r"^\\s*from\\s+core\\.living_frame\\b"),
+    re.compile(r"^\\s*from\\s+core\\.price_brand_money\\b"),
+    re.compile(r"^\\s*from\\s+core\\.price_symptom_consult\\b"),
+    re.compile(r"^\\s*from\\s+core\\.price_group_overview\\b"),
+    re.compile(r"^\\s*from\\s+core\\.rewrite_policy\\b"),
+    re.compile(r"^\\s*from\\s+contracts\\.answer_packet\\b"),
 ]
 symbol_patterns = [
     re.compile(r"\\bTARGET_FULLCONTEXT_DEV\\b"),

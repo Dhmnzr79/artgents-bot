@@ -76,9 +76,6 @@ def run_pre_resolver_turn(
 
     q, truncated = normalize_question_text(q_raw)
     bind_chat_ctx(sid, client_id)
-    request.ctx["retrieval_scope_topic"] = None
-    request.ctx["retrieval_scope_guard_reason"] = "none"
-    request.ctx["retrieval_scope_widen_fallback"] = False
     request.ctx["legacy_intent"] = None
     request.ctx["effective_intent"] = None
 

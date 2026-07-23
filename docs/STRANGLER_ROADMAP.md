@@ -383,7 +383,7 @@
   implementation `a2596f9`.
 - [x] **S51 correction — stale neighbor test + ARCH sync** — migrate
   `test_demo_target_turn_frame_bound_response.py` to issue-based contract; ARCH § S51
-  documents active Verifier. **NO LIVE**. Governance `e847228`.
+  documents active Verifier. **NO LIVE**. Governance `e847228`; correction `239a405`.
 
 ## Какой roadmap актуален
 

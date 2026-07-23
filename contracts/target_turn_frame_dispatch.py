@@ -8,6 +8,7 @@ from typing import Literal
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_response_verifier import TargetVerifiedComposedResponse
+from core.target_session_selection import TargetMaterializedSessionSelection
 
 
 TargetTurnFrameTerminalMode = Literal[
@@ -35,6 +36,7 @@ class TargetTurnFrameBoundMaterializeResponse:
     kind: Literal["materialize"]
     dispatch: TargetTurnFrameMaterializeDispatch
     verified: TargetVerifiedComposedResponse
+    session_selection: TargetMaterializedSessionSelection | None = None
 
 
 @dataclass(frozen=True, slots=True)

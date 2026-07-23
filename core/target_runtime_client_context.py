@@ -14,7 +14,7 @@ from contracts.doctor_schema_refs import (
     build_doctor_source_refs,
     validate_doctor_catalog_external_refs,
 )
-from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
+from contracts.response_schema import ResponseSchemaBundle
 from contracts.response_schema_refs import (
     ResponseSchemaExternalIndex,
     validate_response_schema_external_refs,
@@ -65,11 +65,10 @@ class TargetRuntimeClientContext:
     cached_full_context: TargetCachedFullContext
     allowed_topics: tuple[str, ...]
     tone: TargetComposerTone
-    default_strategy_context: TargetStrategyMatch
+    cta_capability: bool
     semantic_context: str
     include_initial_block: bool
     include_consultation_close: bool
-    include_cta: bool
 
     @property
     def cache_key(self) -> str:
@@ -145,14 +144,10 @@ def _build_context(client_id: str) -> TargetRuntimeClientContext:
             key="commercial_warm",
             instruction="Отвечай доброжелательно и без давления.",
         ),
-        default_strategy_context=TargetStrategyMatch(
-            family="implantology",
-            extent="full_arch",
-        ),
+        cta_capability=bool(bundle.marketing.cta_contexts),
         semantic_context="service",
         include_initial_block=False,
         include_consultation_close=True,
-        include_cta=False,
     )
 
 

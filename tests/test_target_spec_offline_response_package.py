@@ -91,6 +91,7 @@ def test_exact_shape_signature_defaults_and_four_error_codes() -> None:
         "shown_fact_ids",
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
+        "turn_topic",
     ]
     for name in (
         "marketing_scenarios",
@@ -187,6 +188,19 @@ def test_nonmaterializable_specs_fail_before_s31(
     assert called is False
 
 
+def test_include_cta_clamps_to_spec_allow_cta(monkeypatch: pytest.MonkeyPatch) -> None:
+    nested = SimpleNamespace(plan=SimpleNamespace(cta_key="consultation"))
+    monkeypatch.setattr(
+        spec_package_module,
+        "assemble_target_offline_response_package",
+        lambda *a, **k: nested,
+    )
+    result = assemble_target_spec_offline_response_package(
+        **_inputs(include_cta=True, spec=_spec(allow_cta=False))
+    )
+    assert result.selected_cta_key is None
+
+
 @pytest.mark.parametrize(
     ("overrides", "permission"),
     [
@@ -194,7 +208,6 @@ def test_nonmaterializable_specs_fail_before_s31(
         ({"marketing_scenarios": ("cost",)}, "marketing_facts"),
         ({"marketing_scenarios": []}, "marketing_facts"),
         ({"include_consultation_close": True}, "consultation_close"),
-        ({"include_cta": True}, "cta"),
     ],
 )
 def test_selection_cannot_widen_spec_permission(

@@ -22,7 +22,7 @@ from core.target_composer_executor import (
     TargetComposerTone,
 )
 from core.target_policy_bound_verified_response_pipeline import (
-    run_target_offline_policy_bound_verified_response_pipeline,
+    run_target_offline_policy_bound_verified_response_pipeline_with_selection,
 )
 from core.target_response_verifier import TargetSemanticVerifierBackend
 from core.target_turn_frame_dispatch import dispatch_target_turn_frame_response
@@ -59,32 +59,34 @@ def run_target_offline_turn_frame_bound_response(
     dispatch = dispatch_target_turn_frame_response(turn_frame, envelope)
     if dispatch.kind == "terminal":
         return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
+    verified, session_selection = run_target_offline_policy_bound_verified_response_pipeline_with_selection(
+        dispatch.policy_request,
+        bundle,
+        doctor_catalog,
+        external_index,
+        consultation_values,
+        brand_term=brand_term,
+        strategy_context=strategy_context,
+        semantic_context=semantic_context,
+        today=today,
+        md_root=md_root,
+        cached_full_context=cached_full_context,
+        include_initial_block=include_initial_block,
+        include_consultation_close=include_consultation_close,
+        include_cta=include_cta,
+        user_message=user_message,
+        tone=tone,
+        composer_backend=composer_backend,
+        semantic_backend=semantic_backend,
+        marketing_scenarios=marketing_scenarios,
+        shown_fact_ids=shown_fact_ids,
+        shown_amplifier_refs=shown_amplifier_refs,
+        shown_consultation_value_refs=shown_consultation_value_refs,
+        turn_topic=turn_frame.topic,
+    )
     return TargetTurnFrameBoundMaterializeResponse(
         kind="materialize",
         dispatch=dispatch,
-        verified=run_target_offline_policy_bound_verified_response_pipeline(
-            dispatch.policy_request,
-            bundle,
-            doctor_catalog,
-            external_index,
-            consultation_values,
-            brand_term=brand_term,
-            strategy_context=strategy_context,
-            semantic_context=semantic_context,
-            today=today,
-            md_root=md_root,
-            cached_full_context=cached_full_context,
-            include_initial_block=include_initial_block,
-            include_consultation_close=include_consultation_close,
-            include_cta=include_cta,
-            user_message=user_message,
-            tone=tone,
-            composer_backend=composer_backend,
-            semantic_backend=semantic_backend,
-            marketing_scenarios=marketing_scenarios,
-            shown_fact_ids=shown_fact_ids,
-            shown_amplifier_refs=shown_amplifier_refs,
-            shown_consultation_value_refs=shown_consultation_value_refs,
-            turn_topic=turn_frame.topic,
-        ),
+        verified=verified,
+        session_selection=session_selection,
     )

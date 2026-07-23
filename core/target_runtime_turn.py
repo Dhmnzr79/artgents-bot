@@ -30,10 +30,13 @@ from core.target_runtime_session import (
     read_target_runtime_session,
     write_target_runtime_session_after_materialized,
 )
+from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
+from core.target_runtime_strategy import resolve_target_runtime_strategy_context
 from core.target_runtime_turn_frame_bridge import (
     TargetRuntimeTurnFrameError,
     load_runtime_turn_frame,
 )
+from core.target_session_selection import TargetMaterializedSessionSelection
 from core.target_runtime_widget import (
     TargetRuntimeWidgetPayload,
     materialize_target_error_payload,
@@ -46,6 +49,20 @@ class TargetRuntimeTurnOutcome:
     widget: TargetRuntimeWidgetPayload
     pipeline_result: object | None
     turn_frame: TurnFrame | None
+
+
+def _followups_from_widget(widget: TargetRuntimeWidgetPayload) -> tuple[TargetRuntimeFollowupItem, ...]:
+    payload = widget.payload
+    quick = payload.get("quick_replies") if isinstance(payload.get("quick_replies"), list) else []
+    items: list[TargetRuntimeFollowupItem] = []
+    for entry in quick:
+        if not isinstance(entry, dict):
+            continue
+        ref = str(entry.get("ref") or "").strip()
+        label = str(entry.get("label") or "").strip()
+        if ref:
+            items.append(TargetRuntimeFollowupItem(ref=ref, label=label))
+    return tuple(items)
 
 
 def run_target_fullcontext_runtime_turn(
@@ -105,6 +122,11 @@ def run_target_fullcontext_runtime_turn(
             turn_frame=turn_frame,
         )
 
+    strategy_context = resolve_target_runtime_strategy_context(
+        context.bundle,
+        service_id=turn_frame.service_id,
+    )
+
     try:
         result = run_target_offline_boundary_enforced_fullcontext_response(
             turn_frame,
@@ -124,14 +146,14 @@ def run_target_fullcontext_runtime_turn(
             min_service_confidence=0.0,
             min_intent_confidence=0.0,
             brand_term=brand_term,
-            strategy_context=context.default_strategy_context,
+            strategy_context=strategy_context,
             semantic_context=context.semantic_context,
             today=runtime_today(),
             md_root=context.md_root,
             cached_full_context=context.cached_full_context,
             include_initial_block=context.include_initial_block,
             include_consultation_close=context.include_consultation_close,
-            include_cta=context.include_cta,
+            include_cta=context.cta_capability,
             user_message=user_message,
             tone=context.tone,
             composer_backend=composer_backend,
@@ -171,13 +193,15 @@ def run_target_fullcontext_runtime_turn(
     )
 
     if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
+        selection = result.session_selection or TargetMaterializedSessionSelection((), (), ())
+        followups = _followups_from_widget(widget)
         write_target_runtime_session_after_materialized(
             sid,
             turn_frame=turn_frame,
             verified=result.verified,
-            shown_fact_ids=session_state.shown_fact_ids,
-            shown_amplifier_refs=session_state.shown_amplifier_refs,
-            shown_consultation_value_refs=session_state.shown_consultation_value_refs,
+            prior=session_state,
+            current_selection=selection,
+            followups=followups,
         )
 
     return TargetRuntimeTurnOutcome(

@@ -124,6 +124,28 @@ def materialize_verified_widget_payload(
     return TargetRuntimeMaterializedPayload(kind="materialized", payload=payload)
 
 
+def materialize_target_unknown_ref_payload(
+    *,
+    client_id: str,
+    sid: str,
+) -> TargetRuntimeTerminalPayload:
+    payload = {
+        "answer": _CLARIFY_TEXT,
+        "quick_replies": [],
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": _base_meta(
+            client_id=client_id,
+            sid=sid,
+            route="target_fullcontext_followup_unknown",
+            terminal_mode="clarify",
+        ),
+    }
+    return TargetRuntimeTerminalPayload(kind="terminal", payload=payload, terminal_mode="clarify")
+
+
 def materialize_boundary_uncertain_payload(
     *,
     client_id: str,

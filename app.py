@@ -405,6 +405,7 @@ def _orchestrate_ask_turn(data: dict):
         client_txt=_client_txt,
         service_payload=build_service_payload,
         get_last_content_ui_payload=get_last_content_ui_payload_compat,
+        target_fullcontext_mode=TARGET_FULLCONTEXT_DEV,
     )
     if isinstance(pre, AskOrchestrationResult):
         return pre

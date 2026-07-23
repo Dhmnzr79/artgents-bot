@@ -80,13 +80,12 @@ def assemble_target_spec_offline_response_package(
     ):
         if type(value) is not bool:
             _error("spec_package_selection_invalid", (field_name, value))
+    effective_include_cta = include_cta and spec.allow_cta
     if is_fullcontext_content_only_spec(spec):
         if brand_term is not None or include_initial_block or marketing_scenarios != ():
             _error("spec_package_permission_forbidden", "marketing_facts")
         if include_consultation_close and not spec.allow_consultation_close:
             _error("spec_package_permission_forbidden", "consultation_close")
-        if include_cta:
-            _error("spec_package_permission_forbidden", "cta")
         return assemble_target_fullcontext_content_bound_package(
             spec,
             bundle,
@@ -111,8 +110,6 @@ def assemble_target_spec_offline_response_package(
         _error("spec_package_permission_forbidden", "marketing_facts")
     if include_consultation_close and not spec.allow_consultation_close:
         _error("spec_package_permission_forbidden", "consultation_close")
-    if include_cta and not spec.allow_cta:
-        _error("spec_package_permission_forbidden", "cta")
 
     package = assemble_target_offline_response_package(
         bundle,
@@ -134,7 +131,7 @@ def assemble_target_spec_offline_response_package(
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
     )
-    selected_cta_key = package.plan.cta_key if include_cta else None
+    selected_cta_key = package.plan.cta_key if effective_include_cta else None
     return TargetSpecBoundOfflineResponsePackage(
         spec=spec,
         package=package,

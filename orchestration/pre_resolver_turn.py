@@ -63,6 +63,7 @@ def run_pre_resolver_turn(
     client_txt: Callable[[str | None], dict[str, str]],
     service_payload: Callable[..., dict],
     get_last_content_ui_payload: Callable[[str], dict | None],
+    target_fullcontext_mode: bool = False,
 ) -> AskOrchestrationResult | AskTurnContext:
     """
     Pre-Resolver pipeline: client/reset/rate/noise/ingress/flows/guards/ref/continuation.
@@ -193,7 +194,7 @@ def run_pre_resolver_turn(
 
     st = mem_get(sid)
 
-    if is_duplicate_question(st, q):
+    if not target_fullcontext_mode and is_duplicate_question(st, q):
         snap = get_last_content_ui_payload(sid)
         log_json(logger, "duplicate_short_circuit", sid=sid, client_id=client_id)
         return AskOrchestrationResult(
@@ -274,43 +275,70 @@ def run_pre_resolver_turn(
                         for sid_opt, entry in catalog.items()
                         if sid_opt in option_ids and isinstance(entry, dict)
                     }
-                    # Кнопки ценового clarify несут price:<service_id> — тоже выбор.
                     option_refs |= {f"price:{sid_opt}" for sid_opt in option_ids}
                     if ref_eff in option_refs:
                         clear_pending_clarify(sid)
                 except Exception:
                     pass
-        price_from_ref = orchestrate_price_widget_ref(
-            ref,
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            decision_frame=decision_frame,
-        )
-        if price_from_ref is not None:
-            return price_from_ref
-        consult_from_ref = orchestrate_consult_symptom_ref(
-            ref,
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            decision_frame=decision_frame,
-        )
-        if consult_from_ref is not None:
-            return consult_from_ref
-        ch = get_chunk_by_ref(ref, client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(
-                kind="chunk",
+        if target_fullcontext_mode:
+            if not q:
+                from core.target_runtime_followup_nav import resolve_target_followup_navigation
+                from core.target_runtime_session import read_target_runtime_session
+                from core.target_runtime_widget import materialize_target_unknown_ref_payload
+
+                nav = resolve_target_followup_navigation(
+                    ref=ref_eff,
+                    q=q,
+                    followups=read_target_runtime_session(sid).followups,
+                )
+                if nav is not None and nav.matched_ref is None:
+                    payload = materialize_target_unknown_ref_payload(
+                        client_id=client_id,
+                        sid=sid,
+                    ).payload
+                    return AskOrchestrationResult(
+                        kind="service_reply",
+                        q=q,
+                        sid=sid,
+                        client_id=client_id,
+                        service_payload=payload,
+                        service_route="target_fullcontext_followup_unknown",
+                        decision_frame=decision_frame,
+                    )
+                if nav is not None and nav.user_message:
+                    q = nav.user_message
+        else:
+            price_from_ref = orchestrate_price_widget_ref(
+                ref,
                 q=q,
                 sid=sid,
                 client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=q or f"Информация из {ref}",
-                log_event="Answer generated from ref",
-                chunk_route="retrieval_chunk",
                 decision_frame=decision_frame,
             )
+            if price_from_ref is not None:
+                return price_from_ref
+            consult_from_ref = orchestrate_consult_symptom_ref(
+                ref,
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                decision_frame=decision_frame,
+            )
+            if consult_from_ref is not None:
+                return consult_from_ref
+            ch = get_chunk_by_ref(ref, client_id=client_id)
+            if ch:
+                return AskOrchestrationResult(
+                    kind="chunk",
+                    q=q,
+                    sid=sid,
+                    client_id=client_id,
+                    chosen_chunk=ch,
+                    llm_question=q or f"Информация из {ref}",
+                    log_event="Answer generated from ref",
+                    chunk_route="retrieval_chunk",
+                    decision_frame=decision_frame,
+                )
 
     if not q:
         return AskOrchestrationResult(
@@ -325,7 +353,7 @@ def run_pre_resolver_turn(
             decision_frame=decision_frame,
         )
 
-    if continuation_without_context(q, st):
+    if not target_fullcontext_mode and continuation_without_context(q, st):
         log_json(logger, "continuation_no_context", sid=sid, client_id=client_id)
         return AskOrchestrationResult(
             kind="service_reply",
@@ -339,7 +367,7 @@ def run_pre_resolver_turn(
             decision_frame=decision_frame,
         )
 
-    if is_direct_promo_question(q):
+    if not target_fullcontext_mode and is_direct_promo_question(q):
         promo_payload = build_promo_overview_payload(sid=sid, client_id=client_id, q=q)
         if promo_payload is not None:
             return AskOrchestrationResult(
@@ -354,35 +382,36 @@ def run_pre_resolver_turn(
                 decision_frame=decision_frame,
             )
 
-    current_doc_id = (st.get("current_doc_id") or "").strip()
-    if current_doc_id and continuation_only_phrase(q):
-        ch = get_chunk_by_ref(f"{current_doc_id}#korotko", client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(
-                kind="chunk",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=q,
-                log_event="Answer from continuation topic fallback",
-                chunk_route="retrieval_chunk",
-                decision_frame=decision_frame,
-            )
+    if not target_fullcontext_mode:
+        current_doc_id = (st.get("current_doc_id") or "").strip()
+        if current_doc_id and continuation_only_phrase(q):
+            ch = get_chunk_by_ref(f"{current_doc_id}#korotko", client_id=client_id)
+            if ch:
+                return AskOrchestrationResult(
+                    kind="chunk",
+                    q=q,
+                    sid=sid,
+                    client_id=client_id,
+                    chosen_chunk=ch,
+                    llm_question=q,
+                    log_event="Answer from continuation topic fallback",
+                    chunk_route="retrieval_chunk",
+                    decision_frame=decision_frame,
+                )
 
-    if is_short_contextual(q, st) and current_doc_id:
-        ch = get_chunk_by_ref(f"{current_doc_id}#korotko", client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(
-                kind="chunk",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=q,
-                log_event="Answer from short_contextual fallback",
-                chunk_route="retrieval_chunk",
-                decision_frame=decision_frame,
-            )
+        if is_short_contextual(q, st) and current_doc_id:
+            ch = get_chunk_by_ref(f"{current_doc_id}#korotko", client_id=client_id)
+            if ch:
+                return AskOrchestrationResult(
+                    kind="chunk",
+                    q=q,
+                    sid=sid,
+                    client_id=client_id,
+                    chosen_chunk=ch,
+                    llm_question=q,
+                    log_event="Answer from short_contextual fallback",
+                    chunk_route="retrieval_chunk",
+                    decision_frame=decision_frame,
+                )
 
     return AskTurnContext(q=q, sid=sid, client_id=client_id, ref=ref, data=data, st=st)

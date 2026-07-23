@@ -194,6 +194,8 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | `tests/test_s65_authority_switch_offline.py` | update mocks (`run_planner_turn`) |
 | `tests/test_s67_legacy_isolation_offline.py` | update if imports reference resolver_turn |
 | `tests/test_s61_correction_target_runtime.py` | update `resolver_turn` → `planner_turn` mocks/imports |
+| `tests/test_s62_correction_offline.py` | update `resolver_turn` → `planner_turn` imports if broken by rename |
+| `tests/test_s63_correction_offline.py` | update `resolver_turn` → `planner_turn` imports if broken by rename |
 | `tests/test_turn_plan_protocol_guard.py` | **delete** or move to historical — guards removed |
 
 ### C2b hard gates
@@ -390,7 +392,7 @@ STOP and escalate to owner if:
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | ❌ (`548b9a6` — allowlist gaps G1/G2) → correction pending |
+| PRE-CODE | ✅ (`0103316` governance correction) |
 | C2a checker | |
 | C2b checker | |
 | C2c checker | |

@@ -57,9 +57,10 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
 | Последний завершённый checkpoint | **S58 — one controlled S57 end-to-end live run (AUTOMATED_FAIL 7/9)** |
-| Текущий S-series checkpoint | **S61 — target FullContext runtime path (dev flag OFF)** |
+| Последний завершённый checkpoint | **S61 — target FullContext runtime path (dev flag OFF)** |
+| Текущий S-series checkpoint | **Owner-approved local live runtime test / authority switch (not started)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **S61 runtime wiring behind `TARGET_FULLCONTEXT_DEV`; then owner-approved local live test** |
+| Ближайший рабочий focus | **Owner-approved local live test with `TARGET_FULLCONTEXT_DEV=1`; then authority switch** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -417,7 +418,7 @@
   lightweight blocking: diagnosis, personal conclusion, dangerous/absurd/contradicting claims only;
   plausible external medical detail → non-blocking `minor_external_detail`; strict clinic facts unchanged.
   **NO LIVE**.
-- [ ] **S61 — target FullContext runtime path (dev flag OFF by default)** — wire S39–S59 chain into `/ask`
+- [x] **S61 — target FullContext runtime path (dev flag OFF by default)** — wire S39–S59 chain into `/ask`
   behind `TARGET_FULLCONTEXT_DEV=0`; flag ON = target-only (no legacy RAG, no fallback). Bootstrap +
   TurnFrame bridge + widget materializer + session bridge. **OFFLINE ONLY / NO LIVE in S61**.
 

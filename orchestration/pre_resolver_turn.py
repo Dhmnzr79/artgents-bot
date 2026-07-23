@@ -282,9 +282,11 @@ def run_pre_resolver_turn(
                     pass
         if target_fullcontext_mode:
             if not q:
-                from core.target_runtime_followup_nav import resolve_target_followup_navigation
+                from core.target_runtime_followup_nav import (
+                    build_target_unknown_ref_clarify_payload,
+                    resolve_target_followup_navigation,
+                )
                 from core.target_runtime_session import read_target_runtime_session
-                from core.target_runtime_widget import materialize_target_unknown_ref_payload
 
                 nav = resolve_target_followup_navigation(
                     ref=ref_eff,
@@ -292,10 +294,10 @@ def run_pre_resolver_turn(
                     followups=read_target_runtime_session(sid).followups,
                 )
                 if nav is not None and nav.matched_ref is None:
-                    payload = materialize_target_unknown_ref_payload(
+                    payload = build_target_unknown_ref_clarify_payload(
                         client_id=client_id,
                         sid=sid,
-                    ).payload
+                    )
                     return AskOrchestrationResult(
                         kind="service_reply",
                         q=q,

@@ -49,3 +49,29 @@ def resolve_target_followup_navigation(
         user_message=_UNKNOWN_REF_MESSAGE,
         matched_ref=None,
     )
+
+
+def build_target_unknown_ref_clarify_payload(
+    *,
+    client_id: str,
+    sid: str,
+) -> dict:
+    """Widget payload for unknown follow-up ref in target-only mode (no legacy chunks)."""
+
+    return {
+        "answer": _UNKNOWN_REF_MESSAGE,
+        "quick_replies": [],
+        "cta": None,
+        "video": None,
+        "situation": {"show": False, "mode": "normal"},
+        "offer": None,
+        "meta": {
+            "client_id": client_id,
+            "sid": sid,
+            "intent": "content",
+            "answer_path": "target_fullcontext",
+            "service_route": "target_fullcontext_followup_unknown",
+            "ui_source_family": "target_fullcontext",
+            "terminal_mode": "clarify",
+        },
+    }

@@ -70,7 +70,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.live:
         try:
-            payload = run_http_harness(live=True, monkeypatch=None)
+            payload = run_http_harness(
+                live=True,
+                monkeypatch=None,
+                owner_override_attempt_marker=args.owner_override_attempt_marker,
+            )
         except Exception as error:
             if ATTEMPT_MARKER_EXISTS_CODE in str(error):
                 print(ATTEMPT_MARKER_EXISTS_CODE, file=sys.stderr)

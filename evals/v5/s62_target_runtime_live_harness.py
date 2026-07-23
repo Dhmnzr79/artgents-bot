@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
-from evals.v5.fullcontext_response_eval_contract import prepare_json_artifact_payload, sha256_file_hex
+from evals.v5.fullcontext_response_eval_contract import (
+    HarnessConfigError,
+    prepare_json_artifact_payload,
+    sha256_file_hex,
+)
 from evals.v5.s62_target_runtime_live_contract import (
     CLIENT_ID,
     DEFAULT_LIVE_ARTIFACT_PATHS,
@@ -40,8 +44,11 @@ from evals.v5.s62_target_runtime_live_contract import (
     build_manual_review_seed,
     create_attempt_marker_exclusive,
     finalize_attempt_marker,
+    load_attempt_marker,
     load_frozen_turns,
+    persist_attempt_marker,
 )
+from evals.v5.s62_target_runtime_live_contract import AttemptMarkerExistsError
 from evals.v5.s62_target_runtime_live_provider_audit import (
     get_audit_state,
     provider_audit_context,
@@ -123,19 +130,28 @@ def install_legacy_guards(monkeypatch: Any | None = None) -> None:
         return _forbidden
 
     targets = {
-        "orchestration.routing_after_resolver": "orchestrate_routing_after_resolver",
+        "orchestration.ask_turn": "orchestrate_routing_after_resolver",
+        "orchestration.pre_resolver_turn": (
+            "get_chunk_by_ref",
+            "orchestrate_price_widget_ref",
+            "orchestrate_consult_symptom_ref",
+            "build_promo_overview_payload",
+        ),
         "core.md_chunks": "get_chunk_by_ref",
         "core.price_ref_routing": "orchestrate_price_widget_ref",
         "core.price_symptom_consult": "orchestrate_consult_symptom_ref",
         "core.promo_overview": "build_promo_overview_payload",
     }
-    for module_name, attr in targets.items():
-        replacement = guard(attr)
-        if monkeypatch is not None:
-            monkeypatch.setattr(module_name, attr, replacement)
-        else:
-            module = __import__(module_name, fromlist=[attr])
-            setattr(module, attr, replacement)
+    for module_name, attrs in targets.items():
+        attr_names = attrs if isinstance(attrs, tuple) else (attrs,)
+        for attr in attr_names:
+            replacement = guard(f"{module_name}.{attr}")
+            target = f"{module_name}.{attr}"
+            if monkeypatch is not None:
+                monkeypatch.setattr(module_name, attr, replacement)
+            else:
+                module = __import__(module_name, fromlist=[attr])
+                setattr(module, attr, replacement)
 
 
 def install_fullcontext_build_counter(monkeypatch: Any | None = None) -> None:
@@ -246,10 +262,28 @@ def prepare_live_run(
     owner_override_attempt_marker: bool = False,
     baseline_commit: str | None = None,
 ) -> None:
-    assert_attempt_marker_absent(
-        attempt_marker_path,
-        owner_override=owner_override_attempt_marker,
-    )
+    if attempt_marker_path.exists():
+        marker = load_attempt_marker(attempt_marker_path)
+        started_calls = int(marker.get("started_provider_calls", 0))
+        if started_calls > 0:
+            raise AttemptMarkerExistsError(
+                "attempt marker exists with started provider calls; rerun blocked"
+            )
+        if owner_override_attempt_marker and started_calls == 0:
+            marker["status"] = "attempt_aborted_preflight"
+            marker["abort_reason"] = "preflight_failure_before_first_provider_call"
+            persist_attempt_marker(attempt_marker_path, marker)
+            attempt_marker_path.unlink()
+        else:
+            assert_attempt_marker_absent(
+                attempt_marker_path,
+                owner_override=False,
+            )
+    else:
+        assert_attempt_marker_absent(
+            attempt_marker_path,
+            owner_override=owner_override_attempt_marker,
+        )
     excluded = {attempt_marker_path.resolve()}
     preflight_paths = tuple(
         path for path in artifact_paths if path.resolve() not in excluded
@@ -305,8 +339,11 @@ def run_http_harness(
     clear_target_runtime_client_context_cache()
 
     import app as app_module
+    from orchestration.ask_turn import orchestrate_routing_after_resolver
 
     importlib.reload(app_module)
+    install_legacy_guards(monkeypatch)
+    setattr(app_module, "orchestrate_routing_after_resolver", orchestrate_routing_after_resolver)
 
     turn_results: list[dict[str, Any]] = []
     followup_ref_used = False

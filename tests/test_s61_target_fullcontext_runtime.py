@@ -109,10 +109,10 @@ def _clear_target_cache():
     clear_target_runtime_client_context_cache()
 
 
-def test_default_flag_off_in_config() -> None:
+def test_default_flag_on_in_config() -> None:
     import config
 
-    assert config.TARGET_FULLCONTEXT_DEV is False
+    assert config.TARGET_FULLCONTEXT_DEV is True
 
 
 def test_flag_off_uses_legacy_orchestration(monkeypatch: pytest.MonkeyPatch) -> None:

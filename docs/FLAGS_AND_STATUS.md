@@ -25,17 +25,19 @@
 
 ---
 
-## Target FullContext dev gate (S61)
+## Target FullContext product authority (S61 / S65)
 
 | Флаг | Что делает | Дефолт |
 |---|---|---|
-| `TARGET_FULLCONTEXT_DEV` | При `1` — `/ask` и `/ask/stream` идут только через target FullContext (S46); legacy RAG/chunk/resolver routing не вызывается и **не** используется как fallback в том же ходе. При `0` — legacy product path; target bootstrap для ответов не вызывается. | **OFF (`0`)** |
+| `TARGET_FULLCONTEXT_DEV` | При `1` (default) — `/ask` и `/ask/stream` идут только через target FullContext (S46); legacy RAG/chunk/resolver routing **не вызывается** и **не** используется как fallback в том же ходе. При `0` — **ручной legacy kill-switch**: после перезапуска процесса запросы идут по legacy path; target bootstrap для ответов не вызывается. | **ON (`1`)** |
 
-**S61–S63:** target path проверен live под `=1` (S63: 3/3 materialized, legacy hits = 0). **Authority не передана** — дефолт OFF остаётся единственной причиной, почему в обычном локальном процессе отвечает legacy.
+**S65 (owner-approved):** product authority передана target FullContext по умолчанию. Переключатель читается при **старте процесса** (`config.py`); это **не** per-turn fallback.
 
-**S64 audit:** `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md`. Emergency rollback = смена env **между** запросами (`=0` → legacy), не автоматический откат внутри одного turn.
+**Emergency rollback:** установить `TARGET_FULLCONTEXT_DEV=0` и перезапустить процесс → legacy path. Между запросами, не внутри одного turn.
 
-**S61:** offline tests используют fake/recording backends.
+**S63 live proof** (под `=1`): 3/3 materialized, legacy hits = 0. Post-switch live verification — отдельный milestone (не выполнялся в S65).
+
+**Offline tests** используют fake/recording backends.
 
 ---
 

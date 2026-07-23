@@ -60,12 +60,12 @@
 | Последний завершённый checkpoint | **S61 — target FullContext runtime path (dev flag OFF)** |
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
-| Текущий S-series checkpoint | **S64 — FullContext authority audit (read-only, complete)** |
-| Следующий gate | **S65 — minimal product authority switch (owner approval required)** |
+| Текущий S-series checkpoint | **S65 — default FullContext product authority (offline, complete)** |
+| Следующий gate | **S66 — limited local live verification of default authority (owner approval)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Owner decision on S65 authority switch (`TARGET_FULLCONTEXT_DEV` default flip + kill-switch)** |
-| Что сейчас отвечает в локальном demo | **Legacy product path** (`TARGET_FULLCONTEXT_DEV=0`); target path proven live under flag ON only |
-| FullContext authority | **NOT transferred** — dev flag default OFF |
+| Ближайший рабочий focus | **Legacy isolation/removal; optional post-switch live smoke (S66)** |
+| Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON) |
+| FullContext authority | **Transferred (S65 offline)** — legacy kill-switch: `TARGET_FULLCONTEXT_DEV=0` + process restart |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -443,9 +443,11 @@
 - [x] **S64 — FullContext authority audit (read-only)** — code-traced audit of `/ask` + `/ask/stream`
   OFF/ON chains, pre-target short-circuits, legacy component matrix, blockers, S65 minimal plan,
   rollback semantics. Deliverable: `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md`. **NO product code / NO authority switch**.
-- [ ] **S65 — minimal product authority switch** — owner-approved default ON for target FullContext path;
-  emergency kill-switch via env flip between requests (no in-turn legacy fallback); offline tests only.
-  Legacy deletion **not** in S65 scope.
+- [x] **S65 — default FullContext product authority (offline)** — `TARGET_FULLCONTEXT_DEV` default ON;
+  `=0` manual legacy kill-switch at process start; fail-closed target errors without in-turn legacy fallback;
+  offline acceptance tests A–H (`tests/test_s65_authority_switch_offline.py`). **NO LIVE / legacy not deleted**.
+- [ ] **S66 — limited local live verification of default authority** — owner approval required; not started.
+- [ ] **Legacy isolation / removal** — separate milestone after post-switch verification.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

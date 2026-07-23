@@ -92,8 +92,8 @@ FULLCTX_ON = os.getenv("FULLCTX_ON", "1").lower() in (
     "yes",
 )
 
-# --- Target FullContext product path (S61; default OFF — dev gate before authority) ---
-TARGET_FULLCONTEXT_DEV = os.getenv("TARGET_FULLCONTEXT_DEV", "0").lower() in (
+# --- Target FullContext product path (S65; default ON — legacy kill-switch via env=0) ---
+TARGET_FULLCONTEXT_DEV = os.getenv("TARGET_FULLCONTEXT_DEV", "1").lower() in (
     "1",
     "true",
     "yes",

@@ -1,103 +1,175 @@
-# TASK — S68 legacy deletion inventory (READ-ONLY)
+# TASK — S69 legacy product answer path deletion (OWNER APPROVED)
 
-**Baseline:** `codex/stage-a` / `3d0060d` · **NO PRODUCT CODE / NO LEGACY DELETE / NO LIVE**
+**Baseline:** `codex/stage-a` / `d3313a1` · **NO LIVE / NO LLM / NO A9**
+
+**Authority:** Owner approved per S68 inventory (`docs/S68_LEGACY_DELETION_INVENTORY.md`).
 
 ## Goal
 
-Produce an evidence-backed map of what can be **mechanically deleted** after S67 isolation, without touching FullContext, shared guards, TurnFrame/planner, lead/booking flows, or frozen artifacts.
+Permanently delete legacy product answer chain (routing → RAG/source routing → chunk/composer). **FullContext is the only product authority** — no `TARGET_FULLCONTEXT_DEV`, no kill-switch, no hidden legacy fallback.
 
-**S68 changes no product code.** Output is audit doc + minimal roadmap/docs notes only.
+## Process
 
-## Process (mandatory)
+1. Governance commit: **only** `TASK.md` → push → PRE-CODE ✅
+2. **Checkpoint A** — authority/seam cut → pytest → CHECKPOINT-A checker ✅ → commit + push
+3. **Checkpoint B** — module/test deletion + docs → pytest/collect → COMPLETION checker ✅ → commit + push
+4. Any checker ❌ → STOP → fix within allowlist → repeat checker
 
-1. Governance commit: **only** `TASK.md`
-2. PRE-CODE checker ✅ **before** any audit work
-3. If PRE-CODE ❌ → STOP → fix **only** `TASK.md` → governance correction commit → repeat PRE-CODE
-4. **No** WIP audit doc until PRE-CODE ✅
-5. After audit → COMPLETION checker → docs commit → push `origin/codex/stage-a` → STOP
+## Delete list (Checkpoint B — after A verified)
 
-## Allowlist
+| File | ~LOC | Pre-delete `rg` |
+|------|-----:|-----------------|
+| `chunk_responder.py` | 1400 | `rg -l "chunk_responder" --glob "*.py"` |
+| `orchestration/ask_turn.py` | 376 | `rg -l "ask_turn" --glob "*.py"` |
+| `source_routing.py` | 330 | `rg -l "source_routing" --glob "*.py"` |
+| `orchestration/composer_flow.py` | 296 | `rg -l "composer_flow" --glob "*.py"` |
+| `orchestration/price_flow.py` | 473 | `rg -l "price_flow" --glob "*.py"` |
+| `orchestration/catalog_flow.py` | 163 | `rg -l "catalog_flow" --glob "*.py"` |
+| `orchestration/patient_playbook_flow.py` | 240 | `rg -l "patient_playbook_flow" --glob "*.py"` |
+
+**Legacy-only tests (delete in B after module gone):**
+
+`tests/test_composer_flow.py`, `test_composer_wiring.py`, `test_composer_display_chunk.py`, `test_contacts_routing.py`, `test_doctor_route_order.py`, `test_source_routing_golden.py`, `test_clarify_state.py`, `test_md_clean.py`, `test_verifier_trigger.py`, `test_price_layer_parity.py`
+
+**Session/plan (delete in B if no readers):** `core/answer_plan_apply.py`, `core/answer_packet.py`, `core/answer_packet_materialize.py`, `core/answer_packet_snapshot.py` — only after `rg` confirms no target/shared importer.
+
+## Modify list
+
+### Checkpoint A
 
 | File | Change |
 |------|--------|
-| `TASK.md` | governance + completion |
-| `docs/S68_LEGACY_DELETION_INVENTORY.md` | **new** deliverable (sections A–J) |
-| `docs/STRANGLER_ROADMAP.md` | S68 status; pointer to inventory |
-| `docs/FLAGS_AND_STATUS.md` | future kill-switch removal note only if needed; **no flag change now** |
+| `config.py` | Remove `TARGET_FULLCONTEXT_DEV` |
+| `app.py` | Unconditional target orchestration; remove lazy `orchestrate_routing_after_resolver`; remove `chunk`/`composer` dispatch + SSE helpers; simplify `_service_reply` (no legacy answer-plan) |
+| `orchestration/pre_resolver_turn.py` | Remove `target_fullcontext_mode`; target ref nav only; remove legacy ref/continuation/promo/price/consult/chunk branches |
+| `orchestration/lead_flow.py` | Remove `redirect_ref` → `get_chunk_by_ref` → `kind=chunk` (`redirect_ref` has **no producer** in repo — `rg redirect_ref` → only `lead_flow.py`) |
+| `core/price_ref_routing.py` | Remove `orchestrate_price_widget_ref`; keep `parse_price_widget_ref` (content_linter) |
+| `core/price_symptom_consult.py` | Remove `orchestrate_consult_symptom_ref` only if no shared caller after A |
+| `tests/test_s69_checkpoint_a_offline.py` | **new** — Checkpoint A acceptance |
+| `tests/test_s61_correction_target_runtime.py` | Remove kill-switch/OFF tests |
+| `tests/test_s61_target_fullcontext_runtime.py` | Remove flag=OFF tests |
+| `tests/test_s65_authority_switch_offline.py` | Remove §B kill-switch, §F; keep target authority |
+| `tests/test_s67_legacy_isolation_offline.py` | Remove kill-switch F; update import firewall; no flag tests |
 
-**Forbidden:** any product `.py` change, legacy file deletion, kill-switch removal/change, live/LLM, FullContext/Composer/Verifier/planner/boundary/session changes, A9 changes, frozen artifact edits, git history rewrite, merge/push to `main`.
+### Checkpoint B
 
-## Mandatory read-only analysis (10 areas)
+| File | Change |
+|------|--------|
+| Delete list modules | Physical delete after `rg` clean |
+| Delete list tests | Physical delete |
+| `session.py` | Remove `pending_clarify` helpers if no readers |
+| `tests/test_dialog_focus_baseline.py` | Remove `route_source` sections |
+| `tests/test_turn_planner_wiring.py` | Remove `composer_flow` mock sections |
+| `tests/test_price_ref_routing.py` | Keep parse tests; drop orchestrate tests |
+| `tests/test_s69_legacy_deleted_offline.py` | **new** — import audit + no legacy dispatch |
+| `docs/FLAGS_AND_STATUS.md` | Kill-switch removed; unconditional FullContext |
+| `docs/STRANGLER_ROADMAP.md` | S69 completed |
+| `docs/ARCH_TARGET_DESIGN.md` | Only if still mentions legacy authority/fallback |
+| `TASK.md` | Completion record |
 
-1. **Authority & kill-switch** — `TARGET_FULLCONTEXT_DEV`, `_orchestrate_ask_turn`, lazy `orchestrate_routing_after_resolver`; what to remove for unconditional FullContext; tests/docs depending on `=0`
-2. **Legacy orchestration** — `orchestration.ask_turn`, `orchestrate_routing_after_resolver`, continuation/promo/clarify/fallback; direct + transitive importers
-3. **RAG/source routing** — `source_routing`, legacy answer planning, retrieval/chunk selection, MD chunk loaders **only** for legacy responder vs FullContext MD loader
-4. **Legacy response generation** — `chunk_responder`, `orchestration.composer_flow`, legacy Composer overlay, dispatch kinds `chunk`/`composer`, `_sse_chunk_response` / `_sse_composer_reply` / JSON analogs; shared delivery helpers to **KEEP**
-5. **Legacy ref handling** — `get_chunk_by_ref`, legacy price/chunk/consult ref handlers vs target ref navigation (S63)
-6. **Session compatibility** — `last_subject`, `current_doc_id`, `pending_clarify`, legacy history/focus fields; readers in shared guards/planner vs target-only
-7. **Shared code — KEEP** (verify real importers): ingress, rate limit/reset/noise, lead/booking/situation, resolver/planner/TurnFrame shadow, target runtime, target FullContext loader, target session, CTA/follow-up widget, HTTP/SSE delivery, shared observability
-8. **Tests** — target/protected, shared guard, legacy-only, mixed, frozen pin, historical eval replay
-9. **Docs/config/dependencies** — stale flags, legacy-only env, RAG-only requirements, historical vs active docs
-10. **Reachability** — per candidate: importers, callers, reachable on default FullContext, reachable only on `=0`, shared with target, direct delete vs seam change first
+## Keep list (must not delete)
 
-**Rule:** do not classify as legacy by name alone; prove with `rg` / import graph.
+`orchestration/resolver_turn.py`, `orchestration/target_fullcontext_turn.py`, `orchestration/lead_flow.py` (service_reply path), `orchestration/finalize_turn.py`, `orchestration/helpers.py`, `orchestration/route_guards.py`, `core/target_*`, `core/dialog_focus.py`, `core/turn_planner_llm.py`, `query_selector.py`, `core/md_chunks.py` (tooling/lead until proven unused), `llm.py` (shared providers), `evals/v5/**` artifacts, A9 shadow, frozen pin guards.
 
-## Deliverable: `docs/S68_LEGACY_DELETION_INVENTORY.md`
+## Checkpoint A — scope detail
 
-| Section | Content |
-|---------|---------|
-| A | Executive summary: ready to delete? blockers? how many deletion milestones |
-| B | Current diagrams: default FullContext path vs kill-switch legacy path |
-| C | Files/symbols table: File/symbol · callers/importers · target/shared · legacy-only · Action · removal order · tests affected. Actions: `DELETE`, `KEEP_SHARED`, `MODIFY_THEN_DELETE`, `KEEP_HISTORICAL`, `INVESTIGATE_BLOCKER` |
-| D | Runtime branches / dispatch kinds table |
-| E | Session compatibility table |
-| F | Tests classification table |
-| G | Frozen protection list (S47/S50/S53/S55/S58/S62/S63/S66 artifacts, A9, audit manifests, pin guards) |
-| H | Minimal S69 deletion milestone: exact allowlist + preferred order (or two milestones with concrete blocker) |
-| I | S69 stop conditions |
-| J | Evidence: real file/function refs + `rg` commands used |
+1. `config.py`: delete `TARGET_FULLCONTEXT_DEV` entirely
+2. `app.py`: always `orchestrate_target_fullcontext_turn`; fail-closed target errors; `service_reply`/`_sse_service_reply` only
+3. `pre_resolver_turn.py`: always target ref nav; strip legacy `else` branches
+4. `lead_flow.py`: remove chunk redirect branch only
+5. Partial ref helpers: orchestrate functions out; parsers kept
 
-### Preferred S69 order (default proposal; override only with blocker proof)
+### Checkpoint A tests (`test_s69_checkpoint_a_offline.py`)
 
-1. Remove kill-switch + legacy authority branch
-2. Remove legacy dispatch kinds from `app.py`
-3. Remove legacy ref answer paths
-4. Delete orchestration/source routing/chunk/composer modules if no shared callers
-5. Remove legacy session compatibility after last reader gone
-6. Delete legacy-only tests
-7. Update active docs/config
-8. Run target/shared regression suite
+- `/ask` and `/ask/stream` target-only
+- Target error no legacy
+- Target ref-click no `get_chunk_by_ref`
+- Ingress hard-stop, lead flow, situation flow (if covered)
+- TurnFrame planner path
+- Session/CTA/follow-up
+- No `TARGET_FULLCONTEXT_DEV` in config
+- No product dispatch `chunk`/`composer`
+- Frozen S62/S63/S66 pins
 
-## Read-only commands
+### Checkpoint A commands
 
 ```powershell
+$bt = Join-Path $env:TEMP ("s69a_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_s69_checkpoint_a_offline.py `
+  tests/test_s65_authority_switch_offline.py `
+  tests/test_s67_legacy_isolation_offline.py `
+  tests/test_s61_correction_target_runtime.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  -q
+
+python -m pytest --collect-only -q tests/test_s61_correction_target_runtime.py tests/test_s65_authority_switch_offline.py
+
 git diff --check
+python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
 
-# Authority / orchestration
-rg -n "TARGET_FULLCONTEXT_DEV|orchestrate_routing_after_resolver|orchestrate_target_fullcontext" app.py config.py orchestration/
-rg -l "from orchestration.ask_turn|import orchestration.ask_turn|from chunk_responder|import chunk_responder|source_routing|composer_flow" --glob "*.py"
+rg -n "TARGET_FULLCONTEXT_DEV|orchestrate_routing_after_resolver|kind=.chunk|kind=.composer" app.py config.py orchestration/pre_resolver_turn.py orchestration/lead_flow.py
+```
 
-# Refs / session
-rg -n "get_chunk_by_ref|last_subject|current_doc_id|pending_clarify" --glob "*.py"
+## Checkpoint B — scope detail
 
-# Tests
-rg -l "TARGET_FULLCONTEXT_DEV.*0|kill.switch|legacy" tests/ --glob "*.py"
+1. Delete 7 legacy modules (delete list) — `rg` before each
+2. Session/plan cleanup per S68 E (pending_clarify, answer_plan_apply, answer_packet* if orphaned)
+3. Delete legacy-only tests; modify mixed tests
+4. Product import audit — **zero** imports/calls of deleted stack in active product `.py` (excl. `evals/`, `tests/`, `docs/`, `archive/`)
 
-# Frozen pin sanity (no artifact writes)
+### Checkpoint B commands
+
+```powershell
+$bt = Join-Path $env:TEMP ("s69b_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_s69_checkpoint_a_offline.py `
+  tests/test_s69_legacy_deleted_offline.py `
+  tests/test_s65_authority_switch_offline.py `
+  tests/test_s67_legacy_isolation_offline.py `
+  tests/test_s61_correction_target_runtime.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_s62_correction_offline.py `
+  tests/test_s63_correction_offline.py `
+  -q
+
+python -m pytest --collect-only -q 2>&1 | Select-Object -Last 5
+
+rg -l "orchestration\.ask_turn|chunk_responder|source_routing|composer_flow|price_flow|catalog_flow|patient_playbook_flow|TARGET_FULLCONTEXT_DEV|orchestrate_routing_after_resolver" --glob "*.py" | Where-Object { $_ -notmatch '^(evals|tests|docs|archive|tools)/' }
+
+git diff --check
 python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
 ```
 
-**No pytest required** unless product code changes (none expected).
+## Legacy absence criteria (post-B)
+
+Active product code must have **no**:
+- `import`/`from` of delete-list modules
+- `TARGET_FULLCONTEXT_DEV`
+- `orchestrate_routing_after_resolver`
+- `AskOrchestrationResult(kind="chunk"|kind="composer")` on product path
+- Automatic fallback to legacy on target error
+
+## Stop conditions
+
+- Target/shared runtime caller on delete candidate → STOP that file
+- `redirect_ref` producer found outside lead_flow → STOP, escalate owner
+- Planner/TurnFrame/lead/booking regression requiring semantics change
+- Frozen artifact rewrite required
+- PRE-CODE or CHECKPOINT-A ❌ not fixable in TASK allowlist
+- Live/LLM needed
+
+## Forbidden
+
+Live/LLM, FullContext/Planner/Composer/Verifier/boundary policy changes, frozen artifact edits, A9 changes, new flags, legacy fallback, merge/push to `main`.
 
 ## Acceptance
 
-- [x] PRE-CODE checker ✅ (`9af09d8`)
-- [x] `S68_LEGACY_DELETION_INVENTORY.md` sections A–J with evidence
-- [x] Target/shared dependencies not marked DELETE
-- [x] Tests classified; frozen/A9 protected
-- [x] S69 scope minimal (single milestone, 8 phases)
-- [x] No product code changed
-- [x] COMPLETION checker ✅ (`d1b3026`)
-- [x] Push `origin/codex/stage-a` (`d1b3026`)
+- [ ] PRE-CODE checker ✅
+- [ ] Checkpoint A complete + CHECKPOINT-A ✅
+- [ ] Checkpoint B complete + COMPLETION ✅
+- [ ] Legacy import audit clean
+- [ ] Frozen pins unchanged
+- [ ] Push `origin/codex/stage-a`
 
-**STOP after S68 — do not start S69 without separate owner decision.**
+**STOP after S69 — no further tooling/history cleanup without owner decision.**

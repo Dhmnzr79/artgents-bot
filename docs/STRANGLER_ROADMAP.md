@@ -56,9 +56,9 @@
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
-| Текущий S-series checkpoint | **S57 complete; future live pending owner approval** |
-| Предыдущий checkpoint | **S56 — topic-scoped consultation facts + missing-base Composer guard (OFFLINE)** |
-| Ближайший рабочий focus без live | **Owner approval for S57 live (9 Composer + 9 Verifier = 18 calls)** |
+| Текущий S-series checkpoint | **S58 — one controlled S57 end-to-end live run (OWNER APPROVED)** |
+| Предыдущий checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
+| Ближайший рабочий focus | **S58 live: 9 Composer + 9 Verifier = 18 calls, one attempt only** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -408,6 +408,9 @@
   harness reuses S47 `run_case` + single cached FullContext; fail-closed live CLI;
   18 future LLM budget (9 Composer + 9 Verifier). Targeted pytest 47 passed.
   **NO LIVE / NO LLM** — real model quality not yet measured.
+- [ ] **S58 — one controlled S57 end-to-end live run** — OWNER APPROVED:
+  `qwen3.7-plus` Composer + Verifier, max 18 calls, retry 0, one attempt only.
+  **RERUN_BLOCKED** without new owner approval.
 
 ## Какой roadmap актуален
 

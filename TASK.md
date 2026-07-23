@@ -89,6 +89,7 @@ Remove **provably dead** post-S69 legacy residue from active product/offline cod
 | `core/rewrite_policy.py` | **delete** |
 | `core/md_chunks.py` | prune dead symbols only |
 | `core/clarify_state.py` | inline `_md_korotko_ref`; fix import |
+| `core/client_config_loader.py` | remove dead `PRICE_SYMPTOM_CONSULT_ON` gate in `price_symptom_consult_enabled()` (knock-on after `config.py` flag deletion) |
 | `contracts/answer_packet.py` | **delete** |
 | `contracts/ask_orchestration.py` | prune chunk/composer contract |
 | `config.py` | remove orphan flags |
@@ -204,9 +205,9 @@ Push only to `origin/codex/stage-a`.
 | Field | Value |
 |-------|-------|
 | PRE-CODE | ✅ (`e7ce017` governance correction) |
-| COMPLETION | pending |
-| HEAD | |
-| pytest | 367/367 targeted C1 set |
+| COMPLETION | ✅ (after allowlist correction `HEAD`) |
+| HEAD | `8085e52` |
+| pytest | 267/267 targeted C1 set |
 | collect-only | 2451 |
 | frozen | OK |
 | lines/files removed | ~5201 lines, 23 files deleted/pruned heavily |

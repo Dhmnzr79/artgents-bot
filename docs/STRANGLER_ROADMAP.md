@@ -56,7 +56,8 @@
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
-| Текущий S-series checkpoint | **S58 — one controlled S57 end-to-end live run (OWNER APPROVED)** |
+| Последний завершённый checkpoint | **S58 — one controlled S57 end-to-end live run (AUTOMATED_FAIL 7/9)** |
+| Текущий S-series checkpoint | **S58 complete; manual review pending; RERUN_BLOCKED** |
 | Предыдущий checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
 | Ближайший рабочий focus | **S58 live: 9 Composer + 9 Verifier = 18 calls, one attempt only** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
@@ -408,9 +409,10 @@
   harness reuses S47 `run_case` + single cached FullContext; fail-closed live CLI;
   18 future LLM budget (9 Composer + 9 Verifier). Targeted pytest 47 passed.
   **NO LIVE / NO LLM** — real model quality not yet measured.
-- [ ] **S58 — one controlled S57 end-to-end live run** — OWNER APPROVED:
-  `qwen3.7-plus` Composer + Verifier, max 18 calls, retry 0, one attempt only.
-  **RERUN_BLOCKED** without new owner approval.
+- [x] **S58 — one controlled S57 end-to-end live run** — OWNER APPROVED, **one attempt**:
+  `qwen3.7-plus` Composer + Verifier, **18 calls**, retry 0. **AUTOMATED_FAIL** 7/9 materialized;
+  blocks: `s57_missing_01` (external immune claim), `s57_medical_02` (lactation/hormones extension).
+  Immutable S58 artifacts committed. **RERUN_BLOCKED** without new owner approval.
 
 ## Какой roadmap актуален
 

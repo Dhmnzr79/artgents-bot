@@ -1,6 +1,6 @@
 # TASK — S58 S57 end-to-end live run (one controlled attempt)
 
-**Baseline:** `codex/stage-a` / `21fbeb5` · **OWNER APPROVED LIVE · ONE ATTEMPT ONLY**
+**Baseline:** `codex/stage-a` / `cac54a5` · **LIVE COMPLETE · ONE ATTEMPT · RERUN_BLOCKED**
 
 ## Owner approval (exact)
 

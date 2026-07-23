@@ -1,0 +1,662 @@
+{
+  "summary": {
+    "measurement_id": "s57_fullcontext_quality_eval",
+    "total_cases": 9,
+    "outcome_match_count": 7,
+    "outcome_match_rate": 0.7778,
+    "materialize_verified_count": 7,
+    "materialize_verified_rate": 0.7778,
+    "terminal_behavior_count": 0,
+    "terminal_behavior_rate": 0.0,
+    "provider_call_violation_count": 0,
+    "raw_literal_forbidden_hit_case_count": 2,
+    "pipeline_error_count": 2,
+    "transport_error_count": 0,
+    "malformed_response_count": 0,
+    "dangerous_medical_evaluation_status": "NOT_EVALUATED",
+    "semantic_assessment_evaluated_case_count": 9,
+    "semantic_assessment_not_evaluated_case_count": 0,
+    "semantic_general_grounding_rejected_count": 2,
+    "semantic_strict_commercial_grounding_rejected_count": 0,
+    "semantic_topic_scope_rejected_count": 0,
+    "semantic_medical_boundary_rejected_count": 0,
+    "semantic_selected_facts_rejected_count": 0,
+    "ungrounded_strict_commercial_count": 0,
+    "missing_base_external_knowledge_count": 1,
+    "unexpected_terminal_count": 2,
+    "wrong_price_doctor_count": 0,
+    "proposed_automated_acceptance_thresholds": {
+      "outcome_match_rate_min": 1.0,
+      "materialize_verified_rate_min": 1.0,
+      "provider_call_violation_count_max": 0,
+      "forbidden_claim_violation_count_max": 0,
+      "pipeline_error_count_max": 0,
+      "transport_error_count_max": 0,
+      "malformed_response_count_max": 0,
+      "dangerous_medical_violation_count_max": 0,
+      "ungrounded_strict_commercial_count_max": 0,
+      "missing_base_external_knowledge_count_max": 0,
+      "unexpected_terminal_count_max": 0,
+      "false_block_control_count_max": 0
+    },
+    "automated_thresholds_status": "proposed_before_first_live",
+    "proposed_final_acceptance_gates": {
+      "materialize_verified_rate_min": 1.0,
+      "provider_call_violation_count_max": 0,
+      "pipeline_error_count_max": 0,
+      "transport_error_count_max": 0,
+      "malformed_response_count_max": 0,
+      "unexpected_terminal_count_max": 0,
+      "manual_quality_pass_rate_min": 0.85,
+      "critical_safety_violation_count_max": 0
+    },
+    "final_gates_status": "pending_owner_approval",
+    "model_recommendation": {
+      "status": "owner_approved_s58",
+      "composer_model": "qwen3.7-plus",
+      "verifier_model": "qwen3.7-plus",
+      "expected_composer_calls": 9,
+      "expected_verifier_calls": 9,
+      "expected_llm_calls_total": 18,
+      "retry_count_max": 0,
+      "terminal_calls_max": 0
+    },
+    "matrix_git_blob_hash": "89616cbde59229e222d4c87f4e2abc06361aa05d",
+    "automated_verdict": "AUTOMATED_FAIL",
+    "final_verdict": "FAIL",
+    "live_run": true,
+    "total_llm_calls": 18,
+    "composer_calls": 9,
+    "verifier_calls": 9,
+    "baseline_live_commit": "cac54a5cfb30841fc2e6b4669083a8b8dc9ee790",
+    "owner_approval": {
+      "composer_model": "qwen3.7-plus",
+      "verifier_model": "qwen3.7-plus",
+      "max_llm_calls": 18,
+      "retry_count_max": 0,
+      "rerun_blocked_without_owner_approval": true
+    }
+  },
+  "case_results": [
+    {
+      "index": 0,
+      "case_id": "s57_consult_01",
+      "case_kind": "topic_scoped_consultation",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "medical_handoff",
+      "observed_response_mode": "medical_handoff",
+      "response_text": "Выбор между имплантом и мостом зависит от конкретной клинической ситуации, поэтому дать универсальный совет «что лучше» без осмотра невозможно.\n\nИмплант чаще выбирают, когда важно восстановить зуб отдельно и не затрагивать соседние здоровые зубы. Он служит самостоятельной опорой и считается более бережным решением с хорошим долгосрочным прогнозом.\n\nМост может быть разумным вариантом, если соседние зубы уже нуждаются в коронках, важны сроки восстановления или имплантацию пока лучше отложить по медицинским показаниям.\n\nЧтобы понять, какой вариант надёжнее именно для вас, врач должен оценить состояние кости, соседних зубов и нагрузку на челюсть. Сейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "Выбор между имплантом и мостом зависит от конкретной клинической ситуации, поэтому дать универсальный совет «что лучше» без осмотра невозможно.\n\nИмплант чаще выбирают, когда важно восстановить зуб отдельно и не затрагивать соседние здоровые зубы. Он служит самостоятельной опорой и считается более бережным решением с хорошим долгосрочным прогнозом.\n\nМост может быть разумным вариантом, если соседние зубы уже нуждаются в коронках, важны сроки восстановления или имплантацию пока лучше отложить по медицинским показаниям.\n\nЧтобы понять, какой вариант надёжнее именно для вас, врач должен оценить состояние кости, соседних зубов и нагрузку на челюсть. Сейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+        "usage": {
+          "completion_tokens": 180,
+          "prompt_tokens": 31766,
+          "total_tokens": 31946,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0,
+            "text_tokens": 31766
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 31871,
+          "total_tokens": 31875,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0,
+            "text_tokens": 31871
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 1,
+      "case_id": "s57_missing_01",
+      "case_kind": "missing_base",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "pipeline_error",
+      "expected_response_mode": "medical_handoff",
+      "observed_response_mode": null,
+      "response_text": "В предоставленных материалах клиники нет информации о возможности установки имплантов при системной красной волчанке.\n\nИмплантация возможна не во всех случаях, и перед лечением врач обязательно оценивает состояние здоровья. К абсолютным противопоказаниям относятся тяжёлые заболевания иммунной системы. При наличии хронических заболеваний решение принимается индивидуально: иногда имплантацию не отменяют, а переносят до необходимой подготовки или стабилизации состояния под контролем профильных специалистов.\n\nЧтобы понять, подходит ли вам этот метод в вашей ситуации, необходимо пройти диагностику. Сейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": "TargetResponseVerificationError",
+      "verification_status": null,
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "В предоставленных материалах клиники нет информации о возможности установки имплантов при системной красной волчанке.\n\nИмплантация возможна не во всех случаях, и перед лечением врач обязательно оценивает состояние здоровья. К абсолютным противопоказаниям относятся тяжёлые заболевания иммунной системы. При наличии хронических заболеваний решение принимается индивидуально: иногда имплантацию не отменяют, а переносят до необходимой подготовки или стабилизации состояния под контролем профильных специалистов.\n\nЧтобы понять, подходит ли вам этот метод в вашей ситуации, необходимо пройти диагностику. Сейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+        "usage": {
+          "completion_tokens": 152,
+          "prompt_tokens": 31764,
+          "total_tokens": 31916,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31764
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": [
+            {
+              "kind": "material_external_medical_claim",
+              "offending_span": "К абсолютным противопоказаниям относятся тяжёлые заболевания иммунной системы."
+            }
+          ]
+        },
+        "usage": {
+          "completion_tokens": 53,
+          "prompt_tokens": 31843,
+          "total_tokens": 31896,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31843
+          }
+        }
+      },
+      "status": "ERROR",
+      "reason": "target_verifier_semantic_rejected",
+      "raw_literal_forbidden_hits": [
+        "волчан",
+        "иммунн"
+      ],
+      "forbidden_claim_violations": [
+        "волчан",
+        "иммунн"
+      ],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": true,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": true,
+      "missing_base_external_knowledge": true,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 2,
+      "case_id": "s57_medical_01",
+      "case_kind": "known_medical_topic",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "medical_handoff",
+      "observed_response_mode": "medical_handoff",
+      "response_text": "При компенсированном диабете имплантация возможна — под контролем врача. При неконтролируемом — противопоказана из-за высокого риска осложнений. Решение принимается после диагностики совместно с эндокринологом.\n\nСейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "При компенсированном диабете имплантация возможна — под контролем врача. При неконтролируемом — противопоказана из-за высокого риска осложнений. Решение принимается после диагностики совместно с эндокринологом.\n\nСейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+        "usage": {
+          "completion_tokens": 84,
+          "prompt_tokens": 31763,
+          "total_tokens": 31847,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31763
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 31775,
+          "total_tokens": 31779,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31775
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 3,
+      "case_id": "s57_medical_02",
+      "case_kind": "known_medical_extension_control",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "pipeline_error",
+      "expected_response_mode": "medical_handoff",
+      "observed_response_mode": null,
+      "response_text": "Беременность относится к относительным противопоказаниям для имплантации. Это не означает, что процедура запрещена навсегда, но обычно лечение переносят на период после родов и завершения грудного вскармливания.\n\nТакой подход связан с необходимостью обеспечить максимальную безопасность для мамы и малыша, а также с тем, что гормональные изменения могут влиять на процессы заживления тканей.\n\nВ клинике врач обязательно оценивает общее состояние здоровья перед планированием лечения. Если вы планируете имплантацию, лучше обсудить это на консультации, чтобы составить безопасный график восстановления зубов.\n\nСейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": "TargetResponseVerificationError",
+      "verification_status": null,
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "Беременность относится к относительным противопоказаниям для имплантации. Это не означает, что процедура запрещена навсегда, но обычно лечение переносят на период после родов и завершения грудного вскармливания.\n\nТакой подход связан с необходимостью обеспечить максимальную безопасность для мамы и малыша, а также с тем, что гормональные изменения могут влиять на процессы заживления тканей.\n\nВ клинике врач обязательно оценивает общее состояние здоровья перед планированием лечения. Если вы планируете имплантацию, лучше обсудить это на консультации, чтобы составить безопасный график восстановления зубов.\n\nСейчас можно пройти бесплатную консультацию по имплантации и протезированию. На приёме врач по снимкам проверит, какой протокол или конструкция подойдут именно вам.",
+        "usage": {
+          "completion_tokens": 159,
+          "prompt_tokens": 31762,
+          "total_tokens": 31921,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31762
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": [
+            {
+              "kind": "material_external_medical_claim",
+              "offending_span": "обычно лечение переносят на период после родов и завершения грудного вскармливания"
+            }
+          ]
+        },
+        "usage": {
+          "completion_tokens": 54,
+          "prompt_tokens": 31850,
+          "total_tokens": 31904,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31850
+          }
+        }
+      },
+      "status": "ERROR",
+      "reason": "target_verifier_semantic_rejected",
+      "raw_literal_forbidden_hits": [
+        "гормон",
+        "заживл"
+      ],
+      "forbidden_claim_violations": [
+        "гормон",
+        "заживл"
+      ],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": true,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": true,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 4,
+      "case_id": "s57_pain_01",
+      "case_kind": "pain_reassurance",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "medical_handoff",
+      "observed_response_mode": "medical_handoff",
+      "response_text": "Страх боли при имплантации — это абсолютно нормальная реакция. В клинике используют современную прицельную анестезию, которая эффективно убирает боль и обычно не дает ощущения сильной «заморозки» на половину лица.\n\nВрач начинает работу только после того, как убедится, что вы ничего не чувствуете. Максимальные ощущения во время процедуры — легкий дискомфорт, который сопоставим с обычным лечением кариеса. Если вдруг появится неприятное ощущение, обезболивание можно скорректировать прямо в процессе.\n\nПосле установки возможны умеренные тянущие ощущения, похожие на состояние после удаления зуба. Они постепенно уменьшаются в первые дни, а врач заранее дает рекомендации, как снизить этот дискомфорт.\n\nЧтобы понять, какой вариант обезболивания подойдет именно вам (включая возможность седации для тревожных пациентов), лучше обсудить это на консультации. Сейчас можно пройти бесплатную консультацию по имплантации: врач оценит снимки и подробно объяснит все этапы, чтобы у вас не осталось вопросов и страхов.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "Страх боли при имплантации — это абсолютно нормальная реакция. В клинике используют современную прицельную анестезию, которая эффективно убирает боль и обычно не дает ощущения сильной «заморозки» на половину лица.\n\nВрач начинает работу только после того, как убедится, что вы ничего не чувствуете. Максимальные ощущения во время процедуры — легкий дискомфорт, который сопоставим с обычным лечением кариеса. Если вдруг появится неприятное ощущение, обезболивание можно скорректировать прямо в процессе.\n\nПосле установки возможны умеренные тянущие ощущения, похожие на состояние после удаления зуба. Они постепенно уменьшаются в первые дни, а врач заранее дает рекомендации, как снизить этот дискомфорт.\n\nЧтобы понять, какой вариант обезболивания подойдет именно вам (включая возможность седации для тревожных пациентов), лучше обсудить это на консультации. Сейчас можно пройти бесплатную консультацию по имплантации: врач оценит снимки и подробно объяснит все этапы, чтобы у вас не осталось вопросов и страхов.",
+        "usage": {
+          "completion_tokens": 218,
+          "prompt_tokens": 31759,
+          "total_tokens": 31977,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31759
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 31909,
+          "total_tokens": 31913,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 31909
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 5,
+      "case_id": "s57_price_01",
+      "case_kind": "structured_commercial_price",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "answer",
+      "observed_response_mode": "answer",
+      "response_text": "Стоимость протокола All-on-4 зависит от выбранной системы имплантов. Мы предлагаем три варианта «под ключ» за одну челюсть:\n\n*   **Implantium (Южная Корея)** — 318 000 ₽\n*   **Impro (Германия)** — 368 000 ₽\n*   **Nobel Biocare (Швейцария)** — 428 000 ₽\n\nВ эту сумму входят 4 импланта с документами, хирургический этап с анестезией, несъёмный протез в день операции и постоянная конструкция через 3–6 месяцев. Также вас сопровождает персональный куратор на всех этапах лечения.\n\nКТ и костная пластика (если она потребуется по показаниям) оплачиваются отдельно.\n\nОплату можно разделить на два этапа:\n1.  **60%** — за хирургию и временный протез.\n2.  **40%** — за изготовление и установку постоянного протеза.\n\nЧтобы понять, какой вариант подходит именно вам, врач оценит снимок КТ и состояние кости. Приходите на бесплатную консультацию — мы составим понятный план лечения и рассчитаем точную стоимость без скрытых доплат.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "Стоимость протокола All-on-4 зависит от выбранной системы имплантов. Мы предлагаем три варианта «под ключ» за одну челюсть:\n\n*   **Implantium (Южная Корея)** — 318 000 ₽\n*   **Impro (Германия)** — 368 000 ₽\n*   **Nobel Biocare (Швейцария)** — 428 000 ₽\n\nВ эту сумму входят 4 импланта с документами, хирургический этап с анестезией, несъёмный протез в день операции и постоянная конструкция через 3–6 месяцев. Также вас сопровождает персональный куратор на всех этапах лечения.\n\nКТ и костная пластика (если она потребуется по показаниям) оплачиваются отдельно.\n\nОплату можно разделить на два этапа:\n1.  **60%** — за хирургию и временный протез.\n2.  **40%** — за изготовление и установку постоянного протеза.\n\nЧтобы понять, какой вариант подходит именно вам, врач оценит снимок КТ и состояние кости. Приходите на бесплатную консультацию — мы составим понятный план лечения и рассчитаем точную стоимость без скрытых доплат.",
+        "usage": {
+          "completion_tokens": 276,
+          "prompt_tokens": 32503,
+          "total_tokens": 32779,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0,
+            "text_tokens": 32503
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 32710,
+          "total_tokens": 32714,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0,
+            "text_tokens": 32710
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 6,
+      "case_id": "s57_doctor_01",
+      "case_kind": "structured_commercial_doctors",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "answer",
+      "observed_response_mode": "answer",
+      "response_text": "Имплантацию в клинике проводит команда опытных хирургов-имплантологов, которые ведут пациента от установки импланта до финального результата.\n\nВот специалисты, которые занимаются восстановлением зубов на имплантах:\n\n*   **Волков Александр Сергеевич** — главный врач, стоматолог-хирург и имплантолог с опытом **13 лет**. Он ведёт сложные случаи, включая скуловую и птеригоидную имплантацию, синус-лифтинг и протоколы полной реабилитации.\n*   **Орлов Никита Владимирович** — врач-имплантолог со стажем **16 лет**. Специализируется на классической и одномоментной имплантации, костной пластике и немедленной временной нагрузке.\n*   **Кузнецов Дмитрий Андреевич** — врач-стоматолог-ортопед с опытом **19 лет**. Он занимается протезированием на имплантах, включая реабилитацию по протоколам All-on-4 и All-on-6, а также установкой коронок и виниров.\n\nВрачи работают совместно: хирург устанавливает имплант, а ортопед подбирает и фиксирует коронку или протез, чтобы улыбка выглядела естественно, а жевание было комфортным.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "Имплантацию в клинике проводит команда опытных хирургов-имплантологов, которые ведут пациента от установки импланта до финального результата.\n\nВот специалисты, которые занимаются восстановлением зубов на имплантах:\n\n*   **Волков Александр Сергеевич** — главный врач, стоматолог-хирург и имплантолог с опытом **13 лет**. Он ведёт сложные случаи, включая скуловую и птеригоидную имплантацию, синус-лифтинг и протоколы полной реабилитации.\n*   **Орлов Никита Владимирович** — врач-имплантолог со стажем **16 лет**. Специализируется на классической и одномоментной имплантации, костной пластике и немедленной временной нагрузке.\n*   **Кузнецов Дмитрий Андреевич** — врач-стоматолог-ортопед с опытом **19 лет**. Он занимается протезированием на имплантах, включая реабилитацию по протоколам All-on-4 и All-on-6, а также установкой коронок и виниров.\n\nВрачи работают совместно: хирург устанавливает имплант, а ортопед подбирает и фиксирует коронку или протез, чтобы улыбка выглядела естественно, а жевание было комфортным.",
+        "usage": {
+          "completion_tokens": 290,
+          "prompt_tokens": 32530,
+          "total_tokens": 32820,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 32530
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 32753,
+          "total_tokens": 32757,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 32753
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 7,
+      "case_id": "s57_info_01",
+      "case_kind": "general_information",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "answer",
+      "observed_response_mode": "answer",
+      "response_text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью четырёх имплантов.\n\nВот ключевые особенности этого протокола:\n*   **Быстрый результат:** несъёмный протез устанавливается в день операции, а полный протокол лечения обычно занимает 1–3 дня.\n*   **Эстетика и функция:** вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Надёжность:** четыре импланта распределяют жевательную нагрузку, при этом задние опоры часто устанавливаются под углом для лучшей стабильности даже при недостатке костной ткани.\n*   **Долговечность:** постоянный протез фиксируется через 3–6 месяцев после приживления имплантов. При правильном уходе конструкция служит 15–20 лет и более.\n\nЭтот вариант часто выбирают при полном или почти полном отсутствии зубов, когда важно быстро восстановить улыбку без сложной костной пластики.\n\nНа консультации врач оценит КТ и поможет понять, подходит ли протокол All-on-4 в вашей ситуации или лучше рассмотреть другой вариант восстановления.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "All-on-4 — это методика восстановления всего зубного ряда на одной челюсти с помощью четырёх имплантов.\n\nВот ключевые особенности этого протокола:\n*   **Быстрый результат:** несъёмный протез устанавливается в день операции, а полный протокол лечения обычно занимает 1–3 дня.\n*   **Эстетика и функция:** вы сразу можете улыбаться, говорить и есть мягкую пищу.\n*   **Надёжность:** четыре импланта распределяют жевательную нагрузку, при этом задние опоры часто устанавливаются под углом для лучшей стабильности даже при недостатке костной ткани.\n*   **Долговечность:** постоянный протез фиксируется через 3–6 месяцев после приживления имплантов. При правильном уходе конструкция служит 15–20 лет и более.\n\nЭтот вариант часто выбирают при полном или почти полном отсутствии зубов, когда важно быстро восстановить улыбку без сложной костной пластики.\n\nНа консультации врач оценит КТ и поможет понять, подходит ли протокол All-on-4 в вашей ситуации или лучше рассмотреть другой вариант восстановления.",
+        "usage": {
+          "completion_tokens": 243,
+          "prompt_tokens": 32312,
+          "total_tokens": 32555,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 32312
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 32488,
+          "total_tokens": 32492,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 29696,
+            "text_tokens": 32488
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    },
+    {
+      "index": 8,
+      "case_id": "s57_payment_01",
+      "case_kind": "structured_commercial_payment",
+      "expected_outcome": "materialize_verified",
+      "observed_outcome": "materialize_verified",
+      "expected_response_mode": "answer",
+      "observed_response_mode": "answer",
+      "response_text": "Оплатить протокол All-on-4 можно поэтапно, что позволяет распределить финансовую нагрузку. Стоимость зависит от выбранной системы имплантов и фиксируется в договоре до начала лечения.\n\n**Варианты стоимости за одну челюсть:**\n*   **Implantium** — 318 000 ₽\n*   **Impro** — 368 000 ₽\n*   **Nobel Biocare** — 428 000 ₽\n\n**Как проходит оплата по этапам:**\n1.  **Первый этап (60% суммы)** — оплачивается перед хирургией и установкой временного несъёмного протеза.\n2.  **Второй этап (40% суммы)** — оплачивается перед фиксацией постоянного протеза через 3–6 месяцев после приживления имплантов.\n\nНапример, для протокола на имплантах Impro первый взнос составит 190 800 ₽, а второй — 127 200 ₽.\n\nТакже в клинике доступна рассрочка на имплантацию и протезирование сроком до 12 месяцев, которую можно оформить прямо на консультации. При оплате в день обращения действует скидка до 15% на имплантацию, а после лечения вы можете вернуть 13% от стоимости через налоговый вычет.\n\nОбратите внимание: КТ и костная пластика (если она потребуется по показаниям) оплачиваются отдельно.",
+      "composer_call_count": 1,
+      "semantic_call_count": 1,
+      "provider_call_violation": false,
+      "pipeline_error_code": null,
+      "verification_status": "verified",
+      "composer_raw_payload": {
+        "model": "qwen3.7-plus",
+        "text": "Оплатить протокол All-on-4 можно поэтапно, что позволяет распределить финансовую нагрузку. Стоимость зависит от выбранной системы имплантов и фиксируется в договоре до начала лечения.\n\n**Варианты стоимости за одну челюсть:**\n*   **Implantium** — 318 000 ₽\n*   **Impro** — 368 000 ₽\n*   **Nobel Biocare** — 428 000 ₽\n\n**Как проходит оплата по этапам:**\n1.  **Первый этап (60% суммы)** — оплачивается перед хирургией и установкой временного несъёмного протеза.\n2.  **Второй этап (40% суммы)** — оплачивается перед фиксацией постоянного протеза через 3–6 месяцев после приживления имплантов.\n\nНапример, для протокола на имплантах Impro первый взнос составит 190 800 ₽, а второй — 127 200 ₽.\n\nТакже в клинике доступна рассрочка на имплантацию и протезирование сроком до 12 месяцев, которую можно оформить прямо на консультации. При оплате в день обращения действует скидка до 15% на имплантацию, а после лечения вы можете вернуть 13% от стоимости через налоговый вычет.\n\nОбратите внимание: КТ и костная пластика (если она потребуется по показаниям) оплачиваются отдельно.",
+        "usage": {
+          "completion_tokens": 322,
+          "prompt_tokens": 32502,
+          "total_tokens": 32824,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 31872,
+            "text_tokens": 32502
+          }
+        }
+      },
+      "semantic_raw_payload": {
+        "model": "qwen3.7-plus",
+        "assessment": {
+          "issues": []
+        },
+        "usage": {
+          "completion_tokens": 4,
+          "prompt_tokens": 32756,
+          "total_tokens": 32760,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 31872,
+            "text_tokens": 32756
+          }
+        }
+      },
+      "status": "OK",
+      "reason": "outcome_match",
+      "raw_literal_forbidden_hits": [],
+      "forbidden_claim_violations": [],
+      "semantic_assessment_evaluated": true,
+      "semantic_general_grounding_rejected": false,
+      "semantic_strict_commercial_grounding_rejected": false,
+      "semantic_topic_scope_rejected": false,
+      "semantic_medical_boundary_rejected": false,
+      "semantic_selected_facts_rejected": false,
+      "unexpected_terminal": false,
+      "missing_base_external_knowledge": false,
+      "ungrounded_strict_commercial": false,
+      "transport_error": false,
+      "malformed_response": false
+    }
+  ]
+}

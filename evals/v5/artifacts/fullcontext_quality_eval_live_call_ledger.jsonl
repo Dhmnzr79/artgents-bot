@@ -1,0 +1,36 @@
+{"timestamp_utc": "2026-07-23T14:48:29.708301+00:00", "case_id": "s57_consult_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 1}
+{"timestamp_utc": "2026-07-23T14:48:36.685365+00:00", "case_id": "s57_consult_01", "provider": "composer", "phase": "call_complete", "call_index": 1}
+{"timestamp_utc": "2026-07-23T14:48:36.721619+00:00", "case_id": "s57_consult_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 2}
+{"timestamp_utc": "2026-07-23T14:48:38.743260+00:00", "case_id": "s57_consult_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 2}
+{"timestamp_utc": "2026-07-23T14:48:38.756041+00:00", "case_id": "s57_missing_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 3}
+{"timestamp_utc": "2026-07-23T14:48:42.323748+00:00", "case_id": "s57_missing_01", "provider": "composer", "phase": "call_complete", "call_index": 3}
+{"timestamp_utc": "2026-07-23T14:48:42.388881+00:00", "case_id": "s57_missing_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 4}
+{"timestamp_utc": "2026-07-23T14:48:43.982104+00:00", "case_id": "s57_missing_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 4}
+{"timestamp_utc": "2026-07-23T14:48:43.993945+00:00", "case_id": "s57_medical_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 5}
+{"timestamp_utc": "2026-07-23T14:48:46.147743+00:00", "case_id": "s57_medical_01", "provider": "composer", "phase": "call_complete", "call_index": 5}
+{"timestamp_utc": "2026-07-23T14:48:46.187719+00:00", "case_id": "s57_medical_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 6}
+{"timestamp_utc": "2026-07-23T14:48:47.766158+00:00", "case_id": "s57_medical_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 6}
+{"timestamp_utc": "2026-07-23T14:48:47.776153+00:00", "case_id": "s57_medical_02", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 7}
+{"timestamp_utc": "2026-07-23T14:48:51.386401+00:00", "case_id": "s57_medical_02", "provider": "composer", "phase": "call_complete", "call_index": 7}
+{"timestamp_utc": "2026-07-23T14:48:51.423934+00:00", "case_id": "s57_medical_02", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 8}
+{"timestamp_utc": "2026-07-23T14:48:53.293288+00:00", "case_id": "s57_medical_02", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 8}
+{"timestamp_utc": "2026-07-23T14:48:53.304730+00:00", "case_id": "s57_pain_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 9}
+{"timestamp_utc": "2026-07-23T14:48:57.835539+00:00", "case_id": "s57_pain_01", "provider": "composer", "phase": "call_complete", "call_index": 9}
+{"timestamp_utc": "2026-07-23T14:48:57.890646+00:00", "case_id": "s57_pain_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 10}
+{"timestamp_utc": "2026-07-23T14:48:59.039758+00:00", "case_id": "s57_pain_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 10}
+{"timestamp_utc": "2026-07-23T14:48:59.055075+00:00", "case_id": "s57_price_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 11}
+{"timestamp_utc": "2026-07-23T14:49:04.572335+00:00", "case_id": "s57_price_01", "provider": "composer", "phase": "call_complete", "call_index": 11}
+{"timestamp_utc": "2026-07-23T14:49:04.646078+00:00", "case_id": "s57_price_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 12}
+{"timestamp_utc": "2026-07-23T14:49:06.353646+00:00", "case_id": "s57_price_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 12}
+{"timestamp_utc": "2026-07-23T14:49:06.379584+00:00", "case_id": "s57_doctor_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 13}
+{"timestamp_utc": "2026-07-23T14:49:10.907158+00:00", "case_id": "s57_doctor_01", "provider": "composer", "phase": "call_complete", "call_index": 13}
+{"timestamp_utc": "2026-07-23T14:49:10.950814+00:00", "case_id": "s57_doctor_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 14}
+{"timestamp_utc": "2026-07-23T14:49:12.119219+00:00", "case_id": "s57_doctor_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 14}
+{"timestamp_utc": "2026-07-23T14:49:12.140189+00:00", "case_id": "s57_info_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 15}
+{"timestamp_utc": "2026-07-23T14:49:16.355298+00:00", "case_id": "s57_info_01", "provider": "composer", "phase": "call_complete", "call_index": 15}
+{"timestamp_utc": "2026-07-23T14:49:16.393898+00:00", "case_id": "s57_info_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 16}
+{"timestamp_utc": "2026-07-23T14:49:18.284224+00:00", "case_id": "s57_info_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 16}
+{"timestamp_utc": "2026-07-23T14:49:18.299711+00:00", "case_id": "s57_payment_01", "provider": "composer", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 17}
+{"timestamp_utc": "2026-07-23T14:49:22.953302+00:00", "case_id": "s57_payment_01", "provider": "composer", "phase": "call_complete", "call_index": 17}
+{"timestamp_utc": "2026-07-23T14:49:22.996314+00:00", "case_id": "s57_payment_01", "provider": "semantic_verifier", "phase": "call_start", "measurement_id": "s57_fullcontext_quality_eval", "model": "qwen3.7-plus", "call_index": 18}
+{"timestamp_utc": "2026-07-23T14:49:24.647616+00:00", "case_id": "s57_payment_01", "provider": "semantic_verifier", "phase": "call_complete", "call_index": 18}

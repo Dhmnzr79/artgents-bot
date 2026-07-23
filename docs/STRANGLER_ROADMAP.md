@@ -421,6 +421,8 @@
 - [x] **S61 — target FullContext runtime path (dev flag OFF by default)** — wire S39–S59 chain into `/ask`
   behind `TARGET_FULLCONTEXT_DEV=0`; flag ON = target-only (no legacy RAG, no fallback). Bootstrap +
   TurnFrame bridge + widget materializer + session bridge. **OFFLINE ONLY / NO LIVE in S61**.
+- [x] **S61 correction** — target-only ingress precedence, effective CTA, session frequency IDs,
+  service-derived strategy context, HTTP `/ask`/`/ask/stream` integration tests. **OFFLINE ONLY**.
 
 ## Какой roadmap актуален
 

@@ -97,7 +97,7 @@ python -c "from evals.v5.s66_default_authority_live_contract import assert_froze
 - [x] Tests classified; frozen/A9 protected
 - [x] S69 scope minimal (single milestone, 8 phases)
 - [x] No product code changed
-- [ ] COMPLETION checker
-- [ ] Push `origin/codex/stage-a`
+- [x] COMPLETION checker ✅ (`d1b3026`)
+- [x] Push `origin/codex/stage-a` (`d1b3026`)
 
 **STOP after S68 — do not start S69 without separate owner decision.**

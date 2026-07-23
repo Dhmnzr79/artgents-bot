@@ -109,50 +109,9 @@ def _clear_target_cache():
     clear_target_runtime_client_context_cache()
 
 
-def test_default_flag_on_in_config() -> None:
-    import config
-
-    assert config.TARGET_FULLCONTEXT_DEV is True
-
-
-def test_flag_off_uses_legacy_orchestration(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_uses_target_orchestration_only(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", False)
-    legacy = MagicMock(
-        return_value=AskOrchestrationResult(
-            kind="service_reply",
-            q="q",
-            sid="sid",
-            client_id="demo",
-            service_payload={"answer": "legacy"},
-            service_route="legacy",
-        )
-    )
-    target = MagicMock()
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    monkeypatch.setattr(
-        app_module,
-        "run_pre_resolver_turn",
-        lambda *a, **k: MagicMock(q="q", sid="sid", client_id="demo", st={}, data={}),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "run_resolver_turn",
-        lambda **k: MagicMock(intent="content", decision=None, scope_topic_candidate=None, resolver_bypassed_env=False),
-    )
-    result = app_module._orchestrate_ask_turn({"q": "test", "sid": "sid"})
-    legacy.assert_called_once()
-    target.assert_not_called()
-    assert result.service_route == "legacy"
-
-
-def test_flag_on_uses_target_orchestration_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app as app_module
-
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     target = MagicMock(
         return_value=AskOrchestrationResult(
             kind="service_reply",
@@ -163,7 +122,6 @@ def test_flag_on_uses_target_orchestration_only(monkeypatch: pytest.MonkeyPatch)
             service_route="target_fullcontext_materialized",
         )
     )
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
     monkeypatch.setattr(
         app_module,
@@ -177,7 +135,6 @@ def test_flag_on_uses_target_orchestration_only(monkeypatch: pytest.MonkeyPatch)
     )
     result = app_module._orchestrate_ask_turn({"q": "test", "sid": "sid"})
     target.assert_called_once()
-    legacy.assert_not_called()
     assert result.service_payload["answer"] == "target"
 
 

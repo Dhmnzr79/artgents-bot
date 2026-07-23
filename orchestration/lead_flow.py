@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from contracts.ask_orchestration import AskOrchestrationResult
 from orchestration.helpers import decision_dump
-from core.md_chunks import get_chunk_by_ref
 
 
 def build_service_payload(
@@ -53,21 +52,6 @@ def lead_flow_orchestration_result(
     decision,
 ) -> AskOrchestrationResult:
     decision_frame = decision_dump(decision)
-    redirect_ref = (flow_result.get("redirect_ref") or "").strip()
-    if redirect_ref:
-        ch = get_chunk_by_ref(redirect_ref, client_id=client_id)
-        if ch:
-            return AskOrchestrationResult(
-                kind="chunk",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                chosen_chunk=ch,
-                llm_question=q or f"Информация из {redirect_ref}",
-                log_event="Answer generated from flow redirect_ref",
-                chunk_route="flow_redirect_ref",
-                decision_frame=decision_frame,
-            )
     return AskOrchestrationResult(
         kind="service_reply",
         q=q,

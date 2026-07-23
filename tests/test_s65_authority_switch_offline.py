@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import uuid
 from unittest.mock import MagicMock
@@ -25,7 +24,6 @@ from tests.test_s61_correction_target_runtime import (
     _fake_backends,
     _fake_target_turn_factory,
     _install_turn_frame,
-    _pre_resolver,
     _run_materialized_turn,
     _seed_followups,
     _turn_frame,
@@ -35,30 +33,6 @@ from tests.test_target_boundary_enforced_fullcontext_response import (
     RecordingComposerBackend,
     RecordingSemanticBackend,
 )
-
-
-@pytest.fixture(autouse=True)
-def _restore_config_default_after_reload(monkeypatch: pytest.MonkeyPatch):
-    yield
-    _reload_config_flag(monkeypatch, None)
-
-
-def _reload_config_flag(monkeypatch: pytest.MonkeyPatch, value: str | None):
-    if value is None:
-        monkeypatch.delenv("TARGET_FULLCONTEXT_DEV", raising=False)
-    else:
-        monkeypatch.setenv("TARGET_FULLCONTEXT_DEV", value)
-    import config
-
-    importlib.reload(config)
-    return config
-
-
-def _sync_app_flag(monkeypatch: pytest.MonkeyPatch, enabled: bool):
-    import app as app_module
-
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", enabled)
-    return app_module
 
 
 def _ask_context(q: str = "test", sid: str = "sid", data: dict | None = None):
@@ -87,16 +61,9 @@ def _stub_pre_to_context(monkeypatch: pytest.MonkeyPatch, app_module, ctx: AskTu
 # --- A: Default authority ---
 
 
-def test_config_default_on_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = _reload_config_flag(monkeypatch, None)
-    assert config.TARGET_FULLCONTEXT_DEV is True
-
-
-def test_app_default_authority_calls_target_not_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_app_default_authority_calls_target(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    _sync_app_flag(monkeypatch, True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     target = MagicMock(
         return_value=AskOrchestrationResult(
             kind="service_reply",
@@ -107,14 +74,12 @@ def test_app_default_authority_calls_target_not_legacy(monkeypatch: pytest.Monke
             service_route="target_fullcontext_materialized",
         )
     )
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
     _stub_pre_to_context(monkeypatch, app_module, _ask_context())
     _stub_resolver(monkeypatch, app_module)
 
     result = app_module._orchestrate_ask_turn({"q": "test", "sid": "sid"})
     target.assert_called_once()
-    legacy.assert_not_called()
     assert result.service_route == "target_fullcontext_materialized"
 
 
@@ -123,10 +88,7 @@ def test_http_ask_default_target_authority(monkeypatch: pytest.MonkeyPatch) -> N
 
     sid = f"s65-ask-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    _sync_app_flag(monkeypatch, True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     composer, semantic, boundary = _fake_backends()
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     monkeypatch.setattr(
         app_module,
         "orchestrate_target_fullcontext_turn",
@@ -143,7 +105,6 @@ def test_http_ask_default_target_authority(monkeypatch: pytest.MonkeyPatch) -> N
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["meta"]["answer_path"] == "target_fullcontext"
-    legacy.assert_not_called()
 
 
 def test_http_stream_default_target_authority(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -151,10 +112,7 @@ def test_http_stream_default_target_authority(monkeypatch: pytest.MonkeyPatch) -
 
     sid = f"s65-stream-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    _sync_app_flag(monkeypatch, True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     composer, semantic, boundary = _fake_backends()
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     monkeypatch.setattr(
         app_module,
         "orchestrate_target_fullcontext_turn",
@@ -170,107 +128,13 @@ def test_http_stream_default_target_authority(monkeypatch: pytest.MonkeyPatch) -
     )
     assert resp.status_code == 200
     assert "event: ui" in resp.data.decode("utf-8")
-    legacy.assert_not_called()
 
 
-# --- B: Manual kill-switch ---
+# --- B: Target failure ---
 
 
-def test_kill_switch_env_zero_uses_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = _reload_config_flag(monkeypatch, "0")
-    assert config.TARGET_FULLCONTEXT_DEV is False
+def test_target_error_does_not_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
-
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", False)
-    target = MagicMock(side_effect=AssertionError("target must not run"))
-    legacy = MagicMock(
-        return_value=AskOrchestrationResult(
-            kind="service_reply",
-            q="q",
-            sid="sid",
-            client_id="demo",
-            service_payload={"answer": "legacy"},
-            service_route="legacy",
-        )
-    )
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
-    _stub_pre_to_context(monkeypatch, app_module, _ask_context())
-    _stub_resolver(monkeypatch, app_module)
-
-    result = app_module._orchestrate_ask_turn({"q": "test", "sid": "sid"})
-    legacy.assert_called_once()
-    target.assert_not_called()
-    assert result.service_route == "legacy"
-
-
-def test_http_kill_switch_legacy_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app as app_module
-
-    _sync_app_flag(monkeypatch, False)
-    target = MagicMock(side_effect=AssertionError("target must not run"))
-    legacy = MagicMock(
-        return_value=AskOrchestrationResult(
-            kind="service_reply",
-            q="q",
-            sid="sid",
-            client_id="demo",
-            service_payload={"answer": "legacy"},
-            service_route="legacy",
-        )
-    )
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
-    _stub_pre_to_context(monkeypatch, app_module, _ask_context(sid="sid-kill"))
-    _stub_resolver(monkeypatch, app_module)
-
-    client = app_module.app.test_client()
-    for endpoint in ("/ask", "/ask/stream"):
-        resp = client.post(endpoint, json={"q": "test", "sid": "sid-kill", "client_id": "demo"})
-        assert resp.status_code == 200
-    assert legacy.call_count == 2
-    target.assert_not_called()
-
-
-# --- C: Explicit ON ---
-
-
-def test_explicit_env_one_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = _reload_config_flag(monkeypatch, "1")
-    assert config.TARGET_FULLCONTEXT_DEV is True
-    import app as app_module
-
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
-    target = MagicMock(
-        return_value=AskOrchestrationResult(
-            kind="service_reply",
-            q="q",
-            sid="sid",
-            client_id="demo",
-            service_payload={"answer": "target"},
-            service_route="target_fullcontext_materialized",
-        )
-    )
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    _stub_pre_to_context(monkeypatch, app_module, _ask_context())
-    _stub_resolver(monkeypatch, app_module)
-
-    app_module._orchestrate_ask_turn({"q": "test", "sid": "sid"})
-    target.assert_called_once()
-    legacy.assert_not_called()
-
-
-# --- D: Target failure ---
-
-
-def test_target_error_does_not_call_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app as app_module
-
-    _sync_app_flag(monkeypatch, True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
 
     def failing_target(**kwargs):
         payload = {
@@ -295,18 +159,14 @@ def test_target_error_does_not_call_legacy(monkeypatch: pytest.MonkeyPatch) -> N
     _stub_resolver(monkeypatch, app_module)
 
     result = app_module._orchestrate_ask_turn({"q": "test", "sid": "sid-err"})
-    legacy.assert_not_called()
     assert result.service_route == "target_fullcontext_error"
     assert result.service_payload["meta"]["target_error_code"] == "target_runtime_turn_frame_unavailable"
 
 
-def test_target_runtime_fail_closed_no_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_target_runtime_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
     from core.target_runtime_turn_frame_bridge import TargetRuntimeTurnFrameError
 
-    _sync_app_flag(monkeypatch, True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     _stub_pre_to_context(monkeypatch, app_module, _ask_context(q="Сколько стоит?", sid="sid-tf"))
     _stub_resolver(monkeypatch, app_module)
 
@@ -323,7 +183,6 @@ def test_target_runtime_fail_closed_no_legacy(monkeypatch: pytest.MonkeyPatch) -
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["meta"]["service_route"] == "target_fullcontext_error"
-    legacy.assert_not_called()
 
 
 @pytest.fixture
@@ -334,17 +193,14 @@ def flask_ctx():
         yield
 
 
-# --- E: Guards ---
+# --- C: Guards ---
 
 
 def test_ingress_manual_contact_short_circuits_before_target(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    _sync_app_flag(monkeypatch, True)
     target = MagicMock(side_effect=AssertionError("target must not run"))
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     monkeypatch.setattr(
         "orchestration.pre_resolver_turn.classify_ingress",
         lambda **k: IngressRouteResult(
@@ -362,17 +218,13 @@ def test_ingress_manual_contact_short_circuits_before_target(monkeypatch: pytest
     )
     assert resp.status_code == 200
     target.assert_not_called()
-    legacy.assert_not_called()
 
 
 def test_lead_flow_short_circuits_before_target(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    _sync_app_flag(monkeypatch, True)
     target = MagicMock(side_effect=AssertionError("target must not run"))
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -381,7 +233,6 @@ def test_lead_flow_short_circuits_before_target(monkeypatch: pytest.MonkeyPatch)
     )
     assert resp.status_code == 200
     target.assert_not_called()
-    legacy.assert_not_called()
 
 
 def test_ref_click_uses_target_navigation(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -393,9 +244,6 @@ def test_ref_click_uses_target_navigation(monkeypatch: pytest.MonkeyPatch) -> No
         sid,
         TargetRuntimeFollowupItem(ref="price:all_on_4/stages", label="Этапы оплаты"),
     )
-    _sync_app_flag(monkeypatch, True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     captured: dict[str, str] = {}
     composer, semantic, boundary = _fake_backends()
 
@@ -414,60 +262,9 @@ def test_ref_click_uses_target_navigation(monkeypatch: pytest.MonkeyPatch) -> No
     )
     assert resp.status_code == 200
     assert captured.get("q") == "Этапы оплаты"
-    legacy.assert_not_called()
 
 
-# --- F: No hidden legacy ---
-
-
-def test_default_path_no_hidden_legacy_modules(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app as app_module
-
-    sid = f"s65-spy-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    _sync_app_flag(monkeypatch, True)
-    route_source = MagicMock(side_effect=AssertionError("route_source must not run"))
-    get_chunk = MagicMock(side_effect=AssertionError("get_chunk_by_ref must not run"))
-    composer_overlay = MagicMock(side_effect=AssertionError("composer overlay must not run"))
-    legacy = MagicMock(side_effect=AssertionError("legacy orchestrator must not run"))
-
-    monkeypatch.setattr("source_routing.route_source", route_source)
-    monkeypatch.setattr("core.md_chunks.get_chunk_by_ref", get_chunk)
-    monkeypatch.setattr("orchestration.composer_flow.try_composer_overlay", composer_overlay)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
-    composer, semantic, boundary = _fake_backends()
-    monkeypatch.setattr(
-        app_module,
-        "orchestrate_target_fullcontext_turn",
-        _fake_target_turn_factory(composer, semantic, boundary),
-    )
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
-    monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
-
-    client = app_module.app.test_client()
-    resp = client.post(
-        "/ask",
-        json={"q": "Сколько стоит All-on-4?", "sid": sid, "client_id": "demo"},
-    )
-    assert resp.status_code == 200
-    legacy.assert_not_called()
-    route_source.assert_not_called()
-    get_chunk.assert_not_called()
-    composer_overlay.assert_not_called()
-
-
-def test_target_ref_path_does_not_call_get_chunk_by_ref(monkeypatch: pytest.MonkeyPatch, flask_ctx) -> None:
-    get_chunk = MagicMock(side_effect=AssertionError("legacy chunk ref must not run"))
-    monkeypatch.setattr("core.md_chunks.get_chunk_by_ref", get_chunk)
-    result = _pre_resolver(
-        {"q": "", "ref": "price:all_on_4/stages", "sid": "sid-pre", "client_id": "demo"},
-        target_mode=True,
-    )
-    assert not isinstance(result, AskOrchestrationResult) or result.service_route != "retrieval_chunk"
-    get_chunk.assert_not_called()
-
-
-# --- G: State and UI ---
+# --- D: State and UI ---
 
 
 def test_target_session_continuity_after_materialized(flask_ctx) -> None:
@@ -491,7 +288,6 @@ def test_target_cta_mapping_still_works() -> None:
 def test_json_and_stream_share_target_authority(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    _sync_app_flag(monkeypatch, True)
     calls: list[str] = []
     composer, semantic, boundary = _fake_backends()
 
@@ -500,7 +296,6 @@ def test_json_and_stream_share_target_authority(monkeypatch: pytest.MonkeyPatch)
         return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
 
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", MagicMock())
     monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
@@ -515,7 +310,7 @@ def test_json_and_stream_share_target_authority(monkeypatch: pytest.MonkeyPatch)
     assert calls == ["sid-json", "sid-sse"]
 
 
-# --- H: Frozen artifacts ---
+# --- E: Frozen artifacts ---
 
 
 def test_frozen_s62_artifacts_unchanged() -> None:

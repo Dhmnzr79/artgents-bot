@@ -133,33 +133,6 @@ def try_price_symptom_consult_orchestration(
     )
 
 
-def orchestrate_consult_symptom_ref(
-    ref: str,
-    *,
-    q: str,
-    sid: str,
-    client_id: str,
-    decision_frame: dict[str, Any] | None = None,
-) -> AskOrchestrationResult | None:
-    if (ref or "").strip() != CONSULT_SYMPTOM_DETAILS_REF:
-        return None
-    if not price_symptom_consult_enabled(client_id):
-        return None
-    _ = load_ui_bundle(client_id)
-    payload = build_price_symptom_consult_details_payload(sid=sid, client_id=client_id)
-    return AskOrchestrationResult(
-        kind="service_reply",
-        q=q,
-        sid=sid,
-        client_id=client_id,
-        service_payload=payload,
-        service_doc_id=None,
-        service_track_user=True,
-        service_route="price_symptom_consult",
-        decision_frame=decision_frame,
-    )
-
-
 def should_defer_price_strict_service(
     *,
     q: str,

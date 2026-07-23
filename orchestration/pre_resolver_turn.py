@@ -8,7 +8,6 @@ from flask import request
 from config import (
     ANTI_SPAM_BURST_MESSAGES,
     ANTI_SPAM_BURST_WINDOW_SEC,
-    CLARIFY_STATE_ON,
     INPUT_MAX_CHARS,
 )
 from contracts.ask_orchestration import AskOrchestrationResult
@@ -20,31 +19,20 @@ from orchestration.helpers import decision_dump
 from orchestration.lead_flow import lead_flow_orchestration_result
 from orchestration.route_guards import (
     check_rate_limit,
-    continuation_clarify_payload,
-    duplicate_payload,
-    is_duplicate_question,
     is_message_burst,
     is_obvious_noise,
-    is_short_contextual,
     normalize_question_text,
     obvious_noise_ingress_result,
     rate_limited_response_payload,
     should_soft_redirect_no_intent,
     soft_redirect_payload,
 )
-from core.price_ref_routing import orchestrate_price_widget_ref
-from core.promo_overview import build_promo_overview_payload, is_direct_promo_question
-from core.price_symptom_consult import orchestrate_consult_symptom_ref
-from policy import continuation_only_phrase, continuation_without_context
-from core.md_chunks import get_chunk_by_ref
 from session import (
     get_topic_state,
-    clear_pending_clarify,
     is_active_lead_flow,
     is_lead_context,
     mark_nav_ref_used,
     mem_get,
-    pending_clarify_age,
     mem_reset,
     set_anti_spam_redirect_shown,
     sid_from_body,
@@ -63,11 +51,9 @@ def run_pre_resolver_turn(
     client_txt: Callable[[str | None], dict[str, str]],
     service_payload: Callable[..., dict],
     get_last_content_ui_payload: Callable[[str], dict | None],
-    target_fullcontext_mode: bool = False,
 ) -> AskOrchestrationResult | AskTurnContext:
     """
-    Pre-Resolver pipeline: client/reset/rate/noise/ingress/flows/guards/ref/continuation.
-    Extracted from app._orchestrate_ask_turn (Phase 3d).
+    Pre-Resolver pipeline: client/reset/rate/noise/ingress/flows/guards/target ref nav.
     """
     decision = None
     client_id = resolve_client_id(data.get("client_id"), host=request.host)
@@ -121,10 +107,6 @@ def run_pre_resolver_turn(
 
     st = mem_get(sid)
     decision_frame = decision_dump(decision)
-    pending_clarify = st.get("pending_clarify") if CLARIFY_STATE_ON else None
-    if isinstance(pending_clarify, dict) and pending_clarify_age(st) > 2:
-        clear_pending_clarify(sid)
-        pending_clarify = None
 
     if is_obvious_noise(q) and not is_lead_context(st):
         noise_res = obvious_noise_ingress_result()
@@ -194,21 +176,6 @@ def run_pre_resolver_turn(
 
     st = mem_get(sid)
 
-    if not target_fullcontext_mode and is_duplicate_question(st, q):
-        snap = get_last_content_ui_payload(sid)
-        log_json(logger, "duplicate_short_circuit", sid=sid, client_id=client_id)
-        return AskOrchestrationResult(
-            kind="service_reply",
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=duplicate_payload(sid, client_id, snap),
-            service_doc_id=None,
-            service_track_user=True,
-            service_route="duplicate_short_circuit",
-            decision_frame=decision_frame,
-        )
-
     if not is_lead_context(st):
         if is_message_burst(st):
             set_anti_spam_redirect_shown(sid, True)
@@ -260,87 +227,34 @@ def run_pre_resolver_turn(
             except Exception:
                 pass
             mark_nav_ref_used(sid, ref_eff)
-            if isinstance(pending_clarify, dict):
-                try:
-                    from core.clarify_state import active_service_catalog, service_ref
-
-                    catalog = active_service_catalog(client_id)
-                    option_ids = {
-                        str(x or "").strip()
-                        for x in list(pending_clarify.get("option_service_ids") or [])
-                        if str(x or "").strip()
-                    }
-                    option_refs = {
-                        service_ref(entry)
-                        for sid_opt, entry in catalog.items()
-                        if sid_opt in option_ids and isinstance(entry, dict)
-                    }
-                    option_refs |= {f"price:{sid_opt}" for sid_opt in option_ids}
-                    if ref_eff in option_refs:
-                        clear_pending_clarify(sid)
-                except Exception:
-                    pass
-        if target_fullcontext_mode:
-            if not q:
-                from core.target_runtime_followup_nav import (
-                    build_target_unknown_ref_clarify_payload,
-                    resolve_target_followup_navigation,
-                )
-                from core.target_runtime_session import read_target_runtime_session
-
-                nav = resolve_target_followup_navigation(
-                    ref=ref_eff,
-                    q=q,
-                    followups=read_target_runtime_session(sid).followups,
-                )
-                if nav is not None and nav.matched_ref is None:
-                    payload = build_target_unknown_ref_clarify_payload(
-                        client_id=client_id,
-                        sid=sid,
-                    )
-                    return AskOrchestrationResult(
-                        kind="service_reply",
-                        q=q,
-                        sid=sid,
-                        client_id=client_id,
-                        service_payload=payload,
-                        service_route="target_fullcontext_followup_unknown",
-                        decision_frame=decision_frame,
-                    )
-                if nav is not None and nav.user_message:
-                    q = nav.user_message
-        else:
-            price_from_ref = orchestrate_price_widget_ref(
-                ref,
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                decision_frame=decision_frame,
+        if not q:
+            from core.target_runtime_followup_nav import (
+                build_target_unknown_ref_clarify_payload,
+                resolve_target_followup_navigation,
             )
-            if price_from_ref is not None:
-                return price_from_ref
-            consult_from_ref = orchestrate_consult_symptom_ref(
-                ref,
+            from core.target_runtime_session import read_target_runtime_session
+
+            nav = resolve_target_followup_navigation(
+                ref=ref_eff,
                 q=q,
-                sid=sid,
-                client_id=client_id,
-                decision_frame=decision_frame,
+                followups=read_target_runtime_session(sid).followups,
             )
-            if consult_from_ref is not None:
-                return consult_from_ref
-            ch = get_chunk_by_ref(ref, client_id=client_id)
-            if ch:
+            if nav is not None and nav.matched_ref is None:
+                payload = build_target_unknown_ref_clarify_payload(
+                    client_id=client_id,
+                    sid=sid,
+                )
                 return AskOrchestrationResult(
-                    kind="chunk",
+                    kind="service_reply",
                     q=q,
                     sid=sid,
                     client_id=client_id,
-                    chosen_chunk=ch,
-                    llm_question=q or f"Информация из {ref}",
-                    log_event="Answer generated from ref",
-                    chunk_route="retrieval_chunk",
+                    service_payload=payload,
+                    service_route="target_fullcontext_followup_unknown",
                     decision_frame=decision_frame,
                 )
+            if nav is not None and nav.user_message:
+                q = nav.user_message
 
     if not q:
         return AskOrchestrationResult(
@@ -354,66 +268,5 @@ def run_pre_resolver_turn(
             service_route="error",
             decision_frame=decision_frame,
         )
-
-    if not target_fullcontext_mode and continuation_without_context(q, st):
-        log_json(logger, "continuation_no_context", sid=sid, client_id=client_id)
-        return AskOrchestrationResult(
-            kind="service_reply",
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            service_payload=continuation_clarify_payload(sid, client_id),
-            service_doc_id=None,
-            service_track_user=True,
-            service_route="continuation_clarify",
-            decision_frame=decision_frame,
-        )
-
-    if not target_fullcontext_mode and is_direct_promo_question(q):
-        promo_payload = build_promo_overview_payload(sid=sid, client_id=client_id, q=q)
-        if promo_payload is not None:
-            return AskOrchestrationResult(
-                kind="service_reply",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=promo_payload,
-                service_doc_id=None,
-                service_track_user=True,
-                service_route="promo_overview",
-                decision_frame=decision_frame,
-            )
-
-    if not target_fullcontext_mode:
-        current_doc_id = (st.get("current_doc_id") or "").strip()
-        if current_doc_id and continuation_only_phrase(q):
-            ch = get_chunk_by_ref(f"{current_doc_id}#korotko", client_id=client_id)
-            if ch:
-                return AskOrchestrationResult(
-                    kind="chunk",
-                    q=q,
-                    sid=sid,
-                    client_id=client_id,
-                    chosen_chunk=ch,
-                    llm_question=q,
-                    log_event="Answer from continuation topic fallback",
-                    chunk_route="retrieval_chunk",
-                    decision_frame=decision_frame,
-                )
-
-        if is_short_contextual(q, st) and current_doc_id:
-            ch = get_chunk_by_ref(f"{current_doc_id}#korotko", client_id=client_id)
-            if ch:
-                return AskOrchestrationResult(
-                    kind="chunk",
-                    q=q,
-                    sid=sid,
-                    client_id=client_id,
-                    chosen_chunk=ch,
-                    llm_question=q,
-                    log_event="Answer from short_contextual fallback",
-                    chunk_route="retrieval_chunk",
-                    decision_frame=decision_frame,
-                )
 
     return AskTurnContext(q=q, sid=sid, client_id=client_id, ref=ref, data=data, st=st)

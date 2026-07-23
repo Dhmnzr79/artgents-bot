@@ -41,11 +41,9 @@ from session import (
     is_active_lead_flow,
     record_last_bot_payload,
 )
-from config import TARGET_FULLCONTEXT_DEV
 from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn
 from orchestration.helpers import get_last_content_ui_payload_compat
-from orchestration.lead_flow import build_service_payload, lead_flow_orchestration_result
-from orchestration.policy_compat import apply_response_policy_compat
+from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from orchestration.resolver_turn import run_resolver_turn
@@ -99,54 +97,6 @@ def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
     return bool(pmeta.get("lead_flow") or pmeta.get("situation_collect"))
 
 
-def _suppress_plan_append_quick_replies(payload: dict, plan_apply_meta: dict[str, Any]) -> None:
-    from core.answer_plan_apply import payment_terms_suppress_refs
-    from core.price_answer_assembler import hide_navigated_quick_replies
-
-    meta = payload.get("meta") or {}
-    suppress_list = payment_terms_suppress_refs(
-        plan_meta={
-            "answer_plan": meta.get("answer_plan"),
-            "answer_plan_apply": plan_apply_meta,
-        },
-        doc_id=meta.get("doc_id"),
-        answer_body=str(payload.get("answer") or ""),
-    )
-    if not suppress_list:
-        return
-    suppress = {str(r).strip().lower() for r in suppress_list if str(r).strip()}
-    payload["quick_replies"] = hide_navigated_quick_replies(
-        list(payload.get("quick_replies") or []),
-        exclude_refs=suppress,
-    )
-    meta = payload.setdefault("meta", {})
-    if isinstance(meta.get("followups"), list):
-        meta["followups"] = hide_navigated_quick_replies(
-            list(meta.get("followups") or []),
-            exclude_refs=suppress,
-        )
-
-
-def _is_target_fullcontext_service_route(route: str | None) -> bool:
-    return (route or "").strip().lower().startswith("target_fullcontext")
-
-
-def orchestrate_routing_after_resolver(**kwargs):
-    """Lazy legacy orchestrator — loaded only when kill-switch branch runs."""
-    from orchestration.ask_turn import orchestrate_routing_after_resolver as _impl
-
-    return _impl(**kwargs)
-
-
-def _stamp_service_answer_path(payload: dict, route: str | None) -> None:
-    """Telemetry only: mark which answer path produced the payload."""
-    r = (route or "").strip().lower()
-    if r in {"price_lookup", "price_concern"}:
-        payload.setdefault("meta", {})["answer_path"] = "price"
-    elif r == "price_symptom_consult":
-        payload.setdefault("meta", {})["answer_path"] = "price_symptom_consult"
-
-
 def _service_reply(
     payload: dict,
     sid: str,
@@ -163,71 +113,6 @@ def _service_reply(
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
-    _stamp_service_answer_path(payload, route)
-    r = (route or "").strip().lower()
-    plan = None
-    if not _is_target_fullcontext_service_route(route):
-        from core.answer_plan_apply import apply_answer_plan_append
-        from core.answer_packet_snapshot import build_and_publish_answer_packet
-        from core.answer_planner import answer_plan_from_ctx
-        from session import set_last_aspect
-
-        plan = answer_plan_from_ctx()
-        pmeta = payload.get("meta") or {}
-        if plan is not None and r in {"price_lookup", "price_concern", "catalog_facts"}:
-            svc_id = str(pmeta.get("matched_service_id") or plan.service_id or "").strip() or None
-            plan_tail, plan_apply_meta = apply_answer_plan_append(
-                plan,
-                client_id=pmeta.get("client_id"),
-                service_id=svc_id,
-                q=q,
-                existing_append=None,
-                price_offer_meta=pmeta if isinstance(pmeta, dict) else None,
-                answer_body=str(payload.get("answer") or ""),
-            )
-            if plan_tail:
-                base = str(payload.get("answer") or "").strip()
-                if plan_tail not in base:
-                    payload["answer"] = f"{base}\n\n{plan_tail}" if base else plan_tail
-            if plan.primary_aspect:
-                set_last_aspect(sid, plan.primary_aspect)
-            payload.setdefault("meta", {})["answer_plan"] = plan.model_dump()
-            packet = build_and_publish_answer_packet(
-                plan,
-                client_id=pmeta.get("client_id"),
-                route=r,
-                service_id=svc_id,
-                apply_meta=plan_apply_meta,
-            )
-            payload.setdefault("meta", {})["answer_packet"] = packet.model_dump()
-            if plan_apply_meta.get("applied") or plan_apply_meta.get("suppressed"):
-                _suppress_plan_append_quick_replies(payload, plan_apply_meta)
-                payload.setdefault("meta", {})["answer_plan_apply"] = plan_apply_meta
-        if (
-            r in {"price_lookup", "price_concern", "catalog_facts"}
-            and not _skip_lead_pii_in_session_hist(payload)
-        ):
-            from core.follow_up_rewrite import persist_focus_from_service_turn
-
-            pmeta = payload.get("meta") or {}
-            svc_id = str(pmeta.get("matched_service_id") or "").strip() or None
-            topic = (plan.topic if plan else None) or str(pmeta.get("service_topic") or "").strip() or None
-            persist_focus_from_service_turn(
-                sid,
-                client_id=pmeta.get("client_id"),
-                matched_service_id=svc_id,
-                route=r,
-                answer=str(payload.get("answer") or ""),
-                topic=topic,
-            )
-    if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
-        pmeta = payload.get("meta") or {}
-        record_consult_nudge_after_answer(
-            sid,
-            route,
-            pmeta.get("consult_nudge"),
-            str(payload.get("answer") or ""),
-        )
     payload = apply_ui_source_policy(payload, route=route)
     payload = normalize_policy_payload(payload)
     answer = (payload.get("answer") or "").strip()
@@ -417,12 +302,11 @@ def _orchestrate_ask_turn(data: dict):
         client_txt=_client_txt,
         service_payload=build_service_payload,
         get_last_content_ui_payload=get_last_content_ui_payload_compat,
-        target_fullcontext_mode=TARGET_FULLCONTEXT_DEV,
     )
     if isinstance(pre, AskOrchestrationResult):
         return pre
 
-    resolver = run_resolver_turn(
+    run_resolver_turn(
         q=pre.q,
         sid=pre.sid,
         client_id=pre.client_id,
@@ -430,27 +314,11 @@ def _orchestrate_ask_turn(data: dict):
         enqueue_resolver_trace=_enqueue_v5_resolver_trace,
     )
 
-    if TARGET_FULLCONTEXT_DEV:
-        return orchestrate_target_fullcontext_turn(
-            q=pre.q,
-            sid=pre.sid,
-            client_id=pre.client_id,
-            data=pre.data,
-        )
-
-    return orchestrate_routing_after_resolver(
+    return orchestrate_target_fullcontext_turn(
         q=pre.q,
         sid=pre.sid,
         client_id=pre.client_id,
-        intent=resolver.intent,
-        decision=resolver.decision,
-        scope_topic_candidate=resolver.scope_topic_candidate,
-        resolver_bypassed_env=resolver.resolver_bypassed_env,
         data=pre.data,
-        client_txt=_client_txt,
-        service_payload=build_service_payload,
-        lead_flow_from_result=lead_flow_orchestration_result,
-        apply_response_policy=apply_response_policy_compat,
     )
 
 
@@ -472,41 +340,6 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
-    if orch_r.kind == "composer":
-        from chunk_responder import respond_from_composer
-
-        out = respond_from_composer(
-            composed_answer=str(orch_r.composed_answer or ""),
-            materialized_cards=list(orch_r.materialized_cards or []),
-            q=orch_r.q,
-            sid=orch_r.sid,
-            client_id=orch_r.client_id,
-            matched_service_id=orch_r.matched_service_id,
-            route=orch_r.chunk_route or "retrieval_chunk",
-            primary_chunk_ref=orch_r.composer_primary_chunk_ref,
-            finalize_ask=finalize_ask,
-            logger=logger,
-            log_event="Answer generated from composer",
-        )
-        return safe_jsonify(out)
-    if orch_r.kind == "chunk":
-        from chunk_responder import respond_from_chunk
-
-        return respond_from_chunk(
-            chunk=orch_r.chosen_chunk,
-            q=orch_r.q,
-            sid=orch_r.sid,
-            client_id=orch_r.client_id,
-            finalize_ask=finalize_ask,
-            safe_jsonify=safe_jsonify,
-            logger=logger,
-            llm_question=orch_r.llm_question,
-            log_event=orch_r.log_event,
-            route=orch_r.chunk_route,
-            generator_append_text=orch_r.generator_append_text,
-            price_offer_meta=orch_r.price_offer_meta,
-            matched_service_id=orch_r.matched_service_id,
-        )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 
 @app.post("/ask")
@@ -571,10 +404,6 @@ _SSE_HEADERS = {
 
 def _sse_typing_phase(*, kind: str, route: str | None) -> str:
     """Фаза индикатора в виджете: searching = «база знаний», writing = только «печатает»."""
-    if kind == "chunk":
-        return "searching"
-    if kind == "composer":
-        return "searching"
     r = (route or "").strip().lower()
     if r.startswith("ingress_"):
         return "writing"
@@ -613,16 +442,8 @@ def _sse_service_reply(
         mem_add_user(sid, q)
     if route:
         payload.setdefault("meta", {})["service_route"] = str(route).strip()
-    _stamp_service_answer_path(payload, route)
-    r = (route or "").strip().lower()
-    if r == "price_lookup" and not is_active_lead_flow(mem_get(sid)):
-        pmeta = payload.get("meta") or {}
-        record_consult_nudge_after_answer(
-            sid,
-            route,
-            pmeta.get("consult_nudge"),
-            str(payload.get("answer") or ""),
-        )
+    payload = apply_ui_source_policy(payload, route=route)
+    payload = normalize_policy_payload(payload)
     answer = (payload.get("answer") or "").strip()
     turn_meta = None
     if track_user and (q or "").strip():
@@ -647,74 +468,6 @@ def _sse_service_reply(
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
 
 
-def _sse_composer_reply(
-    orch_r: AskOrchestrationResult,
-):
-    """Composer overlay via SSE: typing + ui + done (no text_delta)."""
-    from chunk_responder import respond_from_composer
-
-    out = respond_from_composer(
-        composed_answer=str(orch_r.composed_answer or ""),
-        materialized_cards=list(orch_r.materialized_cards or []),
-        q=orch_r.q,
-        sid=orch_r.sid,
-        client_id=orch_r.client_id,
-        matched_service_id=orch_r.matched_service_id,
-        route=orch_r.chunk_route or "retrieval_chunk",
-        primary_chunk_ref=orch_r.composer_primary_chunk_ref,
-        finalize_ask=finalize_ask,
-        logger=logger,
-        log_event="Answer generated from composer",
-    )
-    route = orch_r.chunk_route or "retrieval_chunk"
-    phase = _sse_typing_phase(kind="composer", route=route)
-
-    def _gen():
-        yield _sse_typing_line(phase)
-        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
-        yield "event: done\ndata: {}\n\n"
-
-    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
-
-
-def _sse_chunk_response(
-    chunk: dict,
-    q: str,
-    sid: str,
-    client_id: str | None,
-    *,
-    llm_question: str | None = None,
-    log_event: str = "Answer generated",
-    route: str = "retrieval_chunk",
-    generator_append_text: str | None = None,
-    price_offer_meta: dict | None = None,
-    matched_service_id: str | None = None,
-):
-    """Стриминговый ответ из чанка через SSE."""
-    from chunk_responder import respond_from_chunk_stream
-
-    return app.response_class(
-        stream_with_context(
-            respond_from_chunk_stream(
-                chunk=chunk,
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                finalize_ask=finalize_ask,
-                logger=logger,
-                llm_question=llm_question,
-                log_event=log_event,
-                route=route,
-                generator_append_text=generator_append_text,
-                price_offer_meta=price_offer_meta,
-                matched_service_id=matched_service_id,
-            ),
-        ),
-        mimetype="text/event-stream",
-        headers=_SSE_HEADERS,
-    )
-
-
 def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
     """SSE-упаковка результата оркестратора (как исторический /ask/stream)."""
     if orch_r.kind == "unknown_client":
@@ -733,21 +486,6 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
         if orch_r.http_status != 200:
             return resp, orch_r.http_status
         return resp
-    if orch_r.kind == "composer":
-        return _sse_composer_reply(orch_r)
-    if orch_r.kind == "chunk":
-        return _sse_chunk_response(
-            orch_r.chosen_chunk,
-            orch_r.q,
-            orch_r.sid,
-            orch_r.client_id,
-            llm_question=orch_r.llm_question,
-            log_event=orch_r.log_event,
-            route=orch_r.chunk_route,
-            generator_append_text=orch_r.generator_append_text,
-            price_offer_meta=orch_r.price_offer_meta,
-            matched_service_id=orch_r.matched_service_id,
-        )
     raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
 
 

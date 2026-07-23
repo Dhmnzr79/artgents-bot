@@ -82,7 +82,7 @@ def _fake_backends():
     )
 
 
-def _pre_resolver(data: dict, *, target_mode: bool):
+def _pre_resolver(data: dict):
     return run_pre_resolver_turn(
         data,
         resolve_client_id=lambda *a, **k: "demo",
@@ -91,7 +91,6 @@ def _pre_resolver(data: dict, *, target_mode: bool):
         client_txt=lambda cid: {},
         service_payload=lambda **k: {},
         get_last_content_ui_payload=lambda sid: None,
-        target_fullcontext_mode=target_mode,
     )
 
 
@@ -334,121 +333,16 @@ def test_session_terminal_error_does_not_mutate_shown_ids(flask_ctx) -> None:
     assert after.shown_fact_ids == before.shown_fact_ids
 
 
-def test_target_mode_skips_price_ref(monkeypatch: pytest.MonkeyPatch, flask_ctx) -> None:
-    price_mock = MagicMock()
-    monkeypatch.setattr("orchestration.pre_resolver_turn.orchestrate_price_widget_ref", price_mock)
-    _pre_resolver({"q": "", "ref": "price:all_on_4", "sid": "s1"}, target_mode=True)
-    price_mock.assert_not_called()
-
-
-def test_target_mode_skips_chunk_ref(monkeypatch: pytest.MonkeyPatch, flask_ctx) -> None:
-    chunk_mock = MagicMock(return_value={"id": "chunk"})
-    monkeypatch.setattr("orchestration.pre_resolver_turn.get_chunk_by_ref", chunk_mock)
-    _pre_resolver({"q": "test", "ref": "kb:foo.md#bar", "sid": "s2"}, target_mode=True)
-    chunk_mock.assert_not_called()
-
-
-def test_target_mode_skips_promo(monkeypatch: pytest.MonkeyPatch, flask_ctx) -> None:
-    promo_mock = MagicMock(return_value={"answer": "promo"})
-    monkeypatch.setattr("orchestration.pre_resolver_turn.build_promo_overview_payload", promo_mock)
-    monkeypatch.setattr("orchestration.pre_resolver_turn.is_direct_promo_question", lambda q: True)
-    _pre_resolver({"q": "акции", "sid": "s3"}, target_mode=True)
-    promo_mock.assert_not_called()
-
-
-def test_target_mode_skips_consult_symptom_ref(
-    monkeypatch: pytest.MonkeyPatch,
-    flask_ctx,
-) -> None:
-    consult_mock = MagicMock()
-    monkeypatch.setattr(
-        "orchestration.pre_resolver_turn.orchestrate_consult_symptom_ref",
-        consult_mock,
-    )
-    sid = "s-consult-ref"
-    mem_reset(sid)
-    _pre_resolver(
-        {"q": "", "ref": CONSULT_SYMPTOM_DETAILS_REF, "sid": sid},
-        target_mode=True,
-    )
-    consult_mock.assert_not_called()
-
-
-def test_target_mode_skips_continuation_without_context(
-    monkeypatch: pytest.MonkeyPatch,
-    flask_ctx,
-) -> None:
-    clarify_mock = MagicMock(return_value={"answer": "clarify"})
-    monkeypatch.setattr(
-        "orchestration.pre_resolver_turn.continuation_clarify_payload",
-        clarify_mock,
-    )
-    sid = "s-cont-no-ctx"
-    mem_reset(sid)
-    _pre_resolver({"q": "подробнее", "sid": sid}, target_mode=True)
-    clarify_mock.assert_not_called()
-
-
-def test_target_mode_skips_current_doc_continuation(
-    monkeypatch: pytest.MonkeyPatch,
-    flask_ctx,
-) -> None:
-    chunk_mock = MagicMock(return_value={"id": "chunk"})
-    monkeypatch.setattr("orchestration.pre_resolver_turn.get_chunk_by_ref", chunk_mock)
-    sid = "s-cont-doc"
-    mem_reset(sid)
-    st = mem_get(sid)
-    st["current_doc_id"] = "implantation__service__all_on_4"
-    _pre_resolver({"q": "подробнее", "sid": sid}, target_mode=True)
-    chunk_mock.assert_not_called()
-
-
-def test_target_mode_skips_short_contextual(
-    monkeypatch: pytest.MonkeyPatch,
-    flask_ctx,
-) -> None:
-    chunk_mock = MagicMock(return_value={"id": "chunk"})
-    monkeypatch.setattr("orchestration.pre_resolver_turn.get_chunk_by_ref", chunk_mock)
-    monkeypatch.setattr("orchestration.pre_resolver_turn.handle_flows", lambda **k: None)
-    sid = "s-short"
-    mem_reset(sid)
-    st = mem_get(sid)
-    st["current_doc_id"] = "implantation__service__all_on_4"
-    from session import _lock, _persist_unlocked
-
-    with _lock:
-        _persist_unlocked(sid, st)
-    _pre_resolver({"q": "ок", "sid": sid}, target_mode=True)
-    chunk_mock.assert_not_called()
-
-
-def test_target_mode_skips_duplicate_replay(
-    monkeypatch: pytest.MonkeyPatch,
-    flask_ctx,
-) -> None:
-    dup_mock = MagicMock(return_value={"answer": "dup"})
-    monkeypatch.setattr("orchestration.pre_resolver_turn.duplicate_payload", dup_mock)
-    sid = "s-dup"
-    mem_reset(sid)
-    st = mem_get(sid)
-    st["hist"] = [{"role": "user", "content": "Сколько стоит имплантация?"}]
-    _pre_resolver(
-        {"q": "Сколько стоит имплантация?", "sid": sid},
-        target_mode=True,
-    )
-    dup_mock.assert_not_called()
-
-
-def test_target_mode_unknown_ref_returns_clarify(flask_ctx) -> None:
+def test_unknown_ref_returns_clarify(flask_ctx) -> None:
     sid = "s-unknown-ref"
     mem_reset(sid)
-    result = _pre_resolver({"q": "", "ref": "unknown:ref", "sid": sid}, target_mode=True)
+    result = _pre_resolver({"q": "", "ref": "unknown:ref", "sid": sid})
     assert isinstance(result, AskOrchestrationResult)
     assert result.service_route == "target_fullcontext_followup_unknown"
     assert "уточните" in result.service_payload["answer"].lower()
 
 
-def test_target_mode_known_followup_ref_maps_to_label(flask_ctx) -> None:
+def test_known_followup_ref_maps_to_label(flask_ctx) -> None:
     sid = "s-known-ref"
     mem_reset(sid)
     _seed_followups(
@@ -457,7 +351,6 @@ def test_target_mode_known_followup_ref_maps_to_label(flask_ctx) -> None:
     )
     result = _pre_resolver(
         {"q": "", "ref": "price:all_on_4/stages", "sid": sid},
-        target_mode=True,
     )
     assert isinstance(result, AskTurnContext)
     assert result.q == "Этапы оплаты"
@@ -476,53 +369,12 @@ def test_followup_nav_maps_ref_to_label() -> None:
     assert nav.matched_ref == "price:all_on_4/stages"
 
 
-def test_http_ask_flag_off_legacy_not_target(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app as app_module
-
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", False)
-    target = MagicMock(side_effect=AssertionError("target must not run"))
-    legacy = MagicMock(
-        return_value=AskOrchestrationResult(
-            kind="service_reply",
-            q="q",
-            sid="sid",
-            client_id="demo",
-            service_payload={"answer": "legacy"},
-            service_route="legacy",
-        )
-    )
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target)
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
-    monkeypatch.setattr(
-        app_module,
-        "run_pre_resolver_turn",
-        lambda *a, **k: MagicMock(q="q", sid="sid", client_id="demo", st={}, data={}),
-    )
-    monkeypatch.setattr(
-        app_module,
-        "run_resolver_turn",
-        lambda **k: ResolverTurnOutcome("content", None, None, False),
-    )
-    client = app_module.app.test_client()
-    resp = client.post("/ask", json={"q": "test", "sid": "sid-http-off", "client_id": "demo"})
-    assert resp.status_code == 200
-    target.assert_not_called()
-    legacy.assert_called_once()
-
-
-def test_http_ask_flag_on_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_http_ask_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
     sid = f"s-http-on-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
     composer, semantic, boundary = _fake_backends()
-    monkeypatch.setattr(
-        app_module,
-        "orchestrate_routing_after_resolver",
-        legacy,
-    )
     monkeypatch.setattr(
         app_module,
         "orchestrate_target_fullcontext_turn",
@@ -545,10 +397,9 @@ def test_http_ask_flag_on_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resp.status_code == 200
     body = resp.get_json()
     assert "318" in body.get("answer", "")
-    legacy.assert_not_called()
 
 
-def test_http_ask_flag_on_followup_ref_click(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_http_ask_followup_ref_click(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
     sid = f"s-http-ref-{uuid.uuid4().hex[:8]}"
@@ -557,9 +408,6 @@ def test_http_ask_flag_on_followup_ref_click(monkeypatch: pytest.MonkeyPatch) ->
         sid,
         TargetRuntimeFollowupItem(ref="price:all_on_4/stages", label="Этапы оплаты"),
     )
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     captured: dict[str, str] = {}
     composer, semantic, boundary = _fake_backends()
 
@@ -580,7 +428,6 @@ def test_http_ask_flag_on_followup_ref_click(monkeypatch: pytest.MonkeyPatch) ->
     )
     assert resp.status_code == 200
     assert captured["q"] == "Этапы оплаты"
-    legacy.assert_not_called()
 
 
 def test_http_ask_two_turns_carries_session_shown_ids(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -602,12 +449,6 @@ def test_http_ask_two_turns_carries_session_shown_ids(monkeypatch: pytest.Monkey
         turn_module,
         "run_target_offline_boundary_enforced_fullcontext_response",
         boundary_spy,
-    )
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
-    monkeypatch.setattr(
-        app_module,
-        "orchestrate_routing_after_resolver",
-        MagicMock(side_effect=AssertionError("legacy must not run")),
     )
     monkeypatch.setattr(
         "core.target_runtime_turn.load_runtime_turn_frame",
@@ -649,10 +490,9 @@ def test_http_ask_two_turns_carries_session_shown_ids(monkeypatch: pytest.Monkey
     assert captured_consult[1] == (CONSULTATION_REF,)
 
 
-def test_http_stream_flag_on_batch_ui(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_http_stream_batch_ui(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
     monkeypatch.setattr(
         app_module,
         "_orchestrate_ask_turn",

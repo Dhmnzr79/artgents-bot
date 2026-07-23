@@ -220,6 +220,9 @@ def run_replay_case(
         is_terminal=is_terminal,
         composer_provider_calls=composer_provider_calls,
         verifier_provider_calls=verifier_provider_calls,
+        composer_invocations=composer_backend.invocation_count,
+        verifier_invocations=semantic_backend.invocation_count,
+        offline_mode=True,
     )
     response_text: str | None = None
     if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
@@ -416,6 +419,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"CONFIG_ERROR: {error}", file=sys.stderr)
         return 2
 
+    try:
+        assert_attempt_marker_absent(
+            LIVE_ATTEMPT_MARKER_PATH,
+            owner_override=args.owner_override_attempt_marker,
+        )
+        assert_replay_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
+    except (AttemptMarkerExistsError, LiveArtifactWriteError) as error:
+        print(f"ARTIFACT_GUARD: {error}", file=sys.stderr)
+        return 4
+
     if args.dry_run:
         payload = {
             "measurement_id": MEASUREMENT_ID,
@@ -430,16 +443,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
-
-    try:
-        assert_attempt_marker_absent(
-            LIVE_ATTEMPT_MARKER_PATH,
-            owner_override=args.owner_override_attempt_marker,
-        )
-        assert_replay_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
-    except (AttemptMarkerExistsError, LiveArtifactWriteError) as error:
-        print(f"ARTIFACT_GUARD: {error}", file=sys.stderr)
-        return 4
 
     if args.live:
         print("LIVE_NOT_CONFIGURED", file=sys.stderr)

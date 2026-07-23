@@ -72,13 +72,25 @@ def test_replay_provider_call_budget_rules() -> None:
     assert replay_provider_call_violation(
         is_terminal=False,
         composer_provider_calls=0,
-        verifier_provider_calls=1,
+        verifier_provider_calls=0,
+        composer_invocations=1,
+        verifier_invocations=1,
+        offline_mode=True,
     ) is False
     assert replay_provider_call_violation(
         is_terminal=False,
         composer_provider_calls=0,
         verifier_provider_calls=0,
+        composer_invocations=0,
+        verifier_invocations=1,
+        offline_mode=True,
     ) is True
+    assert replay_provider_call_violation(
+        is_terminal=False,
+        composer_provider_calls=0,
+        verifier_provider_calls=1,
+        offline_mode=False,
+    ) is False
 
 
 def test_frozen_composer_backend_has_no_provider_imports() -> None:
@@ -222,6 +234,7 @@ def test_offline_owner_label_harness_decision_metrics() -> None:
     assert payload["summary"]["false_block_count"] == 0
     assert payload["summary"]["missed_block_count"] == 0
     assert payload["summary"]["decision_match_rate"] == 1.0
+    assert all(not row["provider_call_violation"] for row in materializable)
 
 
 def test_blast_radius_summary_covers_mass_selling_groups() -> None:

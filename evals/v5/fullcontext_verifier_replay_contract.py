@@ -400,9 +400,19 @@ def replay_provider_call_violation(
     is_terminal: bool,
     composer_provider_calls: int,
     verifier_provider_calls: int,
+    composer_invocations: int = 0,
+    verifier_invocations: int = 0,
+    offline_mode: bool = True,
 ) -> bool:
     if is_terminal:
         return composer_provider_calls != 0 or verifier_provider_calls != 0
+    if offline_mode:
+        return (
+            composer_provider_calls != 0
+            or verifier_provider_calls != 0
+            or composer_invocations != 1
+            or verifier_invocations != 1
+        )
     return composer_provider_calls != 0 or verifier_provider_calls != 1
 
 

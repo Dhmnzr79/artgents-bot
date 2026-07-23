@@ -57,9 +57,9 @@
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
 | Последний завершённый checkpoint | **S58 — one controlled S57 end-to-end live run (AUTOMATED_FAIL 7/9)** |
-| Текущий S-series checkpoint | **S58 complete; manual review pending; RERUN_BLOCKED** |
-| Предыдущий checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
-| Ближайший рабочий focus | **S58 live: 9 Composer + 9 Verifier = 18 calls, one attempt only** |
+| Текущий S-series checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
+| Предыдущий checkpoint | **S58 — one controlled S57 end-to-end live run (AUTOMATED_FAIL 7/9)** |
+| Ближайший рабочий focus | **S59 policy text + offline acceptance; then architecture read-only audit** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -413,6 +413,10 @@
   `qwen3.7-plus` Composer + Verifier, **18 calls**, retry 0. **AUTOMATED_FAIL** 7/9 materialized;
   blocks: `s57_missing_01` (external immune claim), `s57_medical_02` (lactation/hormones extension).
   Immutable S58 artifacts committed. **RERUN_BLOCKED** without new owner approval.
+- [ ] **S59 — final semantic Verifier medical policy simplification** — OFFLINE ONLY:
+  lightweight blocking: diagnosis, personal conclusion, dangerous/absurd/contradicting claims only;
+  plausible external medical detail → non-blocking `minor_external_detail`; strict clinic facts unchanged.
+  **NO LIVE**.
 
 ## Какой roadmap актуален
 

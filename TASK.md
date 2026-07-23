@@ -206,7 +206,7 @@ Push only to `origin/codex/stage-a`.
 |-------|-------|
 | PRE-CODE | ✅ (`e7ce017` governance correction) |
 | COMPLETION | ✅ (after allowlist correction `HEAD`) |
-| HEAD | `8085e52` |
+| HEAD | `0321272` |
 | pytest | 267/267 targeted C1 set |
 | collect-only | 2451 |
 | frozen | OK |

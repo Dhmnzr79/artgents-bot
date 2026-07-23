@@ -61,10 +61,11 @@
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
 | Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
-| Текущий S-series checkpoint | **S69 — legacy deletion (completed)** |
-| Следующий gate | **Owner decision — post-S69 tooling/history cleanup (out of scope)** |
+| Текущий S-series checkpoint | **S70 — FullContext migration closeout (completed)** |
+| S-series status | **COMPLETE** (`S_SERIES_COMPLETE`) |
+| Следующий gate | **Owner decision — post-S-series product direction (no auto S71)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Harness FC build counter fix; post-S69 eval hygiene** |
+| Ближайший рабочий focus | **Provider prompt caching / real client onboarding / optional hygiene** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path only** — unconditional; legacy modules deleted |
 | FullContext authority | **Sole product authority (S69); S65/S66/S67 precursors** |
 | Patient-scope authority | **Forbidden** |
@@ -468,6 +469,9 @@
   FullContext is the **only** product authority. Offline acceptance:
   `tests/test_s69_checkpoint_a_offline.py`, `tests/test_s69_legacy_deleted_offline.py`.
   **NO LIVE / NO A9**.
+- [x] **S70 — FullContext migration closeout (read-only)** — `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md`:
+  verdict `S_SERIES_COMPLETE`; single target FullContext product chain verified; provider prompt caching
+  and token streaming classified as deferred; no must-fix blockers. **NO product code / NO LIVE**.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

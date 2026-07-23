@@ -90,12 +90,14 @@ python -m pytest -q tests/test_s69_checkpoint_a_offline.py tests/test_s69_legacy
 
 ## Acceptance
 
-- [ ] PRE-CODE checker ✅
-- [ ] `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` complete (sections A–J)
-- [ ] Active docs updated (allowlist)
-- [ ] Static verification recorded in closeout
-- [ ] COMPLETION checker ✅
+- [x] PRE-CODE checker ✅ (`f9e42ebb`, governance `86ebf9b`)
+- [x] `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` complete (sections A–J)
+- [x] Active docs updated (STRANGLER, ARCH contradiction note)
+- [x] Static verification recorded in closeout (2524 collect, 19/19 targeted S69, frozen OK)
+- [x] COMPLETION checker ✅ (`3a9b5b37`)
 - [ ] Docs commit + push `origin/codex/stage-a`
 - [ ] Clean tree; HEAD == origin
+
+**Verdict:** `S_SERIES_COMPLETE` — see closeout doc section A.
 
 **STOP after S70 — do not auto-create S71.**

@@ -69,8 +69,8 @@
 - Offline S35/S36 **не противоречат** этому закону: они materialize **selected strict identities**
   для verification и exact-fact enforcement, **не** подменяя cached FullContext как основной
   knowledge input Composer.
-- Текущий legacy path, chunk_responder и retrieval в repo — **СЕЙЧАС**, не TARGET; не оправдание
-  для новых temporary bridges.
+- Текущий legacy path, chunk_responder и retrieval в repo — **удалены из product path (S69)**;
+  историческое описание перехода — в archive и секции «СЕЙЧАС» выше; не оправдание для новых temporary bridges.
 
 ## Owner clarification: Medical question semantics
 
@@ -218,7 +218,11 @@ Boundary detection → TurnFrame → Boundary enforcement + Response policy → 
 
 ---
 
-## Что СЕЙЧАС (переходное — честно)
+## Что СЕЙЧАС (переходное — исторический baseline до S69)
+
+> **Post-S69 (cdcd79f):** legacy product answer path **удалён**. Актуальная product-цепочка —
+> target FullContext only (см. `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md`). Буллеты ниже описывают
+> **переходное состояние до strangler-миграции**, не live wiring `/ask` после S69.
 
 - Понимание **размазано**: planner + resolver + patient_situation + dialog_focus + aspect_planner + regex-гейты.
 - `topic` — **не ось**, выводится после planner из `service_id` + regex в адаптере; `ServiceTopic` без `whitening`.

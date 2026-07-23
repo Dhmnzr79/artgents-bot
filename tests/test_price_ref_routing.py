@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from core.price_ref_routing import orchestrate_price_widget_ref, parse_price_widget_ref
+from core.price_ref_routing import parse_price_widget_ref
 
 
 def test_parse_price_widget_ref_service():

@@ -75,13 +75,19 @@ Permanently delete legacy product answer chain (routing → RAG/source routing �
 |------|--------|
 | Delete list modules | Physical delete after `rg` clean |
 | Delete list tests | Physical delete (full list above) |
-| `session.py` | Remove `pending_clarify` helpers; prune `last_aspect` writers if orphaned; **investigate** `current_doc_id` / `last_catalog_service` readers — delete only after `rg` shows no target/shared reader (S68 §E) |
+| `session.py` | **Deferred:** `get_pending_clarify` still read by `core/turn_planner_llm.py`; no change in B |
 | `core/follow_up_rewrite.py` | Remove legacy-only functions (`persist_focus_from_service_turn` etc.) if orphaned; **keep** `focus_from_legacy_session` while `dialog_focus` reads it (S68 §C/F) |
 | `core/answer_planner.py` | **KEEP_SHARED** — planner unit tests and TurnFrame shadow; remove only legacy product-only exports if orphaned after B (`rg` gate) |
 | `tests/test_dialog_focus_baseline.py` | Remove `route_source` sections |
 | `tests/test_turn_planner_wiring.py` | Remove `composer_flow` mock sections |
 | `tests/test_price_ref_routing.py` | Keep parse tests; drop orchestrate tests |
 | `tests/test_price_brand_money.py` | Remove `price_flow` imports/tests; keep shared price logic covered elsewhere (S68 §C) |
+| `tests/test_answer_planner.py` | Drop `answer_plan_apply` unit tests after module delete; keep `build_answer_plan` / `detect_aspects` |
+| `tests/test_focus_context.py` | Drop `persist_focus_from_service_turn` test after follow_up_rewrite cleanup |
+| `tests/test_s62_correction_offline.py` | Remove `TARGET_FULLCONTEXT_DEV` / legacy orchestrator mocks (B pytest suite) |
+| `tests/test_s63_correction_offline.py` | Remove `TARGET_FULLCONTEXT_DEV` / legacy orchestrator mocks (B pytest suite) |
+| `tests/test_turn_planner_stage3.py` | Drop `answer_packet_materialize` test after module delete |
+| `tests/test_vague_doctor_followup.py` | Drop `source_routing` tests after module delete; keep `doctors_lookup` + target e2e |
 | `tests/test_s69_legacy_deleted_offline.py` | **new** — import audit + no legacy dispatch |
 | `docs/FLAGS_AND_STATUS.md` | Kill-switch removed; unconditional FullContext |
 | `docs/STRANGLER_ROADMAP.md` | S69 completed |
@@ -186,11 +192,11 @@ Live/LLM, FullContext/Planner/Composer/Verifier/boundary policy changes, frozen 
 
 ## Acceptance
 
-- [ ] PRE-CODE checker ✅ (retry after governance correction `6d43f2e` → …)
-- [ ] Checkpoint A complete + CHECKPOINT-A ✅
-- [ ] Checkpoint B complete + COMPLETION ✅
-- [ ] Legacy import audit clean
-- [ ] Frozen pins unchanged
+- [x] PRE-CODE checker ✅ (retry after governance correction `6d43f2e` → `a54cf6b`)
+- [x] Checkpoint A complete + CHECKPOINT-A ✅ (`248b6c6`)
+- [x] Checkpoint B complete + COMPLETION ✅
+- [x] Legacy import audit clean
+- [x] Frozen pins unchanged
 - [ ] Push `origin/codex/stage-a`
 
 **STOP after S69 — no further tooling/history cleanup without owner decision.**

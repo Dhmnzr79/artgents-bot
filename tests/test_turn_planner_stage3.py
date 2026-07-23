@@ -43,34 +43,6 @@ def test_patient_situation_uses_turn_plan_before_regex():
     assert meta["patient_situation_source"] == "turn_planner"
 
 
-def test_price_fact_block_filters_by_turn_plan_brand_group(brand_on):
-    from core.answer_packet_materialize import render_price_fact_block
-    from core.turn_planner_llm import publish_turn_plan
-
-    app = pytest.importorskip("flask").Flask(__name__)
-    with app.test_request_context("/"):
-        from flask import request
-
-        request.ctx = {}
-        publish_turn_plan(
-            TurnPlan(
-                route="price_lookup",
-                aspects=["price"],
-                service_id="classic",
-                followup_of=None,
-                needs_clarify=False,
-                brand_filter={"brand_group": "korean"},
-            )
-        )
-        text = render_price_fact_block(client_id="demo", service_id="classic")
-
-    assert text is not None
-    assert "Implantium" in text
-    assert "Impro" not in text
-    assert "Nobel" not in text
-    assert "76 200" in text
-
-
 def test_price_answer_lookup_filters_by_turn_plan_brand_group(brand_on):
     from core.price_offers import build_price_answer_for_lookup
     from core.turn_planner_llm import publish_turn_plan

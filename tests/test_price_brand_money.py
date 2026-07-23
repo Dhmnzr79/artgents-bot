@@ -18,7 +18,6 @@ from core.price_brand_money import (
 )
 from core.price_offers import build_price_answer_for_lookup as _build_price_lookup
 from core.turn_planner_llm import publish_turn_plan, _validate_plan
-from orchestration.price_flow import price_matched_from_route, try_a3_price_route
 from query_selector import select_price_service_route
 from session import mem_reset
 
@@ -273,38 +272,6 @@ def test_budget_anchor_brief_has_no_list_labels(brand_on):
     assert "85 200" in brief
 
 
-def test_budget_anchor_before_concern_ref(brand_on, monkeypatch):
-    from contracts.source_route_result import SourceRouteResult
-
-    q = "какие импланты подешевле?"
-    sr = SourceRouteResult(
-        source="price_concern",
-        service_id="classic",
-        ref="implantation__faq__cost.md#korotko",
-        concern_ref="implantation__faq__cost.md#korotko",
-        payload=None,
-        match_score=0.9,
-        match_method="concern_default",
-    )
-    monkeypatch.setattr(
-        "orchestration.price_flow.get_chunk_by_ref",
-        lambda *_a, **_k: {"text": "concern chunk should not win"},
-    )
-    with _flask_ctx():
-        from flask import request
-
-        request.ctx = {}
-        result = try_a3_price_route(
-            q=q,
-            sid="concern-intercept",
-            client_id="demo",
-            sr=sr,
-            decision=None,
-            decision_frame=None,
-        )
-    assert result is not None
-    assert result.kind == "service_reply"
-    assert result.service_route == "price_brand_budget_anchor"
 
 
 def test_budget_anchor_card_from_pricebook_not_literals(brand_on):
@@ -369,34 +336,3 @@ def test_planner_validates_conversational_nobel_alias(brand_on):
     assert plan is not None
     assert plan.brand_filter is not None
     assert plan.brand_filter.brand == "Nobel Biocare"
-
-
-def test_price_matched_from_route_korean_via_planner(brand_on, monkeypatch):
-    sid = f"bbm-kr-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    q = "сколько стоят корейские импланты?"
-    route = select_price_service_route(q, client_id="demo", sid=sid, intent_override="price_lookup")
-    with _flask_ctx():
-        from flask import request
-
-        request.ctx = {}
-        _publish_brand_filter(brand_group="korean")
-        monkeypatch.setattr(
-            "core.price_symptom_consult.try_price_symptom_consult_orchestration",
-            lambda **_: None,
-        )
-        monkeypatch.setattr(
-            "core.price_symptom_consult.try_price_strict_service_defer",
-            lambda **_: None,
-        )
-        result = price_matched_from_route(
-            q=q,
-            sid=sid,
-            client_id="demo",
-            price_route=route,
-            decision=None,
-            decision_frame=None,
-        )
-    assert result.kind == "service_reply"
-    meta = (result.service_payload or {}).get("meta") or {}
-    assert meta.get("price_offer_ids") == ["classic.one_tooth.implantium"]

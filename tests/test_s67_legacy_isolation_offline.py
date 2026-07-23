@@ -100,14 +100,10 @@ def _assert_frozen_s66_artifacts_unchanged() -> None:
 
 
 def _install_default_target_http(monkeypatch: pytest.MonkeyPatch, app_module) -> tuple:
-    route_source = MagicMock(side_effect=AssertionError("route_source must not run"))
     get_chunk = MagicMock(side_effect=AssertionError("get_chunk_by_ref must not run"))
-    composer_overlay = MagicMock(side_effect=AssertionError("composer overlay must not run"))
     answer_plan = MagicMock(side_effect=AssertionError("answer_plan_from_ctx must not run"))
 
-    monkeypatch.setattr("source_routing.route_source", route_source)
     monkeypatch.setattr("core.md_chunks.get_chunk_by_ref", get_chunk)
-    monkeypatch.setattr("orchestration.composer_flow.try_composer_overlay", composer_overlay)
     monkeypatch.setattr("core.answer_planner.answer_plan_from_ctx", answer_plan)
 
     composer, semantic, boundary = _fake_backends()
@@ -118,7 +114,7 @@ def _install_default_target_http(monkeypatch: pytest.MonkeyPatch, app_module) ->
     )
     monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
-    return route_source, get_chunk, composer_overlay, answer_plan
+    return get_chunk, answer_plan
 
 
 # --- A: Default import isolation ---
@@ -157,7 +153,7 @@ def test_default_ask_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -> N
 
     sid = f"s67-ask-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    route_source, get_chunk, composer_overlay, answer_plan = _install_default_target_http(
+    get_chunk, answer_plan = _install_default_target_http(
         monkeypatch, app_module
     )
 
@@ -169,9 +165,7 @@ def test_default_ask_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -> N
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["meta"]["answer_path"] == "target_fullcontext"
-    route_source.assert_not_called()
     get_chunk.assert_not_called()
-    composer_overlay.assert_not_called()
     answer_plan.assert_not_called()
 
 
@@ -183,7 +177,7 @@ def test_default_stream_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -
 
     sid = f"s67-stream-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    route_source, get_chunk, composer_overlay, answer_plan = _install_default_target_http(
+    get_chunk, answer_plan = _install_default_target_http(
         monkeypatch, app_module
     )
 
@@ -195,9 +189,7 @@ def test_default_stream_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -
     assert resp.status_code == 200
     text = resp.data.decode("utf-8")
     assert "event: ui" in text
-    route_source.assert_not_called()
     get_chunk.assert_not_called()
-    composer_overlay.assert_not_called()
     answer_plan.assert_not_called()
 
 
@@ -209,8 +201,6 @@ def test_target_error_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     sid = f"s67-err-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    route_source = MagicMock(side_effect=AssertionError("route_source must not run"))
-    monkeypatch.setattr("source_routing.route_source", route_source)
 
     def failing_target(**kwargs):
         payload = {
@@ -235,12 +225,11 @@ def test_target_error_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_resolver(monkeypatch, app_module)
 
     client = app_module.app.test_client()
-    resp = client.post("/ask", json={"q": "test", "sid": sid, "client_id": "demo"})
+    resp = client.post("/ask", json={"q": "Сколько стоит?", "sid": sid, "client_id": "demo"})
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["meta"]["target_error_code"] == "target_runtime_turn_frame_unavailable"
     assert "answer_plan" not in (body.get("meta") or {})
-    route_source.assert_not_called()
 
 
 # --- E: Target ref-click ---

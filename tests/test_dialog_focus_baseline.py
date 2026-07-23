@@ -9,25 +9,11 @@ from __future__ import annotations
 
 import uuid
 
-from contracts.decision_frame import DecisionFrame
 from core.attribute_followup import detect_vague_attribute_kinds
 from core.dialog_focus import build_dialog_focus_decision
 from core.pricebook_loader import load_pricebook_service
-from core.routing_loader import THRESHOLDS
 from query_selector import select_price_service_route
-from source_routing import route_source
-from session import mem_add_user, mem_get, mem_reset, set_last_subject
-
-
-def _content_frame(*, topic: str = "implantation") -> DecisionFrame:
-    return DecisionFrame(
-        route_intent="content",
-        service_topic=topic,
-        service_id=None,
-        query_mode="specific",
-        confidence={"intent": 0.9, "topic": 0.9, "service": 0.0, "query_mode": 0.9},
-        needs_clarification=False,
-    )
+from session import mem_reset, set_last_subject
 
 
 def _set_focus(
@@ -98,51 +84,8 @@ def test_baseline_explicit_new_service_does_not_use_previous_focus():
     assert route.get("matched_service_id") != "classic"
 
 
-def test_baseline_vague_doctor_followup_uses_last_focus():
-    sid = f"df-doctor-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    _set_focus(sid, service_id="classic", label="Классическая имплантация")
-
-    sr = route_source(
-        "Кто делает?",
-        sid=sid,
-        client_id="demo",
-        decision=_content_frame(),
-        app_intent="content",
-    )
-
-    payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
-    assert sr.source == "doctor"
-    assert isinstance(payload, dict)
-    assert payload.get("matched_service_id") == "classic"
-
-
 def test_baseline_vague_attribute_kinds_cover_common_followups():
     assert "warranty" in detect_vague_attribute_kinds("А что по гарантиям?")
     assert "duration" in detect_vague_attribute_kinds("Сколько это длится?")
     assert "doctor" in detect_vague_attribute_kinds("Кто делает?")
     assert "included" in detect_vague_attribute_kinds("Что входит?")
-
-
-def test_baseline_stale_focus_is_not_used_for_vague_doctor():
-    sid = f"df-stale-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    _set_focus(sid, service_id="classic", label="Классическая имплантация")
-
-    for _ in range(int(THRESHOLDS.follow_up.max_subject_turn_age) + 1):
-        mem_add_user(sid, "другой вопрос")
-    assert int(mem_get(sid).get("subject_turn_age") or 0) > int(
-        THRESHOLDS.follow_up.max_subject_turn_age
-    )
-
-    sr = route_source(
-        "Кто делает?",
-        sid=sid,
-        client_id="demo",
-        decision=_content_frame(),
-        app_intent="content",
-    )
-
-    payload = sr.payload.get("doctor") if isinstance(sr.payload, dict) else None
-    if isinstance(payload, dict):
-        assert payload.get("matched_service_id") != "classic"

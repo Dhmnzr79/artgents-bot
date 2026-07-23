@@ -25,21 +25,15 @@
 
 ---
 
-## Target FullContext product authority (S61 / S65)
+## Target FullContext product authority (S61 / S65 / S69)
 
-| Флаг | Что делает | Дефолт |
-|---|---|---|
-| `TARGET_FULLCONTEXT_DEV` | При `1` (default) — `/ask` и `/ask/stream` идут только через target FullContext (S46); legacy RAG/chunk/composer **не импортируются eagerly** и **не вызываются**; нет per-turn fallback. При `0` — **ручной legacy kill-switch**: после перезапуска процесса legacy path доступен; legacy modules загружаются **лениво** только при выборе legacy branch; target bootstrap для ответов не вызывается. Kill-switch будет удалён только отдельным owner-approved milestone. | **ON (`1`)** |
+**S69 (owner-approved, completed):** legacy product answer chain удалён. `/ask` и `/ask/stream` **всегда** идут только через target FullContext. Kill-switch `TARGET_FULLCONTEXT_DEV` и legacy RAG/chunk/composer dispatch **удалены** — отката на legacy path нет.
 
-**S65 (owner-approved):** product authority передана target FullContext по умолчанию. Переключатель читается при **старте процесса** (`config.py`); это **не** per-turn fallback.
+**S65 (owner-approved):** product authority передана target FullContext по умолчанию.
 
-**S67 (owner-approved):** legacy answer-production stack изолирован от default path — lazy import только за `=0` или `chunk`/`composer` dispatch. Legacy files остаются в репозитории.
+**S67 (owner-approved):** legacy answer-production stack изолирован до S69.
 
-**S68 (read-only):** inventory complete — see `docs/S68_LEGACY_DELETION_INVENTORY.md`. Kill-switch removal planned for owner-approved S69 only; **no flag change in S68**.
-
-**Emergency rollback (until S69):** установить `TARGET_FULLCONTEXT_DEV=0` и перезапустить процесс → legacy path. Между запросами, не внутри одного turn.
-
-**S63 live proof** (под `=1`): 3/3 materialized, legacy hits = 0. Post-switch live verification — отдельный milestone (не выполнялся в S65).
+**S68 (read-only):** inventory — `docs/S68_LEGACY_DELETION_INVENTORY.md`.
 
 **Offline tests** используют fake/recording backends.
 
@@ -62,7 +56,7 @@
 
 | Флаг | Что делает | Почему OFF / решение |
 |---|---|---|
-| `CLARIFY_STATE_ON` | Переспрос «обычная коронка или на имплант?» | Работает (F1/F2 зелёные с флагом; `needs_clarify` потребляется в `composer_flow.py:157`). НО переспрос лезет в медзону («болит зуб → кариес или пульпит?»). Свёрнуто на тёплый handoff. Нужен **медзона-гвард** (детерминированный allowlist пациент-знаемых осей), НЕ мерж |
+| `CLARIFY_STATE_ON` | Переспрос «обычная коронка или на имплант?» | Работает (F1/F2 зелёные с флагом; legacy `composer_flow` удалён в S69). НО переспрос лезет в медзону («болит зуб → кариес или пульпит?»). Свёрнуто на тёплый handoff. Нужен **медзона-гвард** (детерминированный allowlist пациент-знаемых осей), НЕ мерж |
 
 ### B. В работе / не доказан паритет (единая карта 5.5)
 

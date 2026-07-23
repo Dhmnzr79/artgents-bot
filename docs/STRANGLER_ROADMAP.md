@@ -61,12 +61,12 @@
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
 | Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
-| Текущий S-series checkpoint | **S68 — legacy deletion inventory (read-only)** |
-| Следующий gate | **S69 — mechanical legacy deletion (owner decision)** |
+| Текущий S-series checkpoint | **S69 — legacy deletion (completed)** |
+| Следующий gate | **Owner decision — post-S69 tooling/history cleanup (out of scope)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **S69 deletion (owner approval); harness FC build counter fix** |
-| Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON); legacy modules lazy-only behind `=0` |
-| FullContext authority | **Transferred (S65 default ON; S66 product evidence live verified; official S66_NOT_PASSED); S67 legacy isolated not deleted** |
+| Ближайший рабочий focus | **Harness FC build counter fix; post-S69 eval hygiene** |
+| Что сейчас отвечает в локальном demo | **Target FullContext path only** — unconditional; legacy modules deleted |
+| FullContext authority | **Sole product authority (S69); S65/S66/S67 precursors** |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -463,6 +463,11 @@
   map of 7 legacy-only modules (~3.3k LOC), shared dependencies (`query_selector`, `dialog_focus`, `md_chunks`
   for lead_flow), single S69 deletion milestone with 8 ordered phases. **NO product code changes / NO LIVE**.
   S69 blocked until owner-approved TASK.
+- [x] **S69 — legacy product answer path deletion** — removed kill-switch `TARGET_FULLCONTEXT_DEV`,
+  deleted 7 legacy modules (~3.3k LOC), answer_packet/plan_apply stack, legacy-only tests.
+  FullContext is the **only** product authority. Offline acceptance:
+  `tests/test_s69_checkpoint_a_offline.py`, `tests/test_s69_legacy_deleted_offline.py`.
+  **NO LIVE / NO A9**.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

@@ -242,44 +242,6 @@ def _dialog_focus_for_follow_up(
     )
 
 
-def persist_focus_from_service_turn(
-    session_id: str,
-    *,
-    client_id: str | None,
-    matched_service_id: str | None,
-    route: str | None,
-    answer: str,
-    topic: str | None = None,
-) -> None:
-    """Write last_subject after price/catalog service_reply (4a focus for follow-up)."""
-    if not (answer or "").strip():
-        return
-    if route in ("guided", "lead_cancelled", "error"):
-        return
-    from session import set_last_catalog_service, set_last_subject
-
-    meta: dict[str, Any] = {}
-    if topic:
-        meta["topic"] = topic.strip().lower()
-    focus = resolve_focus_from_turn(
-        client_id=client_id,
-        doc_id=None,
-        matched_service_id=matched_service_id,
-        route=route,
-        meta=meta,
-    )
-    if not focus:
-        return
-    set_last_subject(
-        session_id,
-        service_id=focus["service_id"],
-        topic=focus["topic"],
-        label=focus["label"],
-        last_route=str(focus.get("last_route") or route or ""),
-    )
-    set_last_catalog_service(session_id, focus["service_id"])
-
-
 def prepare_follow_up_turn(
     q: str,
     st: dict[str, Any],

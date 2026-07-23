@@ -336,9 +336,6 @@ def test_http_followup_ref_click_target_only(monkeypatch: pytest.MonkeyPatch) ->
             label="Кому подходит All-on-4",
         ),
     )
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
-    legacy = MagicMock(side_effect=AssertionError("legacy must not run"))
-    monkeypatch.setattr(app_module, "orchestrate_routing_after_resolver", legacy)
     captured: dict[str, str] = {}
     composer, semantic, boundary = _fake_backends()
 
@@ -364,14 +361,12 @@ def test_http_followup_ref_click_target_only(monkeypatch: pytest.MonkeyPatch) ->
     )
     assert resp.status_code == 200
     assert captured["q"] == "Кому подходит All-on-4"
-    legacy.assert_not_called()
     assert composer.invocations
 
 
-def test_http_stream_flag_on_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_http_stream_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    monkeypatch.setattr(app_module, "TARGET_FULLCONTEXT_DEV", True)
     monkeypatch.setattr(
         app_module,
         "_orchestrate_ask_turn",

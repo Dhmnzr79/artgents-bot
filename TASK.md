@@ -1,83 +1,103 @@
-# TASK — S67 legacy answer path isolation
+# TASK — S68 legacy deletion inventory (READ-ONLY)
 
-**Baseline:** `codex/stage-a` / `d558efb` · **NO LIVE / NO LEGACY DELETE**
+**Baseline:** `codex/stage-a` / `3d0060d` · **NO PRODUCT CODE / NO LEGACY DELETE / NO LIVE**
 
 ## Goal
 
-Isolate legacy RAG/chunk/composer answer-production stack from default FullContext path loading/execution. Legacy remains available **only** via manual kill-switch `TARGET_FULLCONTEXT_DEV=0` (process restart). **Isolation, not deletion.**
+Produce an evidence-backed map of what can be **mechanically deleted** after S67 isolation, without touching FullContext, shared guards, TurnFrame/planner, lead/booking flows, or frozen artifacts.
 
-## Seam audit (read-only, `app.py` @ `d558efb`)
+**S68 changes no product code.** Output is audit doc + minimal roadmap/docs notes only.
 
-| Seam | Current | S67 change |
-|------|---------|------------|
-| Top-level `from orchestration.ask_turn import orchestrate_routing_after_resolver` | Eager; pulls `source_routing`, `composer_flow`, `answer_planner`, `md_chunks` | **Lazy** inside `TARGET_FULLCONTEXT_DEV=0` branch only |
-| Top-level `from chunk_responder import ...` | Eager | **Lazy** inside `chunk`/`composer` dispatch only |
-| `_orchestrate_ask_turn` | Target branch before legacy | **Unchanged** semantics |
-| `_service_reply` | `answer_plan_from_ctx` + plan append for `price_lookup`/`catalog_facts` routes | **Skip** legacy plan block for `target_fullcontext_*` routes |
-| `_sse_service_reply` | No answer-plan block | **Unchanged** (already target-safe) |
-| Shared: ingress, flows, resolver, target turn, finalize_ask, UI policy | Pre-target / delivery | **Keep** |
+## Process (mandatory)
 
-**Shared (not legacy):** `pre_resolver_turn`, `resolver_turn`, `target_fullcontext_turn`, `lead_flow`, `finalize_ask`, `apply_ui_source_policy`, `policy_compat`.
+1. Governance commit: **only** `TASK.md`
+2. PRE-CODE checker ✅ **before** any audit work
+3. If PRE-CODE ❌ → STOP → fix **only** `TASK.md` → governance correction commit → repeat PRE-CODE
+4. **No** WIP audit doc until PRE-CODE ✅
+5. After audit → COMPLETION checker → docs commit → push `origin/codex/stage-a` → STOP
 
 ## Allowlist
 
 | File | Change |
 |------|--------|
 | `TASK.md` | governance + completion |
-| `app.py` | lazy legacy imports; target `_service_reply` guard |
-| `tests/test_s67_legacy_isolation_offline.py` | acceptance A–J |
-| `docs/STRANGLER_ROADMAP.md` | S67 status |
-| `docs/FLAGS_AND_STATUS.md` | kill-switch lazy legacy note |
+| `docs/S68_LEGACY_DELETION_INVENTORY.md` | **new** deliverable (sections A–J) |
+| `docs/STRANGLER_ROADMAP.md` | S68 status; pointer to inventory |
+| `docs/FLAGS_AND_STATUS.md` | future kill-switch removal note only if needed; **no flag change now** |
 
-**Forbidden:** legacy file deletion, kill-switch removal, fallback, FullContext policy changes, S66 counter fix, frozen artifact edits, A9, live/LLM.
+**Forbidden:** any product `.py` change, legacy file deletion, kill-switch removal/change, live/LLM, FullContext/Composer/Verifier/planner/boundary/session changes, A9 changes, frozen artifact edits, git history rewrite, merge/push to `main`.
 
-## Legacy modules (import firewall check list)
+## Mandatory read-only analysis (10 areas)
 
-Eager load **forbidden** on default `import app`:
+1. **Authority & kill-switch** — `TARGET_FULLCONTEXT_DEV`, `_orchestrate_ask_turn`, lazy `orchestrate_routing_after_resolver`; what to remove for unconditional FullContext; tests/docs depending on `=0`
+2. **Legacy orchestration** — `orchestration.ask_turn`, `orchestrate_routing_after_resolver`, continuation/promo/clarify/fallback; direct + transitive importers
+3. **RAG/source routing** — `source_routing`, legacy answer planning, retrieval/chunk selection, MD chunk loaders **only** for legacy responder vs FullContext MD loader
+4. **Legacy response generation** — `chunk_responder`, `orchestration.composer_flow`, legacy Composer overlay, dispatch kinds `chunk`/`composer`, `_sse_chunk_response` / `_sse_composer_reply` / JSON analogs; shared delivery helpers to **KEEP**
+5. **Legacy ref handling** — `get_chunk_by_ref`, legacy price/chunk/consult ref handlers vs target ref navigation (S63)
+6. **Session compatibility** — `last_subject`, `current_doc_id`, `pending_clarify`, legacy history/focus fields; readers in shared guards/planner vs target-only
+7. **Shared code — KEEP** (verify real importers): ingress, rate limit/reset/noise, lead/booking/situation, resolver/planner/TurnFrame shadow, target runtime, target FullContext loader, target session, CTA/follow-up widget, HTTP/SSE delivery, shared observability
+8. **Tests** — target/protected, shared guard, legacy-only, mixed, frozen pin, historical eval replay
+9. **Docs/config/dependencies** — stale flags, legacy-only env, RAG-only requirements, historical vs active docs
+10. **Reachability** — per candidate: importers, callers, reachable on default FullContext, reachable only on `=0`, shared with target, direct delete vs seam change first
 
-- `orchestration.ask_turn`
-- `chunk_responder`
-- `source_routing`
-- `orchestration.composer_flow`
+**Rule:** do not classify as legacy by name alone; prove with `rg` / import graph.
 
-## Offline tests (`test_s67_legacy_isolation_offline.py`)
+## Deliverable: `docs/S68_LEGACY_DELETION_INVENTORY.md`
 
-| ID | Requirement |
-|----|-------------|
-| A | Subprocess import app; legacy modules not in `sys.modules` |
-| B | Default `/ask` — target only; legacy spies = 0 |
-| C | Default `/ask/stream` — same + SSE |
-| D | Target error — no legacy activation |
-| E | Target ref-click — no `get_chunk_by_ref` |
-| F | Kill-switch subprocess `=0` — legacy orchestrator called; target not |
-| G | Ingress hard-stop; lead flow; planner path |
-| H | Session/CTA; no legacy post-processing on target route |
-| I | S62+S63+S66 frozen byte-identical |
-| J | Target modules don't import legacy stack |
+| Section | Content |
+|---------|---------|
+| A | Executive summary: ready to delete? blockers? how many deletion milestones |
+| B | Current diagrams: default FullContext path vs kill-switch legacy path |
+| C | Files/symbols table: File/symbol · callers/importers · target/shared · legacy-only · Action · removal order · tests affected. Actions: `DELETE`, `KEEP_SHARED`, `MODIFY_THEN_DELETE`, `KEEP_HISTORICAL`, `INVESTIGATE_BLOCKER` |
+| D | Runtime branches / dispatch kinds table |
+| E | Session compatibility table |
+| F | Tests classification table |
+| G | Frozen protection list (S47/S50/S53/S55/S58/S62/S63/S66 artifacts, A9, audit manifests, pin guards) |
+| H | Minimal S69 deletion milestone: exact allowlist + preferred order (or two milestones with concrete blocker) |
+| I | S69 stop conditions |
+| J | Evidence: real file/function refs + `rg` commands used |
 
-Also run: `tests/test_s65_authority_switch_offline.py` (subset), `tests/test_s61_correction_target_runtime.py` HTTP tests if green.
+### Preferred S69 order (default proposal; override only with blocker proof)
 
-## Commands
+1. Remove kill-switch + legacy authority branch
+2. Remove legacy dispatch kinds from `app.py`
+3. Remove legacy ref answer paths
+4. Delete orchestration/source routing/chunk/composer modules if no shared callers
+5. Remove legacy session compatibility after last reader gone
+6. Delete legacy-only tests
+7. Update active docs/config
+8. Run target/shared regression suite
+
+## Read-only commands
 
 ```powershell
-$bt = Join-Path $env:TEMP ("s67_pytest_" + [guid]::NewGuid().ToString("n"))
-python -m pytest -p no:cacheprovider --basetemp $bt `
-  tests/test_s67_legacy_isolation_offline.py `
-  tests/test_s65_authority_switch_offline.py `
-  -q
-
 git diff --check
+
+# Authority / orchestration
+rg -n "TARGET_FULLCONTEXT_DEV|orchestrate_routing_after_resolver|orchestrate_target_fullcontext" app.py config.py orchestration/
+rg -l "from orchestration.ask_turn|import orchestration.ask_turn|from chunk_responder|import chunk_responder|source_routing|composer_flow" --glob "*.py"
+
+# Refs / session
+rg -n "get_chunk_by_ref|last_subject|current_doc_id|pending_clarify" --glob "*.py"
+
+# Tests
+rg -l "TARGET_FULLCONTEXT_DEV.*0|kill.switch|legacy" tests/ --glob "*.py"
+
+# Frozen pin sanity (no artifact writes)
 python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
 ```
 
+**No pytest required** unless product code changes (none expected).
+
 ## Acceptance
 
-- [x] PRE-CODE checker ❌ on governance (`e38eefe`) — frozen command gap in TASK; implementation adds S66 pins in test I
-- [x] Default path lazy isolation
-- [x] Kill-switch `=0` works
-- [x] Targeted pytest green (35 S67+S65; 61 with S61 neighbor)
-- [x] Frozen artifacts unchanged (S62+S63+S66)
-- [ ] COMPLETION checker
+- [ ] PRE-CODE checker ✅ before audit
+- [ ] `S68_LEGACY_DELETION_INVENTORY.md` sections A–J complete with evidence
+- [ ] Target/shared dependencies not marked DELETE
+- [ ] Tests classified; frozen/A9 protected
+- [ ] S69 scope minimal and allowlisted
+- [ ] No product code changed
+- [ ] COMPLETION checker ✅
 - [ ] Push `origin/codex/stage-a`
 
-**STOP after S67 — deletion inventory is separate milestone.**
+**STOP after S68 — do not start S69 without separate owner decision.**

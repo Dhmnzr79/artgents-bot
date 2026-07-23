@@ -56,10 +56,9 @@
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
 | Последний завершённый checkpoint | **S56 — topic-scoped consultation facts + missing-base Composer guard (OFFLINE)** |
+| Текущий S-series checkpoint | **S57 — compact end-to-end quality eval offline prep (NO LIVE)** |
 | Предыдущий checkpoint | **S55 — verifier-only live replay v2 (19 calls, AUTOMATED_FAIL 17/19)** |
-| Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
-| Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **Manual review S55 v2 artifacts; optional S57+ offline follow-ups** |
+| Ближайший рабочий focus без live | **S57 matrix + harness; future live pending owner approval** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |

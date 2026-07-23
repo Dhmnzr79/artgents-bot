@@ -1,202 +1,385 @@
-# TASK — C1 Dead legacy residue cleanup + C2 TurnFrame plan (Cleanup-series)
+# TASK — C2 Native TurnFrame cleanup (Cleanup-series)
 
-**Baseline:** `codex/stage-a` / `c9598ee` (S70 closeout) · **NO LIVE / NO LLM / NO A9 changes**
+**Baseline:** `codex/stage-a` / `5c3d3bb` (C1 closeout) · **NO LIVE / NO LLM / NO A9 changes**
 
-**Authority:** Owner-approved Cleanup-series C1 after `S_SERIES_COMPLETE` (S70).
+**Authority:** Owner-approved C2 (`OWNER APPROVED C2`, 2026-07-24).
 
 ## Goal
 
-Remove **provably dead** post-S69 legacy residue from active product/offline code without changing FullContext behavior, Planner/TurnFrame semantics, Composer/Verifier/boundary, client data, or frozen audit history. Produce exact `docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` (plan only — no C2 implementation).
+Make **native TurnFrame** the sole Planner product authority: one Planner LLM call → runtime TurnFrame → target FullContext. Remove `legacy_plan`, TurnFrame adapter, shadow product naming, resolver fallback (second routing LLM), legacy session dual-read, and provably dead loader fallbacks — **without** changing FullContext answer semantics, Composer/Verifier/boundary/evidence, client data, or frozen/A9 artifacts.
+
+**Target chain after C2:**
+
+```text
+HTTP → shared guards → one Planner LLM → native TurnFrame → session hydration
+→ medical boundary → FullContext → Composer → lightweight Verifier → widget/session
+```
 
 ## Process (mandatory)
 
 1. **Governance commit:** only `TASK.md` → push → **PRE-CODE checker ✅**
-2. If PRE-CODE ❌: STOP, fix only `TASK.md`, governance correction commit, repeat PRE-CODE until ✅
-3. **Implementation** only after PRE-CODE ✅ (product WIP forbidden before)
-4. Offline pytest + collect-only + frozen pins + import firewall + `rg` residue report
-5. **COMPLETION checker ✅** → docs/commits → push `origin/codex/stage-a` → **STOP** (do not start C2)
+2. If PRE-CODE ❌: STOP, fix only `TASK.md`, governance correction, repeat PRE-CODE until ✅
+3. **C2a** implementation → tests → **C2a checkpoint checker ✅** → commit + push → clean/synced
+4. **C2b** → C2b checker ✅ → commit + push
+5. **C2c** → C2c checker ✅ → commit + push
+6. **C2d** → final **COMPLETION checker ✅** → docs → push → **STOP**
+
+No product WIP before PRE-CODE ✅. No checkpoint advance on checker ❌.
 
 ## Forbidden
 
-- Live/LLM runs
-- Planner/TurnFrame semantic changes (`legacy_plan`, adapter, resolver fallback, shadow naming behavior)
+- Second Planner/Resolver/classifier LLM on product path
+- `legacy_plan` / TurnPlan as target authority
+- `DecisionFrame` as target response authority
+- Resolver fail-open / `resolve_with_fallback` on product path
+- RAG/retrieval reintroduction
+- Legacy session dual-read after C2c cutover
+- `patient_scope` product authority (routing/pricing/strategy/boundary/evidence/UI)
 - Composer/Verifier/boundary/evidence changes
-- Answer/client data changes
-- A9 changes
-- Frozen artifact edits or pin guard weakening
-- Historical evidence deletion for clean `rg`
+- Client MD/structured data changes
+- Live/LLM runs; A9 matrix/harness rerun
+- Frozen S47/S50/S53/S55/S58/S62/S63/S66 artifact byte changes
+- Protected acceptance spec/golden/target/current edits to greenwash
 - Merge/push to `main`
-- Files outside allowlist without governance correction + new PRE-CODE ✅
+- Files outside checkpoint allowlist without governance correction + PRE-CODE ✅
+
+## Allowed
+
+- Governance TASK; PRE-CODE / checkpoint / COMPLETION checkers
+- Product code strictly per checkpoint allowlist
+- Fake/spy offline tests; import firewall tests
+- Docs updates listed below
+- Push only to `origin/codex/stage-a`
 
 ---
 
-## Read-only audit summary (baseline `c9598ee`)
+## Read-only audit summary (baseline `5c3d3bb`)
 
-### Candidate disposition table
+### Current product wiring (verified call sites)
 
-| Symbol / file | Active product callers | Offline tooling callers | Historical callers | Action |
-|---------------|------------------------|-------------------------|-------------------|--------|
-| `core/md_chunks.py` | none on target path | `build_index.split_md_to_chunks`; tests `get_chunk_by_ref` | deleted `price_flow`/`catalog_flow`/`answer_packet_*` | **PRUNE_SYMBOLS** `find_chunk_by_topic_aspect`; **KEEP** `split_md_to_chunks`, `get_chunk_by_ref`, `CONTACTS_CHUNK_REF` |
-| `core/catalog_resolution.py` | `clarify_state._md_korotko_ref` only | `tests/test_price_resolution.py` | deleted `catalog_flow`; dead `ux_builder.build_price_resolution_payload` | **DELETE_NOW** file; **MOVE** `_md_korotko_ref` → `core/clarify_state.py`; **PRUNE** `ux_builder.build_price_resolution_payload` + `fallback_reason_to_resolution`/`service_content_snippet` chain; **DELETE** `tests/test_price_resolution.py` |
-| `llm.py` retrieval rewrite | none (no callers) | `tests/test_rewrite_*` | deleted chunk path | **PRUNE_SYMBOLS** `rewrite_query_for_retrieval`, `validated_retrieval_rewrite`, `_REWRITE_SYSTEM`, `_norm_rewrite_compare` |
-| `llm.py` packet/chunk composer | none | deleted tests (already removed) | deleted `composer_flow` | **PRUNE_SYMBOLS** `build_messages_for_packet_composer*`, `generate_answer_from_packet*`, `generate_answer_stream`, `build_messages_for_gpt`, `generate_answer`, `generate_facts_card_answer`, `_format_composer_card_blocks`, `_consult_nudge_addon` usage in dead paths |
-| `core/rewrite_policy.py` | none | `tests/test_rewrite_policy.py` | `llm.rewrite_query_for_retrieval` | **DELETE_NOW** |
-| `contracts/ask_orchestration.py` | `kind=service_reply` only in product | — | deleted chunk/composer dispatch | **PRUNE_SYMBOLS** remove `chunk`/`composer` kinds and orphan fields; drop `MaterializedCard` import |
-| `contracts/answer_packet.py` | none after prune | deleted legacy tests | deleted packet stack | **DELETE_NOW** entire contract module |
-| `config.py` `COMPOSER_ON`/`FULLCTX_ON`/`ANSWER_PACKET_ASSEMBLER_ON` | none (orphan) | deleted tests | deleted `composer_flow`/`llm` packet | **DELETE_NOW** symbols + env docs |
-| `config.py` `QUERY_REWRITE_*` | none after llm prune | deleted tests | retrieval rewrite | **DELETE_NOW** symbols |
-| `config.py` `LIVING_OVERVIEW_ON`/`SITUATION_PRICE_ON`/`PRICE_SYMPTOM_CONSULT_ON` | none on target path | legacy tests | deleted `patient_playbook_flow`/`price_flow` | **DELETE_NOW** symbols |
-| `app.py` `/__debug/retrieval` | none (returns 410) | — | retired embed debug | **DELETE_NOW** endpoint |
-| `app.py` `retrieval_scope_*` ctx init + error telemetry | set null only; never populated on target | — | deleted `apply_content_retrieval_scope_ctx` | **PRUNE_SYMBOLS** remove init + error payload keys where dead |
-| `app.py` `legacy_intent` | **active** resolver fallback telemetry | tests | — | **KEEP_ACTIVE** (C2) |
-| `orchestration/helpers.py` retrieval helpers | none | — | deleted `ask_turn`/chunk arbiter | **PRUNE_SYMBOLS** `apply_content_retrieval_scope_ctx`, `apply_metadata_first_after_content_route`, `log_selection`, `chunk_info`, `ref_from_chunk`, `canonical_ref`, `guided_menu_payload`, `service_price_line_for_content`, `ru_doctor_count_word`; drop dead imports |
-| `orchestration/finalize_turn.py` | active finalize | — | — | **PRUNE_SYMBOLS** only dead `retrieval_scope_*` log fields if removed from ctx; **KEEP** `metadata_first_turn_details`, `legacy_intent` logging |
-| `query_selector.compute_retrieval_scope_with_conflict_guard` | none after helpers prune | tests | deleted retrieval scope | **PRUNE_SYMBOLS** |
-| `core/metadata_first_observability.py` | `record_decision_frame_ctx` (resolver), `metadata_first_turn_details` (finalize) | tests | `merge_retrieval_debug_meta` via deleted helpers | **PRUNE_SYMBOLS** retrieval-only merge helpers if unreferenced; **KEEP** decision-frame + turn details |
-| `core/knowledge_base.py` | none | `tests/test_knowledge_base.py` | deleted `composer_flow`, `living_frame` | **DELETE_NOW** |
-| `core/living_frame.py` | none | tests | deleted `patient_playbook_flow` | **DELETE_NOW** |
-| `core/price_brand_money.py` | none | `tests/test_price_brand_money.py` | deleted `price_flow`/`ask_turn` | **DELETE_NOW** |
-| `core/price_symptom_consult.py` | none | `tests/test_price_symptom_consult.py`; dead import in `tests/test_s61_correction_target_runtime.py` | deleted `price_flow`/`composer_flow` | **DELETE_NOW**; remove unused `CONSULT_SYMPTOM_DETAILS_REF` import from `test_s61_correction_target_runtime.py` |
-| `core/price_group_overview.py` | none (answer builder) | `tests/test_price_group_overview.py`; `tests/test_pricebook_golden.py` (overview sections); `tests/test_price_ref_routing.py` (quick replies); `core/price_offers.py` unit-clarify helpers | deleted `price_flow`/`ux_builder` payloads | **DELETE_NOW** module; **PRUNE** `price_offers` unit-clarify helpers + related tests; **KEEP** `query_selector` `group_overview` *routing mode* only |
-| `core/consult_nudge.py` | `app._service_reply`/`_sse_service_reply` `reset_consult_nudge_on_route` | tests | dead `ux_builder` catalog_facts writer | **KEEP_ACTIVE** |
-| `core/clarify_state.py` | `turn_planner_llm`, planner tests | tests | deleted composer clarify writer | **KEEP_ACTIVE**; absorb `_md_korotko_ref` |
-| `core/answer_planner.py` | `attribute_followup.detect_aspects` | tests | deleted `ask_turn` plan publish | **KEEP_ACTIVE** (shared selector; not C2 TurnFrame adapter) |
-| `core/turn_planner_llm.py` `legacy_plan`/shadow | **active** resolver path | tests | — | **MOVE_TO_C2** map only — **do not change** |
-| `core/turn_frame_adapter.py` | shadow/planner tests | tests | — | **MOVE_TO_C2** map only — **do not change** |
-| `resolver.resolve_with_fallback` | **active** when planner returns no plan | tests | — | **MOVE_TO_C2** map only — **do not change** |
-| `session.last_subject`/`pending_clarify` | planner/focus readers | tests | deleted writers | **MOVE_TO_C2** map only — **do not change** |
-| `core/dialog_focus.py` legacy compat | shared selectors/focus | tests | — | **MOVE_TO_C2** map only — **do not change** |
-| `core/routing_loader.py` / `core/turn_timing.py` | ingress/resolver/finalize/app | eval harness | — | **KEEP_ACTIVE** |
-| `ux_builder.py` legacy payloads | none on target path | tests | deleted orchestration | **PRUNE_SYMBOLS** dead builders (`build_service_facts_card_payload`, `build_clarify_payload`, `build_price_resolution_payload`, `build_price_symptom_consult_*`, `build_price_group_overview_payload`, `build_price_unit_clarify_payload`, `build_price_concern_payload` chain); **KEEP** app/pre_resolver helpers (`empty_question_response`, `normalize_policy_payload`, `reset_session_response`, `internal_error_response`, `format_price_answer_from_item` if still referenced) |
+| Step | File | Active today |
+|------|------|--------------|
+| `/ask` orchestration | `app.py:296–322` | `run_pre_resolver_turn` → `run_resolver_turn` → `orchestrate_target_fullcontext_turn` |
+| Planner + dual branch | `core/turn_planner_llm.py:558–685` | 1× LLM → `build_turn_frame_from_raw` (shadow) + `_validate_plan` → `legacy_plan` |
+| Ctx publish shadow | `orchestration/resolver_turn.py:59–61` | `record_planner_attempt_shadow(attempt)` |
+| Ctx publish legacy | `resolver_turn.py:62–64` | `turn_plan_to_decision_frame` + `publish_turn_plan` |
+| Resolver fallback | `resolver_turn.py:96–154` | `resolve_with_fallback` when `legacy_plan is None` (2nd LLM) |
+| Target load frame | `core/target_runtime_turn_frame_bridge.py:31–45` | reads `turn_frame_shadow*` ctx keys |
+| Session hydration | `core/target_runtime_turn_frame_hydration.py:38–72` | `target_runtime_state.last_service_id` (not `last_subject`) |
+| Session write | `core/target_runtime_session.py:95–140` | writes `target_runtime_state` + **dual-write** `set_last_subject` |
+| Resolver import (product) | `orchestration/resolver_turn.py:17` | only active product importer of `resolver.py` |
 
-### C2 mapping obligation (docs only)
+### Guard parity (baseline = current target shadow_frame path)
 
-`docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` must answer owner Cleanup-series C2 spec sections 1–13 (legacy_plan → TurnFrame wiring, resolver fallback, session field migration, C2 allowlist/stop conditions) using **real call sites** from: `core/turn_planner_llm.py`, `core/turn_frame_from_raw.py`, `core/turn_frame_adapter.py`, `core/turn_frame_shadow.py`, `orchestration/resolver_turn.py`, `resolver.py`, `core/target_runtime_turn_frame_hydration.py`, `session.py`, `core/dialog_focus.py`, pricebook/patient playbook loaders — **no C2 code**.
+| Guard / helper | Mutates | Target uses result? | C2 action |
+|--------------|---------|---------------------|-----------|
+| `_apply_protocol_choice_guard` | `legacy_plan` only | **No** — TurnFrame built from raw JSON before guard | **DELETE** with legacy branch (C2b) |
+| `_apply_focus_followup_enrichment` | `legacy_plan` only | **No** — hydration uses `target_runtime_state` | **DELETE** (C2b) |
+| `_session_focus_service_id` | legacy guards only | **No** | **DELETE** (C2b) |
+| `_pending_clarify_prompt_block` | planner prompt | **No** — no target writer for `pending_clarify` | **DELETE** reads (C2b/C2c) |
+| `hydrate_target_runtime_turn_frame_from_session` | TurnFrame | **Yes** | **KEEP** (C2c verify only) |
+| `build_turn_frame_from_raw` | TurnFrame | **Yes** | **KEEP** — sole product builder |
+
+**Do not port** legacy_plan-only guards to TurnFrame unless a **target** acceptance test proves dependency.
+
+### Symbol disposition table
+
+| Symbol / file | Active product callers | Offline / historical | Action |
+|---------------|------------------------|-------------------|--------|
+| `legacy_plan` / `TurnPlan` product path | `resolver_turn.py`, `turn_planner_llm.publish_turn_plan` | tests, `composer_flow`/`ask_turn` (not `/ask` target) | **DELETE** product use (C2b) |
+| `turn_frame_shadow` ctx API | `target_runtime_turn_frame_bridge`, `resolver_turn`, `finalize_turn` telemetry | A9 eval contracts read `meta.metadata_first.turn_frame_shadow*` | **REPLACE** product with `runtime_turn_frame` (C2a); module **HISTORICAL** for evals |
+| `core/turn_frame_adapter.py` | `turn_frame_shadow.record_turn_frame_shadow` only | unit tests | **DELETE** file (C2b) after product cut |
+| `record_turn_frame_shadow` / adapter path | none on hot path | tests | **DELETE** (C2b) |
+| `resolve_with_fallback` | `resolver_turn.py:118` | `resolver.py`, evals | **REMOVE** product call (C2b); **KEEP** `resolver.py` historical |
+| `classify_intent` / `RESOLVER_OFF` path | `resolver_turn.py:105–115` | emergency bypass | **REMOVE** product path (C2b) |
+| `TURN_PLANNER_ON` | `resolver_turn.py:52` | tests | **DELETE** flag — planner always on (C2b) |
+| `RESOLVER_OFF` | `resolver_turn.py:30–32,105` | tests | **DELETE** product bypass (C2b) |
+| `V5_RESOLVER_SHADOW_ON` | `resolver.py:19` | eval harness | **KEEP** in `resolver.py` (historical); no product reader |
+| `RESOLVER_MODEL` / `config.py` | none after C2b | evals | **PRUNE** if orphan (C2b) |
+| `last_subject` read | `turn_planner_llm`, `dialog_focus`, `follow_up_rewrite`, `query_selector`, `answer_planner` | tests | **REMOVE** product reads (C2c); remove dual-write (C2c) |
+| `set_last_subject` write | `target_runtime_session.py:134` | tests | **DELETE** dual-write (C2c) |
+| `pending_clarify` | read: `turn_planner_llm`, `ask_turn`; write: `composer_flow` only | tests | **DELETE** planner reads + session API if dead (C2c) |
+| `DecisionFrame` target authority | `resolver_turn` → `record_decision_frame_ctx` | contracts, evals | **REMOVE** product authority (C2b); contract **KEEP** |
+| `prices.json` / `price_offers.json` fallback | `query_selector.py`, `core/price_offers.py`, `startup_check.py` | scripts | **AUDIT** C2d; delete only if no active target caller |
+| `core/patient_playbook.py` loader fallbacks | startup / target selectors | tests | **AUDIT** C2d |
+| A9 eval harness | reads `turn_frame_shadow` in response meta | frozen artifacts | **DO NOT CHANGE** A9 bytes; product may alias telemetry keys for contract tests |
 
 ---
 
-## Allowlist (implementation)
+## Checkpoint C2a — native runtime TurnFrame contract
+
+**Goal:** Product publishes/reads TurnFrame via neutral runtime API; no shadow naming on product path.
+
+### C2a changes
+
+1. **New** `core/runtime_turn_frame.py`: `publish_runtime_turn_frame`, `load_runtime_turn_frame_snapshot`, `get_runtime_turn_frame_status`, constants `RUNTIME_FRAME_STATUS_*`, ctx keys `runtime_turn_frame`, `runtime_turn_frame_status`, `runtime_turn_frame_reason`.
+2. `build_turn_frame_from_raw()` remains sole product builder from Planner JSON.
+3. `core/target_runtime_turn_frame_bridge.py` reads **runtime** ctx keys only (not `turn_frame_shadow`).
+4. `orchestration/resolver_turn.py` calls runtime publisher instead of `record_planner_attempt_shadow` (legacy_plan branch may remain until C2b).
+5. `core/turn_frame_shadow.py` — **no product imports** after C2a; kept for historical eval contract imports only.
+6. `partial` → target dispatch (no resolver); `not_available`/`degraded` → existing fail-closed.
+7. `core/metadata_first_observability.py` — add runtime telemetry keys; **may** retain `turn_frame_shadow*` aliases in response meta for A9 offline contract tests (no A9 artifact edits).
+
+### C2a allowlist
 
 | File | Change |
 |------|--------|
-| `TASK.md` | governance + completion record |
-| `core/catalog_resolution.py` | **delete** |
-| `core/knowledge_base.py` | **delete** |
-| `core/living_frame.py` | **delete** |
-| `core/price_brand_money.py` | **delete** |
-| `core/price_symptom_consult.py` | **delete** |
-| `core/price_group_overview.py` | **delete** |
-| `core/rewrite_policy.py` | **delete** |
-| `core/md_chunks.py` | prune dead symbols only |
-| `core/clarify_state.py` | inline `_md_korotko_ref`; fix import |
-| `core/client_config_loader.py` | remove dead `PRICE_SYMPTOM_CONSULT_ON` gate in `price_symptom_consult_enabled()` (knock-on after `config.py` flag deletion) |
-| `contracts/answer_packet.py` | **delete** |
-| `contracts/ask_orchestration.py` | prune chunk/composer contract |
-| `config.py` | remove orphan flags |
-| `llm.py` | prune dead legacy helpers/imports |
-| `app.py` | remove debug endpoint; prune dead telemetry fields |
-| `orchestration/helpers.py` | prune dead retrieval/chunk helpers |
-| `orchestration/finalize_turn.py` | prune dead retrieval telemetry fields (if unreferenced) |
-| `orchestration/pre_resolver_turn.py` | prune dead `retrieval_scope_*` ctx init if safe |
-| `query_selector.py` | prune `compute_retrieval_scope_with_conflict_guard` |
-| `core/metadata_first_observability.py` | prune unreferenced retrieval-only helpers |
-| `core/price_offers.py` | prune `build_unit_clarify_answer` / `unit_clarify_quick_replies` / `should_offer_unit_clarify` if only dead callers |
-| `ux_builder.py` | prune dead legacy payload builders + imports |
-| `tests/test_c1_import_firewall_offline.py` | **new** — product import firewall (A) |
-| `tests/test_knowledge_base.py` | **delete** |
-| `tests/test_price_brand_money.py` | **delete** |
-| `tests/test_price_symptom_consult.py` | **delete** |
-| `tests/test_price_group_overview.py` | **delete** (routing covered by `test_price_scope_router.py`) |
-| `tests/test_rewrite_policy.py` | **delete** |
-| `tests/test_rewrite_validation.py` | **delete** |
-| `tests/test_s69_legacy_deleted_offline.py` | extend `DELETED_MODULES` + forbidden imports for C1 deletions (`catalog_resolution`, `knowledge_base`, `living_frame`, `price_brand_money`, `price_symptom_consult`, `price_group_overview`, `rewrite_policy`, `contracts.answer_packet`) |
-| `tests/test_s69_checkpoint_a_offline.py` | update if import assertions reference pruned symbols |
-| `tests/test_metadata_first_observability.py` | adjust only if pruned symbols removed |
-| `tests/test_price_offers.py` | remove tests for pruned unit-clarify/group-overview helpers only |
-| `tests/test_price_resolution.py` | **delete** (legacy price resolution payload) |
-| `tests/test_price_scope_router.py` | remove `build_price_resolution_payload` case only; keep routing tests |
-| `tests/test_price_ref_routing.py` | remove `group_overview_quick_replies` case; keep ref-routing tests |
-| `tests/test_pricebook_golden.py` | remove `test_s3_group_overview_from_manifest` and jaw overview sections only |
-| `tests/test_s61_correction_target_runtime.py` | remove unused `CONSULT_SYMPTOM_DETAILS_REF` import only |
-| `tests/test_finalize_metadata_first_hook.py` | adjust only if hook signatures change |
-| `docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` | **new** — C2 plan deliverable |
-| `docs/C1_LEGACY_RESIDUE_REPORT.md` | **new** — post-`rg` classification report |
-| `docs/STRANGLER_ROADMAP.md` | C1 checkpoint + C2 plan pointer |
-| `docs/FLAGS_AND_STATUS.md` | remove orphan flag rows |
-| `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` | optional addendum: C1 hygiene done |
+| `core/runtime_turn_frame.py` | **new** |
+| `core/target_runtime_turn_frame_bridge.py` | read runtime keys |
+| `orchestration/resolver_turn.py` | publish via runtime API |
+| `core/turn_frame_shadow.py` | strip product hot-path; historical only |
+| `core/metadata_first_observability.py` | runtime + optional alias keys |
+| `orchestration/finalize_turn.py` | telemetry field names if needed |
+| `tests/test_c2a_runtime_turn_frame_offline.py` | **new** |
+| `tests/test_c2_import_firewall_offline.py` | **new** — no product import of `turn_frame_shadow` |
+| `tests/test_s61_target_fullcontext_runtime.py` | update ctx key assertions |
+| `tests/test_turn_frame_from_raw.py` | unchanged expectations |
+| `tests/test_metadata_first_observability.py` | adjust only if telemetry keys change |
 
-**Explicitly NOT in allowlist (C2):** `core/turn_planner_llm.py`, `core/turn_frame_adapter.py`, `resolver.py`, `session.py` semantic fields, `core/dialog_focus.py`, target runtime modules, frozen artifacts, client packs, A9 evals.
+### C2a acceptance
 
----
+- raw → runtime TurnFrame; ctx publish/load; `ok` + usable `partial`; `not_available`/`degraded` fail-closed
+- target bridge uses runtime keys
+- product import firewall: active product modules do not import `core.turn_frame_shadow`
+- `patient_scope` not used for routing/evidence/price/UI (existing tests)
 
-## Acceptance criteria
-
-### A. Product import firewall
-New/extended offline test: active product modules (`app.py`, `orchestration/*.py` except deleted ghosts, `core/target*.py`, `ingress_gate.py`, `flow_handlers.py`, `resolver.py`, `llm.py` shared surface) do **not** import deleted modules/symbols.
-
-### B. `/ask`
-FullContext materialized; price/doctors/payment/info; target error fail-closed (existing target tests).
-
-### C. `/ask/stream`
-Target batch SSE (`typing` → `ui` → `done`).
-
-### D. Follow-up/session
-Ref navigation; vague price/doctors follow-up; session continuity (existing tests).
-
-### E. Guards
-Ingress urgent/manual contact; lead/booking; situation; reset/rate/noise representative tests.
-
-### F. Planner protection
-`tests/test_turn_planner_llm.py`, `tests/test_turn_frame_shadow.py`, `tests/test_turn_frame_from_raw.py` pass **without expectation changes**.
-
-### G. Structured data
-Pricebook; staged payments; doctors; marketing/CTA; consultation values (existing target tests).
-
-### H. Medical
-Boundary; lightweight Verifier; missing-base; no A9 authority.
-
-### I. Collection/imports
-Targeted pytest green; `pytest --collect-only -q` succeeds; no stale imports.
-
-### J. Frozen
-S62/S63/S66 pin guards byte-identical; commands unchanged from S70.
-
----
-
-## Test commands (offline only)
+### C2a tests
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = "1"
-$basetemp = Join-Path $env:TEMP ("demo-bot-c1-" + [guid]::NewGuid().ToString("n"))
-
-python -m pytest -p no:cacheprovider --basetemp $basetemp `
-  tests/test_c1_import_firewall_offline.py `
-  tests/test_s69_legacy_deleted_offline.py `
-  tests/test_s69_checkpoint_a_offline.py `
-  tests/test_turn_planner_llm.py `
-  tests/test_turn_frame_shadow.py `
+$bt = Join-Path $env:TEMP ("demo-bot-c2a-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2a_runtime_turn_frame_offline.py `
+  tests/test_c2_import_firewall_offline.py `
   tests/test_turn_frame_from_raw.py `
   tests/test_s61_target_fullcontext_runtime.py `
-  tests/test_target_fullcontext_content_response.py `
+  -q
+```
+
+---
+
+## Checkpoint C2b — remove legacy_plan and resolver fallback
+
+**Goal:** One Planner LLM call; frame-first `PlannerAttempt`; no resolver/DecisionFrame on product path.
+
+### C2b changes
+
+1. `core/turn_planner_llm.py` — frame-only outcome; delete `_validate_plan` product path, `_project_legacy_turn_plan_raw`, legacy guards, `publish_turn_plan`, `turn_plan_to_decision_frame`, `plan_turn` legacy wrapper.
+2. `contracts/planner_attempt.py` — remove `legacy_plan`; frame-first status invariants (`ok`/`partial`/`not_available`/`degraded`).
+3. `orchestration/resolver_turn.py` → **`orchestration/planner_turn.py`**; `run_resolver_turn` → `run_planner_turn`; publish runtime frame; **no** `resolve_with_fallback`, **no** `classify_intent`, **no** DecisionFrame authority.
+4. `app.py` — import `run_planner_turn`; remove resolver terminology on product path.
+5. `core/turn_frame_adapter.py` — **delete** file.
+6. `config.py` — remove `TURN_PLANNER_ON`, `RESOLVER_OFF`, orphan `RESOLVER_MODEL` if unreferenced.
+7. `resolver.py` — **no** active product import; classify as historical/offline.
+
+### C2b allowlist
+
+| File | Change |
+|------|--------|
+| `core/turn_planner_llm.py` | frame-only planner |
+| `contracts/planner_attempt.py` | frame-first contract |
+| `contracts/turn_plan.py` | **KEEP** (historical/tests); no product import |
+| `orchestration/planner_turn.py` | **new** (from resolver_turn) |
+| `orchestration/resolver_turn.py` | **delete** after rename |
+| `app.py` | planner_turn wiring |
+| `config.py` | flag prune |
+| `core/turn_frame_adapter.py` | **delete** |
+| `core/metadata_first_observability.py` | remove DecisionFrame product hooks if dead |
+| `tests/test_c2b_no_resolver_offline.py` | **new** — spy: 1 planner call, 0 resolver |
+| `tests/test_turn_planner_llm.py` | frame-first assertions (update expectations) |
+| `tests/test_planner_attempt_contract.py` | frame-first contract |
+| `tests/test_turn_frame_shadow.py` | historical-only scope / rename tests |
+| `tests/test_s69_checkpoint_a_offline.py` | no resolver on planner failure |
+| `tests/test_s65_authority_switch_offline.py` | update mocks (`run_planner_turn`) |
+| `tests/test_s67_legacy_isolation_offline.py` | update if imports reference resolver_turn |
+| `tests/test_turn_plan_protocol_guard.py` | **delete** or move to historical — guards removed |
+
+### C2b hard gates
+
+- Normal turn: exactly **one** Planner backend call (fake/spy)
+- Planner malformed/failure: **zero** resolver calls; controlled fail-closed
+- Partial frame: **zero** resolver calls
+- Target never uses DecisionFrame authority
+- Composer/Verifier call counts unchanged for materialized turn
+
+### C2b tests
+
+```powershell
+$bt = Join-Path $env:TEMP ("demo-bot-c2b-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2b_no_resolver_offline.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_planner_attempt_contract.py `
+  tests/test_turn_frame_from_raw.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_s69_checkpoint_a_offline.py `
   tests/test_s67_legacy_isolation_offline.py `
   -q
+```
 
+---
+
+## Checkpoint C2c — session compatibility cleanup
+
+**Goal:** Planner + target use `target_runtime_state` only; no `last_subject` product reads/dual-write.
+
+### C2c changes
+
+1. `core/target_runtime_session.py` — remove `set_last_subject` dual-write (`:134–140`).
+2. `core/turn_planner_llm.py` — remove `_session_focus_service_id`, pending_clarify prompt (already deleted guards in C2b).
+3. `session.py` — stop exporting `last_subject`/`pending_clarify` for product (remove or deprecate helpers after last reader gone).
+4. `core/dialog_focus.py` — remove `turn_plan_from_ctx`, `_focus_from_last_subject` product paths; keep observability if still used by `finalize_turn`.
+5. `core/follow_up_rewrite.py` — remove `last_subject` reads (`focus_from_legacy_session` chain).
+6. `query_selector.py` — remove `last_subject` read in price routing (`:258–259`) if still present.
+7. `orchestration/pre_resolver_turn.py` — verify `/reset` clears target state (full `mem_reset` already deletes session).
+8. **Do not** add `target_runtime_state.pending_clarify` — field is dead (writer only in legacy `composer_flow`).
+
+### C2c allowlist
+
+| File | Change |
+|------|--------|
+| `core/target_runtime_session.py` | remove dual-write |
+| `core/target_runtime_turn_frame_hydration.py` | verify session-only inputs |
+| `session.py` | prune legacy focus/clarify product API |
+| `core/dialog_focus.py` | remove legacy session/plan readers |
+| `core/follow_up_rewrite.py` | remove legacy session reads |
+| `query_selector.py` | remove `last_subject` read |
+| `core/answer_planner.py` | remove `get_last_subject` if still referenced |
+| `tests/test_c2c_session_migration_offline.py` | **new** |
+| `tests/test_s62_correction_offline.py` | session continuity |
+| `tests/test_s63_correction_offline.py` | session continuity |
+| `tests/test_vague_price_followup.py` | offline/unit only (no live) |
+| `tests/test_vague_doctor_followup.py` | offline/unit only |
+| `tests/test_focus_context.py` | update if product API removed |
+| `tests/test_follow_up_rewrite.py` | update legacy expectations |
+
+### C2c acceptance
+
+- «All-on-4?» → «сколько стоит?»; «кто делает?»; payment follow-up; ref-click
+- Fresh clinic-wide doctors question without invented `service_id`
+- Session continuity via `target_runtime_state` only
+- Reset clears target state; terminal/error does not corrupt valid focus
+
+---
+
+## Checkpoint C2d — target-only loader fallback cleanup
+
+**Prerequisite:** C2a–C2c checkpoint checkers ✅.
+
+### C2d audit targets
+
+| File | Legacy fallback | Action |
+|------|-----------------|--------|
+| `core/pricebook_loader.py` | docstring only at `5c3d3bb` | verify canonical-only load |
+| `core/price_offers.py` | `price_offers.json`, append-only path `:460` | **PRUNE** if target uses pricebook only |
+| `query_selector.py` | `prices.json` `:246,573,639` | **PRUNE** if startup guarantees canonical |
+| `core/startup_check.py` | `prices.json` OR pricebook `:15,37,72` | require canonical pricebook for demo |
+| `contracts/pricebook.py` | legacy docstring | docs only |
+| `core/patient_playbook.py` | legacy schema fallback | audit call sites |
+| `core/client_config_loader.py` | schema fallback | audit only |
+
+**STOP** if any fallback is required by active target path for demo client.
+
+### C2d allowlist
+
+| File | Change |
+|------|--------|
+| `core/pricebook_loader.py` | remove dead fallback branches if any |
+| `core/price_offers.py` | remove `price_offers.json` / append-only path |
+| `query_selector.py` | remove `prices.json` reads |
+| `core/startup_check.py` | fail-closed canonical validation |
+| `core/patient_playbook.py` | prune legacy loader fallback |
+| `contracts/pricebook.py` | docstring only |
+| `tests/test_pricebook_golden.py` | keep green |
+| `tests/test_demo_target_price_offers.py` | keep green |
+| `tests/test_marketing_loader.py` | no regression |
+| `tests/test_c2d_loader_canonical_offline.py` | **new** |
+
+---
+
+## Full C2 acceptance (COMPLETION)
+
+### A. Product import firewall
+
+Active product must not import/read: `TurnPlan` authority, `legacy_plan`, `turn_frame_adapter`, `turn_frame_shadow` (product), `resolve_with_fallback`, resolver LLM, `DecisionFrame` as response authority, `last_subject`, legacy `pending_clarify`, `prices.json` fallback.
+
+### B–H. Runtime (unchanged semantics)
+
+`/ask`, `/ask/stream`, follow-up/session, guards, structured data, medical boundary — existing target offline tests green.
+
+### I. Integrity
+
+- `pytest --collect-only -q` succeeds
+- Frozen S62/S63/S66 pins byte-identical
+- A9 artifacts byte-identical; **do not run** A9 harness
+- `git diff --check` clean
+
+### COMPLETION test block
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-c2-final-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2a_runtime_turn_frame_offline.py `
+  tests/test_c2b_no_resolver_offline.py `
+  tests/test_c2c_session_migration_offline.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_turn_frame_from_raw.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_s62_correction_offline.py `
+  tests/test_s63_correction_offline.py `
+  tests/test_s67_legacy_isolation_offline.py `
+  tests/test_s69_checkpoint_a_offline.py `
+  tests/test_target_fullcontext_content_response.py `
+  -q
 python -m pytest -p no:cacheprovider --collect-only -q 2>&1 | Select-Object -Last 3
-
 python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
 ```
 
-Post-implementation `rg` report (classify each hit: active / shared / historical / planned C2 / false positive) for: `retrieval`, `chunk`, `legacy`, `composer`, `RAG`, `fallback`, `shadow` — document in `docs/C1_LEGACY_RESIDUE_REPORT.md`.
+---
+
+## Docs (completion)
+
+| File | Change |
+|------|--------|
+| `docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` | completion addendum |
+| `docs/ARCH_TARGET_DESIGN.md` | native TurnFrame authority |
+| `docs/STRANGLER_ROADMAP.md` | C2 checkpoints |
+| `docs/FLAGS_AND_STATUS.md` | removed resolver/planner flags |
+| `docs/S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md` | C2 addendum |
+| `TASK.md` | completion record |
 
 ---
 
 ## Commits (minimum)
 
-1. `C1 governance TASK` (this commit)
-2. `C1 implementation: dead legacy residue cleanup + import firewall tests`
-3. `C1 completion: C2 plan + residue report + docs` (may merge 2+3 if checker prefers single completion commit)
+1. `C2 governance TASK` (this commit)
+2. `C2a: native runtime TurnFrame contract`
+3. `C2b: remove legacy_plan and resolver fallback`
+4. `C2c: session migration to target_runtime_state`
+5. `C2d: loader canonical cleanup`
+6. `C2 completion docs` (if not merged with C2d)
 
-Push only to `origin/codex/stage-a`.
+Each checkpoint: tests → checker ✅ → commit → push → clean/synced.
+
+---
+
+## Stop conditions
+
+STOP and escalate to owner if:
+
+1. Second LLM call required on product path
+2. Partial frame routed to resolver
+3. `patient_scope` authority needed
+4. Composer/Verifier/boundary/evidence change required
+5. Client data change required
+6. Live/LLM or A9 artifact change required
+7. Target behavior cannot be preserved without `legacy_plan`
+8. Loader fallback required by demo target client
+9. Checker ❌ requires scope beyond allowlist
+10. Unaccounted DecisionFrame/TurnPlan consumer on product path
 
 ---
 
@@ -204,17 +387,20 @@ Push only to `origin/codex/stage-a`.
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | ✅ (`e7ce017` governance correction) |
-| COMPLETION | ✅ (after allowlist correction `HEAD`) |
-| HEAD | `75a6295` |
-| pytest | 267/267 targeted C1 set |
-| collect-only | 2451 |
-| frozen | OK |
-| lines/files removed | ~5201 lines, 23 files deleted/pruned heavily |
-| DEAD LEGACY RESIDUE CLEANED | yes (see `docs/C1_LEGACY_RESIDUE_REPORT.md`) |
-| FULLCONTEXT BEHAVIOR UNCHANGED | yes |
-| PLANNER COMPATIBILITY NOT YET REMOVED | yes — C2 plan only |
-| NO LIVE / NO LLM | yes |
-| NO A9 CHANGES | yes |
+| PRE-CODE | |
+| C2a checker | |
+| C2b checker | |
+| C2c checker | |
+| COMPLETION | |
+| HEAD | |
+| Planner LLM calls/turn | 1 (target) |
+| Resolver fallback | removed (target) |
+| pytest | |
+| collect-only | |
+| frozen | |
+| A9 bytes | unchanged |
+| NATIVE TURNFRAME ONLY | |
+| NO LIVE / NO LLM | |
+| NO A9 CHANGES | |
 
-**STOP after C1 — C2 requires separate owner decision.**
+**STOP after C2 — do not start next milestone without owner decision.**

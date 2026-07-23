@@ -10,8 +10,6 @@
 
 | Флаг | Что делает |
 |---|---|
-| `COMPOSER_ON` | Композер собирает один живой ответ из пакета (цена/факты пришпилены) |
-| `FULLCTX_ON` | Вся база клиента в контексте композера (не поиск кусками) |
 | `SERVICE_SELECT_LLM_ON` | Модель выбирает услугу (чинит «generic → дорогой протокол») |
 | `TURN_PLANNER_ON` | Один плановый вызов вместо цепочки классификаторов |
 | `PATIENT_SITUATION_LLM_ON` | Распознавание ситуации пациента («нет зуба») смыслом, не регексом |
@@ -19,7 +17,8 @@
 | `LEAD_TURN_LLM_CLASSIFY_ON` | Серая зона намерения оставить контакт |
 | `BOOKING_INTENT_LLM_ON` | Намерение «записаться» |
 | `PRICE_INTENT_LLM_ON` | Ценовое намерение |
-| `QUERY_REWRITE_ON` | Досборка follow-up-вопросов по истории |
+
+**C1 (removed orphan flags):** `COMPOSER_ON`, `FULLCTX_ON`, `QUERY_REWRITE_*`, `ANSWER_PACKET_ASSEMBLER_ON`, `LIVING_OVERVIEW_ON`, `SITUATION_PRICE_ON`, `PRICE_SYMPTOM_CONSULT_ON` — deleted from `config.py`; legacy packet/retrieval code removed. Target FullContext does not read them.
 
 Эти в консоли включать не надо — они и так ON.
 
@@ -48,7 +47,6 @@
 | Флаг | Что делает | Ключей |
 |---|---|---|
 | `PRICE_STRICT_SERVICE_ON` | Цена без явно названной услуги → честный defer, не выдуманная цена (уважает ситуационный фокус) | 1 (env) |
-| `PRICE_SYMPTOM_CONSULT_ON` | «Симптом + цена» → тёплое приглашение на бесплатную консультацию (срабатывает раньше strict) | 2 (env + features.yaml) |
 | `BOOKING_DATE_DEFER_ON` | Не подтверждать/не эхоить дату и слот записи | 2 (env + features.yaml) |
 | `BRAND_FILTER_ON` | Бренд-фильтр + бюджетный якорь на ценовом пути имплантов: «корейские/нобель» → один бренд; «подешевле» → честный якорь (доступный + рекомендованный + платёж + консультация); прочее «дешевле» → тёплый fallback | 2 (env + features.yaml) |
 
@@ -60,17 +58,15 @@
 
 ### B. В работе / не доказан паритет (единая карта 5.5)
 
-| Флаг | Что делает | Статус |
-|---|---|---|
-| `SITUATION_PRICE_ON` | Цена по ситуации через единую карту (узел→линза) | Первый вайринг подключён, паритет не закрыт |
-| `LIVING_OVERVIEW_ON` | Живой intro для обзоров цен | Добавляет доп. LLM-вызов (тепло vs скорость) — включать осознанно |
+_Удалено в C1:_ `SITUATION_PRICE_ON`, `LIVING_OVERVIEW_ON` (legacy price overview modules deleted).
 
 ### C. Переходные / кандидаты на уборку
 
 | Флаг | Примечание |
 |---|---|
 | `ASPECT_PLANNER_LLM_ON` | Старый аспект-планировщик; по большей части заменён `TURN_PLANNER_ON`. Проверить и списать |
-| `ANSWER_PACKET_ASSEMBLER_ON` | Ранняя фаза сборщика пакета; переходный |
+
+_Удалено в C1:_ `ANSWER_PACKET_ASSEMBLER_ON`.
 
 ---
 
@@ -79,7 +75,7 @@
 Чтобы красный в тесте означал настоящую проблему, а не «забыл флаг». Стандартный композер-прогон (PowerShell):
 
 ```powershell
-$env:FULLCTX_ON="1"; $env:COMPOSER_ON="1"; $env:SERVICE_SELECT_LLM_ON="1"; $env:ASPECT_PLANNER_LLM_ON="1"; $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
+$env:SERVICE_SELECT_LLM_ON="1"; $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
 ```
 
 **Кейсы, зависящие от доп. флагов** (без них краснеют «ложно»):

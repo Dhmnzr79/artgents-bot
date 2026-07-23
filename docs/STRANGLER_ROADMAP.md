@@ -62,8 +62,10 @@
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
 | Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
 | Текущий S-series checkpoint | **S70 — FullContext migration closeout (completed)** |
+| Cleanup-series | **C1 — dead legacy residue cleanup (completed)** → `docs/C1_LEGACY_RESIDUE_REPORT.md` |
+| C2 plan | **`docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md`** — plan only; owner decision before code |
 | S-series status | **COMPLETE** (`S_SERIES_COMPLETE`) |
-| Следующий gate | **Owner decision — post-S-series product direction (no auto S71)** |
+| Следующий gate | **Owner decision — C2 native TurnFrame (no auto start)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
 | Ближайший рабочий focus | **Provider prompt caching / real client onboarding / optional hygiene** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path only** — unconditional; legacy modules deleted |

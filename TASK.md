@@ -203,17 +203,17 @@ Push only to `origin/codex/stage-a`.
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | |
-| COMPLETION | |
+| PRE-CODE | ✅ (`e7ce017` governance correction) |
+| COMPLETION | pending |
 | HEAD | |
-| pytest | |
-| collect-only | |
-| frozen | |
-| lines/files removed | |
-| DEAD LEGACY RESIDUE CLEANED | |
-| FULLCONTEXT BEHAVIOR UNCHANGED | |
-| PLANNER COMPATIBILITY NOT YET REMOVED | |
-| NO LIVE / NO LLM | |
-| NO A9 CHANGES | |
+| pytest | 367/367 targeted C1 set |
+| collect-only | 2451 |
+| frozen | OK |
+| lines/files removed | ~5201 lines, 23 files deleted/pruned heavily |
+| DEAD LEGACY RESIDUE CLEANED | yes (see `docs/C1_LEGACY_RESIDUE_REPORT.md`) |
+| FULLCONTEXT BEHAVIOR UNCHANGED | yes |
+| PLANNER COMPATIBILITY NOT YET REMOVED | yes — C2 plan only |
+| NO LIVE / NO LLM | yes |
+| NO A9 CHANGES | yes |
 
 **STOP after C1 — C2 requires separate owner decision.**

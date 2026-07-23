@@ -91,13 +91,13 @@ python -c "from evals.v5.s66_default_authority_live_contract import assert_froze
 
 ## Acceptance
 
-- [ ] PRE-CODE checker ✅ before audit
-- [ ] `S68_LEGACY_DELETION_INVENTORY.md` sections A–J complete with evidence
-- [ ] Target/shared dependencies not marked DELETE
-- [ ] Tests classified; frozen/A9 protected
-- [ ] S69 scope minimal and allowlisted
-- [ ] No product code changed
-- [ ] COMPLETION checker ✅
+- [x] PRE-CODE checker ✅ (`9af09d8`)
+- [x] `S68_LEGACY_DELETION_INVENTORY.md` sections A–J with evidence
+- [x] Target/shared dependencies not marked DELETE
+- [x] Tests classified; frozen/A9 protected
+- [x] S69 scope minimal (single milestone, 8 phases)
+- [x] No product code changed
+- [ ] COMPLETION checker
 - [ ] Push `origin/codex/stage-a`
 
 **STOP after S68 — do not start S69 without separate owner decision.**

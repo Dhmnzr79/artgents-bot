@@ -35,7 +35,9 @@
 
 **S67 (owner-approved):** legacy answer-production stack изолирован от default path — lazy import только за `=0` или `chunk`/`composer` dispatch. Legacy files остаются в репозитории.
 
-**Emergency rollback:** установить `TARGET_FULLCONTEXT_DEV=0` и перезапустить процесс → legacy path. Между запросами, не внутри одного turn.
+**S68 (read-only):** inventory complete — see `docs/S68_LEGACY_DELETION_INVENTORY.md`. Kill-switch removal planned for owner-approved S69 only; **no flag change in S68**.
+
+**Emergency rollback (until S69):** установить `TARGET_FULLCONTEXT_DEV=0` и перезапустить процесс → legacy path. Между запросами, не внутри одного turn.
 
 **S63 live proof** (под `=1`): 3/3 materialized, legacy hits = 0. Post-switch live verification — отдельный milestone (не выполнялся в S65).
 

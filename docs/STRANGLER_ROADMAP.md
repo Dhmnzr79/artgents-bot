@@ -61,10 +61,10 @@
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
 | Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
-| Текущий S-series checkpoint | **S67 — legacy answer path isolation (offline)** |
-| Следующий gate | **Legacy deletion inventory (owner decision; mechanical removal only)** |
+| Текущий S-series checkpoint | **S68 — legacy deletion inventory (read-only)** |
+| Следующий gate | **S69 — mechanical legacy deletion (owner decision)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Harness FC build counter fix (offline); legacy deletion inventory** |
+| Ближайший рабочий focus | **S69 deletion (owner approval); harness FC build counter fix** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON); legacy modules lazy-only behind `=0` |
 | FullContext authority | **Transferred (S65 default ON; S66 product evidence live verified; official S66_NOT_PASSED); S67 legacy isolated not deleted** |
 | Patient-scope authority | **Forbidden** |
@@ -459,6 +459,10 @@
   Target `service_reply` skips legacy answer-plan post-processing. Legacy files **not deleted**.
   Offline acceptance A–J (`tests/test_s67_legacy_isolation_offline.py`). **NO LIVE / NO A9**.
   Next separate milestone: read-only deletion inventory + mechanical removal (owner-approved).
+- [x] **S68 — legacy deletion inventory (read-only)** — `docs/S68_LEGACY_DELETION_INVENTORY.md`: evidence-backed
+  map of 7 legacy-only modules (~3.3k LOC), shared dependencies (`query_selector`, `dialog_focus`, `md_chunks`
+  for lead_flow), single S69 deletion milestone with 8 ordered phases. **NO product code changes / NO LIVE**.
+  S69 blocked until owner-approved TASK.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

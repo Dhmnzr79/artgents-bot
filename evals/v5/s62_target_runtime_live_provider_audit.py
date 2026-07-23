@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import inspect
 import threading
 from contextlib import contextmanager
@@ -43,6 +44,11 @@ _STATE = ProviderAuditState()
 _LOCK = threading.Lock()
 _INSTALLED = False
 _ORIGINAL_CHAT = None
+_ORIGINAL_MODULE_BINDINGS: dict[str, object] = {}
+_PENDING_ROLE: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "s62_pending_provider_role",
+    default=None,
+)
 
 
 def get_audit_state() -> ProviderAuditState:
@@ -76,20 +82,91 @@ def record_fullcontext_build() -> None:
 
 
 def _infer_provider_role() -> str:
-    for frame in inspect.stack()[2:20]:
+    pending = _PENDING_ROLE.get()
+    if pending:
+        return pending
+    for frame in inspect.stack()[2:40]:
         filename = frame.filename.replace("\\", "/")
-        if "/ingress_gate.py" in filename:
+        function = frame.function
+        if filename.endswith("/ingress_gate.py") or function in {
+            "_call_ingress_llm",
+            "classify_ingress_route",
+        }:
             return "ingress"
-        if "/turn_planner_llm.py" in filename:
+        if "/turn_planner_llm.py" in filename or function in {
+            "_planner_chat_completions_create",
+            "plan_turn_attempt",
+        }:
             return "planner"
         if "/target_runtime_llm_backends.py" in filename:
-            if frame.function == "generate":
+            if function == "generate":
                 return "composer"
-            if frame.function == "assess":
+            if function == "assess":
                 return "semantic_verifier"
-            if frame.function == "classify":
+            if function == "classify":
                 return "medical_boundary"
     raise ProviderRoleViolationError("unknown provider call role")
+
+
+def _role_wrapped(role: str, audited_chat):
+    def wrapped(**kwargs: Any):
+        token = _PENDING_ROLE.set(role)
+        try:
+            return audited_chat(**kwargs)
+        finally:
+            _PENDING_ROLE.reset(token)
+
+    return wrapped
+
+
+def _rebind_audited_chat(audited_chat) -> None:
+    import importlib
+
+    import llm
+
+    llm.chat_completions_create = audited_chat
+    for module_name, role in (
+        ("ingress_gate", "ingress"),
+        ("core.turn_planner_llm", "planner"),
+    ):
+        module = importlib.import_module(module_name)
+        if hasattr(module, "chat_completions_create"):
+            binding_key = f"{module_name}.chat_completions_create"
+            if binding_key not in _ORIGINAL_MODULE_BINDINGS:
+                _ORIGINAL_MODULE_BINDINGS[binding_key] = getattr(
+                    module,
+                    "chat_completions_create",
+                )
+            setattr(
+                module,
+                "chat_completions_create",
+                _role_wrapped(role, audited_chat),
+            )
+        if module_name == "core.turn_planner_llm" and hasattr(
+            module,
+            "_planner_chat_completions_create",
+        ):
+            planner_key = f"{module_name}._planner_chat_completions_create"
+            if planner_key not in _ORIGINAL_MODULE_BINDINGS:
+                _ORIGINAL_MODULE_BINDINGS[planner_key] = getattr(
+                    module,
+                    "_planner_chat_completions_create",
+                )
+            setattr(
+                module,
+                "_planner_chat_completions_create",
+                _role_wrapped("planner", audited_chat),
+            )
+
+
+def _restore_module_bindings() -> None:
+    import importlib
+
+    for binding_key, original in list(_ORIGINAL_MODULE_BINDINGS.items()):
+        module_name, attr = binding_key.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        setattr(module, attr, original)
+    _ORIGINAL_MODULE_BINDINGS.clear()
 
 
 def _role_budget(role: str, count: int) -> int:
@@ -237,6 +314,7 @@ def install_provider_audit(
         return response
 
     llm.chat_completions_create = audited_chat_completions_create
+    _rebind_audited_chat(audited_chat_completions_create)
     _INSTALLED = True
 
 
@@ -247,8 +325,10 @@ def uninstall_provider_audit() -> None:
     import llm
 
     llm.chat_completions_create = _ORIGINAL_CHAT
+    _restore_module_bindings()
     _INSTALLED = False
     _ORIGINAL_CHAT = None
+    reset_audit_state()
 
 
 @contextmanager

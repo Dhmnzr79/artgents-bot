@@ -429,8 +429,10 @@
   4 HTTP turns via Flask test client, `TARGET_FULLCONTEXT_DEV=1` in isolated process only;
   real providers (`qwen3.6-flash` ingress/planner, `qwen3.7-plus` boundary/composer/verifier);
   **18 actual LLM calls** (10 audited in target-runtime ledger; ingress/planner via separate transport frames).
-  Harness `AUTOMATED_PASS`; **follow-up ref FAIL** (no price quick reply in Turn 1); Turn 3 `terminal_defer` on doctors.
-  Turn 4 medical stream materialized. Artifacts committed. **RERUN_BLOCKED** without new owner approval.
+  Frozen harness `AUTOMATED_PASS` **erroneous** (scorer/harness bug). **Official: S62_NOT_PASSED** — diagnostic evidence only.
+  Post-live audit (`396a226`): stdout capture SHA-pinned, frozen artifacts immutable, `RERUN_BLOCKED`.
+  Offline correction: session hydration for doctors/price/payment follow-ups, CTA widget mapping, harness gates/ledger accounting.
+  **NO LIVE / NO RERUN**.
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

@@ -17,7 +17,7 @@ from core.target_response_followup_materializer import (
 )
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_runtime_client_context import TargetRuntimeClientContext
-from ux_builder import build_cta
+from core.client_config_loader import load_lead_cta_variants
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +89,23 @@ def _followups_to_quick_replies(
     return quick
 
 
+def build_target_runtime_widget_cta(
+    *,
+    client_id: str,
+    selected_cta_key: str | None,
+) -> dict[str, str] | None:
+    """Map selected target CTA key to authored client lead variant (fail-closed)."""
+
+    key = str(selected_cta_key or "").strip()
+    if not key:
+        return None
+    variants = {variant.key: variant for variant in load_lead_cta_variants(client_id)}
+    if key not in variants:
+        return None
+    variant = variants[key]
+    return {"text": variant.label, "action": "lead", "key": variant.key}
+
+
 def materialize_verified_widget_payload(
     *,
     context: TargetRuntimeClientContext,
@@ -111,7 +128,11 @@ def materialize_verified_widget_payload(
     )
     if verified.selected_cta_key:
         meta["cta_key"] = verified.selected_cta_key
-    cta = build_cta(meta, client_id=context.client_id) if verified.selected_cta_key else None
+        meta["cta_action"] = "lead"
+    cta = build_target_runtime_widget_cta(
+        client_id=context.client_id,
+        selected_cta_key=verified.selected_cta_key,
+    )
     payload = {
         "answer": verified.text,
         "quick_replies": quick_replies,

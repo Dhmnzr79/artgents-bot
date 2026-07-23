@@ -108,6 +108,17 @@ def _session_snapshot(sid: str) -> dict[str, Any]:
     }
 
 
+def _pick_displayed_followup(quick_replies: list[dict[str, Any]]) -> dict[str, str] | None:
+    for item in quick_replies:
+        if not isinstance(item, dict):
+            continue
+        ref = str(item.get("ref") or "").strip()
+        label = str(item.get("label") or "").strip()
+        if ref and label:
+            return {"ref": ref, "label": label}
+    return None
+
+
 def _pick_price_followup(quick_replies: list[dict[str, Any]]) -> dict[str, str] | None:
     for item in quick_replies:
         if not isinstance(item, dict):
@@ -118,7 +129,7 @@ def _pick_price_followup(quick_replies: list[dict[str, Any]]) -> dict[str, str] 
             continue
         if ref.startswith("price:") or _PRICE_REF_RE.search(label):
             return {"ref": ref, "label": label}
-    return None
+    return _pick_displayed_followup(quick_replies)
 
 
 def install_legacy_guards(monkeypatch: Any | None = None) -> None:
@@ -216,6 +227,12 @@ def _evaluate_turn_gates(turn_result: dict[str, Any]) -> dict[str, Any]:
     )
     flags["no_legacy_route"] = "retrieval_chunk" not in route and "legacy" not in route
     flags["no_terminal_error"] = "target_fullcontext_error" not in route
+    flags["no_unexpected_terminal_defer"] = "target_fullcontext_terminal_defer" not in route or (
+        turn_result.get("turn_id") != "s62_turn_03_doctors"
+    )
+    if turn_result.get("turn_id") == "s62_turn_01_all_on_4_info":
+        cta_key = str(meta.get("cta_key") or "").strip()
+        flags["cta_widget_present_when_key_selected"] = not cta_key or turn_result.get("cta") is not None
     if turn_result.get("endpoint") == "/ask/stream":
         stream = str(turn_result.get("stream_text") or "")
         flags["stream_ui_done"] = "event: ui" in stream and "event: done" in stream
@@ -223,7 +240,33 @@ def _evaluate_turn_gates(turn_result: dict[str, Any]) -> dict[str, Any]:
     return {"flags": flags, "automated_turn_verdict": verdict}
 
 
+def _ledger_role_totals_complete(role_totals: dict[str, int]) -> bool:
+    if not role_totals:
+        return False
+    return int(role_totals.get("ingress", 0)) > 0 and int(role_totals.get("planner", 0)) > 0
+
+
 def _evaluate_summary(turn_results: list[dict[str, Any]], audit: Any) -> dict[str, Any]:
+    followup_ref_pass = any(row.get("followup_ref_used") for row in turn_results)
+    doctors_turn = next(
+        (row for row in turn_results if row.get("turn_id") == "s62_turn_03_doctors"),
+        None,
+    )
+    doctors_materialized = bool(
+        doctors_turn
+        and "target_fullcontext_materialized"
+        in str((doctors_turn.get("meta") or {}).get("service_route") or "")
+    )
+    turn1 = next(
+        (row for row in turn_results if row.get("turn_id") == "s62_turn_01_all_on_4_info"),
+        None,
+    )
+    cta_widget_ok = True
+    if turn1 is not None:
+        meta = turn1.get("meta") or {}
+        cta_key = str(meta.get("cta_key") or "").strip()
+        cta_widget_ok = not cta_key or turn1.get("cta") is not None
+
     technical = {
         "http_turns_completed": sum(1 for row in turn_results if row["gates"]["flags"]["http_completed"]),
         "target_answer_path": sum(
@@ -231,19 +274,28 @@ def _evaluate_summary(turn_results: list[dict[str, Any]], audit: Any) -> dict[st
         ),
         "legacy_hits": list(audit.legacy_hits),
         "fullcontext_build_count": audit.fullcontext_build_count,
-        "followup_ref_pass": any(row.get("followup_ref_used") for row in turn_results),
+        "followup_ref_pass": followup_ref_pass,
+        "doctors_materialized": doctors_materialized,
+        "cta_widget_ok": cta_widget_ok,
     }
     provider = {
         "total_calls": audit.total_started,
         "role_totals": dict(audit.role_totals),
         "retries": 0,
+        "ledger_complete": _ledger_role_totals_complete(dict(audit.role_totals)),
     }
     automated_fail = (
         technical["http_turns_completed"] != MAX_HTTP_TURNS
         or technical["target_answer_path"] != MAX_HTTP_TURNS
         or technical["legacy_hits"]
         or technical["fullcontext_build_count"] != 1
+        or not followup_ref_pass
+        or not doctors_materialized
+        or not cta_widget_ok
         or provider["total_calls"] > MAX_PROVIDER_CALLS
+        or not provider["ledger_complete"]
+        or int(provider["role_totals"].get("ingress", 0)) == 0
+        or int(provider["role_totals"].get("planner", 0)) == 0
     )
     automated_verdict = "AUTOMATED_FAIL" if automated_fail else "AUTOMATED_PASS"
     return {
@@ -361,7 +413,7 @@ def run_http_harness(
             request_body: dict[str, Any]
             followup_meta: dict[str, Any] = {"followup_ref_used": False}
             if spec.get("request_kind") == "followup_ref_from_turn_1":
-                picked = _pick_price_followup(turn1_quick_replies)
+                picked = _pick_displayed_followup(turn1_quick_replies)
                 if picked is not None:
                     request_body = {"q": "", "ref": picked["ref"]}
                     followup_meta = {
@@ -374,7 +426,7 @@ def run_http_harness(
                     request_body = dict(spec["fallback_request"])
                     followup_meta = {
                         "followup_ref_used": False,
-                        "followup_criterion": "FAIL_NO_PRICE_FOLLOWUP",
+                        "followup_criterion": "FAIL_NO_DISPLAYED_FOLLOWUP",
                     }
             else:
                 request_body = dict(spec["request"])

@@ -16,6 +16,7 @@ from evals.v5.s62_target_runtime_live_contract import (
 )
 from evals.v5.s62_target_runtime_live_provider_audit import (
     install_provider_audit,
+    reset_audit_state,
     set_current_turn,
     uninstall_provider_audit,
 )
@@ -45,6 +46,8 @@ def test_provider_audit_blocks_call_21(
 ) -> None:
     marker = tmp_path / "attempt.json"
     ledger = tmp_path / "ledger.jsonl"
+    reset_audit_state()
+    uninstall_provider_audit()
     create_attempt_marker_exclusive(marker, build_attempt_marker_payload(baseline_commit="x"))
     import llm
     from evals.v5 import s62_target_runtime_live_provider_audit as audit_module
@@ -83,7 +86,7 @@ def test_provider_audit_blocks_call_21(
             lambda captured_role=role: captured_role,
         )
         llm.chat_completions_create(model="qwen3.6-flash", messages=[])
-    set_current_turn(4)
+    set_current_turn(5)
     monkeypatch.setattr(audit_module, "_infer_provider_role", lambda: "ingress")
     with pytest.raises(HarnessConfigError, match="provider call budget exceeded"):
         llm.chat_completions_create(model="qwen3.6-flash", messages=[])

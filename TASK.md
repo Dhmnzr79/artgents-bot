@@ -1,41 +1,61 @@
-# TASK — S62 post-live audit capture (Checkpoint A)
+# TASK — S62 offline runtime/harness correction (Checkpoint B)
 
-**Baseline:** `codex/stage-a` / `0a43da1` · **NO LIVE / NO LLM / NO RERUN**
+**Baseline:** `codex/stage-a` / `396a226` · **NO LIVE / NO LLM / NO RERUN**
 
 ## Scope
 
-Append-only governance capture after S62 live attempt. Official ruling: **`S62_NOT_PASSED`** (diagnostic evidence only). Frozen live artifacts **must not be edited**.
+Offline correction after S62 post-live audit (`S62_NOT_PASSED`). Frozen live artifacts remain immutable.
 
-## Deliverables
+## B1 — doctors/session continuity
 
-- [ ] `docs/S62_TARGET_RUNTIME_POST_LIVE_AUDIT.md`
-- [ ] `evals/v5/artifacts/s62_target_runtime_post_live_audit_manifest.json`
-- [ ] `evals/v5/artifacts/s62_live_stdout_capture.txt` (preserved; SHA pinned)
-- [ ] `TASK.md` governance update
-- [ ] `docs/STRANGLER_ROADMAP.md` note (audit capture only)
+- Root cause: planner shadow frame built from raw LLM output before focus enrichment; target runtime read shadow without `service_id`.
+- Fix: `hydrate_target_runtime_turn_frame_from_session` in target runtime path using `last_service_id` for vague contextual follow-ups only.
 
-## Immutable (do not modify)
+## B2 — CTA widget mapping
 
-- `evals/v5/artifacts/s62_target_runtime_live_{raw,result,manifest,attempt,call_ledger,manual_review}.json|jsonl`
-- `evals/v5/artifacts/s62_target_runtime_live_audit.log`
+- Map `selected_cta_key` → authored client CTA via `lead_cta_dict_from_meta` with `cta_action=lead`.
+- Fail-closed on unknown keys.
 
-## Stdout capture
+## B3 — follow-up click criterion
 
-- SHA-256: `3CA6A7EBB971FEDAFD5A3507442A49BE660CB56B96BD862CB11528C9D15D7AFC`
-- Unique evidence for ingress/planner calls (18 total actual)
+- Harness uses any displayed target quick reply (not price-only).
+
+## B4 — harness accounting/verdict
+
+- Provider audit rebinds module-level `chat_completions_create` imports.
+- Corrected gates: follow-up ref, doctors materialized, CTA widget, ledger ingress/planner completeness.
+- Read-only frozen recompute → `AUTOMATED_FAIL`.
+
+## Allowlist
+
+| File | Change |
+|------|--------|
+| `TASK.md` | Checkpoint B governance |
+| `core/target_runtime_turn_frame_hydration.py` | session hydration |
+| `core/target_runtime_turn.py` | wire hydration |
+| `core/target_runtime_widget.py` | CTA mapping |
+| `evals/v5/s62_target_runtime_live_provider_audit.py` | audit rebind |
+| `evals/v5/s62_target_runtime_live_harness.py` | gates/follow-up |
+| `evals/v5/s62_target_runtime_live_recompute.py` | frozen recompute |
+| `tests/test_s62_correction_offline.py` | correction tests |
+| `tests/test_s62_target_runtime_live_harness.py` | harness test updates |
+| `docs/STRANGLER_ROADMAP.md` | completion note |
+
+**Forbidden:** live/LLM, frozen S62 live artifact edits, Verifier changes, authority/A9.
+
+## Commands
+
+```powershell
+$bt = Join-Path $env:TEMP ("s62b_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_s62_correction_offline.py `
+  tests/test_s62_target_runtime_live_harness.py `
+  -q
+```
 
 ## Checker
 
 | Checkpoint | When |
 |---|---|
-| PRE-CODE | before commit |
-| POST-CODE audit | after commit |
-
-## Commands
-
-```powershell
-python -c "from pathlib import Path; from evals.v5.fullcontext_response_eval_contract import sha256_file_hex; print(sha256_file_hex(Path('evals/v5/artifacts/s62_live_stdout_capture.txt')).upper())"
-python -c "from evals.v5.fullcontext_quality_eval_contract import assert_frozen_prior_artifacts_unchanged; assert_frozen_prior_artifacts_unchanged()"
-```
-
-Push to `origin/codex/stage-a` only.
+| PRE-CODE | before implementation |
+| COMPLETION | after pytest green |

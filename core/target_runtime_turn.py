@@ -32,6 +32,9 @@ from core.target_runtime_session import (
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_runtime_strategy import resolve_target_runtime_strategy_context
+from core.target_runtime_turn_frame_hydration import (
+    hydrate_target_runtime_turn_frame_from_session,
+)
 from core.target_runtime_turn_frame_bridge import (
     TargetRuntimeTurnFrameError,
     load_runtime_turn_frame,
@@ -104,6 +107,13 @@ def run_target_fullcontext_runtime_turn(
         )
 
     session_state = read_target_runtime_session(sid)
+    turn_frame = hydrate_target_runtime_turn_frame_from_session(
+        turn_frame,
+        user_message=user_message,
+        session_state=session_state,
+        allowed_service_ids=frozenset(context.bundle.services.keys()),
+    )
+
     try:
         boundary = execute_target_medical_boundary_classification(
             user_message,

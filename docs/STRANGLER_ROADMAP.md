@@ -61,12 +61,12 @@
 | Последний завершённый checkpoint | **S61 test-hardening (pre-live, OFFLINE)** |
 | Последний завершённый checkpoint | **S63 — delta target FullContext HTTP live runtime test (AUTOMATED_PASS, manual PASS)** |
 | Последний завершённый checkpoint | **S65 — default FullContext product authority (offline)** |
-| Текущий S-series checkpoint | **S66 — default authority live verification (one attempt, RERUN_BLOCKED)** |
-| Следующий gate | **Legacy isolation/removal (owner decision)** |
+| Текущий S-series checkpoint | **S67 — legacy answer path isolation (offline)** |
+| Следующий gate | **Legacy deletion inventory (owner decision; mechanical removal only)** |
 | Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Harness FC build counter fix (offline); legacy isolation planning** |
-| Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON) |
-| FullContext authority | **Transferred (S65 default ON; S66 product evidence live verified; official S66_NOT_PASSED)** |
+| Ближайший рабочий focus | **Harness FC build counter fix (offline); legacy deletion inventory** |
+| Что сейчас отвечает в локальном demo | **Target FullContext path по умолчанию** (`TARGET_FULLCONTEXT_DEV` default ON); legacy modules lazy-only behind `=0` |
+| FullContext authority | **Transferred (S65 default ON; S66 product evidence live verified; official S66_NOT_PASSED); S67 legacy isolated not deleted** |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
 
@@ -453,7 +453,12 @@
   legacy=0; 5/5 provider calls. **AUTOMATED_FAIL** (harness `fullcontext_build_count=0` counter miss; composer 32334 tokens).
   Manual PASS does not upgrade official verdict. **Official: S66_NOT_PASSED**; product authority live verified separately.
   Process/measurement incident, not proven product failure. **RERUN_BLOCKED**. Audit: `docs/S66_GOVERNANCE_CORRECTION_AUDIT.md`.
-- [ ] **Legacy isolation / removal** — separate milestone after post-switch verification.
+- [x] **S67 — legacy answer path isolation** — default FullContext path no longer eagerly imports legacy
+  answer-production stack (`ask_turn`, `chunk_responder`, `source_routing`, `composer_flow`). Legacy modules
+  load lazily only behind manual kill-switch `TARGET_FULLCONTEXT_DEV=0` or `chunk`/`composer` dispatch.
+  Target `service_reply` skips legacy answer-plan post-processing. Legacy files **not deleted**.
+  Offline acceptance A–J (`tests/test_s67_legacy_isolation_offline.py`). **NO LIVE / NO A9**.
+  Next separate milestone: read-only deletion inventory + mechanical removal (owner-approved).
 ## Какой roadmap актуален
 
 Этот файл — единственный актуальный roadmap **A-series**. Он описывает безопасную пошаговую замену внутреннего «мозга» понимания вопроса.

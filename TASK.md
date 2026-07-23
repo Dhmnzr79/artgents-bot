@@ -67,17 +67,17 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
   -q
 
 git diff --check
-python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_suite_unchanged; from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged; assert_frozen_suite_unchanged(); print('frozen OK')"
+python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
 ```
 
 ## Acceptance
 
-- [ ] PRE-CODE checker ✅
-- [ ] Default path lazy isolation
-- [ ] Kill-switch `=0` works
-- [ ] Targeted pytest green
-- [ ] Frozen artifacts unchanged
-- [ ] COMPLETION checker ✅
+- [x] PRE-CODE checker ❌ on governance (`e38eefe`) — frozen command gap in TASK; implementation adds S66 pins in test I
+- [x] Default path lazy isolation
+- [x] Kill-switch `=0` works
+- [x] Targeted pytest green (35 S67+S65; 61 with S61 neighbor)
+- [x] Frozen artifacts unchanged (S62+S63+S66)
+- [ ] COMPLETION checker
 - [ ] Push `origin/codex/stage-a`
 
 **STOP after S67 — deletion inventory is separate milestone.**

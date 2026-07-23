@@ -29,9 +29,11 @@
 
 | Флаг | Что делает | Дефолт |
 |---|---|---|
-| `TARGET_FULLCONTEXT_DEV` | При `1` (default) — `/ask` и `/ask/stream` идут только через target FullContext (S46); legacy RAG/chunk/resolver routing **не вызывается** и **не** используется как fallback в том же ходе. При `0` — **ручной legacy kill-switch**: после перезапуска процесса запросы идут по legacy path; target bootstrap для ответов не вызывается. | **ON (`1`)** |
+| `TARGET_FULLCONTEXT_DEV` | При `1` (default) — `/ask` и `/ask/stream` идут только через target FullContext (S46); legacy RAG/chunk/composer **не импортируются eagerly** и **не вызываются**; нет per-turn fallback. При `0` — **ручной legacy kill-switch**: после перезапуска процесса legacy path доступен; legacy modules загружаются **лениво** только при выборе legacy branch; target bootstrap для ответов не вызывается. Kill-switch будет удалён только отдельным owner-approved milestone. | **ON (`1`)** |
 
 **S65 (owner-approved):** product authority передана target FullContext по умолчанию. Переключатель читается при **старте процесса** (`config.py`); это **не** per-turn fallback.
+
+**S67 (owner-approved):** legacy answer-production stack изолирован от default path — lazy import только за `=0` или `chunk`/`composer` dispatch. Legacy files остаются в репозитории.
 
 **Emergency rollback:** установить `TARGET_FULLCONTEXT_DEV=0` и перезапустить процесс → legacy path. Между запросами, не внутри одного turn.
 

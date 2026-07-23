@@ -92,6 +92,14 @@ def _fact_is_eligible(
         return False
     if fact.allowed_service_ids and service_id not in fact.allowed_service_ids:
         return False
+    if service_id is None and fact.allowed_topics:
+        return False
+    if (
+        service_id is not None
+        and fact.allowed_topics
+        and not fact.allowed_service_ids
+    ):
+        return False
     if any(selected_id in fact.incompatible_with for selected_id in selected_fact_ids):
         return False
     if any(

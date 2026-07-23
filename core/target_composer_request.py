@@ -483,10 +483,40 @@ def materialize_target_composer_request(
 
     scoped = build_target_scoped_response_evidence(bound_package, md_root=md_root)
     if is_fullcontext_content_only_spec(scoped.spec):
+        if not scoped.scope_records:
+            return TargetComposerRequest(
+                user_message=user_message,
+                spec=scoped.spec,
+                evidence_blocks=(),
+                selected_followups=scoped.selected_followups,
+                selected_cta_key=scoped.selected_cta_key,
+            )
+        facts_by_id = {
+            fact.id: fact for fact in bound_package.package.materials.commercial_facts
+        }
+        root = _root(md_root)
+        blocks = tuple(
+            _block(
+                record,
+                root=root,
+                component_doctor_ids=frozenset(),
+                offers={},
+                doctors={},
+                facts=facts_by_id,
+                consultations={},
+            )
+            for record in scoped.scope_records
+        )
+        projected = tuple((block.ref, block.topics, block.fact_ids) for block in blocks)
+        expected = tuple(
+            (record.ref, record.topics, record.fact_ids) for record in scoped.scope_records
+        )
+        if projected != expected:
+            _error("composer_request_output_inconsistent", (projected, expected))
         return TargetComposerRequest(
             user_message=user_message,
             spec=scoped.spec,
-            evidence_blocks=(),
+            evidence_blocks=blocks,
             selected_followups=scoped.selected_followups,
             selected_cta_key=scoped.selected_cta_key,
         )

@@ -55,12 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S55 — verifier-only live replay v2 (19 calls, AUTOMATED_FAIL 17/19)** |
-| Текущий S-series checkpoint | **S56 — topic-scoped consultation facts + missing-base Composer guard (OFFLINE)** |
-| Предыдущий checkpoint | **S54 — S53 post-live audit + verifier offline calibration (NO LIVE)** |
+| Последний завершённый checkpoint | **S56 — topic-scoped consultation facts + missing-base Composer guard (OFFLINE)** |
+| Предыдущий checkpoint | **S55 — verifier-only live replay v2 (19 calls, AUTOMATED_FAIL 17/19)** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **S56 offline fix for fc_boundary_03 + fc_missing_01 root causes** |
+| Ближайший рабочий focus без live | **Manual review S55 v2 artifacts; optional S57+ offline follow-ups** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -401,6 +400,10 @@
   `qwen3.7-plus`, 19 Verifier / 0 Composer calls; immutable v2 artifacts + manual review.
   **AUTOMATED_FAIL** (decision_match 17/19; missed blocks fc_missing_01, fc_boundary_03).
   S53/S50 artifacts unchanged.
+- [x] **S56 — topic-scoped consultation facts + missing-base Composer guard** — OFFLINE ONLY:
+  optional `allowed_topics` on commercial facts; topic-scoped consultation selector for
+  `service_id=None` FullContext path; PRIMARY_EVIDENCE wiring; minimal Composer rule 7 strengthen.
+  Verifier unchanged. Targeted pytest 142 passed. **NO LIVE**.
 
 ## Какой roadmap актуален
 

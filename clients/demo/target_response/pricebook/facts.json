@@ -57,6 +57,10 @@
       "pterygoid_implants",
       "removable_dentures"
     ],
+    "allowed_topics": [
+      "implantation",
+      "prosthetics"
+    ],
     "incompatible_with": [],
     "active_until": "2026-12-31",
     "detail_ref": "clinic__info__consultation.md#korotko"

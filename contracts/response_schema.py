@@ -323,6 +323,7 @@ class TargetCommercialFact(TargetSchemaModel):
     active_from: IsoDate | None = None
     active_until: IsoDate | None = None
     allowed_service_ids: list[NonBlankStr] = Field(default_factory=list)
+    allowed_topics: list[NonBlankStr] = Field(default_factory=list)
     detail_ref: NonBlankStr | None = None
     incompatible_with: list[NonBlankStr] = Field(default_factory=list)
 
@@ -330,6 +331,8 @@ class TargetCommercialFact(TargetSchemaModel):
     def _fact_invariants(self) -> "TargetCommercialFact":
         if _duplicates(self.allowed_service_ids):
             raise ValueError("fact_allowed_service_duplicate")
+        if _duplicates(self.allowed_topics):
+            raise ValueError("fact_allowed_topic_duplicate")
         if _duplicates(self.incompatible_with):
             raise ValueError("fact_incompatible_ref_duplicate")
         if self.id in self.incompatible_with:

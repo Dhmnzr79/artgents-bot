@@ -67,6 +67,7 @@ def assemble_target_spec_offline_response_package(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    turn_topic: str | None = None,
 ) -> TargetSpecBoundOfflineResponsePackage:
     """Bind proven S32/S33 composition decisions to one S31 package."""
 
@@ -88,6 +89,11 @@ def assemble_target_spec_offline_response_package(
             _error("spec_package_permission_forbidden", "cta")
         return assemble_target_fullcontext_content_bound_package(
             spec,
+            bundle,
+            turn_topic=turn_topic,
+            today=today,
+            shown_fact_ids=shown_fact_ids,
+            include_consultation_close=include_consultation_close,
             selected_cta_key=None,
         )
     if (

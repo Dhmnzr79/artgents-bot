@@ -85,5 +85,6 @@ def run_target_offline_turn_frame_bound_response(
             shown_fact_ids=shown_fact_ids,
             shown_amplifier_refs=shown_amplifier_refs,
             shown_consultation_value_refs=shown_consultation_value_refs,
+            turn_topic=turn_frame.topic,
         ),
     )

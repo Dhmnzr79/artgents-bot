@@ -188,19 +188,44 @@ def build_target_scoped_response_evidence(
     if is_fullcontext_content_only_spec(spec):
         if bound_package.selected_cta_key is not None:
             _error("scoped_evidence_package_inconsistent", "selected_cta_key")
+        package = bound_package.package
+        plan = package.plan
+        materials = package.materials
+        facts_by_id = {fact.id: fact for fact in materials.commercial_facts}
+        if any(fact_id not in facts_by_id for fact_id in plan.commercial_fact_ids):
+            _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+        if plan.commercial_fact_ids and not spec.allow_consultation_close:
+            _error("scoped_evidence_package_inconsistent", "consultation_content_ref")
+        if len(plan.commercial_fact_ids) > 1:
+            _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+        records: list[TargetEvidenceScopeRecord] = []
+        for fact_id in plan.commercial_fact_ids:
+            fact = facts_by_id[fact_id]
+            matched_topics = tuple(
+                topic for topic in spec.allowed_topics if topic in fact.allowed_topics
+            )
+            if not matched_topics:
+                _error("scoped_evidence_package_inconsistent", "commercial_fact_topics")
+            records.append(
+                TargetEvidenceScopeRecord(
+                    ref=f"fact:{fact_id}",
+                    topics=matched_topics,
+                    fact_ids=(fact_id,),
+                )
+            )
         return TargetScopedResponseEvidence(
             spec=spec,
             service_id=None,
             primary_content_ref=None,
             offer_ids=(),
             doctor_ids=(),
-            commercial_fact_ids=(),
+            commercial_fact_ids=plan.commercial_fact_ids,
             external_source_refs=(),
             consultation_content_ref=None,
-            selected_followups=bound_package.package.selected_followups,
+            selected_followups=package.selected_followups,
             selected_cta_key=None,
-            scope_records=(),
-            covered_fact_ids=(),
+            scope_records=tuple(records),
+            covered_fact_ids=plan.commercial_fact_ids,
         )
 
     package = bound_package.package

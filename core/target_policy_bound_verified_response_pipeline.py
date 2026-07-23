@@ -53,6 +53,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    turn_topic: str | None = None,
 ) -> TargetVerifiedComposedResponse:
     """Build spec-bound package and return one exact verified target response."""
 
@@ -75,6 +76,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
+        turn_topic=turn_topic,
     )
     return run_target_offline_verified_response_pipeline(
         bound_package,

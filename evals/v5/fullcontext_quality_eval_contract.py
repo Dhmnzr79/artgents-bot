@@ -234,7 +234,7 @@ FINAL_ACCEPTANCE_GATES = {
 }
 
 MODEL_RECOMMENDATION = {
-    "status": "pending_owner_approval",
+    "status": "owner_approved_s58",
     "composer_model": "qwen3.7-plus",
     "verifier_model": "qwen3.7-plus",
     "expected_composer_calls": 9,
@@ -243,6 +243,11 @@ MODEL_RECOMMENDATION = {
     "retry_count_max": 0,
     "terminal_calls_max": 0,
 }
+
+OWNER_APPROVED_COMPOSER_MODEL = "qwen3.7-plus"
+OWNER_APPROVED_VERIFIER_MODEL = "qwen3.7-plus"
+MAX_COMPOSER_CALLS = 9
+MAX_VERIFIER_CALLS = 9
 
 FROZEN_S49_LIVE_RAW_SHA256 = (
     "c78403a8a1a82f472d3665f4893db3fb3fa794a9db254e91611448081be7536c"
@@ -400,14 +405,168 @@ def assert_frozen_prior_artifacts_unchanged() -> None:
             )
 
 
-def build_attempt_marker_payload(*, matrix_hash: str = FROZEN_MATRIX_HASH) -> dict[str, Any]:
+def build_attempt_marker_payload(
+    *,
+    matrix_hash: str = FROZEN_MATRIX_HASH,
+    baseline_commit: str | None = None,
+) -> dict[str, Any]:
     return {
         "measurement_id": MEASUREMENT_ID,
         "matrix_git_blob_hash": matrix_hash,
-        "status": "in_progress",
+        "status": "attempt_started",
+        "baseline_commit": baseline_commit,
+        "composer_model": OWNER_APPROVED_COMPOSER_MODEL,
+        "verifier_model": OWNER_APPROVED_VERIFIER_MODEL,
         "started_provider_calls": 0,
+        "started_composer_calls": 0,
+        "started_verifier_calls": 0,
         "max_llm_calls": EXPECTED_LLM_CALLS,
+        "max_composer_calls": MAX_COMPOSER_CALLS,
+        "max_verifier_calls": MAX_VERIFIER_CALLS,
+        "retry_count_max": 0,
         "rerun_blocked_without_owner_approval": True,
+    }
+
+
+def load_attempt_marker(path: Path = LIVE_ATTEMPT_MARKER_PATH) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise HarnessConfigError("attempt marker must be object")
+    return payload
+
+
+def persist_attempt_marker(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
+    path.write_text(
+        json.dumps(serialized, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def finalize_attempt_marker(
+    path: Path,
+    *,
+    status: str,
+    total_llm_calls: int,
+) -> None:
+    marker = load_attempt_marker(path)
+    marker["status"] = status
+    marker["completed_provider_calls"] = total_llm_calls
+    persist_attempt_marker(path, marker)
+
+
+def record_provider_call_started(
+    path: Path = LIVE_ATTEMPT_MARKER_PATH,
+    *,
+    provider: Literal["composer", "semantic_verifier"],
+) -> int:
+    marker = load_attempt_marker(path)
+    total = int(marker.get("started_provider_calls", 0))
+    composer_calls = int(marker.get("started_composer_calls", 0))
+    verifier_calls = int(marker.get("started_verifier_calls", 0))
+    if total >= EXPECTED_LLM_CALLS:
+        raise HarnessConfigError(
+            f"live LLM call budget exceeded before start total={total} max={EXPECTED_LLM_CALLS}"
+        )
+    if provider == "composer":
+        if composer_calls >= MAX_COMPOSER_CALLS:
+            raise HarnessConfigError(
+                f"composer call budget exceeded count={composer_calls} max={MAX_COMPOSER_CALLS}"
+            )
+        composer_calls += 1
+    else:
+        if verifier_calls >= MAX_VERIFIER_CALLS:
+            raise HarnessConfigError(
+                f"verifier call budget exceeded count={verifier_calls} max={MAX_VERIFIER_CALLS}"
+            )
+        verifier_calls += 1
+    total += 1
+    marker["started_provider_calls"] = total
+    marker["started_composer_calls"] = composer_calls
+    marker["started_verifier_calls"] = verifier_calls
+    persist_attempt_marker(path, marker)
+    return total
+
+
+def append_call_ledger_entry(path: Path, entry: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = prepare_json_artifact_payload(entry)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(serialized, ensure_ascii=False) + "\n")
+
+
+def _extract_semantic_issues(semantic_payload: object) -> list[dict[str, str]]:
+    from core.target_response_verifier import TargetSemanticAssessment
+
+    if type(semantic_payload) is TargetSemanticAssessment:
+        return [
+            {"kind": issue.kind, "offending_span": issue.offending_span}
+            for issue in semantic_payload.issues
+        ]
+    if not isinstance(semantic_payload, dict):
+        return []
+    if "assessment" in semantic_payload:
+        assessment = semantic_payload["assessment"]
+        if isinstance(assessment, dict) and isinstance(assessment.get("issues"), list):
+            raw_issues = assessment["issues"]
+        else:
+            return []
+    elif isinstance(semantic_payload.get("issues"), list):
+        raw_issues = semantic_payload["issues"]
+    else:
+        return []
+    issues: list[dict[str, str]] = []
+    for item in raw_issues:
+        if isinstance(item, dict) and "kind" in item and "offending_span" in item:
+            issues.append(
+                {
+                    "kind": str(item["kind"]),
+                    "offending_span": str(item["offending_span"]),
+                }
+            )
+    return issues
+
+
+def build_manual_review_seed(
+    *,
+    case_results: list[dict[str, Any]],
+    result_sha256: str,
+    matrix_hash: str = FROZEN_MATRIX_HASH,
+    matrix_spec: dict[str, Any],
+    baseline_commit: str,
+) -> dict[str, Any]:
+    matrix_by_id = {case["case_id"]: case for case in matrix_spec["cases"]}
+    cases: list[dict[str, Any]] = []
+    for row in case_results:
+        matrix_case = matrix_by_id[row["case_id"]]
+        profile = matrix_case.get("case_specific_rubric_profile")
+        profile_ids = CASE_SPECIFIC_RUBRIC_IDS.get(profile or "", ())
+        cases.append(
+            {
+                "case_id": row["case_id"],
+                "user_message": matrix_case["user_message"],
+                "review_status": "pending",
+                "response_text": row.get("response_text"),
+                "observed_outcome": row.get("observed_outcome"),
+                "verification_status": row.get("verification_status"),
+                "pipeline_error_code": row.get("pipeline_error_code"),
+                "reason": row.get("reason"),
+                "semantic_issues": _extract_semantic_issues(row.get("semantic_raw_payload")),
+                "case_specific_rubric_profile": profile,
+                "global_checks": {item: None for item in GLOBAL_RUBRIC_IDS},
+                "case_specific_checks": {item: None for item in profile_ids},
+                "critical_violation": None,
+                "notes": "",
+            }
+        )
+    return {
+        "measurement_id": MEASUREMENT_ID,
+        "matrix_git_blob_hash": matrix_hash,
+        "baseline_live_commit": baseline_commit,
+        "result_sha256": result_sha256,
+        "review_status": "pending",
+        "rerun_blocked_without_owner_approval": True,
+        "cases": cases,
     }
 
 
@@ -435,11 +594,6 @@ def assert_attempt_marker_absent(
         raise AttemptMarkerExistsError(ATTEMPT_MARKER_EXISTS_CODE)
 
 
-def record_provider_call_started(path: Path = LIVE_ATTEMPT_MARKER_PATH) -> None:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["started_provider_calls"] = int(payload.get("started_provider_calls", 0)) + 1
-    serialized = prepare_json_artifact_payload(payload)
-    path.write_text(json.dumps(serialized, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _gate_result(
@@ -547,6 +701,10 @@ __all__ = [
     "MATRIX_PATH",
     "MEASUREMENT_ID",
     "MODEL_RECOMMENDATION",
+    "OWNER_APPROVED_COMPOSER_MODEL",
+    "OWNER_APPROVED_VERIFIER_MODEL",
+    "MAX_COMPOSER_CALLS",
+    "MAX_VERIFIER_CALLS",
     "SUITE_ID",
     "AttemptMarkerExistsError",
     "HarnessConfigError",
@@ -555,13 +713,17 @@ __all__ = [
     "assert_attempt_marker_absent",
     "assert_frozen_prior_artifacts_unchanged",
     "assert_live_artifacts_absent",
+    "append_call_ledger_entry",
     "build_attempt_marker_payload",
+    "build_manual_review_seed",
     "build_literal_and_semantic_extensions",
     "create_attempt_marker_exclusive",
     "derive_case_automated_flags",
     "evaluate_automated_verdict",
     "evaluate_final_verdict",
-    "load_frozen_matrix",
+    "finalize_attempt_marker",
+    "load_attempt_marker",
+    "persist_attempt_marker",
     "prepare_json_artifact_payload",
     "record_provider_call_started",
     "summarize_results",

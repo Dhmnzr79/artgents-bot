@@ -242,17 +242,21 @@ def test_default_cli_is_live_not_configured() -> None:
     assert run_quality_eval_main([]) == 4
 
 
-def test_live_flag_is_live_not_configured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_live_flag_blocked_when_result_artifact_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing = tmp_path / "result.json"
+    existing.write_text("{}\n", encoding="utf-8")
     marker = tmp_path / "attempt.json"
-    monkeypatch.setattr(
-        "evals.v5.run_fullcontext_quality_eval.LIVE_ATTEMPT_MARKER_PATH",
-        marker,
-    )
-    monkeypatch.setattr(
-        "evals.v5.run_fullcontext_quality_eval.DEFAULT_LIVE_ARTIFACT_PATHS",
-        (),
-    )
-    assert run_quality_eval_main(["--live"]) == 4
+    from evals.v5.fullcontext_response_eval_contract import LiveArtifactExistsError
+
+    with pytest.raises(LiveArtifactExistsError):
+        prepare_live_run(
+            attempt_marker_path=marker,
+            artifact_paths=(existing,),
+            baseline_commit="test",
+        )
 
 
 def test_existing_attempt_marker_blocks_before_backend(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

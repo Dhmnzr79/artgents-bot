@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S54 — S53 post-live audit + verifier offline calibration (NO LIVE)** |
-| Предыдущий checkpoint | **S53 — verifier-only live replay (19 calls, AUTOMATED_FAIL)** |
+| Последний завершённый checkpoint | **S55 — verifier-only live replay v2 (19 calls, AUTOMATED_FAIL 17/19)** |
+| Предыдущий checkpoint | **S54 — S53 post-live audit + verifier offline calibration (NO LIVE)** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **S55 v2 verifier-only live replay — pending owner approval (model/budget)** |
+| Ближайший рабочий focus без live | **Manual review S55 v2 artifacts; verifier FN tuning (fc_missing_01, fc_boundary_03)** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -396,6 +396,10 @@
   byte-identical; canonical replay issue parser fix; honest causal taxonomy (v1 15/19, v2 17/19
   diagnostic recompute, frozen FAIL unchanged); replay matrix v2 (14 pass / 5 block); minimal
   semantic policy clarification; future v2 live paths wired `pending_owner_approval`. **NO LIVE**.
+- [x] **S55 — verifier-only live replay v2** — one owner-approved live run on matrix v2:
+  `qwen3.7-plus`, 19 Verifier / 0 Composer calls; immutable v2 artifacts + manual review.
+  **AUTOMATED_FAIL** (decision_match 17/19; missed blocks fc_missing_01, fc_boundary_03).
+  S53/S50 artifacts unchanged.
 
 ## Какой roadmap актуален
 

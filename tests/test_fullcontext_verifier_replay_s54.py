@@ -185,34 +185,61 @@ def test_diagnostic_recompute_is_not_s53_pass() -> None:
 
 def test_cli_matrix_v2_dry_run(capsys, monkeypatch, tmp_path) -> None:
     paths = {
-        "attempt": tmp_path / "attempt.json",
-        "raw": tmp_path / "raw.json",
-        "result": tmp_path / "result.json",
-        "ledger": tmp_path / "ledger.jsonl",
-        "manifest": tmp_path / "manifest.json",
-        "manual": tmp_path / "manual.json",
+        "attempt": tmp_path / "v2_attempt.json",
+        "raw": tmp_path / "v2_raw.json",
+        "result": tmp_path / "v2_result.json",
+        "ledger": tmp_path / "v2_ledger.jsonl",
+        "manifest": tmp_path / "v2_manifest.json",
+        "manual": tmp_path / "v2_manual.json",
     }
     artifact_paths = tuple(paths.values())
-    monkeypatch.setattr(replay_runner, "LIVE_ATTEMPT_MARKER_PATH", paths["attempt"])
-    monkeypatch.setattr(replay_runner, "DEFAULT_LIVE_ARTIFACT_PATHS", artifact_paths)
+    monkeypatch.setattr(replay_runner, "V2_LIVE_ATTEMPT_MARKER_PATH", paths["attempt"])
+    monkeypatch.setattr(replay_runner, "DEFAULT_V2_LIVE_ARTIFACT_PATHS", artifact_paths)
     assert run_replay_main(["--matrix-v2", "--dry-run"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["matrix_v2"] is True
     assert out["matrix_git_blob_hash"] == REPLAY_MATRIX_V2_HASH
-    assert out["v2_live_status"] == "pending_owner_approval"
+    assert out["v2_live_status"] == "owner_approved"
 
 
-def test_cli_matrix_v2_live_blocked(capsys, monkeypatch, tmp_path) -> None:
-    paths = {
-        "attempt": tmp_path / "attempt.json",
-        "raw": tmp_path / "raw.json",
-        "result": tmp_path / "result.json",
-        "ledger": tmp_path / "ledger.jsonl",
-        "manifest": tmp_path / "manifest.json",
-        "manual": tmp_path / "manual.json",
+def test_cli_matrix_v2_live_guard_uses_v2_paths_only(capsys, monkeypatch, tmp_path) -> None:
+    v2_paths = {
+        "attempt": tmp_path / "v2_attempt.json",
+        "raw": tmp_path / "v2_raw.json",
+        "result": tmp_path / "v2_result.json",
+        "ledger": tmp_path / "v2_ledger.jsonl",
+        "manifest": tmp_path / "v2_manifest.json",
+        "manual": tmp_path / "v2_manual.json",
     }
-    artifact_paths = tuple(paths.values())
-    monkeypatch.setattr(replay_runner, "LIVE_ATTEMPT_MARKER_PATH", paths["attempt"])
-    monkeypatch.setattr(replay_runner, "DEFAULT_LIVE_ARTIFACT_PATHS", artifact_paths)
-    assert run_replay_main(["--matrix-v2", "--live"]) == 3
-    assert "V2_LIVE_PENDING_OWNER_APPROVAL" in capsys.readouterr().err
+    monkeypatch.setattr(replay_runner, "V2_LIVE_ATTEMPT_MARKER_PATH", v2_paths["attempt"])
+    monkeypatch.setattr(replay_runner, "V2_LIVE_RAW_ARTIFACT_PATH", v2_paths["raw"])
+    monkeypatch.setattr(replay_runner, "V2_LIVE_RESULT_ARTIFACT_PATH", v2_paths["result"])
+    monkeypatch.setattr(replay_runner, "V2_LIVE_CALL_LEDGER_PATH", v2_paths["ledger"])
+    monkeypatch.setattr(replay_runner, "V2_LIVE_MANIFEST_ARTIFACT_PATH", v2_paths["manifest"])
+    monkeypatch.setattr(replay_runner, "V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH", v2_paths["manual"])
+    monkeypatch.setattr(replay_runner, "DEFAULT_V2_LIVE_ARTIFACT_PATHS", tuple(v2_paths.values()))
+    monkeypatch.setattr(replay_runner, "prepare_replay_live_run", lambda **kwargs: None)
+    monkeypatch.setattr(
+        replay_runner,
+        "run_replay_harness",
+        lambda **kwargs: {
+            "summary": {
+                "decision_match_rate": 0.0,
+                "false_block_count": 0,
+                "missed_block_count": 0,
+                "verifier_provider_call_count": 0,
+                "composer_provider_call_count": 0,
+                "retry_count": 0,
+                "malformed_count": 0,
+                "transport_error_count": 0,
+                "backend_failure_count": 0,
+                "invalid_offending_span_count": 0,
+                "terminal_control_match": True,
+                "automated_verdict": {"verdict": "AUTOMATED_FAIL"},
+            },
+            "case_results": [],
+        },
+    )
+    monkeypatch.setattr(replay_runner, "write_json_exclusive", lambda path, payload: None)
+    monkeypatch.setattr(replay_runner, "sha256_file_hex", lambda path: "deadbeef")
+    assert run_replay_main(["--matrix-v2", "--live"]) == 0

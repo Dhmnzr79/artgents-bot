@@ -1,59 +1,36 @@
-# TASK — S55 verifier-only live replay v2
+# TASK — S55 verifier-only live replay v2 (COMPLETE)
 
-**Baseline:** `codex/stage-a` / `6427088` · **ONE LIVE RUN AUTHORIZED**
+**Baseline:** `codex/stage-a` / `6427088` · **ONE LIVE RUN EXECUTED**
 
-**Goal:** One owner-approved verifier-only live replay on matrix v2 (19 frozen S50
-candidates, updated owner labels). Immutable artifacts + manual review seed.
+## Result
 
-## Owner approval (binding)
+| Field | Value |
+|-------|-------|
+| Measurement | `s55_fullcontext_verifier_replay_v2_live` |
+| Matrix v2 hash | `009977fca3a3e2a37b5c865f74c55c49c00de669` |
+| Verifier calls | 19 |
+| Composer calls | 0 |
+| Decision match | **17/19** |
+| False blocks | 0 |
+| Missed blocks | 2 (`fc_missing_01`, `fc_boundary_03`) |
+| Automated verdict | **AUTOMATED_FAIL** |
+| Final verdict | **FAIL** (pending manual review) |
 
-- Model: `qwen3.7-plus`
-- Max Verifier provider calls: **19** (materializable cases)
-- Composer provider calls: **0**
-- Retry/repair/rerun: **forbidden**
-- Matrix v2 git blob hash: `009977fca3a3e2a37b5c865f74c55c49c00de669`
-- Automated gates: **owner_approved** (same thresholds as S53 contract constants)
-- Expected block cases (v2): fc_medical_03, fc_missing_01, fc_missing_02, fc_boundary_02, fc_boundary_03
+## S55 artifact SHA-256 pins (immutable)
 
-## Protected (do not rerun / modify)
+| Artifact | SHA-256 |
+|----------|---------|
+| `fullcontext_verifier_replay_v2_live_raw.json` | `0f599bd7e01d7574d1ffd8c4a4dda04e2f3b21eb868e6a09d2ba37c1ebb4a081` |
+| `fullcontext_verifier_replay_v2_live_result.json` | `2af56925e4ea8c21cd4ef287933929af54baf8981c4ddd17464674ed418b3fc1` |
+| `fullcontext_verifier_replay_v2_live_manifest.json` | `1bd78abc9446c87a0f000d8b6de8489895bb0b99f694e145e364d09b96313bcf` |
+| `fullcontext_verifier_replay_v2_live_attempt.json` | `ffdb0b8f079e82070021e630c6229091c51c1c01ffaa9aa4642019544324305b` |
+| `fullcontext_verifier_replay_v2_live_call_ledger.jsonl` | `c1d3c7582de09da90420a6c6632b45ce2125b83ff3a1742a1ed91f3a3dd50bd8` |
+| `fullcontext_verifier_replay_v2_manual_review.json` | `4c2d0306630056758d3ceffd4d101638f18f15c6321ddeb0c0f89f236cb9311f` |
 
-- S53 live artifacts (frozen SHA pins in S54 TASK)
-- S50/S47 live artifacts
-- Matrix v1 `a273a58d96b00a76fd22b4d6fc9b97791df4f6d1`
-- Matrix v2 content (hash pinned — no file edits)
+## Protected unchanged
 
-## V2 live artifact paths (exclusive write)
+S53 frozen SHA pins verified post-run. S50/S47 artifacts not touched.
 
-- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_raw.json`
-- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_result.json`
-- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_manifest.json`
-- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_attempt.json`
-- `evals/v5/artifacts/fullcontext_verifier_replay_v2_live_call_ledger.jsonl`
-- `evals/v5/artifacts/fullcontext_verifier_replay_v2_manual_review.json`
+## STOP
 
-## Allowlist
-
-- `TASK.md`
-- `evals/v5/fullcontext_verifier_replay_contract.py`
-- `evals/v5/fullcontext_verifier_replay_live_backend.py`
-- `evals/v5/run_fullcontext_verifier_replay.py`
-- `tests/test_fullcontext_verifier_replay_s54.py`
-- `docs/STRANGLER_ROADMAP.md`
-
-## Acceptance
-
-1. `--matrix-v2 --live` runs once; v2 artifact guards isolated from S53 marker.
-2. 19 verifier / 0 composer provider calls; canonical issue parser for scoring.
-3. Immutable artifacts written exclusively; manual review seeded from matrix v2.
-4. S53/S50 artifacts byte-identical after run.
-5. Targeted offline pytest green.
-
-## Live command
-
-```powershell
-.\.venv\codex312\Scripts\python.exe evals/v5/run_fullcontext_verifier_replay.py --matrix-v2 --live
-```
-
-## Process
-
-Governance commit → wire v2 live → run once → artifact commit → push → STOP
+No rerun. Manual review pending.

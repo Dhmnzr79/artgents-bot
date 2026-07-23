@@ -33,6 +33,7 @@ class FullContextVerifierReplayLiveSemanticBackend:
         model: str | None = None,
         call_ledger_path: Path,
         attempt_marker_path: Path,
+        measurement_id: str = "s53_fullcontext_verifier_replay_live",
     ) -> None:
         resolved_model = model or fullcontext_response_eval_live_model()
         if resolved_model != OWNER_APPROVED_SEMANTIC_MODEL:
@@ -42,6 +43,7 @@ class FullContextVerifierReplayLiveSemanticBackend:
             )
         self.case_id = case_id
         self.model = resolved_model
+        self.measurement_id = measurement_id
         self.call_ledger_path = call_ledger_path
         self.attempt_marker_path = attempt_marker_path
         self._delegate = FullContextResponseEvalLiveSemanticBackend(model=self.model)
@@ -61,7 +63,7 @@ class FullContextVerifierReplayLiveSemanticBackend:
             self.call_ledger_path,
             {
                 "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-                "measurement_id": "s53_fullcontext_verifier_replay_live",
+                "measurement_id": self.measurement_id,
                 "case_id": self.case_id,
                 "provider": "semantic_verifier",
                 "model": self.model,

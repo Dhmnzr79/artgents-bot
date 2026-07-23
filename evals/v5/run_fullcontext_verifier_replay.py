@@ -70,6 +70,13 @@ from evals.v5.fullcontext_verifier_replay_contract import (
     REPLAY_MATRIX_V2_HASH,
     REPLAY_MATRIX_V2_PATH,
     MEASUREMENT_ID_V2,
+    MEASUREMENT_ID_V2_LIVE,
+    V2_LIVE_ATTEMPT_MARKER_PATH,
+    V2_LIVE_CALL_LEDGER_PATH,
+    V2_LIVE_MANIFEST_ARTIFACT_PATH,
+    V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+    V2_LIVE_RAW_ARTIFACT_PATH,
+    V2_LIVE_RESULT_ARTIFACT_PATH,
 )
 from evals.v5.run_fullcontext_response_eval import _load_pipeline_context
 
@@ -292,6 +299,7 @@ def _live_backend_factory(
     *,
     call_ledger_path: Path,
     attempt_marker_path: Path,
+    measurement_id: str = MEASUREMENT_ID_LIVE,
 ) -> Callable[[dict[str, Any]], tuple[FrozenCandidateComposerBackend, object]]:
     from evals.v5.fullcontext_verifier_replay_live_backend import (
         FullContextVerifierReplayLiveSemanticBackend,
@@ -313,6 +321,7 @@ def _live_backend_factory(
                 model=OWNER_APPROVED_SEMANTIC_MODEL,
                 call_ledger_path=call_ledger_path,
                 attempt_marker_path=attempt_marker_path,
+                measurement_id=measurement_id,
             ),
         )
 
@@ -327,6 +336,7 @@ def run_replay_harness(
     preflight_exclude_paths: Sequence[Path] | None = None,
     offline_mode: bool = True,
     measurement_id: str = MEASUREMENT_ID,
+    matrix_hash: str = REPLAY_MATRIX_HASH,
 ) -> dict[str, Any]:
     replay = replay_spec or load_replay_matrix()
     from evals.v5.fullcontext_response_eval_contract import load_v2_matrix
@@ -374,6 +384,7 @@ def run_replay_harness(
         replay_spec=replay,
         measurement_id=measurement_id,
         live_run=not offline_mode,
+        matrix_hash=matrix_hash,
     )
     return {"summary": summary, "case_results": case_results}
 
@@ -468,27 +479,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             matrix_hash = REPLAY_MATRIX_V2_HASH
             artifact_paths = DEFAULT_V2_LIVE_ARTIFACT_PATHS
             measurement_id = MEASUREMENT_ID_V2
+            live_measurement_id = MEASUREMENT_ID_V2_LIVE
+            attempt_marker_path = V2_LIVE_ATTEMPT_MARKER_PATH
         else:
             replay_spec = load_replay_matrix(path=Path(args.matrix))
             matrix_hash = REPLAY_MATRIX_HASH
             artifact_paths = DEFAULT_LIVE_ARTIFACT_PATHS
             measurement_id = MEASUREMENT_ID
+            live_measurement_id = MEASUREMENT_ID_LIVE
+            attempt_marker_path = LIVE_ATTEMPT_MARKER_PATH
     except HarnessConfigError as error:
         print(f"CONFIG_ERROR: {error}", file=sys.stderr)
         return 2
 
-    if args.matrix_v2 and args.live:
-        print("V2_LIVE_PENDING_OWNER_APPROVAL", file=sys.stderr)
-        return 3
-
     try:
         assert_attempt_marker_absent(
-            LIVE_ATTEMPT_MARKER_PATH,
+            attempt_marker_path,
             owner_override=args.owner_override_attempt_marker,
         )
-        assert_replay_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
-        if args.matrix_v2:
-            assert_replay_live_artifacts_absent(DEFAULT_V2_LIVE_ARTIFACT_PATHS)
+        assert_replay_live_artifacts_absent(artifact_paths)
     except (AttemptMarkerExistsError, LiveArtifactWriteError) as error:
         print(f"ARTIFACT_GUARD: {error}", file=sys.stderr)
         return 4
@@ -507,29 +516,43 @@ def main(argv: Sequence[str] | None = None) -> int:
             "artifact_paths": {path.name: str(path) for path in artifact_paths},
         }
         if args.matrix_v2:
-            payload["v2_live_status"] = "pending_owner_approval"
+            payload["v2_live_status"] = "owner_approved"
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     if args.live:
-        artifact_paths = DEFAULT_LIVE_ARTIFACT_PATHS
+        if args.matrix_v2:
+            live_raw_path = V2_LIVE_RAW_ARTIFACT_PATH
+            live_result_path = V2_LIVE_RESULT_ARTIFACT_PATH
+            live_manifest_path = V2_LIVE_MANIFEST_ARTIFACT_PATH
+            live_manual_path = V2_LIVE_MANUAL_REVIEW_ARTIFACT_PATH
+            live_call_ledger_path = V2_LIVE_CALL_LEDGER_PATH
+        else:
+            live_raw_path = LIVE_RAW_ARTIFACT_PATH
+            live_result_path = LIVE_RESULT_ARTIFACT_PATH
+            live_manifest_path = LIVE_MANIFEST_ARTIFACT_PATH
+            live_manual_path = LIVE_MANUAL_REVIEW_ARTIFACT_PATH
+            live_call_ledger_path = LIVE_CALL_LEDGER_PATH
         try:
             prepare_replay_live_run(
-                attempt_marker_path=LIVE_ATTEMPT_MARKER_PATH,
+                attempt_marker_path=attempt_marker_path,
                 artifact_paths=artifact_paths,
                 owner_override_attempt_marker=args.owner_override_attempt_marker,
+                matrix_hash=matrix_hash,
             )
             payload = run_replay_harness(
                 backend_factory=_live_backend_factory(
                     replay_spec,
-                    call_ledger_path=LIVE_CALL_LEDGER_PATH,
-                    attempt_marker_path=LIVE_ATTEMPT_MARKER_PATH,
+                    call_ledger_path=live_call_ledger_path,
+                    attempt_marker_path=attempt_marker_path,
+                    measurement_id=live_measurement_id,
                 ),
                 replay_spec=replay_spec,
                 artifact_paths=artifact_paths,
-                preflight_exclude_paths=(LIVE_ATTEMPT_MARKER_PATH,),
+                preflight_exclude_paths=(attempt_marker_path,),
                 offline_mode=False,
-                measurement_id=MEASUREMENT_ID_LIVE,
+                measurement_id=live_measurement_id,
+                matrix_hash=matrix_hash,
             )
         except AttemptMarkerExistsError as error:
             print(str(error), file=sys.stderr)
@@ -562,8 +585,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         raw_artifact = prepare_json_artifact_payload(
             {
-                "measurement_id": MEASUREMENT_ID_LIVE,
-                "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
+                "measurement_id": live_measurement_id,
+                "matrix_git_blob_hash": matrix_hash,
                 "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
                 "verifier_provider_call_count": verifier_calls,
                 "cases": [
@@ -582,36 +605,40 @@ def main(argv: Sequence[str] | None = None) -> int:
         result_artifact = prepare_json_artifact_payload(payload)
         manifest_artifact = prepare_json_artifact_payload(
             {
-                "measurement_id": MEASUREMENT_ID_LIVE,
-                "matrix_git_blob_hash": REPLAY_MATRIX_HASH,
+                "measurement_id": live_measurement_id,
+                "matrix_git_blob_hash": matrix_hash,
                 "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
                 "verifier_provider_call_count": verifier_calls,
-                "attempt_marker_path": str(LIVE_ATTEMPT_MARKER_PATH),
-                "call_ledger_path": str(LIVE_CALL_LEDGER_PATH),
-                "raw_artifact_path": str(LIVE_RAW_ARTIFACT_PATH),
-                "result_artifact_path": str(LIVE_RESULT_ARTIFACT_PATH),
-                "manual_review_artifact_path": str(LIVE_MANUAL_REVIEW_ARTIFACT_PATH),
+                "attempt_marker_path": str(attempt_marker_path),
+                "call_ledger_path": str(live_call_ledger_path),
+                "raw_artifact_path": str(live_raw_path),
+                "result_artifact_path": str(live_result_path),
+                "manual_review_artifact_path": str(live_manual_path),
             }
         )
         try:
-            write_json_exclusive(LIVE_RAW_ARTIFACT_PATH, raw_artifact)
-            write_json_exclusive(LIVE_RESULT_ARTIFACT_PATH, result_artifact)
-            write_json_exclusive(LIVE_MANIFEST_ARTIFACT_PATH, manifest_artifact)
-            result_sha256 = sha256_file_hex(LIVE_RESULT_ARTIFACT_PATH)
+            write_json_exclusive(live_raw_path, raw_artifact)
+            write_json_exclusive(live_result_path, result_artifact)
+            write_json_exclusive(live_manifest_path, manifest_artifact)
+            result_sha256 = sha256_file_hex(live_result_path)
             manual_review = build_manual_review_seed(
                 case_results=list(case_results),
                 result_sha256=result_sha256,
                 replay_spec=replay_spec,
+                matrix_hash=matrix_hash,
+                measurement_id=live_measurement_id,
             )
             write_json_exclusive(
-                LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+                live_manual_path,
                 prepare_json_artifact_payload(manual_review),
             )
         except LiveArtifactWriteError as error:
             print(f"ARTIFACT_WRITE_ERROR: {error}", file=sys.stderr)
             return 6
 
-        print(json.dumps(result_artifact, ensure_ascii=False, indent=2))
+        sys.stdout.buffer.write(
+            (json.dumps(result_artifact, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        )
         return 0
 
     print("LIVE_NOT_CONFIGURED", file=sys.stderr)

@@ -34,6 +34,7 @@ REPLAY_MATRIX_V2_PATH = (
 REPLAY_MATRIX_V2_HASH = "009977fca3a3e2a37b5c865f74c55c49c00de669"
 SUITE_ID_V2 = "s54_fullcontext_verifier_replay_v2"
 MEASUREMENT_ID_V2 = "s54_fullcontext_verifier_replay_v2"
+MEASUREMENT_ID_V2_LIVE = "s55_fullcontext_verifier_replay_v2_live"
 
 FROZEN_S53_LIVE_RAW_SHA256 = (
     "5f71c1025024b75f0aded1bd0208f35fc1366ae0cef8f24ab0c869bd9d2755c6"
@@ -747,6 +748,7 @@ def build_manual_review_seed(
     result_sha256: str,
     matrix_hash: str = REPLAY_MATRIX_HASH,
     replay_spec: dict[str, Any] | None = None,
+    measurement_id: str = MEASUREMENT_ID_LIVE,
 ) -> dict[str, Any]:
     replay_by_id = (
         {case["case_id"]: case for case in replay_spec["cases"]} if replay_spec else {}
@@ -801,7 +803,7 @@ def build_manual_review_seed(
             }
         )
     return {
-        "measurement_id": MEASUREMENT_ID_LIVE,
+        "measurement_id": measurement_id,
         "matrix_git_blob_hash": matrix_hash,
         "source_result_sha256": FROZEN_SOURCE_RESULT_SHA256,
         "result_sha256": result_sha256,

@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S51 — lightweight risk-based semantic Verifier** |
-| Предыдущий checkpoint | **S50b — offline harness correction (Checkpoint B)** |
+| Последний завершённый checkpoint | **S52 — Verifier-only replay prep (offline harness on frozen S50 candidates)** |
+| Предыдущий checkpoint | **S51 correction — stale neighbor test + ARCH sync** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **Verifier-only live eval на frozen S50 candidate texts — только после отдельного owner approval** |
+| Ближайший рабочий focus без live | **Один verifier-only live run (19 calls) — только после отдельного owner approval model/gates/budget** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -384,6 +384,10 @@
 - [x] **S51 correction — stale neighbor test + ARCH sync** — migrate
   `test_demo_target_turn_frame_bound_response.py` to issue-based contract; ARCH § S51
   documents active Verifier. **NO LIVE**. Governance `e847228`; correction `239a405`.
+- [x] **S52 — Verifier-only replay prep** — isolated offline harness on 19 frozen S50 v2
+  candidate texts; replay matrix metadata-only; frozen Composer injection + fake
+  issue-based semantic backend; future-live artifact paths and gates pinned
+  `pending_owner_approval`. **NO LIVE**. Governance `33b08fc`/`2ac1e72`.
 
 ## Какой roadmap актуален
 

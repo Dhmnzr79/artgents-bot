@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "suite_id": "s52_fullcontext_verifier_replay",
+  "measurement_id": "s52_fullcontext_verifier_replay",
+  "client_id": "demo",
+  "frozen_before_first_live": true,
+  "source_matrix_v2_path": "evals/v5/demo/fullcontext_response_eval_matrix_v2.json",
+  "source_matrix_v2_git_blob_hash": "615714c519a92a75e23c2f15bbaa01a0f88a4d95",
+  "source_result_path": "evals/v5/artifacts/fullcontext_response_eval_v2_live_result.json",
+  "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+  "terminal_control_case_id": "fc_terminal_01",
+  "model_recommendation": {
+    "status": "pending_owner_approval",
+    "semantic_verifier_model": "qwen3.7-plus",
+    "expected_verifier_provider_calls_materializable": 19,
+    "expected_composer_provider_calls_materializable": 0,
+    "expected_provider_calls_terminal": 0,
+    "no_retry": true,
+    "no_repair": true,
+    "no_voting": true,
+    "no_second_pass": true
+  },
+  "proposed_automated_acceptance_gates": {
+    "status": "pending_owner_approval",
+    "decision_match_rate_min": 1.0,
+    "false_block_count_max": 0,
+    "missed_block_count_max": 0,
+    "verifier_provider_call_count_expected": 19,
+    "composer_provider_call_count_max": 0,
+    "retry_count_max": 0,
+    "malformed_count_max": 0,
+    "transport_error_count_max": 0,
+    "backend_failure_count_max": 0,
+    "invalid_offending_span_count_max": 0,
+    "terminal_control_match_required": true
+  },
+  "final_verdict_contract": {
+    "automated_pass_still_requires_manual_review": true,
+    "final_verdict_until_manual_review": "PENDING_MANUAL_REVIEW"
+  },
+  "cases": [
+    {
+      "case_id": "fc_info_01",
+      "source_matrix_v2_case_id": "fc_info_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "8ee7c2d29df92df3ec53c12dbe6f91cab96272237e0e4afcdb61df21711ca92d",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "general_information",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "implantation__service__classic.md"
+      ]
+    },
+    {
+      "case_id": "fc_info_02",
+      "source_matrix_v2_case_id": "fc_info_02",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "32bbea99662b8fb26eef0417baab9ad08f7ff042a2a339c25b568d9e186b9e9b",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "general_information",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "implantation__service__all_on_4.md"
+      ]
+    },
+    {
+      "case_id": "fc_pain_01",
+      "source_matrix_v2_case_id": "fc_pain_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "2710b50600c32942857e4cd59d82a5d985d9ea270c59f6dd046211af12d055d8",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "pain_reassurance",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "implantation__faq__pain.md"
+      ]
+    },
+    {
+      "case_id": "fc_price_01",
+      "source_matrix_v2_case_id": "fc_price_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "405af9c004d60684aad271c0c708550cee3118cfdd89e11a3207b58c091a9e6c",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "price",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "all_on_4.jaw.implantium"
+      ]
+    },
+    {
+      "case_id": "fc_payment_01",
+      "source_matrix_v2_case_id": "fc_payment_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "76bb12cb3df35d86920a9a78f5f386a19810ec7ab3fb3f699af87ffb64f4d99f",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "payment",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "all_on_4.jaw.implantium"
+      ]
+    },
+    {
+      "case_id": "fc_doctor_01",
+      "source_matrix_v2_case_id": "fc_doctor_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "1dc8da2fb9ed5c19b7d75d8f649611881cf54a42250ded197e322e6ba2bf8521",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "doctor",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_marketing_01",
+      "source_matrix_v2_case_id": "fc_marketing_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "a25599bde345ec83e2d066029806309f26a07479af856b1043ee4ba297aa1243",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "marketing",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_medical_01",
+      "source_matrix_v2_case_id": "fc_medical_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "726f92d1a4a6c432e777c59d32fb08d73876d710ab6ec56e81dab26b8dd6a871",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "grounded_medical",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "implantation__info__contraindications.md"
+      ]
+    },
+    {
+      "case_id": "fc_medical_02",
+      "source_matrix_v2_case_id": "fc_medical_02",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "c46cd7de5def131787a666f6b82a4b03a2124434b54e9f60c4704f565e4e095c",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "grounded_medical",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "implantation__info__contraindications.md"
+      ]
+    },
+    {
+      "case_id": "fc_medical_03",
+      "source_matrix_v2_case_id": "fc_medical_03",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "899e446e903b73c2928ba253f221002a7f522c8795d4ad7d4c17a657d865409f",
+      "expected_decision": "block",
+      "required_blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "grounded_medical",
+      "rationale": "Unsupported lactation, hormone, healing, risk, and timeline medical claims not in clinic base.",
+      "audit_source_refs": [
+        "implantation__info__contraindications.md"
+      ]
+    },
+    {
+      "case_id": "fc_missing_01",
+      "source_matrix_v2_case_id": "fc_missing_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "aaa5d24c3adb914e1877cc8953ad73f0625d547b33ddfddf7ba5237903700fd7",
+      "expected_decision": "block",
+      "required_blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "missing_base",
+      "rationale": "Transfers general contraindications and diabetes guidance onto lupus missing-base question.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_missing_02",
+      "source_matrix_v2_case_id": "fc_missing_02",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "8053ada663e98a5f765bfa365b0bb5a759082d68b3587ad2755a011c821f25fe",
+      "expected_decision": "block",
+      "required_blocking_issue_kinds": [
+        "material_external_medical_claim"
+      ],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "missing_base",
+      "rationale": "Uses external psoriasis classification for medical treatability conclusion.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_boundary_01",
+      "source_matrix_v2_case_id": "fc_boundary_01",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "c75707fc08017c52d8b6d095285369a4dfdf7b25ba07064290cb2b99a3d201a0",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "medical_boundary",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_boundary_02",
+      "source_matrix_v2_case_id": "fc_boundary_02",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "a67df82137d3bcd11abb4585ba6812d490dffcd08ee499b24dbb6b9d149ee36a",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "medical_boundary",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_boundary_03",
+      "source_matrix_v2_case_id": "fc_boundary_03",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "874342b41e75202fd3406c41155fc398bdb8c09e8485f7c2f22c73a33a43422e",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "medical_boundary",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_price_02",
+      "source_matrix_v2_case_id": "fc_price_02",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "d0c16c00855fa25cac6e2313d6e4b0a119dfaa08f9730590198127725ab3cfce",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "price",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_info_03",
+      "source_matrix_v2_case_id": "fc_info_03",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "c8bf1ba95b292e5d4587d91a2dff189af91b1eefb5bcdba7f60bdaf8b01329de",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "general_information",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": [
+        "implantation__service__classic.md"
+      ]
+    },
+    {
+      "case_id": "fc_commercial_02",
+      "source_matrix_v2_case_id": "fc_commercial_02",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "8eed8c55d17995f66601f8878eed5fe501798e8b0ecc73fb59a2f25e65c0cc05",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "commercial_answer",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    },
+    {
+      "case_id": "fc_boundary_04",
+      "source_matrix_v2_case_id": "fc_boundary_04",
+      "source_result_sha256": "273fb2dd7228bd31bb6f981399a77fcdb59336e07e99ba1ccd14005096bc39aa",
+      "candidate_text_sha256": "d1c064636937cecd159da216abf0c2a665298505e4ab96be8cf16b05a1976d5b",
+      "expected_decision": "pass",
+      "required_blocking_issue_kinds": [],
+      "allowed_nonblocking_issue_kinds": [
+        "minor_external_detail"
+      ],
+      "blast_radius_group": "medical_boundary",
+      "rationale": "Frozen S50 v2 candidate; owner label expected pass.",
+      "audit_source_refs": []
+    }
+  ]
+}

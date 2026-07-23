@@ -34,7 +34,7 @@ from core.target_composer_executor import (
 from core.target_turn_frame_bound_response import run_target_offline_turn_frame_bound_response
 from core.target_turn_frame_dispatch import TargetTurnFrameDispatchError
 from core.target_response_verifier import (
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
     TargetSemanticVerifierInvocation,
 )
 from core.turn_frame_from_raw import build_turn_frame_from_raw
@@ -73,13 +73,7 @@ class RecordingSemanticBackend:
 
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
-        return TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
-        )
+        return TargetSemanticAssessment()
 
 
 def _envelope(**overrides: object) -> TargetTurnFramePolicyEnvelope:

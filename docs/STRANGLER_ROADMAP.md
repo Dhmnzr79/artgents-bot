@@ -381,6 +381,9 @@
   numeric/strict-fact layer unchanged; historical five-boolean readers for frozen S47/S50
   replay only. Offline contract/wiring tests only — **NO LIVE**. Governance `1231742`;
   implementation `a2596f9`.
+- [x] **S51 correction — stale neighbor test + ARCH sync** — migrate
+  `test_demo_target_turn_frame_bound_response.py` to issue-based contract; ARCH § S51
+  documents active Verifier. **NO LIVE**. Governance `e847228`.
 
 ## Какой roadmap актуален
 

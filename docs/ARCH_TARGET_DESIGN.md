@@ -145,8 +145,9 @@ Verifier будущего медицинского ответа обязан п�
 - отсутствие персонального вывода о пригодности пациента;
 - отсутствие самостоятельного выбора лечения.
 
-Offline S38 уже закладывает semantic assessment по medical boundary и selected facts; полный
-checklist выше — **TARGET** для финальной medical-handoff verification.
+Offline S38 закладывает semantic assessment; **S51** заменил active five-boolean контракт
+на issue-based `TargetSemanticAssessment` (см. § S51 ниже). Полный checklist выше —
+**TARGET** для финальной medical-handoff verification.
 
 ### Организация контента: противопоказания (не routing)
 
@@ -332,8 +333,9 @@ S38 добавляет fail-closed target Verifier. Digit-form numeric claims с
 этапы, package/profile text без сканирования IDs, а lexical names вроде `All-on-4` уходят в
 semantic grounding. Каждый selected strict commercial fact обязан присутствовать verbatim.
 После deterministic checks каждый ответ получает ровно одну provider-neutral semantic
-assessment: grounding (включая числа словами и unit/context), topic scope, medical boundary
-и все selected facts. Verifier не чинит и не сокращает текст: mismatch/failure блокирует,
+assessment. **S51 (актуально):** active semantic output — `TargetSemanticAssessment` с
+`issues[]` (`kind` + `offending_span`); blocking kinds определяет код; model pass boolean
+отсутствует (см. § S51). Verifier не чинит и не сокращает текст: mismatch/failure блокирует,
 success сохраняет exact S37 text и sidecars. Provider/live quality proof, runtime/UI и
 product authority всё ещё отсутствуют.
 
@@ -406,9 +408,9 @@ input for general clinic MD (informational, reassuring, approved medical facts);
 primary evidence** remains strict authority for prices, payment stages, promotions,
 marketing/consultation values, CTA, and exact doctor credentials. On conflict structured
 exact facts win; Verifier fail-closes. Dispatch sanitizes envelope for content-only path
-(`required_fact_ids=()`, no marketing/CTA). `TargetSemanticVerification` replaces misleading
-`grounded_in_primary_evidence` with `general_grounding_ok` + `strict_commercial_grounding_ok`.
-Verifier receives the same prebuilt `TargetCachedFullContext` as Composer. **S34/S40/S41
+(`required_fact_ids=()`, no marketing/CTA). Verifier получает тот же prebuilt
+`TargetCachedFullContext`, что и Composer. **S51** заменил interim five-boolean semantic
+contract (`general_grounding_ok` и др.) на issue-based assessment (см. § S51). **S34/S40/S41
 service-specific paths unchanged in meaning.** No live/LLM. Governance `e7c312c`.
 
 S46 closes the last manual seam in the offline response chain (offline/unwired). Public API
@@ -434,6 +436,21 @@ binds result SHA-256 + matrix hash for all cases, final verdict stays
 `PENDING_MANUAL_REVIEW` (never `PASS`). Global manual rubric + case-specific profiles in
 matrix; proposed final acceptance gates and model recommendation remain
 `pending_owner_approval`. No live.
+
+S51 replaces the overloaded **active** five-boolean semantic contract
+(`general_grounding_ok`, `strict_commercial_grounding_ok`, `topic_scope_ok`,
+`medical_boundary_ok`, `selected_facts_ok`) with a lightweight issue-based assessment
+(offline/unwired). **Deterministic layer unchanged:** money from structured primary evidence only;
+verbatim `must_preserve_exact`; semantic backend not called after deterministic rejection.
+**Active semantic output:** `TargetSemanticAssessment` with `issues[]` of
+`TargetSemanticIssue` (`kind` + non-empty `offending_span` present in candidate text).
+**Blocking kinds (code decides):** `unsupported_clinic_claim`,
+`personal_medical_conclusion`, `material_external_medical_claim`.
+**Non-blocking:** `minor_external_detail` (warning only). No model pass boolean; verdict derived
+from validated blocking kinds. Conversational empathy, consultation invitations, and faithful
+paraphrase are not violations. Old five-boolean fields remain **only** for historical frozen
+S47/S50 replay readers — not active product schema. FullContext, structured authority, and
+FINAL_FULLCONTEXT_ONLY unchanged. Governance `1231742` / `a2596f9`. No live/LLM.
 
 ---
 

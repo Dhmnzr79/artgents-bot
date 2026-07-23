@@ -32,7 +32,8 @@ from core.target_composer_request import TargetComposerRequestError
 from core.target_response_policy import build_target_response_spec
 from core.target_response_verifier import (
     TargetResponseVerificationError,
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
+    TargetSemanticIssue,
     TargetSemanticVerifierInvocation,
 )
 from core.target_spec_offline_response_package import (
@@ -81,12 +82,15 @@ class RecordingSemanticBackend:
 
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
-        return TargetSemanticVerification(
-            general_grounding_ok=self.accepted,
-            strict_commercial_grounding_ok=self.accepted,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
+        if self.accepted:
+            return TargetSemanticAssessment()
+        return TargetSemanticAssessment(
+            issues=(
+                TargetSemanticIssue(
+                    kind="unsupported_clinic_claim",
+                    offending_span="318 000",
+                ),
+            )
         )
 
 
@@ -261,7 +265,7 @@ def test_real_semantic_rejection_returns_no_partial_verified_response() -> None:
         )
     assert (caught.value.code, caught.value.value) == (
         "target_verifier_semantic_rejected",
-        ("general_grounding_ok", "strict_commercial_grounding_ok"),
+        (("unsupported_clinic_claim", "318 000"),),
     )
     assert len(composer.invocations) == 1
     assert len(semantic.invocations) == 1

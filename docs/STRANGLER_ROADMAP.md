@@ -55,11 +55,11 @@
 | Вопрос | Ответ |
 |---|---|
 | Текущий этап | **A9 — Native Patient-scope Extraction** |
-| Последний завершённый checkpoint | **S50b — offline harness correction (Checkpoint B)** |
-| Предыдущий checkpoint | **S50 — live re-eval v2 incident audit capture** |
+| Последний завершённый checkpoint | **S51 — lightweight risk-based semantic Verifier** |
+| Предыдущий checkpoint | **S50b — offline harness correction (Checkpoint B)** |
 | Следующий технический checkpoint A9 | **A9 One-run Live Re-audit — только после отдельного разрешения владельца** |
 | Отдельная S-series без live | **S47 first live attempted — AUTOMATED_FAIL**; incident captured, not passed |
-| Ближайший рабочий focus без live | **Первый разрешённый live response eval — отдельное governance** |
+| Ближайший рабочий focus без live | **Verifier-only live eval на frozen S50 candidate texts — только после отдельного owner approval** |
 | Что сейчас отвечает в локальном demo | Текущий legacy product path; новая patient-scope ось остаётся shadow-only |
 | Patient-scope authority | **Forbidden** |
 | Новый live/LLM run | Только после отдельного разрешения владельца |
@@ -376,6 +376,10 @@
   `captures` delegation; post-marker output preflight (`preflight_exclude_paths`).
   Harness reliability only; Verifier FN (`fc_missing_01`/`fc_medical_03`) still open.
   **NO LIVE**. Governance `85e64ce`.
+- [x] **S51 — lightweight risk-based semantic Verifier** — replace active five-boolean
+  `TargetSemanticVerification` with issue-based `TargetSemanticAssessment`; deterministic
+  numeric/strict-fact layer unchanged; historical five-boolean readers for frozen S47/S50
+  replay only. Offline contract/wiring tests only — **NO LIVE**. Governance `1231742`.
 
 ## Какой roadmap актуален
 

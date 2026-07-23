@@ -7,7 +7,7 @@ from typing import Protocol
 
 from core.target_composer_executor import TargetComposerBackend, TargetComposerInvocation
 from core.target_response_verifier import (
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
     TargetSemanticVerifierBackend,
     TargetSemanticVerifierInvocation,
 )
@@ -67,15 +67,9 @@ class FullContextResponseEvalRecordingSemanticBackend:
 
     def __init__(
         self,
-        assessment: TargetSemanticVerification | None = None,
+        assessment: TargetSemanticAssessment | None = None,
     ) -> None:
-        self.assessment = assessment or TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
-        )
+        self.assessment = assessment or TargetSemanticAssessment()
         self.call_count = 0
         self.captures: list[FullContextResponseEvalSemanticCapture] = []
 

@@ -36,7 +36,8 @@ from core.target_fullcontext_content_package import assemble_target_fullcontext_
 from core.target_response_policy import build_target_response_spec
 from core.target_response_verifier import (
     TargetResponseVerificationError,
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
+    TargetSemanticIssue,
     TargetSemanticVerifierInvocation,
     verify_target_composed_response,
 )
@@ -87,6 +88,28 @@ UNGROUNDED_EXTENSION_TEXT = (
     "Обычно полное заживление занимает около трёх месяцев."
 )
 
+FC_MISSING_01_TEXT = (
+    "В материалах клиники нет информации по этой теме. "
+    "При компенсированном диабете имплантация возможна под контролем врача. "
+    "Системная красная волчанка относится к аутоиммунным заболеваниям."
+)
+
+FC_MISSING_02_TEXT = (
+    "В материалах клиники нет информации по этой теме. "
+    "Псориаз относится к аутоиммунным заболеваниям."
+)
+
+FC_MEDICAL_03_TEXT = (
+    "При беременности имплантация противопоказана. "
+    "В период лактации гормональный фон замедляет заживление, поэтому лучше подождать."
+)
+
+MINOR_CLASSIFICATION_TEXT = (
+    "В материалах клиники нет информации по этой теме. "
+    "Системная красная волчанка относится к аутоиммунным заболеваниям. "
+    "На консультации врач ответит на ваш вопрос."
+)
+
 CTA_FROM_CORPUS_TEXT = (
     "Страх боли при имплантации — нормальная реакция. "
     "Запишитесь по телефону +7 (495) 128-47-60."
@@ -104,19 +127,17 @@ class RecordingComposerBackend:
 
 
 class RecordingSemanticBackend:
-    def __init__(self, assessment: TargetSemanticVerification | None = None) -> None:
-        self.assessment = assessment or TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
-        )
+    def __init__(self, assessment: TargetSemanticAssessment | None = None) -> None:
+        self.assessment = assessment or TargetSemanticAssessment()
         self.invocations: list[TargetSemanticVerifierInvocation] = []
 
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
         return self.assessment
+
+
+def _issue(kind: str, span: str) -> TargetSemanticIssue:
+    return TargetSemanticIssue(kind=kind, offending_span=span)  # type: ignore[arg-type]
 
 
 class RuleBasedSemanticBackend:
@@ -142,69 +163,84 @@ class RuleBasedSemanticBackend:
                     "гарантируем отсутствие боли",
                 )
             )
-            return TargetSemanticVerification(
-                general_grounding_ok=grounded,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=not personal_promise,
-                selected_facts_ok=True,
-            )
+            issues: tuple[TargetSemanticIssue, ...] = ()
+            if not grounded:
+                issues += (_issue("unsupported_clinic_claim", "боль"),)
+            if personal_promise:
+                issues += (_issue("personal_medical_conclusion", "вам не будет больно"),)
+            return TargetSemanticAssessment(issues=issues)
         if self.mode == "diabetes_ok":
             grounded = "компенсирован" in text and "компенсирован" in corpus
-            return TargetSemanticVerification(
-                general_grounding_ok=grounded,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=True,
-                selected_facts_ok=True,
+            return TargetSemanticAssessment(
+                issues=()
+                if grounded
+                else (_issue("material_external_medical_claim", "компенсирован"),)
             )
         if self.mode == "diabetes_reject":
-            return TargetSemanticVerification(
-                general_grounding_ok=False,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=False,
-                selected_facts_ok=True,
+            return TargetSemanticAssessment(
+                issues=(_issue("personal_medical_conclusion", "Вам можно"),)
             )
         if self.mode == "missing_ok":
             no_external = "волчан" not in text and "аутоиммун" not in text
             mentions_gap = "материал" in text and "нет" in text
-            return TargetSemanticVerification(
-                general_grounding_ok=mentions_gap,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=no_external,
-                selected_facts_ok=True,
-            )
+            issues: tuple[TargetSemanticIssue, ...] = ()
+            if not mentions_gap:
+                issues += (_issue("unsupported_clinic_claim", "материал"),)
+            if not no_external:
+                issues += (
+                    _issue("material_external_medical_claim", "аутоиммун"),
+                )
+            return TargetSemanticAssessment(issues=issues)
         if self.mode == "missing_reject":
-            return TargetSemanticVerification(
-                general_grounding_ok=True,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=False,
-                selected_facts_ok=True,
+            return TargetSemanticAssessment(
+                issues=(_issue("material_external_medical_claim", "аутоиммун"),)
             )
+        if self.mode == "missing_minor":
+            return TargetSemanticAssessment(
+                issues=(
+                    _issue(
+                        "minor_external_detail",
+                        "аутоиммунным заболеваниям",
+                    ),
+                )
+            )
+        if self.mode == "fc_missing_01":
+            issues: list[TargetSemanticIssue] = []
+            if "компенсирован" in text:
+                issues.append(_issue("material_external_medical_claim", "компенсирован"))
+            if "волчан" in text or "аутоиммун" in text:
+                issues.append(_issue("material_external_medical_claim", "аутоиммун"))
+            return TargetSemanticAssessment(issues=tuple(issues))
+        if self.mode == "fc_missing_02":
+            if "аутоиммун" in text:
+                return TargetSemanticAssessment(
+                    issues=(_issue("material_external_medical_claim", "аутоиммун"),)
+                )
+            return TargetSemanticAssessment()
+        if self.mode == "fc_medical_03":
+            issues: list[TargetSemanticIssue] = []
+            for span in ("лактац", "гормон", "заживл"):
+                if span in text:
+                    issues.append(_issue("material_external_medical_claim", span))
+            return TargetSemanticAssessment(issues=tuple(issues))
         if self.mode == "ungrounded_extension":
             grounded_core = "компенсирован" in text and "компенсирован" in corpus
             ungrounded_addition = "трёх месяц" in text or "заживл" in text
-            return TargetSemanticVerification(
-                general_grounding_ok=grounded_core and not ungrounded_addition,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=True,
-                selected_facts_ok=True,
-            )
+            issues: tuple[TargetSemanticIssue, ...] = ()
+            if not grounded_core:
+                issues += (_issue("material_external_medical_claim", "компенсирован"),)
+            if ungrounded_addition:
+                issues += (_issue("material_external_medical_claim", "трёх месяц"),)
+            return TargetSemanticAssessment(issues=issues)
         if self.mode == "cta_reject":
             has_contact = "+7" in text or "whatsapp" in text
             spec = json.loads(invocation.response_spec_json)
             allowed = spec.get("allow_cta", True)
-            return TargetSemanticVerification(
-                general_grounding_ok=True,
-                strict_commercial_grounding_ok=not has_contact or allowed,
-                topic_scope_ok=True,
-                medical_boundary_ok=True,
-                selected_facts_ok=True,
-            )
+            if has_contact and not allowed:
+                return TargetSemanticAssessment(
+                    issues=(_issue("unsupported_clinic_claim", "+7"),)
+                )
+            return TargetSemanticAssessment()
         raise AssertionError(f"unknown mode: {self.mode}")
 
 
@@ -393,7 +429,7 @@ def test_personal_eligibility_answer_is_rejected() -> None:
             semantic_backend=RuleBasedSemanticBackend(mode="diabetes_reject"),
         )
     assert caught.value.code == "target_verifier_semantic_rejected"
-    assert "medical_boundary_ok" in caught.value.value
+    assert caught.value.value[0][0] == "personal_medical_conclusion"
 
 
 def test_missing_topic_synthetic_passes_controlled_no_information(tmp_path: Path) -> None:
@@ -500,7 +536,7 @@ def test_ungrounded_medical_extension_is_rejected() -> None:
             semantic_backend=RuleBasedSemanticBackend(mode="ungrounded_extension"),
         )
     assert caught.value.code == "target_verifier_semantic_rejected"
-    assert "general_grounding_ok" in caught.value.value
+    assert caught.value.value[0][0] == "material_external_medical_claim"
 
 
 def test_cta_prose_from_corpus_rejected_when_allow_cta_false() -> None:
@@ -531,7 +567,7 @@ def test_cta_prose_from_corpus_rejected_when_allow_cta_false() -> None:
             semantic_backend=RuleBasedSemanticBackend(mode="cta_reject"),
         )
     assert caught.value.code == "target_verifier_semantic_rejected"
-    assert "strict_commercial_grounding_ok" in caught.value.value
+    assert caught.value.value[0][0] == "unsupported_clinic_claim"
 
 
 def test_consultation_close_without_contacts_stays_allowed() -> None:
@@ -747,3 +783,142 @@ def test_confident_medical_handoff_materializes_without_service_id() -> None:
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.dispatch.policy_request.service_id is None
     assert result.dispatch.policy_request.response_mode == "medical_handoff"
+
+
+def test_fc_missing_01_class_blocks_cross_disease_transfer(tmp_path: Path) -> None:
+    md_root = tmp_path / "md"
+    md_root.mkdir()
+    (md_root / "general.md").write_text(
+        "---\ndoc_id: general\ntopic: implantation\n---\n\n## Общее\nКлиника проводит имплантацию.\n",
+        encoding="utf-8",
+    )
+    cached = build_target_cached_full_context(md_root)
+    bundle = load_response_schema_bundle(TARGET_ROOT)
+    doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+    consultations = build_service_consultation_values(MD_ROOT)
+    spec = build_target_response_spec(_content_only_policy(response_mode="medical_handoff"))
+    bound = assemble_target_fullcontext_content_bound_package(spec)
+    request = materialize_target_composer_request(
+        bound,
+        bundle,
+        doctors,
+        consultations,
+        user_message="Можно ли делать имплантацию при системной красной волчанке?",
+        md_root=md_root,
+    )
+    unverified = TargetUnverifiedComposedResponse(
+        text=FC_MISSING_01_TEXT,
+        spec=request.spec,
+        selected_followups=request.selected_followups,
+        selected_cta_key=request.selected_cta_key,
+    )
+    with pytest.raises(TargetResponseVerificationError) as caught:
+        verify_target_composed_response(
+            request,
+            unverified,
+            cached_full_context=cached,
+            semantic_backend=RuleBasedSemanticBackend(mode="fc_missing_01"),
+        )
+    assert caught.value.code == "target_verifier_semantic_rejected"
+
+
+def test_fc_missing_02_class_blocks_external_psoriasis_classification(
+    tmp_path: Path,
+) -> None:
+    md_root = tmp_path / "md"
+    md_root.mkdir()
+    (md_root / "general.md").write_text(
+        "---\ndoc_id: general\ntopic: implantation\n---\n\n## Общее\nКлиника проводит имплантацию.\n",
+        encoding="utf-8",
+    )
+    cached = build_target_cached_full_context(md_root)
+    bundle = load_response_schema_bundle(TARGET_ROOT)
+    doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+    consultations = build_service_consultation_values(MD_ROOT)
+    spec = build_target_response_spec(_content_only_policy(response_mode="medical_handoff"))
+    bound = assemble_target_fullcontext_content_bound_package(spec)
+    request = materialize_target_composer_request(
+        bound,
+        bundle,
+        doctors,
+        consultations,
+        user_message="Можно ли делать имплантацию при псориазе?",
+        md_root=md_root,
+    )
+    unverified = TargetUnverifiedComposedResponse(
+        text=FC_MISSING_02_TEXT,
+        spec=request.spec,
+        selected_followups=request.selected_followups,
+        selected_cta_key=request.selected_cta_key,
+    )
+    with pytest.raises(TargetResponseVerificationError):
+        verify_target_composed_response(
+            request,
+            unverified,
+            cached_full_context=cached,
+            semantic_backend=RuleBasedSemanticBackend(mode="fc_missing_02"),
+        )
+
+
+def test_fc_medical_03_class_blocks_lactation_healing_claims() -> None:
+    inputs = _pipeline_inputs()
+    spec = build_target_response_spec(_content_only_policy(response_mode="medical_handoff"))
+    bound = assemble_target_fullcontext_content_bound_package(spec)
+    request = materialize_target_composer_request(
+        bound,
+        inputs["bundle"],  # type: ignore[arg-type]
+        inputs["doctor_catalog"],  # type: ignore[arg-type]
+        inputs["consultation_values"],  # type: ignore[arg-type]
+        user_message="Можно ли ставить имплант при беременности?",
+        md_root=MD_ROOT,
+    )
+    unverified = TargetUnverifiedComposedResponse(
+        text=FC_MEDICAL_03_TEXT,
+        spec=request.spec,
+        selected_followups=request.selected_followups,
+        selected_cta_key=request.selected_cta_key,
+    )
+    with pytest.raises(TargetResponseVerificationError) as caught:
+        verify_target_composed_response(
+            request,
+            unverified,
+            cached_full_context=DEMO_FULL_CONTEXT,
+            semantic_backend=RuleBasedSemanticBackend(mode="fc_medical_03"),
+        )
+    assert caught.value.code == "target_verifier_semantic_rejected"
+
+
+def test_minor_external_classification_is_warning_only(tmp_path: Path) -> None:
+    md_root = tmp_path / "md"
+    md_root.mkdir()
+    (md_root / "general.md").write_text(
+        "---\ndoc_id: general\ntopic: implantation\n---\n\n## Общее\nКлиника проводит имплантацию.\n",
+        encoding="utf-8",
+    )
+    cached = build_target_cached_full_context(md_root)
+    bundle = load_response_schema_bundle(TARGET_ROOT)
+    doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+    consultations = build_service_consultation_values(MD_ROOT)
+    spec = build_target_response_spec(_content_only_policy(response_mode="medical_handoff"))
+    bound = assemble_target_fullcontext_content_bound_package(spec)
+    request = materialize_target_composer_request(
+        bound,
+        bundle,
+        doctors,
+        consultations,
+        user_message="Можно ли делать имплантацию при системной красной волчанке?",
+        md_root=md_root,
+    )
+    unverified = TargetUnverifiedComposedResponse(
+        text=MINOR_CLASSIFICATION_TEXT,
+        spec=request.spec,
+        selected_followups=request.selected_followups,
+        selected_cta_key=request.selected_cta_key,
+    )
+    result = verify_target_composed_response(
+        request,
+        unverified,
+        cached_full_context=cached,
+        semantic_backend=RuleBasedSemanticBackend(mode="missing_minor"),
+    )
+    assert result.verification_status == "verified"

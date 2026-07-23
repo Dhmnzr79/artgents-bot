@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -336,6 +337,25 @@ SEMANTIC_REJECT_FIELDS = (
     "semantic_selected_facts_rejected",
 )
 
+_HISTORICAL_FIVE_BOOLEAN_FIELDS = (
+    "general_grounding_ok",
+    "strict_commercial_grounding_ok",
+    "topic_scope_ok",
+    "medical_boundary_ok",
+    "selected_facts_ok",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class HistoricalFiveBooleanSemanticAssessment:
+    """Frozen S47/S50 live replay only — not active product schema."""
+
+    general_grounding_ok: bool
+    strict_commercial_grounding_ok: bool
+    topic_scope_ok: bool
+    medical_boundary_ok: bool
+    selected_facts_ok: bool
+
 CASE_RESULT_KEYS = frozenset(
     {
         "index",
@@ -384,29 +404,60 @@ def extract_candidate_text_from_composer_payload(payload: object) -> str | None:
     return None
 
 
+def _issue_list_from_payload(semantic_raw_payload: object) -> list[dict[str, Any]] | None:
+    if not isinstance(semantic_raw_payload, dict):
+        return None
+    assessment = semantic_raw_payload.get("assessment")
+    if isinstance(assessment, dict) and "issues" in assessment:
+        issues = assessment.get("issues")
+        return list(issues) if isinstance(issues, (list, tuple)) else None
+    if "issues" in semantic_raw_payload:
+        issues = semantic_raw_payload.get("issues")
+        return list(issues) if isinstance(issues, (list, tuple)) else None
+    return None
+
+
 def _semantic_assessment_dict(semantic_raw_payload: object) -> dict[str, Any] | None:
     if not isinstance(semantic_raw_payload, dict):
         return None
     assessment = semantic_raw_payload.get("assessment")
     if isinstance(assessment, dict):
-        return assessment
-    ok_fields = (
-        "general_grounding_ok",
-        "strict_commercial_grounding_ok",
-        "topic_scope_ok",
-        "medical_boundary_ok",
-        "selected_facts_ok",
-    )
-    if any(field in semantic_raw_payload for field in ok_fields):
+        if "issues" in assessment:
+            return assessment
+        if any(field in assessment for field in _HISTORICAL_FIVE_BOOLEAN_FIELDS):
+            return assessment
+    if _issue_list_from_payload(semantic_raw_payload) is not None:
+        return semantic_raw_payload
+    if any(field in semantic_raw_payload for field in _HISTORICAL_FIVE_BOOLEAN_FIELDS):
         return semantic_raw_payload
     return None
+
+
+def _reject_flags_from_issue_kinds(issues: list[dict[str, Any]]) -> dict[str, bool]:
+    flags = dict.fromkeys(SEMANTIC_REJECT_FIELDS, False)
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        kind = issue.get("kind")
+        if kind == "unsupported_clinic_claim":
+            flags["semantic_general_grounding_rejected"] = True
+            flags["semantic_strict_commercial_grounding_rejected"] = True
+            flags["semantic_topic_scope_rejected"] = True
+            flags["semantic_selected_facts_rejected"] = True
+        elif kind == "personal_medical_conclusion":
+            flags["semantic_medical_boundary_rejected"] = True
+        elif kind == "material_external_medical_claim":
+            flags["semantic_general_grounding_rejected"] = True
+    return flags
 
 
 def derive_semantic_reject_flags(semantic_raw_payload: object) -> dict[str, bool]:
     assessment = _semantic_assessment_dict(semantic_raw_payload)
     if assessment is None:
         raise HarnessConfigError("semantic assessment required to derive reject flags")
-    flags: dict[str, bool] = {}
+    issues = _issue_list_from_payload(semantic_raw_payload) or assessment.get("issues")
+    if isinstance(issues, list):
+        return _reject_flags_from_issue_kinds(issues)
     mapping = {
         "general_grounding_ok": "semantic_general_grounding_rejected",
         "strict_commercial_grounding_ok": "semantic_strict_commercial_grounding_rejected",
@@ -414,6 +465,7 @@ def derive_semantic_reject_flags(semantic_raw_payload: object) -> dict[str, bool
         "medical_boundary_ok": "semantic_medical_boundary_rejected",
         "selected_facts_ok": "semantic_selected_facts_rejected",
     }
+    flags: dict[str, bool] = {}
     for ok_field, reject_field in mapping.items():
         flags[reject_field] = assessment.get(ok_field) is False
     return flags

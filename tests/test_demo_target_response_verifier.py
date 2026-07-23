@@ -26,7 +26,7 @@ from core.target_composer_request import materialize_target_composer_request
 from core.target_response_policy import build_target_response_spec
 from core.target_cached_full_context import build_target_cached_full_context
 from core.target_response_verifier import (
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
     TargetSemanticVerifierInvocation,
     verify_target_composed_response,
 )
@@ -46,13 +46,7 @@ class RecordingSemanticBackend:
 
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
-        return TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
-        )
+        return TargetSemanticAssessment()
 
 
 def _real_request():
@@ -155,6 +149,8 @@ def test_real_demo_all_on_4_response_reaches_one_offline_semantic_assessment() -
         "allowed_topics": ["implantation", "doctors"],
         "forbidden_topics": ["diagnosis", "personal_eligibility"],
         "required_fact_ids": ["free_implant_consult"],
+        "allow_cta": True,
+        "allow_consultation_close": True,
     }
     evidence = json.loads(invocation.primary_evidence_json)
     assert [item["kind"] for item in evidence] == [

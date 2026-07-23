@@ -21,7 +21,8 @@ from core.target_response_verifier import (
     TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY,
     TargetNumericClaim,
     TargetResponseVerificationError,
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
+    TargetSemanticIssue,
     TargetSemanticVerifierInvocation,
     TargetVerifiedComposedResponse,
     verify_target_composed_response,
@@ -30,13 +31,7 @@ from core.target_response_verifier import (
 
 class RecordingBackend:
     def __init__(self, assessment: object | None = None) -> None:
-        self.assessment = assessment or TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
-        )
+        self.assessment = assessment or TargetSemanticAssessment()
         self.invocations: list[TargetSemanticVerifierInvocation] = []
 
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
@@ -232,13 +227,11 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "primary_evidence_json",
         "candidate_text",
     ]
-    assert [field.name for field in fields(TargetSemanticVerification)] == [
-        "general_grounding_ok",
-        "strict_commercial_grounding_ok",
-        "topic_scope_ok",
-        "medical_boundary_ok",
-        "selected_facts_ok",
+    assert [field.name for field in fields(TargetSemanticIssue)] == [
+        "kind",
+        "offending_span",
     ]
+    assert [field.name for field in fields(TargetSemanticAssessment)] == ["issues"]
     assert [field.name for field in fields(TargetVerifiedComposedResponse)] == [
         "text",
         "spec",
@@ -264,10 +257,9 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "target_verifier_full_context_invalid",
     }
     assert "CACHED_FULL_CONTEXT" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
-    assert "every selected commercial fact" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "unsupported_clinic_claim" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
     assert "Never rewrite" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
-    assert "allow_cta" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
-    assert "general_grounding_ok=false" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
+    assert "minor_external_detail" in TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY
 
 
 def test_success_calls_one_semantic_backend_and_preserves_exact_response() -> None:
@@ -476,12 +468,13 @@ def test_digit_ranges_percent_decimals_and_time_are_typed() -> None:
 def test_number_words_are_delegated_to_mandatory_semantic_assessment() -> None:
     request = _request()
     backend = RecordingBackend(
-        TargetSemanticVerification(
-            general_grounding_ok=False,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
+        TargetSemanticAssessment(
+            issues=(
+                TargetSemanticIssue(
+                    kind="unsupported_clinic_claim",
+                    offending_span="сто тысяч рублей",
+                ),
+            )
         )
     )
     error = _caught(
@@ -495,7 +488,7 @@ def test_number_words_are_delegated_to_mandatory_semantic_assessment() -> None:
     assert len(backend.invocations) == 1
     assert (error.code, error.value) == (
         "target_verifier_semantic_rejected",
-        ("general_grounding_ok",),
+        (("unsupported_clinic_claim", "сто тысяч рублей"),),
     )
 
 
@@ -697,27 +690,35 @@ def test_backend_failures_and_semantic_false_fields_are_fail_closed_once() -> No
     assert malformed.code == "target_verifier_semantic_output_invalid"
 
     rejected_backend = RecordingBackend(
-        TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=False,
-            medical_boundary_ok=False,
-            selected_facts_ok=False,
+        TargetSemanticAssessment(
+            issues=(
+                TargetSemanticIssue(
+                    kind="personal_medical_conclusion",
+                    offending_span="Вам нельзя",
+                ),
+                TargetSemanticIssue(
+                    kind="material_external_medical_claim",
+                    offending_span="три месяца",
+                ),
+            )
         )
     )
     rejected = _caught(
         lambda: verify_target_composed_response(
             request,
-            response,
+            _response(
+                request,
+                "Вам нельзя имплантацию. Полное заживление занимает три месяца. "
+                "Строгий факт 5 лет.",
+            ),
             cached_full_context=_cached_context(),
             semantic_backend=rejected_backend,
         )
     )
     assert rejected.code == "target_verifier_semantic_rejected"
     assert rejected.value == (
-        "topic_scope_ok",
-        "medical_boundary_ok",
-        "selected_facts_ok",
+        ("personal_medical_conclusion", "Вам нельзя"),
+        ("material_external_medical_claim", "три месяца"),
     )
     assert len(rejected_backend.invocations) == 1
 
@@ -832,3 +833,90 @@ def test_import_firewall_excludes_legacy_provider_runtime_and_live_hooks() -> No
     assert all(token not in filtered_import_lines for token in forbidden)
     assert "pytest.skip" not in source
     assert "xfail" not in source
+
+
+def test_minor_external_detail_is_warning_only_and_does_not_reject() -> None:
+    request = _request()
+    backend = RecordingBackend(
+        TargetSemanticAssessment(
+            issues=(
+                TargetSemanticIssue(
+                    kind="minor_external_detail",
+                    offending_span="аутоиммунным заболеваниям",
+                ),
+            )
+        )
+    )
+    result = verify_target_composed_response(
+        request,
+        _response(
+            request,
+            "Волчанка относится к аутоиммунным заболеваниям. Строгий факт 5 лет.",
+        ),
+        cached_full_context=_cached_context(),
+        semantic_backend=backend,
+    )
+    assert result.verification_status == "verified"
+
+
+def test_invalid_offending_span_fails_before_acceptance() -> None:
+    request = _request()
+    backend = RecordingBackend(
+        TargetSemanticAssessment(
+            issues=(
+                TargetSemanticIssue(
+                    kind="material_external_medical_claim",
+                    offending_span="missing fragment",
+                ),
+            )
+        )
+    )
+    error = _caught(
+        lambda: verify_target_composed_response(
+            request,
+            _response(request),
+            cached_full_context=_cached_context(),
+            semantic_backend=backend,
+        )
+    )
+    assert error.code == "target_verifier_semantic_output_invalid"
+
+
+def test_empathy_and_consultation_wording_passes_with_empty_issues() -> None:
+    request = _request(
+        spec=_spec(
+            service_id=None,
+            required_fact_ids=(),
+            required_components=("content",),
+            allow_marketing_facts=False,
+            allow_cta=False,
+        ),
+        blocks=(),
+    )
+    request = TargetComposerRequest(
+        user_message="Больно ли?",
+        spec=request.spec,
+        evidence_blocks=(),
+        selected_followups=TargetResponseFollowupSelection(
+            source=None,
+            content=(),
+            price=(),
+        ),
+        selected_cta_key=None,
+    )
+    text = (
+        "Понимаю ваш страх — это нормально. "
+        "На консультации врач спокойно объяснит, как проходит обезболивание."
+    )
+    result = verify_target_composed_response(
+        request,
+        TargetUnverifiedComposedResponse(
+            text=text,
+            spec=request.spec,
+            selected_followups=request.selected_followups,
+            selected_cta_key=None,
+        ),
+        cached_full_context=_cached_context("corpus анестезия консультация"),
+        semantic_backend=RecordingBackend(),
+    )
+    assert result.verification_status == "verified"

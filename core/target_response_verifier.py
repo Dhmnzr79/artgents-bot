@@ -29,13 +29,14 @@ TargetNumericKind: TypeAlias = Literal[
     "generic",
 ]
 
-TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY = """1. Assess whether general factual claims are grounded in CACHED_FULL_CONTEXT and/or allowed non-commercial PRIMARY_EVIDENCE.
-2. Assess whether strict commercial claims—prices, payment stages, promotions, marketing facts, consultation values, CTA, and exact doctor credentials—are grounded only in structured PRIMARY_EVIDENCE.
-3. Assess whether the answer stays inside allowed topics and outside forbidden topics.
-4. In medical_handoff: set medical_boundary_ok=true for general grounded conditional answers that do not diagnose, decide personal eligibility, compare diagnoses, or choose treatment for the user. Set medical_boundary_ok=false for diagnosis, differential diagnosis, personal eligibility, or treatment choice for the user. Set general_grounding_ok=false if any medical factual claim is not supported by CACHED_FULL_CONTEXT, including explanations, causes, timelines, diagnostic steps, or recommendations absent from clinic materials. A neutral invitation to consultation or in-person assessment is not personal eligibility.
-5. Treat phone numbers, messenger handles, URLs, and contact CTAs in prose as strict commercial claims: strict_commercial_grounding_ok=false unless they appear only in allowed PRIMARY_EVIDENCE and response spec allow_cta permits them.
-6. Assess every selected commercial fact: natural facts must be present without meaning change and strict facts must remain verbatim.
-7. Return only the structured assessment fields. Never rewrite, repair, shorten, or replace the candidate answer."""
+TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY = """1. Assess the candidate answer against CACHED_FULL_CONTEXT and PRIMARY_EVIDENCE.
+2. Return JSON only: {"issues":[{"kind":"<kind>","offending_span":"<exact substring from candidate>"}, ...]}. An empty issues array means no semantic violations.
+3. unsupported_clinic_claim — invented or distorted clinic prices, numbers, guarantees, or facts; ungrounded strict commercial claims (prices, payment stages, promotions, marketing facts, consultation values, CTA, exact doctor credentials) not supported by PRIMARY_EVIDENCE; phone numbers, messenger handles, URLs, or contact CTAs in prose when allow_cta is false or they are absent from allowed PRIMARY_EVIDENCE; content outside allowed topics or touching forbidden topics; selected commercial facts paraphrased with meaning change or missing strict verbatim facts.
+4. personal_medical_conclusion — diagnosis or differential for the user; personal eligibility verdict (вам можно/нельзя); treatment choice or medical advice for this patient.
+5. material_external_medical_claim — a medical factual claim not supported by CACHED_FULL_CONTEXT or PRIMARY_EVIDENCE that materially changes risk, contraindication, treatability, required examination, treatment timelines, or medical recommendation. Missing-base answers must not transfer facts from similar conditions.
+6. minor_external_detail — immaterial external medical classification or detail that does not change medical conclusion (for example a neutral disease-category label without eligibility, risk, contraindication, timeline, examination, or treatment implications). When uncertain between material and minor, choose minor_external_detail if the medical conclusion is unchanged.
+7. Conversational empathy, neutral consultation invitations without contact details, and faithful paraphrase preserving meaning are not violations.
+8. Each offending_span must be a non-empty exact substring of the candidate answer. Never rewrite, repair, shorten, or replace the candidate answer."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,13 +54,42 @@ class TargetSemanticVerifierInvocation:
     candidate_text: str
 
 
+TargetSemanticIssueKind: TypeAlias = Literal[
+    "unsupported_clinic_claim",
+    "personal_medical_conclusion",
+    "material_external_medical_claim",
+    "minor_external_detail",
+]
+
+_TARGET_SEMANTIC_ISSUE_KINDS = frozenset(
+    {
+        "unsupported_clinic_claim",
+        "personal_medical_conclusion",
+        "material_external_medical_claim",
+        "minor_external_detail",
+    }
+)
+
+TARGET_SEMANTIC_ISSUE_KINDS = _TARGET_SEMANTIC_ISSUE_KINDS
+
+_TARGET_SEMANTIC_BLOCKING_KINDS = frozenset(
+    {
+        "unsupported_clinic_claim",
+        "personal_medical_conclusion",
+        "material_external_medical_claim",
+    }
+)
+
+
 @dataclass(frozen=True, slots=True)
-class TargetSemanticVerification:
-    general_grounding_ok: bool
-    strict_commercial_grounding_ok: bool
-    topic_scope_ok: bool
-    medical_boundary_ok: bool
-    selected_facts_ok: bool
+class TargetSemanticIssue:
+    kind: TargetSemanticIssueKind
+    offending_span: str
+
+
+@dataclass(frozen=True, slots=True)
+class TargetSemanticAssessment:
+    issues: tuple[TargetSemanticIssue, ...] = ()
 
 
 class TargetSemanticVerifierBackend(Protocol):
@@ -490,6 +520,63 @@ def _compact_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=False)
 
 
+def _normalize_span_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _span_in_candidate(span: str, candidate_text: str) -> bool:
+    normalized_span = _normalize_span_text(span)
+    if not normalized_span:
+        return False
+    return normalized_span in _normalize_span_text(candidate_text)
+
+
+def _validated_semantic_issue(raw: object, *, candidate_text: str) -> TargetSemanticIssue:
+    if type(raw) is TargetSemanticIssue:
+        issue = raw
+    elif type(raw) is dict:
+        kind = raw.get("kind")
+        offending_span = raw.get("offending_span")
+        if type(kind) is not str or kind not in _TARGET_SEMANTIC_ISSUE_KINDS:
+            _error("target_verifier_semantic_output_invalid", raw)
+        if not _canonical(offending_span):
+            _error("target_verifier_semantic_output_invalid", raw)
+        issue = TargetSemanticIssue(kind=kind, offending_span=offending_span)  # type: ignore[arg-type]
+    else:
+        _error("target_verifier_semantic_output_invalid", raw)
+    if not _span_in_candidate(issue.offending_span, candidate_text):
+        _error("target_verifier_semantic_output_invalid", issue.offending_span)
+    return issue
+
+
+def _validated_semantic_assessment(
+    assessment: object,
+    *,
+    candidate_text: str,
+) -> TargetSemanticAssessment:
+    if type(assessment) is TargetSemanticAssessment:
+        raw_issues = assessment.issues
+    elif type(assessment) is dict:
+        raw_issues = assessment.get("issues")
+        if raw_issues is None:
+            _error("target_verifier_semantic_output_invalid", assessment)
+        if type(raw_issues) is not list:
+            _error("target_verifier_semantic_output_invalid", assessment)
+    else:
+        _error("target_verifier_semantic_output_invalid", assessment)
+    issues = tuple(
+        _validated_semantic_issue(item, candidate_text=candidate_text) for item in raw_issues
+    )
+    return TargetSemanticAssessment(issues=issues)
+
+
+def _blocking_issues(assessment: TargetSemanticAssessment) -> tuple[TargetSemanticIssue, ...]:
+    return tuple(
+        issue for issue in assessment.issues if issue.kind in _TARGET_SEMANTIC_BLOCKING_KINDS
+    )
+
+
 def _semantic_invocation(
     request: TargetComposerRequest,
     response: TargetUnverifiedComposedResponse,
@@ -576,30 +663,16 @@ def verify_target_composed_response(
         assessment = assess(invocation)
     except Exception as exc:
         _error("target_verifier_backend_failed", type(exc).__name__, exc)
-    if type(assessment) is not TargetSemanticVerification or not all(
-        type(getattr(assessment, name)) is bool
-        for name in (
-            "general_grounding_ok",
-            "strict_commercial_grounding_ok",
-            "topic_scope_ok",
-            "medical_boundary_ok",
-            "selected_facts_ok",
-        )
-    ):
-        _error("target_verifier_semantic_output_invalid", assessment)
-    failed = tuple(
-        name
-        for name in (
-            "general_grounding_ok",
-            "strict_commercial_grounding_ok",
-            "topic_scope_ok",
-            "medical_boundary_ok",
-            "selected_facts_ok",
-        )
-        if not getattr(assessment, name)
+    validated_assessment = _validated_semantic_assessment(
+        assessment,
+        candidate_text=response.text,
     )
-    if failed:
-        _error("target_verifier_semantic_rejected", failed)
+    blocking = _blocking_issues(validated_assessment)
+    if blocking:
+        _error(
+            "target_verifier_semantic_rejected",
+            tuple((issue.kind, issue.offending_span) for issue in blocking),
+        )
     return TargetVerifiedComposedResponse(
         text=response.text,
         spec=response.spec,

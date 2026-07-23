@@ -583,7 +583,8 @@ def test_transport_error_does_not_set_semantic_reject_flags() -> None:
 def test_run_case_preserves_candidate_on_verifier_rejection(monkeypatch) -> None:
     from core.target_composer_executor import TargetComposerInvocation
     from core.target_response_verifier import (
-        TargetSemanticVerification,
+        TargetSemanticAssessment,
+        TargetSemanticIssue,
         TargetSemanticVerifierInvocation,
     )
     from evals.v5.run_fullcontext_response_eval import _load_pipeline_context
@@ -594,12 +595,13 @@ def test_run_case_preserves_candidate_on_verifier_rejection(monkeypatch) -> None
     candidate = "При компенсированном диабете имплантация возможна под контролем врача."
     composer = FullContextResponseEvalRecordingComposerBackend(candidate)
     semantic = FullContextResponseEvalRecordingSemanticBackend(
-        assessment=TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=False,
-            selected_facts_ok=True,
+        assessment=TargetSemanticAssessment(
+            issues=(
+                TargetSemanticIssue(
+                    kind="personal_medical_conclusion",
+                    offending_span="диабете",
+                ),
+            )
         )
     )
     composer.generate(
@@ -624,7 +626,7 @@ def test_run_case_preserves_candidate_on_verifier_rejection(monkeypatch) -> None
     def _raise_verifier_rejection(*args, **kwargs):
         raise TargetResponseVerificationError(
             "target_verifier_semantic_rejected",
-            ["medical_boundary_ok"],
+            (("personal_medical_conclusion", "диабете"),),
         )
 
     monkeypatch.setattr(

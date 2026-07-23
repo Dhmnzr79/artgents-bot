@@ -8,7 +8,9 @@ import os
 from config import QWEN_PLUS_MODEL
 from core.target_composer_executor import TargetComposerInvocation
 from core.target_response_verifier import (
-    TargetSemanticVerification,
+    TARGET_SEMANTIC_ISSUE_KINDS,
+    TargetSemanticAssessment,
+    TargetSemanticIssue,
     TargetSemanticVerifierInvocation,
 )
 from evals.v5.fullcontext_response_eval_backend import (
@@ -35,18 +37,13 @@ _VERIFIER_USER_TEMPLATE = (
     "RESPONSE_SPEC_JSON:\n{response_spec_json}\n\n"
     "PRIMARY_EVIDENCE_JSON:\n{primary_evidence_json}\n\n"
     "CANDIDATE_TEXT:\n{candidate_text}\n\n"
-    "Return JSON with exactly these boolean fields:\n"
-    "general_grounding_ok, strict_commercial_grounding_ok, topic_scope_ok, "
-    "medical_boundary_ok, selected_facts_ok"
+    "Return JSON only: "
+    '{{"issues":[{{"kind":"<unsupported_clinic_claim|personal_medical_conclusion|'
+    "material_external_medical_claim|minor_external_detail>\","
+    '"offending_span":"<exact substring from candidate>"}}]}}'
 )
 
-_VERIFICATION_FIELDS = (
-    "general_grounding_ok",
-    "strict_commercial_grounding_ok",
-    "topic_scope_ok",
-    "medical_boundary_ok",
-    "selected_facts_ok",
-)
+_ISSUE_KINDS = tuple(sorted(TARGET_SEMANTIC_ISSUE_KINDS))
 
 
 def serialize_composer_invocation_for_sdk(
@@ -132,15 +129,28 @@ def fullcontext_response_eval_live_model() -> str:
     )
 
 
-def _parse_verification_payload(payload: object) -> TargetSemanticVerification:
+def _parse_assessment_payload(payload: object) -> TargetSemanticAssessment:
     if not isinstance(payload, dict):
         raise ValueError("semantic_live_not_object")
-    if set(payload.keys()) != set(_VERIFICATION_FIELDS):
+    if set(payload.keys()) != {"issues"}:
         raise ValueError("semantic_live_field_mismatch")
-    values = {name: payload[name] for name in _VERIFICATION_FIELDS}
-    if not all(type(value) is bool for value in values.values()):
-        raise ValueError("semantic_live_non_bool")
-    return TargetSemanticVerification(**values)
+    raw_issues = payload["issues"]
+    if type(raw_issues) is not list:
+        raise ValueError("semantic_live_issues_not_list")
+    issues: list[TargetSemanticIssue] = []
+    for item in raw_issues:
+        if not isinstance(item, dict):
+            raise ValueError("semantic_live_issue_not_object")
+        if set(item.keys()) != {"kind", "offending_span"}:
+            raise ValueError("semantic_live_issue_field_mismatch")
+        kind = item["kind"]
+        span = item["offending_span"]
+        if type(kind) is not str or kind not in TARGET_SEMANTIC_ISSUE_KINDS:
+            raise ValueError("semantic_live_issue_kind_invalid")
+        if type(span) is not str or not span.strip():
+            raise ValueError("semantic_live_issue_span_invalid")
+        issues.append(TargetSemanticIssue(kind=kind, offending_span=span.strip()))  # type: ignore[arg-type]
+    return TargetSemanticAssessment(issues=tuple(issues))
 
 
 class FullContextResponseEvalLiveComposerBackend:
@@ -233,7 +243,7 @@ class FullContextResponseEvalLiveSemanticBackend:
             )
             raw_text = (response.choices[0].message.content or "").strip()
             payload = json.loads(raw_text)
-            assessment = _parse_verification_payload(payload)
+            assessment = _parse_assessment_payload(payload)
             self.captures.append(
                 FullContextResponseEvalSemanticCapture(
                     invocation=invocation,

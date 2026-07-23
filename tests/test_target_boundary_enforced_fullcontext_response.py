@@ -37,7 +37,8 @@ from core.target_composer_executor import (
     TargetComposerTone,
 )
 from core.target_response_verifier import (
-    TargetSemanticVerification,
+    TargetSemanticAssessment,
+    TargetSemanticIssue,
     TargetSemanticVerifierInvocation,
 )
 from core.target_turn_frame_dispatch import TargetTurnFrameDispatchError
@@ -85,19 +86,17 @@ class RecordingComposerBackend:
 
 
 class RecordingSemanticBackend:
-    def __init__(self, assessment: TargetSemanticVerification | None = None) -> None:
-        self.assessment = assessment or TargetSemanticVerification(
-            general_grounding_ok=True,
-            strict_commercial_grounding_ok=True,
-            topic_scope_ok=True,
-            medical_boundary_ok=True,
-            selected_facts_ok=True,
-        )
+    def __init__(self, assessment: TargetSemanticAssessment | None = None) -> None:
+        self.assessment = assessment or TargetSemanticAssessment()
         self.invocations: list[TargetSemanticVerifierInvocation] = []
 
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
         return self.assessment
+
+
+def _issue(kind: str, span: str) -> TargetSemanticIssue:
+    return TargetSemanticIssue(kind=kind, offending_span=span)  # type: ignore[arg-type]
 
 
 class RuleBasedSemanticBackend:
@@ -112,30 +111,24 @@ class RuleBasedSemanticBackend:
             corpus = invocation.cached_full_context.lower()
             grounded = "анестез" in text and "анестез" in corpus
             personal_promise = "вам не будет больно" in text
-            return TargetSemanticVerification(
-                general_grounding_ok=grounded,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=not personal_promise,
-                selected_facts_ok=True,
-            )
+            issues: tuple[TargetSemanticIssue, ...] = ()
+            if not grounded:
+                issues += (_issue("unsupported_clinic_claim", "анестез"),)
+            if personal_promise:
+                issues += (_issue("personal_medical_conclusion", "вам не будет больно"),)
+            return TargetSemanticAssessment(issues=issues)
         if self.mode == "missing_ok":
             no_external = "волчан" not in text and "аутоиммун" not in text
             mentions_gap = "материал" in text and "нет" in text
-            return TargetSemanticVerification(
-                general_grounding_ok=mentions_gap,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=no_external,
-                selected_facts_ok=True,
-            )
+            issues: tuple[TargetSemanticIssue, ...] = ()
+            if not mentions_gap:
+                issues += (_issue("unsupported_clinic_claim", "материал"),)
+            if not no_external:
+                issues += (_issue("material_external_medical_claim", "аутоиммун"),)
+            return TargetSemanticAssessment(issues=issues)
         if self.mode == "missing_reject":
-            return TargetSemanticVerification(
-                general_grounding_ok=True,
-                strict_commercial_grounding_ok=True,
-                topic_scope_ok=True,
-                medical_boundary_ok=False,
-                selected_facts_ok=True,
+            return TargetSemanticAssessment(
+                issues=(_issue("material_external_medical_claim", "аутоиммун"),)
             )
         raise AssertionError(f"unknown mode: {self.mode}")
 

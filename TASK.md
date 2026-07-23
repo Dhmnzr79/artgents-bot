@@ -1,71 +1,82 @@
-# TASK — S64 FullContext authority audit (read-only) — COMPLETE
+# TASK — S65 FullContext authority switch (offline)
 
-**Baseline:** `codex/stage-a` / `520e34a`
-**Governance commit:** `e7c57a2`
-**Status:** **COMPLETE** · **NO LIVE / NO LLM / NO AUTHORITY SWITCH**
+**Baseline:** `codex/stage-a` / `9dddd9f` · **OWNER APPROVED** · **NO LIVE / NO LLM**
 
-## Goal (done)
+## Goal
 
-Read-only audit of `POST /ask` and `POST /ask/stream` to define minimal safe authority transfer to target FullContext chain.
+Make target FullContext the **default product authority** for `/ask` and `/ask/stream`. Legacy remains a **manual kill-switch** via `TARGET_FULLCONTEXT_DEV=0` at process start. **No in-turn legacy fallback.**
 
-## Deliverables
+## Owner decisions (binding)
 
-| # | File | Status |
-|---|------|--------|
-| 1 | `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md` | ✅ sections A–G (+ session/failure/post-switch) |
-| 2 | `docs/STRANGLER_ROADMAP.md` | ✅ S63 confirmed, S64 complete, S65 gate |
-| 3 | `docs/FLAGS_AND_STATUS.md` | ✅ clarified; default unchanged |
-| 4 | `TASK.md` | ✅ closed |
+- Default authority = target FullContext
+- Target errors = fail-closed (controlled target widget only)
+- `TARGET_FULLCONTEXT_DEV=0` = explicit legacy kill-switch between requests/processes
+- No legacy deletion, no rollout %, no shadow, no verifier/composer/planner changes
 
-## Audit conclusions (summary)
+## Implementation
 
-| Finding | Result |
-|---------|--------|
-| Authority gate | `app.py` — `TARGET_FULLCONTEXT_DEV` branch only |
-| Why legacy answers | Default OFF (`config.py`) — sole product reason |
-| `/ask` vs `/ask/stream` | Identical `_orchestrate_ask_turn`; packaging only differs |
-| Hidden legacy when ON | **None** — `orchestrate_routing_after_resolver` skipped |
-| Pre-target guards kept | ingress, flows, rate, reset, anti-spam, target ref nav |
-| Legacy skipped when ON | duplicate, continuation, promo, chunk/price ref handlers |
-| Target failure modes | All fail-closed target widget routes; no legacy fallback |
-| Code blockers | **None** — owner approval for S65 default flip |
-| S65 scope | Default ON + offline spy tests + kill-switch docs; no legacy delete |
+| Change | Detail |
+|--------|--------|
+| `config.py` | `TARGET_FULLCONTEXT_DEV` default `"0"` → `"1"`; update comment |
+| `app.py` | **No change** unless PRE-CODE/code trace proves required (gate already uses imported flag) |
 
-## Allowlist (actual diff)
+## Allowlist
 
 | File | Change |
 |------|--------|
-| `TASK.md` | governance + completion |
-| `docs/S64_FULLCONTEXT_AUTHORITY_AUDIT.md` | new |
-| `docs/STRANGLER_ROADMAP.md` | S63/S64/S65 |
-| `docs/FLAGS_AND_STATUS.md` | clarification |
-| `drafts/checker_last.md` | PRE-CODE + COMPLETION reports |
+| `TASK.md` | S65 governance + completion |
+| `config.py` | default ON |
+| `tests/test_s65_authority_switch_offline.py` | new — acceptance A–H |
+| `tests/test_s61_target_fullcontext_runtime.py` | **only** `test_default_flag_off_in_config` → default ON assertion |
+| `docs/FLAGS_AND_STATUS.md` | default ON, kill-switch semantics |
+| `docs/STRANGLER_ROADMAP.md` | S65 complete, authority transferred |
 
-## Commands run
+**Forbidden:** `app.py` (unless escalated), legacy deletion, live/LLM, A9, frozen artifacts, verifier/composer/planner changes, new flags, rollout/shadow.
+
+## Offline acceptance tests (`test_s65_authority_switch_offline.py`)
+
+| ID | Requirement |
+|----|-------------|
+| A | Default (no env): target orchestrator called; legacy not; `/ask` + `/ask/stream` |
+| B | `TARGET_FULLCONTEXT_DEV=0`: legacy called; target not |
+| C | `TARGET_FULLCONTEXT_DEV=1`: target called; legacy not |
+| D | Target failure: controlled error; legacy never called; single architecture per turn |
+| E | Guards: ingress hard-stop/manual_contact; lead flow; target ref navigation |
+| F | Spy: no `orchestrate_routing_after_resolver`, `route_source`, legacy composer, `get_chunk_by_ref` on target ref path |
+| G | Session continuity, CTA/follow-up, JSON/SSE same authority |
+| H | `assert_frozen_s62_live_artifacts_unchanged()` |
+
+Fake/spy backends only. No live/LLM.
+
+## Commands
 
 ```powershell
+$bt = Join-Path $env:TEMP ("s65_pytest_" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_s65_authority_switch_offline.py `
+  tests/test_s61_target_fullcontext_runtime.py::test_default_flag_on_in_config `
+  -q
+
 git diff --check
 python -c "from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); print('S62 frozen OK')"
-git diff 520e34a -- evals/v5/artifacts/s62_* evals/v5/artifacts/s63_*
 ```
 
 ## Acceptance (COMPLETION)
 
-- [x] PRE-CODE checker ✅ (`e7c57a2`)
-- [x] Audit doc complete, code-traced
-- [x] Both endpoints covered; legacy fallback checked
-- [x] S65 minimal with allowlist
-- [x] No product code, no live, no authority, no A9
-- [x] S62 frozen artifacts unchanged
-- [x] `git diff --check` clean
-- [x] COMPLETION checker ✅
-- [x] Completion commit + push `origin/codex/stage-a` (`0e9d98b`)
+- [ ] PRE-CODE checker ✅
+- [ ] `config.py` default ON
+- [ ] Targeted pytest green
+- [ ] S62 frozen artifacts byte-identical
+- [ ] `git diff --check` clean
+- [ ] Allowlist-only diff
+- [ ] COMPLETION checker ✅
+- [ ] Completion commit + push `origin/codex/stage-a`
 
 ## Checker
 
-| Checkpoint | Verdict |
+| Checkpoint | When |
 |---|---|
-| PRE-CODE (`e7c57a2`) | ✅ |
-| COMPLETION | ✅ |
+| PRE-CODE | after governance commit, before code |
+| COMPLETION | after pytest green |
 
-**STOP — await owner decision on S65 authority switch.**
+**STOP after offline S65 — no post-switch live run.**

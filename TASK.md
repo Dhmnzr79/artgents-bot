@@ -226,12 +226,15 @@ price intent + usable topic + service_id=null
 
 ## W1 allowlist (implementation)
 
+**Governance correction (2026-07-24, post-implementation):** расширение allowlist для обязательных companion-файлов и frozen-shape тестов, вытекающих из `family_price_overview_topic` / `content_ref` membership / pipeline assembly clamp. Без изменения продуктовой семантики W1.
+
 ### New files
 
 | File |
 |------|
 | `core/target_family_price_overview.py` |
 | `contracts/target_family_price_overview.py` |
+| `contracts/target_service_content_topic.py` |
 | `tests/test_w1_family_price_overview_offline.py` |
 | `tests/test_w1_widget_followup_contract_offline.py` |
 | `tests/test_w1_attribution_contract_offline.py` |
@@ -250,7 +253,9 @@ price intent + usable topic + service_id=null
 | `core/target_scoped_response_evidence.py` |
 | `core/target_response_verifier.py` |
 | `core/target_response_policy.py` |
+| `core/target_policy_bound_verified_response_pipeline.py` (clamp marketing/CTA/consultation_close for family overview) |
 | `contracts/target_response_spec.py` |
+| `contracts/target_response_policy.py` |
 | `contracts/target_turn_frame_dispatch.py` (only if dispatch result type needs extension) |
 | `core/target_runtime_widget.py` |
 | `core/target_runtime_followup_nav.py` |
@@ -269,6 +274,10 @@ price intent + usable topic + service_id=null
 | `tests/test_demo_target_price_offers.py` |
 | `tests/test_turn_planner_llm.py` (only if dispatch integration mocks need update) |
 | `tests/test_c2_import_firewall_offline.py` (extend if new public surface) |
+| `tests/test_c2c_dead_clarify_offline.py` (defer regression: low `topic_confidence` after family overview) |
+| `tests/test_target_offline_response_assembly.py` (frozen shape: `family_service_ids`) |
+| `tests/test_target_response_policy.py` (frozen shape: `family_price_overview_topic`) |
+| `tests/test_target_response_spec.py` (frozen shape: `family_price_overview_topic`) |
 
 ### Explicit KEEP (do not change)
 
@@ -371,16 +380,15 @@ Each: tests → checker ✅ → commit → push → clean/synced.
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | |
+| PRE-CODE | ✅ (governance commit `3c21237`) |
 | Baseline | `b09cb45` |
-| COMPLETION checker | |
-| HEAD | |
-| pytest focused W1 | |
-| pytest neighbors | |
-| pytest wide safe-offline | |
-| collect-only | |
-| frozen S47/S50/S53/S55/S58/S62/S63/S66 | |
-| git diff --check | |
+| COMPLETION checker | pending re-run after governance correction |
+| HEAD | (uncommitted WIP) |
+| pytest focused W1 + neighbors | 278 passed, 1 skipped |
+| pytest wide safe-offline | 2084 passed, 2 skipped |
+| collect-only | 2283 collected |
+| frozen S47/S50/S53/S55/S58/S62/S63/S66 | frozen OK |
+| git diff --check | clean (CRLF warnings only) |
 | NO LIVE / NO LLM / NO A9 | |
 
 **STOP after W1 COMPLETION — live widget re-test only with separate owner approval.**

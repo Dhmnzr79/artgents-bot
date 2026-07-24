@@ -1008,17 +1008,74 @@ STOP and escalate to owner if:
 | C2d PRE-CODE | ✅ (governance corrected F1–F3) |
 | C2d-D1 checker | ✅ (`cdc4853`) |
 | C2d-D2 checker | ✅ (`3f94e69`) |
-| C2e PRE-CODE | ✅ (`dea418c`) |
-| C2e / CLEANUP_SERIES COMPLETION checker | ✅ |
-| HEAD | `e6cd5ff` |
+| C2e PRE-CODE | ✅ (`dea418c`) — initial governance only |
+| C2e governance-delta | ✅ (post-implementation allowlist correction; not retroactive PRE-CODE) |
+| C2e / CLEANUP_SERIES COMPLETION checker | ✅ (2026-07-24) |
+| HEAD | see commit after governance-delta closeout |
+| Baseline | `3f94e69` (C2d-D2) |
 | Planner LLM calls/turn | 1 (target) |
 | Resolver fallback | removed (target) |
-| pytest | 347 passed (C2e focused block) |
-| collect-only | 2268 |
+| pytest focused (TASK block) | 335 passed |
+| pytest wide corrected safe-offline | 2067 passed, 1 skipped, 0 failed |
+| collect-only | 2265 |
 | frozen | S62/S63/S66 OK |
 | A9 bytes | unchanged |
-| NATIVE TURNFRAME ONLY | |
-| NO LIVE / NO LLM | |
-| NO A9 CHANGES | |
+| NATIVE TURNFRAME ONLY | ✅ |
+| NO LIVE / NO LLM | ✅ |
+| NO A9 CHANGES | ✅ |
+| **CLEANUP_SERIES_COMPLETE** | **✅ STOP — no C2f** |
+
+**C2e deleted:** `aspect_arbitration`, `consult_nudge`, `retrieval_candidate`, answer_plan API surface, `test_consult_nudge`, live stale `test_vague_attribute_followup_e2e`.  
+**C2e kept:** `md_chunks`, pruned `answer_planner` (`detect_aspects*`), FullContext stack, `topic_taxonomy` via 2 canonical importers.
 
 **STOP after C2e — CLEANUP_SERIES_COMPLETE. Do not start C2f without owner decision.**
+
+---
+
+## C2e governance correction — wide-suite delta + stale test allowlist (2026-07-24)
+
+**Baseline for delta:** `dea418c` (isolated worktree, placeholder `.env` for collect-only parity).
+
+**Corrected wide safe-offline command** (no live, no A9 harness/contracts):
+
+```powershell
+python -m pytest -p no:cacheprovider --basetemp $bt tests/ `
+  --ignore=tests/test_composer_live_eval.py `
+  --ignore=tests/test_emotion_route_matrix.py `
+  --ignore=tests/test_medical_boundary_eval_live_cli.py `
+  --ignore=tests/test_fullcontext_quality_eval_live_wiring.py `
+  --ignore=tests/test_s62_target_runtime_live_harness.py `
+  --ignore=tests/test_s63_target_runtime_live_harness.py `
+  --ignore=tests/test_s66_default_authority_live_harness.py `
+  --ignore=tests/test_patient_scope_shadow_eval_contract.py `
+  --ignore=tests/test_patient_scope_shadow_eval_v2_contract.py `
+  --ignore=tests/test_patient_scope_native_contract_spec.py `
+  --ignore=tests/test_topic_shadow_eval_contract.py `
+  --ignore=tests/test_topic_shadow_attempt_eval_contract.py `
+  -q
+```
+
+**Delta summary (corrected suite):** `dea418c` 20 failed → post-fix WIP **0 failed** in allowed suite. Category **B** stale seams fixed; `topic_taxonomy` runtime-import test updated to canonical allowlist (was misclassified C).
+
+**Governance-delta review (WIP, not retroactive PRE-CODE):** allowlist expansion below covers all uncommitted C2e delta fixes. Checker reviews current diff against this section + C2e allowlist.
+
+### Additional C2e allowlist — stale test cleanup (category B)
+
+| File | Change |
+|------|--------|
+| `tests/test_turn_planner_stage3.py` | Replace `publish_turn_plan` with ctx `turn_plan` publish (native `turn_plan_from_ctx` seam) |
+| `tests/test_vague_attribute_followup_e2e.py` | **delete** — live `/ask` LLM e2e + removed `answer_plan` meta; coverage in `test_attribute_followup.py` + `test_vague_price_followup.py` |
+| `tests/test_target_policy_bound_verified_response_pipeline.py` | Sync signature/mocks/firewall with `turn_topic` + `with_selection` pipeline |
+| `tests/test_topic_taxonomy.py` | Replace blanket runtime-import ban with allowlisted surface: `turn_planner_llm` + `target_runtime_client_context` may import **only** `load_client_topic_taxonomy` |
+| `tests/test_lead_turn_classifier.py` | Mock gray-zone LLM in `test_invalid_name_is_unclear_not_slot_first` (safe-offline deterministic; no live `meta_cancel` flake) |
+| `tests/test_topic_shadow_eval_contract.py` | **exclude (D)** — frozen A6 bytes; stale `plan_turn` assert documented only |
+| `tests/test_topic_shadow_attempt_eval_contract.py` | **exclude (D)** — A7 frozen hash chain over A6 contract file |
+
+**Canonical `topic_taxonomy` runtime import surface (product):**
+
+| Module | Symbol | Role |
+|--------|--------|------|
+| `core/turn_planner_llm.py` | `load_client_topic_taxonomy` | Planner prompt + TurnFrame topic sanitization (A7) |
+| `core/target_runtime_client_context.py` | `load_client_topic_taxonomy` | FullContext bootstrap `allowed_topics` (S61) |
+
+No other `core/` or `orchestration/` module may import `core.topic_taxonomy`. Enforced by `test_runtime_topic_taxonomy_import_surface_is_allowlisted`.

@@ -15,6 +15,14 @@ from core.topic_taxonomy import (
 
 _LOADER_MODULE = Path("core/topic_taxonomy.py")
 
+# Canonical runtime import surface (C2e governance-delta):
+# - turn_planner_llm: planner prompt + TurnFrame topic sanitization (A7)
+# - target_runtime_client_context: FullContext bootstrap allowed_topics (S61)
+_RUNTIME_TOPIC_TAXONOMY_IMPORT_ALLOWLIST: dict[str, frozenset[str]] = {
+    "core/turn_planner_llm.py": frozenset({"load_client_topic_taxonomy"}),
+    "core/target_runtime_client_context.py": frozenset({"load_client_topic_taxonomy"}),
+}
+
 
 @pytest.fixture(autouse=True)
 def _clear_taxonomy_cache():
@@ -178,21 +186,48 @@ def _imports_topic_taxonomy(path: Path) -> list[str]:
                 for alias in node.names:
                     hits.append(f"from {module} import {alias.name}")
             elif module == "core" and any(alias.name == "topic_taxonomy" for alias in node.names):
-                hits.append(f"from core import topic_taxonomy")
-    return hits
+                hits.append("from core import topic_taxonomy")
+    return sorted(hits)
 
 
-def test_no_runtime_imports_of_topic_taxonomy_loader():
-    offenders: dict[str, list[str]] = {}
+def _runtime_relative_path(path: Path) -> str:
+    return path.as_posix()
+
+
+def _imported_symbols(path: Path) -> frozenset[str]:
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    symbols: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "core.topic_taxonomy":
+            for alias in node.names:
+                symbols.add(alias.name)
+    return frozenset(symbols)
+
+
+def test_runtime_topic_taxonomy_import_surface_is_allowlisted():
+    """Only canonical FullContext/planner consumers may import the taxonomy loader."""
     scanned = _iter_runtime_py_files()
     assert scanned, "expected runtime python files under core/ and orchestration/"
 
+    actual_imports: dict[str, list[str]] = {}
+    actual_symbols: dict[str, frozenset[str]] = {}
     for path in scanned:
+        rel = _runtime_relative_path(path)
         imports = _imports_topic_taxonomy(path)
         if imports:
-            offenders[str(path)] = imports
+            actual_imports[rel] = imports
+            actual_symbols[rel] = _imported_symbols(path)
 
-    assert offenders == {}
+    expected_imports = {
+        rel: sorted(f"from core.topic_taxonomy import {symbol}" for symbol in sorted(symbols))
+        for rel, symbols in _RUNTIME_TOPIC_TAXONOMY_IMPORT_ALLOWLIST.items()
+    }
+
+    assert actual_imports == expected_imports
+    assert set(actual_symbols) == set(_RUNTIME_TOPIC_TAXONOMY_IMPORT_ALLOWLIST)
+    for rel, symbols in actual_symbols.items():
+        assert symbols == _RUNTIME_TOPIC_TAXONOMY_IMPORT_ALLOWLIST[rel]
 
 
 def test_demo_md_dir_exists_for_integration_sanity():

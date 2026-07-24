@@ -111,8 +111,12 @@ def test_ya_anna_is_slot() -> None:
     assert decision.slot_value == "Анна"
 
 
-def test_invalid_name_is_unclear_not_slot_first() -> None:
-    decision = classify_lead_active_turn("12345", st=_st())
+def test_invalid_name_is_unclear_not_slot_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "core.lead_turn_classifier.classify_lead_turn_gray_zone",
+        lambda *a, **k: None,
+    )
+    decision = classify_lead_active_turn("12345", st=_st(), sid="s1", client_id="demo")
     assert decision.kind == "unclear"
 
 

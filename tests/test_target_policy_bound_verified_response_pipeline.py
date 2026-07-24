@@ -73,6 +73,7 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         "shown_fact_ids",
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
+        "turn_topic",
     ]
     assert inspect.signature(
         run_target_offline_policy_bound_verified_response_pipeline
@@ -90,9 +91,7 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         call.func.id for call in calls if isinstance(call.func, ast.Name)
     ]
     assert called_names == [
-        "build_target_response_spec",
-        "assemble_target_spec_offline_response_package",
-        "run_target_offline_verified_response_pipeline",
+        "run_target_offline_policy_bound_verified_response_pipeline_with_selection",
     ]
 
 
@@ -128,6 +127,15 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "run_target_offline_verified_response_pipeline",
         run_pipeline,
     )
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_target_session_selection",
+        lambda _bound: pipeline_module.TargetMaterializedSessionSelection(
+            shown_fact_ids=(),
+            shown_amplifier_refs=(),
+            shown_consultation_value_refs=(),
+        ),
+    )
 
     result = run_target_offline_policy_bound_verified_response_pipeline(**values)  # type: ignore[arg-type]
 
@@ -155,6 +163,7 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "shown_fact_ids": (),
         "shown_amplifier_refs": (),
         "shown_consultation_value_refs": (),
+        "turn_topic": None,
     }
     assert calls[2][1] == (
         bound,
@@ -253,14 +262,18 @@ def test_import_firewall_excludes_legacy_provider_runtime_and_live_hooks() -> No
         "requests",
         "httpx",
         "router",
-        "session",
         "search",
         "llm",
+    )
+    legacy_session_imports = (
+        "from session import",
+        "import session",
     )
     import_lines = "\n".join(
         line for line in source.splitlines() if line.startswith(("import ", "from "))
     ).lower()
     assert all(token not in import_lines for token in forbidden)
+    assert all(token not in import_lines for token in legacy_session_imports)
     assert " import cache" not in import_lines
     assert " from cache" not in import_lines
     assert "pytest.skip" not in source

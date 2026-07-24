@@ -5,6 +5,12 @@ import pytest
 from contracts.turn_plan import TurnPlan
 
 
+def _publish_turn_plan_ctx(plan: TurnPlan) -> None:
+    from flask import request
+
+    request.ctx["turn_plan"] = plan.model_dump()
+
+
 @pytest.fixture
 def brand_on(monkeypatch):
     monkeypatch.setenv("BRAND_FILTER_ON", "1")
@@ -13,14 +19,13 @@ def brand_on(monkeypatch):
 
 def test_patient_situation_uses_turn_plan_before_regex():
     from core.patient_situation_session import resolve_patient_situation_for_turn
-    from core.turn_planner_llm import publish_turn_plan
 
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
         from flask import request
 
         request.ctx = {}
-        publish_turn_plan(
+        _publish_turn_plan_ctx(
             TurnPlan(
                 route="content",
                 aspects=["overview"],
@@ -45,14 +50,13 @@ def test_patient_situation_uses_turn_plan_before_regex():
 
 def test_price_answer_lookup_filters_by_turn_plan_brand_group(brand_on):
     from core.price_offers import build_price_answer_for_lookup
-    from core.turn_planner_llm import publish_turn_plan
 
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
         from flask import request
 
         request.ctx = {}
-        publish_turn_plan(
+        _publish_turn_plan_ctx(
             TurnPlan(
                 route="price_lookup",
                 aspects=["price"],

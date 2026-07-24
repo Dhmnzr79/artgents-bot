@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
-from dataclasses import dataclass
-
 from contracts.turn_frame import TurnFrame
+from core.routing_loader import THRESHOLDS
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_session_selection import TargetMaterializedSessionSelection
@@ -14,23 +14,94 @@ from session import mem_get
 
 _TARGET_SESSION_KEY = "target_runtime_state"
 _TARGET_FOLLOWUPS_KEY = "target_runtime_followups"
+_SERVICE_FOCUS_KEYS = frozenset(
+    {"last_service_id", "last_topic", "last_primary_aspect", "service_focus_set_at_turn"}
+)
 
 
-def focus_dict_from_session_state(st: dict[str, Any]) -> dict[str, str] | None:
-    """Read service continuity from target_runtime_state only (C2c)."""
+@dataclass(frozen=True, slots=True)
+class ServiceFocusSnapshot:
+    service_id: str
+    topic: str
+    label: str
+    last_route: str
+    service_focus_age: int
+
+
+def max_service_focus_turn_age() -> int:
+    return int(THRESHOLDS.follow_up.max_service_focus_turn_age)
+
+
+def compute_service_focus_age(
+    *,
+    session_turn_count: int,
+    service_focus_set_at_turn: int | None,
+) -> int | None:
+    if service_focus_set_at_turn is None:
+        return None
+    return max(0, int(session_turn_count) - int(service_focus_set_at_turn))
+
+
+def read_age_guarded_service_focus(st: dict[str, Any]) -> ServiceFocusSnapshot | None:
+    """Canonical product helper: target_runtime_state focus with unified age guard."""
     raw = st.get(_TARGET_SESSION_KEY)
     if not isinstance(raw, dict):
         return None
     service_id = str(raw.get("last_service_id") or "").strip()
     if not service_id:
         return None
+    set_at = raw.get("service_focus_set_at_turn")
+    if set_at is None:
+        return None
+    try:
+        set_at_turn = int(set_at)
+    except (TypeError, ValueError):
+        return None
+    turn_count = int(st.get("session_turn_count") or 0)
+    age = compute_service_focus_age(
+        session_turn_count=turn_count,
+        service_focus_set_at_turn=set_at_turn,
+    )
+    if age is None or age > max_service_focus_turn_age():
+        return None
     topic = str(raw.get("last_topic") or "unknown").strip().lower() or "unknown"
+    return ServiceFocusSnapshot(
+        service_id=service_id,
+        topic=topic,
+        label=service_id,
+        last_route="",
+        service_focus_age=age,
+    )
+
+
+def focus_dict_from_session_state(st: dict[str, Any]) -> dict[str, str] | None:
+    """Age-guarded focus dict for legacy call sites (C2c-correction)."""
+    snap = read_age_guarded_service_focus(st)
+    if snap is None:
+        return None
     return {
-        "service_id": service_id,
-        "topic": topic,
-        "label": service_id,
-        "last_route": "",
+        "service_id": snap.service_id,
+        "topic": snap.topic,
+        "label": snap.label,
+        "last_route": snap.last_route,
     }
+
+
+def clear_target_service_focus(session_id: str) -> None:
+    """Clear service focus fields only; preserve shown_* continuity."""
+    from session import _lock, _persist_unlocked
+
+    with _lock:
+        st = mem_get(session_id)
+        raw = st.get(_TARGET_SESSION_KEY)
+        if not isinstance(raw, dict):
+            return
+        updated = {k: v for k, v in raw.items() if k not in _SERVICE_FOCUS_KEYS}
+        if updated:
+            st[_TARGET_SESSION_KEY] = updated
+        else:
+            st.pop(_TARGET_SESSION_KEY, None)
+        _persist_unlocked(session_id, st)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,22 +109,24 @@ class TargetRuntimeSessionState:
     last_service_id: str | None
     last_topic: str | None
     last_primary_aspect: str | None
+    service_focus_set_at_turn: int | None
+    session_turn_count: int
     shown_fact_ids: tuple[str, ...]
     shown_amplifier_refs: tuple[str, ...]
     shown_consultation_value_refs: tuple[str, ...]
     followups: tuple[TargetRuntimeFollowupItem, ...]
 
+    def service_focus_age(self) -> int | None:
+        return compute_service_focus_age(
+            session_turn_count=self.session_turn_count,
+            service_focus_set_at_turn=self.service_focus_set_at_turn,
+        )
 
-def _empty_state() -> TargetRuntimeSessionState:
-    return TargetRuntimeSessionState(
-        last_service_id=None,
-        last_topic=None,
-        last_primary_aspect=None,
-        shown_fact_ids=(),
-        shown_amplifier_refs=(),
-        shown_consultation_value_refs=(),
-        followups=(),
-    )
+    def is_service_focus_fresh(self) -> bool:
+        age = self.service_focus_age()
+        if age is None or not self.last_service_id:
+            return False
+        return age <= max_service_focus_turn_age()
 
 
 def _merge_unique(*groups: tuple[str, ...]) -> tuple[str, ...]:
@@ -71,6 +144,7 @@ def _merge_unique(*groups: tuple[str, ...]) -> tuple[str, ...]:
 
 def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
     st = mem_get(sid)
+    session_turn_count = int(st.get("session_turn_count") or 0)
     raw = st.get(_TARGET_SESSION_KEY)
     followups_raw = st.get(_TARGET_FOLLOWUPS_KEY)
     followups: tuple[TargetRuntimeFollowupItem, ...] = ()
@@ -89,15 +163,25 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             last_service_id=None,
             last_topic=None,
             last_primary_aspect=None,
+            service_focus_set_at_turn=None,
+            session_turn_count=session_turn_count,
             shown_fact_ids=(),
             shown_amplifier_refs=(),
             shown_consultation_value_refs=(),
             followups=followups,
         )
+    set_at_raw = raw.get("service_focus_set_at_turn")
+    set_at: int | None
+    try:
+        set_at = int(set_at_raw) if set_at_raw is not None else None
+    except (TypeError, ValueError):
+        set_at = None
     return TargetRuntimeSessionState(
         last_service_id=str(raw.get("last_service_id") or "").strip() or None,
         last_topic=str(raw.get("last_topic") or "").strip() or None,
         last_primary_aspect=str(raw.get("last_primary_aspect") or "").strip() or None,
+        service_focus_set_at_turn=set_at,
+        session_turn_count=session_turn_count,
         shown_fact_ids=tuple(str(x).strip() for x in raw.get("shown_fact_ids") or [] if str(x).strip()),
         shown_amplifier_refs=tuple(
             str(x).strip() for x in raw.get("shown_amplifier_refs") or [] if str(x).strip()
@@ -136,14 +220,32 @@ def write_target_runtime_session_after_materialized(
     )
     with _lock:
         st = mem_get(sid)
-        st[_TARGET_SESSION_KEY] = {
-            "last_service_id": turn_frame.service_id,
-            "last_topic": turn_frame.topic,
-            "last_primary_aspect": turn_frame.primary_aspect,
+        turn_count = int(st.get("session_turn_count") or 0)
+        payload: dict[str, Any] = {
             "shown_fact_ids": list(shown_fact_ids),
             "shown_amplifier_refs": list(shown_amplifier_refs),
             "shown_consultation_value_refs": list(shown_consultation_value_refs),
         }
+        service_id = str(turn_frame.service_id or "").strip() or None
+        if service_id:
+            payload.update(
+                {
+                    "last_service_id": service_id,
+                    "last_topic": turn_frame.topic,
+                    "last_primary_aspect": turn_frame.primary_aspect,
+                    "service_focus_set_at_turn": turn_count,
+                }
+            )
+        elif prior.last_service_id:
+            payload.update(
+                {
+                    "last_service_id": prior.last_service_id,
+                    "last_topic": prior.last_topic,
+                    "last_primary_aspect": prior.last_primary_aspect,
+                    "service_focus_set_at_turn": prior.service_focus_set_at_turn,
+                }
+            )
+        st[_TARGET_SESSION_KEY] = payload
         st[_TARGET_FOLLOWUPS_KEY] = [
             {"ref": item.ref, "label": item.label} for item in followups if item.ref
         ]

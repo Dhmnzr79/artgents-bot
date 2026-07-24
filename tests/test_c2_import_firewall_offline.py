@@ -90,7 +90,7 @@ patterns = [
     re.compile(r"\\bclear_last_subject\\b"),
     re.compile(r"\\bget_pending_clarify\\b"),
     re.compile(r"\\bset_pending_clarify\\b"),
-    re.compile(r"\\bfocus_from_legacy_session\\b"),
+    re.compile(r"\\bsubject_turn_age\\b"),
 ]
 offenders = []
 for rel in files:

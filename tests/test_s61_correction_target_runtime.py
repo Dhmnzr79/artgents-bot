@@ -111,6 +111,9 @@ def _seed_target_runtime_state(sid: str, **fields: object) -> None:
 
     with _lock:
         st = mem_get(sid)
+        if fields.get("last_service_id") and "service_focus_set_at_turn" not in fields:
+            fields = dict(fields)
+            fields.setdefault("service_focus_set_at_turn", int(st.get("session_turn_count") or 0))
         st["target_runtime_state"] = fields
         _persist_unlocked(sid, st)
 

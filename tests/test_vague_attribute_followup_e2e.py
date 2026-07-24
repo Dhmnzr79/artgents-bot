@@ -7,7 +7,8 @@ import uuid
 import pytest
 
 from core.attribute_followup import detect_vague_attribute_kinds
-from session import get_last_subject, mem_reset
+from core.target_runtime_session import read_target_runtime_session
+from session import mem_reset
 
 
 def _classic_context_turn(client, sid: str) -> None:
@@ -20,9 +21,8 @@ def _classic_context_turn(client, sid: str) -> None:
         },
     )
     assert resp.status_code == 200
-    sub = get_last_subject(sid)
-    assert sub is not None
-    assert sub.get("service_id") == "classic"
+    runtime = read_target_runtime_session(sid)
+    assert runtime.last_service_id == "classic"
 
 
 @pytest.fixture

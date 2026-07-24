@@ -84,6 +84,8 @@ def test_fresh_clinic_doctors_not_hydrated() -> None:
         shown_fact_ids=(),
         shown_amplifier_refs=(),
         shown_consultation_value_refs=(),
+        service_focus_set_at_turn=0,
+        session_turn_count=0,
         followups=(),
     )
     hydrated = hydrate_target_runtime_turn_frame_from_session(

@@ -11,7 +11,11 @@ from typing import Any
 from core.client_config_loader import _pack_path
 from core.routing_loader import THRESHOLDS
 from core.service_followup import is_short_attribute_followup, normalize_service_id
-from core.target_runtime_session import focus_dict_from_session_state
+from core.target_runtime_session import (
+    clear_target_service_focus,
+    focus_dict_from_session_state,
+    read_age_guarded_service_focus,
+)
 
 _PAYMENT_RE = re.compile(r"\b(рассроч|оплат|кредит|цен)\w*\b", re.I | re.U)
 _WARRANTY_RE = re.compile(r"\bгарант\w*\b", re.I | re.U)
@@ -41,7 +45,7 @@ class FollowUpTurnContext:
     follow_up_mode: bool
     rewritten_query: str
     focus: dict[str, str]
-    subject_turn_age: int
+    service_focus_age: int
 
 
 def follow_up_ctx_to_dict(ctx: FollowUpTurnContext) -> dict[str, Any]:
@@ -49,7 +53,7 @@ def follow_up_ctx_to_dict(ctx: FollowUpTurnContext) -> dict[str, Any]:
         "follow_up_mode": ctx.follow_up_mode,
         "rewritten_query": ctx.rewritten_query,
         "focus": dict(ctx.focus),
-        "subject_turn_age": ctx.subject_turn_age,
+        "service_focus_age": ctx.service_focus_age,
     }
 
 
@@ -71,7 +75,7 @@ def follow_up_ctx_from_dict(raw: dict[str, Any] | None) -> FollowUpTurnContext |
             "label": str(focus.get("label") or focus.get("service_id") or "").strip(),
             "last_route": str(focus.get("last_route") or "").strip(),
         },
-        subject_turn_age=int(raw.get("subject_turn_age") or 0),
+        service_focus_age=int(raw.get("service_focus_age") or 0),
     )
 
 
@@ -203,9 +207,14 @@ def _dialog_focus_for_follow_up(
     age = (
         int(focus_decision.focus_turn_age)
         if isinstance(focus_decision.focus_turn_age, int)
-        else int(st.get("subject_turn_age") or 0)
+        else None
     )
-    if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
+    if age is None:
+        snap = read_age_guarded_service_focus(st)
+        if snap is None:
+            return None
+        age = snap.service_focus_age
+    elif age > int(THRESHOLDS.follow_up.max_service_focus_turn_age):
         return None
     label = (
         str(focus_decision.focus_label or "").strip()
@@ -242,10 +251,13 @@ def prepare_follow_up_turn(
     else:
         if not is_short_attribute_followup(q0):
             return None
+        snap = read_age_guarded_service_focus(st)
+        if snap is None:
+            return None
         focus = focus_dict_from_session_state(st)
         if not focus:
             return None
-        age = 0
+        age = snap.service_focus_age
     if is_explicit_topic_change(q0, focus, client_id=client_id):
         return None
 
@@ -254,7 +266,7 @@ def prepare_follow_up_turn(
         follow_up_mode=True,
         rewritten_query=rewritten,
         focus=focus,
-        subject_turn_age=age,
+        service_focus_age=age,
     )
 
 
@@ -276,7 +288,7 @@ def get_follow_up_turn_ctx(
 
     if not sid:
         return None
-    from session import clear_focus_context, mem_get
+    from session import mem_get
 
     st = mem_get(sid)
     q0 = (q or "").strip()
@@ -284,7 +296,7 @@ def get_follow_up_turn_ctx(
     focus = focus_dict_from_session_state(st)
 
     if focus and is_explicit_topic_change(q0, focus, client_id=client_id):
-        clear_focus_context(sid)
+        clear_target_service_focus(sid)
         return None
 
     ctx = prepare_follow_up_turn(q, st, client_id=client_id)
@@ -312,5 +324,5 @@ def follow_up_turn_meta(ctx: FollowUpTurnContext | None) -> dict[str, Any]:
             "topic": ctx.focus.get("topic"),
             "label": ctx.focus.get("label"),
         },
-        "subject_turn_age": ctx.subject_turn_age,
+        "service_focus_age": ctx.service_focus_age,
     }

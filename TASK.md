@@ -268,6 +268,95 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 
 ---
 
+## Checkpoint C2c-correction — service focus age + legacy API cleanup
+
+**Prerequisite:** C2c checkpoint checker ✅ (`70b5aa3`).
+
+**Goal:** Canonical `service_focus_age` from `target_runtime_state.service_focus_set_at_turn` + `session_turn_count`; unified age guard for all product consumers; remove dead `last_subject` / `subject_turn_age` API; rename telemetry source; update stale tests.
+
+### C2c-correction audit (read-only, confirmed)
+
+| Gap | Action |
+|-----|--------|
+| No target-owned focus age | Add `service_focus_set_at_turn`; compute `service_focus_age` |
+| `subject_turn_age` not synced with target writer | Remove; use target timestamp only |
+| Consumers use different freshness semantics | Single `read_age_guarded_service_focus()` helper |
+| `pending_clarify` no **product** writer/reader | **KEEP** session API for legacy `ask_turn`/`composer_flow` only; no product reads |
+| Stale tests use `set_last_subject` | Migrate to `target_runtime_state` seed helpers |
+
+### C2c-correction changes
+
+1. `target_runtime_state.service_focus_set_at_turn` — set to `session_turn_count` on materialized response **with** `service_id`.
+2. `read_age_guarded_service_focus(st)` — canonical helper; returns `None` when age > `max_service_focus_turn_age` (4).
+3. Rename threshold: `max_subject_turn_age` → `max_service_focus_turn_age` in `routing.yaml` / `routing_loader.py`.
+4. All product consumers (`dialog_focus`, `follow_up_rewrite`, `query_selector`, `answer_planner`, hydration) use canonical helper.
+5. Terminal/error: no write to `target_runtime_state` (unchanged); focus ages on user turns.
+6. Remove `last_subject` / `subject_turn_age` session API and field after last product reader gone.
+7. `pending_clarify` API: **not deleted** — legacy `orchestration/ask_turn.py` + `composer_flow.py` still read/write (off `/ask` target path).
+8. Telemetry: `DialogFocusSource` `"last_subject"` → `"target_runtime_state"`.
+9. Update `test_answer_planner.py`, `test_dialog_focus_baseline.py`, related stale tests.
+
+### C2c-correction allowlist
+
+| File | Change |
+|------|--------|
+| `TASK.md` | governance + completion record |
+| `core/target_runtime_session.py` | age field, canonical helper, clear focus |
+| `core/target_runtime_turn_frame_hydration.py` | age guard on hydrate |
+| `session.py` | remove `last_subject`/`subject_turn_age`; `clear_focus_context` uses target clear |
+| `core/routing.yaml` | rename threshold |
+| `core/routing_loader.py` | rename threshold field |
+| `core/dialog_focus.py` | canonical helper + telemetry source |
+| `core/follow_up_rewrite.py` | canonical helper; topic-change clear |
+| `query_selector.py` | canonical helper |
+| `core/answer_planner.py` | canonical helper |
+| `contracts/dialog_focus.py` | source literal rename |
+| `tests/test_c2c_service_focus_age_offline.py` | **new** |
+| `tests/test_c2c_session_migration_offline.py` | age scenarios + seed updates |
+| `tests/test_c2_import_firewall_offline.py` | extend firewall |
+| `tests/test_answer_planner.py` | target_runtime_state seeds |
+| `tests/test_dialog_focus_baseline.py` | target_runtime_state seeds |
+| `tests/test_focus_context.py` | target focus clear |
+| `tests/test_follow_up_session.py` | service focus age tests |
+| `tests/test_follow_up_rewrite.py` | seed updates |
+| `tests/test_vague_price_followup.py` | seed updates |
+| `tests/test_vague_doctor_followup.py` | seed updates |
+| `tests/test_s61_correction_target_runtime.py` | `_seed_target_runtime_state` helper |
+| `tests/test_s62_correction_offline.py` | seed updates if needed |
+| `tests/test_s63_correction_offline.py` | seed updates if needed |
+| `tests/test_dialog_focus_contract.py` | threshold rename + target seeds |
+
+### C2c-correction tests
+
+```powershell
+$bt = Join-Path $env:TEMP ("demo-bot-c2cc-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2c_service_focus_age_offline.py `
+  tests/test_c2c_session_migration_offline.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_s62_correction_offline.py `
+  tests/test_s63_correction_offline.py `
+  tests/test_vague_price_followup.py `
+  tests/test_vague_doctor_followup.py `
+  tests/test_focus_context.py `
+  tests/test_follow_up_rewrite.py `
+  tests/test_follow_up_session.py `
+  tests/test_answer_planner.py `
+  tests/test_dialog_focus_baseline.py `
+  tests/test_dialog_focus_contract.py `
+  -q
+```
+
+### C2c-correction acceptance
+
+- Age 0 after materialized service; increments per user turn; works until limit 4; stale focus ignored
+- New materialized service turn resets timestamp; terminal/error do not rejuvenate
+- Price/doctors/payment share same freshness helper
+- Reset/sid isolation; no product `last_subject`/`subject_turn_age`/`pending_clarify` reads
+
+---
+
 ## Checkpoint C2d — target-only loader fallback cleanup
 
 **Prerequisite:** C2a–C2c checkpoint checkers ✅.
@@ -395,9 +484,9 @@ STOP and escalate to owner if:
 | PRE-CODE | ✅ (`0103316` governance correction) |
 | C2a checker | ✅ |
 | C2b checker | ✅ |
-| C2c checker | |
-| COMPLETION | |
-| HEAD | |
+| C2c checker | ✅ (`70b5aa3`) |
+| C2c-correction checker | ✅ |
+| HEAD | pending |
 | Planner LLM calls/turn | 1 (target) |
 | Resolver fallback | removed (target) |
 | pytest | |

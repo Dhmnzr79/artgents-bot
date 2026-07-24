@@ -5,7 +5,8 @@ import pytest
 from contracts.dialog_focus import DialogFocusDecision
 from contracts.source_route_result import SourceRouteResult
 from core.answer_planner import build_answer_plan, detect_aspects
-from session import mem_reset, set_last_subject
+from session import mem_reset
+from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
 
 
 def test_detect_aspects_price_and_payment():
@@ -62,14 +63,14 @@ def test_primary_aspect_only_from_current_question():
     assert plan.append == []
 
 
-def test_follow_up_payment_uses_last_subject():
+def test_follow_up_payment_uses_target_runtime_state():
     sid = "t_follow_payment"
     mem_reset(sid)
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id="classic",
-        topic="implantation",
-        label="Классическая имплантация",
+        last_service_id="classic",
+        last_topic="implantation",
+        service_focus_set_at_turn=0,
     )
     plan = build_answer_plan(
         q="рассрочка?",
@@ -99,7 +100,7 @@ def test_planner_uses_dialog_focus_for_attribute_without_session_subject():
                 attribute="warranty",
                 explicit_topic_change=False,
                 resolved_service_id="classic",
-                source="last_subject",
+                source="target_runtime_state",
                 used_llm=False,
                 confidence=0.8,
                 reason="test",

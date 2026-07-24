@@ -15,8 +15,7 @@ from contracts.decision_frame import DecisionFrame
 from contracts.dialog_focus import DialogFocusAttribute, DialogFocusDecision, DialogFocusSource
 from contracts.turn_plan import TurnPlan
 from core.attribute_followup import catalog_match_is_authoritative, detect_vague_attribute_kinds
-from core.target_runtime_session import focus_dict_from_session_state
-from core.routing_loader import THRESHOLDS
+from core.target_runtime_session import read_age_guarded_service_focus
 from core.service_followup import normalize_service_id
 from session import mem_get
 
@@ -43,10 +42,18 @@ _GRAY_BARE_ACK_RE = re.compile(
 
 
 def _focus_from_target_runtime_session(st: dict[str, Any]) -> tuple[dict[str, str] | None, int | None]:
-    focus = focus_dict_from_session_state(st)
-    if focus is None:
+    snap = read_age_guarded_service_focus(st)
+    if snap is None:
         return None, None
-    return focus, None
+    return (
+        {
+            "service_id": snap.service_id,
+            "topic": snap.topic,
+            "label": snap.label,
+            "last_route": snap.last_route,
+        },
+        snap.service_focus_age,
+    )
 
 
 def _primary_attribute(q: str) -> DialogFocusAttribute:
@@ -139,7 +146,7 @@ def build_dialog_focus_decision(
     st = mem_get(sid) if sid else {}
 
     focus, age = _focus_from_target_runtime_session(st)
-    source: DialogFocusSource = "last_subject" if focus else "none"
+    source: DialogFocusSource = "target_runtime_state" if focus else "none"
 
     explicit_service_id = _explicit_service_match(q0, client_id=client_id) if q0 else None
     focus_service_id = normalize_service_id(str((focus or {}).get("service_id") or "")) or None
@@ -260,11 +267,11 @@ def build_dialog_focus_from_turn_plan(
         attr = "overview"
     source: DialogFocusSource = "none"
     if plan.followup_of:
-        source = "last_subject"
+        source = "target_runtime_state"
     elif resolved_service_id:
         source = "explicit_service"
     elif focus_service_id:
-        source = "last_subject"
+        source = "target_runtime_state"
     reason_bits = ["turn_planner"]
     if plan.followup_of:
         reason_bits.append("followup_of")

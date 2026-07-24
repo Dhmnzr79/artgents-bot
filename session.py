@@ -89,10 +89,8 @@ def _fresh_defaults() -> dict:
         "topic_state": {},
         "last_content_ui_payload": None,
         "last_catalog_service_id": None,
-        "last_subject": None,
         "last_patient_situation": None,
         "last_aspect": None,
-        "subject_turn_age": 0,
         "patient_situation_turn_age": 0,
         "pending_clarify": None,
         "pending_lead_offer": False,
@@ -173,8 +171,6 @@ def mem_get(session_id: str) -> dict:
 def mem_add_user(session_id: str, text: str) -> None:
     with _lock:
         st = mem_get(session_id)
-        if isinstance(st.get("last_subject"), dict) and st["last_subject"].get("service_id"):
-            st["subject_turn_age"] = int(st.get("subject_turn_age") or 0) + 1
         if isinstance(st.get("last_patient_situation"), dict) and str(
             st["last_patient_situation"].get("kind") or ""
         ).strip():
@@ -489,39 +485,6 @@ def set_last_catalog_service(session_id: str, service_id: str) -> None:
         _persist_unlocked(session_id, st)
 
 
-def get_last_subject(session_id: str) -> dict | None:
-    """Legacy session focus API; product continuity uses target_runtime_state (C2c)."""
-    st = mem_get(session_id)
-    sub = st.get("last_subject")
-    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
-        return sub
-    return None
-
-
-def set_last_subject(
-    session_id: str,
-    *,
-    service_id: str,
-    topic: str,
-    label: str,
-    last_route: str = "",
-) -> None:
-    """Legacy session focus API; product continuity uses target_runtime_state (C2c)."""
-    sid = (service_id or "").strip()
-    if not sid:
-        return
-    with _lock:
-        st = mem_get(session_id)
-        st["last_subject"] = {
-            "service_id": sid,
-            "topic": (topic or "").strip() or "unknown",
-            "label": (label or sid).strip(),
-            "last_route": (last_route or "").strip(),
-        }
-        st["subject_turn_age"] = 0
-        _persist_unlocked(session_id, st)
-
-
 def get_last_patient_situation(session_id: str) -> dict | None:
     from core.routing_loader import THRESHOLDS
 
@@ -562,27 +525,22 @@ def clear_last_patient_situation(session_id: str) -> None:
 
 
 def clear_focus_context(session_id: str) -> None:
-    """Reset dialog focus: subject, aspect, patient_situation, turn ages (4a/4b)."""
+    """Reset dialog focus: target service focus, aspect, patient_situation turn ages."""
+    from core.target_runtime_session import clear_target_service_focus
+
+    clear_target_service_focus(session_id)
     with _lock:
         st = mem_get(session_id)
         if (
-            st.get("last_subject") is None
-            and st.get("last_aspect") is None
+            st.get("last_aspect") is None
             and st.get("last_patient_situation") is None
-            and int(st.get("subject_turn_age") or 0) == 0
             and int(st.get("patient_situation_turn_age") or 0) == 0
         ):
             return
-        st["last_subject"] = None
         st["last_aspect"] = None
-        st["subject_turn_age"] = 0
         st["last_patient_situation"] = None
         st["patient_situation_turn_age"] = 0
         _persist_unlocked(session_id, st)
-
-
-def clear_last_subject(session_id: str) -> None:
-    clear_focus_context(session_id)
 
 
 def get_last_aspect(session_id: str) -> str | None:

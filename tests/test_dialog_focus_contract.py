@@ -7,16 +7,16 @@ import pytest
 from contracts.dialog_focus import DialogFocusGrayOutput
 from core.dialog_focus import build_dialog_focus_decision, dialog_focus_for_turn
 from core.routing_loader import THRESHOLDS
-from session import mem_add_user, mem_reset, set_last_subject
+from session import mem_add_user, mem_reset
+from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
 
 
 def _set_focus(sid: str, service_id: str = "classic") -> None:
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id=service_id,
-        topic="implantation",
-        label="Классическая имплантация" if service_id == "classic" else "Скуловая имплантация",
-        last_route="catalog_md_first",
+        last_service_id=service_id,
+        last_topic="implantation",
+        service_focus_set_at_turn=0,
     )
 
 
@@ -35,7 +35,7 @@ def test_dialog_focus_contract_carries_last_subject_for_pronoun_price():
     assert focus.resolved_service_id == "zygomatic_implants"
     assert focus.attribute == "price"
     assert focus.explicit_topic_change is False
-    assert focus.source == "last_subject"
+    assert focus.source == "target_runtime_state"
     assert focus.used_llm is False
 
 
@@ -176,7 +176,7 @@ def test_dialog_focus_contract_ignores_stale_subject():
     sid = f"df-contract-stale-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
     _set_focus(sid, "classic")
-    for _ in range(int(THRESHOLDS.follow_up.max_subject_turn_age) + 1):
+    for _ in range(int(THRESHOLDS.follow_up.max_service_focus_turn_age) + 1):
         mem_add_user(sid, "другой вопрос")
 
     focus = build_dialog_focus_decision(

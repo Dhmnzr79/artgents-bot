@@ -68,6 +68,8 @@ def test_hydrate_all_on_4_price_doctors_payment_followups() -> None:
         shown_fact_ids=(),
         shown_amplifier_refs=(),
         shown_consultation_value_refs=(),
+        service_focus_set_at_turn=0,
+        session_turn_count=0,
         followups=(),
     )
     allowed = frozenset({"all_on_4"})
@@ -108,6 +110,8 @@ def test_fresh_clinic_wide_doctors_question_does_not_invent_service_id() -> None
         shown_fact_ids=(),
         shown_amplifier_refs=(),
         shown_consultation_value_refs=(),
+        service_focus_set_at_turn=0,
+        session_turn_count=0,
         followups=(),
     )
     doctors_frame = _frame(topic="doctors", aspects=["doctor"], primary_aspect="doctor")
@@ -120,13 +124,25 @@ def test_fresh_clinic_wide_doctors_question_does_not_invent_service_id() -> None
     assert hydrated.service_id is None
 
 
-def test_focus_dict_reads_target_runtime_state_only() -> None:
+def test_focus_dict_requires_service_focus_timestamp() -> None:
     sid = f"c2c-focus-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    _seed_target_runtime_state(sid, last_service_id="all_on_4", last_topic="implantation")
-    from session import set_last_subject
+    from session import _lock, _persist_unlocked, mem_get
 
-    set_last_subject(sid, service_id="classic", topic="implantation", label="classic")
+    with _lock:
+        st = mem_get(sid)
+        st["target_runtime_state"] = {
+            "last_service_id": "all_on_4",
+            "last_topic": "implantation",
+        }
+        _persist_unlocked(sid, st)
+    assert focus_dict_from_session_state(mem_get(sid)) is None
+    _seed_target_runtime_state(
+        sid,
+        last_service_id="all_on_4",
+        last_topic="implantation",
+        service_focus_set_at_turn=0,
+    )
     focus = focus_dict_from_session_state(mem_get(sid))
     assert focus is not None
     assert focus["service_id"] == "all_on_4"
@@ -140,7 +156,6 @@ def test_materialized_turn_updates_target_runtime_focus(flask_ctx) -> None:
     after = read_target_runtime_session(sid)
     assert after.last_service_id == "all_on_4"
     assert after.last_topic == "implantation"
-    assert mem_get(sid).get("last_subject") is None
 
 
 def test_terminal_error_does_not_wipe_service_focus(flask_ctx) -> None:

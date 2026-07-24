@@ -49,6 +49,8 @@ def hydrate_target_runtime_turn_frame_from_session(
     if not _is_session_contextual_followup(turn_frame, user_message):
         return turn_frame
 
+    if not session_state.is_service_focus_fresh():
+        return turn_frame
     last_service_id = str(session_state.last_service_id or "").strip()
     if not last_service_id or last_service_id not in allowed_service_ids:
         return turn_frame

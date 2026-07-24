@@ -12,7 +12,8 @@ from core.attribute_followup import (
     query_has_explicit_service_object,
 )
 from core.price_followup import is_vague_price_followup
-from session import mem_reset, set_last_subject
+from session import mem_reset
+from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
 
 # --- audit phrases (stem/stop; not route→file) ---
 
@@ -80,11 +81,11 @@ def test_weak_catalog_not_authoritative_for_vague_duration():
 def test_planner_session_first_for_vague_duration():
     sid = f"vague-dur-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id="classic",
-        topic="implantation",
-        label="Классическая имплантация",
+        last_service_id="classic",
+        last_topic="implantation",
+        service_focus_set_at_turn=0,
     )
     plan = build_answer_plan(
         q="А долго?",

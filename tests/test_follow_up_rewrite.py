@@ -64,7 +64,7 @@ def test_prepare_follow_up_turn_uses_dialog_focus_ctx_without_session_subject():
                 attribute="included",
                 explicit_topic_change=False,
                 resolved_service_id="classic",
-                source="last_subject",
+                source="target_runtime_state",
                 used_llm=False,
                 confidence=0.8,
                 reason="test",

@@ -140,7 +140,7 @@ class FollowUpThresholds(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    max_subject_turn_age: int = Field(..., ge=1, le=16)
+    max_service_focus_turn_age: int = Field(..., ge=1, le=16)
     min_compat_score: float = Field(..., ge=0.0, le=1.0)
     doc_type_boost: float = Field(..., ge=0.0, le=0.25)
 

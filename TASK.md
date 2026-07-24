@@ -81,6 +81,10 @@ No product WIP before PRE-CODE ✅.
 | Session | `core/target_runtime_session.py` | Stores followups; no `family_price_group` continuity field yet. |
 | Hydration | `core/target_runtime_turn_frame_hydration.py` | Restores `service_id` for vague attribute follow-ups only — not group selection. |
 | Evidence | `core/target_composer_request.py` `_family_overview_sources` | Full offer JSON incl. `payment_stages`, `package` — too heavy for compact menu. |
+| **Follow-up forbid** | `contracts/target_response_spec.py:101-107` | `family_price_overview_followups_forbidden` if `followup_source is not None` — **blocks menu phase**; must relax for menu-only. |
+| **Follow-up policy clamp** | `core/target_response_policy.py:18-20` | `_followup_source` returns `None` whenever `family_price_overview_topic` set — **blocks menu**; must branch on menu vs drill-down. |
+| **S29/S30 scope** | `core/target_response_followup_materializer.py`, `core/target_response_followup_policy.py` | Materializer builds **content/price** from MD/offers only (`_SOURCES = content|price`). Client-owned group buttons are **not** MD/offer follow-ups — **do not route menu buttons through S29/S30**. |
+| **Widget merge** | `core/target_runtime_widget.py:100-110` | `_followups_to_quick_replies(content, price)` only — must accept third tuple `group` for menu phase. |
 | Exact path | `service_id` + price aspects | Unchanged; All-on-4 exact + payment questions must stay on single-service path. |
 | Widget | `core/target_runtime_widget.py` | Single `quick_replies` channel ✅ (W1). `ui_source_family` for family overview uses `price_navigation`. |
 | Membership | `contracts/target_service_content_topic.py` | Topic from `content_ref` prefix — reuse for validating group `service_ids` belong to topic. |
@@ -106,6 +110,30 @@ Phase B — group drill-down
 Exact service question (service_id set) → unchanged single-service path
 Payment/stages question on known service → unchanged
 ```
+
+### Architecture decision: situation follow-ups bypass S29/S30
+
+**Chosen mechanism (fixed in governance — not executor choice):**
+
+Situation menu buttons are **client-configured navigation**, not MD-derived content follow-ups nor pricebook offer follow-ups. Therefore:
+
+1. **Do NOT** call `materialize_target_response_followups` / `select_target_response_followups` for menu phase.
+2. Build group buttons directly from `family_price_groups.yaml` in `core/target_family_price_overview.py` (`build_family_price_situation_followups`) → typed `TargetFamilyPriceGroupFollowup` (ref `target:family_price_group/{topic}/{group_id}`, label from config).
+3. Extend `TargetResponseFollowupSelection` with `group: tuple[TargetFamilyPriceGroupFollowup, ...]` (`core/target_response_followup_policy.py` + contract type). S29 materializer **unchanged**.
+4. Widget `_followups_to_quick_replies` renders `content` + `price` + `group` in deterministic order (menu phase: **only** `group` populated).
+5. Session stores emitted group refs like existing price/content refs.
+
+**Spec/policy relaxations (menu phase only):**
+
+| Rule | Menu (`group_id=null`) | Drill-down (`group_id` set) |
+|------|------------------------|-----------------------------|
+| `family_price_overview_followups_forbidden` | **Removed** when `followup_source=="family_price_group"` | Still enforced (`followup_source` must be `null`) |
+| `followup_source not in required_components` | **Exception** for `family_price_group` | N/A |
+| `_followup_source()` | Returns `"family_price_group"` | Returns `None` |
+
+`TargetFollowupSource` extended: `Literal["content", "price", "family_price_group"]`.
+
+Drill-down reuses W1 multi-offer assembly filtered by group `service_ids` with `followup_source=None` (no situation buttons).
 
 ### Client-owned groups config (chosen after audit)
 
@@ -254,6 +282,7 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 | File |
 |------|
 | `contracts/target_family_price_groups.py` |
+| `contracts/target_family_price_group_followup.py` (typed group button + ref builder) |
 | `clients/demo/target_response/family_price_groups.yaml` (implantation only until prosthetics sign-off) |
 | `tests/test_w1b_family_price_situation_menu_offline.py` |
 | `tests/test_w1b_family_price_group_drilldown_offline.py` |
@@ -266,6 +295,7 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 | `core/response_schema_loader.py` |
 | `contracts/target_response_spec.py` |
 | `contracts/target_response_policy.py` |
+| `core/target_response_followup_policy.py` (extend `TargetResponseFollowupSelection.group` only; S30 selector unchanged) |
 | `core/target_response_policy.py` |
 | `core/target_family_price_overview.py` |
 | `core/target_turn_frame_dispatch.py` |
@@ -291,10 +321,12 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 | `tests/test_s63_correction_offline.py` |
 | `tests/test_w1_attribution_contract_offline.py` |
 | `tests/test_response_schema_loader.py` |
-| `tests/test_c2_import_firewall_offline.py` (if new public surface) |
+| `tests/test_target_response_followup_policy.py` (frozen shape: `group` field on Selection) |
+| `tests/test_demo_target_response_followup_policy.py` (if Selection shape asserted) |
 
-### Explicit KEEP
+### Explicit KEEP (do not change)
 
+- `core/target_response_followup_materializer.py` (S29 — MD/offer follow-ups only; menu buttons bypass this path)
 - `clients/demo/target_response/pricebook/**` amounts and offer IDs
 - Frozen S47/S50/S53/S55/S58/S62/S63/S66 artifacts (byte-identical)
 - Exact All-on-4 payment/stages path

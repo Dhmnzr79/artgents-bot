@@ -16,6 +16,8 @@ class TargetResponsePolicyBuildError(ValueError):
 
 
 def _followup_source(request: TargetResponsePolicyRequest) -> TargetFollowupSource | None:
+    if request.family_price_overview_topic is not None:
+        return None
     if request.response_mode in {"clarify", "defer"}:
         return None
     if request.primary_component in {"content", "price"}:
@@ -42,6 +44,7 @@ def build_target_response_spec(
     return TargetResponseSpec(
         response_mode=request.response_mode,
         service_id=request.service_id,
+        family_price_overview_topic=request.family_price_overview_topic,
         tone_key=request.tone_key,
         allowed_topics=request.allowed_topics,
         forbidden_topics=request.forbidden_topics,

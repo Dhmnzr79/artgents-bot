@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from typing import Literal
 
 from contracts.target_medical_boundary import TargetMedicalBoundaryTerminalEnforcement
+from contracts.target_response_spec import TargetResponseSpec
 from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameBoundMaterializeResponse,
     TargetTurnFrameBoundTerminalResponse,
 )
 from contracts.turn_frame import TurnFrame
+from core.target_family_price_overview import is_family_price_overview_spec
 from core.target_response_followup_materializer import (
     TargetContentFollowup,
     TargetPriceFollowup,
@@ -18,6 +20,8 @@ from core.target_response_followup_materializer import (
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_runtime_client_context import TargetRuntimeClientContext
 from core.client_config_loader import load_lead_cta_variants
+
+AttributionKind = Literal["content", "plain", "lead"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,14 +67,31 @@ _CLARIFY_TEXT = (
 )
 
 
-def _base_meta(*, client_id: str, sid: str, route: str, **extra: object) -> dict:
+def _materialized_ui_source_family(spec: TargetResponseSpec) -> str:
+    if "doctors" in spec.required_components and spec.required_components == ("doctors",):
+        return "doctor_navigation"
+    if "price" in spec.required_components:
+        return "price_navigation"
+    return "md_navigation"
+
+
+def _base_meta(
+    *,
+    client_id: str,
+    sid: str,
+    route: str,
+    attribution_kind: AttributionKind,
+    ui_source_family: str,
+    **extra: object,
+) -> dict:
     meta = {
         "client_id": client_id,
         "sid": sid,
         "intent": "content",
         "answer_path": "target_fullcontext",
         "service_route": route,
-        "ui_source_family": "target_fullcontext",
+        "ui_source_family": ui_source_family,
+        "attribution_kind": attribution_kind,
     }
     meta.update(extra)
     return meta
@@ -118,14 +139,21 @@ def materialize_verified_widget_payload(
         content=followups.content,
         price=followups.price,
     )
+    spec = verified.spec
+    ui_family = _materialized_ui_source_family(spec)
     meta = _base_meta(
         client_id=context.client_id,
         sid=sid,
         route="target_fullcontext_materialized",
-        matched_service_id=turn_frame.service_id,
-        service_topic=turn_frame.topic,
-        followups=quick_replies,
+        attribution_kind="content",
+        ui_source_family=ui_family,
+        matched_service_id=turn_frame.service_id or spec.service_id,
+        service_topic=turn_frame.topic or spec.family_price_overview_topic,
+        followup_count=len(quick_replies),
+        followup_source="quick_replies",
     )
+    if is_family_price_overview_spec(spec):
+        meta["family_price_overview"] = True
     if verified.selected_cta_key:
         meta["cta_key"] = verified.selected_cta_key
         meta["cta_action"] = "lead"
@@ -161,6 +189,8 @@ def materialize_boundary_uncertain_payload(
             client_id=client_id,
             sid=sid,
             route="target_fullcontext_boundary_uncertain",
+            attribution_kind="plain",
+            ui_source_family="guided_fallback",
             terminal_mode="defer",
         ),
     }
@@ -195,6 +225,8 @@ def materialize_s41_terminal_payload(
             client_id=client_id,
             sid=sid,
             route=f"target_fullcontext_terminal_{mode}",
+            attribution_kind="plain",
+            ui_source_family="guided_fallback",
             terminal_mode=mode,
         ),
     }
@@ -224,6 +256,8 @@ def materialize_target_error_payload(
             client_id=client_id,
             sid=sid,
             route=route,
+            attribution_kind="plain",
+            ui_source_family="guided_fallback",
             target_error_code=error_code,
         ),
     }

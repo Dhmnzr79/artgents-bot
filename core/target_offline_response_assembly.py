@@ -43,6 +43,7 @@ class TargetOfflineResponseMaterials:
     consultation_close: ServiceConsultationValue | None
     marketing_slots_used: int
     amplifier_slots_used: int
+    family_service_ids: tuple[str, ...] = ()
 
 
 class TargetOfflineResponseAssemblyError(ValueError):

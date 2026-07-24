@@ -1,5 +1,6 @@
 ﻿import { postAsk, streamAsk } from "./api.js";
 import { setBotAnswerBody } from "./answer_format.js";
+import { mergeFollowupControls } from "./followup_controls.js";
 
 const STORAGE_SID = "clinic_widget_sid";
 const STORAGE_LAUNCHER_TEASER = "clinic_widget_launcher_teaser_shown";
@@ -37,6 +38,13 @@ const PLAIN_ATTRIBUTION_ROUTES = new Set([
   "offtopic",
   "situation_collect",
   "situation_back",
+  "target_fullcontext_terminal_clarify",
+  "target_fullcontext_terminal_defer",
+  "target_fullcontext_terminal_medical_handoff_nonmaterializable",
+  "target_fullcontext_boundary_uncertain",
+  "target_fullcontext_error",
+  "target_fullcontext_verifier_blocked",
+  "target_fullcontext_followup_unknown",
 ]);
 /** Синхронно с config.BOOKING_INTENT_RE — до ответа сервера не показываем «базу знаний». */
 const BOOKING_INTENT_RE =
@@ -409,6 +417,12 @@ function isPlainAttributionRoute(route) {
 
 /** @param {unknown} meta @returns {TurnAttributionKind} */
 function resolveTurnAttributionKind(meta) {
+  if (meta && typeof meta === "object") {
+    const explicit = String(meta.attribution_kind || "").trim().toLowerCase();
+    if (explicit === "content" || explicit === "lead" || explicit === "plain") {
+      return /** @type {TurnAttributionKind} */ (explicit);
+    }
+  }
   if (isLeadFlowBotMeta(meta)) return "lead";
   if (meta && typeof meta === "object") {
     if (meta.offtopic) return "plain";
@@ -1390,13 +1404,7 @@ export function mountWidget(root, config) {
    */
   function renderInlineLinks(bubble, m, msgIndex) {
     if (m.linksDismissed) return;
-    const items = [];
-    for (const f of m.followups || []) {
-      items.push({ label: (f.label || f.ref || "").trim(), ref: f.ref });
-    }
-    for (const r of m.quickReplies || []) {
-      items.push({ label: (r.label || r.ref || "").trim(), ref: r.ref });
-    }
+    const items = mergeFollowupControls(m.followups, m.quickReplies);
     if (!items.length) return;
 
     const box = getOrCreateLinksBox(bubble);

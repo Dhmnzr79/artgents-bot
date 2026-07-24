@@ -18,6 +18,7 @@ class TargetResponsePolicyRequest(BaseModel):
 
     response_mode: TargetResponseMode
     service_id: CanonicalToken | None = None
+    family_price_overview_topic: CanonicalToken | None = None
     tone_key: CanonicalToken
     allowed_topics: tuple[CanonicalToken, ...]
     forbidden_topics: tuple[CanonicalToken, ...] = ()
@@ -45,4 +46,13 @@ class TargetResponsePolicyRequest(BaseModel):
             and "price" in self.requested_components
         ):
             raise ValueError("policy_followup_source_ambiguous")
+        if self.family_price_overview_topic is not None:
+            if self.service_id is not None:
+                raise ValueError("family_price_overview_service_id_forbidden")
+            if self.requested_components != ("price",):
+                raise ValueError("family_price_overview_components_invalid")
+            if self.primary_component is not None:
+                raise ValueError("family_price_overview_primary_forbidden")
+            if self.allow_marketing_facts or self.allow_cta:
+                raise ValueError("family_price_overview_marketing_forbidden")
         return self

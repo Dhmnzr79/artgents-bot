@@ -291,6 +291,7 @@ def test_exact_flat_shape_hides_unprojected_context_and_keeps_doctor_order() -> 
         "consultation_close",
         "marketing_slots_used",
         "amplifier_slots_used",
+        "family_service_ids",
     ]
     assert result.service_id == "service_one"
     assert result.selected_content_ref == "service_one.md"

@@ -18,6 +18,7 @@ from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
 from core.service_data_context import ServiceDoctorContext
 from core.target_response_followup_policy import TargetResponseFollowupSelection
+from core.target_family_price_overview import is_family_price_overview_spec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_scoped_response_evidence import (
     TargetEvidenceScopeRecord,
@@ -394,6 +395,27 @@ def _exact_sources(
     return source_offers, source_doctors, source_facts, consultation_by_ref
 
 
+def _family_overview_sources(
+    scoped: TargetScopedResponseEvidence,
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+    bundle: ResponseSchemaBundle,
+) -> dict[str, TargetOffer]:
+    materials = bound_package.package.materials
+    source_offers: dict[str, TargetOffer] = {}
+    material_offers = {offer.offer_id: offer for offer in materials.offers}
+    for offer_id in scoped.offer_ids:
+        matches = [offer for offer in bundle.offers if offer.offer_id == offer_id]
+        if (
+            len(matches) != 1
+            or offer_id not in material_offers
+            or matches[0] != material_offers[offer_id]
+            or matches[0].service_id not in materials.family_service_ids
+        ):
+            _source_mismatch(("offer", offer_id))
+        source_offers[offer_id] = matches[0]
+    return source_offers
+
+
 def _block(
     record: TargetEvidenceScopeRecord,
     *,
@@ -503,6 +525,34 @@ def materialize_target_composer_request(
                 offers={},
                 doctors={},
                 facts=facts_by_id,
+                consultations={},
+            )
+            for record in scoped.scope_records
+        )
+        projected = tuple((block.ref, block.topics, block.fact_ids) for block in blocks)
+        expected = tuple(
+            (record.ref, record.topics, record.fact_ids) for record in scoped.scope_records
+        )
+        if projected != expected:
+            _error("composer_request_output_inconsistent", (projected, expected))
+        return TargetComposerRequest(
+            user_message=user_message,
+            spec=scoped.spec,
+            evidence_blocks=blocks,
+            selected_followups=scoped.selected_followups,
+            selected_cta_key=scoped.selected_cta_key,
+        )
+    if is_family_price_overview_spec(scoped.spec):
+        offers = _family_overview_sources(scoped, bound_package, bundle)
+        root = _root(md_root)
+        blocks = tuple(
+            _block(
+                record,
+                root=root,
+                component_doctor_ids=frozenset(),
+                offers=offers,
+                doctors={},
+                facts={},
                 consultations={},
             )
             for record in scoped.scope_records

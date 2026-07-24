@@ -18,6 +18,11 @@ from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
+from core.target_family_price_overview import (
+    assemble_family_price_overview_package,
+    is_family_price_overview_spec,
+    select_family_price_overview_services,
+)
 from core.target_fullcontext_content_package import (
     assemble_target_fullcontext_content_bound_package,
     is_fullcontext_content_only_spec,
@@ -93,6 +98,70 @@ def assemble_target_spec_offline_response_package(
             today=today,
             shown_fact_ids=shown_fact_ids,
             include_consultation_close=include_consultation_close,
+            selected_cta_key=None,
+        )
+    if is_family_price_overview_spec(spec):
+        if brand_term is not None or include_initial_block or marketing_scenarios != ():
+            _error("spec_package_permission_forbidden", "marketing_facts")
+        if include_consultation_close:
+            _error("spec_package_permission_forbidden", "consultation_close")
+        if include_cta:
+            _error("spec_package_permission_forbidden", "cta")
+        if spec.family_price_overview_topic is None:
+            _error("spec_package_not_materializable", "family_price_overview_topic")
+        selection = select_family_price_overview_services(
+            bundle,
+            doctor_catalog,
+            turn_topic=spec.family_price_overview_topic,
+        )
+        if not selection.entries:
+            _error("spec_package_not_materializable", "family_price_overview_empty")
+        if len(selection.entries) == 1:
+            single_service_id = selection.entries[0].service_id
+            single_spec = spec.model_copy(
+                update={
+                    "service_id": single_service_id,
+                    "family_price_overview_topic": None,
+                    "followup_source": "price",
+                }
+            )
+            package = assemble_target_offline_response_package(
+                bundle,
+                doctor_catalog,
+                external_index,
+                consultation_values,
+                service_term=single_service_id,
+                brand_term=brand_term,
+                strategy_context=strategy_context,
+                semantic_context=semantic_context,
+                today=today,
+                include_initial_block=include_initial_block,
+                include_consultation_close=include_consultation_close,
+                required_components=single_spec.required_components,
+                followup_source=single_spec.followup_source,
+                md_root=md_root,
+                marketing_scenarios=marketing_scenarios,
+                shown_fact_ids=shown_fact_ids,
+                shown_amplifier_refs=shown_amplifier_refs,
+                shown_consultation_value_refs=shown_consultation_value_refs,
+            )
+            selected_cta_key = package.plan.cta_key if include_cta and single_spec.allow_cta else None
+            return TargetSpecBoundOfflineResponsePackage(
+                spec=single_spec,
+                package=package,
+                selected_cta_key=selected_cta_key,
+            )
+        package = assemble_family_price_overview_package(
+            bundle,
+            doctor_catalog,
+            external_index,
+            consultation_values,
+            selection=selection,
+            md_root=md_root,
+        )
+        return TargetSpecBoundOfflineResponsePackage(
+            spec=spec,
+            package=package,
             selected_cta_key=None,
         )
     if (

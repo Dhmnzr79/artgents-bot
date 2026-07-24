@@ -86,6 +86,30 @@ def _intent_price_is_usable(
     return meta.confidence >= envelope.min_intent_confidence
 
 
+def _price_component_requested(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    components = _components_from_turn_frame(turn_frame, envelope)
+    if "price" in components:
+        return True
+    return (
+        turn_frame.intent in _PRICE_INTENTS
+        and _intent_price_is_usable(turn_frame, envelope)
+    )
+
+
+def _family_price_overview_topic(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> str | None:
+    if not _price_component_requested(turn_frame, envelope):
+        return None
+    if not _topic_is_usable(turn_frame, envelope):
+        return None
+    return turn_frame.topic  # type: ignore[return-value]
+
+
 def _components_from_turn_frame(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
@@ -194,6 +218,32 @@ def _materialize_fullcontext_content_policy_request(
     )
 
 
+def _materialize_family_price_overview_policy_request(
+    *,
+    response_mode: TargetResponseMode,
+    turn_topic: str,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> TargetResponsePolicyRequest:
+    if response_mode == "medical_handoff" and not envelope.forbidden_topics:
+        _fail("dispatch_medical_forbidden_empty", envelope.forbidden_topics)
+    return TargetResponsePolicyRequest.model_validate(
+        {
+            "response_mode": response_mode,
+            "service_id": None,
+            "family_price_overview_topic": turn_topic,
+            "tone_key": envelope.tone_key,
+            "allowed_topics": envelope.allowed_topics,
+            "forbidden_topics": envelope.forbidden_topics,
+            "required_fact_ids": (),
+            "requested_components": ("price",),
+            "primary_component": None,
+            "allow_marketing_facts": False,
+            "allow_consultation_close": envelope.allow_consultation_close,
+            "allow_cta": False,
+        }
+    )
+
+
 def _materialize_policy_request(
     *,
     response_mode: TargetResponseMode,
@@ -264,6 +314,17 @@ def dispatch_target_turn_frame_response(
         if _is_fullcontext_content_only_components(components, response_mode):
             policy_request = _materialize_fullcontext_content_policy_request(
                 response_mode=response_mode,
+                envelope=envelope,
+            )
+            return TargetTurnFrameMaterializeDispatch(
+                kind="materialize",
+                policy_request=policy_request,
+            )
+        family_topic = _family_price_overview_topic(turn_frame, envelope)
+        if family_topic is not None and response_mode == "answer":
+            policy_request = _materialize_family_price_overview_policy_request(
+                response_mode=response_mode,
+                turn_topic=family_topic,
                 envelope=envelope,
             )
             return TargetTurnFrameMaterializeDispatch(

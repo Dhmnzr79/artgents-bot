@@ -16,6 +16,7 @@ from core.target_composer_executor import (
     TargetComposerBackend,
     TargetComposerTone,
 )
+from core.target_family_price_overview import is_family_price_overview_spec
 from core.target_response_policy import build_target_response_spec
 from core.target_response_verifier import (
     TargetSemanticVerifierBackend,
@@ -56,6 +57,12 @@ def _assemble_bound_package(
     turn_topic: str | None = None,
 ) -> TargetSpecBoundOfflineResponsePackage:
     spec = build_target_response_spec(policy_request)
+    if is_family_price_overview_spec(spec):
+        brand_term = None
+        include_initial_block = False
+        include_consultation_close = False
+        include_cta = False
+        marketing_scenarios = ()
     return assemble_target_spec_offline_response_package(
         bundle,
         doctor_catalog,

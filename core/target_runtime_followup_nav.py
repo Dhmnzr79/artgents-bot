@@ -71,7 +71,8 @@ def build_target_unknown_ref_clarify_payload(
             "intent": "content",
             "answer_path": "target_fullcontext",
             "service_route": "target_fullcontext_followup_unknown",
-            "ui_source_family": "target_fullcontext",
+            "ui_source_family": "guided_fallback",
+            "attribution_kind": "plain",
             "terminal_mode": "clarify",
         },
     }

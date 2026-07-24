@@ -709,7 +709,12 @@ def test_uncertain_boundary_stays_terminal_defer() -> None:
     composer = RecordingComposerBackend(PAIN_GROUNDED_TEXT)
     semantic = RecordingSemanticBackend()
     result = run_target_offline_turn_frame_bound_response(
-        _frame(service_id=None, aspects=["price"], primary_aspect="price"),
+        _frame(
+            service_id=None,
+            aspects=["price"],
+            primary_aspect="price",
+            topic_confidence=0.2,
+        ),
         _envelope(required_fact_ids=()),
         **_pipeline_inputs(),  # type: ignore[arg-type]
         composer_backend=composer,

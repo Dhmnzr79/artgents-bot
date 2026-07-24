@@ -114,7 +114,7 @@ def test_target_terminal_defer_still_dispatched() -> None:
             "primary_aspect": "price",
             "service_id": None,
             "topic": "implantation",
-            "topic_confidence": 0.9,
+            "topic_confidence": 0.2,
         },
         allowed_topics=frozenset({"implantation", "doctors"}),
         allowed_service_ids=frozenset({"all_on_4"}),

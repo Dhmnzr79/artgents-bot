@@ -12,6 +12,7 @@ from pydantic import TypeAdapter, ValidationError
 from yaml.nodes import MappingNode
 
 from contracts.target_response_spec import CanonicalToken, TargetResponseSpec
+from core.target_family_price_overview import is_family_price_overview_spec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
 from core.target_offline_response_package import TargetOfflineResponsePackage
@@ -226,6 +227,49 @@ def build_target_scoped_response_evidence(
             selected_cta_key=None,
             scope_records=tuple(records),
             covered_fact_ids=plan.commercial_fact_ids,
+        )
+
+    if is_family_price_overview_spec(spec):
+        package = bound_package.package
+        plan = package.plan
+        materials = package.materials
+        if (
+            type(package) is not TargetOfflineResponsePackage
+            or type(plan) is not TargetResponseMaterializationPlan
+            or type(materials) is not TargetOfflineResponseMaterials
+            or plan.service_id is not None
+            or materials.service_id is not None
+            or plan.required_components != ("price",)
+            or plan.unfulfilled_components
+            or bound_package.selected_cta_key is not None
+            or spec.family_price_overview_topic is None
+        ):
+            _error("scoped_evidence_package_inconsistent", "family_price_overview")
+        offers_by_id = {offer.offer_id: offer for offer in materials.offers}
+        if any(offer_id not in offers_by_id for offer_id in plan.offer_ids):
+            _error("scoped_evidence_package_inconsistent", "offer_ids")
+        overview_topic = spec.family_price_overview_topic
+        records = [
+            TargetEvidenceScopeRecord(
+                ref=f"offer:{offer_id}",
+                topics=(overview_topic,),
+                fact_ids=(),
+            )
+            for offer_id in plan.offer_ids
+        ]
+        return TargetScopedResponseEvidence(
+            spec=spec,
+            service_id=None,
+            primary_content_ref=None,
+            offer_ids=plan.offer_ids,
+            doctor_ids=(),
+            commercial_fact_ids=(),
+            external_source_refs=(),
+            consultation_content_ref=None,
+            selected_followups=package.selected_followups,
+            selected_cta_key=None,
+            scope_records=tuple(records),
+            covered_fact_ids=(),
         )
 
     package = bound_package.package

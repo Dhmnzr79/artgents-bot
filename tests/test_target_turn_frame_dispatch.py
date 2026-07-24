@@ -124,14 +124,45 @@ def test_needs_clarification_returns_terminal_clarify_without_materialize() -> N
     assert result.spec.required_components == ()
 
 
-def test_missing_service_id_returns_terminal_defer() -> None:
+def test_missing_service_id_with_price_intent_materializes_family_overview() -> None:
     result = dispatch_target_turn_frame_response(
-        _frame(service_id=None),
+        _frame(service_id=None, aspects=["price"], primary_aspect="price"),
+        _envelope(),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.service_id is None
+    assert result.policy_request.family_price_overview_topic == "implantation"
+    assert result.policy_request.requested_components == ("price",)
+
+
+def test_missing_service_id_without_usable_topic_and_price_returns_defer() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            service_id=None,
+            aspects=["price"],
+            primary_aspect="price",
+            topic_confidence=0.2,
+        ),
         _envelope(),
     )
     assert result.kind == "terminal"
     assert result.terminal_mode == "defer"
     assert result.spec.response_mode == "defer"
+
+
+def test_missing_service_id_content_overview_materializes_content_only() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            service_id=None,
+            aspects=["overview"],
+            primary_aspect="overview",
+            route="content",
+        ),
+        _envelope(),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.requested_components == ("content",)
+    assert result.policy_request.service_id is None
 
 
 def test_content_and_price_without_primary_raises_ambiguous_error() -> None:

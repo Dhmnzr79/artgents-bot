@@ -7,8 +7,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from contracts.ui_scope_action import ScopeExtent
+from contracts.target_service_applicability import PatientStage
 
-EffectiveScopeSource = Literal["ui_action", "session", "unknown"]
+EffectiveScopeSource = Literal["ui_action", "ui_stage_action", "session", "unknown"]
 
 
 class EffectiveScope(BaseModel):
@@ -17,6 +18,7 @@ class EffectiveScope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     extent: ScopeExtent | Literal["unknown"] = "unknown"
+    stage: PatientStage | None = None
     topic: str | None = None
     source: EffectiveScopeSource = "unknown"
     provenance: str = Field(default="unknown", min_length=1)

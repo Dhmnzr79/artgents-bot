@@ -10,14 +10,16 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
+from contracts.effective_scope import EffectiveScope
 from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from core.target_composer_executor import (
     TargetComposerBackend,
     TargetComposerTone,
 )
-from core.target_family_price_overview import is_family_price_overview_spec
+from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_response_policy import build_target_response_spec
+from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_response_verifier import (
     TargetSemanticVerifierBackend,
     TargetVerifiedComposedResponse,
@@ -55,14 +57,23 @@ def _assemble_bound_package(
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
     turn_topic: str | None = None,
+    effective_scope: EffectiveScope | None = None,
+    client_id: str = "demo",
 ) -> TargetSpecBoundOfflineResponsePackage:
     spec = build_target_response_spec(policy_request)
-    if is_family_price_overview_spec(spec):
-        brand_term = None
-        include_initial_block = False
+    if is_scope_aware_price_spec(spec):
         include_consultation_close = False
-        include_cta = False
-        marketing_scenarios = ()
+        resolved_stage = spec.response_stage
+        if resolved_stage == "stage_clarify":
+            brand_term = None
+            include_initial_block = False
+            include_cta = False
+            marketing_scenarios = ()
+        elif resolved_stage not in {None, "broad_family_price"}:
+            brand_term = None
+            include_initial_block = False
+            include_cta = False
+            marketing_scenarios = ()
     return assemble_target_spec_offline_response_package(
         bundle,
         doctor_catalog,
@@ -82,6 +93,8 @@ def _assemble_bound_package(
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
         turn_topic=turn_topic,
+        effective_scope=effective_scope,
+        client_id=client_id,
     )
 
 
@@ -110,6 +123,8 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
     turn_topic: str | None = None,
+    effective_scope: EffectiveScope | None = None,
+    client_id: str = "demo",
 ) -> tuple[TargetVerifiedComposedResponse, TargetMaterializedSessionSelection]:
     bound_package = _assemble_bound_package(
         policy_request,
@@ -130,6 +145,8 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
         turn_topic=turn_topic,
+        effective_scope=effective_scope,
+        client_id=client_id,
     )
     verified = run_target_offline_verified_response_pipeline(
         bound_package,
@@ -171,6 +188,8 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
     turn_topic: str | None = None,
+    effective_scope: EffectiveScope | None = None,
+    client_id: str = "demo",
 ) -> TargetVerifiedComposedResponse:
     """Build spec-bound package and return one exact verified target response."""
 
@@ -198,5 +217,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
         turn_topic=turn_topic,
+        effective_scope=effective_scope,
+        client_id=client_id,
     )
     return verified

@@ -12,7 +12,8 @@ from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameBoundTerminalResponse,
 )
 from contracts.turn_frame import TurnFrame
-from core.target_family_price_overview import is_family_price_overview_spec
+from core.target_client_ui_nav import TargetNavigationFollowup
+from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_response_followup_materializer import (
     TargetContentFollowup,
     TargetPriceFollowup,
@@ -110,6 +111,35 @@ def _followups_to_quick_replies(
     return quick
 
 
+def _navigation_to_quick_replies(
+    navigation: tuple[TargetNavigationFollowup, ...],
+) -> list[dict[str, str]]:
+    return [{"label": item.label, "ref": item.ref} for item in navigation if item.ref]
+
+
+def _merge_quick_replies(
+    *,
+    navigation: tuple[TargetNavigationFollowup, ...],
+    content: tuple[TargetContentFollowup, ...],
+    price: tuple[TargetPriceFollowup, ...],
+) -> list[dict[str, str]]:
+    merged: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in _navigation_to_quick_replies(navigation):
+        ref = item["ref"]
+        if ref in seen:
+            continue
+        seen.add(ref)
+        merged.append(item)
+    for item in _followups_to_quick_replies(content=content, price=price):
+        ref = item["ref"]
+        if ref in seen:
+            continue
+        seen.add(ref)
+        merged.append(item)
+    return merged
+
+
 def build_target_runtime_widget_cta(
     *,
     client_id: str,
@@ -135,7 +165,8 @@ def materialize_verified_widget_payload(
     turn_frame: TurnFrame,
 ) -> TargetRuntimeMaterializedPayload:
     followups = verified.selected_followups
-    quick_replies = _followups_to_quick_replies(
+    quick_replies = _merge_quick_replies(
+        navigation=verified.navigation_followups,
         content=followups.content,
         price=followups.price,
     )
@@ -148,12 +179,14 @@ def materialize_verified_widget_payload(
         attribution_kind="content",
         ui_source_family=ui_family,
         matched_service_id=turn_frame.service_id or spec.service_id,
-        service_topic=turn_frame.topic or spec.family_price_overview_topic,
+        service_topic=turn_frame.topic or spec.scope_price_topic,
         followup_count=len(quick_replies),
         followup_source="quick_replies",
     )
-    if is_family_price_overview_spec(spec):
-        meta["family_price_overview"] = True
+    if is_scope_aware_price_spec(spec):
+        meta["response_stage"] = spec.response_stage
+        if spec.scope_price_topic:
+            meta["scope_price_topic"] = spec.scope_price_topic
     if verified.selected_cta_key:
         meta["cta_key"] = verified.selected_cta_key
         meta["cta_action"] = "lead"

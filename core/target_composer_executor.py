@@ -11,6 +11,7 @@ import hashlib
 from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
     TargetComposerRequest,
@@ -165,11 +166,23 @@ def _fullcontext_content_only_request(request: TargetComposerRequest) -> bool:
     return is_fullcontext_content_only_spec(request.spec)
 
 
+def _empty_evidence_scope_price_request(request: TargetComposerRequest) -> bool:
+    stage = request.spec.response_stage
+    return is_scope_aware_price_stage(stage) and stage in {
+        "stage_clarify",
+        "data_gap",
+    }
+
+
 def _validate_blocks(request: TargetComposerRequest) -> None:
     blocks = request.evidence_blocks
     if type(blocks) is not tuple:
         _error("composer_executor_request_invalid", "request_evidence")
-    if not blocks and not _fullcontext_content_only_request(request):
+    if (
+        not blocks
+        and not _fullcontext_content_only_request(request)
+        and not _empty_evidence_scope_price_request(request)
+    ):
         _error("composer_executor_request_invalid", "request_evidence")
     if not blocks:
         return

@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
+from contracts.effective_scope import EffectiveScope
 from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
@@ -67,6 +68,8 @@ def run_target_offline_boundary_enforced_fullcontext_response(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    effective_scope: EffectiveScope | None = None,
+    client_id: str = "demo",
 ) -> (
     TargetMedicalBoundaryTerminalEnforcement
     | TargetTurnFrameBoundMaterializeResponse
@@ -113,4 +116,6 @@ def run_target_offline_boundary_enforced_fullcontext_response(
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
+        effective_scope=effective_scope,
+        client_id=client_id,
     )

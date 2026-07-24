@@ -187,7 +187,9 @@ def _family_overview_frame(**overrides: object):
 
 
 def test_implantation_family_price_overview_materializes_via_pipeline() -> None:
+    from contracts.effective_scope import EffectiveScope
     from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundMaterializeResponse
+    from core.target_scope_aware_selection import run_target_scope_aware_selection
     from core.target_turn_frame_bound_response import run_target_offline_turn_frame_bound_response
     from tests.test_demo_target_turn_frame_bound_response import (
         RecordingComposerBackend,
@@ -197,28 +199,36 @@ def test_implantation_family_price_overview_materializes_via_pipeline() -> None:
     )
 
     bundle = load_response_schema_bundle(TARGET_ROOT)
-    selection = select_family_price_overview_services(
+    doctors = load_doctor_catalog(__import__("pathlib").Path("clients/demo/doctor_catalog.json"))
+    selection = run_target_scope_aware_selection(
         bundle,
-        load_doctor_catalog(__import__("pathlib").Path("clients/demo/doctor_catalog.json")),
-        turn_topic="implantation",
+        doctors,
+        effective_scope=EffectiveScope(),
+        topic="implantation",
     )
+    assert selection.kind == "broad_anchors"
     parts: list[str] = ["Стоимость зависит от метода."]
-    for entry in selection.entries:
-        offer = next(o for o in bundle.offers if o.offer_id == entry.offer_id)
+    seen_offer_ids: set[str] = set()
+    for anchor in selection.anchors:
+        if anchor.offer_id in seen_offer_ids:
+            continue
+        seen_offer_ids.add(anchor.offer_id)
+        service = bundle.services[anchor.service_id]
+        offer = next(o for o in bundle.offers if o.offer_id == anchor.offer_id)
         price = offer.price
         if price.mode == "from":
             amount = price.min_amount
-            parts.append(f"{entry.service_name} — от {amount:,} рублей".replace(",", " "))
+            parts.append(f"{service.name} — от {amount:,} рублей".replace(",", " "))
         elif price.mode == "fixed":
-            parts.append(f"{entry.service_name} — {price.amount:,} рублей".replace(",", " "))
+            parts.append(f"{service.name} — {price.amount:,} рублей".replace(",", " "))
         elif price.mode == "range":
             parts.append(
-                f"{entry.service_name} — от {price.min_amount:,} до {price.max_amount:,} рублей".replace(
+                f"{service.name} — от {price.min_amount:,} до {price.max_amount:,} рублей".replace(
                     ",", " "
                 )
             )
         else:
-            parts.append(f"{entry.service_name} — {price.approved_text}")  # type: ignore[union-attr]
+            parts.append(f"{service.name} — {price.approved_text}")  # type: ignore[union-attr]
     answer = " ".join(parts)
     composer = RecordingComposerBackend(text=answer)
     semantic = RecordingSemanticBackend()
@@ -232,7 +242,9 @@ def test_implantation_family_price_overview_materializes_via_pipeline() -> None:
         semantic_backend=semantic,
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
-    assert result.dispatch.policy_request.family_price_overview_topic == "implantation"
+    assert result.dispatch.policy_request.response_stage == "broad_family_price"
+    assert result.dispatch.policy_request.scope_price_topic == "implantation"
+    assert len(result.verified.navigation_followups) == 3
     assert len(composer.invocations) == 1
     evidence = __import__("json").loads(composer.invocations[0].primary_evidence_json)
     assert len(evidence) >= 2
@@ -262,4 +274,4 @@ def test_all_on_4_exact_price_path_unchanged() -> None:
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.dispatch.policy_request.service_id == "all_on_4"
-    assert result.dispatch.policy_request.family_price_overview_topic is None
+    assert result.dispatch.policy_request.response_stage is None

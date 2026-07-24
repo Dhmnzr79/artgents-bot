@@ -237,6 +237,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "spec",
         "selected_followups",
         "selected_cta_key",
+        "navigation_followups",
         "verification_status",
     ]
     assert list(inspect.signature(verify_target_composed_response).parameters) == [
@@ -244,6 +245,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "response",
         "cached_full_context",
         "semantic_backend",
+        "navigation_followups",
     ]
     source = Path("core/target_response_verifier.py").read_text(encoding="utf-8")
     assert set(re.findall(r'"(target_verifier_[a-z_]+)"', source)) == {

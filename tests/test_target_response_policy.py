@@ -41,7 +41,8 @@ def test_exact_request_shape_defaults_and_strict_frozen_config() -> None:
     assert list(TargetResponsePolicyRequest.model_fields) == [
         "response_mode",
         "service_id",
-        "family_price_overview_topic",
+        "response_stage",
+        "scope_price_topic",
         "tone_key",
         "allowed_topics",
         "forbidden_topics",
@@ -53,7 +54,8 @@ def test_exact_request_shape_defaults_and_strict_frozen_config() -> None:
         "allow_cta",
     ]
     assert TargetResponsePolicyRequest.model_fields["service_id"].default is None
-    assert TargetResponsePolicyRequest.model_fields["family_price_overview_topic"].default is None
+    assert TargetResponsePolicyRequest.model_fields["response_stage"].default is None
+    assert TargetResponsePolicyRequest.model_fields["scope_price_topic"].default is None
     assert TargetResponsePolicyRequest.model_fields["forbidden_topics"].default == ()
     assert TargetResponsePolicyRequest.model_fields["required_fact_ids"].default == ()
     assert TargetResponsePolicyRequest.model_fields["primary_component"].default is None

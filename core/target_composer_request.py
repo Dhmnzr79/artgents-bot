@@ -18,7 +18,7 @@ from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
 from core.service_data_context import ServiceDoctorContext
 from core.target_response_followup_policy import TargetResponseFollowupSelection
-from core.target_family_price_overview import is_family_price_overview_spec
+from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_scoped_response_evidence import (
     TargetEvidenceScopeRecord,
@@ -395,6 +395,28 @@ def _exact_sources(
     return source_offers, source_doctors, source_facts, consultation_by_ref
 
 
+def _scope_price_overview_sources(
+    scoped: TargetScopedResponseEvidence,
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+    bundle: ResponseSchemaBundle,
+) -> dict[str, TargetOffer]:
+    materials = bound_package.package.materials
+    source_offers: dict[str, TargetOffer] = {}
+    material_offers = {offer.offer_id: offer for offer in materials.offers}
+    bundle_offers = {offer.offer_id: offer for offer in bundle.offers}
+    for offer_id in scoped.offer_ids:
+        material = material_offers.get(offer_id)
+        bundle_offer = bundle_offers.get(offer_id)
+        if (
+            material is None
+            or bundle_offer is None
+            or bundle_offer.service_id not in materials.family_service_ids
+        ):
+            _source_mismatch(("offer", offer_id))
+        source_offers[offer_id] = material
+    return source_offers
+
+
 def _family_overview_sources(
     scoped: TargetScopedResponseEvidence,
     bound_package: TargetSpecBoundOfflineResponsePackage,
@@ -542,8 +564,16 @@ def materialize_target_composer_request(
             selected_followups=scoped.selected_followups,
             selected_cta_key=scoped.selected_cta_key,
         )
-    if is_family_price_overview_spec(scoped.spec):
-        offers = _family_overview_sources(scoped, bound_package, bundle)
+    if is_scope_aware_price_spec(scoped.spec):
+        if scoped.spec.response_stage in {"stage_clarify", "data_gap"}:
+            return TargetComposerRequest(
+                user_message=user_message,
+                spec=scoped.spec,
+                evidence_blocks=(),
+                selected_followups=scoped.selected_followups,
+                selected_cta_key=scoped.selected_cta_key,
+            )
+        offers = _scope_price_overview_sources(scoped, bound_package, bundle)
         root = _root(md_root)
         blocks = tuple(
             _block(

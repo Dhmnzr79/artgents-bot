@@ -10,6 +10,7 @@ from contracts.target_turn_frame_dispatch import (
 )
 from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
+from contracts.ui_stage_action import UiStageAction
 from core.target_boundary_enforced_fullcontext_response import (
     run_target_offline_boundary_enforced_fullcontext_response,
 )
@@ -35,6 +36,7 @@ from core.target_runtime_session import (
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_runtime_strategy import resolve_target_runtime_strategy_context
+from core.target_strategy_context import strategy_match_from_effective_scope
 from core.target_runtime_turn_frame_hydration import (
     hydrate_target_runtime_turn_frame_from_session,
 )
@@ -82,6 +84,21 @@ def _current_ui_scope_action_from_request() -> UiScopeAction | None:
         return None
     try:
         return UiScopeAction.model_validate(raw)
+    except Exception:
+        return None
+
+
+def _current_ui_stage_action_from_request() -> UiStageAction | None:
+    try:
+        from flask import request
+
+        raw = request.ctx.get("current_ui_stage_action")
+    except Exception:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return UiStageAction.model_validate(raw)
     except Exception:
         return None
 
@@ -145,12 +162,12 @@ def run_target_fullcontext_runtime_turn(
     session_state = read_target_runtime_session(sid)
     effective_scope = resolve_effective_scope(
         current_ui_action=_current_ui_scope_action_from_request(),
+        current_ui_stage_action=_current_ui_stage_action_from_request(),
         session_facts=session_state.patient_facts,
         current_topic=turn_frame.topic,
         session_turn_count=session_state.session_turn_count,
     )
     _publish_effective_scope(effective_scope)
-    _ = effective_scope
 
     try:
         boundary = execute_target_medical_boundary_classification(
@@ -170,9 +187,13 @@ def run_target_fullcontext_runtime_turn(
             turn_frame=turn_frame,
         )
 
-    strategy_context = resolve_target_runtime_strategy_context(
+    catalog_strategy = resolve_target_runtime_strategy_context(
         context.bundle,
         service_id=turn_frame.service_id,
+    )
+    strategy_context = strategy_match_from_effective_scope(
+        effective_scope,
+        service_family=catalog_strategy.family,
     )
 
     try:
@@ -210,6 +231,8 @@ def run_target_fullcontext_runtime_turn(
             shown_fact_ids=session_state.shown_fact_ids,
             shown_amplifier_refs=session_state.shown_amplifier_refs,
             shown_consultation_value_refs=session_state.shown_consultation_value_refs,
+            effective_scope=effective_scope,
+            client_id=client_id,
         )
     except TargetResponseVerificationError as exc:
         return TargetRuntimeTurnOutcome(

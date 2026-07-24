@@ -225,6 +225,7 @@ def run_pre_resolver_turn(
             mark_nav_ref_used(sid, ref_eff)
         if not q:
             from contracts.ui_scope_action import is_ui_scope_ref
+            from contracts.ui_stage_action import is_ui_stage_ref
             from core.target_runtime_followup_nav import (
                 build_target_unknown_ref_clarify_payload,
                 resolve_target_followup_navigation,
@@ -232,8 +233,10 @@ def run_pre_resolver_turn(
             from core.target_runtime_session import (
                 read_target_runtime_session,
                 write_session_patient_facts_from_ui_action,
+                write_session_patient_facts_from_ui_stage_action,
             )
             from core.target_ui_scope_action import resolve_ui_scope_ref_click
+            from core.target_ui_stage_action import resolve_ui_stage_ref_click
 
             session_state = read_target_runtime_session(sid)
             if is_ui_scope_ref(ref_eff):
@@ -258,6 +261,38 @@ def run_pre_resolver_turn(
                 write_session_patient_facts_from_ui_action(sid, ui_resolution.action)
                 try:
                     request.ctx["current_ui_scope_action"] = ui_resolution.action.model_dump()
+                except Exception:
+                    pass
+                if ui_resolution.planner_message:
+                    q = ui_resolution.planner_message
+                elif not q:
+                    q = "продолжить"
+            elif is_ui_stage_ref(ref_eff):
+                ui_resolution = resolve_ui_stage_ref_click(
+                    ref=ref_eff,
+                    followups=session_state.followups,
+                )
+                if ui_resolution.kind != "ok" or ui_resolution.action is None:
+                    payload = build_target_unknown_ref_clarify_payload(
+                        client_id=client_id,
+                        sid=sid,
+                    )
+                    return AskOrchestrationResult(
+                        kind="service_reply",
+                        q=q,
+                        sid=sid,
+                        client_id=client_id,
+                        service_payload=payload,
+                        service_route="target_fullcontext_followup_unknown",
+                        decision_frame=decision_frame,
+                    )
+                write_session_patient_facts_from_ui_stage_action(
+                    sid,
+                    ui_resolution.action,
+                    prior=session_state.patient_facts,
+                )
+                try:
+                    request.ctx["current_ui_stage_action"] = ui_resolution.action.model_dump()
                 except Exception:
                     pass
                 if ui_resolution.planner_message:

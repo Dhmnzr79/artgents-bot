@@ -12,6 +12,7 @@ from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetFollowupSource
+from contracts.target_response_stage import ResponseStage
 from core.target_offline_response_assembly import (
     TargetOfflineResponseMaterials,
     assemble_target_offline_response_materials,
@@ -24,6 +25,7 @@ from core.target_response_followup_policy import (
     TargetResponseFollowupSelection,
     select_target_response_followups,
 )
+from core.target_client_ui_nav import TargetNavigationFollowup
 from core.target_response_materialization_plan import (
     TargetResponseMaterializationPlan,
     build_target_response_materialization_plan,
@@ -36,6 +38,8 @@ class TargetOfflineResponsePackage:
     plan: TargetResponseMaterializationPlan
     followup_candidates: TargetResponseFollowups
     selected_followups: TargetResponseFollowupSelection
+    navigation_followups: tuple[TargetNavigationFollowup, ...] = ()
+    response_stage: ResponseStage | None = None
 
 
 def assemble_target_offline_response_package(
@@ -96,4 +100,5 @@ def assemble_target_offline_response_package(
         plan=plan,
         followup_candidates=followup_candidates,
         selected_followups=selected_followups,
+        navigation_followups=(),
     )

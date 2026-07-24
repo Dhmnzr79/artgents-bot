@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from contracts.ui_scope_action import is_ui_scope_ref
+from contracts.ui_stage_action import is_ui_stage_ref
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +40,8 @@ def resolve_target_followup_navigation(
     if not ref_eff:
         return None
     if is_ui_scope_ref(ref_eff):
+        return None
+    if is_ui_stage_ref(ref_eff):
         return None
     for item in followups:
         if item.ref == ref_eff:

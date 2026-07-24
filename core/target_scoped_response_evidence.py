@@ -12,7 +12,7 @@ from pydantic import TypeAdapter, ValidationError
 from yaml.nodes import MappingNode
 
 from contracts.target_response_spec import CanonicalToken, TargetResponseSpec
-from core.target_family_price_overview import is_family_price_overview_spec
+from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
 from core.target_offline_response_package import TargetOfflineResponsePackage
@@ -229,26 +229,77 @@ def build_target_scoped_response_evidence(
             covered_fact_ids=plan.commercial_fact_ids,
         )
 
-    if is_family_price_overview_spec(spec):
+    if is_scope_aware_price_spec(spec):
         package = bound_package.package
         plan = package.plan
         materials = package.materials
+        if spec.response_stage == "stage_clarify":
+            if (
+                type(package) is not TargetOfflineResponsePackage
+                or type(plan) is not TargetResponseMaterializationPlan
+                or type(materials) is not TargetOfflineResponseMaterials
+                or plan.required_components != ("price",)
+                or spec.scope_price_topic is None
+            ):
+                _error("scoped_evidence_package_inconsistent", "scope_aware_price")
+            if plan.offer_ids or materials.offers:
+                _error("scoped_evidence_package_inconsistent", "stage_clarify_offers")
+            return TargetScopedResponseEvidence(
+                spec=spec,
+                service_id=None,
+                primary_content_ref=None,
+                offer_ids=(),
+                doctor_ids=(),
+                commercial_fact_ids=(),
+                external_source_refs=(),
+                consultation_content_ref=None,
+                selected_followups=package.selected_followups,
+                selected_cta_key=bound_package.selected_cta_key,
+                scope_records=(),
+                covered_fact_ids=(),
+            )
+        if spec.response_stage == "data_gap":
+            if (
+                type(package) is not TargetOfflineResponsePackage
+                or type(plan) is not TargetResponseMaterializationPlan
+                or type(materials) is not TargetOfflineResponseMaterials
+                or plan.required_components != ("price",)
+                or spec.scope_price_topic is None
+            ):
+                _error("scoped_evidence_package_inconsistent", "scope_aware_price")
+            if plan.offer_ids or materials.offers:
+                _error("scoped_evidence_package_inconsistent", "data_gap_offers")
+            return TargetScopedResponseEvidence(
+                spec=spec,
+                service_id=None,
+                primary_content_ref=None,
+                offer_ids=(),
+                doctor_ids=(),
+                commercial_fact_ids=(),
+                external_source_refs=(),
+                consultation_content_ref=None,
+                selected_followups=package.selected_followups,
+                selected_cta_key=None,
+                scope_records=(),
+                covered_fact_ids=(),
+            )
         if (
             type(package) is not TargetOfflineResponsePackage
             or type(plan) is not TargetResponseMaterializationPlan
             or type(materials) is not TargetOfflineResponseMaterials
-            or plan.service_id is not None
-            or materials.service_id is not None
             or plan.required_components != ("price",)
             or plan.unfulfilled_components
-            or bound_package.selected_cta_key is not None
-            or spec.family_price_overview_topic is None
+            or spec.scope_price_topic is None
         ):
-            _error("scoped_evidence_package_inconsistent", "family_price_overview")
+            _error("scoped_evidence_package_inconsistent", "scope_aware_price")
+        if bound_package.selected_cta_key is not None and spec.response_stage != "broad_family_price":
+            _error("scoped_evidence_package_inconsistent", "selected_cta_key")
+        if plan.service_id is not None and spec.service_id not in (None, plan.service_id):
+            _error("scoped_evidence_package_inconsistent", "service_id")
         offers_by_id = {offer.offer_id: offer for offer in materials.offers}
         if any(offer_id not in offers_by_id for offer_id in plan.offer_ids):
             _error("scoped_evidence_package_inconsistent", "offer_ids")
-        overview_topic = spec.family_price_overview_topic
+        overview_topic = spec.scope_price_topic
         records = [
             TargetEvidenceScopeRecord(
                 ref=f"offer:{offer_id}",
@@ -259,7 +310,7 @@ def build_target_scoped_response_evidence(
         ]
         return TargetScopedResponseEvidence(
             spec=spec,
-            service_id=None,
+            service_id=plan.service_id,
             primary_content_ref=None,
             offer_ids=plan.offer_ids,
             doctor_ids=(),
@@ -267,7 +318,7 @@ def build_target_scoped_response_evidence(
             external_source_refs=(),
             consultation_content_ref=None,
             selected_followups=package.selected_followups,
-            selected_cta_key=None,
+            selected_cta_key=bound_package.selected_cta_key,
             scope_records=tuple(records),
             covered_fact_ids=(),
         )

@@ -9,6 +9,7 @@ from contracts.target_response_spec import (
     TargetResponseComponent,
     TargetResponseMode,
 )
+from contracts.target_response_stage import ResponseStage
 
 
 class TargetResponsePolicyRequest(BaseModel):
@@ -18,7 +19,8 @@ class TargetResponsePolicyRequest(BaseModel):
 
     response_mode: TargetResponseMode
     service_id: CanonicalToken | None = None
-    family_price_overview_topic: CanonicalToken | None = None
+    response_stage: ResponseStage | None = None
+    scope_price_topic: CanonicalToken | None = None
     tone_key: CanonicalToken
     allowed_topics: tuple[CanonicalToken, ...]
     forbidden_topics: tuple[CanonicalToken, ...] = ()
@@ -46,13 +48,20 @@ class TargetResponsePolicyRequest(BaseModel):
             and "price" in self.requested_components
         ):
             raise ValueError("policy_followup_source_ambiguous")
-        if self.family_price_overview_topic is not None:
-            if self.service_id is not None:
-                raise ValueError("family_price_overview_service_id_forbidden")
+        if self.response_stage is not None:
+            if self.service_id is not None and self.response_stage not in {
+                "concrete_service_price",
+                "scoped_family_price",
+            }:
+                raise ValueError("scope_price_service_id_forbidden")
+            if self.scope_price_topic is None and self.response_stage != "concrete_service_price":
+                raise ValueError("scope_price_topic_required")
             if self.requested_components != ("price",):
-                raise ValueError("family_price_overview_components_invalid")
+                raise ValueError("scope_price_components_invalid")
             if self.primary_component is not None:
-                raise ValueError("family_price_overview_primary_forbidden")
-            if self.allow_marketing_facts or self.allow_cta:
-                raise ValueError("family_price_overview_marketing_forbidden")
+                raise ValueError("scope_price_primary_forbidden")
+            if self.response_stage == "stage_clarify" and (
+                self.allow_marketing_facts or self.allow_cta
+            ):
+                raise ValueError("stage_clarify_marketing_forbidden")
         return self

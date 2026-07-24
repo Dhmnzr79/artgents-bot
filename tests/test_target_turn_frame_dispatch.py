@@ -124,15 +124,34 @@ def test_needs_clarification_returns_terminal_clarify_without_materialize() -> N
     assert result.spec.required_components == ()
 
 
-def test_missing_service_id_with_price_intent_materializes_family_overview() -> None:
+def test_missing_service_id_with_price_intent_materializes_scope_price() -> None:
     result = dispatch_target_turn_frame_response(
         _frame(service_id=None, aspects=["price"], primary_aspect="price"),
         _envelope(),
     )
     assert result.kind == "materialize"
     assert result.policy_request.service_id is None
-    assert result.policy_request.family_price_overview_topic == "implantation"
+    assert result.policy_request.response_stage == "broad_family_price"
+    assert result.policy_request.scope_price_topic == "implantation"
     assert result.policy_request.requested_components == ("price",)
+
+
+def test_known_extent_materializes_scoped_family_price() -> None:
+    from contracts.effective_scope import EffectiveScope
+
+    result = dispatch_target_turn_frame_response(
+        _frame(service_id=None, aspects=["price"], primary_aspect="price"),
+        _envelope(),
+        effective_scope=EffectiveScope(
+            extent="one_tooth",
+            topic="implantation",
+            source="session",
+            provenance="target:ui_scope/implantation/one_tooth",
+        ),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.response_stage is None
+    assert result.policy_request.scope_price_topic == "implantation"
 
 
 def test_missing_service_id_without_usable_topic_and_price_returns_defer() -> None:
@@ -200,6 +219,7 @@ def test_public_dispatch_signature_is_single_entrypoint() -> None:
     assert list(inspect.signature(dispatch_target_turn_frame_response).parameters) == [
         "turn_frame",
         "envelope",
+        "effective_scope",
     ]
 
 

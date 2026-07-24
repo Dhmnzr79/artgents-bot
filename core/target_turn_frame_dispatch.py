@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal, NoReturn
 
 from contracts.answer_plan import AspectKind
+from contracts.effective_scope import EffectiveScope
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from contracts.target_response_spec import TargetResponseComponent, TargetResponseMode
 from contracts.turn_frame import FieldMeta, TurnFrame
@@ -99,7 +100,7 @@ def _price_component_requested(
     )
 
 
-def _family_price_overview_topic(
+def _scope_price_topic(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
 ) -> str | None:
@@ -108,6 +109,14 @@ def _family_price_overview_topic(
     if not _topic_is_usable(turn_frame, envelope):
         return None
     return turn_frame.topic  # type: ignore[return-value]
+
+
+def _initial_scope_price_stage(
+    effective_scope: EffectiveScope | None,
+) -> str | None:
+    if effective_scope is None or effective_scope.extent == "unknown":
+        return "broad_family_price"
+    return None
 
 
 def _components_from_turn_frame(
@@ -218,28 +227,33 @@ def _materialize_fullcontext_content_policy_request(
     )
 
 
-def _materialize_family_price_overview_policy_request(
+def _materialize_scope_price_policy_request(
     *,
     response_mode: TargetResponseMode,
     turn_topic: str,
+    effective_scope: EffectiveScope | None,
     envelope: TargetTurnFramePolicyEnvelope,
 ) -> TargetResponsePolicyRequest:
     if response_mode == "medical_handoff" and not envelope.forbidden_topics:
         _fail("dispatch_medical_forbidden_empty", envelope.forbidden_topics)
+    stage = _initial_scope_price_stage(effective_scope)
+    allow_marketing = stage == "broad_family_price" and envelope.allow_marketing_facts
+    allow_cta = stage == "broad_family_price" and envelope.allow_cta
     return TargetResponsePolicyRequest.model_validate(
         {
             "response_mode": response_mode,
             "service_id": None,
-            "family_price_overview_topic": turn_topic,
+            "response_stage": stage,
+            "scope_price_topic": turn_topic,
             "tone_key": envelope.tone_key,
             "allowed_topics": envelope.allowed_topics,
             "forbidden_topics": envelope.forbidden_topics,
             "required_fact_ids": (),
             "requested_components": ("price",),
             "primary_component": None,
-            "allow_marketing_facts": False,
-            "allow_consultation_close": envelope.allow_consultation_close,
-            "allow_cta": False,
+            "allow_marketing_facts": allow_marketing,
+            "allow_consultation_close": False,
+            "allow_cta": allow_cta,
         }
     )
 
@@ -281,6 +295,8 @@ def _is_fullcontext_content_only_components(
 def dispatch_target_turn_frame_response(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
+    *,
+    effective_scope: EffectiveScope | None = None,
 ) -> TargetTurnFrameMaterializeDispatch | TargetTurnFrameTerminalDispatch:
     """Map one TurnFrame and explicit envelope to materialize or terminal dispatch."""
 
@@ -320,11 +336,12 @@ def dispatch_target_turn_frame_response(
                 kind="materialize",
                 policy_request=policy_request,
             )
-        family_topic = _family_price_overview_topic(turn_frame, envelope)
-        if family_topic is not None and response_mode == "answer":
-            policy_request = _materialize_family_price_overview_policy_request(
+        scope_topic = _scope_price_topic(turn_frame, envelope)
+        if scope_topic is not None and response_mode == "answer":
+            policy_request = _materialize_scope_price_policy_request(
                 response_mode=response_mode,
-                turn_topic=family_topic,
+                turn_topic=scope_topic,
+                effective_scope=effective_scope,
                 envelope=envelope,
             )
             return TargetTurnFrameMaterializeDispatch(

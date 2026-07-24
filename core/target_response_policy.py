@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from contracts.target_response_spec import TargetFollowupSource, TargetResponseSpec
+from contracts.target_response_stage import is_scope_aware_price_stage
 
 
 class TargetResponsePolicyBuildError(ValueError):
@@ -16,7 +17,13 @@ class TargetResponsePolicyBuildError(ValueError):
 
 
 def _followup_source(request: TargetResponsePolicyRequest) -> TargetFollowupSource | None:
-    if request.family_price_overview_topic is not None:
+    if request.scope_price_topic is not None and request.response_stage is None:
+        return None
+    if is_scope_aware_price_stage(request.response_stage):
+        if request.response_stage in {"broad_family_price", "stage_clarify"}:
+            return None
+        if request.response_stage in {"scoped_family_price", "concrete_service_price"}:
+            return "price"
         return None
     if request.response_mode in {"clarify", "defer"}:
         return None
@@ -44,7 +51,8 @@ def build_target_response_spec(
     return TargetResponseSpec(
         response_mode=request.response_mode,
         service_id=request.service_id,
-        family_price_overview_topic=request.family_price_overview_topic,
+        response_stage=request.response_stage,
+        scope_price_topic=request.scope_price_topic,
         tone_key=request.tone_key,
         allowed_topics=request.allowed_topics,
         forbidden_topics=request.forbidden_topics,

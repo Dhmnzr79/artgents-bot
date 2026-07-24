@@ -23,7 +23,7 @@ def selection_patient_context_from_inputs(
     extent: ScopeExtent | Literal["unknown"] = effective_scope.extent
     return SelectionPatientContext(
         extent=extent,
-        stage=stage,
+        stage=stage if stage is not None else effective_scope.stage,
         jaw=jaw,
         reported_context=reported_context,
     )
@@ -45,7 +45,7 @@ def strategy_match_from_effective_scope(
     return TargetStrategyMatch(
         family=service_family,
         extent=extent,
-        stage=stage,
+        stage=stage if stage is not None else effective_scope.stage,
         jaw=jaw,
         reported_context=reported_context,
     )

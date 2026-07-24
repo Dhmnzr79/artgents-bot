@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
+from contracts.effective_scope import EffectiveScope
 from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
@@ -53,10 +54,16 @@ def run_target_offline_turn_frame_bound_response(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    effective_scope: EffectiveScope | None = None,
+    client_id: str = "demo",
 ) -> TargetTurnFrameBoundMaterializeResponse | TargetTurnFrameBoundTerminalResponse:
     """Dispatch one TurnFrame and return either terminal spec or one exact verified response."""
 
-    dispatch = dispatch_target_turn_frame_response(turn_frame, envelope)
+    dispatch = dispatch_target_turn_frame_response(
+        turn_frame,
+        envelope,
+        effective_scope=effective_scope,
+    )
     if dispatch.kind == "terminal":
         return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
     verified, session_selection = run_target_offline_policy_bound_verified_response_pipeline_with_selection(
@@ -83,6 +90,8 @@ def run_target_offline_turn_frame_bound_response(
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
         turn_topic=turn_frame.topic,
+        effective_scope=effective_scope,
+        client_id=client_id,
     )
     return TargetTurnFrameBoundMaterializeResponse(
         kind="materialize",

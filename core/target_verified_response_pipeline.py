@@ -59,4 +59,5 @@ def run_target_offline_verified_response_pipeline(
         unverified,
         cached_full_context=cached_full_context,
         semantic_backend=semantic_backend,
+        navigation_followups=bound_package.package.navigation_followups,
     )

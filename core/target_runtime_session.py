@@ -7,6 +7,7 @@ from typing import Any
 
 from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
+from contracts.ui_stage_action import UiStageAction
 from core.routing_loader import THRESHOLDS
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_effective_scope import (
@@ -14,6 +15,7 @@ from core.target_effective_scope import (
     patient_facts_payload,
     read_session_patient_facts,
     session_patient_facts_from_ui_action,
+    session_patient_facts_from_ui_stage_action,
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_session_selection import TargetMaterializedSessionSelection
@@ -219,6 +221,31 @@ def write_session_patient_facts_from_ui_action(
         st = mem_get(sid)
         turn_count = int(st.get("session_turn_count") or 0)
         facts = session_patient_facts_from_ui_action(action, set_at_turn=turn_count)
+        st[_PATIENT_FACTS_KEY] = patient_facts_payload(facts)
+        _persist_unlocked(sid, st)
+        return facts
+
+
+def write_session_patient_facts_from_ui_stage_action(
+    sid: str,
+    action: UiStageAction,
+    *,
+    prior: SessionPatientFacts | None = None,
+) -> SessionPatientFacts:
+    """Persist canonical stage from explicit UI click; preserve extent when known."""
+
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        turn_count = int(st.get("session_turn_count") or 0)
+        if prior is None:
+            prior = read_session_patient_facts(st.get(_PATIENT_FACTS_KEY))
+        facts = session_patient_facts_from_ui_stage_action(
+            action,
+            set_at_turn=turn_count,
+            prior=prior,
+        )
         st[_PATIENT_FACTS_KEY] = patient_facts_payload(facts)
         _persist_unlocked(sid, st)
         return facts

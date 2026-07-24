@@ -25,6 +25,8 @@ def _payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
         "response_mode": "answer",
         "service_id": "all_on_4",
+        "response_stage": None,
+        "scope_price_topic": None,
         "tone_key": "commercial_warm",
         "allowed_topics": ("implantation",),
         "forbidden_topics": ("diagnosis",),
@@ -34,7 +36,6 @@ def _payload(**overrides: object) -> dict[str, object]:
         "allow_marketing_facts": True,
         "allow_consultation_close": True,
         "allow_cta": True,
-        "family_price_overview_topic": None,
     }
     payload.update(overrides)
     return payload
@@ -49,7 +50,8 @@ def test_exact_fields_defaults_aliases_and_strict_frozen_config() -> None:
     assert list(TargetResponseSpec.model_fields) == [
         "response_mode",
         "service_id",
-        "family_price_overview_topic",
+        "response_stage",
+        "scope_price_topic",
         "tone_key",
         "allowed_topics",
         "forbidden_topics",
@@ -61,7 +63,8 @@ def test_exact_fields_defaults_aliases_and_strict_frozen_config() -> None:
         "allow_cta",
     ]
     assert TargetResponseSpec.model_fields["service_id"].default is None
-    assert TargetResponseSpec.model_fields["family_price_overview_topic"].default is None
+    assert TargetResponseSpec.model_fields["response_stage"].default is None
+    assert TargetResponseSpec.model_fields["scope_price_topic"].default is None
     assert TargetResponseSpec.model_fields["forbidden_topics"].default == ()
     assert TargetResponseSpec.model_fields["required_fact_ids"].default == ()
     assert TargetResponseSpec.model_fields["followup_source"].default is None

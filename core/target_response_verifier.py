@@ -12,11 +12,13 @@ from typing import Literal, NoReturn, Protocol, TypeAlias
 from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import TargetUnverifiedComposedResponse
+from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
     TargetComposerRequest,
 )
+from core.target_client_ui_nav import TargetNavigationFollowup
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 
 
@@ -102,6 +104,7 @@ class TargetVerifiedComposedResponse:
     spec: TargetResponseSpec
     selected_followups: TargetResponseFollowupSelection
     selected_cta_key: str | None
+    navigation_followups: tuple[TargetNavigationFollowup, ...] = ()
     verification_status: Literal["verified"] = "verified"
 
 
@@ -182,7 +185,12 @@ def _validated_inputs(
     if type(blocks) is not tuple:
         _error("target_verifier_input_invalid", "evidence")
     if not blocks and not is_fullcontext_content_only_spec(spec):
-        _error("target_verifier_input_invalid", "evidence")
+        stage = spec.response_stage
+        if not (
+            is_scope_aware_price_stage(stage)
+            and stage in {"stage_clarify", "data_gap"}
+        ):
+            _error("target_verifier_input_invalid", "evidence")
     if not blocks:
         return request, response
     refs: list[str] = []
@@ -625,6 +633,7 @@ def verify_target_composed_response(
     *,
     cached_full_context: TargetCachedFullContext,
     semantic_backend: TargetSemanticVerifierBackend,
+    navigation_followups: tuple[TargetNavigationFollowup, ...] = (),
 ) -> TargetVerifiedComposedResponse:
     """Verify one adjacent S37 response without modifying or repairing its text."""
 
@@ -678,4 +687,5 @@ def verify_target_composed_response(
         spec=response.spec,
         selected_followups=response.selected_followups,
         selected_cta_key=response.selected_cta_key,
+        navigation_followups=navigation_followups,
     )

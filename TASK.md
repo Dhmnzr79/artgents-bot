@@ -262,3 +262,90 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | Tests | 129 passed (focused A9R1 + AC1–AC3 neighbors) |
 | Matrix blob | `36d137112007a3fb0a96ad0759aa111af6115a35` (unchanged) |
 | Import firewall | `test_product_sources_do_not_read_a9_nested_shadow_scope` ✅ |
+
+---
+
+# TASK — A9R2 Patient scope planner live eval (pre-live checkpoint)
+
+**Status:** pre-live governance + offline harness · **NO LIVE / NO LLM / NO PRODUCT AUTHORITY**
+
+**Baseline:** `075722f` (A9R1 COMPLETION ✅)
+
+## Goal (A9R2)
+
+One owner-approved live measurement of existing `plan_turn_attempt()` patient_scope extraction via A9R2 v2 matrix. **Does not enable authority.** Even `AUTOMATED_PASS` → `PENDING_MANUAL_REVIEW` only.
+
+| Deliverable | Role |
+|-------------|------|
+| `patient_scope_a9r_matrix_v2.json` | Typo fix for `a9r_typo_01_chelyust`; v1 frozen |
+| Live harness | Planner-only; 16 cases / 17 calls; retry=0; budget=17 |
+| Scoring | Miss vs wrong vs false-positive vs malformed vs correction vs session safety |
+| Artifacts | raw, result, manifest, attempt marker, call ledger, manual review |
+
+**Matrix defect fix:** v1 `a9r_typo_01_chelyust` duplicated extent_01 question. v2 question: «Сколько стоит имплантация всей чилюсти?»; expected `full_arch` unchanged.
+
+## Proposed gates (owner approval for live run)
+
+| Gate | Threshold |
+|------|-----------|
+| wrong non-unknown axis | 0 |
+| false-positive on negative/ambiguous | 0 |
+| correction success | 100% |
+| positive-axis recall | ≥ 0.85 |
+| composite exact turn rate | ≥ 0.85 |
+| malformed/transport errors | 0 |
+| planner calls | ≤ 17 |
+| retry | 0 |
+
+## Allowlist (A9R2 pre-live)
+
+| File | Purpose |
+|------|---------|
+| `evals/v5/demo/patient_scope_a9r_matrix_v2.json` | New frozen v2 matrix |
+| `evals/v5/a9r2_patient_scope_live_contract.py` | Artifact paths, budget, gates |
+| `evals/v5/a9r2_patient_scope_live_scoring.py` | Miss/wrong/FP/malformed scoring |
+| `evals/v5/a9r2_patient_scope_live_harness.py` | Planner harness (injectable) |
+| `evals/v5/run_a9r2_patient_scope_live.py` | CLI dry-run only until owner GO |
+| `tests/test_patient_scope_a9r_matrix_v2_contract.py` | v2 blob + v1 regression |
+| `tests/test_a9r2_patient_scope_live_offline.py` | Offline harness tests |
+| `TASK.md` | This checkpoint |
+
+**Forbidden:** live run in this checkpoint; `resolve_effective_scope` wiring; editing v1 A9R matrix; editing A9 shadow v1/v2, W1b, S-series artifacts.
+
+## Tests (A9R2 pre-live)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-a9r2-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_patient_scope_a9r_matrix_v2_contract.py `
+  tests/test_a9r2_patient_scope_live_offline.py `
+  tests/test_patient_scope_a9r_matrix_contract.py `
+  tests/test_a9r1_offline_harness.py `
+  tests/test_patient_scope_projection.py `
+  tests/test_effective_scope_merge.py `
+  tests/test_turn_frame_shadow.py `
+  tests/test_ac3_scope_price_flow_offline.py -q
+python evals/v5/run_a9r2_patient_scope_live.py --dry-run
+```
+
+## STOP conditions (A9R2)
+
+1. Live LLM invoked in pre-live commit
+2. Product authority wiring
+3. Modifying frozen v1 A9R matrix or historical artifacts
+4. `--live` enabled without separate owner GO
+
+**STOP after PRE-CODE ✅ + offline COMPLETION ✅. Live run is separate owner GO.**
+
+## Completion record (A9R2 pre-live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `075722f` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| A9R2 pre-live HEAD | `82a9829` |
+| Matrix v1 blob | `36d137112007a3fb0a96ad0759aa111af6115a35` (unchanged) |
+| Matrix v2 blob | `6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57` |
+| Live blocked | `--live` returns exit 3 until owner GO |

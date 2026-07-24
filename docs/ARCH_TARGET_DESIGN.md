@@ -203,13 +203,17 @@ message / typed UI action
 authority decision; free-text correction after A9 quality proof.
 
 **Canonical extent:** `one_tooth | few_teeth | full_arch` (+ jaw/stage). UI labels
-client-owned. `ResponseStage` — AC3; not in AC1/AC2 scope.
+client-owned. `ResponseStage` — **AC3** (derived from EffectiveScope + AC2 result; controls answer
+shape and follow-ups, not service selection).
 
-**AC2 (offline):** `service_catalog.selection` applicability gate + compose S15/S23;
-no product runtime wiring until AC3.
+**AC2 (offline, complete @ `5a3a2f8`):** `service_catalog.selection` applicability gate + compose S15/S23.
 
-**W1b WIP** припаркован; `family_price_groups` — будущий **navigation overlay** по
-extent, не второй applicability engine.
+**AC3:** atomic product runtime wiring — thread EffectiveScope, call AC2, emit scope buttons,
+retire W1 `family_price_overview` selector.
+
+**W1b WIP** припаркован (read-only). AC3 REWORK: extent-keyed client labels +
+`target:ui_scope/` refs (опционально `scope_nav.yaml`); **REJECT** `family_price_groups.yaml`
+как applicability authority и `target:family_price_group/` refs.
 
 ---
 

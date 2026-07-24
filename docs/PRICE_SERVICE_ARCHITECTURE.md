@@ -6,8 +6,11 @@ helpers материализуются S-series; **runtime/product wiring scope/
 
 **AC1 (`72681cc`):** `EffectiveScope` + typed `UiScopeAction` + session `patient_facts` в product path.
 
-**AC2 (`TASK.md`):** offline `service_catalog.selection` applicability + compose S15/S23;
-**без** product runtime/widget wiring (AC3).
+**AC2 (`5a3a2f8`):** offline `service_catalog.selection` applicability + compose S15/S23;
+**без** product runtime/widget wiring.
+
+**AC3 (`TASK.md`):** atomic runtime wiring — AC1 scope + AC2 selection → ResponseStage → widget;
+retire W1 `family_price_overview` selector from product path.
 
 **W1b (2026-07-24):** незавершённый product WIP **припаркован** в
 [`artifacts/w1b_wip_checkpoint_2026-07-24/`](artifacts/w1b_wip_checkpoint_2026-07-24/MANIFEST.txt);

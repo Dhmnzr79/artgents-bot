@@ -1,24 +1,26 @@
 # Architecture Convergence — канон (2026-07-24)
 
 **Статус:** docs-only checkpoint после Architecture Convergence Audit.
-**Baseline:** `codex/stage-a` @ `eedbd66`. **W1b WIP:** припаркован, см. ниже.
+**Baseline:** `codex/stage-a` @ `57f9067` (AC2 complete). **W1b WIP:** припаркован, см. ниже.
 
 ## Что завершено
 
 - Target FullContext product path (S69/S70): `/ask` → planner shadow → target runtime → cached FullContext → Composer → Verifier → widget.
 - Offline target data: `service_catalog`, `pricebook`, `clinic_strategy`, `marketing.yaml`, doctors (S1–S27).
 - A9 shadow infra; **product authority forbidden**.
+- **AC1 ✅** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts`.
+- **AC2 ✅** — offline `run_target_scope_aware_selection` (applicability + S15 + S23/S24).
 
 ## Что не завершено (blockers для «образцовой» клиники)
 
 | Gap | Следствие |
 |-----|-----------|
-| ~~Нет `EffectiveScope` в runtime~~ | **AC1 ✅** — scope в product path |
-| ~~UI click → label → planner~~ | **AC1 ✅** — typed `UiScopeAction` |
-| `service_catalog.selection` не в product path | applicability обходится ad-hoc (W1 family overview; W1b groups) |
-| `clinic_strategy` extent rules не wired к patient scope | приоритет без scope-aware filter |
-| Marketing runtime stub | `marketing_scenarios=()`, no initial block |
-| PRICE_SERVICE verification matrix | не доказана end-to-end |
+| AC1 scope discarded before dispatch | `target_runtime_turn.py` вычисляет `effective_scope`, но не передаёт в price path |
+| W1 `family_price_overview` в product path | selection без `service_catalog.selection`; scope не влияет на цены |
+| Нет scope button emitter | `build_ui_scope_ref` только в тестах; виджет не показывает «Один зуб / …» |
+| `ResponseStage` не в коде | broad vs scoped ответ не различается детерминированно |
+| Marketing runtime stub | `marketing_scenarios=()` на части путей; family overview запрещает CTA |
+| PRICE_SERVICE verification matrix | не доказана end-to-end в product path |
 
 ## Единый pipeline (target)
 
@@ -33,7 +35,7 @@ message / typed UI action
   → Composer + Verifier + widget
 ```
 
-(`ResponseStage` enum — post-AC1 checkpoint; not in AC1 scope.)
+(`ResponseStage` enum — **AC3**; derived from EffectiveScope + AC2 result, not a second selector.)
 
 ## Source owners
 
@@ -46,7 +48,7 @@ message / typed UI action
 | Price | `pricebook` |
 | Marketing text | `facts.json` + KB |
 | Marketing policy | `marketing.yaml` |
-| Situation nav buttons | extent-keyed overlay (evolution of W1b) |
+| Situation nav buttons | extent-keyed client labels + `target:ui_scope/` refs (AC3 emitter) |
 | Session | `target_runtime_session` |
 
 ## EffectiveScope priority
@@ -75,9 +77,9 @@ Scope **не выбирает** лечение, протокол или `service
 
 1. ~~W1b park + docs sync~~ (2026-07-24)
 2. ~~**AC1** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts`~~ (`72681cc`)
-3. **AC2** — scope-aware selection component (offline, unwired): applicability + strategy + offers (`TASK.md`)
-4. **AC3** — atomic runtime wiring + ResponseStage + follow-up/marketing/CTA
-5. A9 v2 live re-audit (owner approval)
+3. ~~**AC2** — scope-aware selection component (offline, unwired)~~ (`5a3a2f8`)
+4. **AC3** — atomic runtime wiring + ResponseStage + scope/follow-up/marketing/CTA (`TASK.md`)
+5. A9 v2 live re-audit (owner approval) — free-text scope authority
 6. Full HTTP/widget matrix → live E2E
 7. Provider prompt caching
 

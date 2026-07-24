@@ -696,33 +696,24 @@ STOP and escalate to owner if:
 | `retrieval` | Telemetry vocabulary (`metadata_first` pool keys), historical eval field names |
 | `legacy` | Historical audit docs, frozen artifact comparison fields |
 
-### C2e read-only inventory (baseline `3f94e69`)
+### C2e read-only inventory (baseline `3f94e69` / `fe20219`)
 
-#### DELETE — orphan / S69 checkpoint-B targets (zero active FullContext callers)
+**Snapshot note:** S69 checkpoint-B deletions are **already applied** @ `3f94e69`. `tests/test_s69_legacy_deleted_offline.py` is **green** (5 passed). The DELETE table below is **cumulative audit history** + **remaining C2e work**. Executor must **baseline-audit** (`importlib.util.find_spec`) before each `git rm` — do not fail on already-absent paths.
+
+#### REMAINING @ baseline — DELETE (still importable)
 
 | Object | Evidence | Classification |
 |--------|----------|----------------|
-| `orchestration/ask_turn.py` | Not imported from `app.py`; defines `orchestrate_routing_after_resolver` | orphan (S69 B) |
-| `orchestration/composer_flow.py` | Only `ask_turn` importer | orphan (S69 B) |
-| `orchestration/price_flow.py` | Only `ask_turn` importer | orphan (S69 B) |
-| `orchestration/catalog_flow.py` | Only `ask_turn` importer | orphan (S69 B) |
-| `orchestration/patient_playbook_flow.py` | Only `ask_turn` importer | orphan (S69 B) |
-| `orchestration/resolver_turn.py` | Not on `/ask` path since C2b; only stale tests reference | orphan |
-| `core/answer_plan_apply.py` | Legacy packet append; only deleted flows | orphan (S69 B) |
-| `core/answer_packet.py` | Legacy packet composer input | orphan (S69 B) |
-| `core/answer_packet_materialize.py` | Legacy card materializer | orphan (S69 B) |
-| `core/answer_packet_snapshot.py` | Legacy snapshot helper | orphan (S69 B) |
-| `core/catalog_resolution.py` | Legacy md_first resolver; only deleted flows | orphan (S69 B) |
-| `core/knowledge_base.py` | Legacy KB assembler for packet composer | orphan (S69 B) |
-| `core/living_frame.py` | C1 orphan; still on disk | orphan (S69 B) |
-| `core/rewrite_policy.py` | C1 orphan; still on disk | orphan (S69 B) |
-| `core/price_brand_money.py` | C1 orphan; only `price_flow` / legacy tests | orphan (S69 B) |
-| `core/price_symptom_consult.py` | C1 orphan; legacy tests only | orphan (S69 B) |
-| `core/price_group_overview.py` | C1 orphan; legacy tests only | orphan (S69 B) |
-| `contracts/answer_packet.py` | Legacy packet contract | orphan (S69 B) |
-| `core/turn_frame_adapter.py` | Only `tests/test_turn_frame_contract.py`; C2b product cut done | orphan |
 | `core/aspect_arbitration.py` | `filter_compact_for_facet_arbitration` — zero importers | orphan |
-| `contracts/retrieval_candidate.py` | Re-export only; never constructed | orphan |
+| `core/consult_nudge.py` | `app.py` calls `reset_consult_nudge_on_route` only; `record_consult_nudge_after_answer` never called on product path | orphan (vestigial reset) |
+| `contracts/retrieval_candidate.py` | `contracts/__init__.py` re-export only; never constructed | orphan |
+| `tests/test_consult_nudge.py` | tests deleted `consult_nudge` module | tests-only |
+
+#### ALREADY DELETED @ baseline (S69-B / C1 — do not re-delete)
+
+`chunk_responder`, `source_routing`, `orchestration.ask_turn`, `orchestration.composer_flow`, `orchestration.price_flow`, `orchestration.catalog_flow`, `orchestration.patient_playbook_flow`, `orchestration.resolver_turn`, `core.answer_plan_apply`, `core.answer_packet`, `core.answer_packet_materialize`, `core.answer_packet_snapshot`, `core.catalog_resolution`, `core.knowledge_base`, `core.living_frame`, `core.rewrite_policy`, `core.price_brand_money`, `core.price_symptom_consult`, `core.price_group_overview`, `contracts.answer_packet`, `core.turn_frame_adapter` — **not importable** @ `3f94e69`.
+
+Stale tests already absent @ baseline: `test_composer_flow`, `test_answer_packet*`, `test_knowledge_base`, `test_price_brand_money`, `test_price_group_overview`, `test_turn_frame_contract`, `test_contacts_routing`, etc.
 
 #### PRUNE — keep module/file, remove dead surface only
 
@@ -762,18 +753,11 @@ STOP and escalate to owner if:
 
 | Test file | Reason |
 |-----------|--------|
-| `tests/test_composer_flow.py` | `composer_flow` deleted |
-| `tests/test_composer_wiring.py` | packet/chunk composer wiring |
-| `tests/test_answer_packet.py` | `answer_packet` deleted |
-| `tests/test_answer_packet_composer.py` | packet materialize deleted |
-| `tests/test_answer_packet_snapshot.py` | snapshot deleted |
-| `tests/test_knowledge_base.py` | `knowledge_base` deleted |
-| `tests/test_price_brand_money.py` | `price_brand_money` deleted |
-| `tests/test_price_group_overview.py` | `price_group_overview` deleted |
-| `tests/test_price_symptom_consult.py` | `price_symptom_consult` deleted |
-| `tests/test_contacts_routing.py` | `ask_turn` chunk contacts path |
 | `tests/test_consult_nudge.py` | `consult_nudge` deleted |
-| `tests/test_aspect_arbitration.py` | if present — `aspect_arbitration` deleted |
+
+#### STALE tests — already absent @ baseline (no action)
+
+`test_composer_flow`, `test_composer_wiring`, `test_answer_packet*`, `test_knowledge_base`, `test_price_brand_money`, `test_price_group_overview`, `test_price_symptom_consult`, `test_contacts_routing`, `test_turn_frame_contract`, `test_aspect_arbitration` (if absent).
 
 #### STALE tests — update (not delete) if they assert deleted modules
 
@@ -782,8 +766,7 @@ STOP and escalate to owner if:
 | `tests/test_answer_planner.py` | Keep `detect_aspects` cases; drop `build_answer_plan` cases |
 | `tests/test_attribute_followup.py` | Drop `build_answer_plan` imports |
 | `tests/test_turn_planner_wiring.py` | Drop legacy `build_answer_plan` cases |
-| `tests/test_turn_frame_contract.py` | Remove `turn_frame_adapter` sections |
-| `tests/test_c1_import_firewall_offline.py` | Extend banned list to match S69 deletions |
+| `tests/test_c1_import_firewall_offline.py` | Extend banned list for C2e orphans |
 | `tests/test_c2_import_firewall_offline.py` | Extend — no resurrected legacy imports |
 
 #### STALE tests — **KEEP** (still validate target product)
@@ -800,7 +783,7 @@ STOP and escalate to owner if:
 
 ### C2e allowlist — delete (after audit confirms zero product callers)
 
-All rows in inventory **DELETE** table above, plus stale tests listed.
+`core/aspect_arbitration.py`, `core/consult_nudge.py`, `contracts/retrieval_candidate.py`, `tests/test_consult_nudge.py`.
 
 ### C2e allowlist — modify
 
@@ -816,10 +799,11 @@ All rows in inventory **DELETE** table above, plus stale tests listed.
 | `tests/test_c2e_legacy_deleted_offline.py` | **new** — extends S69 module list + rg audit needles |
 | `tests/test_c2_import_firewall_offline.py` | extend banned imports |
 | `tests/test_c1_import_firewall_offline.py` | sync with S69 deletions |
+| `core/client_config_loader.py` | remove dead `consult_nudge_*` after module delete |
+| `tests/test_client_config_loader.py` | update if consult_nudge bundle fields removed |
 | `tests/test_answer_planner.py` | prune legacy plan tests |
 | `tests/test_attribute_followup.py` | drop legacy plan usage |
 | `tests/test_turn_planner_wiring.py` | drop legacy plan usage |
-| `tests/test_turn_frame_contract.py` | remove adapter dependency |
 | `docs/FLAGS_AND_STATUS.md` | C2e closeout note |
 | `docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md` | C2e completion addendum |
 | `docs/C1_LEGACY_RESIDUE_REPORT.md` | post-C2e residue table (audit doc only) |

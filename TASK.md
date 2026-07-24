@@ -140,9 +140,9 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 |-------|-------|
 | W1b park checkpoint | 2026-07-24 |
 | W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
-| Governance HEAD | |
-| PRE-CODE | |
-| COMPLETION | |
-| AC1 product HEAD | |
+| Governance HEAD | `bbeef20` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| AC1 product HEAD | (this commit) |
 
-**STOP after governance PRE-CODE ✅. AC1 implementation starts only after separate owner go.**
+**STOP after AC1 COMPLETION ✅. AC2 starts only after separate owner go.**

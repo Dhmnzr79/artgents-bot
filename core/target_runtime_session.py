@@ -6,14 +6,22 @@ from dataclasses import dataclass
 from typing import Any
 
 from contracts.turn_frame import TurnFrame
+from contracts.ui_scope_action import UiScopeAction
 from core.routing_loader import THRESHOLDS
 from core.target_response_verifier import TargetVerifiedComposedResponse
+from core.target_effective_scope import (
+    SessionPatientFacts,
+    patient_facts_payload,
+    read_session_patient_facts,
+    session_patient_facts_from_ui_action,
+)
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_session_selection import TargetMaterializedSessionSelection
 from session import mem_get
 
 _TARGET_SESSION_KEY = "target_runtime_state"
 _TARGET_FOLLOWUPS_KEY = "target_runtime_followups"
+_PATIENT_FACTS_KEY = "patient_facts"
 _SERVICE_FOCUS_KEYS = frozenset(
     {"last_service_id", "last_topic", "last_primary_aspect", "service_focus_set_at_turn"}
 )
@@ -115,6 +123,7 @@ class TargetRuntimeSessionState:
     shown_amplifier_refs: tuple[str, ...]
     shown_consultation_value_refs: tuple[str, ...]
     followups: tuple[TargetRuntimeFollowupItem, ...]
+    patient_facts: SessionPatientFacts | None = None
 
     def service_focus_age(self) -> int | None:
         return compute_service_focus_age(
@@ -158,6 +167,7 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             if ref:
                 items.append(TargetRuntimeFollowupItem(ref=ref, label=label))
         followups = tuple(items)
+    patient_facts = read_session_patient_facts(st.get(_PATIENT_FACTS_KEY))
     if not isinstance(raw, dict):
         return TargetRuntimeSessionState(
             last_service_id=None,
@@ -169,6 +179,7 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             shown_amplifier_refs=(),
             shown_consultation_value_refs=(),
             followups=followups,
+            patient_facts=patient_facts,
         )
     set_at_raw = raw.get("service_focus_set_at_turn")
     set_at: int | None
@@ -192,7 +203,55 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             if str(x).strip()
         ),
         followups=followups,
+        patient_facts=patient_facts,
     )
+
+
+def write_session_patient_facts_from_ui_action(
+    sid: str,
+    action: UiScopeAction,
+) -> SessionPatientFacts:
+    """Persist canonical extent from explicit UI click; replaces prior extent."""
+
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        turn_count = int(st.get("session_turn_count") or 0)
+        facts = session_patient_facts_from_ui_action(action, set_at_turn=turn_count)
+        st[_PATIENT_FACTS_KEY] = patient_facts_payload(facts)
+        _persist_unlocked(sid, st)
+        return facts
+
+
+def clear_session_patient_facts(sid: str) -> None:
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        if _PATIENT_FACTS_KEY in st:
+            st.pop(_PATIENT_FACTS_KEY, None)
+            _persist_unlocked(sid, st)
+
+
+def sync_session_patient_facts_topic(
+    sid: str,
+    *,
+    current_topic: str | None,
+) -> None:
+    """Drop carried extent when runtime topic no longer matches session facts."""
+
+    from session import _lock, _persist_unlocked, mem_get
+
+    topic_eff = str(current_topic or "").strip().lower()
+    with _lock:
+        st = mem_get(sid)
+        facts = read_session_patient_facts(st.get(_PATIENT_FACTS_KEY))
+        if facts is None:
+            return
+        if topic_eff and facts.topic != topic_eff:
+            st.pop(_PATIENT_FACTS_KEY, None)
+            _persist_unlocked(sid, st)
 
 
 def write_target_runtime_session_after_materialized(

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from contracts.ui_scope_action import is_ui_scope_ref
+
 
 @dataclass(frozen=True, slots=True)
 class TargetRuntimeFollowupItem:
@@ -35,6 +37,8 @@ def resolve_target_followup_navigation(
     if q_eff:
         return TargetFollowupNavigationResult(user_message=q_eff, matched_ref=ref_eff or None)
     if not ref_eff:
+        return None
+    if is_ui_scope_ref(ref_eff):
         return None
     for item in followups:
         if item.ref == ref_eff:

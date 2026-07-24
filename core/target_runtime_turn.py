@@ -9,6 +9,7 @@ from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameBoundTerminalResponse,
 )
 from contracts.turn_frame import TurnFrame
+from contracts.ui_scope_action import UiScopeAction
 from core.target_boundary_enforced_fullcontext_response import (
     run_target_offline_boundary_enforced_fullcontext_response,
 )
@@ -26,8 +27,10 @@ from core.target_runtime_client_context import (
     load_target_runtime_client_context,
     runtime_today,
 )
+from core.target_effective_scope import resolve_effective_scope
 from core.target_runtime_session import (
     read_target_runtime_session,
+    sync_session_patient_facts_topic,
     write_target_runtime_session_after_materialized,
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
@@ -66,6 +69,30 @@ def _followups_from_widget(widget: TargetRuntimeWidgetPayload) -> tuple[TargetRu
         if ref:
             items.append(TargetRuntimeFollowupItem(ref=ref, label=label))
     return tuple(items)
+
+
+def _current_ui_scope_action_from_request() -> UiScopeAction | None:
+    try:
+        from flask import request
+
+        raw = request.ctx.get("current_ui_scope_action")
+    except Exception:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return UiScopeAction.model_validate(raw)
+    except Exception:
+        return None
+
+
+def _publish_effective_scope(scope) -> None:
+    try:
+        from flask import request
+
+        request.ctx["effective_scope"] = scope.model_dump()
+    except Exception:
+        pass
 
 
 def run_target_fullcontext_runtime_turn(
@@ -113,6 +140,17 @@ def run_target_fullcontext_runtime_turn(
         session_state=session_state,
         allowed_service_ids=frozenset(context.bundle.services.keys()),
     )
+
+    sync_session_patient_facts_topic(sid, current_topic=turn_frame.topic)
+    session_state = read_target_runtime_session(sid)
+    effective_scope = resolve_effective_scope(
+        current_ui_action=_current_ui_scope_action_from_request(),
+        session_facts=session_state.patient_facts,
+        current_topic=turn_frame.topic,
+        session_turn_count=session_state.session_turn_count,
+    )
+    _publish_effective_scope(effective_scope)
+    _ = effective_scope
 
     try:
         boundary = execute_target_medical_boundary_classification(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from dataclasses import dataclass
 
 from contracts.turn_frame import TurnFrame
@@ -12,6 +14,23 @@ from session import mem_get
 
 _TARGET_SESSION_KEY = "target_runtime_state"
 _TARGET_FOLLOWUPS_KEY = "target_runtime_followups"
+
+
+def focus_dict_from_session_state(st: dict[str, Any]) -> dict[str, str] | None:
+    """Read service continuity from target_runtime_state only (C2c)."""
+    raw = st.get(_TARGET_SESSION_KEY)
+    if not isinstance(raw, dict):
+        return None
+    service_id = str(raw.get("last_service_id") or "").strip()
+    if not service_id:
+        return None
+    topic = str(raw.get("last_topic") or "unknown").strip().lower() or "unknown"
+    return {
+        "service_id": service_id,
+        "topic": topic,
+        "label": service_id,
+        "last_route": "",
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +122,7 @@ def write_target_runtime_session_after_materialized(
 ) -> None:
     """Persist target continuity only after a successful materialized response."""
 
-    from session import _lock, _persist_unlocked, mem_get, set_last_subject
+    from session import _lock, _persist_unlocked, mem_get
 
     _ = verified
     shown_fact_ids = _merge_unique(prior.shown_fact_ids, current_selection.shown_fact_ids)
@@ -129,12 +148,3 @@ def write_target_runtime_session_after_materialized(
             {"ref": item.ref, "label": item.label} for item in followups if item.ref
         ]
         _persist_unlocked(sid, st)
-
-    if turn_frame.service_id:
-        set_last_subject(
-            sid,
-            service_id=turn_frame.service_id,
-            topic=str(turn_frame.topic or "unknown"),
-            label=turn_frame.service_id,
-            last_route=str(turn_frame.intent or "content"),
-        )

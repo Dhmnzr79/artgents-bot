@@ -255,11 +255,12 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
             "context_doc_id": context_doc_id,
         }
 
-    # Попытка 1: last_subject (диалоговый фокус; приоритет над устаревшим catalog id)
-    sub = st.get("last_subject")
-    age = int(st.get("subject_turn_age") or 0)
-    if isinstance(sub, dict) and age <= int(THRESHOLDS.follow_up.max_subject_turn_age):
-        sub_sid = (sub.get("service_id") or "").strip()
+    # Попытка 1: target_runtime_state (единственный диалоговый фокус для continuity)
+    from core.target_runtime_session import focus_dict_from_session_state
+
+    focus = focus_dict_from_session_state(st)
+    if focus:
+        sub_sid = focus.get("service_id") or ""
         if sub_sid and sub_sid in catalog:
             entry = catalog[sub_sid]
             if isinstance(entry, dict) and bool(entry.get("active", True)):

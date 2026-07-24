@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from config import CLARIFY_STATE_ON, TURN_PLANNER_LLM_MODEL
+from config import TURN_PLANNER_LLM_MODEL
 from contracts.planner_attempt import PlannerAttempt, turn_frame_has_invalid_or_missing
 from contracts.turn_plan import TurnPlan
 from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
@@ -14,7 +14,7 @@ from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.topic_taxonomy import load_client_topic_taxonomy
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_client, chat_completions_create
-from session import format_dialog_context_for_understanding, get_pending_clarify, recent_dialog_history
+from session import format_dialog_context_for_understanding, recent_dialog_history
 
 logger = get_logger(__name__)
 
@@ -115,37 +115,6 @@ def _catalog_lines(rows: list[dict[str, str]]) -> str:
         suffix = f" — {about}" if about and about != title else ""
         lines.append(f"- {sid}: {title}{suffix}")
     return "\n".join(lines)
-
-
-def _pending_clarify_prompt_block(*, sid: str | None, client_id: str | None) -> str:
-    if not CLARIFY_STATE_ON or not (sid or "").strip():
-        return ""
-    pending = get_pending_clarify(str(sid))
-    if not isinstance(pending, dict):
-        return ""
-    question = str(pending.get("question") or "").strip()
-    option_ids = [
-        str(x or "").strip()
-        for x in list(pending.get("option_service_ids") or [])
-        if str(x or "").strip()
-    ]
-    if not question or not option_ids:
-        return ""
-    from core.clarify_state import (
-        TURN_PLANNER_PENDING_CLARIFY_INSTRUCTION,
-        pending_options_line,
-    )
-
-    options = pending_options_line(client_id=client_id, option_service_ids=option_ids)
-    if not options:
-        return ""
-    return (
-        TURN_PLANNER_PENDING_CLARIFY_INSTRUCTION.format(
-            question=json.dumps(question, ensure_ascii=False),
-            options=options,
-        )
-        + "\n\n"
-    )
 
 
 def _topics_prompt_block(allowed_topics: frozenset[str]) -> str:
@@ -252,7 +221,6 @@ def plan_turn_attempt(
         f"{brand_hint}"
         f"{topics_hint}"
         f"{format_dialog_context_for_understanding(hist)}"
-        f"{_pending_clarify_prompt_block(sid=sid, client_id=client_id)}"
         f"Вопрос пациента:\n{msg[:900]}"
     )
     try:

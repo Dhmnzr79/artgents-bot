@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from doctors_lookup import build_doctors_list_llm_question, doctors_lookup
 from session import mem_reset
+from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from core.target_runtime_session import TargetRuntimeSessionState
+from core.target_runtime_turn_frame_hydration import hydrate_target_runtime_turn_frame_from_session
+from core.turn_frame_from_raw import build_turn_frame_from_raw
 
 
 def test_vague_kto_iz_vrachej_doctors_lookup_generic():
@@ -37,34 +39,40 @@ def test_doctors_list_prompt_leaves_consult_invite_to_policy():
     assert "Не добавляй отдельное приглашение на консультацию" in prompt
 
 
-@pytest.fixture
-def ask_client(monkeypatch):
-    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
-    from app import app
-
-    return app.test_client()
-
-
-def test_e2e_vague_doctor_after_classic(ask_client):
-    sid = f"e2e-vague-doc-{uuid.uuid4().hex[:10]}"
+def test_vague_doctor_followup_hydrates_from_target_runtime_state():
+    sid = f"vague-doc-{uuid.uuid4().hex[:10]}"
     mem_reset(sid)
-    resp = ask_client.post(
-        "/ask",
-        json={
-            "q": "сколько стоит поставить один имплант?",
-            "sid": sid,
-            "client_id": "demo",
+    _seed_target_runtime_state(
+        sid,
+        last_service_id="classic",
+        last_topic="implantation",
+    )
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": ["doctor"],
+            "primary_aspect": "doctor",
+            "service_id": None,
+            "topic": "doctors",
+            "topic_confidence": 0.95,
         },
+        allowed_topics=frozenset({"implantation", "doctors"}),
+        allowed_service_ids=frozenset({"classic", "all_on_4"}),
     )
-    assert resp.status_code == 200
-
-    resp = ask_client.post(
-        "/ask",
-        json={"q": "Кто делает?", "sid": sid, "client_id": "demo"},
+    session = TargetRuntimeSessionState(
+        last_service_id="classic",
+        last_topic="implantation",
+        last_primary_aspect="price",
+        shown_fact_ids=(),
+        shown_amplifier_refs=(),
+        shown_consultation_value_refs=(),
+        followups=(),
     )
-    assert resp.status_code == 200
-    body = resp.get_json() or {}
-    answer = body.get("answer") or ""
-    assert len(answer) > 40
-    low = answer.lower()
-    assert "врач" in low or "имплант" in low or "волков" in low
+    hydrated = hydrate_target_runtime_turn_frame_from_session(
+        frame,
+        user_message="Кто делает?",
+        session_state=session,
+        allowed_service_ids=frozenset({"classic", "all_on_4"}),
+    )
+    assert hydrated.service_id == "classic"
+    assert hydrated.followup_of == "classic"

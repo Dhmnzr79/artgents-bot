@@ -11,6 +11,7 @@ from typing import Any
 from core.client_config_loader import _pack_path
 from core.routing_loader import THRESHOLDS
 from core.service_followup import is_short_attribute_followup, normalize_service_id
+from core.target_runtime_session import focus_dict_from_session_state
 
 _PAYMENT_RE = re.compile(r"\b(рассроч|оплат|кредит|цен)\w*\b", re.I | re.U)
 _WARRANTY_RE = re.compile(r"\bгарант\w*\b", re.I | re.U)
@@ -113,23 +114,6 @@ def _topic_from_doc_id(doc_id: str | None) -> str | None:
         return None
     head = raw.split("__", 1)[0].strip().lower()
     return head or None
-
-
-def focus_from_legacy_session(st: dict[str, Any], *, client_id: str | None) -> dict[str, str] | None:
-    svc_id = normalize_service_id(str(st.get("last_catalog_service_id") or ""))
-    doc_id = (st.get("current_doc_id") or "").strip()
-    if not svc_id:
-        svc_id = _service_id_from_doc_id(doc_id) or ""
-    if not svc_id:
-        return None
-    topic = _topic_from_doc_id(doc_id) or "unknown"
-    label = catalog_service_label(client_id, svc_id) or svc_id
-    return {
-        "service_id": svc_id,
-        "topic": topic,
-        "label": label,
-        "last_route": "",
-    }
 
 
 def resolve_focus_from_turn(
@@ -258,23 +242,10 @@ def prepare_follow_up_turn(
     else:
         if not is_short_attribute_followup(q0):
             return None
-        sub = st.get("last_subject")
-        if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
-            focus = {
-                "service_id": str(sub.get("service_id") or "").strip(),
-                "topic": str(sub.get("topic") or "").strip(),
-                "label": str(sub.get("label") or sub.get("service_id") or "").strip(),
-                "last_route": str(sub.get("last_route") or "").strip(),
-            }
-        else:
-            legacy = focus_from_legacy_session(st, client_id=client_id)
-            if not legacy:
-                return None
-            focus = legacy
-
-        age = int(st.get("subject_turn_age") or 0)
-        if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
+        focus = focus_dict_from_session_state(st)
+        if not focus:
             return None
+        age = 0
     if is_explicit_topic_change(q0, focus, client_id=client_id):
         return None
 
@@ -310,16 +281,7 @@ def get_follow_up_turn_ctx(
     st = mem_get(sid)
     q0 = (q or "").strip()
     focus: dict[str, str] | None = None
-    sub = st.get("last_subject")
-    if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
-        focus = {
-            "service_id": str(sub.get("service_id") or "").strip(),
-            "topic": str(sub.get("topic") or "").strip(),
-            "label": str(sub.get("label") or sub.get("service_id") or "").strip(),
-            "last_route": str(sub.get("last_route") or "").strip(),
-        }
-    else:
-        focus = focus_from_legacy_session(st, client_id=client_id)
+    focus = focus_dict_from_session_state(st)
 
     if focus and is_explicit_topic_change(q0, focus, client_id=client_id):
         clear_focus_context(sid)

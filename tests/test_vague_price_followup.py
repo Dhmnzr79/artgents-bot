@@ -12,7 +12,8 @@ from core.price_followup import (
 from core.pricebook_loader import load_pricebook_service
 from core.service_followup import is_short_attribute_followup
 from query_selector import match_service_from_catalog, select_price_service_route
-from session import get_last_subject, mem_add_user, mem_reset, set_last_catalog_service, set_last_subject
+from session import mem_add_user, mem_reset, set_last_catalog_service
+from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
 
 
 def test_vague_price_not_short_attribute_followup():
@@ -64,11 +65,10 @@ def test_price_only_lemma_weak_not_confident():
 def test_one_tooth_context_vague_price_uses_session():
     sid = f"vague-classic-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id="classic",
-        topic="implantation",
-        label="Классическая имплантация одного зуба",
+        last_service_id="classic",
+        last_topic="implantation",
     )
     route = select_price_service_route("А что по ценам?", client_id="demo", sid=sid)
     assert route.get("mode") == "matched"
@@ -79,11 +79,10 @@ def test_one_tooth_context_vague_price_uses_session():
 def test_zygomatic_context_vague_price_uses_session():
     sid = f"vague-zygo-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id="zygomatic_implants",
-        topic="implantation",
-        label="Зигоматические импланты",
+        last_service_id="zygomatic_implants",
+        last_topic="implantation",
     )
     route = select_price_service_route("А сколько стоит?", client_id="demo", sid=sid)
     assert route.get("mode") == "matched"
@@ -105,11 +104,10 @@ def test_zygomatic_pricebook_has_demo_price():
 def test_all_on_4_context_vague_price_stays_all_on_4():
     sid = f"vague-a4-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id="all_on_4",
-        topic="implantation",
-        label="All-on-4",
+        last_service_id="all_on_4",
+        last_topic="implantation",
     )
     set_last_catalog_service(sid, "all_on_4")
     route = select_price_service_route("А сколько стоит?", client_id="demo", sid=sid)
@@ -117,41 +115,16 @@ def test_all_on_4_context_vague_price_stays_all_on_4():
     assert route.get("matched_service_id") == "all_on_4"
 
 
-def test_e2e_multi_turn_vague_price_after_zygomatic_content(monkeypatch):
-    """Инцидент: classic → jaw overview → zygomatic content → vague price (не All-on-4)."""
-    monkeypatch.setenv("E2E_USE_TEST_CLIENT", "1")
-    from app import app
-
-    client = app.test_client()
-    sid = f"e2e-vague-mt-{uuid.uuid4().hex[:12]}"
-    turns_before_price = [
-        "сколько стоит поставить один имплант?",
-        "Сколько стоит имплантация всей челюсти?",
-        "расскажите про скуловую имплантацию",
-    ]
-    for i, q in enumerate(turns_before_price):
-        resp = client.post("/ask", json={"q": q, "sid": sid, "client_id": "demo"})
-        assert resp.status_code == 200
-        if i == 2:
-            meta3 = (resp.get_json() or {}).get("meta") or {}
-            assert meta3.get("doc_id") == "implantation__service__zygomatic_implants"
-
-    sub = get_last_subject(sid)
-    assert sub is not None
-    assert sub.get("service_id") == "zygomatic_implants"
-    # Метка маршрута сменилась с retrieval-эпохи (catalog_md_first) на composer-путь:
-    # решение, которое охраняет тест — сервис в фокусе, а не имя маршрута.
-    assert sub.get("last_route") in ("catalog_md_first", "content", "composer")
-
-    resp = client.post(
-        "/ask",
-        json={"q": "А сколько они стоят?", "sid": sid, "client_id": "demo"},
+def test_vague_price_after_zygomatic_target_runtime_state():
+    """После zygomatic в target_runtime_state vague price не уходит в All-on-4 (offline)."""
+    sid = f"vague-zygo-mt-{uuid.uuid4().hex[:12]}"
+    mem_reset(sid)
+    _seed_target_runtime_state(
+        sid,
+        last_service_id="zygomatic_implants",
+        last_topic="implantation",
     )
-    assert resp.status_code == 200
-    body = resp.get_json() or {}
-    meta = body.get("meta") or {}
-    assert meta.get("matched_service_id") == "zygomatic_implants"
-    answer = body.get("answer") or ""
-    assert "420 000" in answer or "420000" in answer.replace(" ", "")
-    assert "318 000" not in answer
-    assert "all-on-4" not in answer.lower()
+    route = select_price_service_route("А сколько они стоят?", client_id="demo", sid=sid)
+    assert route.get("mode") == "matched"
+    assert route.get("matched_service_id") == "zygomatic_implants"
+    assert route.get("matched_service_id") != "all_on_4"

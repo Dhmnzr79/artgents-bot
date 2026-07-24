@@ -20,9 +20,9 @@ from core.attribute_followup import (
     is_vague_attribute_followup_any,
 )
 from core.dialog_focus import dialog_focus_from_ctx, dialog_focus_service_id
+from core.target_runtime_session import focus_dict_from_session_state
 from query_selector import match_service_from_catalog
 from core.service_followup import is_short_attribute_followup, normalize_service_id
-from session import get_last_subject
 
 _PAYMENT_ASPECT_RE = re.compile(
     r"(?:рассроч|оплат\w*\s+по\s+(?:част|этап)|оплат\w*\s+потом|кредит)",
@@ -240,7 +240,9 @@ def _resolve_service_id(
             str(getattr(focus_decision, "focus_topic", None) or topic or "").strip().lower()
             or topic
         )
-    subject = get_last_subject(sid)
+    from session import mem_get
+
+    subject = focus_dict_from_session_state(mem_get(sid)) if sid else None
     vague_kinds = detect_vague_attribute_kinds(q)
     if not svc and subject and vague_kinds:
         svc = normalize_service_id(str(subject.get("service_id") or ""))
@@ -326,8 +328,11 @@ def build_answer_plan(
         "included",
     ):
         reason_bits.append("dialog_focus")
-    if service_id and get_last_subject(sid):
-        reason_bits.append("subject_carry")
+    if service_id and sid:
+        from session import mem_get
+
+        if focus_dict_from_session_state(mem_get(sid)):
+            reason_bits.append("subject_carry")
     try:
         from core.turn_planner_llm import turn_plan_from_ctx
 

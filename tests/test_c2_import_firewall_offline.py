@@ -67,3 +67,48 @@ assert not offenders, offenders
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_c2c_product_modules_have_no_last_subject_or_pending_clarify_reads() -> None:
+    script = f"""
+import pathlib
+import re
+root = pathlib.Path({str(_REPO_ROOT)!r})
+files = [
+    "core/turn_planner_llm.py",
+    "core/target_runtime_session.py",
+    "core/dialog_focus.py",
+    "core/follow_up_rewrite.py",
+    "query_selector.py",
+    "core/answer_planner.py",
+]
+patterns = [
+    re.compile(r'\\.get\\("last_subject"\\)'),
+    re.compile(r'\\["last_subject"\\]'),
+    re.compile(r"\\bget_last_subject\\b"),
+    re.compile(r"\\bset_last_subject\\b"),
+    re.compile(r"\\bclear_last_subject\\b"),
+    re.compile(r"\\bget_pending_clarify\\b"),
+    re.compile(r"\\bset_pending_clarify\\b"),
+    re.compile(r"\\bfocus_from_legacy_session\\b"),
+]
+offenders = []
+for rel in files:
+    path = root / rel
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        for pattern in patterns:
+            if pattern.search(line):
+                offenders.append(f"{{rel}}:{{lineno}}:{{stripped}}")
+assert not offenders, offenders
+"""
+    proc = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr

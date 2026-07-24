@@ -11,7 +11,8 @@ from core.follow_up_rewrite import (
     rewrite_follow_up_query,
     resolve_focus_from_turn,
 )
-from session import clear_last_subject, mem_get, set_last_subject
+from session import mem_get, mem_reset
+from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
 
 
 def test_rewrite_warranty_from_focus_label():
@@ -104,13 +105,11 @@ def test_prepare_follow_up_turn_uses_general_dialog_focus_rewrite():
 
 def test_prepare_follow_up_turn_with_session_focus():
     sid = "test-follow-up-focus"
-    clear_last_subject(sid)
-    set_last_subject(
+    mem_reset(sid)
+    _seed_target_runtime_state(
         sid,
-        service_id="classic",
-        topic="implantation",
-        label="классическую имплантацию",
-        last_route="retrieval_chunk",
+        last_service_id="classic",
+        last_topic="implantation",
     )
     st = mem_get(sid)
     ctx = prepare_follow_up_turn("а гарантия?", st, client_id="demo")
@@ -122,13 +121,11 @@ def test_prepare_follow_up_turn_with_session_focus():
 
 def test_prepare_blocks_explicit_topic_change():
     sid = "test-follow-up-topic-change"
-    clear_last_subject(sid)
-    set_last_subject(
+    mem_reset(sid)
+    _seed_target_runtime_state(
         sid,
-        service_id="classic",
-        topic="implantation",
-        label="классическую имплантацию",
-        last_route="retrieval_chunk",
+        last_service_id="classic",
+        last_topic="implantation",
     )
     st = mem_get(sid)
     assert prepare_follow_up_turn("сколько стоят виниры?", st, client_id="demo") is None

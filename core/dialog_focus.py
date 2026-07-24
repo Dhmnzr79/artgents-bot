@@ -15,7 +15,7 @@ from contracts.decision_frame import DecisionFrame
 from contracts.dialog_focus import DialogFocusAttribute, DialogFocusDecision, DialogFocusSource
 from contracts.turn_plan import TurnPlan
 from core.attribute_followup import catalog_match_is_authoritative, detect_vague_attribute_kinds
-from core.follow_up_rewrite import focus_from_legacy_session
+from core.target_runtime_session import focus_dict_from_session_state
 from core.routing_loader import THRESHOLDS
 from core.service_followup import normalize_service_id
 from session import mem_get
@@ -42,25 +42,11 @@ _GRAY_BARE_ACK_RE = re.compile(
 )
 
 
-def _focus_from_last_subject(st: dict[str, Any]) -> tuple[dict[str, str] | None, int | None]:
-    sub = st.get("last_subject")
-    if not isinstance(sub, dict) or not str(sub.get("service_id") or "").strip():
+def _focus_from_target_runtime_session(st: dict[str, Any]) -> tuple[dict[str, str] | None, int | None]:
+    focus = focus_dict_from_session_state(st)
+    if focus is None:
         return None, None
-    age = int(st.get("subject_turn_age") or 0)
-    if age > int(THRESHOLDS.follow_up.max_subject_turn_age):
-        return None, age
-    service_id = normalize_service_id(str(sub.get("service_id") or ""))
-    if not service_id:
-        return None, age
-    return (
-        {
-            "service_id": service_id,
-            "topic": str(sub.get("topic") or "").strip().lower(),
-            "label": str(sub.get("label") or service_id).strip(),
-            "last_route": str(sub.get("last_route") or "").strip(),
-        },
-        age,
-    )
+    return focus, None
 
 
 def _primary_attribute(q: str) -> DialogFocusAttribute:
@@ -152,14 +138,8 @@ def build_dialog_focus_decision(
     attribute = _primary_attribute(q0)
     st = mem_get(sid) if sid else {}
 
-    focus, age = _focus_from_last_subject(st)
+    focus, age = _focus_from_target_runtime_session(st)
     source: DialogFocusSource = "last_subject" if focus else "none"
-    if focus is None and st:
-        legacy = focus_from_legacy_session(st, client_id=client_id)
-        if legacy:
-            focus = legacy
-            age = int(st.get("subject_turn_age") or 0)
-            source = "legacy_session"
 
     explicit_service_id = _explicit_service_match(q0, client_id=client_id) if q0 else None
     focus_service_id = normalize_service_id(str((focus or {}).get("service_id") or "")) or None
@@ -257,7 +237,7 @@ def build_dialog_focus_from_turn_plan(
     """Publish focus telemetry from turn planner output without gray-zone LLM."""
     _ = client_id
     st = mem_get(sid) if sid else {}
-    focus, age = _focus_from_last_subject(st)
+    focus, age = _focus_from_target_runtime_session(st)
     focus_service_id = normalize_service_id(str(plan.followup_of or (focus or {}).get("service_id") or "")) or None
     resolved_service_id = normalize_service_id(str(plan.service_id or plan.followup_of or "")) or None
     decision_service_id = (
@@ -349,21 +329,6 @@ def record_dialog_focus_ctx(
     client_id: str | None,
     decision: DecisionFrame | None = None,
 ) -> DialogFocusDecision:
-    try:
-        from core.turn_planner_llm import turn_plan_from_ctx
-
-        plan = turn_plan_from_ctx()
-        if plan is not None:
-            focus = build_dialog_focus_from_turn_plan(
-                plan,
-                sid=sid,
-                client_id=client_id,
-                decision=decision,
-            )
-            publish_dialog_focus_decision(focus)
-            return focus
-    except Exception:
-        pass
     focus = build_dialog_focus_decision(q, sid=sid, client_id=client_id, decision=decision)
     publish_dialog_focus_decision(focus)
     return focus

@@ -490,6 +490,7 @@ def set_last_catalog_service(session_id: str, service_id: str) -> None:
 
 
 def get_last_subject(session_id: str) -> dict | None:
+    """Legacy session focus API; product continuity uses target_runtime_state (C2c)."""
     st = mem_get(session_id)
     sub = st.get("last_subject")
     if isinstance(sub, dict) and str(sub.get("service_id") or "").strip():
@@ -505,6 +506,7 @@ def set_last_subject(
     label: str,
     last_route: str = "",
 ) -> None:
+    """Legacy session focus API; product continuity uses target_runtime_state (C2c)."""
     sid = (service_id or "").strip()
     if not sid:
         return

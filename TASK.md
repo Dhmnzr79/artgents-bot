@@ -54,8 +54,8 @@ No product WIP before PRE-CODE ✅.
 - Changing existing pricebook amounts or offer IDs
 - Weakening Verifier or numeric grounding; ослабление acceptance tests
 - Files outside allowlist without governance correction + PRE-CODE ✅
-- Writing `prosthetics` groups to client data **without owner sign-off** on table below (§ Prosthetics owner checkpoint)
-- Inventing prosthetics service→group mapping when ambiguous
+- Inventing offer/group mapping not in client config
+- Mixing implantation services (`all_on_4`, `all_on_6`, etc.) into `prosthetics` topic groups
 
 ## Allowed
 
@@ -103,9 +103,10 @@ Phase A — situation menu
 
 Phase B — group drill-down
   nav ref target:family_price_group/{topic}/{group_id} OR session-hydrated group
-  → validate group exists for topic; service_ids ⊆ catalog; priced offers exist
-  → multi-service price overview LIMITED to group service_ids (W1 assembly reuse)
-  → no situation buttons on drill-down (or only if config allows — v1: none)
+  → validate group exists for topic
+  → resolve each group **entry** to exactly one priced offer (pinned `offer_id` or representative projection for `service_id`-only entries)
+  → drill-down evidence includes **only** those offers — never sibling offers of the same service
+  → no situation buttons on drill-down (v1: none)
 
 Exact service question (service_id set) → unchanged single-service path
 Payment/stages question on known service → unchanged
@@ -133,13 +134,33 @@ Situation menu buttons are **client-configured navigation**, not MD-derived cont
 
 `TargetFollowupSource` extended: `Literal["content", "price", "family_price_group"]`.
 
-Drill-down reuses W1 multi-offer assembly filtered by group `service_ids` with `followup_source=None` (no situation buttons).
+Drill-down reuses W1 multi-offer assembly filtered by group **entries** (explicit `offer_id` list and/or `service_id`-only representative rows) with `followup_source=None` (no situation buttons).
 
 ### Client-owned groups config (chosen after audit)
+
+**Governance correction (2026-07-24):** group membership is **offer-aware**. `service_id`-only lists are insufficient when one service has multiple offers that belong to different patient situations (e.g. `removable_dentures.jaw.partial` vs `removable_dentures.jaw.full`).
 
 **File:** `clients/{client}/target_response/family_price_groups.yaml`
 
 Loaded into `ResponseSchemaBundle` via `core/response_schema_loader.py` (same pack, no parallel data layer).
+
+**Minimal typed entry model** (`FamilyPriceGroupEntry` in `contracts/target_family_price_groups.py`):
+
+| Field | Required | Semantics |
+|-------|----------|-----------|
+| `offer_id` | preferred | Pin **one** pricebook offer. Drill-down uses exactly this offer. |
+| `service_id` | optional cross-check | If present with `offer_id`, must equal `bundle.offers[offer_id].service_id` — else loader **fail-closed**. |
+| `option_id` | optional | If present with `offer_id`, must equal offer's `option_id` when set on the offer record — else **fail-closed**. Reserved for future option-scoped pins; demo prosthetics uses distinct `offer_id` files instead. |
+
+**Resolution rule (runtime, deterministic):**
+
+1. If `offer_id` set → load that offer from pricebook bundle; reject if missing, inactive, or `service_id` mismatch.
+2. Else if `service_id` set (no `offer_id`) → use existing W1 `_representative_offer` projection for that service (implantation shorthand only).
+3. Else → loader **fail-closed** (`family_price_group_entry_invalid`).
+
+**Topic guard:** resolved `service_id` must be `active` and `content_ref` topic prefix must match the group's topic.
+
+**Same `service_id`, different offers across groups:** allowed and expected — e.g. `removable_dentures` partial in `several_teeth`, full in `full_jaw`; groups never auto-expand to all offers of a service.
 
 ```yaml
 version: 1
@@ -148,24 +169,51 @@ topics:
     groups:
       - id: one_tooth
         label: Один зуб
-        service_ids: [classic, one_stage]
+        entries:
+          - service_id: classic
+          - service_id: one_stage
       - id: several_teeth
         label: Несколько зубов
-        service_ids: [classic, one_stage]
+        entries:
+          - service_id: classic
+          - service_id: one_stage
       - id: full_jaw
         label: Вся челюсть
-        service_ids: [all_on_4, all_on_6, zygomatic_implants]
-  # prosthetics: see § Prosthetics owner checkpoint — not written until sign-off
+        entries:
+          - service_id: all_on_4
+          - service_id: all_on_6
+          - service_id: zygomatic_implants
+  prosthetics:
+    groups:
+      - id: one_tooth
+        label: Один зуб
+        entries:
+          - offer_id: zirconia_crowns.default
+          - offer_id: implant_supported_prosthetics.default
+      - id: several_teeth
+        label: Несколько зубов
+        entries:
+          - offer_id: zirconia_crowns.default
+          - offer_id: implant_supported_prosthetics.default
+          - offer_id: clasp_dentures.default
+          - offer_id: removable_dentures.jaw.partial
+      - id: full_jaw
+        label: Вся челюсть
+        entries:
+          - offer_id: removable_dentures.jaw.full
 ```
 
 **Validation rules (contract):**
 - Each `group.id` unique per topic; `label` non-blank (client-owned text).
-- Each `service_id` exists in `service_catalog.json`, `active`, and `content_ref` topic prefix matches topic.
-- Groups may share a service_id across situations (explicit in data).
-- Services not in any group are excluded from family flows (not auto-inferred).
-- Loader fail-closed on unknown service_id or topic/group shape errors.
+- Each group has ≥1 `entries` row; no duplicate `offer_id` within a group.
+- Pinned `offer_id` must exist in loaded pricebook and belong to the topic via service `content_ref`.
+- Unknown `offer_id`, wrong `service_id` cross-check, or wrong `option_id` → loader **fail-closed** (no silent drop).
+- Services/offers not listed in any group are excluded from family flows (not auto-inferred).
+- **`veneers` excluded** from `prosthetics` family overview — exact veneers questions use normal single-service path.
 
-**Excluded from implantation groups (adjunct / not patient situation bucket):** `sinus_lift`, `pterygoid_implants`, `temporary_teeth`, `tomography` — not in owner menu; remain reachable via exact/context paths only.
+**Excluded from implantation groups (adjunct / not patient situation bucket):** `sinus_lift`, `pterygoid_implants`, `temporary_teeth`, `tomography` — remain reachable via exact/context paths only.
+
+**Excluded from prosthetics family overview:** `veneers` (separate aesthetic service); all `implantation` topic services including `all_on_4` / `all_on_6`.
 
 ### Target navigation ref contract
 
@@ -210,35 +258,29 @@ Exact `service_id` path unchanged.
 
 ## Demo implantation mapping (owner-approved)
 
-| Group | Label | service_ids |
-|-------|-------|-------------|
+| Group | Label | entries (`service_id` → representative offer) |
+|-------|-------|-----------------------------------------------|
 | `one_tooth` | Один зуб | `classic`, `one_stage` |
 | `several_teeth` | Несколько зубов | `classic`, `one_stage` |
 | `full_jaw` | Вся челюсть | `all_on_4`, `all_on_6`, `zygomatic_implants` |
 
+Implantation uses `service_id`-only entries (W1 representative projection). Drill-down must not pull sibling brand offers beyond the projected representative per service.
+
 ---
 
-## Prosthetics owner checkpoint (STOP before client write)
+## Demo prosthetics mapping (owner-approved 2026-07-24)
 
-Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_groups.yaml` prosthetics section until owner signs one row below.**
+Menu labels (same patient-facing trio as implantation — client-owned, not hardcoded in core):
 
-| service_id | name | selection notes |
-|------------|------|-----------------|
-| `zirconia_crowns` | Коронки из диоксида циркония | extent: one_tooth, few_teeth |
-| `clasp_dentures` | Бюгельные протезы | extent: few_teeth |
-| `removable_dentures` | Съёмное протезирование | extent: few_teeth, full_arch; options partial/full |
-| `implant_supported_prosthetics` | Протезирование на имплантах | extent: one_tooth, few_teeth, full_arch |
-| `veneers` | Виниры E-max | context only, no extent — **ambiguous** |
+| Group | Label | Pinned `offer_id` entries |
+|-------|-------|---------------------------|
+| `one_tooth` | Один зуб | `zirconia_crowns.default`, `implant_supported_prosthetics.default` |
+| `several_teeth` | Несколько зубов | `zirconia_crowns.default`, `implant_supported_prosthetics.default`, `clasp_dentures.default`, `removable_dentures.jaw.partial` |
+| `full_jaw` | Вся челюсть | `removable_dentures.jaw.full` |
 
-**Proposed draft (NOT approved — executor STOP if implementing without owner OK):**
+**Owner exclusions:** `veneers` not in prosthetics family overview. `all_on_4` / `all_on_6` never in `prosthetics` topic. Exact per-service / per-offer questions unchanged.
 
-| Group id | Label | Proposed service_ids | Ambiguity |
-|----------|-------|----------------------|-----------|
-| `one_tooth` | Один зуб | `zirconia_crowns` | veneers omitted — confirm |
-| `several_teeth` | Несколько зубов | `zirconia_crowns`, `clasp_dentures`, `removable_dentures` | removable spans full/partial |
-| `full_jaw` | Вся челюсть | `implant_supported_prosthetics`, `removable_dentures` | implant_supported also lists one_tooth/few_teeth |
-
-**Executor rule:** at prosthetics checkpoint, if owner has not approved table → **СТОП** with this table in report; implantation-only delivery still allowed if tests 1–6 + 8–9 green and test 7 explicitly skipped with documented owner pending (not `xfail` — split test or conditional only with TASK amendment).
+**Regression guard:** `several_teeth` must **not** surface `removable_dentures.jaw.full`; `full_jaw` must **not** surface partial/pinned one-tooth offers from other groups.
 
 ---
 
@@ -247,7 +289,8 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 ### A — Client groups config + loader
 
 - `family_price_groups.yaml` schema contract + loader integration in `ResponseSchemaBundle`
-- Validators: topic/service membership via `content_ref` prefix
+- Typed `FamilyPriceGroupEntry` (`offer_id` pin / `service_id` representative shorthand)
+- Validators: topic membership via `content_ref`; offer_id fail-closed cross-checks
 
 ### B — Situation menu phase
 
@@ -283,7 +326,7 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 |------|
 | `contracts/target_family_price_groups.py` |
 | `contracts/target_family_price_group_followup.py` (typed group button + ref builder) |
-| `clients/demo/target_response/family_price_groups.yaml` (implantation only until prosthetics sign-off) |
+| `clients/demo/target_response/family_price_groups.yaml` (implantation + prosthetics per § demo mappings) |
 | `tests/test_w1b_family_price_situation_menu_offline.py` |
 | `tests/test_w1b_family_price_group_drilldown_offline.py` |
 
@@ -342,7 +385,7 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 4. Select «Несколько зубов» → only configured services; honest short answer if none priced.
 5. «Сколько стоит All-on-4?» → exact service path; **no** situation menu.
 6. «Как оплатить All-on-4?» / payment stages → unchanged.
-7. Prosthetics family overview → **owner sign-off required** (§ checkpoint); own groups; no implantation buttons.
+7. «Сколько стоит протезирование?» → situation menu (3 labels); **no** implantation buttons; **no** veneers; drill-down «Несколько зубов» includes `removable_dentures.jaw.partial` only (not `.jaw.full`); «Вся челюсть» includes `removable_dentures.jaw.full` only (not partial / not one-tooth pinned offers).
 8. Terminal/error → plain attribution.
 9. Frozen artifacts byte-identical.
 
@@ -350,11 +393,11 @@ Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_gr
 
 ## STOP conditions
 
-1. Prosthetics grouping ambiguous and owner has not signed proposed table
-2. Honest group price anchor impossible without inventing amounts
-3. Implementation requires per-MD routing or RAG
-4. Verifier weakening or frozen artifact change required
-5. Scope beyond allowlist without governance correction
+1. Honest group price anchor impossible without inventing amounts
+2. Implementation requires per-MD routing or RAG
+3. Verifier weakening or frozen artifact change required
+4. Scope beyond allowlist without governance correction
+5. Drill-down would auto-include sibling offers not listed in group `entries`
 
 ---
 
@@ -409,7 +452,7 @@ Same ignores as W1 (`TASK.md` W1 wide block). Frozen pin script unchanged.
 | PRE-CODE | |
 | Baseline | `73de39a` |
 | COMPLETION checker | |
-| Prosthetics owner sign-off | pending |
+| Prosthetics owner sign-off | ✅ (offer-pinned mapping 2026-07-24) |
 | HEAD | |
 | NO LIVE / NO LLM / NO A9 | |
 

@@ -1,378 +1,372 @@
-# TASK — W1 Family price overview + widget contract fixes
+# TASK — W1b Family price situation menu + grouped drill-down
 
-**Baseline:** `codex/stage-a` / `b09cb45` (C2e CLEANUP_SERIES_COMPLETE closeout) · **NO LIVE / NO LLM / NO A9 changes**
+**Baseline:** `codex/stage-a` / `73de39a` (W1 COMPLETE) · **NO LIVE / NO LLM / NO A9 changes**
 
-**Authority:** Owner-approved W1 (`OWNER APPROVED: начать W1`, 2026-07-24).
+**Authority:** Owner decision (2026-07-24) — situation buttons for vague family price questions.
 
 ## Goal
 
-Fix three confirmed user-facing defects **systemically** (no implantation-only hacks, no RAG):
+Extend W1 family price overview with a **two-phase** patient-friendly flow:
 
-1. **A — Family price overview:** vague family price questions (`topic` + price intent + `service_id=null`) materialize a multi-service price overview instead of terminal defer.
-2. **B — Single follow-up channel:** target runtime exposes follow-up controls only via `payload.quick_replies`; widget fail-safe deduplicates by `ref`.
-3. **C — Terminal/error attribution:** terminal/defer/error/verifier-block/unknown-ref responses show plain bot name only; materialized content/price/doctors keep «по материалам клиники».
+1. **Situation menu (first screen):** vague topic price question (`topic` + price + `service_id=null`) → **compact** price overview + **client-owned situation buttons** (not protocol names).
+2. **Group drill-down (second screen):** after button click → prices **only** for services in the selected group; topic continuity preserved.
 
-**Target chain (unchanged architecture):**
+**Owner example (implantation):**
+
+Patient: «Сколько стоит имплантация?»
+
+First response: short overview (2–4 price anchors max) + buttons:
+- Один зуб
+- Несколько зубов
+- Вся челюсть
+
+**Must NOT** show on first screen: Классическая имплантация, Одномоментная, All-on-4, All-on-6.
+
+After group selection → show only that group's services and prices.
+
+**Unchanged architecture:**
 
 ```text
-HTTP → shared guards → one Planner LLM → native TurnFrame → session hydration
-→ medical boundary → FullContext → Composer → lightweight Verifier → widget/session
+HTTP → guards → Planner LLM → TurnFrame → session hydration
+→ medical boundary → FullContext → Composer → Verifier → widget/session
 ```
+
+Group selection is **structured client data + target navigation**, not RAG/per-MD routing.
 
 ## Process (mandatory)
 
-1. **Verify baseline:** clean tree; `HEAD == origin/codex/stage-a` @ `b09cb45`.
-2. **Read:** `TASK.md`, `docs/ARCH_TARGET_DESIGN.md`, `docs/STRANGLER_ROADMAP.md`, `REVIEW_CHECKLIST.md`, `.cursor/rules/00-guardrails.mdc`.
-3. **Read-only seam audit** (below) — completed in governance commit.
+1. **Verify baseline:** clean tree; `HEAD == origin/codex/stage-a` @ `73de39a`.
+2. **Read:** `TASK.md`, `docs/ARCH_TARGET_DESIGN.md`, `REVIEW_CHECKLIST.md`, `.cursor/rules/00-guardrails.mdc`.
+3. **Read-only seam audit** (below).
 4. **Governance commit:** only `TASK.md` → push → **PRE-CODE checker ✅**
 5. If PRE-CODE ❌: STOP, fix only `TASK.md`, repeat PRE-CODE until ✅.
-6. **W1 implementation** → focused + neighbor + wide offline tests → **COMPLETION checker ✅** → commit + push → clean/synced → **STOP** (no live widget re-test without owner).
+6. **W1b implementation** → focused + neighbor + wide offline → frozen pins → **COMPLETION checker ✅** → commit + push → clean/synced → **STOP**.
 
-No product WIP before PRE-CODE ✅. No advance on checker ❌.
+No product WIP before PRE-CODE ✅.
 
 ## Forbidden
 
 - Live/LLM runs; A9 matrix/harness rerun; frozen A9 artifact edits
-- Merge/push to `main`; product authority changes
-- Hardcode имплантации/протезирования or demo-specific phrases in shared `core/`
-- Зашитые готовые тексты ответов по отдельным услугам (Composer writes freely from evidence)
-- New retriever/RAG/per-document routing; per-MD thematic routers
-- Changing existing exact price amounts, doctors, marketing/CTA semantics
+- Hardcode in shared `core/`: `implantation`, `all_on_4`, `all_on_6`, clinic button labels, demo service_ids
+- RAG/per-MD routing; legacy chunk navigation for group buttons
+- `meta.followups` restoration; duplicate quick_reply channels
+- Payment stages / marketing / CTA / doctors in **situation menu** phase
+- Changing existing pricebook amounts or offer IDs
 - Weakening Verifier or numeric grounding; ослабление acceptance tests
-- Temporary compatibility fallback; duplicate follow-up channel restoration
 - Files outside allowlist without governance correction + PRE-CODE ✅
-- Protected acceptance spec/golden/target/current edits to greenwash
+- Writing `prosthetics` groups to client data **without owner sign-off** on table below (§ Prosthetics owner checkpoint)
+- Inventing prosthetics service→group mapping when ambiguous
 
 ## Allowed
 
 - Governance `TASK.md`; PRE-CODE / COMPLETION checkers (read-only)
-- Product code and offline tests per allowlist below
-- Synthetic temporary client fixture (non-demo service IDs/tags/prices)
+- Product code + offline tests per allowlist
+- **New client-owned config** in `clients/demo/target_response/` (groups YAML/JSON + loader); **no price amount edits**
+- Synthetic non-demo fixtures in tests
 - Push only to `origin/codex/stage-a`
 
 ---
 
-## Read-only seam audit (baseline `b09cb45`)
+## Read-only seam audit (baseline `73de39a`)
 
-### A. Family price overview — confirmed gap
+### W1 current behavior (gap vs owner decision)
 
 | Seam | File | Finding |
 |------|------|---------|
-| Planner intent | `core/turn_planner_llm.py:45–58` | Prompt instructs `service_id=null` for vague implantation price → «обзор протоколов». |
-| Dispatch gate | `core/target_turn_frame_dispatch.py:263–275` | `service_id=null` + price component → `terminal defer`; exception only for content-only (`_is_fullcontext_content_only_components`). |
-| Regression test | `tests/test_target_turn_frame_dispatch.py:127–134` | `test_missing_service_id_returns_terminal_defer` encodes current (wrong for family price) behavior — **update** to new contract. |
-| Runtime wiring | `core/target_runtime_turn.py:135–175` | `strategy_context` from `resolve_target_runtime_strategy_context(service_id=turn_frame.service_id)` → empty when `service_id=null`. |
-| Evidence path | `core/target_offline_response_assembly.py`, `core/service_data_context.py` | **Single-service** only (`service_term` → one `service_id`). No multi-service family evidence. |
-| Price authority | `clients/demo/target_response/pricebook/` | Canonical structured offers; loaded via `ResponseSchemaBundle`. |
-| Membership data | `clients/demo/target_response/service_catalog.json` | Each service has `family`, `roles`, `content_ref`. Topic derivable as `content_ref.split("__")[0]` (e.g. `implantation`, `prosthetics`). |
-| Topic taxonomy | `core/topic_taxonomy.py` | MD-derived allowed topics for planner; **not** family membership. |
-| Legacy planner catalog | `clients/demo/service_catalog.json` | Planner guards only; **not** price overview authority. |
-| Ordering | `clients/demo/target_response/clinic_strategy.yaml` | `default_service_priorities: {}`; rules have `service_priorities` per patient match — usable for tie-break, not required for v1 if catalog order + `roles` suffice. |
-| Catalog order | `core/response_schema_loader.py` | JSON key order preserved in `bundle.services` dict insertion order. |
+| Family selection | `core/target_family_price_overview.py` | Selects up to 4 **protocol-named** services by `content_ref` topic prefix + role rank. Shows classic/one_stage/all_on_4 on first screen — **violates** owner UX. |
+| Follow-ups v1 | `assemble_family_price_overview_package` | `followup_source=None`; **no situation buttons**. |
+| Spec gate | `is_family_price_overview_spec` | Requires `followup_source is None` — must extend for menu phase. |
+| Dispatch | `core/target_turn_frame_dispatch.py` | `_materialize_family_price_overview_policy_request` — single phase only. |
+| Navigation | `core/target_runtime_followup_nav.py` | Ref → label text; session stores `quick_replies` refs. No structured group ref parsing. |
+| Session | `core/target_runtime_session.py` | Stores followups; no `family_price_group` continuity field yet. |
+| Hydration | `core/target_runtime_turn_frame_hydration.py` | Restores `service_id` for vague attribute follow-ups only — not group selection. |
+| Evidence | `core/target_composer_request.py` `_family_overview_sources` | Full offer JSON incl. `payment_stages`, `package` — too heavy for compact menu. |
+| Exact path | `service_id` + price aspects | Unchanged; All-on-4 exact + payment questions must stay on single-service path. |
+| Widget | `core/target_runtime_widget.py` | Single `quick_replies` channel ✅ (W1). `ui_source_family` for family overview uses `price_navigation`. |
+| Membership | `contracts/target_service_content_topic.py` | Topic from `content_ref` prefix — reuse for validating group `service_ids` belong to topic. |
 
-**Root cause:** dispatch treats `service_id=null` + price as unmaterializable → terminal defer, despite planner promising family overview.
+**Root cause:** W1 v1 optimized for multi-protocol evidence, not patient situation grouping.
 
-**Proposed mechanism (v1):**
+### Proposed mechanism (W1b)
 
 ```text
-price intent + usable topic + service_id=null
-→ resolve family services by topic prefix on content_ref (canonical membership)
-→ filter: active, ≥1 priced offer in target pricebook bundle
-→ deterministic order: role rank (protocol > advanced_protocol > supporting > none),
-  then catalog order; cap at 4
-→ assemble multi-service structured price evidence
-→ Composer (FullContext + evidence) → Verifier (multi-offer grounding) → materialize
+Phase A — situation menu
+  price + usable topic + service_id=null + no group ref in session/nav
+  → load client topic groups from family_price_groups config
+  → build COMPACT price hints (group-level anchors, max 2–4 lines total)
+  → emit situation quick_replies with opaque target refs
+  → Composer + Verifier on compact evidence only
+
+Phase B — group drill-down
+  nav ref target:family_price_group/{topic}/{group_id} OR session-hydrated group
+  → validate group exists for topic; service_ids ⊆ catalog; priced offers exist
+  → multi-service price overview LIMITED to group service_ids (W1 assembly reuse)
+  → no situation buttons on drill-down (or only if config allows — v1: none)
+
+Exact service question (service_id set) → unchanged single-service path
+Payment/stages question on known service → unchanged
 ```
 
-**Canonical membership source (owner decision in audit):** `clients/{client}/target_response/service_catalog.json` — filter services where `content_ref` topic prefix matches `turn_frame.topic`. Use `family` for consistency checks only; **no** demo hardcoded topic→family table in `core/`.
+### Client-owned groups config (chosen after audit)
 
-**Ordering v1:** role rank + catalog JSON key order. If a future client cannot determine honest order from these two alone → **STOP** and propose minimal `family_price_overview_priorities` config field (governance amendment) before schema change.
+**File:** `clients/{client}/target_response/family_price_groups.yaml`
 
-### B. Follow-up duplication — confirmed gap
+Loaded into `ResponseSchemaBundle` via `core/response_schema_loader.py` (same pack, no parallel data layer).
 
-| Seam | File | Finding |
-|------|------|---------|
-| Payload writer | `core/target_runtime_widget.py:117–127` | `quick_replies` built from followups; **same list** copied to `meta.followups`. |
-| UI family | `core/target_runtime_widget.py:73` | `ui_source_family: "target_fullcontext"` — **not** in `policy._UI_FAMILIES` → falls through to `md_navigation`. |
-| Screen limits | `ux_builder.normalize_policy_payload:45–53` | `md_navigation` → max 1 quick_reply + up to 2 meta followups = **3 visible buttons**. |
-| Widget merge | `static/widget/widget.js:1394–1399` | `renderInlineLinks` concatenates `meta.followups` + `quickReplies` without dedup. |
-| Session storage | `core/target_runtime_turn.py:57–68` | Reads **only** `quick_replies` for session — correct canonical channel once duplication removed. |
+```yaml
+version: 1
+topics:
+  implantation:
+    groups:
+      - id: one_tooth
+        label: Один зуб
+        service_ids: [classic, one_stage]
+      - id: several_teeth
+        label: Несколько зубов
+        service_ids: [classic, one_stage]
+      - id: full_jaw
+        label: Вся челюсть
+        service_ids: [all_on_4, all_on_6, zygomatic_implants]
+  # prosthetics: see § Prosthetics owner checkpoint — not written until sign-off
+```
 
-**Root cause:** dual channel (`quick_replies` + `meta.followups`) + unknown UI family → policy keeps both lists; widget renders both.
+**Validation rules (contract):**
+- Each `group.id` unique per topic; `label` non-blank (client-owned text).
+- Each `service_id` exists in `service_catalog.json`, `active`, and `content_ref` topic prefix matches topic.
+- Groups may share a service_id across situations (explicit in data).
+- Services not in any group are excluded from family flows (not auto-inferred).
+- Loader fail-closed on unknown service_id or topic/group shape errors.
 
-### C. Terminal attribution — confirmed gap
+**Excluded from implantation groups (adjunct / not patient situation bucket):** `sinus_lift`, `pterygoid_implants`, `temporary_teeth`, `tomography` — not in owner menu; remain reachable via exact/context paths only.
 
-| Seam | File | Finding |
-|------|------|---------|
-| Widget resolver | `static/widget/widget.js:411–419` | `resolveTurnAttributionKind` → `"content"` unless route in `PLAIN_ATTRIBUTION_ROUTES` or lead flow. |
-| Target terminal routes | `core/target_runtime_widget.py:197,213,227` | `target_fullcontext_terminal_*`, `target_fullcontext_error`, `target_fullcontext_verifier_blocked` **not** in plain set → show «по материалам клиники». |
-| Unknown ref | `core/target_runtime_followup_nav.py:74` | Same `target_fullcontext` family; should be plain. |
+### Target navigation ref contract
 
-**Preferred fix:** server sets explicit `meta.attribution_kind: content | plain | lead`; widget prefers it; route-based fallback retained for shared guards.
+```text
+target:family_price_group/{topic}/{group_id}
+```
 
-### D. Blast-radius map (must stay green)
+- Emitted only in situation menu `quick_replies`.
+- Session-bound via existing `target_runtime_followups` storage.
+- On ref click (`ref` set, `q` empty): parse ref **before** planner; hydrate TurnFrame/dispatch with `family_price_group_id` + `family_price_overview_topic`; **do not** use MD chunk refs.
+- Unknown ref → existing plain `target_fullcontext_followup_unknown` path.
+- Dedup by `ref` (W1 widget contract preserved).
 
-- Planner/TurnFrame generic price (`tests/test_turn_planner_llm.py`, `tests/test_turn_frame_from_raw.py`)
-- `target_turn_frame_dispatch` + bound response pipeline
-- Family evidence assembly (new)
-- Composer request/evidence + numeric/semantic Verifier
-- Exact service price + payment stages (All-on-4 regression)
-- Target runtime/session/ref navigation (`tests/test_s61_*`, `tests/test_s62_*`, `tests/test_s63_*`)
-- Widget payload + `policy.py` / `ux_builder.normalize_policy_payload`
-- `/ask` + `/ask/stream` offline fake backends
-- Import firewall; frozen S47/S50/S53/S55/S58/S62/S63/S66 byte-identical
+### Compact first-screen evidence (owner compactness)
 
----
+**Forbidden in menu-phase evidence/response:** payment_stages, package breakdown, installment, tax deduction, warranty/contract promos, consultation promos/deadlines, doctors, long medical copy, booking CTA.
 
-## Workstream A — Family price overview
+**Allowed:** one short intro; max 2–4 brief price anchors derived from **group-level** structured projection (min fixed / proven min-from / range per group); one clarifying sentence; situation buttons.
 
-### A. Requirements
+**Price semantics:** use «от» only when value is proven minimum among allowed variants in that anchor; fixed offer → name + exact price; multiple variants → short range or 2–4 lines. All amounts from pricebook only.
 
-1. **Universal:** works for `implantation`, `prosthetics`, `treatment`, and other families with multiple priced services in client pack — no demo phrase lists in shared core.
-2. **Membership:** `target_response/service_catalog.json` + topic prefix on `content_ref`; sums from `target_response/pricebook` only.
-3. **No treatment choice:** overview lists multiple methods with structured «от …»; does not pick `classic`/All-on-4 for patient.
-4. **v1 cap:** ≤4 priced services per family; deterministic order (role rank → catalog order); no LLM ranking.
-5. **Composer text:** free-form from evidence (not hardcoded templates).
-6. **Prosthetics:** only prosthetics-topic services per catalog (коронки, съёмное, имплант-поддерживаемое — per demo data).
-7. **Strict grounding:** all amounts in structured evidence; Verifier receives same multi-offer evidence; FullContext for explanation only.
-8. **Edge cases:**
-   - 1 priced service in family → normal single-service materialized price path
-   - 0 priced services → honest controlled response, no invented prices
-   - exact `service_id` → unchanged existing path
-   - brand-filter without exact service → no wrong price
-   - medical boundary semantics unchanged
-9. **No new follow-up routing protocol** for family overview in v1 — text overview only; preserve exact-service follow-ups on precise price path.
+**Verifier:** no new medical regex/blocklists. Existing numeric grounding + semantic backend; menu-phase evidence must not include fields that would permit forbidden commercial details (strip `payment_stages` from menu offer projection). Optional typed check: menu spec forbids `payment` aspect components.
 
-### A. Implementation seams (allowlist targets)
+### Spec / policy extensions
 
-| Area | Action |
-|------|--------|
-| `core/target_turn_frame_dispatch.py` | New branch: price + usable topic + `service_id=null` → materialize family overview (not defer). |
-| `core/target_family_price_overview.py` | **new** — resolve services, order, build multi-offer evidence package (pure, offline-testable). |
-| `contracts/target_family_price_overview.py` | **new** — typed contracts for family overview selection/evidence. |
-| `core/target_offline_response_assembly.py` / `core/target_spec_offline_response_package.py` | Wire family overview into assembly when spec indicates multi-service price. |
-| `core/target_composer_request.py` | Multi-service offer evidence blocks for Composer + Verifier. |
-| `core/target_scoped_response_evidence.py` | Scope records for multiple offers (if needed for verifier). |
-| `core/target_response_verifier.py` | Accept multi-offer family evidence; block foreign amounts. |
-| `core/target_response_policy.py` / `contracts/target_response_spec.py` | Spec flag or mode for `family_price_overview` (no per-service `service_id`). |
-| `tests/test_w1_family_price_overview_offline.py` | **new** — focused acceptance + synthetic client fixture. |
-| `tests/test_target_turn_frame_dispatch.py` | Update defer test → family materialize for price+topic null service. |
-| Neighbor tests | `test_demo_target_turn_frame_bound_response.py`, `test_vague_price_followup.py`, `test_demo_target_price_offers.py` — keep green. |
+Add to `TargetResponsePolicyRequest` / `TargetResponseSpec` (frozen-shape tests updated):
 
-### A. Demo acceptance cases
+| Field | Menu phase | Drill-down phase |
+|-------|------------|------------------|
+| `family_price_overview_topic` | set | set |
+| `family_price_group_id` | `null` | set |
+| `followup_source` | `"family_price_group"` (new enum value) | `null` |
+| `required_components` | `("price",)` | `("price",)` |
 
-| Case | Expect |
-|------|--------|
-| «Сколько стоит имплантация?» | materialized; ≥2 implantation-topic priced variants; no method chosen for patient; no irrelevant services; not terminal/defer |
-| «Сколько стоит протезирование?» | materialized; multiple prosthetics-topic variants; structured sums only |
-| «Сколько стоит All-on-4?» | exact single-service price path unchanged (green) |
-| «А сколько стоит?» after All-on-4 focus | session hydration + exact price path unchanged (green) |
-| Synthetic temp client fixture | different service IDs/tags/prices; overview without demo hardcode |
+`is_family_price_overview_spec` splits into:
+- `is_family_price_situation_menu_spec` — topic set, group null, followup_source family_price_group
+- `is_family_price_group_overview_spec` — topic + group set, followup_source null
+
+Exact `service_id` path unchanged.
 
 ---
 
-## Workstream B — Single follow-up channel
+## Demo implantation mapping (owner-approved)
 
-### B. Requirements
-
-1. **Canonical channel:** `payload.quick_replies` only for target runtime user controls.
-2. **No duplicate in meta:** remove `meta.followups` copy; observability may keep `followup_count` / `followup_source: quick_replies`.
-3. **Widget dedup:** fail-safe deduplicate merged controls by `ref` in `renderInlineLinks` (or shared helper).
-4. **UI source family:** map target materialized price → `price_navigation`; content → `md_navigation`; doctors → `doctor_navigation`; terminal/error → `guided_fallback` or plain (no nav buttons). Remove unrecognized `target_fullcontext` as UI family.
-5. **Session/ref-click:** continue via `quick_replies`; screen limits apply once.
-
-### B. Acceptance
-
-- All-on-4 price: exactly **two unique** buttons: «Оплата по этапам» and «Что входит»; neither duplicated; ref-click on target path.
-- Content follow-ups unchanged.
-- Session stores full canonical list.
-- `normalize_policy_payload` screen limits applied once.
-
-### B. Implementation seams
-
-| File | Change |
-|------|--------|
-| `core/target_runtime_widget.py` | Stop writing `meta.followups`; set correct `ui_source_family` + `attribution_kind` per response kind. |
-| `core/target_runtime_followup_nav.py` | Plain attribution + guided UI family on unknown ref payload. |
-| `policy.py` | Recognize target price/content/doctor routes if needed for inference fallback. |
-| `static/widget/widget.js` | Dedup by `ref`; honor `meta.attribution_kind` first. |
-| `static/widget/followup_controls.js` | **new** (optional) — pure merge+dedup helper for testability. |
-| `tests/test_w1_widget_followup_contract_offline.py` | **new** — behavior-level: payload contract + dedup (Node subprocess or DOM fixture; not substring-only). |
-| `tests/test_ui_source_policy.py` | Target price payload → `price_navigation`, no followups in meta. |
-| `tests/test_s61_correction_target_runtime.py`, `tests/test_s62_correction_offline.py`, `tests/test_s63_correction_offline.py` | All-on-4 two-button regression. |
+| Group | Label | service_ids |
+|-------|-------|-------------|
+| `one_tooth` | Один зуб | `classic`, `one_stage` |
+| `several_teeth` | Несколько зубов | `classic`, `one_stage` |
+| `full_jaw` | Вся челюсть | `all_on_4`, `all_on_6`, `zygomatic_implants` |
 
 ---
 
-## Workstream C — Terminal/error attribution
+## Prosthetics owner checkpoint (STOP before client write)
 
-### C. Requirements
+Acceptance test #7 requires prosthetics groups. **Do not commit `family_price_groups.yaml` prosthetics section until owner signs one row below.**
 
-1. **Materialized** content/price/doctors → `attribution_kind: content` → «Надежда · по материалам клиники».
-2. **Lead flow** → `attribution_kind: lead` → «Запись на консультацию».
-3. **Plain only** (bot name): `target_fullcontext_terminal_clarify`, `target_fullcontext_terminal_defer`, `target_fullcontext_boundary_uncertain`, `target_fullcontext_error`, `target_fullcontext_verifier_blocked`, unknown follow-up/ref controlled response.
-4. Terminal payloads: no follow-up/CTA.
-5. `/ask` and `/ask/stream` identical attribution.
+| service_id | name | selection notes |
+|------------|------|-----------------|
+| `zirconia_crowns` | Коронки из диоксида циркония | extent: one_tooth, few_teeth |
+| `clasp_dentures` | Бюгельные протезы | extent: few_teeth |
+| `removable_dentures` | Съёмное протезирование | extent: few_teeth, full_arch; options partial/full |
+| `implant_supported_prosthetics` | Протезирование на имплантах | extent: one_tooth, few_teeth, full_arch |
+| `veneers` | Виниры E-max | context only, no extent — **ambiguous** |
 
-### C. Implementation seams
+**Proposed draft (NOT approved — executor STOP if implementing without owner OK):**
 
-| File | Change |
-|------|--------|
-| `core/target_runtime_widget.py` | Set `meta.attribution_kind` on all payload kinds. |
-| `core/target_runtime_followup_nav.py` | `attribution_kind: plain` on unknown ref. |
-| `static/widget/widget.js` | `resolveTurnAttributionKind` checks `meta.attribution_kind` first; extend route fallback for target terminal routes. |
-| `tests/test_w1_attribution_contract_offline.py` | **new** — materialized vs terminal/error matrix via fake backends (`/ask` + `/ask/stream`). |
+| Group id | Label | Proposed service_ids | Ambiguity |
+|----------|-------|----------------------|-----------|
+| `one_tooth` | Один зуб | `zirconia_crowns` | veneers omitted — confirm |
+| `several_teeth` | Несколько зубов | `zirconia_crowns`, `clasp_dentures`, `removable_dentures` | removable spans full/partial |
+| `full_jaw` | Вся челюсть | `implant_supported_prosthetics`, `removable_dentures` | implant_supported also lists one_tooth/few_teeth |
+
+**Executor rule:** at prosthetics checkpoint, if owner has not approved table → **СТОП** with this table in report; implantation-only delivery still allowed if tests 1–6 + 8–9 green and test 7 explicitly skipped with documented owner pending (not `xfail` — split test or conditional only with TASK amendment).
 
 ---
 
-## W1 allowlist (implementation)
+## Workstreams
 
-**Governance correction (2026-07-24, post-implementation):** расширение allowlist для обязательных companion-файлов и frozen-shape тестов, вытекающих из `family_price_overview_topic` / `content_ref` membership / pipeline assembly clamp. Без изменения продуктовой семантики W1.
+### A — Client groups config + loader
+
+- `family_price_groups.yaml` schema contract + loader integration in `ResponseSchemaBundle`
+- Validators: topic/service membership via `content_ref` prefix
+
+### B — Situation menu phase
+
+- Dispatch: menu vs drill-down vs exact service
+- Compact evidence builder (group anchors, no payment_stages)
+- Situation follow-ups with `target:family_price_group/...` refs
+- `followup_source: family_price_group`
+
+### C — Group drill-down phase
+
+- Nav/session hydration from structured ref
+- Reuse W1 multi-offer assembly filtered by group `service_ids`
+- Cap services per group (reuse `FAMILY_PRICE_OVERVIEW_MAX_SERVICES` or per-group limit = all priced in group)
+
+### D — Widget / session / attribution
+
+- Single `quick_replies` channel; dedup preserved
+- `ui_source_family` appropriate for menu (`price_navigation` or new `family_price_navigation` if policy requires — prefer existing families)
+- Terminal/error: `attribution_kind: plain` (W1 contract preserved)
+
+### E — Verifier compactness
+
+- Menu-phase evidence shape excludes commercial detail fields
+- Numeric grounding unchanged; no new regex blocklists
+
+---
+
+## W1b allowlist (implementation)
 
 ### New files
 
 | File |
 |------|
-| `core/target_family_price_overview.py` |
-| `contracts/target_family_price_overview.py` |
-| `contracts/target_service_content_topic.py` |
-| `tests/test_w1_family_price_overview_offline.py` |
-| `tests/test_w1_widget_followup_contract_offline.py` |
-| `tests/test_w1_attribution_contract_offline.py` |
-| `static/widget/followup_controls.js` (if extracted for behavior test) |
+| `contracts/target_family_price_groups.py` |
+| `clients/demo/target_response/family_price_groups.yaml` (implantation only until prosthetics sign-off) |
+| `tests/test_w1b_family_price_situation_menu_offline.py` |
+| `tests/test_w1b_family_price_group_drilldown_offline.py` |
 
 ### Modify
 
 | File |
 |------|
-| `core/target_turn_frame_dispatch.py` |
-| `core/target_offline_response_assembly.py` |
-| `core/target_spec_offline_response_package.py` |
-| `core/target_offline_response_package.py` |
-| `core/target_response_materialization_plan.py` |
-| `core/target_composer_request.py` |
-| `core/target_scoped_response_evidence.py` |
-| `core/target_response_verifier.py` |
-| `core/target_response_policy.py` |
-| `core/target_policy_bound_verified_response_pipeline.py` (clamp marketing/CTA/consultation_close for family overview) |
+| `contracts/response_schema.py` |
+| `core/response_schema_loader.py` |
 | `contracts/target_response_spec.py` |
 | `contracts/target_response_policy.py` |
-| `contracts/target_turn_frame_dispatch.py` (only if dispatch result type needs extension) |
-| `core/target_runtime_widget.py` |
+| `core/target_response_policy.py` |
+| `core/target_family_price_overview.py` |
+| `core/target_turn_frame_dispatch.py` |
+| `core/target_spec_offline_response_package.py` |
+| `core/target_composer_request.py` |
+| `core/target_scoped_response_evidence.py` |
+| `core/target_policy_bound_verified_response_pipeline.py` |
 | `core/target_runtime_followup_nav.py` |
-| `policy.py` |
-| `static/widget/widget.js` |
+| `core/target_runtime_turn_frame_hydration.py` |
+| `core/target_runtime_session.py` |
+| `core/target_runtime_widget.py` |
+| `orchestration/pre_resolver_turn.py` (only if nav_ref must pass to runtime — prefer ctx already set) |
+| `tests/test_w1_family_price_overview_offline.py` (behavior update for two-phase) |
+| `tests/test_w1_widget_followup_contract_offline.py` |
 | `tests/test_target_turn_frame_dispatch.py` |
-| `tests/test_ui_source_policy.py` |
+| `tests/test_target_response_spec.py` |
+| `tests/test_target_response_policy.py` |
 | `tests/test_demo_target_turn_frame_bound_response.py` |
 | `tests/test_vague_price_followup.py` |
+| `tests/test_demo_target_price_offers.py` |
 | `tests/test_s61_correction_target_runtime.py` |
-| `tests/test_s61_target_fullcontext_runtime.py` |
 | `tests/test_s62_correction_offline.py` |
 | `tests/test_s63_correction_offline.py` |
-| `tests/test_s65_authority_switch_offline.py` |
-| `tests/test_target_fullcontext_content_response.py` |
-| `tests/test_demo_target_price_offers.py` |
-| `tests/test_turn_planner_llm.py` (only if dispatch integration mocks need update) |
-| `tests/test_c2_import_firewall_offline.py` (extend if new public surface) |
-| `tests/test_c2c_dead_clarify_offline.py` (defer regression: low `topic_confidence` after family overview) |
-| `tests/test_target_offline_response_assembly.py` (frozen shape: `family_service_ids`) |
-| `tests/test_target_response_policy.py` (frozen shape: `family_price_overview_topic`) |
-| `tests/test_target_response_spec.py` (frozen shape: `family_price_overview_topic`) |
+| `tests/test_w1_attribution_contract_offline.py` |
+| `tests/test_response_schema_loader.py` |
+| `tests/test_c2_import_firewall_offline.py` (if new public surface) |
 
-### Explicit KEEP (do not change)
+### Explicit KEEP
 
 - `clients/demo/target_response/pricebook/**` amounts and offer IDs
-- `clients/demo/target_response/marketing.yaml`, doctor catalog
-- A9 / frozen eval artifacts
-- Planner prompt semantics for `service_id=null` on vague price (already correct)
-- Medical boundary / urgent hard-stop ordering
+- Frozen S47/S50/S53/S55/S58/S62/S63/S66 artifacts (byte-identical)
+- Exact All-on-4 payment/stages path
+- W1 widget single-channel + plain terminal attribution
+
+---
+
+## Acceptance tests (offline, mandatory)
+
+1. «Сколько стоит имплантация?» → materialized; compact answer; **no** payment stages/installment/tax promo/consultation promo; buttons exactly «Один зуб», «Несколько зубов», «Вся челюсть»; no duplicates; **no** protocol names as buttons.
+2. Select «Один зуб» → only one-tooth services/prices; no All-on-4/6.
+3. Select «Вся челюсть» → All-on-4/6 (+ zygomatic if priced) when in group; no one-tooth protocols.
+4. Select «Несколько зубов» → only configured services; honest short answer if none priced.
+5. «Сколько стоит All-on-4?» → exact service path; **no** situation menu.
+6. «Как оплатить All-on-4?» / payment stages → unchanged.
+7. Prosthetics family overview → **owner sign-off required** (§ checkpoint); own groups; no implantation buttons.
+8. Terminal/error → plain attribution.
+9. Frozen artifacts byte-identical.
 
 ---
 
 ## STOP conditions
 
-STOP and escalate to owner if:
-
-1. Family membership requires new complex data schema beyond `service_catalog.json` topic prefix + `family`
-2. Honest deterministic service order impossible with role rank + catalog order (propose config field first)
-3. Implementation requires changing existing price amounts or marketing/CTA
-4. New follow-up routing protocol needed for family overview buttons
-5. A9 or frozen artifact byte change required
-6. Live/LLM required to validate
-7. Checker ❌ requires scope beyond allowlist
+1. Prosthetics grouping ambiguous and owner has not signed proposed table
+2. Honest group price anchor impossible without inventing amounts
+3. Implementation requires per-MD routing or RAG
+4. Verifier weakening or frozen artifact change required
+5. Scope beyond allowlist without governance correction
 
 ---
 
-## Tests (mandatory)
+## Tests (mandatory commands)
 
-### Focused W1 block
+### Focused W1b
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = "1"
-$bt = Join-Path $env:TEMP ("demo-bot-w1-" + [guid]::NewGuid().ToString("n"))
+$bt = Join-Path $env:TEMP ("demo-bot-w1b-" + [guid]::NewGuid().ToString("n"))
 python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_w1b_family_price_situation_menu_offline.py `
+  tests/test_w1b_family_price_group_drilldown_offline.py `
   tests/test_w1_family_price_overview_offline.py `
   tests/test_w1_widget_followup_contract_offline.py `
   tests/test_w1_attribution_contract_offline.py `
   tests/test_target_turn_frame_dispatch.py `
-  tests/test_ui_source_policy.py `
-  tests/test_demo_target_turn_frame_bound_response.py `
-  tests/test_vague_price_followup.py `
-  tests/test_demo_target_price_offers.py `
   -q
 ```
 
-### Neighbor target tests (S45/S46/S56/S61/S63/S65)
+### Neighbors
 
 ```powershell
 python -m pytest -p no:cacheprovider --basetemp $bt `
-  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_demo_target_turn_frame_bound_response.py `
+  tests/test_vague_price_followup.py `
+  tests/test_demo_target_price_offers.py `
   tests/test_s61_correction_target_runtime.py `
   tests/test_s62_correction_offline.py `
   tests/test_s63_correction_offline.py `
-  tests/test_s65_authority_switch_offline.py `
-  tests/test_target_fullcontext_content_response.py `
-  tests/test_s56_missing_base_composer_guard.py `
-  tests/test_turn_planner_llm.py `
-  tests/test_turn_frame_from_raw.py `
+  tests/test_response_schema_loader.py `
   -q
 ```
 
-### Wide safe-offline (corrected C2e command; no live, no A9 harness)
+### Wide safe-offline + integrity
 
-```powershell
-python -m pytest -p no:cacheprovider --basetemp $bt tests/ `
-  --ignore=tests/test_composer_live_eval.py `
-  --ignore=tests/test_emotion_route_matrix.py `
-  --ignore=tests/test_medical_boundary_eval_live_cli.py `
-  --ignore=tests/test_fullcontext_quality_eval_live_wiring.py `
-  --ignore=tests/test_s62_target_runtime_live_harness.py `
-  --ignore=tests/test_s63_target_runtime_live_harness.py `
-  --ignore=tests/test_s66_default_authority_live_harness.py `
-  --ignore=tests/test_patient_scope_shadow_eval_contract.py `
-  --ignore=tests/test_patient_scope_shadow_eval_v2_contract.py `
-  --ignore=tests/test_patient_scope_native_contract_spec.py `
-  --ignore=tests/test_topic_shadow_eval_contract.py `
-  --ignore=tests/test_topic_shadow_attempt_eval_contract.py `
-  -q
-```
-
-### Integrity
-
-```powershell
-python -m pytest -p no:cacheprovider --collect-only -q 2>&1 | Select-Object -Last 3
-python -c "from evals.v5.fullcontext_quality_eval_contract import assert_frozen_prior_artifacts_unchanged; from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_prior_artifacts_unchanged(); assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
-git diff --check
-```
+Same ignores as W1 (`TASK.md` W1 wide block). Frozen pin script unchanged.
 
 ---
 
 ## Commits (minimum)
 
-1. `W1 governance TASK` (this commit)
-2. `W1: family price overview + widget contract fixes` (after COMPLETION checker ✅)
-
-Each: tests → checker ✅ → commit → push → clean/synced.
+1. `W1b governance TASK` (this commit)
+2. `W1b: family price situation menu + group drill-down` (after COMPLETION ✅)
 
 ---
 
@@ -380,20 +374,11 @@ Each: tests → checker ✅ → commit → push → clean/synced.
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | ✅ (`3c21237`, original scope) |
-| Governance-delta review | ✅ (allowlist `8816f27` covers WIP; not retroactive PRE-CODE) |
-| Baseline | `b09cb45` |
-| COMPLETION checker | ✅ (`17760d4`) |
-| HEAD | `17760d4` |
-| pytest focused W1 + neighbors | 278 passed, 1 skipped |
-| pytest wide safe-offline | 2084 passed, 2 skipped |
-| collect-only | 2283 collected |
-| frozen S47/S50/S53/S55/S58/S62/S63/S66 | frozen OK |
-| git diff --check | clean (CRLF warnings only) |
-| NO LIVE / NO LLM / NO A9 | confirmed |
+| PRE-CODE | |
+| Baseline | `73de39a` |
+| COMPLETION checker | |
+| Prosthetics owner sign-off | pending |
+| HEAD | |
+| NO LIVE / NO LLM / NO A9 | |
 
-### Governance incident (chronology, non-blocking)
-
-Original PRE-CODE covered initial allowlist. Implementation required companion files (`contracts/target_service_content_topic.py`, `contracts/target_response_policy.py`, pipeline clamp, frozen-shape tests). Allowlist expanded post-implementation in `8816f27`; governance-delta review confirmed coverage. **Not** retroactive PRE-CODE. Product quality confirmed by green offline suite.
-
-**STOP after W1 COMPLETION — live widget re-test only with separate owner approval.**
+**STOP after W1b COMPLETION.**

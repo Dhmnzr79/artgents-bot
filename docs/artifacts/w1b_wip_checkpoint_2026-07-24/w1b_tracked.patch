@@ -1400,7 +1400,7 @@ index e852c33..9a80dc7 100644
 -    assert len(selection.entries) <= FAMILY_PRICE_OVERVIEW_MAX_SERVICES
 +    assert len(selection.entries) == 3
 +    labels = [entry.service_name for entry in selection.entries]
-+    assert labels == ["╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒", "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓", "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М"]
++    assert labels == ["Один зуб", "Несколько зубов", "Вся челюсть"]
      service_ids = selection.service_ids
      assert "all_on_4" in service_ids
      assert "classic" in service_ids
@@ -1428,7 +1428,7 @@ index e852c33..9a80dc7 100644
 -        for sid in selection.service_ids
 -    )
 +    labels = [entry.service_name for entry in selection.entries]
-+    assert labels == ["╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒", "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓", "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М"]
++    assert labels == ["Один зуб", "Несколько зубов", "Вся челюсть"]
 
 
  def test_synthetic_fixture_family_overview_without_demo_hardcode(tmp_path) -> None:
@@ -1480,9 +1480,9 @@ index e852c33..9a80dc7 100644
 +    assert all('"payment_stages":[' not in block["text"] for block in evidence)
 +    group_buttons = result.verified.selected_followups.group
 +    assert [item.label for item in group_buttons] == [
-+        "╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒",
-+        "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓",
-+        "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М",
++        "Один зуб",
++        "Несколько зубов",
++        "Вся челюсть",
 +    ]
 
 

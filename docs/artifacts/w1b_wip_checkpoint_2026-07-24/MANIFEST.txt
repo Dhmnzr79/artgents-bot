@@ -33,3 +33,22 @@ Restore contract
 4. No force apply, 3-way merge, or reset on conflict — STOP and escalate.
 5. Copy untracked/* back to repo root; re-verify file hashes.
 6. Owner approval required.
+
+Encoding integrity audit (2026-07-24, checkpoint 0 correction)
+--------------------------------------------------------------
+Issue: UTF-8/console mojibake in w1b_tracked.patch test assertions (git apply --check
+passed but restored Cyrillic labels were corrupted).
+
+TRACKED_PATCH lineage (SHA256):
+  original owner snapshot:     53FE25669FBC543274EAED2A990AEEA50E9A9123AF937C1DD862B2A84931AE63
+  whitespace-normalized:       8EDF2229139C8154EBA513D92C8F58676FAC629CA5F77C350AFF8F170F9A51EF
+  encoding-corrected (final):  82AE7AC33E6A3DE505686DAF9CD6E2C14C5685BA5A288190C7E637BCFC334B5F
+
+Corrected lines in w1b_tracked.patch (9 replacements, 3 strings × 3 occurrences):
+  - assert labels == ["Один зуб", "Несколько зубов", "Вся челюсть"]  (×2)
+  - "Один зуб", "Несколько зубов", "Вся челюсть" in follow-up label list  (×1 each)
+
+Mojibake removed (was): ╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒ / ╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓ / ╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М
+
+Product semantics unchanged: patch diff intent identical; only Cyrillic encoding in test
+assertions corrected. untracked/* copies not modified (source of truth for labels).

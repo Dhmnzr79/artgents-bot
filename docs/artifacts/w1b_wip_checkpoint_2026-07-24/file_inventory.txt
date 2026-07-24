@@ -1,13 +1,14 @@
-path,bytes
-checksums.sha256,693
-diff_stat.txt,1370
-file_inventory.txt,244
-MANIFEST.txt,1492
-RESTORE.md,1764
-status_porcelain.txt,1189
-untracked/clients/demo/target_response/family_price_groups.yaml,1179
-untracked/contracts/target_family_price_group_followup.py,1655
-untracked/contracts/target_family_price_groups.py,5283
-untracked/tests/test_w1b_family_price_group_drilldown_offline.py,6586
-untracked/tests/test_w1b_family_price_situation_menu_offline.py,6118
-w1b_tracked.patch,62368
+# path,bytes — file_inventory.txt self-row is non-authoritative (size varies with this note)
+path,bytes,note
+checksums.sha256,693,
+diff_stat.txt,1370,
+file_inventory.txt,616,non-authoritative self-size
+MANIFEST.txt,2785,
+RESTORE.md,1764,
+status_porcelain.txt,1189,
+untracked/clients/demo/target_response/family_price_groups.yaml,1179,
+untracked/contracts/target_family_price_group_followup.py,1655,
+untracked/contracts/target_family_price_groups.py,5283,
+untracked/tests/test_w1b_family_price_group_drilldown_offline.py,6586,
+untracked/tests/test_w1b_family_price_situation_menu_offline.py,6118,
+w1b_tracked.patch,62038,

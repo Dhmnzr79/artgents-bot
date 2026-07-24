@@ -76,7 +76,6 @@ def run_pre_resolver_turn(
 
     q, truncated = normalize_question_text(q_raw)
     bind_chat_ctx(sid, client_id)
-    request.ctx["legacy_intent"] = None
     request.ctx["effective_intent"] = None
 
     if truncated:

@@ -165,7 +165,6 @@ def finalize_ask(
                 "resolver_used": bool(request.ctx.get("resolver_used")),
                 "safety_net_used": bool(request.ctx.get("safety_net_used")),
                 **metadata_first_turn_details(),
-                "legacy_intent": request.ctx.get("legacy_intent"),
                 "effective_intent": str(request.ctx.get("effective_intent") or ""),
                 "source_route_decision": request.ctx.get("source_route_decision"),
                 "dialog_focus_decision": slim_dialog_focus_payload(

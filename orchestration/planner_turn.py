@@ -75,7 +75,6 @@ def run_planner_turn(
         RUNTIME_FRAME_STATUS_PARTIAL,
     }
     request.ctx["resolver_used"] = False
-    request.ctx["legacy_intent"] = None
     request.ctx["safety_net_used"] = False
     if not request.ctx["turn_planner_used"]:
         log_json(

@@ -472,10 +472,6 @@ def numeric_fact_gate_enabled(client_id: str | None) -> bool:
     return feature_flag(client_id, "verifier_gate", "numeric_fact", "enabled", default=False)
 
 
-def consult_nudge_enabled(client_id: str | None) -> bool:
-    return feature_flag(client_id, "consult_nudge", "enabled", default=True)
-
-
 def price_symptom_consult_enabled(client_id: str | None) -> bool:
     return feature_flag(client_id, "price_symptom_consult", "enabled", default=False)
 
@@ -590,8 +586,6 @@ class UiBundle:
     offtopic: UiMenu
     empty_question: UiMenu
     bare_affirmative: UiMenu
-    consult_nudge_exhausted: str
-    consult_nudge_streak: str
     anti_spam_soft_redirect: str
 
 
@@ -608,28 +602,12 @@ _DEFAULT_GUIDED_REPLIES: tuple[dict[str, str], ...] = (
     {"label": "Хочу записаться", "ref": "lead:booking"},
 )
 
-_DEFAULT_CONSULT_EXHAUSTED = (
-    "\n\nЗадача на этот ответ:\n"
-    "Тема для справочного ответа исчерпана.\n"
-    "Не добавляй рекламный хвост, скидки или утверждение о бесплатной консультации.\n"
-    "Если нужен следующий шаг, сформулируй его нейтрально и кратко: можно уточнить ситуацию у администратора или врача."
-)
-
-_DEFAULT_CONSULT_STREAK = (
-    "\n\nЗадача на этот ответ:\n"
-    "Пациент уже несколько раз уточнял по теме клиники.\n"
-    "Сначала ответь по существу на вопрос.\n"
-    "Не добавляй рекламный хвост, скидки или утверждение о бесплатной консультации.\n"
-    "Если нужен следующий шаг, сформулируй его нейтрально: можно уточнить ситуацию у администратора или врача."
-)
-
 
 def load_ui_bundle(client_id: str | None) -> UiBundle:
     ui = load_ui_raw(client_id)
     fb = ui.get("fallback_menu") if isinstance(ui.get("fallback_menu"), dict) else {}
     guided = ui.get("guided_menu") if isinstance(ui.get("guided_menu"), dict) else {}
     cont = ui.get("continuation_clarify") if isinstance(ui.get("continuation_clarify"), dict) else {}
-    cn = ui.get("consult_nudge") if isinstance(ui.get("consult_nudge"), dict) else {}
     msg = ui.get("messaging") if isinstance(ui.get("messaging"), dict) else {}
 
     guided_menu = _parse_menu(
@@ -683,8 +661,6 @@ def load_ui_bundle(client_id: str | None) -> UiBundle:
             fb.get("bare_affirmative"),
             default_answer=_FALLBACK_TXT["bare_affirmative_fallback"],
         ),
-        consult_nudge_exhausted=str(cn.get("exhausted_prompt") or _DEFAULT_CONSULT_EXHAUSTED).strip(),
-        consult_nudge_streak=str(cn.get("streak_prompt") or _DEFAULT_CONSULT_STREAK).strip(),
         anti_spam_soft_redirect=anti_spam,
     )
 

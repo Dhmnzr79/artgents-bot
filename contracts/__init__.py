@@ -6,7 +6,6 @@ from .dialog_focus import DialogFocusDecision
 from .gate_trace import GateTrace
 from .ingress_route import IngressRouteResult
 from .planner_attempt import PlannerAttempt, ShadowAttemptStatus, turn_frame_has_invalid_or_missing
-from .retrieval_candidate import RetrievalCandidate
 from .session_state import SessionState
 from .source_route_result import SourceRouteResult
 from .turn_frame import (
@@ -31,7 +30,6 @@ __all__ = [
     "GateTrace",
     "IngressRouteResult",
     "SourceRouteResult",
-    "RetrievalCandidate",
     "ArbiterDecision",
     "VerifierVerdict",
     "SessionState",

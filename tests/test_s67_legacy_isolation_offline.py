@@ -99,12 +99,10 @@ def _assert_frozen_s66_artifacts_unchanged() -> None:
         assert actual == expected, f"s66 artifact sha mismatch path={path} expected={expected} actual={actual}"
 
 
-def _install_default_target_http(monkeypatch: pytest.MonkeyPatch, app_module) -> tuple:
+def _install_default_target_http(monkeypatch: pytest.MonkeyPatch, app_module):
     get_chunk = MagicMock(side_effect=AssertionError("get_chunk_by_ref must not run"))
-    answer_plan = MagicMock(side_effect=AssertionError("answer_plan_from_ctx must not run"))
 
     monkeypatch.setattr("core.md_chunks.get_chunk_by_ref", get_chunk)
-    monkeypatch.setattr("core.answer_planner.answer_plan_from_ctx", answer_plan)
 
     composer, semantic, boundary = _fake_backends()
     monkeypatch.setattr(
@@ -114,7 +112,7 @@ def _install_default_target_http(monkeypatch: pytest.MonkeyPatch, app_module) ->
     )
     monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
-    return get_chunk, answer_plan
+    return get_chunk
 
 
 # --- A: Default import isolation ---
@@ -153,7 +151,7 @@ def test_default_ask_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -> N
 
     sid = f"s67-ask-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    get_chunk, answer_plan = _install_default_target_http(
+    get_chunk = _install_default_target_http(
         monkeypatch, app_module
     )
 
@@ -166,7 +164,6 @@ def test_default_ask_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -> N
     body = resp.get_json()
     assert body["meta"]["answer_path"] == "target_fullcontext"
     get_chunk.assert_not_called()
-    answer_plan.assert_not_called()
 
 
 # --- C: Default /ask/stream ---
@@ -177,7 +174,7 @@ def test_default_stream_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -
 
     sid = f"s67-stream-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    get_chunk, answer_plan = _install_default_target_http(
+    get_chunk = _install_default_target_http(
         monkeypatch, app_module
     )
 
@@ -190,7 +187,6 @@ def test_default_stream_target_only_no_legacy(monkeypatch: pytest.MonkeyPatch) -
     text = resp.data.decode("utf-8")
     assert "event: ui" in text
     get_chunk.assert_not_called()
-    answer_plan.assert_not_called()
 
 
 # --- D: Target error ---
@@ -354,11 +350,9 @@ def test_target_cta_mapping() -> None:
     assert cta["action"] == "lead"
 
 
-def test_target_service_reply_skips_legacy_answer_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_target_service_reply_has_no_answer_plan_meta(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    answer_plan = MagicMock(side_effect=AssertionError("answer_plan must not run"))
-    monkeypatch.setattr("core.answer_planner.answer_plan_from_ctx", answer_plan)
     payload = {
         "answer": "target answer",
         "meta": {"answer_path": "target_fullcontext", "client_id": "demo"},
@@ -374,7 +368,6 @@ def test_target_service_reply_skips_legacy_answer_plan(monkeypatch: pytest.Monke
     body = out.get_json()
     assert body["answer"] == "target answer"
     assert "answer_plan" not in (body.get("meta") or {})
-    answer_plan.assert_not_called()
 
 
 # --- H: Frozen protection ---

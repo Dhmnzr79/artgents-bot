@@ -4,7 +4,6 @@ from __future__ import annotations
 from core.client_config_loader import (
     admin_client_options,
     admin_enabled,
-    consult_nudge_enabled,
     list_admin_client_ids,
     load_ui_bundle,
     load_widget_config,
@@ -35,10 +34,6 @@ def test_ui_demo_low_score_has_no_tax_deduction():
 
 def test_postgres_events_demo_off():
     assert postgres_events_enabled("demo") is False
-
-
-def test_consult_nudge_enabled_default():
-    assert consult_nudge_enabled("demo") is True
 
 
 def test_admin_disabled_for_demo_only_runtime():

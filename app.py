@@ -106,9 +106,6 @@ def _service_reply(
     track_user: bool = True,
     route: str | None = None,
 ):
-    from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
-
-    reset_consult_nudge_on_route(route, sid)
     if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
     if route:
@@ -381,7 +378,6 @@ def ask():
                     "answer_chars": 0,
                     "latency_ms": None,
                     "fallback_reason": "ask_failed",
-                    "legacy_intent": None,
                     "effective_intent": "",
                 },
             )
@@ -432,9 +428,6 @@ def _sse_service_reply(
     route: str | None = None,
 ):
     """Обёртка _service_reply для SSE: один event ui + done."""
-    from core.consult_nudge import record_consult_nudge_after_answer, reset_consult_nudge_on_route
-
-    reset_consult_nudge_on_route(route, sid)
     if track_user and q and not _skip_lead_pii_in_session_hist(payload):
         mem_add_user(sid, q)
     if route:
@@ -532,7 +525,6 @@ def ask_stream():
                     "answer_chars": 0,
                     "latency_ms": None,
                     "fallback_reason": "ask_stream_failed",
-                    "legacy_intent": None,
                     "effective_intent": "",
                 },
             )

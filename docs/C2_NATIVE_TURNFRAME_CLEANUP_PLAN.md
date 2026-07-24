@@ -528,6 +528,7 @@ Stop and escalate if C2 implementation requires:
 | **C2b** | `run_resolver_turn` no `resolve_with_fallback`; frame guards | Test: planner fail does not call resolver mock |
 | **C2c** | Session migration; drop `last_subject` reads in planner/focus | Hydration + clarify use `target_runtime_state` only |
 | **C2d** | Loader/doc fallback prune (`prices.json`, stale docstrings) | `startup_check` pricebook-only |
+| **C2e** | Final orphan purge (`aspect_arbitration`, `consult_nudge`, `retrieval_candidate`); prune `answer_planner` legacy plan API | `test_c2e_legacy_deleted_offline` green; cleanup-series complete |
 
 ---
 

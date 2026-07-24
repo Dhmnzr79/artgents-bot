@@ -65,6 +65,14 @@
 | `RAG` | comments in `md_chunks.py` header only |
 | `composer` | `target_composer_executor` (target product) |
 
+## Post-C2e residue (2026-07-24)
+
+| Group | Examples |
+|-------|----------|
+| **Deleted** | `aspect_arbitration`, `consult_nudge`, `retrieval_candidate`; `build_answer_plan` API |
+| **Active** | `md_chunks` (kb_ref), `detect_aspects`, `metadata_first_observability`, `routing_loader`, target FullContext stack |
+| **Historical** | A9 `turn_frame_shadow*` meta aliases, eval harness fields, `pg_sink.retrieval_candidates` column |
+
 ## Explicitly unchanged
 
 - TurnFrame planner semantics (`legacy_plan`/shadow behavior)

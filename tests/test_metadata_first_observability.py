@@ -489,7 +489,7 @@ def test_native_a9_partial_scope_preserves_neighbors_without_raw_secret_leak() -
                 "modifiers": [],
                 "secret-native-key": "secret-native-value",
             },
-            status="partial",
+            shadow_status="partial",
             raw_extra={
                 "question": "secret-question",
                 "history": ["secret-history"],

@@ -22,6 +22,8 @@
 
 **C2d-D2 (canonical pricebook):** product path reads only `pricebook/services/*.json` — no `prices.json` / `price_offers.json` loaders; orphan `patient_playbook` / `answer_lens` / `service_node` / `numeric_fact_gate` modules removed.
 
+**C2e (cleanup-series complete):** final orphan legacy removed — `aspect_arbitration`, `consult_nudge`, `retrieval_candidate`; `answer_planner` legacy plan API pruned; active path remains FullContext + `detect_aspects` only.
+
 Эти в консоли включать не надо — они и так ON.
 
 ---

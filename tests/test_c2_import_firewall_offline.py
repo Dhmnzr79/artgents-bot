@@ -137,6 +137,9 @@ modules = [
     "core.service_node",
     "core.numeric_fact_gate",
     "contracts.patient_playbook",
+    "core.aspect_arbitration",
+    "core.consult_nudge",
+    "contracts.retrieval_candidate",
 ]
 patterns = [
     re.compile(r"^\\s*from\\s+" + re.escape(m).replace(".", r"\\.") + r"\\b")

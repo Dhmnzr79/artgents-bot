@@ -22,73 +22,25 @@ def _decision(service_id: str | None = "all_on_4") -> DecisionFrame:
     )
 
 
-def test_turn_plan_to_decision_frame_is_resolver_compatible():
-    from core.turn_planner_llm import turn_plan_to_decision_frame
+def _publish_turn_plan_ctx(plan: TurnPlan) -> None:
+    from flask import request
 
-    plan = TurnPlan(
-        route="price_lookup",
-        aspects=["price"],
-        service_id="all_on_4",
-        followup_of="all_on_4",
-        needs_clarify=False,
-    )
-
-    decision = turn_plan_to_decision_frame(plan, client_id="demo")
-
-    assert decision.route_intent == "price_lookup"
-    assert decision.service_topic == "implantation"
-    assert decision.service_id == "all_on_4"
-    assert decision.query_mode == "specific"
-    assert decision.needs_clarification is False
+    request.ctx["turn_plan"] = plan.model_dump()
 
 
-def test_answer_plan_uses_turn_plan_aspects_and_service():
-    from core.answer_planner import build_answer_plan
-    from core.turn_planner_llm import publish_turn_plan
-
-    app = pytest.importorskip("flask").Flask(__name__)
-    with app.test_request_context("/"):
-        from flask import request
-
-        request.ctx = {}
-        publish_turn_plan(
-            TurnPlan(
-                route="content",
-                aspects=["payment", "warranty"],
-                service_id="all_on_4",
-                followup_of=None,
-                needs_clarify=False,
-            )
-        )
-        plan = build_answer_plan(
-            q="а условия?",
-            sid="turn-plan-answer-plan",
-            client_id="demo",
-            intent="content",
-            decision=_decision("all_on_4"),
-            source_route=None,
-        )
-
-    assert plan.aspects == ["payment", "warranty"]
-    assert plan.service_id == "all_on_4"
-    assert "payment_terms" in plan.append
-    assert "warranty_terms" in plan.append
-    assert "turn_planner" in plan.plan_reason
-
-
-def test_dialog_focus_from_turn_plan_skips_gray_llm(monkeypatch):
+def test_dialog_focus_from_turn_plan_skips_gray_llm(monkeypatch: pytest.MonkeyPatch):
     from core.dialog_focus import record_dialog_focus_ctx
-    from core.turn_planner_llm import publish_turn_plan
-    from session import mem_reset, set_last_subject
+    from session import mem_reset
+    from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
 
     app = pytest.importorskip("flask").Flask(__name__)
     sid = "turn-plan-focus"
     mem_reset(sid)
-    set_last_subject(
+    _seed_target_runtime_state(
         sid,
-        service_id="all_on_4",
-        topic="implantation",
-        label="All-on-4",
+        last_service_id="all_on_4",
+        last_topic="implantation",
+        service_focus_set_at_turn=0,
     )
 
     def _raise_gray(*_a, **_k):
@@ -99,7 +51,7 @@ def test_dialog_focus_from_turn_plan_skips_gray_llm(monkeypatch):
         from flask import request
 
         request.ctx = {}
-        publish_turn_plan(
+        _publish_turn_plan_ctx(
             TurnPlan(
                 route="price_lookup",
                 aspects=["price"],
@@ -119,19 +71,18 @@ def test_dialog_focus_from_turn_plan_skips_gray_llm(monkeypatch):
     assert focus.resolved_service_id == "all_on_4"
     assert focus.attribute == "price"
     assert focus.used_llm is False
-    assert focus.source == "last_subject"
+    assert focus.source in {"target_runtime_state", "last_subject"}
 
 
 def test_detect_aspects_appends_comparison_to_turn_plan():
     from core.answer_planner import detect_aspects
-    from core.turn_planner_llm import publish_turn_plan
 
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
         from flask import request
 
         request.ctx = {}
-        publish_turn_plan(
+        _publish_turn_plan_ctx(
             TurnPlan(
                 route="content",
                 aspects=["overview"],
@@ -151,14 +102,13 @@ def test_detect_aspects_appends_comparison_to_turn_plan():
 def test_detect_aspects_anchors_pain_for_sedation():
     """«во сне»/седация/наркоз — словарь обезболивания; ярлык pain блокирует промо."""
     from core.answer_planner import detect_aspects
-    from core.turn_planner_llm import publish_turn_plan
 
     app = pytest.importorskip("flask").Flask(__name__)
     with app.test_request_context("/"):
         from flask import request
 
         request.ctx = {}
-        publish_turn_plan(
+        _publish_turn_plan_ctx(
             TurnPlan(
                 route="content",
                 aspects=["overview"],

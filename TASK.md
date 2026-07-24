@@ -1008,13 +1008,13 @@ STOP and escalate to owner if:
 | C2d PRE-CODE | ✅ (governance corrected F1–F3) |
 | C2d-D1 checker | ✅ (`cdc4853`) |
 | C2d-D2 checker | ✅ (`3f94e69`) |
-| C2e PRE-CODE | pending |
-| C2e / CLEANUP_SERIES COMPLETION checker | pending |
-| HEAD | `3f94e69` |
+| C2e PRE-CODE | ✅ (`dea418c`) |
+| C2e / CLEANUP_SERIES COMPLETION checker | ✅ |
+| HEAD | pending |
 | Planner LLM calls/turn | 1 (target) |
 | Resolver fallback | removed (target) |
-| pytest | 152 passed (C2d-D2 block) |
-| collect-only | 2276 |
+| pytest | 347 passed (C2e focused block) |
+| collect-only | 2268 |
 | frozen | S62/S63/S66 OK |
 | A9 bytes | unchanged |
 | NATIVE TURNFRAME ONLY | |

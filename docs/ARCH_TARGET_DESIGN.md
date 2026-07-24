@@ -199,8 +199,9 @@ message / typed UI action
 `patient_facts` (same topic) → (3) unknown. Product path **не читает**
 `TurnFrame.patient_scope`.
 
-**Future (docs only):** current-turn A9 `patient_scope` between (1) and (2) after
-authority decision; free-text correction after A9 quality proof.
+**Future (A9R3 — docs only until owner GO):** current-turn A9 `patient_scope` projection between (2) typed UI actions and (3) fresh session `patient_facts`. See `docs/A9R_GOVERNANCE.md`. Free-text correction only after A9R quality proof.
+
+**AC3 complete:** `aa8e6dd` — scope-aware price runtime wired.
 
 **Canonical extent:** `one_tooth | few_teeth | full_arch` (+ jaw/stage). UI labels
 client-owned. `ResponseStage` — **AC3** (derived from EffectiveScope + AC2 result; controls answer
@@ -208,8 +209,11 @@ shape and follow-ups, not service selection).
 
 **AC2 (offline, complete @ `5a3a2f8`):** `service_catalog.selection` applicability gate + compose S15/S23.
 
-**AC3:** atomic product runtime wiring — thread EffectiveScope, call AC2, emit scope buttons,
+**AC3 (complete @ `aa8e6dd`):** atomic product runtime wiring — thread EffectiveScope, call AC2, emit scope buttons,
 retire W1 `family_price_overview` selector.
+
+**A9R (governance):** patient scope authority re-audit — gates A9R → A9R1 → A9R2 → A9R3. See `docs/A9R_GOVERNANCE.md`.
+Free-text scope authority **forbidden** until A9R3 owner GO.
 
 **W1b WIP** припаркован (read-only). AC3 REWORK: extent-keyed client labels +
 `target:ui_scope/` refs (опционально `scope_nav.yaml`); **REJECT** `family_price_groups.yaml`

@@ -629,8 +629,10 @@ A1–A9 не были целиком придуманы заранее как н
 - [x] Native shadow wiring/firewall proof (governance `4162111`, runtime/tests reviewed)
 - [x] Manual-contact `not_applicable` taxonomy (governance `083bdcd`, revision `0eb8566`, helper/tests reviewed)
 - [x] Frozen matrix/harness v2 review (governance `71aa405`, matrix/harness/tests independently reviewed)
-- [ ] One-run live re-audit — только после отдельного разрешения владельца
-- [ ] Authority decision
+- [ ] **A9R governance** — re-audit + frozen matrix + PRE-CODE (`TASK.md`)
+- [ ] A9R1 offline contract/merge/eval
+- [ ] A9R2 one live planner eval (owner permission)
+- [ ] A9R3 authority decision + wiring
 - [ ] Legacy retirement — только после принятой authority architecture
 
 #### Что доказано сейчас
@@ -655,9 +657,26 @@ A1–A9 не были целиком придуманы заранее как н
 
 Подробнее: [PATIENT_SCOPE_DESIGN_A9.md](PATIENT_SCOPE_DESIGN_A9.md), [PATIENT_SCOPE_SHADOW_AUDIT_A9.md](evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md), [PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md](PATIENT_SCOPE_NATIVE_EXTRACTION_DESIGN_A9.md) и [PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md](PATIENT_SCOPE_NATIVE_RAW_CONTRACT_A9.md).
 
-## Следующий технический checkpoint A9 — требуется отдельное разрешение
+## Следующий технический checkpoint — A9R (governance)
 
-### A9 One-run Live Re-audit
+### A9R Patient scope authority re-audit
+
+**Baseline:** AC3 complete @ `aa8e6dd`. **Authority:** forbidden. **Live/LLM:** forbidden in A9R.
+
+A9R re-opens patient-scope work after AC3 cutover without modifying frozen v1/v2 shadow matrices or v1 live raw. Deliverables: read-only seam audit (`docs/A9R_GOVERNANCE.md`), `TASK.md`, new frozen matrix `evals/v5/demo/patient_scope_a9r_matrix.json`, PRE-CODE checker.
+
+Gate sequence after A9R PRE-CODE ✅:
+
+1. **A9R1** — offline projection `PatientScopeFrame` → `EffectiveScope`, merge rules, deterministic harness
+2. **A9R2** — one owner-approved live eval using **existing** planner (no second LLM)
+3. **A9R3** — authority wiring into `resolve_effective_scope` after quality gates
+4. Post-authority widget E2E (separate TASK)
+
+Старые frozen A9 v1/v2 artifacts и `PATIENT_SCOPE_SHADOW_AUDIT_A9.md` **не менять**.
+
+---
+
+## Historical — A9 One-run Live Re-audit (v2, superseded by A9R gate plan)
 
 Frozen matrix/harness v2 подготовлены и независимо проверены **до** live. Первый A9 raw, v1 matrix/harness/summary и исторический audit не переписаны. Product path и ответы бота не менялись; patient-scope authority остаётся запрещённой.
 

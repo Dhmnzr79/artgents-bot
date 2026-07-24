@@ -1,7 +1,7 @@
 # Architecture Convergence — канон (2026-07-24)
 
-**Статус:** docs-only checkpoint после Architecture Convergence Audit.
-**Baseline:** `codex/stage-a` @ `57f9067` (AC2 complete). **W1b WIP:** припаркован, см. ниже.
+**Статус:** docs sync @ AC3 complete (`aa8e6dd`) + A9R governance.
+**Baseline:** `codex/stage-a` @ `b35ed1c` (AC3 complete). **W1b WIP:** припаркован, см. ниже.
 
 ## Что завершено
 
@@ -10,17 +10,19 @@
 - A9 shadow infra; **product authority forbidden**.
 - **AC1 ✅** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts`.
 - **AC2 ✅** — offline `run_target_scope_aware_selection` (applicability + S15 + S23/S24).
+- **AC3 ✅** — scope-aware price runtime + `ResponseStage` + scope/stage UI (`aa8e6dd`).
 
 ## Что не завершено (blockers для «образцовой» клиники)
 
 | Gap | Следствие |
 |-----|-----------|
-| AC1 scope discarded before dispatch | `target_runtime_turn.py` вычисляет `effective_scope`, но не передаёт в price path |
-| W1 `family_price_overview` в product path | selection без `service_catalog.selection`; scope не влияет на цены |
-| Нет scope button emitter | `build_ui_scope_ref` только в тестах; виджет не показывает «Один зуб / …» |
-| `ResponseStage` не в коде | broad vs scoped ответ не различается детерминированно |
-| Marketing runtime stub | `marketing_scenarios=()` на части путей; family overview запрещает CTA |
-| PRICE_SERVICE verification matrix | не доказана end-to-end в product path |
+| ~~AC1 scope discarded before dispatch~~ | **Fixed @ AC3 `aa8e6dd`** |
+| ~~W1 `family_price_overview` in product path~~ | **Replaced @ AC3** |
+| ~~Нет scope button emitter~~ | **Fixed @ AC3** |
+| ~~`ResponseStage` не в коде~~ | **Fixed @ AC3** |
+| A9 free-text scope | **A9R governance** — authority still forbidden |
+| Marketing runtime stub | partial paths still stubbed |
+| PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)
 
@@ -53,15 +55,16 @@ message / typed UI action
 
 ## EffectiveScope priority
 
-**AC1 product (runtime):**
+**AC1 product (runtime @ AC3):**
 
 1. explicit current `UiScopeAction`
-2. fresh session `patient_facts` (same topic)
-3. all-unknown
+2. explicit current `UiStageAction`
+3. fresh session `patient_facts` (same topic, within turn-age threshold)
+4. all-unknown
 
-**Future (after A9 authority — docs only, not AC1):** current-turn A9 `patient_scope` may slot between (1) and (2). Free-text correction — after A9 quality proof.
+**Future (A9R3 — docs only until owner GO):** confident current-turn `TurnFrame.patient_scope` projection slots between (2) and (3). See `docs/A9R_GOVERNANCE.md`. Correction replaces stale session; uncertain/conflicting extraction must not overwrite session.
 
-Scope **не выбирает** лечение, протокол или `service_id`. AC1 product code **не читает** `TurnFrame.patient_scope`.
+Scope **не выбирает** лечение, протокол или `service_id`. Product code **не читает** `TurnFrame.patient_scope` until A9R3.
 
 ## W1b WIP (parked)
 
@@ -76,11 +79,11 @@ Scope **не выбирает** лечение, протокол или `service
 ## Checkpoints (порядок)
 
 1. ~~W1b park + docs sync~~ (2026-07-24)
-2. ~~**AC1** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts`~~ (`72681cc`)
-3. ~~**AC2** — scope-aware selection component (offline, unwired)~~ (`5a3a2f8`)
-4. **AC3** — atomic runtime wiring + ResponseStage + scope/follow-up/marketing/CTA (`TASK.md`)
-5. A9 v2 live re-audit (owner approval) — free-text scope authority
-6. Full HTTP/widget matrix → live E2E
+2. ~~**AC1**~~ (`72681cc`)
+3. ~~**AC2**~~ (`5a3a2f8`)
+4. ~~**AC3**~~ (`aa8e6dd`)
+5. **A9R** — governance re-audit + frozen matrix (`TASK.md`) → A9R1 offline → A9R2 live → A9R3 authority
+6. Post-A9 widget E2E
 7. Provider prompt caching
 
-См. также: [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), [`PATIENT_SCOPE_DESIGN_A9.md`](PATIENT_SCOPE_DESIGN_A9.md).
+См. также: [`A9R_GOVERNANCE.md`](A9R_GOVERNANCE.md), [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), [`PATIENT_SCOPE_DESIGN_A9.md`](PATIENT_SCOPE_DESIGN_A9.md).

@@ -172,7 +172,7 @@ No implementation before PRE-CODE ✅ on this governance commit.
 |-------|-------|
 | AC3 product HEAD | `aa8e6dd` |
 | Governance baseline | `b35ed1c` |
-| A9R governance HEAD | pending |
+| A9R governance HEAD | `02eeee6` |
 | A9R matrix blob | `36d137112007a3fb0a96ad0759aa111af6115a35` |
 | PRE-CODE | ✅ |
 | COMPLETION | N/A (governance only) |

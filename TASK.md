@@ -23,8 +23,9 @@ HTTP → shared guards → one Planner LLM → native TurnFrame → session hydr
 4. **C2b** → C2b checker ✅ → commit + push
 5. **C2c** → C2c checker ✅ → commit + push
 6. **C2c-correction** → C2c-correction checker ✅ → commit + push
-7. **C2c-dead-clarify** → C2c-dead-clarify checker ✅ → commit + push → **STOP before C2d**
-8. **C2d** → final **COMPLETION checker ✅** → docs → push → **STOP**
+7. **C2c-dead-clarify** → checker ✅ → commit + push → **STOP before C2d**
+8. **C2d-D1** → D1 checker ✅ → commit + push
+9. **C2d-D2** → COMPLETION checker ✅ → commit + push → **STOP** (no C2e)
 
 No product WIP before PRE-CODE ✅. No checkpoint advance on checker ❌.
 
@@ -438,38 +439,245 @@ python -c "from evals.v5.s66_default_authority_live_contract import assert_froze
 
 ---
 
-## Checkpoint C2d — target-only loader fallback cleanup
+## Checkpoint C2d — canonical client packs + legacy loader purge
 
-**Prerequisite:** C2a–C2c-dead-clarify checkpoint checkers ✅.
+**Owner approval:** 2026-07-24 — delete `clients/cesi` / `clients/nikadent` (no migration); FullContext-only demo; no compatibility layers.
 
-### C2d audit targets
+**Prerequisite:** C2a–C2c-dead-clarify checkpoint checkers ✅ (`b31d21e`).
 
-| File | Legacy fallback | Action |
-|------|-----------------|--------|
-| `core/pricebook_loader.py` | docstring only at `5c3d3bb` | verify canonical-only load |
-| `core/price_offers.py` | `price_offers.json`, append-only path `:460` | **PRUNE** if target uses pricebook only |
-| `query_selector.py` | `prices.json` `:246,573,639` | **PRUNE** if startup guarantees canonical |
-| `core/startup_check.py` | `prices.json` OR pricebook `:15,37,72` | require canonical pricebook for demo |
-| `contracts/pricebook.py` | legacy docstring | docs only |
-| `core/patient_playbook.py` | legacy schema fallback | audit call sites |
-| `core/client_config_loader.py` | schema fallback | audit only |
+**Goal:** Clean FullContext-only architecture: one active runtime client (`demo`), canonical `target_response/*` data, no `prices.json` / `price_offers.json` fallbacks, no `patient_playbook` product path. **Do not** change target prices, payment stages, doctors, marketing, CTA semantics, or merge `clients/demo/pricebook` with `clients/demo/target_response/pricebook` without separate owner decision.
 
-**STOP** if any fallback is required by active target path for demo client.
+### Forbidden (C2d)
 
-### C2d allowlist
+- Live/LLM runs; A9 harness; frozen A9 artifact edits
+- Product authority / Composer / Verifier / boundary changes
+- Merge to `main`
+- cesi/nikadent migration or compatibility shims
+- Consolidating dual demo pricebook trees without proof + owner decision
+- Changing target price amounts, doctors, marketing, CTA behavior
+
+### Read-only inventory (baseline `b31d21e`)
+
+| Area | Finding | D1/D2 action |
+|------|---------|--------------|
+| Active product path | `app.py` → `planner_turn` → `target_fullcontext_turn`; **no** `patient_playbook` / `price_offers` / `prices.json` on hot path | D2 purge orphans |
+| `clients/cesi`, `clients/nikadent` | 56+59 tracked files; `ALLOWED_CLIENTS` includes both; ~14 test files reference cesi | **D1 DELETE** packs + update config/tests |
+| `clients/_template` | 6 scaffold files; excluded from build (`_` prefix); not in runtime | **KEEP** |
+| `clients/demo/patient_playbook.yaml` | 7 approved rules + `bone_deficit_solution` + `patient_situations` fallback | **D1 DELETE** after proof in `clinic_strategy.yaml` |
+| `clients/demo/target_response/clinic_strategy.yaml` | 7 rules materialized; priorities/caps verified by `test_demo_target_clinic_strategy.py` | **KEEP** (canonical strategy) |
+| Dual demo pricebook | `target_response/pricebook` → target runtime (`response_schema_loader`); `clients/demo/pricebook` → `pricebook_loader` / `turn_planner_llm` guards | **KEEP both** (no consolidation in C2d) |
+| `prices.json` / `price_offers.json` | Absent in demo; fallback code in `query_selector.py:246,574,640`, `core/price_offers.py:60-78`, `startup_check.py:15,37,72` | **D2 PRUNE** |
+| `core/patient_playbook.py` | Callers: `answer_lens`, `service_node` only (legacy flows deleted S69) | **D2 DELETE** |
+| `core/answer_lens.py`, `core/service_node.py` | Only deleted `patient_playbook_flow` consumer | **D2 DELETE** after `service_node` catalog rewire if needed |
+| `core/price_answer_assembler.py` | Only `price_offers.build_price_answer_for_lookup` (orphan) | **D2 DELETE** if no caller after prune |
+| `core/numeric_fact_gate.py` | Only deleted `price_brand_money`; target verifier checks meta key name only | **D2 DELETE** if no caller after prune |
+| `core/price_offers.py` | Query heuristics used by `query_selector`; JSON loader orphan on target path | **D2 PRUNE** JSON paths; **KEEP** query helpers or extract |
+| Legacy orchestration | `ask_turn`, `composer_flow`, `patient_playbook_flow`, `price_flow` — deleted, not importable (S69) | Already gone |
+| A9 ties | `evals/v5` references playbook shadow matrix + price_offers eval scripts (offline); no cesi/nikadent | **DO NOT CHANGE** A9 bytes |
+
+### Canonical data sources after C2d
+
+| Domain | Canonical path / module |
+|--------|-------------------------|
+| Runtime client | `demo` only (`ALLOWED_CLIENTS`) |
+| MD corpus | `clients/demo/md/` |
+| Target prices/offers/facts | `clients/demo/target_response/pricebook/` |
+| Service catalog (planner) | `clients/demo/service_catalog.json` |
+| Clinic strategy | `clients/demo/target_response/clinic_strategy.yaml` |
+| Marketing/CTA | `clients/demo/target_response/marketing.yaml` + `clients/demo/marketing.yaml` (unchanged split) |
+| Planner pricebook guards | `clients/demo/pricebook/` (legacy tree; **not** merged in C2d) |
+
+---
+
+## Checkpoint C2d-D1 — canonical client packs
+
+**Goal:** Remove inactive client packs; delete `patient_playbook.yaml` after 7-rule proof; retarget discovery/startup tests to demo + temp fixtures.
+
+### D1 proof (patient_playbook → clinic_strategy)
+
+Before deleting `clients/demo/patient_playbook.yaml`:
+
+1. `tests/test_demo_target_clinic_strategy.py::test_seven_rules_preserve_current_priorities_and_approved_caps` must pass (7 rules: priorities + approved max_options caps).
+2. Add/keep `tests/test_c2d_playbook_strategy_parity_offline.py` — frozen EXPECTED_RULES snapshot **without** reading deleted YAML at runtime (embed from audit or read only `clinic_strategy.yaml`).
+3. `bone_deficit_solution` and `patient_situations` are **not** migrated — intentionally dropped (current-only).
+
+### D1 delete-list
+
+| Path | Action |
+|------|--------|
+| `clients/cesi/` | **DELETE** entire tree |
+| `clients/nikadent/` | **DELETE** entire tree |
+| `clients/demo/patient_playbook.yaml` | **DELETE** after proof |
+
+### D1 allowlist
 
 | File | Change |
 |------|--------|
-| `core/pricebook_loader.py` | remove dead fallback branches if any |
-| `core/price_offers.py` | remove `price_offers.json` / append-only path |
-| `query_selector.py` | remove `prices.json` reads |
-| `core/startup_check.py` | fail-closed canonical validation |
-| `core/patient_playbook.py` | prune legacy loader fallback |
-| `contracts/pricebook.py` | docstring only |
-| `tests/test_pricebook_golden.py` | keep green |
+| `TASK.md` | governance (this section) |
+| `config.py` | `ALLOWED_CLIENTS` → `demo` only (DEFAULT_CLIENT_ID unchanged) |
+| `admin_dashboard/app.py` | default client → `demo` |
+| `admin_dashboard/static/dashboard.js` | `defaultClientId` → `demo` |
+| `build_index.py` | help text: demo only |
+| `static/multiclient/index.html` | remove cesi/nikadent cards (demo-only landing) |
+| `static/multiclient/cesi.html` | **DELETE** |
+| `static/multiclient/nikadent.html` | **DELETE** |
+| `docs/MULTICLIENT.md` | note demo-only runtime |
+| `tests/test_c2d_playbook_strategy_parity_offline.py` | **new** — 7-rule proof without deleted YAML |
+| `tests/test_demo_target_clinic_strategy.py` | remove `CURRENT_PLAYBOOK` reads after delete; keep green |
+| `tests/test_demo_target_marketing_migration_audit.py` | drop playbook path refs |
+| `tests/test_demo_target_marketing_policy.py` | drop playbook path refs |
+| `tests/test_client_host.py` | demo-only or temp fixture hosts |
+| `tests/test_client_config_loader.py` | demo-only |
+| `tests/test_clinic_hours.py` | demo hours or remove cesi/nikadent cases |
+| `tests/test_lead_service.py` | demo client_id |
+| `tests/test_lead_cta_variants.py` | demo |
+| `tests/test_widget_embed_cors.py` | demo |
+| `tests/test_llm_system_prompt.py` | demo |
+| `tests/test_dialog_segments.py` | demo |
+| `tests/test_numeric_fact_gate.py` | demo |
+| `tests/test_price_offers.py` | demo |
+| `tests/test_price_resolution.py` | demo |
+| `tests/test_purge_session.py` | demo |
+| `tests/test_md_clean.py` | remove cesi/nikadent if referenced |
 | `tests/test_demo_target_price_offers.py` | keep green |
-| `tests/test_marketing_loader.py` | no regression |
-| `tests/test_c2d_loader_canonical_offline.py` | **new** |
+| `tests/test_s61_target_fullcontext_runtime.py` | bootstrap regression |
+| `tests/test_target_fullcontext_content_response.py` | prices/marketing regression |
+
+### D1 acceptance
+
+- `clients/cesi`, `clients/nikadent` absent; `_template` present and not runtime
+- `patient_playbook.yaml` absent; 7 approved rules proven in `clinic_strategy.yaml`
+- Demo FullContext bootstrap, strategy, prices, payment stages, doctors, marketing green
+- No copy of old playbook retained in product data
+- NO LIVE / NO LLM; A9 harness not run
+
+### D1 tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-c2d1-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2d_playbook_strategy_parity_offline.py `
+  tests/test_demo_target_clinic_strategy.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_demo_target_marketing_policy.py `
+  tests/test_demo_target_marketing_migration_audit.py `
+  tests/test_client_config_loader.py `
+  tests/test_client_host.py `
+  tests/test_clinic_hours.py `
+  tests/test_lead_service.py `
+  tests/test_lead_cta_variants.py `
+  tests/test_widget_embed_cors.py `
+  tests/test_llm_system_prompt.py `
+  tests/test_dialog_segments.py `
+  tests/test_numeric_fact_gate.py `
+  tests/test_price_offers.py `
+  tests/test_price_resolution.py `
+  tests/test_purge_session.py `
+  tests/test_md_clean.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_target_fullcontext_content_response.py `
+  -q
+```
+
+**D1:** CHECKPOINT-D1 checker ✅ → commit `C2d-D1: canonical client packs` → push → clean/synced.
+
+---
+
+## Checkpoint C2d-D2 — legacy loader/code purge
+
+**Prerequisite:** C2d-D1 checker ✅.
+
+**Goal:** Remove `prices.json` / `price_offers.json` fallback paths; delete orphan playbook/price-assembler modules; rewire `service_node` catalog to `service_selector_llm._read_service_catalog`; clean stale labels.
+
+### D2 allowlist — modify
+
+| File | Change |
+|------|--------|
+| `core/startup_check.py` | pricebook-only for demo; no `prices.json` OR branch |
+| `query_selector.py` | remove `prices.json` fallback branches only; keep service matching / follow-up |
+| `core/price_offers.py` | remove `price_offers.json` load/append paths; keep query heuristics if still imported |
+| `core/pricebook_loader.py` | remove stale legacy docstring only (code already v2) |
+| `contracts/pricebook.py` | docstring — canonical only |
+| `core/service_node.py` | catalog via `service_selector_llm._read_service_catalog` (if kept) |
+| `tests/test_c2d_loader_canonical_offline.py` | **new** — no prices.json/price_offers.json product reads |
+| `tests/test_c2_import_firewall_offline.py` | extend — banned imports for deleted modules |
+| `tests/test_pricebook_golden.py` | update if assembler removed |
+| `tests/test_price_offers.py` | prune JSON tests; keep heuristics |
+| `tests/test_turn_planner_llm.py` | keep green |
+| `tests/test_c2c_session_migration_offline.py` | session regression |
+| `tests/test_vague_price_followup.py` | price follow-up regression |
+| `docs/FLAGS_AND_STATUS.md` | remove legacy fallback notes |
+| `docs/PRICEBOOK_V2.md` | canonical-only note |
+| `clients/demo/pricebook/README.md` | remove prices.json fallback claim |
+
+### D2 allowlist — delete (only if zero active product callers after audit)
+
+| File | Condition |
+|------|-----------|
+| `core/patient_playbook.py` | no product importer |
+| `contracts/patient_playbook.py` | no product importer after core module delete |
+| `core/answer_lens.py` | no product importer |
+| `core/service_node.py` | no product importer after rewire |
+| `core/price_answer_assembler.py` | no caller after price_offers prune |
+| `core/numeric_fact_gate.py` | no caller after audit |
+| `tests/test_patient_playbook.py` | with patient_playbook module |
+| `tests/test_answer_lens.py` | with answer_lens |
+| `tests/test_service_node.py` | with service_node if deleted |
+| `tests/test_situation_view.py` | with answer_lens |
+| `tests/test_situation_price_overview.py` | legacy flow only |
+| `tests/test_numeric_fact_gate.py` | if module deleted |
+
+**STOP** before deleting any file still imported from `app.py`, `orchestration/planner_turn.py`, `orchestration/target_fullcontext_turn.py`, `core/target_runtime*.py`, shared guards, or A9 contract loaders.
+
+### D2 acceptance
+
+- No active product read of `prices.json` or `price_offers.json`
+- `rg` audit: no `get_pending_clarify`-class dead APIs; no `prices_json` route labels on target path
+- Target runtime startup, catalog, prices, payment stages, doctors, marketing, TurnFrame planner, session/hydration green
+- `/ask` + `/ask/stream` offline (fake backends) green
+- Import firewall: product path does not import deleted modules
+- `collect-only` succeeds; frozen S47/S50/S53/S55/S58/S62/S63/S66 byte-identical
+- A9 unchanged; NO LIVE / NO LLM
+
+### D2 tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-c2d2-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2d_loader_canonical_offline.py `
+  tests/test_c2d_playbook_strategy_parity_offline.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_pricebook_golden.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_c2c_session_migration_offline.py `
+  tests/test_vague_price_followup.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_target_fullcontext_content_response.py `
+  tests/test_demo_target_turn_frame_bound_response.py `
+  tests/test_s62_correction_offline.py `
+  tests/test_s63_correction_offline.py `
+  -q
+python -m pytest -p no:cacheprovider --collect-only -q 2>&1 | Select-Object -Last 3
+python -c "from evals.v5.fullcontext_quality_eval_contract import assert_frozen_prior_artifacts_unchanged; from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_prior_artifacts_unchanged(); assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
+git diff --check
+```
+
+**D2:** COMPLETION checker ✅ → commit `C2d-D2: legacy loader purge` → push → update completion record → **STOP** (no C2e).
+
+### C2d STOP conditions
+
+STOP and escalate to owner if:
+
+1. Target runtime requires `prices.json` / `price_offers.json` / `patient_playbook.yaml` on product path
+2. Deleting cesi/nikadent breaks non-test production wiring that cannot move to demo
+3. Dual demo pricebook consolidation required for green tests (needs separate owner decision)
+4. Semantic conflict between `clients/demo/pricebook` and `target_response/pricebook` surfaces in tests
+5. Any deletion changes target prices, doctors, marketing, or response behavior
+6. A9 artifact change required
+7. Live/LLM required to validate
 
 ---
 
@@ -534,8 +742,10 @@ python -c "from evals.v5.s66_default_authority_live_contract import assert_froze
 2. `C2a: native runtime TurnFrame contract`
 3. `C2b: remove legacy_plan and resolver fallback`
 4. `C2c: session migration to target_runtime_state`
-5. `C2d: loader canonical cleanup`
-6. `C2 completion docs` (if not merged with C2d)
+5. `C2c-dead-clarify: remove pending_clarify session state`
+6. `C2d-D1: canonical client packs`
+7. `C2d-D2: legacy loader purge`
+8. `C2 completion docs` (if not merged with D2)
 
 Each checkpoint: tests → checker ✅ → commit → push → clean/synced.
 
@@ -567,8 +777,11 @@ STOP and escalate to owner if:
 | C2b checker | ✅ |
 | C2c checker | ✅ (`70b5aa3`) |
 | C2c-correction checker | ✅ (`13067dc`) |
-| C2c-dead-clarify checker | ✅ |
-| HEAD | pending |
+| C2c-dead-clarify checker | ✅ (`b31d21e`) |
+| C2d PRE-CODE | ✅ (governance corrected F1–F3) |
+| C2d-D1 checker | pending |
+| C2d-D2 / COMPLETION checker | pending |
+| HEAD | `b31d21e` |
 | Planner LLM calls/turn | 1 (target) |
 | Resolver fallback | removed (target) |
 | pytest | 122 passed (C2c-dead-clarify block) |

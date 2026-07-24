@@ -1010,7 +1010,7 @@ STOP and escalate to owner if:
 | C2d-D2 checker | ✅ (`3f94e69`) |
 | C2e PRE-CODE | ✅ (`dea418c`) |
 | C2e / CLEANUP_SERIES COMPLETION checker | ✅ |
-| HEAD | pending |
+| HEAD | `e6cd5ff` |
 | Planner LLM calls/turn | 1 (target) |
 | Resolver fallback | removed (target) |
 | pytest | 347 passed (C2e focused block) |

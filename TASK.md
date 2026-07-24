@@ -178,3 +178,87 @@ No implementation before PRE-CODE ✅ on this governance commit.
 | COMPLETION | N/A (governance only) |
 
 **STOP after governance PRE-CODE ✅. No A9R1 work without separate owner GO.**
+
+---
+
+# TASK — A9R1 Offline projection + per-axis merge (implementation)
+
+**Status:** implementation · **NO LIVE / NO LLM / NO PRODUCT AUTHORITY**
+
+**Governance baseline:** `6c4cac9` (A9R PRE-CODE ✅)
+
+**Owner GO:** A9R1 implementation authorized from governance HEAD `6c4cac9`.
+
+## Goal (A9R1)
+
+Pure offline contract/projection/merge/harness for A9 patient scope. **No product authority.** A9R3 will wire `merge_effective_scope_axes` into `resolve_effective_scope`; A9R1 does **not** read `TurnFrame.patient_scope` in `target_runtime_turn.py`.
+
+| Deliverable | Role |
+|-------------|------|
+| Extended `EffectiveScope` | `extent`, `jaw`, `stage`, `reported_context`, `topic`, `provenance`, per-axis provenance |
+| `PatientCareStage` + planner prompt | add `natural_tooth_present` (same planner call) |
+| `project_patient_scope_from_turn_frame` | pure projection; native provenance only; scalar bridge not usable |
+| `merge_effective_scope_axes` | per-axis merge: UI scope→extent, UI stage→stage, usable A9→other axes, session fills unknowns |
+| `simulate_session_patient_facts_after_turn` | offline session-write preview only |
+| Harness | frozen `patient_scope_a9r_matrix.json` + deterministic fake planner payloads |
+
+**Merge rules:** unknown current-turn axis must not erase session; explicit A9 correction replaces same axis; `jaw=both` preserved; `reported_bone_deficit` → `reported_context`; no confidence thresholds.
+
+## Allowlist (A9R1 implementation)
+
+| File | Purpose |
+|------|---------|
+| `contracts/effective_scope.py` | Extended scope + axis provenance |
+| `contracts/patient_scope_projection.py` | Projection types |
+| `contracts/turn_frame.py` | `natural_tooth_present` in `PatientCareStage` |
+| `core/target_patient_scope_projection.py` | Pure projection API |
+| `core/target_effective_scope_merge.py` | Pure merge + offline session simulate |
+| `core/target_effective_scope.py` | `SessionPatientFacts` jaw/reported_context read/write |
+| `core/target_strategy_context.py` | `jaw=both` → `None` for AC2 applicability |
+| `core/turn_planner_llm.py` | Planner prompt `natural_tooth_present` |
+| `tests/test_patient_scope_projection.py` | Projection unit tests |
+| `tests/test_effective_scope_merge.py` | Per-axis merge unit tests |
+| `tests/test_a9r1_offline_harness.py` | Matrix harness |
+| `TASK.md` | Completion record |
+
+**Forbidden in A9R1:** `target_runtime_turn.py` wiring; product session writer; live/LLM eval; regex scope parser; editing frozen A9 v1/v2/A9R matrices or W1b/S-series artifacts.
+
+## Tests (A9R1)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-a9r1-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_patient_scope_projection.py `
+  tests/test_effective_scope_merge.py `
+  tests/test_a9r1_offline_harness.py `
+  tests/test_turn_frame_shadow.py `
+  tests/test_patient_scope_a9r_matrix_contract.py `
+  tests/test_effective_scope_contract.py `
+  tests/test_ac3_scope_price_flow_offline.py `
+  tests/test_target_strategy_context.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_ui_scope_click_http_offline.py `
+  tests/test_session_patient_facts_offline.py -q
+```
+
+## STOP conditions (A9R1)
+
+1. Requires wiring A9 into product runtime or `resolve_effective_scope`
+2. Requires modifying frozen v1/v2/A9R matrices, W1b snapshot, S-series artifacts
+3. Requires live eval or second LLM
+4. Scalar bridge becomes merge authority
+
+**STOP after A9R1 COMPLETION ✅. A9R2 starts only after separate owner GO.**
+
+## Completion record (A9R1)
+
+| Field | Value |
+|-------|-------|
+| Governance HEAD | `6c4cac9` |
+| PRE-CODE | ✅ (A9R governance) |
+| COMPLETION | ✅ |
+| A9R1 product HEAD | `f6cb0b6` |
+| Tests | 129 passed (focused A9R1 + AC1–AC3 neighbors) |
+| Matrix blob | `36d137112007a3fb0a96ad0759aa111af6115a35` (unchanged) |
+| Import firewall | `test_product_sources_do_not_read_a9_nested_shadow_scope` ✅ |

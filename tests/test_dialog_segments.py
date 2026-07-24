@@ -27,7 +27,7 @@ def test_split_visits_after_lead():
 def test_build_visit_item_status():
     turns = [_turn("2026-05-31T13:16:52+00:00", "вопрос")]
     lead = datetime.fromisoformat("2026-05-31T13:18:53+00:00").replace(tzinfo=timezone.utc)
-    item = build_visit_item("sid1", "cesi", 0, 1, turns, [lead])
+    item = build_visit_item("sid1", "demo", 0, 1, turns, [lead])
     assert item["visit_index"] == 0
     assert item["turns"] == 1
     assert item["first_user_text"] == "вопрос"

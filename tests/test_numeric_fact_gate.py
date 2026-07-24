@@ -21,12 +21,16 @@ def test_extract_percents_and_installment_months():
     assert extract_installment_months("Лечение занимает 12 месяцев") == []
 
 
-def test_gate_skipped_when_feature_disabled():
+def test_gate_skipped_when_feature_disabled(monkeypatch):
+    monkeypatch.setattr(
+        "core.numeric_fact_gate.numeric_fact_gate_enabled",
+        lambda _cid: False,
+    )
     result = apply_numeric_fact_gate(
         answer="Цена 99 999 ₽",
         route="price_lookup",
         meta={"price_offers_applied": True, "price_offer_ids": ["x"]},
-        client_id="cesi",
+        client_id="demo",
         allowed_source_text="85 200 ₽",
     )
     assert result.action == "skipped"

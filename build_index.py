@@ -67,7 +67,7 @@ def main():
     parser.add_argument(
         "--client",
         default="all",
-        help="Client pack id (demo, cesi, nikadent) or 'all'",
+        help="Client pack id (demo) or 'all'",
     )
     parser.add_argument(
         "--skip-lint",

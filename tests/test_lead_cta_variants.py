@@ -21,8 +21,8 @@ def test_resolve_lead_name_prompt_by_key():
 
 
 def test_resolve_lead_name_prompt_by_label_backward_compat():
-    prompt = resolve_lead_name_prompt("cesi", cta_label="Обсудить на консультации")
-    assert "обсудим ваш вопрос на консультации" in prompt.lower()
+    prompt = resolve_lead_name_prompt("demo", cta_label="Обсудить вопрос")
+    assert "обсудим ваш вопрос с врачом" in prompt.lower()
 
 
 def test_resolve_lead_name_prompt_fallback_to_name_prompt():
@@ -33,12 +33,12 @@ def test_resolve_lead_name_prompt_fallback_to_name_prompt():
 
 def test_lead_cta_dict_from_meta_resolves_key_from_label():
     cta = lead_cta_dict_from_meta(
-        "nikadent",
-        {"cta_text": "Обсудить на консультации", "cta_action": "lead"},
+        "demo",
+        {"cta_text": "Обсудить вопрос", "cta_action": "lead"},
     )
     assert cta is not None
     assert cta["key"] == "consult"
-    assert cta["text"] == "Обсудить на консультации"
+    assert cta["text"] == "Обсудить вопрос"
 
 
 def test_lead_cta_dict_from_meta_explicit_key():

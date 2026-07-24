@@ -32,7 +32,6 @@ DEMO_ROOT = Path("clients/demo")
 TARGET_ROOT = DEMO_ROOT / "target_response"
 CURRENT_MARKETING = DEMO_ROOT / "marketing.yaml"
 CURRENT_TONE = DEMO_ROOT / "tone.yaml"
-CURRENT_PLAYBOOK = DEMO_ROOT / "patient_playbook.yaml"
 CURRENT_PRICE_SERVICES = DEMO_ROOT / "pricebook/services"
 MD_ROOT = DEMO_ROOT / "md"
 TARGET_SERVICES = TARGET_ROOT / "service_catalog.json"
@@ -289,9 +288,6 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
         _load_json(path)["cta_key"]
         for path in sorted(CURRENT_PRICE_SERVICES.glob("*.json"))
     ]
-    playbook_keys = [
-        rule["primary_cta"] for rule in _load_yaml(CURRENT_PLAYBOOK)["rules"]
-    ]
     marketing_keys = [
         entry["primary_cta_key"]
         for entry in _load_yaml(CURRENT_MARKETING)["service_marketing"].values()
@@ -308,7 +304,6 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
         "price": 2,
     }
     assert len(price_keys) == 21 and Counter(price_keys) == {"price": 21}
-    assert Counter(playbook_keys) == {"ct_consultation": 7, "consult": 1}
     assert Counter(marketing_keys) == {"doctor": 10, "consult": 3}
     assert "ct_consultation" not in tone_keys
 

@@ -19,7 +19,7 @@ from core.client_config_loader import (
 
 def test_resolve_pack_default_to_demo():
     assert resolve_pack_client_id("default") == "demo"
-    assert resolve_pack_client_id("cesi") == "cesi"
+    assert resolve_pack_client_id("demo") == "demo"
 
 
 def test_tone_demo_has_submit_ok():
@@ -27,63 +27,30 @@ def test_tone_demo_has_submit_ok():
     assert "демо-бот" in txt["lead_submit_ok"].lower()
 
 
-def test_tone_cesi_no_demo_disclaimer():
-    txt = tone_to_txt_dict("cesi")
-    assert "демо-бот" not in txt["lead_submit_ok"].lower()
-
-
-def test_ui_cesi_low_score_differs_from_demo():
+def test_ui_demo_low_score_has_no_tax_deduction():
     demo = load_ui_bundle("demo")
-    cesi = load_ui_bundle("cesi")
-    assert demo.low_score.answer != cesi.low_score.answer
-    assert "бесплатная" not in demo.low_score.answer.lower()
-    assert "бесплатная" not in cesi.low_score.answer.lower()
     assert "налоговый вычет" not in demo.low_score.answer.lower()
-    assert "бесплатн" not in cesi.anti_spam_soft_redirect.lower()
+    assert "бесплатная" not in demo.low_score.answer.lower()
 
 
 def test_postgres_events_demo_off():
     assert postgres_events_enabled("demo") is False
-    assert postgres_events_enabled("cesi") is True
 
 
 def test_consult_nudge_enabled_default():
     assert consult_nudge_enabled("demo") is True
 
 
-def test_admin_enabled_prod_clients():
+def test_admin_disabled_for_demo_only_runtime():
     assert admin_enabled("demo") is False
-    assert admin_enabled("cesi") is True
-    assert admin_enabled("nikadent") is True
+    assert list_admin_client_ids() == []
+    assert admin_client_options() == []
 
 
-def test_list_admin_client_ids():
-    ids = list_admin_client_ids()
-    assert "cesi" in ids
-    assert "nikadent" in ids
-    assert "demo" not in ids
-
-
-def test_admin_client_options_labels():
-    opts = admin_client_options()
-    by_id = {item["client_id"]: item["label"] for item in opts}
-    assert by_id.get("cesi") == "ЦЭСИ"
-    assert by_id.get("nikadent") == "НикаДент"
-
-
-def test_widget_theme_from_brand_cesi_palette():
-    theme = widget_theme_from_brand("cesi")
-    assert theme["brand"] == "#23BFCF"
-    assert theme["action"] == "#0B7A86"
-    assert theme["button_1"] == "#23BFCF"
-    assert theme["button_2"] == "#1E6FD9"
-
-
-def test_widget_logo_from_brand_cesi():
-    logo = widget_logo_from_brand("cesi")
-    assert logo["logoUrl"] == "/static/clients/cesi/logo.svg"
-    assert logo["logoWidth"] == 64
-    assert logo["logoHeight"] == 65
+def test_widget_theme_from_brand_demo_palette():
+    theme = widget_theme_from_brand("demo")
+    assert theme["button_1"] == "#7B4EFF"
+    assert theme["button_2"] == "#FF8DB2"
 
 
 def test_widget_logo_from_brand_demo():
@@ -93,25 +60,12 @@ def test_widget_logo_from_brand_demo():
     assert logo["logoHeight"] == 28
 
 
-def test_widget_avatar_from_brand_cesi():
-    avatar = widget_avatar_from_brand("cesi")
-    assert avatar["avatarUrl"] == "/static/clients/cesi/avatar.png"
+def test_widget_avatar_from_brand_demo():
+    avatar = widget_avatar_from_brand("demo")
+    assert avatar["avatarUrl"] == "/static/clients/demo/avatar.png"
 
 
-def test_load_widget_config_merges_brand_theme():
-    cfg = load_widget_config("cesi")
-    assert cfg["theme"]["brand"] == "#23BFCF"
-    assert cfg["theme"]["action"] == "#0B7A86"
-    assert cfg["theme"]["button_1"] == "#23BFCF"
-    assert cfg["theme"]["button_2"] == "#1E6FD9"
-    assert cfg["clinicName"] == "ЦЭСИ"
-    assert cfg["logoUrl"] == "/static/clients/cesi/logo.svg"
-    assert cfg["logoWidth"] == 64
-    assert cfg["logoHeight"] == 65
-    assert cfg["avatarUrl"] == "/static/clients/cesi/avatar.png"
-
-
-def test_load_widget_config_merges_demo_logo():
+def test_load_widget_config_merges_demo_brand():
     cfg = load_widget_config("demo")
     assert cfg["logoUrl"] == "/static/clients/demo/logo.svg"
     assert cfg["logoWidth"] == 110

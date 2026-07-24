@@ -44,10 +44,10 @@ def test_send_lead_email_ssl_success(mock_connect: MagicMock) -> None:
     mock_connect.return_value.__enter__.return_value = mock_smtp
 
     ok, status = send_lead_email(
-        client_id="cesi",
+        client_id="demo",
         lead_cfg={
-            "recipients": ["admin@cesi.ru"],
-            "subject_template": "Заявка с бота ЦЭСИ",
+            "recipients": ["admin@demo.ru"],
+            "subject_template": "Заявка с демо-бота",
         },
         name="Иван",
         phone="+79001234567",
@@ -81,10 +81,10 @@ def test_send_lead_email_starttls_success(mock_connect: MagicMock) -> None:
     mock_connect.return_value.__enter__.return_value = mock_smtp
 
     ok, status = send_lead_email(
-        client_id="cesi",
+        client_id="demo",
         lead_cfg={
-            "recipients": ["admin@cesi.ru"],
-            "subject_template": "Заявка с бота ЦЭСИ",
+            "recipients": ["admin@demo.ru"],
+            "subject_template": "Заявка с демо-бота",
         },
         name="Иван",
         phone="+79001234567",
@@ -104,8 +104,8 @@ def test_send_lead_email_starttls_success(mock_connect: MagicMock) -> None:
 
 def test_send_lead_email_no_recipients() -> None:
     ok, status = send_lead_email(
-        client_id="cesi",
-        lead_cfg={"recipients": ["REPLACE_WITH_CESI_ADMIN_EMAIL"]},
+        client_id="demo",
+        lead_cfg={"recipients": ["REPLACE_WITH_DEMO_ADMIN_EMAIL"]},
         name="",
         phone="+79001234567",
         intent="lead",
@@ -120,10 +120,18 @@ def test_send_lead_email_no_recipients() -> None:
 
 @patch("pg_sink.enqueue_lead")
 @patch("lead_service.send_lead_email", return_value=(True, "email"))
-def test_handle_lead_cesi_email_no_pii_in_pg(mock_send, mock_pg_enqueue) -> None:
+@patch(
+    "lead_service.load_lead_config",
+    return_value={"recipients": ["admin@demo.ru"], "subject_template": "Заявка"},
+)
+@patch("lead_service.leads_mode", return_value="email")
+@patch("lead_service.leads_enabled", return_value=True)
+def test_handle_lead_demo_email_no_pii_in_pg(
+    _enabled, _mode, _cfg, mock_send, mock_pg_enqueue
+) -> None:
     payload, status = handle_lead(
         {
-            "client_id": "cesi",
+            "client_id": "demo",
             "name": "Анна",
             "phone": "+79007654321",
             "intent": "lead",
@@ -140,13 +148,15 @@ def test_handle_lead_cesi_email_no_pii_in_pg(mock_send, mock_pg_enqueue) -> None
 
 @patch("pg_sink.enqueue_lead")
 @patch("lead_service.send_lead_email", return_value=(True, "email"))
-@patch("lead_service.load_lead_config", return_value={"store_in_postgres": True})
+@patch("lead_service.load_lead_config", return_value={"store_in_postgres": True, "recipients": ["admin@demo.ru"]})
+@patch("lead_service.leads_mode", return_value="email")
+@patch("lead_service.leads_enabled", return_value=True)
 def test_handle_lead_pg_row_has_no_pii_when_store_enabled(
-    mock_cfg, mock_send, mock_pg_enqueue
+    _enabled, _mode, mock_cfg, mock_send, mock_pg_enqueue
 ) -> None:
     payload, status = handle_lead(
         {
-            "client_id": "cesi",
+            "client_id": "demo",
             "name": "Анна",
             "phone": "+79007654321",
             "intent": "lead",

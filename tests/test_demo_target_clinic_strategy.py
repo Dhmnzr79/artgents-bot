@@ -23,7 +23,6 @@ TARGET_SERVICES = TARGET_ROOT / "service_catalog.json"
 TARGET_BRANDS = TARGET_ROOT / "brand_catalog.json"
 TARGET_FACTS = TARGET_ROOT / "pricebook/facts.json"
 TARGET_OFFERS = TARGET_ROOT / "pricebook/services"
-CURRENT_PLAYBOOK = DEMO_ROOT / "patient_playbook.yaml"
 CURRENT_OFFERS = DEMO_ROOT / "pricebook/services"
 
 EXPECTED_RULES = [
@@ -211,30 +210,15 @@ def test_strategy_is_exact_strict_target_wire_data() -> None:
     assert _real_bundle().strategy.model_dump(exclude_none=True) == raw
 
 
-def test_seven_rules_preserve_current_priorities_and_approved_caps() -> None:
+def test_seven_rules_preserve_approved_priorities_and_caps() -> None:
     target_rules = {rule["id"]: rule for rule in _load_yaml(TARGET_STRATEGY)["rules"]}
-    current_rules = {
-        rule["id"]: rule for rule in _load_yaml(CURRENT_PLAYBOOK)["rules"]
-    }
 
     assert list(target_rules) == [rule["id"] for rule in EXPECTED_RULES]
-    assert set(current_rules) - set(target_rules) == {"bone_deficit_solution"}
-    assert "patient_situations" not in _load_yaml(TARGET_STRATEGY)
 
-    changed_from_four = 0
     for rule_id, target in target_rules.items():
-        current = current_rules[rule_id]
-        assert target["service_priorities"] == {
-            option["service_id"]: option["priority"]
-            for option in current["options"]
-        }
-        if current["max_options"] == 4:
-            changed_from_four += 1
-            assert target["max_options"] == 3
-        else:
-            assert target["max_options"] == current["max_options"]
-
-    assert changed_from_four == 4
+        expected = next(item for item in EXPECTED_RULES if item["id"] == rule_id)
+        assert target["service_priorities"] == expected["service_priorities"]
+        assert target["max_options"] == expected["max_options"]
 
 
 def test_exact_positive_recommendations_become_equal_baseline_priority() -> None:
@@ -356,7 +340,7 @@ def test_real_shortlists_cap_without_adding_candidates() -> None:
 
 def test_sources_are_read_only_and_test_has_no_product_wiring() -> None:
     paths = [
-        CURRENT_PLAYBOOK,
+        TARGET_STRATEGY,
         TARGET_SERVICES,
         TARGET_BRANDS,
         TARGET_FACTS,

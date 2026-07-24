@@ -1,6 +1,6 @@
 const state = {
   clients: [],
-  defaultClientId: "cesi",
+  defaultClientId: "demo",
   expandedVisit: null,
   threadCache: {},
 };
@@ -613,7 +613,7 @@ async function refreshAll() {
 
 async function initDashboard() {
   state.defaultClientId =
-    window.__ADMIN_DEFAULT_CLIENT_ID__ || readUrlClientId() || "cesi";
+    window.__ADMIN_DEFAULT_CLIENT_ID__ || readUrlClientId() || "demo";
 
   try {
     const data = await fetch("/api/clients").then((r) => r.json());

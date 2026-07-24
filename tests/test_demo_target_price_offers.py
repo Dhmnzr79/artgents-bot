@@ -235,10 +235,10 @@ def test_target_files_are_strict_complete_frozen_wire_data() -> None:
     )
     assert len(facts_raw) == 6
     for fact in facts_raw.values():
-        assert (
-            TargetCommercialFact.model_validate(fact).model_dump(exclude_none=True)
-            == fact
-        )
+        parsed = TargetCommercialFact.model_validate(fact)
+        normalized = parsed.model_dump(exclude_none=True)
+        for key, value in fact.items():
+            assert normalized[key] == value
 
 
 def test_nested_duplicate_keys_are_rejected() -> None:

@@ -109,7 +109,7 @@ def _require_db():
 
 def _default_client_id() -> str:
     ids = list_admin_client_ids()
-    return ids[0] if ids else "cesi"
+    return ids[0] if ids else "demo"
 
 
 def _client_id() -> str:

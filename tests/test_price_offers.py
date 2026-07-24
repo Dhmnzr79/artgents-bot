@@ -56,7 +56,7 @@ def test_detect_brand_in_query():
 
 
 def test_detect_brand_without_aliases_file():
-    assert detect_brand_in_query("сколько стоит Nobel под ключ", client_id="cesi") is None
+    assert detect_brand_in_query("сколько стоит Nobel под ключ", client_id="_template") is None
 
 
 def test_render_append_single_brand_includes_excludes():

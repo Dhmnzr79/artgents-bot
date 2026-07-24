@@ -1,6 +1,6 @@
 # Architecture Convergence — канон (2026-07-24)
 
-**Статус:** docs-only checkpoint после Architecture Convergence Audit.  
+**Статус:** docs-only checkpoint после Architecture Convergence Audit.
 **Baseline:** `codex/stage-a` @ `eedbd66`. **W1b WIP:** припаркован, см. ниже.
 
 ## Что завершено
@@ -74,12 +74,12 @@ Scope **не выбирает** лечение, протокол или `service
 
 ## Checkpoints (порядок)
 
-1. ~~W1b park + docs sync~~ (этот checkpoint)  
+1. ~~W1b park + docs sync~~ (этот checkpoint)
 2. **AC1** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts` (`TASK.md`)
 3. Service selection + strategy + pricebook wiring
 4. Response stages + marketing runtime
-5. A9 v2 live re-audit (owner approval)  
-6. Full HTTP/widget matrix → live E2E  
-7. Provider prompt caching  
+5. A9 v2 live re-audit (owner approval)
+6. Full HTTP/widget matrix → live E2E
+7. Provider prompt caching
 
 См. также: [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), [`PATIENT_SCOPE_DESIGN_A9.md`](PATIENT_SCOPE_DESIGN_A9.md).

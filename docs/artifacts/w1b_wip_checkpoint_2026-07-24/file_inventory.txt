@@ -1,21 +1,13 @@
-﻿
-FullName                                                                                                               
---------                                                                                                               
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked                               
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\checksums.txt                           
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\diff_stat.txt                           
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\file_inventory.txt                      
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\MANIFEST.txt                            
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\status_porcelain.txt                    
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\clients                       
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\contracts                     
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\tests                         
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\clients\demo                  
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\clients\demo\target_response  
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\clients\demo\target_respons...
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\contracts\target_family_pri...
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\contracts\target_family_pri...
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\tests\test_w1b_family_price...
-C:\Cursor Projects\demo-bot-local\docs\artifacts\w1b_wip_checkpoint_2026-07-24\untracked\tests\test_w1b_family_price...
-
-
+path,bytes
+checksums.sha256,693
+diff_stat.txt,1370
+file_inventory.txt,244
+MANIFEST.txt,1492
+RESTORE.md,1764
+status_porcelain.txt,1189
+untracked/clients/demo/target_response/family_price_groups.yaml,1179
+untracked/contracts/target_family_price_group_followup.py,1655
+untracked/contracts/target_family_price_groups.py,5283
+untracked/tests/test_w1b_family_price_group_drilldown_offline.py,6586
+untracked/tests/test_w1b_family_price_situation_menu_offline.py,6118
+w1b_tracked.patch,62368

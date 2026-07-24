@@ -1,11 +1,11 @@
-﻿diff --git a/contracts/response_schema.py b/contracts/response_schema.py
+diff --git a/contracts/response_schema.py b/contracts/response_schema.py
 index fe2ca2d..f5f8605 100644
 --- a/contracts/response_schema.py
 +++ b/contracts/response_schema.py
 @@ -10,6 +10,10 @@ from __future__ import annotations
  from datetime import date
  from typing import Annotated, Literal, TypeAlias
- 
+
 +from contracts.target_family_price_groups import (
 +    FamilyPriceGroupsConfig,
 +    validate_family_price_groups_against_bundle,
@@ -18,7 +18,7 @@ index fe2ca2d..f5f8605 100644
      strategy: TargetClinicStrategy
      marketing: TargetMarketingPolicy
 +    family_price_groups: FamilyPriceGroupsConfig
- 
+
      @model_validator(mode="after")
      def _local_references_exist(self) -> "ResponseSchemaBundle":
 @@ -497,6 +502,7 @@ class ResponseSchemaBundle(TargetSchemaModel):
@@ -27,7 +27,7 @@ index fe2ca2d..f5f8605 100644
                  raise ValueError("bundle_marketing_fact_missing")
 +        validate_family_price_groups_against_bundle(self.family_price_groups, self)
          return self
- 
+
      def _marketing_refs(self) -> list[str]:
 diff --git a/contracts/target_response_policy.py b/contracts/target_response_policy.py
 index 2a8b7ed..ff3ced9 100644
@@ -58,8 +58,8 @@ index 6223d5b..0f51f41 100644
  TargetResponseComponent: TypeAlias = Literal["content", "price", "doctors"]
 -TargetFollowupSource: TypeAlias = Literal["content", "price"]
 +TargetFollowupSource: TypeAlias = Literal["content", "price", "family_price_group"]
- 
- 
+
+
  class TargetResponseSpec(BaseModel):
 @@ -38,6 +38,7 @@ class TargetResponseSpec(BaseModel):
      response_mode: TargetResponseMode
@@ -103,14 +103,14 @@ index d9ce8f0..af9ae55 100644
 +_FAMILY_PRICE_GROUPS = Path("family_price_groups.yaml")
  _FACTS = Path("pricebook/facts.json")
  _SERVICES_DIR = Path("pricebook/services")
- 
+
 @@ -218,6 +219,7 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
      facts_path = _require_file(root, _FACTS)
      strategy_path = _require_file(root, _CLINIC_STRATEGY)
      marketing_path = _require_file(root, _MARKETING)
 +    family_price_groups_path = _require_file(root, _FAMILY_PRICE_GROUPS)
      services_dir = _require_directory(root, _SERVICES_DIR)
- 
+
      services = _read_json_mapping(service_catalog_path, _SERVICE_CATALOG)
 @@ -225,6 +227,10 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
      facts = _read_json_mapping(facts_path, _FACTS)
@@ -136,9 +136,9 @@ index 3e99439..7ddd288 100644
 --- a/core/target_composer_executor.py
 +++ b/core/target_composer_executor.py
 @@ -8,6 +8,7 @@ from typing import Literal, NoReturn, Protocol
- 
+
  import hashlib
- 
+
 +from contracts.target_family_price_group_followup import TargetFamilyPriceGroupFollowup
  from contracts.target_cached_full_context import TargetCachedFullContext
  from contracts.target_response_spec import TargetResponseSpec
@@ -201,8 +201,8 @@ index 3e99439..7ddd288 100644
 +            for value in (item.topic, item.group_id, item.label, item.ref)
 +        ):
 +            _error("composer_executor_request_invalid", "request_followups")
- 
- 
+
+
  def _validate_request(request: object) -> TargetComposerRequest:
 diff --git a/core/target_composer_request.py b/core/target_composer_request.py
 index a40beab..fa28ac5 100644
@@ -223,8 +223,8 @@ index a40beab..fa28ac5 100644
      TargetEvidenceScopeRecord,
 @@ -268,6 +272,20 @@ def _compact_json(payload: dict[str, object]) -> str:
      )
- 
- 
+
+
 +def _offer_text_compact(offer: TargetOffer) -> str:
 +    return _compact_json(
 +        {
@@ -244,8 +244,8 @@ index a40beab..fa28ac5 100644
          {
 @@ -395,11 +413,34 @@ def _exact_sources(
      return source_offers, source_doctors, source_facts, consultation_by_ref
- 
- 
+
+
 +def _family_menu_anchor_sources(
 +    scoped: TargetScopedResponseEvidence,
 +    bound_package: TargetSpecBoundOfflineResponsePackage,
@@ -323,9 +323,9 @@ index f850403..66c3c83 100644
 @@ -1,7 +1,8 @@
 -"""Deterministic family price overview selection and assembly (W1)."""
 +"""Deterministic family price overview: situation menu + group drill-down (W1/W1b)."""
- 
+
  from __future__ import annotations
- 
+
 +import sys
  from collections.abc import Sequence
  from datetime import date
@@ -348,8 +348,8 @@ index f850403..66c3c83 100644
      FamilyPriceOverviewServiceEntry,
 @@ -46,15 +56,29 @@ class TargetFamilyPriceOverviewError(ValueError):
          super().__init__(f"{code}: {value!r}")
- 
- 
+
+
 -def is_family_price_overview_spec(spec: TargetResponseSpec) -> bool:
 -    """True when spec declares a multi-service family price overview."""
 +def is_family_price_situation_menu_spec(spec: TargetResponseSpec) -> bool:
@@ -366,7 +366,7 @@ index f850403..66c3c83 100644
 +        and not spec.allow_cta
 +    )
 +
- 
+
 +def is_family_price_group_drilldown_spec(spec: TargetResponseSpec) -> bool:
      if type(spec) is not TargetResponseSpec:
          return False
@@ -380,8 +380,8 @@ index f850403..66c3c83 100644
          and not spec.allow_marketing_facts
 @@ -62,11 +86,26 @@ def is_family_price_overview_spec(spec: TargetResponseSpec) -> bool:
      )
- 
- 
+
+
 +def is_family_price_overview_spec(spec: TargetResponseSpec) -> bool:
 +    """True for situation menu or group drill-down family price flows."""
 +
@@ -393,8 +393,8 @@ index f850403..66c3c83 100644
  def _role_rank(roles: tuple[str, ...]) -> int:
      ranks = [_ROLE_RANK[role] for role in roles if role in _ROLE_RANK]
      return min(ranks) if ranks else 3
- 
- 
+
+
 +def _offer_by_id(bundle: ResponseSchemaBundle) -> dict[str, TargetOffer]:
 +    offers: dict[str, TargetOffer] = {}
 +    for offer in bundle.offers:
@@ -407,8 +407,8 @@ index f850403..66c3c83 100644
      doctor_catalog: TargetDoctorCatalog,
 @@ -83,41 +122,200 @@ def _representative_offer(
      return projection.offers[0]
- 
- 
+
+
 -def select_family_price_overview_services(
 +def _offer_anchor_amount(offer: TargetOffer) -> int:
 +    price = offer.price
@@ -522,7 +522,7 @@ index f850403..66c3c83 100644
 +    topic_groups = get_family_price_topic_groups(bundle, turn_topic=turn_topic)
 +    if topic_groups is None:
 +        raise TargetFamilyPriceOverviewError("family_price_groups_topic_missing", turn_topic)
- 
+
 -    if type(turn_topic) is not str or not turn_topic.strip():
 -        raise TargetFamilyPriceOverviewError("family_overview_topic_invalid", turn_topic)
 +    entries: list[FamilyPriceOverviewServiceEntry] = []
@@ -558,7 +558,7 @@ index f850403..66c3c83 100644
 +    group_eff = group_id.strip()
 +    if not topic or not group_eff:
 +        raise TargetFamilyPriceOverviewError("family_group_context_invalid", (turn_topic, group_id))
- 
+
 -    candidates: list[FamilyPriceOverviewServiceEntry] = []
 -    for catalog_order, (service_id, service) in enumerate(bundle.services.items()):
 -        if not service.active:
@@ -612,7 +612,7 @@ index f850403..66c3c83 100644
 +    max_services: int = FAMILY_PRICE_OVERVIEW_MAX_SERVICES,
 +) -> FamilyPriceOverviewSelection:
 +    """Backward-compatible alias: group drill-down uses explicit groups; menu uses anchors."""
- 
+
 -    candidates.sort(key=lambda entry: (entry.role_rank, entry.catalog_order))
 -    limited = tuple(candidates[:max_services])
 -    return FamilyPriceOverviewSelection(turn_topic=topic, entries=limited)
@@ -623,8 +623,8 @@ index f850403..66c3c83 100644
 +        turn_topic=turn_topic,
 +        max_anchors=max_services,
 +    )
- 
- 
+
+
  def assemble_family_price_overview_materials(
 @@ -125,17 +323,27 @@ def assemble_family_price_overview_materials(
      doctor_catalog: TargetDoctorCatalog,
@@ -655,13 +655,13 @@ index f850403..66c3c83 100644
 +                }
 +            )
 +        offers.append(offer_copy)
- 
+
      return TargetOfflineResponseMaterials(
          service_id=None,
 @@ -162,6 +370,52 @@ def assemble_family_price_overview_materials(
      )
- 
- 
+
+
 +def assemble_family_price_situation_menu_package(
 +    bundle: ResponseSchemaBundle,
 +    doctor_catalog: TargetDoctorCatalog,
@@ -717,7 +717,7 @@ index f850403..66c3c83 100644
  ) -> TargetOfflineResponsePackage:
 -    """Assemble S27-S30 package for family price overview (price-only, no follow-ups)."""
 +    """Group drill-down: price-only multi-offer package without situation buttons."""
- 
+
 -    _ = external_index, consultation_values
      materials = assemble_family_price_overview_materials(
          bundle,
@@ -727,9 +727,9 @@ index cbd0126..efdf6f8 100644
 --- a/core/target_response_followup_policy.py
 +++ b/core/target_response_followup_policy.py
 @@ -4,6 +4,7 @@ from __future__ import annotations
- 
+
  from dataclasses import dataclass
- 
+
 +from contracts.target_family_price_group_followup import TargetFamilyPriceGroupFollowup
  from contracts.target_response_spec import TargetFollowupSource
  from core.target_response_followup_materializer import (
@@ -739,15 +739,15 @@ index cbd0126..efdf6f8 100644
      content: tuple[TargetContentFollowup, ...]
      price: tuple[TargetPriceFollowup, ...]
 +    group: tuple[TargetFamilyPriceGroupFollowup, ...] = ()
- 
- 
+
+
  class TargetResponseFollowupPolicyError(ValueError):
 diff --git a/core/target_response_policy.py b/core/target_response_policy.py
 index 41d8de7..982ae49 100644
 --- a/core/target_response_policy.py
 +++ b/core/target_response_policy.py
 @@ -17,6 +17,8 @@ class TargetResponsePolicyBuildError(ValueError):
- 
+
  def _followup_source(request: TargetResponsePolicyRequest) -> TargetFollowupSource | None:
      if request.family_price_overview_topic is not None:
 +        if request.family_price_group_id is None:
@@ -781,7 +781,7 @@ index fb46535..a12036b 100644
          allowed_service_ids=frozenset(context.bundle.services.keys()),
 +        nav_ref=read_runtime_nav_ref(),
      )
- 
+
      try:
 diff --git a/core/target_runtime_turn_frame_hydration.py b/core/target_runtime_turn_frame_hydration.py
 index 6104459..201c483 100644
@@ -789,7 +789,7 @@ index 6104459..201c483 100644
 +++ b/core/target_runtime_turn_frame_hydration.py
 @@ -3,19 +3,77 @@
  from __future__ import annotations
- 
+
  from contracts.turn_frame import FieldMeta, TurnFrame
 +from contracts.target_family_price_group_followup import (
 +    build_family_price_group_ref,
@@ -802,10 +802,10 @@ index 6104459..201c483 100644
      is_vague_attribute_followup_any,
  )
 -from core.target_runtime_session import TargetRuntimeSessionState
- 
+
  _SESSION_FOLLOWUP_ASPECTS = frozenset({"price", "payment"})
- 
- 
+
+
 +def read_runtime_nav_ref() -> str | None:
 +    try:
 +        from flask import has_request_context, request
@@ -822,8 +822,8 @@ index 6104459..201c483 100644
 +
  def _field_meta(*, provenance: str) -> FieldMeta:
      return FieldMeta(confidence=1.0, provenance=provenance, status="valid")
- 
- 
+
+
 +def _hydrate_family_price_group_nav(
 +    turn_frame: TurnFrame,
 +    *,
@@ -873,7 +873,7 @@ index 6104459..201c483 100644
 +    nav_ref: str | None = None,
  ) -> TurnFrame:
      """Restore service continuity for contextual follow-ups when shadow frame lost it."""
- 
+
 +    group_hydrated = _hydrate_family_price_group_nav(
 +        turn_frame,
 +        nav_ref=nav_ref,
@@ -902,7 +902,7 @@ index df96a3b..aee09b8 100644
  from core.target_runtime_client_context import TargetRuntimeClientContext
  from core.client_config_loader import load_lead_cta_variants
 @@ -99,13 +96,20 @@ def _base_meta(
- 
+
  def _followups_to_quick_replies(
      *,
 -    content: tuple[TargetContentFollowup, ...],
@@ -924,7 +924,7 @@ index df96a3b..aee09b8 100644
 +        seen.add(item.ref)
          quick.append({"label": item.label, "ref": item.ref})
      return quick
- 
+
 @@ -138,6 +142,7 @@ def materialize_verified_widget_payload(
      quick_replies = _followups_to_quick_replies(
          content=followups.content,
@@ -939,7 +939,7 @@ index edc1077..6cf0a13 100644
 +++ b/core/target_scoped_response_evidence.py
 @@ -12,7 +12,11 @@ from pydantic import TypeAdapter, ValidationError
  from yaml.nodes import MappingNode
- 
+
  from contracts.target_response_spec import CanonicalToken, TargetResponseSpec
 -from core.target_family_price_overview import is_family_price_overview_spec
 +from core.target_family_price_overview import (
@@ -953,7 +953,7 @@ index edc1077..6cf0a13 100644
 @@ -229,7 +233,7 @@ def build_target_scoped_response_evidence(
              covered_fact_ids=plan.commercial_fact_ids,
          )
- 
+
 -    if is_family_price_overview_spec(spec):
 +    if is_family_price_situation_menu_spec(spec) or is_family_price_group_drilldown_spec(spec):
          package = bound_package.package
@@ -1118,12 +1118,12 @@ index 38b497e..ed81a80 100644
  from contracts.target_turn_frame_policy_envelope import TargetTurnFramePolicyEnvelope
 +from contracts.target_family_price_group_followup import parse_family_price_group_ref
  from core.target_response_policy import build_target_response_spec
- 
+
  _ASPECT_TO_COMPONENT: dict[AspectKind, TargetResponseComponent] = {
 @@ -218,30 +219,39 @@ def _materialize_fullcontext_content_policy_request(
      )
- 
- 
+
+
 +def _family_price_group_context(turn_frame: TurnFrame) -> tuple[str, str] | None:
 +    raw = turn_frame.followup_of
 +    if raw is None:
@@ -1173,8 +1173,8 @@ index 38b497e..ed81a80 100644
 +    if group_id is not None:
 +        payload["family_price_group_id"] = group_id
 +    return TargetResponsePolicyRequest.model_validate(payload)
- 
- 
+
+
  def _materialize_policy_request(
 @@ -322,9 +332,19 @@ def dispatch_target_turn_frame_response(
              )
@@ -1201,7 +1201,7 @@ index 91d81a1..673f096 100644
 --- a/tests/test_demo_target_price_offers.py
 +++ b/tests/test_demo_target_price_offers.py
 @@ -192,6 +192,9 @@ def _sha256(path: Path) -> str:
- 
+
  def _real_bundle() -> ResponseSchemaBundle:
      raw_services = _load_json(TARGET_SERVICES)
 +    family_price_groups = yaml.safe_load(
@@ -1217,7 +1217,7 @@ index 91d81a1..673f096 100644
 +            "family_price_groups": family_price_groups,
          }
      )
- 
+
 diff --git a/tests/test_response_schema_loader.py b/tests/test_response_schema_loader.py
 index 4b1a52a..92355af 100644
 --- a/tests/test_response_schema_loader.py
@@ -1316,7 +1316,7 @@ index 11dc670..c1262e7 100644
      assert get_args(TargetResponseComponent) == ("content", "price", "doctors")
 -    assert get_args(TargetFollowupSource) == ("content", "price")
 +    assert get_args(TargetFollowupSource) == ("content", "price", "family_price_group")
- 
+
      spec = TargetResponseSpec.model_validate(_payload())
      with pytest.raises(ValidationError, match="frozen_instance"):
 diff --git a/tests/test_target_turn_frame_dispatch.py b/tests/test_target_turn_frame_dispatch.py
@@ -1325,8 +1325,8 @@ index 1469ce0..d159061 100644
 +++ b/tests/test_target_turn_frame_dispatch.py
 @@ -124,7 +124,7 @@ def test_needs_clarification_returns_terminal_clarify_without_materialize() -> N
      assert result.spec.required_components == ()
- 
- 
+
+
 -def test_missing_service_id_with_price_intent_materializes_family_overview() -> None:
 +def test_missing_service_id_with_price_intent_materializes_family_situation_menu() -> None:
      result = dispatch_target_turn_frame_response(
@@ -1376,8 +1376,8 @@ index 1469ce0..d159061 100644
 +
 +    spec = build_target_response_spec(result.policy_request)  # type: ignore[arg-type]
 +    assert spec.followup_source is None
- 
- 
+
+
  def test_missing_service_id_without_usable_topic_and_price_returns_defer() -> None:
 diff --git a/tests/test_w1_family_price_overview_offline.py b/tests/test_w1_family_price_overview_offline.py
 index e852c33..9a80dc7 100644
@@ -1385,8 +1385,8 @@ index e852c33..9a80dc7 100644
 +++ b/tests/test_w1_family_price_overview_offline.py
 @@ -42,7 +42,7 @@ def test_service_catalog_content_topic_matches_is_generic() -> None:
      )
- 
- 
+
+
 -def test_implantation_family_overview_selects_multiple_priced_services() -> None:
 +def test_implantation_family_overview_selects_group_anchors() -> None:
      bundle = load_response_schema_bundle(TARGET_ROOT)
@@ -1406,8 +1406,8 @@ index e852c33..9a80dc7 100644
      assert "classic" in service_ids
 @@ -64,7 +65,7 @@ def test_implantation_family_overview_selects_multiple_priced_services() -> None
      )
- 
- 
+
+
 -def test_prosthetics_family_overview_excludes_implantation_services() -> None:
 +def test_prosthetics_family_overview_uses_group_anchors() -> None:
      bundle = load_response_schema_bundle(TARGET_ROOT)
@@ -1429,8 +1429,8 @@ index e852c33..9a80dc7 100644
 -    )
 +    labels = [entry.service_name for entry in selection.entries]
 +    assert labels == ["╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒", "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓", "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М"]
- 
- 
+
+
  def test_synthetic_fixture_family_overview_without_demo_hardcode(tmp_path) -> None:
 @@ -154,6 +150,22 @@ cta_contexts:
          "version: 1\ndefault_max_options: 3\ndefault_service_priorities: {}\ndefault_offer_priorities: {}\nrules: []\n",
@@ -1452,7 +1452,7 @@ index e852c33..9a80dc7 100644
 +""",
 +        encoding="utf-8",
 +    )
- 
+
      bundle = load_response_schema_bundle(root)
      doctors = load_doctor_catalog(__import__("pathlib").Path("clients/demo/doctor_catalog.json"))
 @@ -163,6 +175,10 @@ cta_contexts:
@@ -1463,8 +1463,8 @@ index e852c33..9a80dc7 100644
 +        "One tooth",
 +        "Several teeth",
 +    ]
- 
- 
+
+
  def _family_overview_frame(**overrides: object):
 @@ -233,10 +249,19 @@ def test_implantation_family_price_overview_materializes_via_pipeline() -> None:
      )
@@ -1484,6 +1484,6 @@ index e852c33..9a80dc7 100644
 +        "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓",
 +        "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М",
 +    ]
- 
- 
+
+
  def test_all_on_4_exact_price_path_unchanged() -> None:

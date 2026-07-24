@@ -366,7 +366,7 @@ Safe wider offline (no live, no A9 harness): above + `tests/test_w1_family_price
 | Governance baseline | `3144572` |
 | AC2 governance HEAD | `47be537` |
 | PRE-CODE | ✅ |
-| COMPLETION | |
-| AC2 product HEAD | |
+| COMPLETION | ✅ |
+| AC2 product HEAD | `5a3a2f8` |
 
-**STOP after governance PRE-CODE ✅. AC2 implementation starts only after separate owner GO.**
+**STOP after AC2 implementation COMPLETION ✅. AC3 starts only after separate owner GO.**

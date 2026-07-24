@@ -14,7 +14,12 @@ SpecificityKind = Literal["unknown", "general", "specific"]
 
 PatientExtent = Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
 PatientJaw = Literal["unknown", "upper", "lower", "both"]
-PatientCareStage = Literal["unknown", "extraction_context", "implant_placed"]
+PatientCareStage = Literal[
+    "unknown",
+    "natural_tooth_present",
+    "extraction_context",
+    "implant_placed",
+]
 PatientScopeModifier = Literal["reported_bone_deficit"]
 
 FieldStatus = Literal["valid", "defaulted", "missing", "invalid"]

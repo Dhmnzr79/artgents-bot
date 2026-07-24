@@ -23,7 +23,7 @@ _TURN_PLANNER_MAX_COMPLETION_TOKENS = 700
 _PATIENT_SCOPE_PROMPT = (
     "patient_scope: верни компактный объект ровно с четырьмя ключами extent, jaw, stage, modifiers. "
     "extent: unknown | one_tooth | few_teeth | full_arch; jaw: unknown | upper | lower | both; "
-    "stage: unknown | extraction_context | implant_placed; modifiers: [] или [reported_bone_deficit]. "
+    "stage: unknown | natural_tooth_present | extraction_context | implant_placed; modifiers: [] или [reported_bone_deficit]. "
     "Всегда верни все четыре ключа. Извлекай только явно сообщённые признаки текущего сообщения; "
     "если признак не сообщён — unknown или [], не угадывай. История может помочь понять referent, "
     "но не переноси старое scope-значение без явного упоминания в текущем сообщении. "

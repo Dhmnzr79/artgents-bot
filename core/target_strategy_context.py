@@ -10,7 +10,18 @@ from contracts.target_service_applicability import (
     ReportedContext,
     SelectionPatientContext,
 )
-from contracts.ui_scope_action import ScopeExtent
+
+
+def _selection_jaw_from_effective_scope(
+    effective_scope: EffectiveScope,
+    *,
+    jaw: PatientJaw | None,
+) -> PatientJaw | None:
+    if jaw is not None:
+        return jaw
+    if effective_scope.jaw in ("upper", "lower"):
+        return effective_scope.jaw  # type: ignore[return-value]
+    return None
 
 
 def selection_patient_context_from_inputs(
@@ -20,12 +31,16 @@ def selection_patient_context_from_inputs(
     jaw: PatientJaw | None = None,
     reported_context: ReportedContext | None = None,
 ) -> SelectionPatientContext:
-    extent: ScopeExtent | Literal["unknown"] = effective_scope.extent
+    extent = effective_scope.extent
     return SelectionPatientContext(
         extent=extent,
         stage=stage if stage is not None else effective_scope.stage,
-        jaw=jaw,
-        reported_context=reported_context,
+        jaw=_selection_jaw_from_effective_scope(effective_scope, jaw=jaw),
+        reported_context=(
+            reported_context
+            if reported_context is not None
+            else effective_scope.reported_context
+        ),
     )
 
 
@@ -46,6 +61,10 @@ def strategy_match_from_effective_scope(
         family=service_family,
         extent=extent,
         stage=stage if stage is not None else effective_scope.stage,
-        jaw=jaw,
-        reported_context=reported_context,
+        jaw=_selection_jaw_from_effective_scope(effective_scope, jaw=jaw),
+        reported_context=(
+            reported_context
+            if reported_context is not None
+            else effective_scope.reported_context
+        ),
     )

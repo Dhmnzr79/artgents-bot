@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from contracts.effective_scope import EffectiveScope
+from contracts.effective_scope import EffectiveScope, EffectiveScopeJaw
+from contracts.target_service_applicability import PatientStage, ReportedContext
 from contracts.ui_scope_action import ScopeExtent, UiScopeAction
 from contracts.ui_stage_action import UiStageAction
-from contracts.target_service_applicability import PatientStage
 from core.routing_loader import THRESHOLDS
 
 
@@ -21,6 +21,8 @@ class SessionPatientFacts:
     set_at_turn: int
     stage: PatientStage | None = None
     stage_ref: str | None = None
+    jaw: Literal["upper", "lower", "both"] | None = None
+    reported_context: ReportedContext | None = None
 
     def is_fresh(self, *, session_turn_count: int) -> bool:
         age = max(0, int(session_turn_count) - int(self.set_at_turn))
@@ -145,6 +147,14 @@ def read_session_patient_facts(raw: object) -> SessionPatientFacts | None:
     if isinstance(stage_raw, str) and stage_raw.strip():
         stage = stage_raw.strip()  # type: ignore[assignment]
     stage_ref = str(raw.get("stage_ref") or "").strip() or None
+    jaw_raw = raw.get("jaw")
+    jaw: Literal["upper", "lower", "both"] | None = None
+    if isinstance(jaw_raw, str) and jaw_raw.strip() in ("upper", "lower", "both"):
+        jaw = jaw_raw.strip()  # type: ignore[assignment]
+    reported_raw = raw.get("reported_context")
+    reported_context: ReportedContext | None = None
+    if reported_raw == "reported_bone_deficit":
+        reported_context = "reported_bone_deficit"
     return SessionPatientFacts(
         extent=extent,  # type: ignore[arg-type]
         topic=topic,
@@ -153,6 +163,8 @@ def read_session_patient_facts(raw: object) -> SessionPatientFacts | None:
         set_at_turn=set_at_turn,
         stage=stage,
         stage_ref=stage_ref,
+        jaw=jaw,
+        reported_context=reported_context,
     )
 
 
@@ -168,4 +180,8 @@ def patient_facts_payload(facts: SessionPatientFacts) -> dict[str, str | int | N
         payload["stage"] = facts.stage
     if facts.stage_ref is not None:
         payload["stage_ref"] = facts.stage_ref
+    if facts.jaw is not None:
+        payload["jaw"] = facts.jaw
+    if facts.reported_context is not None:
+        payload["reported_context"] = facts.reported_context
     return payload

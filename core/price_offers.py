@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from config import PRICE_CONCERN_RE, PRICE_LOOKUP_RE
 from contracts.price_brand_aliases import PriceBrandAliasesFile
-from contracts.price_offer import PriceOffer, PriceOfferUnit, PriceOffersFile
+from contracts.price_offer import PriceOffer, PriceOfferUnit
 from contracts.pricebook import PricebookServiceEntry
 from core.client_runtime import client_pack_dir
 from core.patient_scope_cues import (
@@ -39,11 +39,9 @@ _UNIT_BY_SERVICE: dict[str, PriceOfferUnit] = {
     "all_on_6": "jaw",
 }
 
-_CACHE_LOCK = threading.Lock()
-_CACHE: dict[str, list[PriceOffer]] = {}
-_CACHE_MTIME: dict[str, float] = {}
 _ALIAS_CACHE: dict[str, list[tuple[str, str]]] = {}
 _ALIAS_MTIME: dict[str, float] = {}
+_CACHE_LOCK = threading.Lock()
 
 
 def format_rub(amount: int) -> str:
@@ -56,40 +54,8 @@ def _brand_filter_on() -> bool:
     return bool(BRAND_FILTER_ON)
 
 
-def price_offers_path(client_id: str | None) -> str:
-    return os.path.join(client_pack_dir(client_id), "price_offers.json")
-
-
 def price_brand_aliases_path(client_id: str | None) -> str:
     return os.path.join(client_pack_dir(client_id), "price_brand_aliases.json")
-
-
-def load_price_offers(client_id: str | None, *, force_reload: bool = False) -> list[PriceOffer]:
-    path = price_offers_path(client_id)
-    try:
-        mtime = os.path.getmtime(path) if os.path.isfile(path) else 0.0
-    except OSError:
-        mtime = 0.0
-    pack_key = path
-    with _CACHE_LOCK:
-        if not force_reload and _CACHE.get(pack_key) is not None and _CACHE_MTIME.get(pack_key) == mtime:
-            return list(_CACHE[pack_key])
-    if not os.path.isfile(path):
-        with _CACHE_LOCK:
-            _CACHE[pack_key] = []
-            _CACHE_MTIME[pack_key] = mtime
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            raw = json.load(fh) or {}
-        parsed = PriceOffersFile.model_validate(raw)
-        offers = list(parsed.offers)
-    except (OSError, json.JSONDecodeError, ValidationError, ValueError):
-        offers = []
-    with _CACHE_LOCK:
-        _CACHE[pack_key] = offers
-        _CACHE_MTIME[pack_key] = mtime
-    return list(offers)
 
 
 def load_brand_alias_rules(client_id: str | None, *, force_reload: bool = False) -> list[tuple[str, str]]:
@@ -296,7 +262,7 @@ def get_price_offers(
     if entry is not None:
         pool = offers_from_service_entry(entry) if entry.variants else []
     else:
-        pool = [o for o in load_price_offers(client_id) if o.service_id == sid]
+        pool = []
     out: list[PriceOffer] = []
     for offer in pool:
         if unit_eff and offer.unit != unit_eff:
@@ -457,14 +423,14 @@ def build_price_answer_for_lookup(
     q: str,
     aspect: str | None = None,
 ) -> tuple[str | None, dict[str, Any]]:
-    """PriceBook v2 answer when service entry exists; else legacy append-only."""
+    """PriceBook v2 answer when service entry exists; else no price."""
     from core.price_answer_assembler import assemble_price_answer
     from core.pricebook_loader import load_pricebook_service
 
     sid = (service_id or "").strip()
     entry = load_pricebook_service(client_id, sid)
     if not entry:
-        return build_price_append_for_lookup(client_id=client_id, service_id=sid, q=q)
+        return None, {}
 
     brand = detect_brand_in_query(q, client_id=client_id)
     planner_brand = None

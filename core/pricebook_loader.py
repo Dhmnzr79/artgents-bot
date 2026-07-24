@@ -1,4 +1,4 @@
-"""Load PriceBook v2 client pack (manifest, facts, services) with legacy fallback."""
+"""Load PriceBook v2 client pack (manifest, facts, services)."""
 
 from __future__ import annotations
 

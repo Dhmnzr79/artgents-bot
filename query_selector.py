@@ -78,7 +78,7 @@ def _patient_situation_for_turn(
 def _price_route_is_matched(route_source: str, price_ref: str | None) -> bool:
     if price_ref and route_source == "price_ref":
         return True
-    return route_source in {"prices_json", "pricebook"}
+    return route_source == "pricebook"
 
 
 def _resolve_price_lookup_route(
@@ -91,15 +91,13 @@ def _resolve_price_lookup_route(
     sid: str | None = None,
     client_id: str | None = None,
 ) -> tuple[str, str | None, str | None]:
-    """price_ref → md; pricebook or prices.json; без авто-подстановки payment_terms."""
+    """price_ref → md; pricebook only; без авто-подстановки payment_terms."""
     if continuation_only_phrase(q) and not _service_from_session_context(sid, client_id):
         return route_source, None, None
     pref = str(price_ref or "").strip()
     if pref:
         rs = "price_ref" if route_source == "catalog" else route_source
         return rs, pref, None
-    if price_item is not None:
-        return "prices_json", None, None
     if pricebook_available:
         return "pricebook", None, None
     return route_source, None, "price_not_in_catalog"
@@ -242,9 +240,6 @@ def _service_from_session_context(sid: str | None, client_id: str | None) -> dic
         price_ref = entry.get("price_ref")
         pb_avail = _service_in_pricebook(client_id, service_id, price_key)
         price_item = None
-        if not pb_avail:
-            prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
-            price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
         return {
             "service_id": str(service_id),
             "service": entry,
@@ -571,15 +566,12 @@ def select_price_service_route(
             "fallback_reason": "low_match_score",
             **match,
         }
-    prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
     service = match.get("service") or {}
     price_ref = service.get("price_ref")
     price_key = service.get("price_key")
     matched_sid = str(match.get("matched_service_id") or "")
     pb_avail = _service_in_pricebook(client_id, matched_sid, price_key)
     price_item = None
-    if not pb_avail:
-        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
     route_source = "catalog"
     if intent == "price_concern":
         route_source = "catalog"
@@ -637,13 +629,10 @@ def build_price_route_for_service_id(
     entry = catalog.get(sid_clean)
     if not isinstance(entry, dict) or not bool(entry.get("active", True)):
         return None
-    prices = _read_json_dict(_client_json_path(client_id, "prices.json"))
     price_key = entry.get("price_key")
     price_ref = entry.get("price_ref")
     pb_avail = _service_in_pricebook(client_id, sid_clean, price_key)
     price_item = None
-    if not pb_avail:
-        price_item = prices.get(price_key) if isinstance(prices, dict) and price_key else None
     q_eff = (q or "").strip() or f"Сколько стоит {entry.get('title') or sid_clean}?"
     route_source = "catalog"
     route_source, price_ref, fallback_reason = _resolve_price_lookup_route(

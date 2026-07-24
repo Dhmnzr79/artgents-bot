@@ -20,6 +20,8 @@
 
 **C1 (removed orphan flags):** `COMPOSER_ON`, `FULLCTX_ON`, `QUERY_REWRITE_*`, `ANSWER_PACKET_ASSEMBLER_ON`, `LIVING_OVERVIEW_ON`, `SITUATION_PRICE_ON`, `PRICE_SYMPTOM_CONSULT_ON` — deleted from `config.py`; legacy packet/retrieval code removed. Target FullContext does not read them.
 
+**C2d-D2 (canonical pricebook):** product path reads only `pricebook/services/*.json` — no `prices.json` / `price_offers.json` loaders; orphan `patient_playbook` / `answer_lens` / `service_node` / `numeric_fact_gate` modules removed.
+
 Эти в консоли включать не надо — они и так ON.
 
 ---

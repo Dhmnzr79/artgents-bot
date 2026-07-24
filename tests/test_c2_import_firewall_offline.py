@@ -124,3 +124,50 @@ def test_c2c_dead_clarify_session_has_no_pending_clarify_defaults() -> None:
 
     defaults = _fresh_defaults()
     assert "pending_clarify" not in defaults
+
+
+def test_c2d_product_py_has_no_deleted_legacy_module_imports() -> None:
+    script = f"""
+import pathlib
+import re
+root = pathlib.Path({str(_REPO_ROOT)!r})
+modules = [
+    "core.patient_playbook",
+    "core.answer_lens",
+    "core.service_node",
+    "core.numeric_fact_gate",
+    "contracts.patient_playbook",
+]
+patterns = [
+    re.compile(r"^\\s*from\\s+" + re.escape(m).replace(".", r"\\.") + r"\\b")
+    for m in modules
+] + [
+    re.compile(r"^\\s*import\\s+" + re.escape(m).replace(".", r"\\.") + r"\\b")
+    for m in modules
+]
+skip_prefixes = ("evals/", "tests/", "docs/", "archive/", "tools/", "orchestration/")
+legacy_skip_files = (
+    "core/price_brand_money.py",
+    "core/price_group_overview.py",
+    "core/answer_plan_apply.py",
+)
+offenders = []
+for path in sorted(root.rglob("*.py")):
+    rel = path.relative_to(root).as_posix()
+    if any(rel.startswith(p) for p in skip_prefixes):
+        continue
+    if rel in legacy_skip_files:
+        continue
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if any(p.search(line) for p in patterns):
+            offenders.append(f"{{rel}}:{{lineno}}:{{line.strip()}}")
+assert not offenders, offenders
+"""
+    proc = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=str(_REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr

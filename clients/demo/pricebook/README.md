@@ -1,8 +1,6 @@
 # PriceBook v2 (demo)
 
-**Demo:** единственный источник сумм — `pricebook/services/*.json`. Legacy `prices.json` / `price_offers.json` для demo удалены.
-
-Runtime: PriceBook → при отсутствии entry fallback на `price_offers.json` / `prices.json` (другие клиенты).
+**Demo:** единственный источник сумм — `pricebook/services/*.json`. Legacy `prices.json` / `price_offers.json` не используются runtime.
 
 | Файл | Назначение |
 |------|------------|

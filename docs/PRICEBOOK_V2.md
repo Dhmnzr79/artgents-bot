@@ -2,7 +2,7 @@
 
 **Статус:** MVP runtime на demo (`pricebook_loader`, `price_answer_assembler`).  
 **Demo:** единственный источник сумм — `pricebook/services/*.json` (см. `clients/demo/pricebook/README.md`).  
-**Другие packs:** legacy `price_offers.json` / `prices.json` — fallback при отсутствии entry.  
+**Runtime:** canonical pricebook only — no `price_offers.json` / `prices.json` product reads.
 **Связь:** этап 3 (MVP offers) → **3.5 PriceBook v2** → этап 4 planner-lite → этап 5 verifier gate.
 
 **Граница:** документ описывает current Pricebook schema/runtime. Его старые примеры
@@ -50,10 +50,10 @@ clients/{id}/
   price_brand_aliases.json  # без изменений (MVP)
 ```
 
-**Миграция (demo — завершена; другие packs):**
+**Миграция (demo — завершена):**
 
-1. Legacy `price_offers.json` + `prices.json` — loader читает как fallback.
-2. Если есть `pricebook/services/{id}.json` → PriceBook, иначе legacy.
+1. Legacy `price_offers.json` + `prices.json` удалены с product path.
+2. Единственный источник ₽ — `pricebook/services/{id}.json`.
 3. ₽ не хранить в pricing-md; акции — в `facts.json` + `fact_refs`, не в поле `promo` на service file.
 
 ---
@@ -384,7 +384,7 @@ price_lookup
   → verifier gate (этап 5): любая ₽ ∈ PriceBook
 ```
 
-**Legacy path:** `price_offers.json` + append — только клиенты без pricebook entry (`TECH_DEBT.md`).
+**Canonical path:** `pricebook/services/*.json` only (`core/pricebook_loader.py` + `core/price_answer_assembler.py`).
 
 ---
 

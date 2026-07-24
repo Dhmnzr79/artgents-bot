@@ -1,6 +1,6 @@
 """PriceBook v2 — target client-pack schema (see docs/PRICEBOOK_V2.md).
 
-Runtime: `core/pricebook_loader.py` + `core/price_answer_assembler.py`; legacy `price_offers.json` / `prices.json` as fallback.
+Runtime: `core/pricebook_loader.py` + `core/price_answer_assembler.py` (canonical pricebook only).
 """
 from __future__ import annotations
 

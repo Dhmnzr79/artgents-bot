@@ -12,9 +12,6 @@ from logging_setup import log_json
 
 
 def _client_has_price_source(cid: str) -> bool:
-    prices_path = os.path.join(client_pack_dir(cid), "prices.json")
-    if os.path.isfile(prices_path):
-        return True
     svc_dir = pricebook_services_dir(cid)
     if not os.path.isdir(svc_dir):
         return False
@@ -34,7 +31,6 @@ def run_startup_check(logger: logging.Logger) -> None:
     for cid in client_ids:
         md_dir = client_md_dir(cid)
         catalog_path = os.path.join(client_pack_dir(cid), "service_catalog.json")
-        prices_path = os.path.join(client_pack_dir(cid), "prices.json")
 
         if not os.path.isdir(md_dir):
             logger.error("startup_check_failed: md dir missing for %s: %s", cid, md_dir)
@@ -68,21 +64,10 @@ def run_startup_check(logger: logging.Logger) -> None:
 
         if not _client_has_price_source(cid):
             logger.error(
-                "startup_check_failed: price source missing for %s "
-                "(need prices.json or pricebook/services/*.json)",
+                "startup_check_failed: pricebook missing for %s "
+                "(need pricebook/services/*.json)",
                 cid,
             )
             sys.exit(1)
-
-        if os.path.isfile(prices_path):
-            try:
-                with open(prices_path, "r", encoding="utf-8") as f:
-                    prices_obj = json.load(f)
-                if not isinstance(prices_obj, dict):
-                    logger.error("startup_check_failed: prices must be object for %s", cid)
-                    sys.exit(1)
-            except Exception as e:
-                logger.error("startup_check_failed: invalid prices for %s: %s", cid, e)
-                sys.exit(1)
 
     log_json(logger, "startup_check_ok", clients=client_ids, md_files=total_md_files)

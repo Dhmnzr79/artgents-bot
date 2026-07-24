@@ -380,15 +380,20 @@ Each: tests → checker ✅ → commit → push → clean/synced.
 
 | Field | Value |
 |-------|-------|
-| PRE-CODE | ✅ (governance commit `3c21237`) |
+| PRE-CODE | ✅ (`3c21237`, original scope) |
+| Governance-delta review | ✅ (allowlist `8816f27` covers WIP; not retroactive PRE-CODE) |
 | Baseline | `b09cb45` |
-| COMPLETION checker | pending re-run after governance correction |
-| HEAD | (uncommitted WIP) |
+| COMPLETION checker | ✅ (`17760d4`) |
+| HEAD | `17760d4` |
 | pytest focused W1 + neighbors | 278 passed, 1 skipped |
 | pytest wide safe-offline | 2084 passed, 2 skipped |
 | collect-only | 2283 collected |
 | frozen S47/S50/S53/S55/S58/S62/S63/S66 | frozen OK |
 | git diff --check | clean (CRLF warnings only) |
-| NO LIVE / NO LLM / NO A9 | |
+| NO LIVE / NO LLM / NO A9 | confirmed |
+
+### Governance incident (chronology, non-blocking)
+
+Original PRE-CODE covered initial allowlist. Implementation required companion files (`contracts/target_service_content_topic.py`, `contracts/target_response_policy.py`, pipeline clamp, frozen-shape tests). Allowlist expanded post-implementation in `8816f27`; governance-delta review confirmed coverage. **Not** retroactive PRE-CODE. Product quality confirmed by green offline suite.
 
 **STOP after W1 COMPLETION — live widget re-test only with separate owner approval.**

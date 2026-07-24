@@ -330,13 +330,21 @@ TargetResponsePolicyRequest (+ response_stage)
 | `core/target_policy_bound_verified_response_pipeline.py` | Stage-aware marketing/CTA |
 | `core/target_scoped_response_evidence.py` | Scope-aware evidence branch |
 | `core/target_composer_request.py` | Scope-aware composer sources |
+| `core/target_composer_executor.py` | Allow empty evidence for `stage_clarify` / `data_gap` |
 | `core/target_runtime_widget.py` | Nav + thematic quick_replies merge; dedup |
 | `core/target_runtime_followup_nav.py` | `is_ui_stage_ref` routing |
 | `orchestration/pre_resolver_turn.py` | `UiStageAction` click hydration |
 | `core/target_family_price_overview.py` | Keep materials helper; product selector unused |
 | `tests/test_target_turn_frame_dispatch.py` | Dispatch expects `response_stage` not W1 flag |
 | `tests/test_target_response_spec.py` | Spec validators for `response_stage` |
-| `tests/test_target_response_policy.py` | Policy builders for scope-aware price |
+| `tests/test_target_response_policy.py` | Policy request field migration (`response_stage`, `scope_price_topic`) |
+| `core/target_turn_frame_bound_response.py` | Thread `effective_scope`, `client_id` |
+| `core/target_boundary_enforced_fullcontext_response.py` | Thread `effective_scope`, `client_id` |
+| `core/target_offline_response_package.py` | `navigation_followups` on package |
+| `core/target_response_verifier.py` | `navigation_followups` on verified response |
+| `core/target_verified_response_pipeline.py` | Thread navigation followups |
+| `tests/test_target_response_verifier.py` | Signature for navigation followups |
+| `tests/test_w1_family_price_overview_offline.py` | AC3 pipeline expectations (neighbor) |
 
 ### Explicitly forbidden in AC3 implementation
 
@@ -463,9 +471,9 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
 | Governance baseline | `57f9067` |
 | AC3 governance HEAD | `97d6c94` |
-| Owner decisions correction | |
-| PRE-CODE (post-correction) | |
-| COMPLETION | |
-| AC3 product HEAD | |
+| Owner decisions correction | `b6ac4b1` |
+| PRE-CODE (post-correction) | ✅ |
+| COMPLETION | ✅ |
+| AC3 product HEAD | `aa8e6dd` |
 
 **STOP after governance PRE-CODE ✅ on owner-decisions correction. AC3 implementation starts only after separate owner GO.**

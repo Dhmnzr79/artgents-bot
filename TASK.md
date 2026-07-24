@@ -441,8 +441,8 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | AC2 product HEAD | `5a3a2f8` |
 | W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
 | Governance baseline | `57f9067` |
-| AC3 governance HEAD | |
-| PRE-CODE | |
+| AC3 governance HEAD | `2d75d42` |
+| PRE-CODE | ✅ |
 | COMPLETION | |
 | AC3 product HEAD | |
 

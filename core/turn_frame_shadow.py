@@ -1,4 +1,8 @@
-"""Shadow TurnFrame recorder (A2 observability only; no downstream decisions)."""
+"""Historical TurnFrame shadow recorder (A9 eval contracts / offline tests only).
+
+Product path must use ``core.runtime_turn_frame`` (C2a). Do not import this module
+from active product code.
+"""
 
 from __future__ import annotations
 
@@ -35,64 +39,20 @@ def _ctx() -> dict[str, Any] | None:
 
 
 def mark_turn_frame_shadow_not_available() -> None:
-    """Mark shadow frame unavailable when planner did not produce TurnPlan."""
-    ctx = _ctx()
-    if ctx is None:
-        return
-    ctx[_CTX_STATUS] = SHADOW_STATUS_NOT_AVAILABLE
-    ctx[_CTX_REASON] = SHADOW_REASON_TURN_PLAN_MISSING
-    ctx.pop(_CTX_SHADOW, None)
+    """Historical — delegates to runtime publisher (C2a)."""
+    from core.runtime_turn_frame import mark_runtime_turn_frame_not_available
 
-
-def _mark_turn_frame_shadow_degraded(ctx: dict[str, Any]) -> None:
-    """Record a stable degraded outcome before best-effort event emission."""
-    ctx[_CTX_STATUS] = SHADOW_STATUS_DEGRADED
-    ctx[_CTX_REASON] = SHADOW_REASON_BUILD_FAILED
-    ctx.pop(_CTX_SHADOW, None)
-    try:
-        emit_bot_event(
-            logger,
-            "turn_frame_shadow",
-            status=SHADOW_STATUS_DEGRADED,
-            details={
-                "turn_frame_shadow_status": SHADOW_STATUS_DEGRADED,
-                "turn_frame_shadow_reason": SHADOW_REASON_BUILD_FAILED,
-            },
-        )
-    except Exception:
-        pass
+    mark_runtime_turn_frame_not_available()
 
 
 def record_planner_attempt_shadow(
     *,
     attempt: PlannerAttempt,
 ) -> TurnFrame | None:
-    """Store the field-level attempt frame in ctx without affecting product flow."""
-    ctx = _ctx()
-    if ctx is None:
-        return None
+    """Historical API — delegates to native runtime publisher."""
+    from core.runtime_turn_frame import publish_planner_attempt_frame
 
-    if attempt.shadow_status == SHADOW_STATUS_NOT_AVAILABLE:
-        mark_turn_frame_shadow_not_available()
-        return None
-    if attempt.shadow_status == SHADOW_STATUS_DEGRADED:
-        _mark_turn_frame_shadow_degraded(ctx)
-        return None
-
-    frame = attempt.shadow_frame
-    if frame is None:
-        _mark_turn_frame_shadow_degraded(ctx)
-        return None
-    try:
-        snapshot = frame.model_dump()
-    except Exception:
-        _mark_turn_frame_shadow_degraded(ctx)
-        return None
-
-    ctx[_CTX_SHADOW] = snapshot
-    ctx[_CTX_STATUS] = attempt.shadow_status
-    ctx.pop(_CTX_REASON, None)
-    return frame
+    return publish_planner_attempt_frame(attempt=attempt)
 
 
 def record_turn_frame_shadow(
@@ -100,7 +60,7 @@ def record_turn_frame_shadow(
     turn_plan: TurnPlan,
     decision_frame: DecisionFrame,
 ) -> TurnFrame | None:
-    """Build TurnFrame from legacy planner inputs and store snapshot in request.ctx."""
+    """Build TurnFrame from legacy planner inputs (historical / unit tests only)."""
     ctx = _ctx()
     if ctx is None:
         return None

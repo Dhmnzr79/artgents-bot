@@ -69,6 +69,9 @@ _METADATA_FIRST_TURN_KEYS: tuple[str, ...] = (
     "turn_frame_shadow",
     "turn_frame_shadow_status",
     "turn_frame_shadow_reason",
+    "runtime_turn_frame",
+    "runtime_turn_frame_status",
+    "runtime_turn_frame_reason",
     *RETRIEVAL_POOL_CTX_KEYS,
 )
 

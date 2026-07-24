@@ -31,11 +31,13 @@ from core.target_runtime_turn_frame_bridge import (
 from core.target_runtime_widget import materialize_target_error_payload
 from core.target_runtime_session import read_target_runtime_session
 from core.turn_frame_from_raw import build_turn_frame_from_raw
-from core.turn_frame_shadow import (
-    SHADOW_STATUS_NOT_AVAILABLE,
-    SHADOW_STATUS_OK,
-    get_turn_frame_shadow_snapshot,
-    get_turn_frame_shadow_status,
+from core.runtime_turn_frame import (
+    RUNTIME_FRAME_STATUS_NOT_AVAILABLE,
+    RUNTIME_FRAME_STATUS_OK,
+    RUNTIME_FRAME_STATUS_PARTIAL,
+    get_runtime_turn_frame_status,
+    load_runtime_turn_frame_snapshot,
+    publish_planner_attempt_frame,
 )
 from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn
 from tests.s59_semantic_policy_backend import S59SemanticPolicyBackend
@@ -90,8 +92,15 @@ def _turn_frame(**overrides: object):
 
 
 def _install_turn_frame(frame) -> None:
-    request.ctx["turn_frame_shadow"] = frame.model_dump()
-    request.ctx["turn_frame_shadow_status"] = SHADOW_STATUS_OK
+    from contracts.planner_attempt import PlannerAttempt
+
+    publish_planner_attempt_frame(
+        attempt=PlannerAttempt(
+            legacy_plan=None,
+            shadow_frame=frame,
+            shadow_status="partial",
+        )
+    )
 
 
 @pytest.fixture
@@ -187,17 +196,17 @@ def test_invalid_pack_fail_closed(monkeypatch: pytest.MonkeyPatch, flask_ctx) ->
     assert outcome.widget.error_code == "target_runtime_bundle_invalid"
 
 
-def test_turn_frame_bridge_reads_planner_shadow(flask_ctx) -> None:
+def test_turn_frame_bridge_reads_runtime_frame(flask_ctx) -> None:
     frame = _turn_frame(service_id="all_on_4", primary_aspect="price")
     _install_turn_frame(frame)
     loaded = load_runtime_turn_frame()
     assert loaded.service_id == "all_on_4"
-    assert get_turn_frame_shadow_status() == SHADOW_STATUS_OK
-    assert isinstance(get_turn_frame_shadow_snapshot(), dict)
+    assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_PARTIAL
+    assert isinstance(load_runtime_turn_frame_snapshot(), dict)
 
 
 def test_missing_turn_frame_fail_closed_not_legacy(flask_ctx) -> None:
-    request.ctx["turn_frame_shadow_status"] = SHADOW_STATUS_NOT_AVAILABLE
+    request.ctx["runtime_turn_frame_status"] = RUNTIME_FRAME_STATUS_NOT_AVAILABLE
     with pytest.raises(TargetRuntimeTurnFrameError):
         load_runtime_turn_frame()
 
@@ -444,10 +453,11 @@ def test_error_payload_mapping() -> None:
 
 
 def test_turn_frame_getters_exported() -> None:
-    from core import turn_frame_shadow as mod
+    from core import runtime_turn_frame as mod
 
-    assert callable(mod.get_turn_frame_shadow_status)
-    assert callable(mod.get_turn_frame_shadow_snapshot)
+    assert callable(mod.get_runtime_turn_frame_status)
+    assert callable(mod.load_runtime_turn_frame_snapshot)
+    assert callable(mod.publish_planner_attempt_frame)
 
 
 def test_target_runtime_turn_public_entrypoint() -> None:

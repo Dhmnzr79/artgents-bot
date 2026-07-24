@@ -9,7 +9,7 @@ from flask import request
 
 from config import COMPARISON_QUERY_RE, TURN_PLANNER_ON
 from core.metadata_first_observability import record_decision_frame_ctx
-from core.turn_frame_shadow import record_planner_attempt_shadow
+from core.runtime_turn_frame import publish_planner_attempt_frame
 from query_selector import commercial_info_query, consultation_info_query
 from core.routing_loader import THRESHOLDS
 from llm import classify_intent
@@ -58,7 +58,7 @@ def run_resolver_turn(
 
         attempt = plan_turn_attempt(q, sid, client_id)
         plan = attempt.legacy_plan
-        record_planner_attempt_shadow(attempt=attempt)
+        publish_planner_attempt_frame(attempt=attempt)
         if plan is not None:
             decision = turn_plan_to_decision_frame(plan, client_id=client_id)
             publish_turn_plan(plan)

@@ -18,7 +18,7 @@ from core.metadata_first_observability import (
     RETRIEVAL_POOL_CTX_KEYS,
 )
 from core.turn_frame_from_raw import build_turn_frame_from_raw
-from core.turn_frame_shadow import record_planner_attempt_shadow
+from core.runtime_turn_frame import publish_planner_attempt_frame
 
 
 def _record_a9_scope(patient_situation: object, *, partial: bool = False):
@@ -49,7 +49,7 @@ def _record_a9_scope(patient_situation: object, *, partial: bool = False):
         shadow_frame=frame,
         shadow_status="partial" if partial else "ok",
     )
-    record_planner_attempt_shadow(attempt=attempt)
+    publish_planner_attempt_frame(attempt=attempt)
     return frame
 
 
@@ -85,7 +85,7 @@ def _record_native_a9_scope(
         shadow_frame=frame,
         shadow_status=shadow_status,
     )
-    record_planner_attempt_shadow(attempt=attempt)
+    publish_planner_attempt_frame(attempt=attempt)
     return frame
 
 
@@ -465,7 +465,7 @@ def test_a9_shadow_observability_does_not_leak_malformed_raw_secrets() -> None:
             raw,
             allowed_topics=frozenset({"implantation"}),
         )
-        record_planner_attempt_shadow(
+        publish_planner_attempt_frame(
             attempt=PlannerAttempt(
                 legacy_plan=None,
                 shadow_frame=frame,

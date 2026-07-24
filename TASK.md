@@ -393,7 +393,7 @@ STOP and escalate to owner if:
 | Field | Value |
 |-------|-------|
 | PRE-CODE | ✅ (`0103316` governance correction) |
-| C2a checker | |
+| C2a checker | ✅ |
 | C2b checker | |
 | C2c checker | |
 | COMPLETION | |

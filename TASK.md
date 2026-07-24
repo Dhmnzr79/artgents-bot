@@ -47,10 +47,28 @@ Snapshot: `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` (`MANIFEST.txt`, `chec
 
 ## Process (mandatory)
 
-1. **Governance (this commit):** seam audit in TASK + docs delta → push → **PRE-CODE ✅** → STOP.
-2. **AC3 implementation** (later): atomic runtime wiring + ResponseStage + scope/follow-up UI → **COMPLETION ✅** → product commit → STOP.
+1. ~~**Governance (this commit):** seam audit in TASK + docs delta → push → **PRE-CODE ✅** → STOP.~~
+2. ~~**Governance correction:** owner decisions locked in TASK → push → **PRE-CODE ✅**.~~
+3. **AC3 implementation:** atomic runtime wiring + ResponseStage + scope/stage UI → **COMPLETION ✅** → product commit → STOP.
 
-No product code before PRE-CODE ✅.
+No product code before PRE-CODE ✅ on governance correction.
+
+---
+
+## Owner decisions (locked, AC3)
+
+| # | Decision |
+|---|----------|
+| 1 | **`response_stage`** — canonical field on `TargetResponseSpec` (and policy request). Values: `broad_family_price`, `scoped_family_price`, `concrete_service_price`, `stage_clarify`, `data_gap`. |
+| 2 | **`family_price_overview_topic`** — remove from **active product path** and contracts after full migration; no parallel W1 selector. |
+| 3 | **Scope/stage labels** — `clients/demo/ui.yaml` only (`scope_nav`, `stage_nav` sections). **No** `scope_nav.yaml`. |
+| 4 | **Prosthetics stage** — governed typed `UiStageAction` (`target:ui_stage/{topic}/{stage}`); click saves structured `stage` in session `patient_facts`. Emit stage buttons **only** when unknown `stage` axis would change AC2 applicability. No regex; label not authoritative. |
+| 5 | **`broad_family_price`** — max **one** relevant structured marketing fact + **one** CTA per existing marketing policy. Scope nav = **three separate** quick replies. **No** finance/price follow-ups before scale/service chosen. |
+| 6 | **Single-service collapse** — only when exactly one applicable service, usable offer, and **no** unknown required selection axes. |
+| 7 | **Cutover** — atomic; **no** feature flag; **no** parallel W1 selector in product path. |
+| 8 | **Free-text scope** — deferred to A9 checkpoint (not AC3). |
+
+**Open questions:** closed. Implementation follows this table.
 
 ---
 
@@ -172,8 +190,9 @@ TargetResponsePolicyRequest (+ response_stage)
 
 | Step | Mechanism |
 |------|-----------|
-| Emit | When `ResponseStage=broad_family_price` and AC2 `kind=broad_anchors`: materialize 3 `target:ui_scope/{topic}/{extent}` followups |
-| Labels | Client-owned extent-keyed config (REWORK W1b label idea; **not** `family_price_groups.yaml` applicability) |
+| Emit | When `response_stage=broad_family_price`: 3 `target:ui_scope/{topic}/{extent}` followups |
+| Stage emit | When `response_stage=stage_clarify`: typed `target:ui_stage/{topic}/{stage}` only for stages that change AC2 applicability |
+| Labels | `clients/demo/ui.yaml` → `scope_nav` / `stage_nav` (client-owned) |
 | Consume | Existing AC1 `resolve_ui_scope_ref_click` (session-bound ref) |
 | Suppress | When `effective_scope.extent != unknown` OR `kind=scoped_shortlist` OR explicit `service_id` — **no** scope buttons |
 
@@ -184,7 +203,7 @@ TargetResponsePolicyRequest (+ response_stage)
 | `broad_family_price` | price intent + topic + `extent=unknown` | `broad_anchors` | scope buttons + brief anchors text |
 | `scoped_family_price` | price intent + known extent + no explicit service | `scoped_shortlist` | 2–3 services; no scope buttons |
 | `concrete_service_price` | explicit `service_id` or single-service collapse | scoped or S26 path | price followups from offer |
-| `prosthetics_stage_clarify` | prosthetics + extent known + required stage unknown | applicability empty / stage gate | stage buttons or clarify (authored only) |
+| `stage_clarify` | prosthetics + extent known + required stage unknown | applicability empty / stage gate | typed stage buttons; no CTA |
 | `data_gap` | AC2 exclusions / missing authored data | any | honest stop; no invented price |
 
 **No persistent `response_stage` session key** when derivable from above.
@@ -193,12 +212,13 @@ TargetResponsePolicyRequest (+ response_stage)
 
 | Rule | Source |
 |------|--------|
-| Scope nav buttons | NEW materializer; refs `target:ui_scope/` |
-| Price followups («Что входит», «Оплата») | `offer.followups` via S29/S30 when `followup_source=price` |
+| Scope nav (3 buttons) | `ui.yaml` `scope_nav` + `build_ui_scope_ref` |
+| Stage nav | `ui.yaml` `stage_nav` + `build_ui_stage_ref`; only when axis changes applicability |
+| Price followups | `offer.followups` via S29/S30 — **not** in `broad_family_price` or `stage_clarify` |
 | Content followups | MD `suggest_h3` when `followup_source=content` |
-| Marketing facts | `target_marketing_selector` when stage allows |
-| CTA | ≤1; replaces generic CTA when promo CTA exists (PRICE_SERVICE §18) |
-| Slot budget | ≤2 thematic follow-ups + 1 CTA; no mixing nav+price+CTA overload |
+| Marketing facts | `target_marketing_selector`; `broad_family_price`: max 1 fact |
+| CTA | ≤1; `broad_family_price` allowed per marketing policy |
+| Thematic slot budget | ≤2 follow-ups + 1 CTA (scope/stage nav **separate**, not counted in thematic slots) |
 
 ### Why scale menu disappears after scoped answer
 
@@ -276,39 +296,47 @@ TargetResponsePolicyRequest (+ response_stage)
 | `docs/STRANGLER_ROADMAP.md` |
 | `docs/ARCH_TARGET_DESIGN.md` |
 
-### New (AC3 implementation only — tentative, owner may narrow at PRE-CODE)
+### New (AC3 implementation)
 
 | File | Purpose |
 |------|---------|
-| `contracts/target_response_stage.py` | `ResponseStage` enum + derivation contract |
-| `core/target_response_stage.py` | `derive_response_stage(...)` pure function |
-| `core/target_scope_nav_materializer.py` | Emit `target:ui_scope/` followups from client labels |
-| `core/target_scope_aware_materials.py` | AC2 result → `TargetOfflineResponseMaterials` adapter |
+| `contracts/target_response_stage.py` | `ResponseStage` literal + helpers |
+| `contracts/ui_stage_action.py` | Typed `UiStageAction`; `target:ui_stage/` refs |
+| `core/target_response_stage.py` | `derive_response_stage(...)`, stage-clarify discovery |
+| `core/target_ui_stage_action.py` | Session-bound stage ref resolution |
+| `core/target_client_ui_nav.py` | Load `scope_nav` / `stage_nav` from `ui.yaml` |
+| `core/target_scope_aware_price_package.py` | AC2 → materials + nav followups |
 | `tests/test_target_response_stage.py` | Stage derivation unit tests |
-| `tests/test_target_scope_nav_materializer.py` | Scope button materializer tests |
-| `tests/test_ac3_scope_price_flow_offline.py` | End-to-end offline matrix (below) |
+| `tests/test_ui_stage_action_contract.py` | Stage action contract tests |
+| `tests/test_target_client_ui_nav.py` | ui.yaml nav loader tests |
+| `tests/test_ac3_scope_price_flow_offline.py` | End-to-end offline matrix |
 | `tests/test_ac3_scope_price_flow_http_offline.py` | `/ask` + `/ask/stream` parity |
 
-Client pack (if needed for scope labels only):
-
-| File | Condition |
-|------|-----------|
-| `clients/demo/target_response/scope_nav.yaml` | Extent-keyed labels; not applicability |
-
-### Modify (AC3 implementation only — tentative)
+### Modify (AC3 implementation)
 
 | File | Change |
 |------|--------|
+| `clients/demo/ui.yaml` | Add `scope_nav` + `stage_nav` labels |
+| `contracts/effective_scope.py` | Optional `stage` on `EffectiveScope` |
+| `contracts/target_response_spec.py` | `response_stage`, `scope_price_topic`; retire `family_price_overview_topic` from product validators |
+| `contracts/target_response_policy.py` | Policy request: `response_stage`, `scope_price_topic` |
+| `core/target_effective_scope.py` | Merge `stage` from `UiStageAction` + session |
+| `core/target_runtime_session.py` | Persist `stage` in `patient_facts` |
+| `core/target_strategy_context.py` | Pass `stage` from effective scope |
+| `core/target_response_policy.py` | Build spec with `response_stage` |
 | `core/target_runtime_turn.py` | Thread `effective_scope`; scope-aware strategy |
-| `core/target_turn_frame_dispatch.py` | Scope-aware price dispatch + `response_stage` |
-| `core/target_spec_offline_response_package.py` | AC2 call; retire W1 selector in product path |
-| `core/target_policy_bound_verified_response_pipeline.py` | Stage-aware marketing/CTA guards |
+| `core/target_turn_frame_dispatch.py` | Scope-aware dispatch; `effective_scope` param |
+| `core/target_spec_offline_response_package.py` | AC2 path; remove W1 selector from product |
+| `core/target_policy_bound_verified_response_pipeline.py` | Stage-aware marketing/CTA |
 | `core/target_scoped_response_evidence.py` | Scope-aware evidence branch |
 | `core/target_composer_request.py` | Scope-aware composer sources |
-| `core/target_runtime_widget.py` | Scope + follow-up merge; attribution |
-| `contracts/target_response_spec.py` | `response_stage` field (or replace `family_price_overview_topic`) |
-| `contracts/target_response_policy.py` | Policy request fields for stage |
-| `core/target_family_price_overview.py` | Demote selector; keep materials helper |
+| `core/target_runtime_widget.py` | Nav + thematic quick_replies merge; dedup |
+| `core/target_runtime_followup_nav.py` | `is_ui_stage_ref` routing |
+| `orchestration/pre_resolver_turn.py` | `UiStageAction` click hydration |
+| `core/target_family_price_overview.py` | Keep materials helper; product selector unused |
+| `tests/test_target_turn_frame_dispatch.py` | Dispatch expects `response_stage` not W1 flag |
+| `tests/test_target_response_spec.py` | Spec validators for `response_stage` |
+| `tests/test_target_response_policy.py` | Policy builders for scope-aware price |
 
 ### Explicitly forbidden in AC3 implementation
 
@@ -396,7 +424,8 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
   tests/test_ac3_scope_price_flow_offline.py `
   tests/test_ac3_scope_price_flow_http_offline.py `
   tests/test_target_response_stage.py `
-  tests/test_target_scope_nav_materializer.py `
+  tests/test_ui_stage_action_contract.py `
+  tests/test_target_client_ui_nav.py `
   -q
 ```
 
@@ -421,18 +450,10 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 1. AC3 requires A9 authority or free-text scope parser
 2. Requires W1b restore or `family_price_groups` applicability
 3. Requires second selector duplicating AC2
-4. Requires changing protected acceptance/golden/live harness expectations
-5. Prosthetics data-gap needs client pack change **and** no owner approval for data fix path
-6. PRE-CODE or COMPLETION checker ❌ without fix path
-
-## Open questions (owner decisions before / during implementation)
-
-1. **Spec shape:** add `response_stage` to `TargetResponseSpec` vs retire `family_price_overview_topic` flag?
-2. **Scope labels config path:** new `scope_nav.yaml` vs extend existing client pack file?
-3. **Prosthetics stage UI:** typed stage refs (`target:ui_stage/...`) vs text clarify only in AC3?
-4. **Marketing on broad answer:** re-enable per PRICE_SERVICE rule 1 — confirm CTA slot with 3 scope buttons?
-5. **Single-service collapse:** keep when scoped shortlist has exactly one service?
-6. **Feature flag:** atomic cutover vs `TARGET_SCOPE_AWARE_PRICE=1` default OFF?
+4. Requires feature flag or parallel W1 selector in product path
+5. Requires changing protected acceptance/golden/live harness expectations
+6. Prosthetics data-gap needs client pack change **and** no owner approval for data fix path
+7. PRE-CODE or COMPLETION checker ❌ without fix path
 
 ## Completion record
 
@@ -441,9 +462,10 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | AC2 product HEAD | `5a3a2f8` |
 | W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
 | Governance baseline | `57f9067` |
-| AC3 governance HEAD | `2d75d42` |
-| PRE-CODE | ✅ |
+| AC3 governance HEAD | `97d6c94` |
+| Owner decisions correction | |
+| PRE-CODE (post-correction) | |
 | COMPLETION | |
 | AC3 product HEAD | |
 
-**STOP after governance PRE-CODE ✅. AC3 implementation starts only after separate owner GO.**
+**STOP after governance PRE-CODE ✅ on owner-decisions correction. AC3 implementation starts only after separate owner GO.**

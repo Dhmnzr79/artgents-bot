@@ -364,8 +364,8 @@ Safe wider offline (no live, no A9 harness): above + `tests/test_w1_family_price
 | AC1 product HEAD | `72681cc` |
 | W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
 | Governance baseline | `3144572` |
-| AC2 governance HEAD | |
-| PRE-CODE | |
+| AC2 governance HEAD | `47be537` |
+| PRE-CODE | ✅ |
 | COMPLETION | |
 | AC2 product HEAD | |
 

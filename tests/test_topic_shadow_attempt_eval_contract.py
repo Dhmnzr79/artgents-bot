@@ -50,16 +50,21 @@ def _attempt(
     confidence: object = 0.9,
     aspects: list[str] | None = None,
     shadow_status: str | None = None,
+    status: str | None = None,
     legacy_available: bool = True,
 ):
     frame = _frame(topic, confidence=confidence, aspects=aspects)
     if shadow_status is None:
-        shadow_status = "partial" if topic is None or aspects == [] else "ok"
-    return SimpleNamespace(
-        legacy_plan=object() if legacy_available else None,
-        shadow_frame=frame,
-        shadow_status=shadow_status,
+        shadow_status = status or ("partial" if topic is None or aspects == [] else "ok")
+    attempt = SimpleNamespace(
+        frame=frame,
+        status=shadow_status,
     )
+    attempt.shadow_frame = frame
+    attempt.shadow_status = shadow_status
+    if legacy_available:
+        attempt.legacy_plan = object()
+    return attempt
 
 
 def _perfect_attempt(question: str, _sid, client_id: str):
@@ -114,9 +119,8 @@ def test_perfect_fake_is_called_33_times_in_frozen_order() -> None:
 def test_partial_doctors_with_empty_aspects_is_scoreable_without_legacy() -> None:
     frame = _frame("doctors", confidence=0.95, aspects=[])
     attempt = PlannerAttempt(
-        legacy_plan=None,
-        shadow_frame=frame,
-        shadow_status="partial",
+        frame=frame,
+        status="partial",
     )
 
     result = harness.classify_attempt_result(
@@ -153,7 +157,7 @@ def test_missing_topic_with_zero_confidence_is_scoreable_null() -> None:
 def test_partial_valid_topic_mismatch_is_fail_not_error() -> None:
     result = harness.classify_attempt_result(
         expected_topic="doctors",
-        attempt=_attempt("extraction", shadow_status="partial", legacy_available=False),
+        attempt=_attempt("extraction", status="partial", legacy_available=False),
         taxonomy=_TAXONOMY,
     )
     assert result["status"] == "FAIL"
@@ -163,8 +167,7 @@ def test_partial_valid_topic_mismatch_is_fail_not_error() -> None:
 
 def test_invalid_topic_metadata_is_error_with_stable_reason() -> None:
     attempt = SimpleNamespace(
-        legacy_plan=None,
-        shadow_frame=build_turn_frame_from_raw(
+        frame=build_turn_frame_from_raw(
             {
                 "route": "content",
                 "aspects": ["overview"],
@@ -173,8 +176,10 @@ def test_invalid_topic_metadata_is_error_with_stable_reason() -> None:
             },
             allowed_topics=_TAXONOMY,
         ),
-        shadow_status="partial",
+        status="partial",
     )
+    attempt.shadow_frame = attempt.frame
+    attempt.shadow_status = attempt.status
     result = harness.classify_attempt_result(
         expected_topic=None,
         attempt=attempt,
@@ -188,9 +193,11 @@ def test_invalid_topic_metadata_is_error_with_stable_reason() -> None:
 
 
 def test_invalid_topic_confidence_keeps_stable_field_error() -> None:
+    frame = _frame("doctors", confidence="not-a-number")
     attempt = SimpleNamespace(
-        legacy_plan=None,
-        shadow_frame=_frame("doctors", confidence="not-a-number"),
+        frame=frame,
+        shadow_frame=frame,
+        status="partial",
         shadow_status="partial",
     )
     result = harness.classify_attempt_result(
@@ -208,13 +215,23 @@ def test_invalid_topic_confidence_keeps_stable_field_error() -> None:
     [
         (None, None, "planner_unavailable", "not_available"),
         (
-            SimpleNamespace(legacy_plan=None, shadow_frame=None, shadow_status="not_available"),
+            SimpleNamespace(
+                frame=None,
+                shadow_frame=None,
+                status="not_available",
+                shadow_status="not_available",
+            ),
             None,
             "planner_unavailable",
             "not_available",
         ),
         (
-            SimpleNamespace(legacy_plan=object(), shadow_frame=None, shadow_status="degraded"),
+            SimpleNamespace(
+                frame=None,
+                shadow_frame=None,
+                status="degraded",
+                shadow_status="degraded",
+            ),
             None,
             "shadow_degraded",
             "degraded",
@@ -238,7 +255,7 @@ def test_technical_unavailable_reasons_are_distinct(attempt, error, reason, shad
 def test_valid_shadow_without_legacy_is_still_scoreable() -> None:
     result = harness.classify_attempt_result(
         expected_topic="clinic",
-        attempt=_attempt("clinic", legacy_available=False, shadow_status="partial"),
+        attempt=_attempt("clinic", legacy_available=False, status="partial"),
         taxonomy=_TAXONOMY,
     )
     assert result["status"] == "PASS"
@@ -309,19 +326,22 @@ def test_summary_separates_unavailable_degraded_and_invalid() -> None:
         harness.classify_attempt_result(
             expected_topic=rows[1]["expected_topic"],
             attempt=SimpleNamespace(
-                legacy_plan=object(),
+                frame=None,
                 shadow_frame=None,
+                status="degraded",
                 shadow_status="degraded",
             ),
             taxonomy=_TAXONOMY,
         )
     )
+    invalid_frame = _frame("secret-invalid")
     rows[2].update(
         harness.classify_attempt_result(
             expected_topic=rows[2]["expected_topic"],
             attempt=SimpleNamespace(
-                legacy_plan=None,
-                shadow_frame=_frame("secret-invalid"),
+                frame=invalid_frame,
+                shadow_frame=invalid_frame,
+                status="partial",
                 shadow_status="partial",
             ),
             taxonomy=_TAXONOMY,

@@ -16,7 +16,7 @@ from core.target_runtime_widget import build_target_runtime_widget_cta
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged
 from orchestration.context import AskTurnContext
-from orchestration.resolver_turn import ResolverTurnOutcome
+from orchestration.planner_turn import PlannerTurnOutcome
 from session import mem_get, mem_reset
 from tests.test_s61_correction_target_runtime import (
     BackendPayload,
@@ -49,8 +49,8 @@ def _ask_context(q: str = "test", sid: str = "sid", data: dict | None = None):
 def _stub_resolver(monkeypatch: pytest.MonkeyPatch, app_module) -> None:
     monkeypatch.setattr(
         app_module,
-        "run_resolver_turn",
-        lambda **k: ResolverTurnOutcome("content", None, None, False),
+        "run_planner_turn",
+        lambda **k: PlannerTurnOutcome("content", None),
     )
 
 
@@ -94,7 +94,7 @@ def test_http_ask_default_target_authority(monkeypatch: pytest.MonkeyPatch) -> N
         "orchestrate_target_fullcontext_turn",
         _fake_target_turn_factory(composer, semantic, boundary),
     )
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
     client = app_module.app.test_client()
@@ -118,7 +118,7 @@ def test_http_stream_default_target_authority(monkeypatch: pytest.MonkeyPatch) -
         "orchestrate_target_fullcontext_turn",
         _fake_target_turn_factory(composer, semantic, boundary),
     )
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
     client = app_module.app.test_client()
@@ -252,7 +252,7 @@ def test_ref_click_uses_target_navigation(monkeypatch: pytest.MonkeyPatch) -> No
         return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
 
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
     client = app_module.app.test_client()
@@ -296,7 +296,7 @@ def test_json_and_stream_share_target_authority(monkeypatch: pytest.MonkeyPatch)
         return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
 
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
     client = app_module.app.test_client()

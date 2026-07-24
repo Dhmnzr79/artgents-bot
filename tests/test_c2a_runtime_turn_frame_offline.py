@@ -7,7 +7,6 @@ from flask import Flask, request
 
 from contracts.planner_attempt import PlannerAttempt
 from contracts.turn_frame import TurnFrame
-from contracts.turn_plan import TurnPlan
 from core.runtime_turn_frame import (
     RUNTIME_FRAME_STATUS_DEGRADED,
     RUNTIME_FRAME_STATUS_NOT_AVAILABLE,
@@ -34,6 +33,8 @@ def _frame(**overrides: object) -> TurnFrame:
         "topic_confidence": 0.9,
     }
     raw.update(overrides)
+    if overrides.get("aspects") == []:
+        raw.pop("primary_aspect", None)
     return build_turn_frame_from_raw(
         raw,
         allowed_topics=frozenset({"implantation"}),
@@ -51,9 +52,8 @@ def flask_ctx():
 
 def test_publish_ok_frame(flask_ctx) -> None:
     frame = _frame()
-    legacy = TurnPlan(route="content", aspects=["price"], topic="implantation", topic_confidence=0.9)
     out = publish_planner_attempt_frame(
-        attempt=PlannerAttempt(legacy_plan=legacy, shadow_frame=frame, shadow_status="ok")
+        attempt=PlannerAttempt(frame=frame, status="ok")
     )
     assert out is frame
     assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_OK
@@ -65,9 +65,9 @@ def test_publish_ok_frame(flask_ctx) -> None:
 
 
 def test_publish_partial_frame_usable_by_bridge(flask_ctx) -> None:
-    frame = _frame()
+    frame = _frame(aspects=[])
     publish_planner_attempt_frame(
-        attempt=PlannerAttempt(legacy_plan=None, shadow_frame=frame, shadow_status="partial")
+        attempt=PlannerAttempt(frame=frame, status="partial")
     )
     assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_PARTIAL
     loaded = load_runtime_turn_frame()
@@ -76,7 +76,7 @@ def test_publish_partial_frame_usable_by_bridge(flask_ctx) -> None:
 
 def test_not_available_fail_closed(flask_ctx) -> None:
     publish_planner_attempt_frame(
-        attempt=PlannerAttempt(legacy_plan=None, shadow_frame=None, shadow_status="not_available")
+        attempt=PlannerAttempt(frame=None, status="not_available")
     )
     assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_NOT_AVAILABLE
     assert load_runtime_turn_frame_snapshot() is None
@@ -86,7 +86,7 @@ def test_not_available_fail_closed(flask_ctx) -> None:
 
 def test_degraded_fail_closed(flask_ctx) -> None:
     publish_planner_attempt_frame(
-        attempt=PlannerAttempt(legacy_plan=None, shadow_frame=None, shadow_status="degraded")
+        attempt=PlannerAttempt(frame=None, status="degraded")
     )
     assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_DEGRADED
     with pytest.raises(TargetRuntimeTurnFrameError):
@@ -96,9 +96,9 @@ def test_degraded_fail_closed(flask_ctx) -> None:
 def test_runtime_keys_in_metadata_first_turn_details(flask_ctx) -> None:
     from core.metadata_first_observability import metadata_first_turn_details
 
-    frame = _frame()
+    frame = _frame(aspects=[])
     publish_planner_attempt_frame(
-        attempt=PlannerAttempt(legacy_plan=None, shadow_frame=frame, shadow_status="partial")
+        attempt=PlannerAttempt(frame=frame, status="partial")
     )
     details = metadata_first_turn_details()
     assert details["runtime_turn_frame_status"] == RUNTIME_FRAME_STATUS_PARTIAL

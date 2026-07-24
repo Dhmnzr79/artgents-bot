@@ -96,9 +96,8 @@ def _install_turn_frame(frame) -> None:
 
     publish_planner_attempt_frame(
         attempt=PlannerAttempt(
-            legacy_plan=None,
-            shadow_frame=frame,
-            shadow_status="partial",
+            frame=frame,
+            status="ok",
         )
     )
 
@@ -139,7 +138,7 @@ def test_uses_target_orchestration_only(monkeypatch: pytest.MonkeyPatch) -> None
     )
     monkeypatch.setattr(
         app_module,
-        "run_resolver_turn",
+        "run_planner_turn",
         lambda **k: MagicMock(intent="content", decision=None, scope_topic_candidate=None, resolver_bypassed_env=False),
     )
     result = app_module._orchestrate_ask_turn({"q": "test", "sid": "sid"})
@@ -201,7 +200,7 @@ def test_turn_frame_bridge_reads_runtime_frame(flask_ctx) -> None:
     _install_turn_frame(frame)
     loaded = load_runtime_turn_frame()
     assert loaded.service_id == "all_on_4"
-    assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_PARTIAL
+    assert get_runtime_turn_frame_status() == RUNTIME_FRAME_STATUS_OK
     assert isinstance(load_runtime_turn_frame_snapshot(), dict)
 
 

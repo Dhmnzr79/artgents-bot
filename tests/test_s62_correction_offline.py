@@ -39,7 +39,7 @@ from tests.test_s61_correction_target_runtime import (
     _seed_target_runtime_state,
 )
 from tests.test_demo_target_turn_frame_bound_response import DOCTORS_TEXT
-from orchestration.resolver_turn import ResolverTurnOutcome
+from orchestration.planner_turn import PlannerTurnOutcome
 from contracts.ask_orchestration import AskOrchestrationResult
 from tests.test_target_boundary_enforced_fullcontext_response import (
     PRICE_TEXT,
@@ -346,8 +346,8 @@ def test_http_followup_ref_click_target_only(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
     monkeypatch.setattr(
         app_module,
-        "run_resolver_turn",
-        lambda **k: ResolverTurnOutcome("content", None, None, False),
+        "run_planner_turn",
+        lambda **k: PlannerTurnOutcome("content", None),
     )
     client = app_module.app.test_client()
     resp = client.post(

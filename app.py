@@ -46,7 +46,7 @@ from orchestration.helpers import get_last_content_ui_payload_compat
 from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
-from orchestration.resolver_turn import run_resolver_turn
+from orchestration.planner_turn import run_planner_turn
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
 from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
@@ -306,7 +306,7 @@ def _orchestrate_ask_turn(data: dict):
     if isinstance(pre, AskOrchestrationResult):
         return pre
 
-    run_resolver_turn(
+    run_planner_turn(
         q=pre.q,
         sid=pre.sid,
         client_id=pre.client_id,

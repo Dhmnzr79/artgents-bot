@@ -19,11 +19,12 @@ from core.target_runtime_followup_nav import (
 from core.target_runtime_session import read_target_runtime_session
 from core.target_runtime_strategy import resolve_target_runtime_strategy_context
 from core.target_runtime_turn import run_target_fullcontext_runtime_turn
+from contracts.planner_attempt import PlannerAttempt
+from core.runtime_turn_frame import publish_planner_attempt_frame
 from core.turn_frame_from_raw import build_turn_frame_from_raw
-from core.turn_frame_shadow import SHADOW_STATUS_OK
 from orchestration.context import AskTurnContext
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
-from orchestration.resolver_turn import ResolverTurnOutcome
+from orchestration.planner_turn import PlannerTurnOutcome
 from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn
 from session import mem_get, mem_reset
 from tests.test_target_boundary_enforced_fullcontext_response import (
@@ -69,8 +70,9 @@ def _turn_frame(**overrides: object):
 
 
 def _install_turn_frame(frame) -> None:
-    request.ctx["turn_frame_shadow"] = frame.model_dump()
-    request.ctx["turn_frame_shadow_status"] = SHADOW_STATUS_OK
+    publish_planner_attempt_frame(
+        attempt=PlannerAttempt(frame=frame, status="ok"),
+    )
 
 
 def _fake_backends():
@@ -385,8 +387,8 @@ def test_http_ask_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         app_module,
-        "run_resolver_turn",
-        lambda **k: ResolverTurnOutcome("content", None, None, False),
+        "run_planner_turn",
+        lambda **k: PlannerTurnOutcome("content", None),
     )
     client = app_module.app.test_client()
     resp = client.post(
@@ -417,8 +419,8 @@ def test_http_ask_followup_ref_click(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
     monkeypatch.setattr(
         app_module,
-        "run_resolver_turn",
-        lambda **k: ResolverTurnOutcome("content", None, None, False),
+        "run_planner_turn",
+        lambda **k: PlannerTurnOutcome("content", None),
     )
     client = app_module.app.test_client()
     resp = client.post(
@@ -455,8 +457,8 @@ def test_http_ask_two_turns_carries_session_shown_ids(monkeypatch: pytest.Monkey
     )
     monkeypatch.setattr(
         app_module,
-        "run_resolver_turn",
-        lambda **k: ResolverTurnOutcome("content", None, None, False),
+        "run_planner_turn",
+        lambda **k: PlannerTurnOutcome("content", None),
     )
     composer = RecordingComposerBackend(PRICE_TEXT)
     semantic = RecordingSemanticBackend()

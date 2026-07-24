@@ -37,17 +37,9 @@ def _record_a9_scope(patient_situation: object, *, partial: bool = False):
         },
         allowed_topics=frozenset({"implantation"}),
     )
-    legacy_plan = None
-    if not partial:
-        legacy_plan = TurnPlan(
-            route="content",
-            aspects=["overview"],
-            patient_situation=patient_situation,
-        )
     attempt = PlannerAttempt(
-        legacy_plan=legacy_plan,
-        shadow_frame=frame,
-        shadow_status="partial" if partial else "ok",
+        frame=frame,
+        status="partial" if partial else "ok",
     )
     publish_planner_attempt_frame(attempt=attempt)
     return frame
@@ -77,13 +69,8 @@ def _record_native_a9_scope(
         allowed_topics=frozenset({"implantation"}),
     )
     attempt = PlannerAttempt(
-        legacy_plan=TurnPlan(
-            route="content",
-            aspects=["overview"],
-            patient_situation="one_tooth_missing",
-        ),
-        shadow_frame=frame,
-        shadow_status=shadow_status,
+        frame=frame,
+        status=shadow_status,
     )
     publish_planner_attempt_frame(attempt=attempt)
     return frame
@@ -467,9 +454,8 @@ def test_a9_shadow_observability_does_not_leak_malformed_raw_secrets() -> None:
         )
         publish_planner_attempt_frame(
             attempt=PlannerAttempt(
-                legacy_plan=None,
-                shadow_frame=frame,
-                shadow_status="partial",
+        frame=frame,
+                status="partial",
             )
         )
         observed = {
@@ -503,7 +489,7 @@ def test_native_a9_partial_scope_preserves_neighbors_without_raw_secret_leak() -
                 "modifiers": [],
                 "secret-native-key": "secret-native-value",
             },
-            shadow_status="partial",
+            status="partial",
             raw_extra={
                 "question": "secret-question",
                 "history": ["secret-history"],

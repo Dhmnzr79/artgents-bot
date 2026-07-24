@@ -22,7 +22,7 @@ from core.target_runtime_widget import build_target_runtime_widget_cta
 from evals.v5.fullcontext_response_eval_contract import sha256_file_hex
 from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged
 from evals.v5.s66_default_authority_live_contract import assert_frozen_s63_live_artifacts_unchanged
-from orchestration.resolver_turn import ResolverTurnOutcome
+from orchestration.planner_turn import PlannerTurnOutcome
 from session import mem_get, mem_reset
 from tests.test_s61_correction_target_runtime import (
     _fake_backends,
@@ -112,7 +112,7 @@ def _install_default_target_http(monkeypatch: pytest.MonkeyPatch, app_module) ->
         "orchestrate_target_fullcontext_turn",
         _fake_target_turn_factory(composer, semantic, boundary),
     )
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
     return get_chunk, answer_plan
 
@@ -254,7 +254,7 @@ def test_target_ref_click_no_get_chunk_by_ref(monkeypatch: pytest.MonkeyPatch) -
         return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
 
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
     client = app_module.app.test_client()
@@ -322,7 +322,7 @@ def test_planner_turn_frame_path_reaches_target(monkeypatch: pytest.MonkeyPatch)
         return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
 
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(app_module, "run_resolver_turn", lambda **k: ResolverTurnOutcome("content", None, None, False))
+    monkeypatch.setattr(app_module, "run_planner_turn", lambda **k: PlannerTurnOutcome("content", None))
     monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", _turn_frame)
 
     client = app_module.app.test_client()

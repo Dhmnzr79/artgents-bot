@@ -101,7 +101,7 @@ def publish_planner_attempt_frame(*, attempt: PlannerAttempt) -> TurnFrame | Non
     if ctx is None:
         return None
 
-    status = attempt.shadow_status
+    status = attempt.status
     if status == RUNTIME_FRAME_STATUS_NOT_AVAILABLE:
         mark_runtime_turn_frame_not_available()
         return None
@@ -109,7 +109,7 @@ def publish_planner_attempt_frame(*, attempt: PlannerAttempt) -> TurnFrame | Non
         _mark_runtime_turn_frame_degraded(ctx)
         return None
 
-    frame = attempt.shadow_frame
+    frame = attempt.frame
     if frame is None:
         _mark_runtime_turn_frame_degraded(ctx)
         return None

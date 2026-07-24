@@ -1,4 +1,4 @@
-"""Planner attempt envelope for single-call dual-branch outcome (A7 contract only)."""
+"""Planner attempt envelope for single-call frame-first outcome (C2b)."""
 
 from __future__ import annotations
 
@@ -7,9 +7,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from contracts.turn_frame import PatientScopeFrameMeta, TurnFrame, TurnFrameMeta
-from contracts.turn_plan import TurnPlan
 
-ShadowAttemptStatus = Literal["ok", "partial", "not_available", "degraded"]
+FrameAttemptStatus = Literal["ok", "partial", "not_available", "degraded"]
+
+# Historical alias for offline eval contracts.
+ShadowAttemptStatus = FrameAttemptStatus
 
 
 def turn_frame_has_invalid_or_missing(frame: TurnFrame) -> bool:
@@ -36,30 +38,36 @@ class PlannerAttempt(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    legacy_plan: TurnPlan | None
-    shadow_frame: TurnFrame | None
-    shadow_status: ShadowAttemptStatus
+    frame: TurnFrame | None
+    status: FrameAttemptStatus
+
+    @property
+    def shadow_frame(self) -> TurnFrame | None:
+        """Historical alias for A9/offline eval readers."""
+        return self.frame
+
+    @property
+    def shadow_status(self) -> FrameAttemptStatus:
+        """Historical alias for A9/offline eval readers."""
+        return self.status
 
     @model_validator(mode="after")
-    def _shadow_status_invariants(self) -> "PlannerAttempt":
-        status = self.shadow_status
+    def _status_invariants(self) -> "PlannerAttempt":
+        status = self.status
         if status == "ok":
-            if self.legacy_plan is None or self.shadow_frame is None:
-                raise ValueError("ok_requires_legacy_plan_and_shadow_frame")
-            if turn_frame_has_invalid_or_missing(self.shadow_frame):
+            if self.frame is None:
+                raise ValueError("ok_requires_frame")
+            if turn_frame_has_invalid_or_missing(self.frame):
                 raise ValueError("ok_forbids_invalid_or_missing_metadata")
         elif status == "partial":
-            if self.shadow_frame is None:
-                raise ValueError("partial_requires_shadow_frame")
-            has_issue = self.legacy_plan is None or turn_frame_has_invalid_or_missing(
-                self.shadow_frame
-            )
-            if not has_issue:
-                raise ValueError("partial_requires_legacy_none_or_invalid_metadata")
+            if self.frame is None:
+                raise ValueError("partial_requires_frame")
+            if not turn_frame_has_invalid_or_missing(self.frame):
+                raise ValueError("partial_requires_invalid_or_missing_metadata")
         elif status == "not_available":
-            if self.legacy_plan is not None or self.shadow_frame is not None:
-                raise ValueError("not_available_requires_both_none")
+            if self.frame is not None:
+                raise ValueError("not_available_forbids_frame")
         elif status == "degraded":
-            if self.shadow_frame is not None:
-                raise ValueError("degraded_forbids_shadow_frame")
+            if self.frame is not None:
+                raise ValueError("degraded_forbids_frame")
         return self

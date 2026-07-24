@@ -1,0 +1,469 @@
+{
+  "schema_version": "a9r.patient_scope_authority_prep.v2",
+  "client_id": "demo",
+  "purpose": "Frozen A9R authority-prep expectations: planner patient_scope projection to EffectiveScope merge semantics. Does not replace or modify v1/v2 shadow matrices.",
+  "authority_decision_allowed": false,
+  "product_path_allowed": false,
+  "baseline_product_head": "aa8e6dd",
+  "immutable_prior_artifacts": [
+    "evals/v5/demo/patient_scope_shadow_matrix.json",
+    "evals/v5/demo/patient_scope_shadow_matrix_v2.json",
+    "docs/evidence/a9/PATIENT_SCOPE_SHADOW_AUDIT_A9.md",
+    "evals/v5/demo/patient_scope_a9r_matrix.json"
+  ],
+  "allowed_axes": {
+    "extent": [
+      "unknown",
+      "one_tooth",
+      "few_teeth",
+      "full_arch"
+    ],
+    "jaw": [
+      "unknown",
+      "upper",
+      "lower",
+      "both"
+    ],
+    "stage": [
+      "unknown",
+      "natural_tooth_present",
+      "extraction_context",
+      "implant_placed"
+    ],
+    "modifiers": [
+      "reported_bone_deficit"
+    ]
+  },
+  "merge_contract": {
+    "source_priority": [
+      "ui_scope_action",
+      "ui_stage_action",
+      "current_turn_patient_scope",
+      "session_patient_facts",
+      "unknown"
+    ],
+    "session_write_requires": "confident_current_turn_extraction",
+    "correction_replaces_session": true,
+    "uncertain_or_conflicting_must_not_overwrite_session": true,
+    "topic_change_clears_session": true,
+    "sid_isolation": true
+  },
+  "scoring_contract": {
+    "primary_target": "effective_scope_projection",
+    "shadow_frame_reference": "turn_frame.patient_scope",
+    "session_behavior_scored": true,
+    "planner_reuse_only": true,
+    "no_second_llm": true,
+    "no_regex_scope_parser": true,
+    "no_service_name_scope_inference": true,
+    "live_eval_gate": "A9R2",
+    "offline_eval_gate": "A9R1"
+  },
+  "cases": [
+    {
+      "id": "a9r_extent_01_full_arch_price_question",
+      "category": "extent_positive",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Сколько стоит имплантация всей челюсти?",
+      "expected_effective_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "forbidden_inferences": [
+        "service_id",
+        "all_on_4",
+        "all_on_6"
+      ],
+      "session_write": "optional_if_confident",
+      "rationale": "Explicit full-jaw implantation price question states arch scale; does not select protocol."
+    },
+    {
+      "id": "a9r_extent_02_one_tooth_restore",
+      "category": "extent_positive",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Нужно восстановить один зуб",
+      "expected_effective_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Explicit one-tooth restoration request."
+    },
+    {
+      "id": "a9r_extent_03_few_teeth_missing",
+      "category": "extent_positive",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Нет нескольких зубов",
+      "expected_effective_scope": {
+        "extent": "few_teeth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Several missing teeth without naming a count still maps to few_teeth, not full_arch."
+    },
+    {
+      "id": "a9r_jaw_01_upper",
+      "category": "jaw_positive",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Нет зубов на верхней челюсти",
+      "expected_effective_scope": {
+        "extent": "full_arch",
+        "jaw": "upper",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Toothless upper jaw implies full_arch extent for that jaw plus upper jaw axis."
+    },
+    {
+      "id": "a9r_jaw_02_lower",
+      "category": "jaw_positive",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Восстановление нужно на нижней челюсти",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "lower",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Lower jaw explicit; extent not stated."
+    },
+    {
+      "id": "a9r_jaw_03_both",
+      "category": "jaw_positive",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Нужно восстановить обе челюсти",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "both",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Both jaws explicit without per-jaw tooth count."
+    },
+    {
+      "id": "a9r_stage_01_implant_placed",
+      "category": "stage_positive",
+      "phase": "a9r2_live",
+      "topic": "prosthetics",
+      "question": "Имплант уже установлен, сколько будет коронка?",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "implant_placed",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Patient explicitly states implant is already placed."
+    },
+    {
+      "id": "a9r_stage_02_natural_tooth_present",
+      "category": "stage_positive",
+      "phase": "a9r2_live",
+      "topic": "prosthetics",
+      "question": "Свой зуб ещё сохранился, можно ли поставить коронку?",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "natural_tooth_present",
+        "modifiers": []
+      },
+      "session_write": "optional_if_confident",
+      "rationale": "Natural tooth preserved is an explicit prosthetics stage axis for AC2."
+    },
+    {
+      "id": "a9r_correction_01_one_tooth_after_full_arch",
+      "category": "correction",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "turns": [
+        {
+          "question": "Нужно восстановить всю челюсть",
+          "expected_effective_scope": {
+            "extent": "full_arch",
+            "jaw": "unknown",
+            "stage": "unknown",
+            "modifiers": []
+          },
+          "session_write": "write_if_confident"
+        },
+        {
+          "question": "Нет, речь об одном зубе",
+          "expected_effective_scope": {
+            "extent": "one_tooth",
+            "jaw": "unknown",
+            "stage": "unknown",
+            "modifiers": []
+          },
+          "session_write": "replace_prior_extent",
+          "must_not_keep_prior": {
+            "extent": "full_arch"
+          }
+        }
+      ],
+      "rationale": "Explicit correction must replace prior session extent, not merge silently."
+    },
+    {
+      "id": "a9r_typo_01_chelyust",
+      "category": "robustness",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Сколько стоит имплантация всей чилюсти?",
+      "expected_effective_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "notes": "Colloquial/typo-tolerant phrasing bucket; same semantic as full_arch price question.",
+      "rationale": "Robustness case for conversational full-arch wording."
+    },
+    {
+      "id": "a9r_typo_02_odin_zub_colloquial",
+      "category": "robustness",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Один зубик сломался, сколько восстановление?",
+      "expected_effective_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "rationale": "Colloquial diminutive still means one tooth, not few_teeth."
+    },
+    {
+      "id": "a9r_negative_01_all_on_4_info",
+      "category": "no_scope_from_service",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Что такое All-on-4?",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "forbidden_inferences": [
+        "full_arch",
+        "extent"
+      ],
+      "session_write": "must_not_write",
+      "rationale": "Informational service question must not invent patient tooth loss."
+    },
+    {
+      "id": "a9r_negative_02_all_on_4_price",
+      "category": "no_scope_from_service",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Сколько стоит All-on-4?",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "forbidden_inferences": [
+        "full_arch"
+      ],
+      "session_write": "must_not_write",
+      "rationale": "Named protocol price question routes to concrete service path; must not infer patient arch state."
+    },
+    {
+      "id": "a9r_negative_03_implant_word_only",
+      "category": "no_stage_inference",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Расскажите про имплант",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "forbidden_inferences": [
+        "implant_placed"
+      ],
+      "session_write": "must_not_write",
+      "rationale": "Generic implant topic interest is not implant_placed stage."
+    },
+    {
+      "id": "a9r_ambiguous_01_contradictory_extent",
+      "category": "ambiguous",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Один зуб, ну или может вся челюсть, не знаю",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "must_not_overwrite",
+      "rationale": "Contradictory extent must not pick a winner or overwrite session."
+    },
+    {
+      "id": "a9r_ambiguous_02_vague_several",
+      "category": "ambiguous",
+      "phase": "a9r2_live",
+      "topic": "implantation",
+      "question": "Зубов не хватает",
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "session_write": "must_not_write",
+      "rationale": "Vague missing teeth without count or arch wording stays unknown."
+    },
+    {
+      "id": "a9r_session_01_topic_change_clears",
+      "category": "session_lifecycle",
+      "phase": "a9r1_offline",
+      "topic": "implantation",
+      "setup": {
+        "session_patient_facts": {
+          "extent": "one_tooth",
+          "topic": "implantation",
+          "provenance": "target:ui_scope/implantation/one_tooth",
+          "ref": "target:ui_scope/implantation/one_tooth",
+          "set_at_turn": 1
+        },
+        "current_topic": "prosthetics",
+        "session_turn_count": 3
+      },
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "expected_session_after_sync": "cleared",
+      "rationale": "Topic change must clear carried implantation extent before prosthetics turn."
+    },
+    {
+      "id": "a9r_session_02_stale_session_ignored",
+      "category": "session_lifecycle",
+      "phase": "a9r1_offline",
+      "topic": "implantation",
+      "setup": {
+        "session_patient_facts": {
+          "extent": "full_arch",
+          "topic": "implantation",
+          "provenance": "target:ui_scope/implantation/full_arch",
+          "ref": "target:ui_scope/implantation/full_arch",
+          "set_at_turn": 1
+        },
+        "current_topic": "implantation",
+        "session_turn_count": 99
+      },
+      "expected_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "rationale": "Stale session facts beyond max_service_focus_turn_age must not apply."
+    },
+    {
+      "id": "a9r_session_03_reset_clears",
+      "category": "session_lifecycle",
+      "phase": "a9r1_offline",
+      "topic": "implantation",
+      "setup": {
+        "action": "mem_reset",
+        "prior_session_patient_facts": {
+          "extent": "few_teeth",
+          "topic": "implantation",
+          "provenance": "test",
+          "ref": "test",
+          "set_at_turn": 1
+        }
+      },
+      "expected_session_after": "empty",
+      "rationale": "Session reset must remove patient_facts entirely."
+    },
+    {
+      "id": "a9r_session_04_sid_isolation",
+      "category": "session_lifecycle",
+      "phase": "a9r1_offline",
+      "topic": "implantation",
+      "setup": {
+        "sid_a_facts": {
+          "extent": "one_tooth",
+          "topic": "implantation",
+          "provenance": "test",
+          "ref": "test",
+          "set_at_turn": 1
+        },
+        "sid_b": "empty"
+      },
+      "expected_sid_b_effective_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "rationale": "Facts written under sid A must not leak to sid B."
+    },
+    {
+      "id": "a9r_ui_priority_01_scope_click_beats_text",
+      "category": "merge_priority",
+      "phase": "a9r1_offline",
+      "topic": "implantation",
+      "setup": {
+        "current_ui_action": {
+          "extent": "few_teeth",
+          "topic": "implantation",
+          "ref": "target:ui_scope/implantation/few_teeth"
+        },
+        "planner_patient_scope": {
+          "extent": "one_tooth",
+          "jaw": "unknown",
+          "stage": "unknown",
+          "modifiers": []
+        }
+      },
+      "expected_effective_scope": {
+        "extent": "few_teeth",
+        "source": "ui_action",
+        "modifiers": []
+      },
+      "rationale": "Typed UI action of current turn outranks free-text planner scope."
+    },
+    {
+      "id": "a9r_deterministic_01_scalar_bridge_one_tooth",
+      "category": "deterministic_fixture",
+      "phase": "a9r1_offline",
+      "raw_patient_situation": "one_tooth_missing",
+      "expected_shadow_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "expected_effective_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "rationale": "Legacy scalar bridge remains deterministic baseline; not authority path."
+    }
+  ]
+}

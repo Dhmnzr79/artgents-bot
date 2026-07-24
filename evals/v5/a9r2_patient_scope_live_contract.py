@@ -1,0 +1,310 @@
+"""Frozen contract for A9R2 patient-scope planner live eval (pre-live prep)."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any, Literal
+
+from evals.v5.fullcontext_response_eval_contract import (
+    AttemptMarkerExistsError,
+    HarnessConfigError,
+    LiveArtifactExistsError,
+    prepare_json_artifact_payload,
+    sha256_file_hex,
+)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+MATRIX_V1_PATH = _REPO_ROOT / "evals" / "v5" / "demo" / "patient_scope_a9r_matrix.json"
+MATRIX_V2_PATH = _REPO_ROOT / "evals" / "v5" / "demo" / "patient_scope_a9r_matrix_v2.json"
+
+MATRIX_V1_BLOB = "36d137112007a3fb0a96ad0759aa111af6115a35"
+MATRIX_V2_BLOB = "6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57"
+
+MEASUREMENT_ID = "a9r2_patient_scope_live"
+SUITE_ID = "a9r2_patient_scope_live"
+CLIENT_ID = "demo"
+LIVE_CASE_COUNT = 16
+MAX_PLANNER_CALLS = 17
+RETRY_COUNT_MAX = 0
+OWNER_APPROVED_PLANNER_MODEL = "qwen3.6-flash"
+
+SCORABLE_AXES = ("extent", "jaw", "stage", "reported_context")
+NEGATIVE_AMBIGUOUS_CATEGORIES = frozenset(
+    {
+        "no_scope_from_service",
+        "no_stage_inference",
+        "ambiguous",
+    }
+)
+POSITIVE_CATEGORIES = frozenset(
+    {
+        "extent_positive",
+        "jaw_positive",
+        "stage_positive",
+        "robustness",
+        "correction",
+    }
+)
+
+PROPOSED_GATES: dict[str, Any] = {
+    "wrong_non_unknown_axis_count": {"max": 0},
+    "false_positive_axis_count": {"max": 0, "scope": "negative_ambiguous"},
+    "correction_success_rate": {"min": 1.0},
+    "positive_axis_recall": {"min": 0.85},
+    "composite_exact_turn_rate": {"min": 0.85},
+    "malformed_projection_count": {"max": 0},
+    "transport_provider_error_count": {"max": 0},
+    "planner_calls": {"max": MAX_PLANNER_CALLS},
+    "retry_count": {"max": RETRY_COUNT_MAX},
+}
+
+LIVE_ARTIFACTS_DIR = _REPO_ROOT / "evals" / "v5" / "artifacts"
+LIVE_RAW_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_raw.json"
+LIVE_RESULT_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_result.json"
+LIVE_MANIFEST_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_manifest.json"
+LIVE_MANUAL_REVIEW_ARTIFACT_PATH = (
+    LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_manual_review.json"
+)
+LIVE_ATTEMPT_MARKER_PATH = LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_attempt.json"
+LIVE_CALL_LEDGER_PATH = LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_call_ledger.jsonl"
+
+DEFAULT_LIVE_ARTIFACT_PATHS = (
+    LIVE_RAW_ARTIFACT_PATH,
+    LIVE_RESULT_ARTIFACT_PATH,
+    LIVE_MANIFEST_ARTIFACT_PATH,
+    LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
+    LIVE_ATTEMPT_MARKER_PATH,
+    LIVE_CALL_LEDGER_PATH,
+)
+
+ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
+AxisOutcome = Literal[
+    "correct_expected_axis",
+    "missing_expected_positive_axis",
+    "wrong_non_unknown_axis",
+    "false_positive_axis",
+    "malformed_invalid_defaulted_projection",
+    "not_applicable",
+]
+AutomatedVerdict = Literal["AUTOMATED_PASS", "AUTOMATED_FAIL"]
+FinalVerdict = Literal["PASS", "FAIL", "PENDING_MANUAL_REVIEW"]
+
+
+def _git_blob_hash(path: Path) -> str:
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
+
+
+def assert_matrix_v1_frozen() -> None:
+    if _git_blob_hash(MATRIX_V1_PATH) != MATRIX_V1_BLOB:
+        raise HarnessConfigError("frozen A9R v1 matrix blob mismatch")
+
+
+def assert_matrix_v2_frozen() -> None:
+    if _git_blob_hash(MATRIX_V2_PATH) != MATRIX_V2_BLOB:
+        raise HarnessConfigError("frozen A9R v2 matrix blob mismatch")
+
+
+def load_frozen_matrix_v2() -> dict[str, Any]:
+    assert_matrix_v2_frozen()
+    payload = json.loads(MATRIX_V2_PATH.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != "a9r.patient_scope_authority_prep.v2":
+        raise HarnessConfigError("A9R v2 matrix schema_version mismatch")
+    return payload
+
+
+def iter_live_planner_calls(matrix: dict[str, Any]) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+    for case in matrix.get("cases", []):
+        if case.get("phase") != "a9r2_live":
+            continue
+        case_id = str(case["id"])
+        category = str(case.get("category") or "")
+        topic = str(case.get("topic") or "")
+        if "turns" in case:
+            for index, turn in enumerate(case["turns"]):
+                calls.append(
+                    {
+                        "call_id": f"{case_id}:turn{index + 1}",
+                        "case_id": case_id,
+                        "turn_index": index,
+                        "category": category,
+                        "topic": topic,
+                        "question": str(turn["question"]),
+                        "expected_scope": dict(turn["expected_effective_scope"]),
+                        "session_write": turn.get("session_write"),
+                        "must_not_keep_prior": turn.get("must_not_keep_prior"),
+                        "forbidden_inferences": list(case.get("forbidden_inferences") or []),
+                        "is_correction_turn": index > 0,
+                    }
+                )
+        else:
+            calls.append(
+                {
+                    "call_id": case_id,
+                    "case_id": case_id,
+                    "turn_index": 0,
+                    "category": category,
+                    "topic": topic,
+                    "question": str(case["question"]),
+                    "expected_scope": dict(case["expected_effective_scope"]),
+                    "session_write": case.get("session_write"),
+                    "must_not_keep_prior": None,
+                    "forbidden_inferences": list(case.get("forbidden_inferences") or []),
+                    "is_correction_turn": False,
+                }
+            )
+    if len({call["case_id"] for call in calls}) != LIVE_CASE_COUNT:
+        raise HarnessConfigError(
+            f"live case count mismatch expected={LIVE_CASE_COUNT} actual={len({call['case_id'] for call in calls})}"
+        )
+    if len(calls) != MAX_PLANNER_CALLS:
+        raise HarnessConfigError(
+            f"planner call budget mismatch expected={MAX_PLANNER_CALLS} actual={len(calls)}"
+        )
+    return calls
+
+
+def assert_live_artifacts_absent(
+    *,
+    exclude_paths: frozenset[Path] | None = None,
+) -> None:
+    excluded = {path.resolve() for path in (exclude_paths or frozenset())}
+    for path in DEFAULT_LIVE_ARTIFACT_PATHS:
+        if path.resolve() in excluded:
+            continue
+        if path.exists():
+            raise LiveArtifactExistsError(f"live artifact already exists: {path}")
+
+
+def assert_attempt_marker_absent(
+    path: Path = LIVE_ATTEMPT_MARKER_PATH,
+    *,
+    owner_override: bool = False,
+) -> None:
+    if not path.exists():
+        return
+    marker = load_attempt_marker(path)
+    started = int(marker.get("provider_calls_started") or 0)
+    if owner_override and started == 0:
+        path.unlink()
+        return
+    raise AttemptMarkerExistsError(
+        f"{ATTEMPT_MARKER_EXISTS_CODE}: attempt marker exists at {path} started_calls={started}"
+    )
+
+
+def build_attempt_marker_payload(
+    *,
+    matrix_blob: str = MATRIX_V2_BLOB,
+    planner_model: str = OWNER_APPROVED_PLANNER_MODEL,
+) -> dict[str, Any]:
+    return prepare_json_artifact_payload(
+        {
+            "measurement_id": MEASUREMENT_ID,
+            "suite_id": SUITE_ID,
+            "matrix_blob": matrix_blob,
+            "planner_model": planner_model,
+            "max_planner_calls": MAX_PLANNER_CALLS,
+            "retry_count_max": RETRY_COUNT_MAX,
+            "provider_calls_started": 0,
+            "provider_calls_completed": 0,
+            "status": "in_progress",
+            "abort_blocks_retry_without_owner_approval": True,
+        }
+    )
+
+
+def create_attempt_marker_exclusive(
+    path: Path,
+    payload: dict[str, Any],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = prepare_json_artifact_payload(payload)
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(serialized, ensure_ascii=False, indent=2) + "\n")
+    except FileExistsError as exc:
+        raise AttemptMarkerExistsError(
+            f"{ATTEMPT_MARKER_EXISTS_CODE}: {path}"
+        ) from exc
+
+
+def load_attempt_marker(path: Path = LIVE_ATTEMPT_MARKER_PATH) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def persist_attempt_marker(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
+    path.write_text(
+        json.dumps(serialized, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def record_provider_call_started(path: Path = LIVE_ATTEMPT_MARKER_PATH) -> None:
+    marker = load_attempt_marker(path)
+    marker["provider_calls_started"] = int(marker.get("provider_calls_started") or 0) + 1
+    persist_attempt_marker(path, marker)
+
+
+def finalize_attempt_marker(
+    path: Path,
+    *,
+    status: str,
+    automated_verdict: AutomatedVerdict,
+) -> None:
+    marker = load_attempt_marker(path)
+    marker["status"] = status
+    marker["automated_verdict"] = automated_verdict
+    persist_attempt_marker(path, marker)
+
+
+def append_call_ledger_entry(path: Path, entry: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = prepare_json_artifact_payload(entry)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(serialized, ensure_ascii=False) + "\n")
+
+
+def ledger_entries_balanced(path: Path) -> bool:
+    if not path.exists():
+        return True
+    started = completed = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        if entry.get("event") == "planner_call_started":
+            started += 1
+        elif entry.get("event") == "planner_call_completed":
+            completed += 1
+    return started == completed and started > 0
+
+
+def build_manual_review_seed(*, automated_verdict: AutomatedVerdict) -> dict[str, Any]:
+    return prepare_json_artifact_payload(
+        {
+            "measurement_id": MEASUREMENT_ID,
+            "automated_verdict": automated_verdict,
+            "final_verdict": "PENDING_MANUAL_REVIEW",
+            "manual_review_required": True,
+            "authority_enabled": False,
+            "owner_note": (
+                "AUTOMATED_PASS only means harness gates passed; "
+                "manual review is required before any authority decision."
+            ),
+        }
+    )
+
+
+def write_json_exclusive(path: Path, payload: dict[str, Any]) -> None:
+    serialized = prepare_json_artifact_payload(payload)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            handle.write(json.dumps(serialized, ensure_ascii=False, indent=2) + "\n")
+    except FileExistsError as exc:
+        raise LiveArtifactExistsError(f"artifact already exists: {path}") from exc

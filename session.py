@@ -92,7 +92,6 @@ def _fresh_defaults() -> dict:
         "last_patient_situation": None,
         "last_aspect": None,
         "patient_situation_turn_age": 0,
-        "pending_clarify": None,
         "pending_lead_offer": False,
         "user_turn_timestamps": [],
         "consult_streak": 0,
@@ -104,6 +103,8 @@ def _deserialize_row(payload_json: str) -> dict:
     raw = json.loads(payload_json)
     st = _fresh_defaults()
     for k, v in raw.items():
+        if k == "pending_clarify":
+            continue
         if k == "hist" and isinstance(v, list):
             st["hist"] = deque(v, maxlen=MAX_TURNS * 2)
         else:
@@ -276,64 +277,6 @@ def clear_pending_lead_offer(session_id: str) -> None:
     set_pending_lead_offer(session_id, False)
 
 
-def get_pending_clarify(session_id: str) -> dict | None:
-    st = mem_get(session_id)
-    raw = st.get("pending_clarify")
-    return raw if isinstance(raw, dict) else None
-
-
-def set_pending_clarify(
-    session_id: str,
-    *,
-    question: str,
-    option_service_ids: list[str],
-    reask_count: int = 0,
-    route: str = "",
-) -> None:
-    q = str(question or "").strip()
-    ids = [str(x or "").strip() for x in (option_service_ids or []) if str(x or "").strip()]
-    if not q or not ids:
-        clear_pending_clarify(session_id)
-        return
-    with _lock:
-        st = mem_get(session_id)
-        st["pending_clarify"] = {
-            "question": q,
-            "option_service_ids": ids,
-            "asked_at_turn": int(st.get("session_turn_count") or 0),
-            "reask_count": int(reask_count or 0),
-            "route": str(route or "").strip(),
-        }
-        _persist_unlocked(session_id, st)
-
-
-def clear_pending_clarify(session_id: str) -> None:
-    with _lock:
-        st = mem_get(session_id)
-        st["pending_clarify"] = None
-        _persist_unlocked(session_id, st)
-
-
-def increment_pending_clarify_reask(session_id: str) -> dict | None:
-    with _lock:
-        st = mem_get(session_id)
-        raw = st.get("pending_clarify")
-        if not isinstance(raw, dict):
-            return None
-        updated = dict(raw)
-        updated["reask_count"] = int(updated.get("reask_count") or 0) + 1
-        st["pending_clarify"] = updated
-        _persist_unlocked(session_id, st)
-        return updated
-
-
-def pending_clarify_age(session_state: dict) -> int:
-    raw = (session_state or {}).get("pending_clarify")
-    if not isinstance(raw, dict):
-        return 0
-    return max(0, int((session_state or {}).get("session_turn_count") or 0) - int(raw.get("asked_at_turn") or 0))
-
-
 def record_last_bot_payload(session_id: str, payload: dict) -> None:
     """После policy: фиксируем UI-состояние и pending_lead_offer для strict «да»."""
     from dialog_offer import detect_explicit_lead_offer_in_answer
@@ -374,21 +317,6 @@ def record_last_bot_payload(session_id: str, payload: dict) -> None:
 
         answer_text = str(payload.get("answer") or "")
         lead_flow = bool(meta.get("lead_flow")) or bool(meta.get("situation_collect"))
-        clarify_meta = meta.get("clarify")
-        if isinstance(clarify_meta, dict):
-            question = str(clarify_meta.get("question") or answer_text).strip()
-            option_ids = [
-                str(x or "").strip()
-                for x in list(clarify_meta.get("option_service_ids") or [])
-                if str(x or "").strip()
-            ]
-            if question and option_ids:
-                st["pending_clarify"] = {
-                    "question": question,
-                    "option_service_ids": option_ids,
-                    "asked_at_turn": int(st.get("session_turn_count") or 0),
-                    "reask_count": int(clarify_meta.get("reask_count") or 0),
-                }
         st["pending_lead_offer"] = bool(
             not lead_flow
             and not meta.get("low_score")

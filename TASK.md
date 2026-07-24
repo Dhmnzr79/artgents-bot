@@ -22,7 +22,9 @@ HTTP → shared guards → one Planner LLM → native TurnFrame → session hydr
 3. **C2a** implementation → tests → **C2a checkpoint checker ✅** → commit + push → clean/synced
 4. **C2b** → C2b checker ✅ → commit + push
 5. **C2c** → C2c checker ✅ → commit + push
-6. **C2d** → final **COMPLETION checker ✅** → docs → push → **STOP**
+6. **C2c-correction** → C2c-correction checker ✅ → commit + push
+7. **C2c-dead-clarify** → C2c-dead-clarify checker ✅ → commit + push → **STOP before C2d**
+8. **C2d** → final **COMPLETION checker ✅** → docs → push → **STOP**
 
 No product WIP before PRE-CODE ✅. No checkpoint advance on checker ❌.
 
@@ -98,8 +100,8 @@ No product WIP before PRE-CODE ✅. No checkpoint advance on checker ❌.
 | `RESOLVER_MODEL` / `config.py` | none after C2b | evals | **PRUNE** if orphan (C2b) |
 | `last_subject` read | `turn_planner_llm`, `dialog_focus`, `follow_up_rewrite`, `query_selector`, `answer_planner` | tests | **REMOVE** product reads (C2c); remove dual-write (C2c) |
 | `set_last_subject` write | `target_runtime_session.py:134` | tests | **DELETE** dual-write (C2c) |
-| `pending_clarify` | read: `turn_planner_llm`, `ask_turn`; write: `composer_flow` only | tests | **DELETE** planner reads + session API if dead (C2c) |
-| `turn_plan_from_ctx` / `publish_turn_plan` | `ask_turn.py`, `composer_flow.py` (not `/ask` target) | tests | **KEEP** dead legacy modules; **no** C2b edits unless import break |
+| `pending_clarify` | none (legacy `ask_turn`/`composer_flow` deleted S69) | tests | **DELETE** session API + writer (C2c-dead-clarify) |
+| `turn_plan_from_ctx` / `publish_turn_plan` | deleted with `ask_turn`/`composer_flow` (S69) | tests, evals | **HISTORICAL** only; no product path |
 | `DecisionFrame` target authority | `resolver_turn` → `record_decision_frame_ctx` | contracts, evals | **REMOVE** product authority (C2b); contract **KEEP** |
 | `prices.json` / `price_offers.json` fallback | `query_selector.py`, `core/price_offers.py`, `startup_check.py` | scripts | **AUDIT** C2d; delete only if no active target caller |
 | `core/patient_playbook.py` loader fallbacks | startup / target selectors | tests | **AUDIT** C2d |
@@ -281,7 +283,7 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | No target-owned focus age | Add `service_focus_set_at_turn`; compute `service_focus_age` |
 | `subject_turn_age` not synced with target writer | Remove; use target timestamp only |
 | Consumers use different freshness semantics | Single `read_age_guarded_service_focus()` helper |
-| `pending_clarify` no **product** writer/reader | **KEEP** session API for legacy `ask_turn`/`composer_flow` only; no product reads |
+| `pending_clarify` no **product** writer/reader | Legacy modules deleted (S69); **DELETE** session API + writer (C2c-dead-clarify) |
 | Stale tests use `set_last_subject` | Migrate to `target_runtime_state` seed helpers |
 
 ### C2c-correction changes
@@ -292,7 +294,7 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 4. All product consumers (`dialog_focus`, `follow_up_rewrite`, `query_selector`, `answer_planner`, hydration) use canonical helper.
 5. Terminal/error: no write to `target_runtime_state` (unchanged); focus ages on user turns.
 6. Remove `last_subject` / `subject_turn_age` session API and field after last product reader gone.
-7. `pending_clarify` API: **not deleted** — legacy `orchestration/ask_turn.py` + `composer_flow.py` still read/write (off `/ask` target path).
+7. `pending_clarify` API: superseded by **C2c-dead-clarify** (legacy modules deleted S69).
 8. Telemetry: `DialogFocusSource` `"last_subject"` → `"target_runtime_state"`.
 9. Update `test_answer_planner.py`, `test_dialog_focus_baseline.py`, related stale tests.
 
@@ -357,9 +359,88 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 
 ---
 
+## Checkpoint C2c-dead-clarify — remove orphaned pending_clarify session state
+
+**Prerequisite:** C2c-correction checker ✅ (`13067dc`).
+
+**Goal:** Remove dead `pending_clarify` session API/writer and orphaned `CLARIFY_STATE_ON`. Legacy `orchestration/ask_turn.py` and `orchestration/composer_flow.py` are deleted (S69, not importable). Preserve target terminal clarify/defer, `needs_clarification` in TurnFrame/ResponseSpec, and ordinary clarify answer text. **Do not** add new persistent clarify session state.
+
+### C2c-dead-clarify audit (read-only, confirmed)
+
+| Item | Status |
+|------|--------|
+| `orchestration/ask_turn.py`, `orchestration/composer_flow.py` | Deleted; not importable (S69) |
+| Product readers of `pending_clarify` | None |
+| `session.py` | Still has API + inline writer in `record_last_bot_payload` |
+| `CLARIFY_STATE_ON` in `config.py` | Orphaned |
+
+### C2c-dead-clarify changes
+
+1. Remove `pending_clarify` from `_fresh_defaults`; strip legacy key on deserialize.
+2. Remove `get_pending_clarify`, `set_pending_clarify`, `clear_pending_clarify`, `increment_pending_clarify_reask`, `pending_clarify_age`.
+3. Remove inline `pending_clarify` write from `record_last_bot_payload` (even when `meta.clarify` present).
+4. Remove `CLARIFY_STATE_ON` from `config.py`.
+5. Update `docs/FLAGS_AND_STATUS.md` — remove claims that clarify-state flag works.
+6. Delete `tests/test_clarify_state.py` (legacy-only; no shared semantics with target terminal clarify).
+7. Fix TASK audit lines — do not reference `ask_turn`/`composer_flow` as active `pending_clarify` readers.
+
+### Preserve
+
+- Target terminal clarify/defer response path
+- `needs_clarification` in TurnFrame / ResponseSpec
+- Ordinary clarify answer text in responses
+- No new persistent clarify session state
+
+### C2c-dead-clarify allowlist
+
+| File | Change |
+|------|--------|
+| `TASK.md` | governance + completion record |
+| `session.py` | remove pending_clarify defaults/API/writer; strip on load |
+| `config.py` | remove `CLARIFY_STATE_ON` |
+| `docs/FLAGS_AND_STATUS.md` | remove dead clarify-state flag/docs |
+| `tests/test_c2c_dead_clarify_offline.py` | **new** |
+| `tests/test_c2_import_firewall_offline.py` | extend firewall if needed |
+| `tests/test_clarify_state.py` | **delete** |
+
+### C2c-dead-clarify tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-c2cdc-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_c2c_dead_clarify_offline.py `
+  tests/test_c2c_session_migration_offline.py `
+  tests/test_c2c_service_focus_age_offline.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_target_turn_frame_dispatch.py `
+  tests/test_demo_target_turn_frame_bound_response.py `
+  tests/test_s61_target_fullcontext_runtime.py `
+  tests/test_s62_correction_offline.py `
+  tests/test_s63_correction_offline.py `
+  tests/test_turn_planner_llm.py `
+  -q
+python -m pytest -p no:cacheprovider --collect-only -q 2>&1 | Select-Object -Last 3
+python -c "from evals.v5.s66_default_authority_live_contract import assert_frozen_s62_live_artifacts_unchanged, assert_frozen_s63_live_artifacts_unchanged; from tests.test_s67_legacy_isolation_offline import _assert_frozen_s66_artifacts_unchanged; assert_frozen_s62_live_artifacts_unchanged(); assert_frozen_s63_live_artifacts_unchanged(); _assert_frozen_s66_artifacts_unchanged(); print('frozen OK')"
+```
+
+### C2c-dead-clarify acceptance
+
+- Target terminal clarify/defer still returned (`needs_clarification` / missing service)
+- Fresh session state has no `pending_clarify` key
+- `record_last_bot_payload` does not create `pending_clarify` even with `meta.clarify`
+- Product/config import firewall holds
+- Session/reset/lead/target runtime regression green
+- `collect-only` succeeds; frozen S62/S63/S66 byte-identical
+- A9 unchanged; **no harness**; **NO LIVE / NO LLM**
+
+**STOP before C2d** after checkpoint checker ✅, commit, push, clean/synced.
+
+---
+
 ## Checkpoint C2d — target-only loader fallback cleanup
 
-**Prerequisite:** C2a–C2c checkpoint checkers ✅.
+**Prerequisite:** C2a–C2c-dead-clarify checkpoint checkers ✅.
 
 ### C2d audit targets
 
@@ -485,13 +566,14 @@ STOP and escalate to owner if:
 | C2a checker | ✅ |
 | C2b checker | ✅ |
 | C2c checker | ✅ (`70b5aa3`) |
-| C2c-correction checker | ✅ |
+| C2c-correction checker | ✅ (`13067dc`) |
+| C2c-dead-clarify checker | ✅ |
 | HEAD | pending |
 | Planner LLM calls/turn | 1 (target) |
 | Resolver fallback | removed (target) |
-| pytest | |
-| collect-only | |
-| frozen | |
+| pytest | 122 passed (C2c-dead-clarify block) |
+| collect-only | 2321 |
+| frozen | S62/S63/S66 OK |
 | A9 bytes | unchanged |
 | NATIVE TURNFRAME ONLY | |
 | NO LIVE / NO LLM | |

@@ -112,3 +112,15 @@ assert not offenders, offenders
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_c2c_dead_clarify_config_has_no_clarify_state_on_flag() -> None:
+    config_text = (_REPO_ROOT / "config.py").read_text(encoding="utf-8")
+    assert "CLARIFY_STATE_ON" not in config_text
+
+
+def test_c2c_dead_clarify_session_has_no_pending_clarify_defaults() -> None:
+    from session import _fresh_defaults
+
+    defaults = _fresh_defaults()
+    assert "pending_clarify" not in defaults

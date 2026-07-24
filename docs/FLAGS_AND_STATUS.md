@@ -52,9 +52,7 @@
 
 ### A. Ждёт доработки/решения (технически работает, но есть нюанс)
 
-| Флаг | Что делает | Почему OFF / решение |
-|---|---|---|
-| `CLARIFY_STATE_ON` | Переспрос «обычная коронка или на имплант?» | Работает (F1/F2 зелёные с флагом; legacy `composer_flow` удалён в S69). НО переспрос лезет в медзону («болит зуб → кариес или пульпит?»). Свёрнуто на тёплый handoff. Нужен **медзона-гвард** (детерминированный allowlist пациент-знаемых осей), НЕ мерж |
+_Удалено в C2c-dead-clarify:_ `CLARIFY_STATE_ON` / persistent `pending_clarify` session state (legacy modules deleted S69; target uses terminal clarify/defer only).
 
 ### B. В работе / не доказан паритет (единая карта 5.5)
 
@@ -82,7 +80,7 @@ $env:SERVICE_SELECT_LLM_ON="1"; $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCOD
 
 | Кейсы | Нужен флаг | Иначе |
 |---|---|---|
-| F1, F2 (коронка / на имплант) | `CLARIFY_STATE_ON=1` | не переспросит, выберет цирконий |
+| F1, F2 (коронка / на имплант) | — | target terminal clarify/defer (no persistent clarify state) |
 
 (H2/H3, G1, brand-кейсы и симптом/дата-кейсы больше флагов не требуют — соответствующие гварды теперь дефолт-ON.)
 
@@ -103,9 +101,8 @@ $env:SERVICE_SELECT_LLM_ON="1"; $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCOD
 1. Опц. усиление Impro-якоря в брифе («рекомендуем/пожизненная гарантия»).
 2. **Исторический этап 7 — концерн-схемы** (см. [`archive/FULLCONTEXT_ROADMAP.md`](archive/FULLCONTEXT_ROADMAP.md)). Его старые product-правила не являются target-каноном; актуальный контракт — [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md).
 3. Вопросы доверия («врачи опытные?», «отзывы?») — через общий target planner/scenario и doctor/content sources, без отдельного thematic route.
-4. Clarify: медзона-гвард (не мерж — он влит и работает).
-5. Скорость/стриминг (крупно). Сложный расчёт («посчитайте 3 зуба») — беклог.
-6. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
+4. Скорость/стриминг (крупно). Сложный расчёт («посчитайте 3 зуба») — беклог.
+5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

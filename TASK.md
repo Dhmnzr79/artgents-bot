@@ -143,6 +143,6 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | Governance HEAD | `bbeef20` |
 | PRE-CODE | ✅ |
 | COMPLETION | ✅ |
-| AC1 product HEAD | (this commit) |
+| AC1 product HEAD | `72681cc` |
 
 **STOP after AC1 COMPLETION ✅. AC2 starts only after separate owner go.**

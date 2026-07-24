@@ -1,83 +1,229 @@
-# TASK — AC1 Canonical scope + typed UI action + session persistence
+# TASK — AC2 Deterministic scope-aware service/price selection (offline component)
 
-**Product baseline:** `codex/stage-a` @ `eedbd66` · **W1b PARKED** · **NO LIVE / NO LLM / NO A9 product read**
+**Product baseline:** `codex/stage-a` @ `3144572` (AC1 complete) · **W1b PARKED** · **NO LIVE / NO LLM / NO A9 product read**
 
-**Authority:** Architecture Convergence Audit (2026-07-24); канон: `docs/ARCHITECTURE_CONVERGENCE.md`.
+**Authority:** Architecture Convergence Audit (2026-07-24); канон: `docs/ARCHITECTURE_CONVERGENCE.md`, `docs/PRICE_SERVICE_ARCHITECTURE.md`.
+
+**AC1 complete:** `72681cc` · `EffectiveScope` + `UiScopeAction` + session `patient_facts` in product path.
 
 ## Goal
 
-Ввести **постоянный** product contract для patient scope до service-selection wiring:
+Построить **один детерминированный offline selection-компонент** (pure, tested, unwired):
 
-1. **`EffectiveScope`** — merge explicit current `UiScopeAction` + fresh session `patient_facts` (same topic).
-2. **`UiScopeAction`** — UI click передаёт canonical `extent` (`one_tooth|few_teeth|full_arch`), **не** label для повторного угадывания planner.
-3. **Session `patient_facts`** — persist extent/jaw/stage между ходами; topic change clears stale carry; new `UiScopeAction` replaces prior session extent.
+```text
+EffectiveScope
+  → active service_catalog entries (topic/family)
+  → service_catalog.selection applicability
+  → clinic_strategy ranking
+  → exact pricebook offers (S23/S24)
+  → typed TargetScopeAwareSelectionResult
+```
 
-**Не в scope AC1:** W1b restore, `service_catalog.selection` runtime wiring, `ResponseStage`, marketing runtime, A9 product read/authority, free-text scope correction, live E2E.
+**AC2 закрывает пробел applicability + composition.** Не создаёт второй offer/strategy engine.
+
+**Явно вне AC2:** product runtime/widget wiring, Composer/Verifier, ResponseStage, marketing/CTA, follow-up UI, W1b restore, видимое изменение ответов пользователю. Полное атомарное подключение — **AC3**.
 
 ## W1b parked (do not touch)
 
 Snapshot: `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` (`MANIFEST.txt`, `checksums.sha256`, `RESTORE.md`).
-Restore W1b only by explicit owner decision.
+
+- **Запрещено:** restore patch, `family_price_groups.yaml` as authority, `several_teeth`/`full_jaw` vocabulary, копирование W1b кода целиком.
+- **Разрешено:** read-only изучение snapshot; классификация идей для AC3 (ref overlay, two-phase nav).
+- **Artifact hashes** must remain byte-identical to `checksums.sha256`.
 
 ## Baseline and tree state
 
-**До governance commit (этот checkpoint):**
+**Governance commit (this checkpoint):**
 
-- **Product tree** соответствует `eedbd66` (нет W1b product diff).
-- **Dirty diff** — только governance: `TASK.md`, docs sync, `docs/artifacts/w1b_wip_checkpoint_2026-07-24/**`.
+- `HEAD` = `3144572` (AC1 product + completion record).
+- Dirty diff — только `TASK.md` + minimal docs sync.
+- Push → **PRE-CODE checker ✅** → STOP.
 
-**После governance commit:**
+**AC2 implementation preflight** (later, separate owner GO):
 
-- `HEAD` = governance commit поверх `eedbd66`; working tree **clean**; branch synced с `origin/codex/stage-a`.
-
-**AC1 implementation preflight** (не этот commit):
-
-- `HEAD` = governance commit (не `eedbd66`).
-- Product tree clean; W1b artifact checksums match `checksums.sha256`.
+- `HEAD` = governance commit after this TASK.
+- Working tree clean; W1b checksums match.
 
 ## Process (mandatory)
 
-1. **Governance checkpoint (this commit):** TASK + docs + W1b artifact only → push → **PRE-CODE checker ✅** → STOP.
-2. **AC1 implementation** (later): verify governance `HEAD`, read docs → contract unit tests → HTTP smoke → **COMPLETION checker ✅** → product commit → STOP.
+1. **Governance (this commit):** seam audit in TASK + docs delta → push → **PRE-CODE ✅** → STOP.
+2. **AC2 implementation** (later): pure selection component + offline test matrix → **COMPLETION ✅** → product commit → STOP.
+3. **AC3** (later): atomic runtime wiring + ResponseStage + follow-up/marketing — separate TASK.
 
 No product code before PRE-CODE ✅.
 
-## Forbidden
+---
 
-- Restore/continue W1b WIP without owner approval
-- Live/LLM; A9 matrix/harness rerun; **any product import/read of `TurnFrame.patient_scope`**
-- Free-text scope correction parser (regex/second classifier) in AC1
-- `family_price_groups` as applicability authority
-- Per-MD routing, RAG, second situation classifier
-- `ResponseStage` or service-selection wiring in AC1
-- Weakening Verifier or frozen artifacts
-- Files outside allowlist without governance correction
+## Read-only seam audit (S14–S27 + AC1)
+
+### Reuse as-is (compose, do not rebuild)
+
+| Layer | Module | Public API | Role |
+|-------|--------|------------|------|
+| Schema load | `core/response_schema_loader.py` | `load_response_schema_bundle(pack_root) -> ResponseSchemaBundle` | `service_catalog.json`, `clinic_strategy.yaml`, pricebook |
+| Selection schema | `contracts/response_schema.py` | `TargetServiceSelection`, `TargetOptionSelection`, `TargetService`, `TargetServiceOption` | Authored applicability axes (`mode`, `extent`, `stage`, `jaw`, `reported_context`) |
+| Strategy match key | `contracts/response_schema.py` | `TargetStrategyMatch` | Rule match context |
+| Strategy rank | `core/response_strategy.py` | `resolve_target_strategy(strategy, context, *, service_ids=(), offer_ids=(), explicit_service_id=..., explicit_offer_id=...) -> TargetStrategyResolution` | Rank **only supplied** candidates; `max_options`; explicit pin |
+| Service context | `core/service_data_context.py` | `build_service_data_context(bundle, doctor_catalog, service_id) -> ServiceDataContext` | Join service + offers |
+| Offer projection | `core/target_offer_projection.py` | `project_target_service_offers(ctx, strategy, strategy_context, *, selected_option_id=..., explicit_offer_id=...) -> TargetOfferProjection` | Active filter, option pin, S15 on offers |
+| Brand projection | `core/target_brand_offer_projection.py` | `project_target_service_brand_offers(...)` | Brand filter → delegates S23 |
+| Brand resolve | `core/target_brand_resolver.py` | `resolve_target_brand_term(...)` | Explicit brand path |
+| Service resolve | `core/target_service_resolver.py` | `resolve_target_service_term(services, term) -> TargetServiceResolution` | Explicit named service (S26); does **not** apply selection |
+| Assembly | `core/target_offline_response_assembly.py` | `assemble_target_offline_response_materials(...)` | S27 vertical slice (AC3 wiring) |
+| Topic membership | `contracts/target_service_content_topic.py` | `service_catalog_content_topic_matches(content_ref, topic) -> bool` | Topic filter **after** applicability |
+| AC1 scope | `contracts/effective_scope.py` | `EffectiveScope` | extent/topic/source/provenance |
+| AC1 merge | `core/target_effective_scope.py` | `resolve_effective_scope(...)`, `SessionPatientFacts` | ui_action > session > unknown |
+| Runtime stub | `core/target_runtime_strategy.py` | `resolve_target_runtime_strategy_context(bundle, service_id=...)` | **Not** patient-scope-aware; AC3 replaces |
+
+### Exists but bypasses selection (do not copy pattern)
+
+| Module | Issue |
+|--------|-------|
+| `core/target_family_price_overview.py` | `select_family_price_overview_services` — topic + active + representative offer + role_rank; **ignores `service_catalog.selection`** |
+| W1b snapshot | `family_price_groups.yaml` entries as parallel applicability — **REJECT** |
+
+### Real gap AC2 closes
+
+1. **Runtime interpreter for `service_catalog.selection`** — types + demo data exist; no `filter_applicable_*` in `core/`.
+2. **`EffectiveScope` → `TargetStrategyMatch` bridge** — extent/jaw/stage/modifiers from effective context; unknown fails closed on required axes.
+3. **Service-level `resolve_target_strategy(service_ids=...)` composition** — tested offline only (`test_target_strategy_resolution.py`, `test_demo_target_clinic_strategy.py`).
+4. **Option-level `TargetOptionSelection`** — schema exists; not applied before offer projection.
+5. **Typed end-to-end offline result** — scope-aware shortlist/anchors + exact offer IDs without UI text.
+
+### Why this is not a second selector
+
+- **Applicability** = new pure gate on authored `TargetServiceSelection` / `TargetOptionSelection`.
+- **Ranking** = existing `resolve_target_strategy` (S15).
+- **Offers** = existing `project_target_service_offers` / brand path (S23/S24).
+- AC2 adds **composition + one result contract**, not parallel price/strategy logic.
+
+### W1b snapshot classification (read-only)
+
+| Verdict | Item |
+|---------|------|
+| REUSE (AC3) | `target:family_price_group/...` ref pattern; two-phase situation nav |
+| REWORK (AC3) | Group labels keyed by canonical extent; run **after** selection gate |
+| REJECT | Hardcoded group `entries` as applicability; `several_teeth`/`full_jaw`; full patch restore |
+
+---
+
+## Normative laws (AC2)
+
+### Source ownership
+
+- `EffectiveScope` owns known extent (+ future jaw/stage/modifiers when present in session).
+- `service_catalog.selection` — **sole** service applicability owner.
+- `clinic_strategy` — order/cap on **already applicable** services/offers.
+- Pricebook — money/units/modes only.
+- UI labels/config — not applicability.
+- Marketing/facts/CTA — out of scope.
+
+### Scope semantics
+
+Canonical extent: `one_tooth | few_teeth | full_arch | unknown`.
+
+Scope **does not** choose All-on-4/6, classic implant, diagnosis, or `service_id`.
+
+### Applicability
+
+- All known required selection fields must match.
+- `unknown` does **not** satisfy required `extent`, `stage`, `jaw`, or `reported_context`.
+- Unknown optional field does not block.
+- `one_stage` requires authored extraction context when catalog requires it.
+- `implant_supported_prosthetics` requires `implant_placed` when catalog requires it.
+- `full_arch` ≠ All-on-4 medically; only commercial eligibility.
+- `reported_bone_deficit` does not auto-select sinus/zygomatic protocol.
+
+### Strategy order
+
+1. explicit active service (when truly named and active)
+2. applicable active catalog entries
+3. matching `clinic_strategy` rule
+4. offer priorities (within S23)
+5. stable catalog/offer order tie-break
+6. `max_options` cap
+
+Strategy cannot resurrect ineligible service.
+
+### Price integrity
+
+Reuse S23 invariants: fixed/from/range/no_public_price verbatim; no tooth-count multiplication; no dual-jaw doubling; distinct billing units; option pin; inactive excluded; missing offer fail-closed.
+
+### Broad unknown scope (offline preparation only)
+
+When extent unknown and offers exist: prepare compact anchors covering `one_tooth` + `full_arch` (`few_teeth` optional per strategy/data). Anchor = scope price orientation, not treatment recommendation. **No user text or buttons in AC2.**
+
+### Known scope
+
+Return only applicable services/offers; no broad menu; no repeated clarification; no-public → typed empty result.
+
+---
+
+## Minimal public contract (AC2 implementation)
+
+New file `contracts/target_scope_aware_selection.py` (name fixed at implementation):
+
+```python
+SelectionKind = Literal["broad_anchors", "scoped_shortlist"]
+
+class TargetPriceAnchor:  # broad_anchors only
+    extent: ScopeExtent          # anchor axis, not medical recommendation
+    service_id: str
+    offer_id: str
+    provenance: str
+
+class TargetScopeAwareSelectionResult:
+    topic: str
+    effective_scope: EffectiveScope      # snapshot
+    kind: SelectionKind
+    strategy_context: TargetStrategyMatch  # REUSE
+    matched_rule_id: str | None
+    service_ids: tuple[str, ...]         # deterministic ranked order
+    offers_by_service_id: dict[str, tuple[TargetOffer, ...]]  # exact IDs from S23
+    anchors: tuple[TargetPriceAnchor, ...]  # empty when scoped_shortlist
+    exclusions: tuple[str, ...]          # minimal typed codes only
+```
+
+**Reuse:** `EffectiveScope`, `TargetStrategyMatch`, `TargetOffer`, `TargetStrategyResolution`, `TargetOfferProjection`.
+
+**Forbidden in result:** answer text, quick_replies, CTA, marketing copy, `ResponseStage`.
+
+### Composition entrypoint (AC2 implementation)
+
+```python
+# core/target_scope_aware_selection.py
+def run_target_scope_aware_selection(
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    *,
+    effective_scope: EffectiveScope,
+    topic: str,
+    explicit_service_id: str | None = None,
+    explicit_offer_id: str | None = None,
+    selected_option_id: str | None = None,
+    selected_brand_id: str | None = None,
+) -> TargetScopeAwareSelectionResult: ...
+```
+
+Supporting pure functions:
+
+- `core/target_strategy_context.py` — `strategy_match_from_effective_scope(scope, *, service_family=None) -> TargetStrategyMatch`
+- `core/target_service_applicability.py` — `filter_applicable_services(bundle, *, topic, strategy_context, explicit_service_id=None) -> tuple[TargetApplicableService, ...]`
+
+---
+
+## Forbidden (AC2)
+
+- Live/LLM; A9 harness/authority; `TurnFrame.patient_scope` product read
+- W1b restore; `family_price_groups` as applicability
+- Product runtime/widget behavior changes (orchestration, `target_runtime_turn`, dispatch, Composer, Verifier)
+- `ResponseStage`; marketing runtime; temporary user-visible fallback
+- Regex/classifier patient situation; RAG/per-MD routing
+- Files outside allowlist
+- Hardcoded demo `service_id` lists in shared core
+- Cross-client data leakage in tests
 
 ## Allowlist
-
-### New (AC1 implementation only)
-
-| File |
-|------|
-| `contracts/effective_scope.py` |
-| `contracts/ui_scope_action.py` |
-| `core/target_effective_scope.py` |
-| `core/target_ui_scope_action.py` |
-| `tests/test_effective_scope_contract.py` |
-| `tests/test_ui_scope_action_contract.py` |
-| `tests/test_session_patient_facts_offline.py` |
-| `tests/test_ui_scope_click_http_offline.py` |
-
-### Modify (AC1 implementation only)
-
-| File |
-|------|
-| `orchestration/pre_resolver_turn.py` |
-| `core/target_runtime_turn_frame_hydration.py` |
-| `core/target_runtime_session.py` |
-| `core/target_runtime_turn.py` |
-| `core/target_runtime_followup_nav.py` |
-| `tests/test_s61_correction_target_runtime.py` (only if neighbor asserts remain valid; no free-text scope cases) |
 
 ### Governance commit (this checkpoint only)
 
@@ -85,64 +231,142 @@ No product code before PRE-CODE ✅.
 |------|
 | `TASK.md` |
 | `docs/ARCHITECTURE_CONVERGENCE.md` |
-| `docs/ARCH_TARGET_DESIGN.md` |
 | `docs/PRICE_SERVICE_ARCHITECTURE.md` |
 | `docs/STRANGLER_ROADMAP.md` |
-| `docs/CURRENT_ARCHITECTURE.md` |
+| `docs/ARCH_TARGET_DESIGN.md` |
+
+### New (AC2 implementation only)
+
+| File |
+|------|
+| `contracts/target_scope_aware_selection.py` |
+| `contracts/target_service_applicability.py` |
+| `core/target_strategy_context.py` |
+| `core/target_service_applicability.py` |
+| `core/target_scope_aware_selection.py` |
+| `tests/test_target_strategy_context.py` |
+| `tests/test_target_service_applicability.py` |
+| `tests/test_target_scope_aware_selection_offline.py` |
+
+### Modify (AC2 implementation only)
+
+| File | Condition |
+|------|-----------|
+| `contracts/response_schema.py` | Only if minimal shared literals needed; prefer new contract file |
+
+### Explicitly forbidden in AC2 implementation
+
+| Area |
+|------|
+| `orchestration/*`, `app.py` |
+| `core/target_runtime_turn.py`, `core/target_turn_frame_dispatch.py` |
+| `core/target_family_price_overview.py` (product path unchanged until AC3) |
+| Composer/Verifier/widget/materializer paths |
 | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/**` |
+| Protected acceptance / golden / live harnesses |
 
-## EffectiveScope priority — AC1 product (normative)
+---
 
-1. explicit current `UiScopeAction` (replaces prior session extent for this turn)
-2. fresh session `patient_facts` (same topic, not stale after topic change)
-3. all-unknown
+## Acceptance (offline, AC2 implementation)
 
-**Future (docs only, not AC1 code):** current-turn A9 `patient_scope` may slot between (1) and (2) after separate authority decision.
+### A. Composition
 
-Scope must **not** select treatment, protocol, or `service_id`. Product path must **not** read `TurnFrame.patient_scope`.
+1. Pipeline composes existing S15 + S23 (+ optional S24) without duplicating offer filter logic.
+2. No new ranking algorithm beyond applicability gate + existing `resolve_target_strategy`.
 
-## Acceptance (offline, AC1 implementation)
+### B. Applicability
 
-1. Typed ref `target:ui_scope/{topic}/{extent}` hydrates `UiScopeAction` **before** planner; planner label is not the sole scope source.
-2. Session stores and restores `extent` across price continuation (same topic); extent question not repeated when session fact is fresh.
-3. New `UiScopeAction` with different `extent` replaces prior session extent (explicit UI correction only).
-4. Topic change clears carried extent.
-5. HTTP `/ask` + `/ask/stream`: ref-only click with empty `q` uses typed path (smoke tests).
-6. **A9 firewall:** product dispatch/session/effective-scope code do not import or read `TurnFrame.patient_scope`; AST or equivalent test proves firewall.
-7. W1b artifact byte-identical to `checksums.sha256`.
+3. `filter_applicable_services` honors `selection.mode` (`scope`/`context`/`direct`) per `PRICE_SERVICE_ARCHITECTURE.md`.
+4. Unknown extent does not satisfy required selection extent list.
+5. Option-level selection intersects parent service eligibility.
 
-Free-text correction («нет, несколько зубов») — **out of scope**; defer to post-A9 authority checkpoint.
+### C. Strategy
 
-## Tests (focused, AC1 implementation)
+6. `resolve_target_strategy` receives only applicable `service_ids`; ineligible never ranked.
+7. Explicit service pin wins over default priority when active and applicable.
+8. `max_options` and stable tie-break respected.
+
+### D. Broad unknown
+
+9. Unknown extent + available offers → `kind=broad_anchors` with `one_tooth` + `full_arch` coverage when catalog/strategy allow.
+10. Anchors carry extent + commercial `service_id`/`offer_id` only.
+
+### E. Known scope
+
+11. Known extent → `kind=scoped_shortlist`; no anchor menu.
+12. No applicable public offer → typed empty/no-public path in result metadata (no invented price).
+
+### F. Price integrity
+
+13. Projected offers preserve price modes and billing units; matrix cases 15–22 pass.
+
+### G. Isolation
+
+14. Two synthetic client strategies → same applicability, different order only (case 23–26).
+15. No demo service IDs hardcoded in shared core (case 27–28).
+
+### H. Neighbors / firewalls
+
+16. AC1 tests unchanged and green.
+17. S34/S40/S46 single-service projection tests unchanged.
+18. A9 product firewall unchanged.
+19. W1b `checksums.sha256` byte-identical (case 32).
+20. No marketing/CTA/Composer/Verifier invocation in AC2 tests (case 34).
+
+---
+
+## Offline test matrix (AC2 implementation)
+
+Implantation (1–8), prosthetics (9–14), price integrity (15–22), strategy/isolation (23–28), neighbors (29–34) — as specified in owner AC2 brief. Implement as parametrized cases in `test_target_scope_aware_selection_offline.py` + unit tests in applicability/strategy_context files.
+
+## Tests (focused, AC2 implementation)
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = "1"
-$bt = Join-Path $env:TEMP ("demo-bot-ac1-" + [guid]::NewGuid().ToString("n"))
+$bt = Join-Path $env:TEMP ("demo-bot-ac2-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_target_strategy_context.py `
+  tests/test_target_service_applicability.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  -q
+```
+
+### Relevant neighbors (must stay green)
+
+```powershell
 python -m pytest -p no:cacheprovider --basetemp $bt `
   tests/test_effective_scope_contract.py `
   tests/test_ui_scope_action_contract.py `
   tests/test_session_patient_facts_offline.py `
   tests/test_ui_scope_click_http_offline.py `
+  tests/test_target_strategy_resolution.py `
+  tests/test_target_offer_projection.py `
+  tests/test_demo_target_clinic_strategy.py `
+  tests/test_demo_target_offer_projection.py `
   -q
 ```
 
+Safe wider offline (no live, no A9 harness): above + `tests/test_w1_family_price_overview_offline.py` (unchanged behavior).
+
 ## STOP conditions
 
-1. AC1 requires reading `TurnFrame.patient_scope` in product path or A9 authority
-2. AC1 requires free-text scope correction or second classifier
-3. Requires W1b product merge in same diff
-4. Requires `service_catalog.selection`, `ResponseStage`, or marketing runtime wiring
-5. PRE-CODE or COMPLETION checker ❌ without fix path
+1. AC2 requires product runtime wiring, widget change, or visible answer change
+2. Requires W1b restore or `family_price_groups` authority
+3. Requires new offer ranking engine duplicating S15/S23
+4. Requires `TurnFrame.patient_scope` or A9 authority
+5. Requires `ResponseStage`, marketing runtime, or Composer/Verifier changes
+6. PRE-CODE or COMPLETION checker ❌ without fix path
 
 ## Completion record
 
 | Field | Value |
 |-------|-------|
-| W1b park checkpoint | 2026-07-24 |
-| W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
-| Governance HEAD | `bbeef20` |
-| PRE-CODE | ✅ |
-| COMPLETION | ✅ |
 | AC1 product HEAD | `72681cc` |
+| W1b artifact | `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` |
+| Governance baseline | `3144572` |
+| AC2 governance HEAD | |
+| PRE-CODE | |
+| COMPLETION | |
+| AC2 product HEAD | |
 
-**STOP after AC1 COMPLETION ✅. AC2 starts only after separate owner go.**
+**STOP after governance PRE-CODE ✅. AC2 implementation starts only after separate owner GO.**

@@ -4,10 +4,14 @@
 helpers материализуются S-series; **runtime/product wiring scope/selection/strategy —
 не реализован** (см. [`ARCHITECTURE_CONVERGENCE.md`](ARCHITECTURE_CONVERGENCE.md)).
 
+**AC1 (`72681cc`):** `EffectiveScope` + typed `UiScopeAction` + session `patient_facts` в product path.
+
+**AC2 (`TASK.md`):** offline `service_catalog.selection` applicability + compose S15/S23;
+**без** product runtime/widget wiring (AC3).
+
 **W1b (2026-07-24):** незавершённый product WIP **припаркован** в
 [`artifacts/w1b_wip_checkpoint_2026-07-24/`](artifacts/w1b_wip_checkpoint_2026-07-24/MANIFEST.txt);
-не является authority для applicability. Следующий product slice — AC1 (scope contract),
-затем service pipeline wiring.
+не является authority для applicability.
 
 **Назначение:** единый источник целевых правил услуг, применимости, брендов, стратегии
 клиники, коммерческих offers и ценовых ответов.

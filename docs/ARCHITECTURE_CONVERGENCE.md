@@ -13,13 +13,12 @@
 
 | Gap | Следствие |
 |-----|-----------|
-| Нет `EffectiveScope` в runtime | scope не переносится между ходами |
-| UI click → label → planner | extent угадывается повторно |
-| `service_catalog.selection` не в product path | applicability обходится ad-hoc (W1b groups) |
-| `clinic_strategy` extent rules не wired | приоритет без фильтра |
-| Session без `patient_facts` | повтор situation menu |
+| ~~Нет `EffectiveScope` в runtime~~ | **AC1 ✅** — scope в product path |
+| ~~UI click → label → planner~~ | **AC1 ✅** — typed `UiScopeAction` |
+| `service_catalog.selection` не в product path | applicability обходится ad-hoc (W1 family overview; W1b groups) |
+| `clinic_strategy` extent rules не wired к patient scope | приоритет без scope-aware filter |
 | Marketing runtime stub | `marketing_scenarios=()`, no initial block |
-| PRICE_SERVICE verification matrix | не доказана |
+| PRICE_SERVICE verification matrix | не доказана end-to-end |
 
 ## Единый pipeline (target)
 
@@ -74,10 +73,10 @@ Scope **не выбирает** лечение, протокол или `service
 
 ## Checkpoints (порядок)
 
-1. ~~W1b park + docs sync~~ (этот checkpoint)
-2. **AC1** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts` (`TASK.md`)
-3. Service selection + strategy + pricebook wiring
-4. Response stages + marketing runtime
+1. ~~W1b park + docs sync~~ (2026-07-24)
+2. ~~**AC1** — `EffectiveScope` + typed `UiScopeAction` + session `patient_facts`~~ (`72681cc`)
+3. **AC2** — scope-aware selection component (offline, unwired): applicability + strategy + offers (`TASK.md`)
+4. **AC3** — atomic runtime wiring + ResponseStage + follow-up/marketing/CTA
 5. A9 v2 live re-audit (owner approval)
 6. Full HTTP/widget matrix → live E2E
 7. Provider prompt caching

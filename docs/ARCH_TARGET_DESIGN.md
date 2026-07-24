@@ -203,7 +203,10 @@ message / typed UI action
 authority decision; free-text correction after A9 quality proof.
 
 **Canonical extent:** `one_tooth | few_teeth | full_arch` (+ jaw/stage). UI labels
-client-owned. `ResponseStage` — post-AC1; not in AC1 scope.
+client-owned. `ResponseStage` — AC3; not in AC1/AC2 scope.
+
+**AC2 (offline):** `service_catalog.selection` applicability gate + compose S15/S23;
+no product runtime wiring until AC3.
 
 **W1b WIP** припаркован; `family_price_groups` — будущий **navigation overlay** по
 extent, не второй applicability engine.

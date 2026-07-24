@@ -64,10 +64,11 @@
 | Текущий S-series checkpoint | **S70 — FullContext migration closeout (completed)** |
 | Cleanup-series | **C1 — dead legacy residue cleanup (completed)** → `docs/C1_LEGACY_RESIDUE_REPORT.md` |
 | C2 plan | **`docs/C2_NATIVE_TURNFRAME_CLEANUP_PLAN.md`** — plan only; owner decision before code |
-| S-series status | **COMPLETE** (`S_SERIES_COMPLETE`) |
-| Следующий gate | **Owner decision — C2 native TurnFrame (no auto start)** |
-| Предыдущий checkpoint | **S59 — final semantic Verifier medical policy simplification (OFFLINE)** |
-| Ближайший рабочий focus | **Provider prompt caching / real client onboarding / optional hygiene** |
+| S-series status | **COMPLETE** (`S_SERIES_COMPLETE`) — FullContext path; scope/price ecosystem incomplete |
+| Следующий gate | **AC1 — canonical scope + typed UI action + session persistence** (`TASK.md`) |
+| W1b status | **PARKED** @ `docs/artifacts/w1b_wip_checkpoint_2026-07-24/` (tree clean @ `eedbd66`) |
+| Предыдущий checkpoint | **Architecture Convergence Audit + W1b park (2026-07-24)** |
+| Ближайший рабочий focus | **AC1 governance → PRE-CODE → scope contracts + typed UI path + session** |
 | Что сейчас отвечает в локальном demo | **Target FullContext path only** — unconditional; legacy modules deleted |
 | FullContext authority | **Sole product authority (S69); S65/S66/S67 precursors** |
 | Patient-scope authority | **Forbidden** |

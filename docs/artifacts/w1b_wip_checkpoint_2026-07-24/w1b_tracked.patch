@@ -1,0 +1,1489 @@
+﻿diff --git a/contracts/response_schema.py b/contracts/response_schema.py
+index fe2ca2d..f5f8605 100644
+--- a/contracts/response_schema.py
++++ b/contracts/response_schema.py
+@@ -10,6 +10,10 @@ from __future__ import annotations
+ from datetime import date
+ from typing import Annotated, Literal, TypeAlias
+ 
++from contracts.target_family_price_groups import (
++    FamilyPriceGroupsConfig,
++    validate_family_price_groups_against_bundle,
++)
+ from pydantic import (
+     AfterValidator,
+     BaseModel,
+@@ -443,6 +447,7 @@ class ResponseSchemaBundle(TargetSchemaModel):
+     facts: dict[NonBlankStr, TargetCommercialFact]
+     strategy: TargetClinicStrategy
+     marketing: TargetMarketingPolicy
++    family_price_groups: FamilyPriceGroupsConfig
+ 
+     @model_validator(mode="after")
+     def _local_references_exist(self) -> "ResponseSchemaBundle":
+@@ -497,6 +502,7 @@ class ResponseSchemaBundle(TargetSchemaModel):
+         for ref in self._marketing_refs():
+             if ref.startswith("fact:") and ref.removeprefix("fact:") not in self.facts:
+                 raise ValueError("bundle_marketing_fact_missing")
++        validate_family_price_groups_against_bundle(self.family_price_groups, self)
+         return self
+ 
+     def _marketing_refs(self) -> list[str]:
+diff --git a/contracts/target_response_policy.py b/contracts/target_response_policy.py
+index 2a8b7ed..ff3ced9 100644
+--- a/contracts/target_response_policy.py
++++ b/contracts/target_response_policy.py
+@@ -19,6 +19,7 @@ class TargetResponsePolicyRequest(BaseModel):
+     response_mode: TargetResponseMode
+     service_id: CanonicalToken | None = None
+     family_price_overview_topic: CanonicalToken | None = None
++    family_price_group_id: CanonicalToken | None = None
+     tone_key: CanonicalToken
+     allowed_topics: tuple[CanonicalToken, ...]
+     forbidden_topics: tuple[CanonicalToken, ...] = ()
+@@ -55,4 +56,6 @@ class TargetResponsePolicyRequest(BaseModel):
+                 raise ValueError("family_price_overview_primary_forbidden")
+             if self.allow_marketing_facts or self.allow_cta:
+                 raise ValueError("family_price_overview_marketing_forbidden")
++            if self.family_price_group_id is not None and self.family_price_group_id.strip() == "":
++                raise ValueError("family_price_group_id_invalid")
+         return self
+diff --git a/contracts/target_response_spec.py b/contracts/target_response_spec.py
+index 6223d5b..0f51f41 100644
+--- a/contracts/target_response_spec.py
++++ b/contracts/target_response_spec.py
+@@ -27,7 +27,7 @@ TargetResponseMode: TypeAlias = Literal[
+     "medical_handoff",
+ ]
+ TargetResponseComponent: TypeAlias = Literal["content", "price", "doctors"]
+-TargetFollowupSource: TypeAlias = Literal["content", "price"]
++TargetFollowupSource: TypeAlias = Literal["content", "price", "family_price_group"]
+ 
+ 
+ class TargetResponseSpec(BaseModel):
+@@ -38,6 +38,7 @@ class TargetResponseSpec(BaseModel):
+     response_mode: TargetResponseMode
+     service_id: CanonicalToken | None = None
+     family_price_overview_topic: CanonicalToken | None = None
++    family_price_group_id: CanonicalToken | None = None
+     tone_key: CanonicalToken
+     allowed_topics: tuple[CanonicalToken, ...]
+     forbidden_topics: tuple[CanonicalToken, ...] = ()
+@@ -97,13 +98,20 @@ class TargetResponseSpec(BaseModel):
+         ):
+             raise ValueError("terminal_response_payload_forbidden")
+         if self.followup_source is not None and self.followup_source not in self.required_components:
+-            raise ValueError("followup_source_component_missing")
++            if not (
++                self.followup_source == "family_price_group"
++                and self.family_price_overview_topic is not None
++            ):
++                raise ValueError("followup_source_component_missing")
+         if self.family_price_overview_topic is not None:
+             if self.service_id is not None:
+                 raise ValueError("family_price_overview_service_id_forbidden")
+             if self.required_components != ("price",):
+                 raise ValueError("family_price_overview_components_invalid")
+-            if self.followup_source is not None:
++            if self.family_price_group_id is None:
++                if self.followup_source != "family_price_group":
++                    raise ValueError("family_price_overview_followups_forbidden")
++            elif self.followup_source is not None:
+                 raise ValueError("family_price_overview_followups_forbidden")
+             if self.allow_marketing_facts or self.allow_cta:
+                 raise ValueError("family_price_overview_marketing_forbidden")
+diff --git a/core/response_schema_loader.py b/core/response_schema_loader.py
+index d9ce8f0..af9ae55 100644
+--- a/core/response_schema_loader.py
++++ b/core/response_schema_loader.py
+@@ -86,6 +86,7 @@ _SERVICE_CATALOG = Path("service_catalog.json")
+ _BRAND_CATALOG = Path("brand_catalog.json")
+ _CLINIC_STRATEGY = Path("clinic_strategy.yaml")
+ _MARKETING = Path("marketing.yaml")
++_FAMILY_PRICE_GROUPS = Path("family_price_groups.yaml")
+ _FACTS = Path("pricebook/facts.json")
+ _SERVICES_DIR = Path("pricebook/services")
+ 
+@@ -218,6 +219,7 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
+     facts_path = _require_file(root, _FACTS)
+     strategy_path = _require_file(root, _CLINIC_STRATEGY)
+     marketing_path = _require_file(root, _MARKETING)
++    family_price_groups_path = _require_file(root, _FAMILY_PRICE_GROUPS)
+     services_dir = _require_directory(root, _SERVICES_DIR)
+ 
+     services = _read_json_mapping(service_catalog_path, _SERVICE_CATALOG)
+@@ -225,6 +227,10 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
+     facts = _read_json_mapping(facts_path, _FACTS)
+     strategy = _read_yaml_mapping(strategy_path, _CLINIC_STRATEGY)
+     marketing = _read_yaml_mapping(marketing_path, _MARKETING)
++    family_price_groups = _read_yaml_mapping(
++        family_price_groups_path,
++        _FAMILY_PRICE_GROUPS,
++    )
+     offers = [
+         _read_json_mapping(path, relative_path)
+         for path, relative_path in _list_offer_files(root, services_dir)
+@@ -239,6 +245,7 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
+                 "facts": facts,
+                 "strategy": strategy,
+                 "marketing": marketing,
++                "family_price_groups": family_price_groups,
+             }
+         )
+     except ValidationError as exc:
+diff --git a/core/target_composer_executor.py b/core/target_composer_executor.py
+index 3e99439..7ddd288 100644
+--- a/core/target_composer_executor.py
++++ b/core/target_composer_executor.py
+@@ -8,6 +8,7 @@ from typing import Literal, NoReturn, Protocol
+ 
+ import hashlib
+ 
++from contracts.target_family_price_group_followup import TargetFamilyPriceGroupFollowup
+ from contracts.target_cached_full_context import TargetCachedFullContext
+ from contracts.target_response_spec import TargetResponseSpec
+ from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+@@ -134,7 +135,7 @@ def _valid_spec_shape(spec: TargetResponseSpec) -> bool:
+             spec.followup_source is None
+             or (
+                 type(spec.followup_source) is str
+-                and spec.followup_source in {"content", "price"}
++                and spec.followup_source in {"content", "price", "family_price_group"}
+             )
+         )
+         and type(spec.allow_marketing_facts) is bool
+@@ -228,21 +229,37 @@ def _validate_followups(request: TargetComposerRequest) -> None:
+         _error("composer_executor_request_invalid", "request_followups")
+     if type(selection.content) is not tuple or type(selection.price) is not tuple:
+         _error("composer_executor_request_invalid", "request_followups")
++    if type(selection.group) is not tuple:
++        _error("composer_executor_request_invalid", "request_followups")
+     source = selection.source
+     family_valid = (
+-        (source is None and not selection.content and not selection.price)
++        (
++            source is None
++            and not selection.content
++            and not selection.price
++            and not selection.group
++        )
+         or (
+             source == "content"
+             and bool(selection.content)
+             and not selection.price
++            and not selection.group
+             and request.spec.followup_source == "content"
+         )
+         or (
+             source == "price"
+             and not selection.content
+             and bool(selection.price)
++            and not selection.group
+             and request.spec.followup_source == "price"
+         )
++        or (
++            source == "family_price_group"
++            and not selection.content
++            and not selection.price
++            and bool(selection.group)
++            and request.spec.followup_source == "family_price_group"
++        )
+     )
+     if not family_valid:
+         _error("composer_executor_request_invalid", "request_followups")
+@@ -264,6 +281,12 @@ def _validate_followups(request: TargetComposerRequest) -> None:
+             _error("composer_executor_request_invalid", "request_followups")
+         if item.ref != f"price:{request.spec.service_id}/{item.id}":
+             _error("composer_executor_request_invalid", "request_followups")
++    for item in selection.group:
++        if type(item) is not TargetFamilyPriceGroupFollowup or not all(
++            _valid_followup_text(value)
++            for value in (item.topic, item.group_id, item.label, item.ref)
++        ):
++            _error("composer_executor_request_invalid", "request_followups")
+ 
+ 
+ def _validate_request(request: object) -> TargetComposerRequest:
+diff --git a/core/target_composer_request.py b/core/target_composer_request.py
+index a40beab..fa28ac5 100644
+--- a/core/target_composer_request.py
++++ b/core/target_composer_request.py
+@@ -18,7 +18,11 @@ from contracts.service_consultation import ServiceConsultationValue
+ from contracts.target_response_spec import TargetResponseSpec
+ from core.service_data_context import ServiceDoctorContext
+ from core.target_response_followup_policy import TargetResponseFollowupSelection
+-from core.target_family_price_overview import is_family_price_overview_spec
++from core.target_family_price_overview import (
++    is_family_price_group_drilldown_spec,
++    is_family_price_overview_spec,
++    is_family_price_situation_menu_spec,
++)
+ from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+ from core.target_scoped_response_evidence import (
+     TargetEvidenceScopeRecord,
+@@ -268,6 +272,20 @@ def _compact_json(payload: dict[str, object]) -> str:
+     )
+ 
+ 
++def _offer_text_compact(offer: TargetOffer) -> str:
++    return _compact_json(
++        {
++            "offer_id": offer.offer_id,
++            "service_id": offer.service_id,
++            "option_id": offer.option_id,
++            "brand_id": offer.brand_id,
++            "price": offer.price.model_dump(mode="json"),
++            "package": offer.package.model_dump(mode="json"),
++            "payment_stages": None,
++        }
++    )
++
++
+ def _offer_text(offer: TargetOffer) -> str:
+     return _compact_json(
+         {
+@@ -395,11 +413,34 @@ def _exact_sources(
+     return source_offers, source_doctors, source_facts, consultation_by_ref
+ 
+ 
++def _family_menu_anchor_sources(
++    scoped: TargetScopedResponseEvidence,
++    bound_package: TargetSpecBoundOfflineResponsePackage,
++    bundle: ResponseSchemaBundle,
++) -> dict[str, TargetOffer]:
++    materials = bound_package.package.materials
++    topic = scoped.spec.family_price_overview_topic
++    if topic is None:
++        _source_mismatch("family_price_menu_topic_missing")
++    source_offers: dict[str, TargetOffer] = {}
++    for index, material_offer in enumerate(materials.offers):
++        anchor_key = f"{topic}.menu_anchor.{index}"
++        matches = [
++            offer for offer in bundle.offers if offer.offer_id == material_offer.offer_id
++        ]
++        if len(matches) != 1 or matches[0].service_id not in materials.family_service_ids:
++            _source_mismatch(("offer", material_offer.offer_id))
++        source_offers[anchor_key] = matches[0]
++    return source_offers
++
++
+ def _family_overview_sources(
+     scoped: TargetScopedResponseEvidence,
+     bound_package: TargetSpecBoundOfflineResponsePackage,
+     bundle: ResponseSchemaBundle,
+ ) -> dict[str, TargetOffer]:
++    if is_family_price_situation_menu_spec(scoped.spec):
++        return _family_menu_anchor_sources(scoped, bound_package, bundle)
+     materials = bound_package.package.materials
+     source_offers: dict[str, TargetOffer] = {}
+     material_offers = {offer.offer_id: offer for offer in materials.offers}
+@@ -425,6 +466,7 @@ def _block(
+     doctors: dict[str, object],
+     facts: dict[str, TargetCommercialFact],
+     consultations: dict[str, ServiceConsultationValue],
++    compact_offer_evidence: bool = False,
+ ) -> TargetComposerEvidenceBlock:
+     if record.ref.startswith("content:"):
+         kind: TargetComposerEvidenceKind = "content"
+@@ -436,7 +478,7 @@ def _block(
+         offer = offers.get(offer_id)
+         if offer is None:
+             _source_mismatch(("offer", offer_id))
+-        text = _offer_text(offer)
++        text = _offer_text_compact(offer) if compact_offer_evidence else _offer_text(offer)
+         preserve = True
+     elif record.ref.startswith("doctor:"):
+         doctor_id = record.ref.removeprefix("doctor:")
+@@ -542,9 +584,12 @@ def materialize_target_composer_request(
+             selected_followups=scoped.selected_followups,
+             selected_cta_key=scoped.selected_cta_key,
+         )
+-    if is_family_price_overview_spec(scoped.spec):
++    if is_family_price_situation_menu_spec(scoped.spec) or is_family_price_group_drilldown_spec(
++        scoped.spec
++    ):
+         offers = _family_overview_sources(scoped, bound_package, bundle)
+         root = _root(md_root)
++        compact = is_family_price_situation_menu_spec(scoped.spec)
+         blocks = tuple(
+             _block(
+                 record,
+@@ -554,6 +599,7 @@ def materialize_target_composer_request(
+                 doctors={},
+                 facts={},
+                 consultations={},
++                compact_offer_evidence=compact,
+             )
+             for record in scoped.scope_records
+         )
+diff --git a/core/target_family_price_overview.py b/core/target_family_price_overview.py
+index f850403..66c3c83 100644
+--- a/core/target_family_price_overview.py
++++ b/core/target_family_price_overview.py
+@@ -1,7 +1,8 @@
+-"""Deterministic family price overview selection and assembly (W1)."""
++"""Deterministic family price overview: situation menu + group drill-down (W1/W1b)."""
+ 
+ from __future__ import annotations
+ 
++import sys
+ from collections.abc import Sequence
+ from datetime import date
+ from pathlib import Path
+@@ -10,6 +11,15 @@ from contracts.doctor_schema import TargetDoctorCatalog
+ from contracts.response_schema import ResponseSchemaBundle, TargetOffer, TargetStrategyMatch
+ from contracts.response_schema_refs import ResponseSchemaExternalIndex
+ from contracts.service_consultation import ServiceConsultationValue
++from contracts.target_family_price_group_followup import (
++    TargetFamilyPriceGroupFollowup,
++    build_family_price_group_followup,
++)
++from contracts.target_family_price_groups import (
++    FamilyPriceGroupEntry,
++    FamilyPriceSituationGroup,
++    FamilyPriceTopicGroups,
++)
+ from contracts.target_family_price_overview import (
+     FamilyPriceOverviewSelection,
+     FamilyPriceOverviewServiceEntry,
+@@ -46,15 +56,29 @@ class TargetFamilyPriceOverviewError(ValueError):
+         super().__init__(f"{code}: {value!r}")
+ 
+ 
+-def is_family_price_overview_spec(spec: TargetResponseSpec) -> bool:
+-    """True when spec declares a multi-service family price overview."""
++def is_family_price_situation_menu_spec(spec: TargetResponseSpec) -> bool:
++    if type(spec) is not TargetResponseSpec:
++        return False
++    return (
++        spec.response_mode == "answer"
++        and spec.service_id is None
++        and spec.family_price_overview_topic is not None
++        and spec.family_price_group_id is None
++        and spec.required_components == ("price",)
++        and spec.followup_source == "family_price_group"
++        and not spec.allow_marketing_facts
++        and not spec.allow_cta
++    )
++
+ 
++def is_family_price_group_drilldown_spec(spec: TargetResponseSpec) -> bool:
+     if type(spec) is not TargetResponseSpec:
+         return False
+     return (
+         spec.response_mode == "answer"
+         and spec.service_id is None
+         and spec.family_price_overview_topic is not None
++        and spec.family_price_group_id is not None
+         and spec.required_components == ("price",)
+         and spec.followup_source is None
+         and not spec.allow_marketing_facts
+@@ -62,11 +86,26 @@ def is_family_price_overview_spec(spec: TargetResponseSpec) -> bool:
+     )
+ 
+ 
++def is_family_price_overview_spec(spec: TargetResponseSpec) -> bool:
++    """True for situation menu or group drill-down family price flows."""
++
++    return is_family_price_situation_menu_spec(spec) or is_family_price_group_drilldown_spec(
++        spec
++    )
++
++
+ def _role_rank(roles: tuple[str, ...]) -> int:
+     ranks = [_ROLE_RANK[role] for role in roles if role in _ROLE_RANK]
+     return min(ranks) if ranks else 3
+ 
+ 
++def _offer_by_id(bundle: ResponseSchemaBundle) -> dict[str, TargetOffer]:
++    offers: dict[str, TargetOffer] = {}
++    for offer in bundle.offers:
++        offers[offer.offer_id] = offer
++    return offers
++
++
+ def _representative_offer(
+     bundle: ResponseSchemaBundle,
+     doctor_catalog: TargetDoctorCatalog,
+@@ -83,41 +122,200 @@ def _representative_offer(
+     return projection.offers[0]
+ 
+ 
+-def select_family_price_overview_services(
++def _offer_anchor_amount(offer: TargetOffer) -> int:
++    price = offer.price
++    if price.mode == "fixed":
++        return int(price.amount)
++    if price.mode == "from":
++        return int(price.min_amount)
++    if price.mode == "range":
++        return int(price.min_amount)
++    return sys.maxsize
++
++
++def get_family_price_topic_groups(
++    bundle: ResponseSchemaBundle,
++    *,
++    turn_topic: str,
++) -> FamilyPriceTopicGroups | None:
++    topic = turn_topic.strip()
++    if not topic:
++        raise TargetFamilyPriceOverviewError("family_overview_topic_invalid", turn_topic)
++    return bundle.family_price_groups.topics.get(topic)
++
++
++def resolve_group_entry_to_offer(
+     bundle: ResponseSchemaBundle,
+     doctor_catalog: TargetDoctorCatalog,
+     *,
+     turn_topic: str,
+-    max_services: int = FAMILY_PRICE_OVERVIEW_MAX_SERVICES,
++    entry: FamilyPriceGroupEntry,
++) -> TargetOffer:
++    topic = turn_topic.strip()
++    if entry.offer_id is not None:
++        offer = _offer_by_id(bundle).get(entry.offer_id)
++        if offer is None:
++            raise TargetFamilyPriceOverviewError("family_group_offer_missing", entry.offer_id)
++        if entry.service_id is not None and offer.service_id != entry.service_id:
++            raise TargetFamilyPriceOverviewError(
++                "family_group_service_offer_mismatch",
++                (entry.service_id, entry.offer_id),
++            )
++        if entry.option_id is not None and offer.option_id != entry.option_id:
++            raise TargetFamilyPriceOverviewError(
++                "family_group_option_mismatch",
++                (entry.offer_id, entry.option_id),
++            )
++        service_id = offer.service_id
++    else:
++        service_id = entry.service_id
++        if service_id is None:
++            raise TargetFamilyPriceOverviewError("family_group_entry_invalid", entry)
++        offer = _representative_offer(bundle, doctor_catalog, service_id)
++        if offer is None:
++            raise TargetFamilyPriceOverviewError("family_group_offer_missing", service_id)
++
++    service = bundle.services.get(service_id)
++    if service is None or not service.active:
++        raise TargetFamilyPriceOverviewError("family_group_service_inactive", service_id)
++    if not service_catalog_content_topic_matches(service.content_ref, topic):
++        raise TargetFamilyPriceOverviewError("family_group_topic_mismatch", (topic, service_id))
++    return offer.model_copy(deep=True)
++
++
++def build_family_price_situation_followups(
++    topic_groups: FamilyPriceTopicGroups,
++    *,
++    turn_topic: str,
++) -> tuple[TargetFamilyPriceGroupFollowup, ...]:
++    followups: list[TargetFamilyPriceGroupFollowup] = []
++    for group in topic_groups.groups:
++        followups.append(
++            build_family_price_group_followup(
++                topic=turn_topic,
++                group_id=group.id,
++                label=group.label,
++            )
++        )
++    return tuple(followups)
++
++
++def _group_anchor_offer(
++    bundle: ResponseSchemaBundle,
++    doctor_catalog: TargetDoctorCatalog,
++    *,
++    turn_topic: str,
++    group: FamilyPriceSituationGroup,
++) -> TargetOffer:
++    resolved = [
++        resolve_group_entry_to_offer(
++            bundle,
++            doctor_catalog,
++            turn_topic=turn_topic,
++            entry=entry,
++        )
++        for entry in group.entries
++    ]
++    priced = [offer for offer in resolved if _offer_anchor_amount(offer) < sys.maxsize]
++    if not priced:
++        raise TargetFamilyPriceOverviewError("family_group_anchor_unpriced", group.id)
++    return min(priced, key=_offer_anchor_amount)
++
++
++def select_family_price_situation_menu_anchors(
++    bundle: ResponseSchemaBundle,
++    doctor_catalog: TargetDoctorCatalog,
++    *,
++    turn_topic: str,
++    max_anchors: int = FAMILY_PRICE_OVERVIEW_MAX_SERVICES,
+ ) -> FamilyPriceOverviewSelection:
+-    """Select priced services for one topic using catalog membership and deterministic order."""
++    topic_groups = get_family_price_topic_groups(bundle, turn_topic=turn_topic)
++    if topic_groups is None:
++        raise TargetFamilyPriceOverviewError("family_price_groups_topic_missing", turn_topic)
+ 
+-    if type(turn_topic) is not str or not turn_topic.strip():
+-        raise TargetFamilyPriceOverviewError("family_overview_topic_invalid", turn_topic)
++    entries: list[FamilyPriceOverviewServiceEntry] = []
++    for group_order, group in enumerate(topic_groups.groups):
++        anchor = _group_anchor_offer(
++            bundle,
++            doctor_catalog,
++            turn_topic=turn_topic,
++            group=group,
++        )
++        service = bundle.services[anchor.service_id]
++        entries.append(
++            FamilyPriceOverviewServiceEntry(
++                service_id=anchor.service_id,
++                service_name=group.label,
++                offer_id=anchor.offer_id,
++                catalog_order=group_order,
++                role_rank=0,
++            )
++        )
++    limited = tuple(entries[:max_anchors])
++    return FamilyPriceOverviewSelection(turn_topic=turn_topic.strip(), entries=limited)
++
++
++def select_family_price_group_drilldown(
++    bundle: ResponseSchemaBundle,
++    doctor_catalog: TargetDoctorCatalog,
++    *,
++    turn_topic: str,
++    group_id: str,
++) -> FamilyPriceOverviewSelection:
+     topic = turn_topic.strip()
++    group_eff = group_id.strip()
++    if not topic or not group_eff:
++        raise TargetFamilyPriceOverviewError("family_group_context_invalid", (turn_topic, group_id))
+ 
+-    candidates: list[FamilyPriceOverviewServiceEntry] = []
+-    for catalog_order, (service_id, service) in enumerate(bundle.services.items()):
+-        if not service.active:
+-            continue
+-        if not service_catalog_content_topic_matches(service.content_ref, topic):
+-            continue
+-        offer = _representative_offer(bundle, doctor_catalog, service_id)
+-        if offer is None:
+-            continue
+-        candidates.append(
++    topic_groups = get_family_price_topic_groups(bundle, turn_topic=topic)
++    if topic_groups is None:
++        raise TargetFamilyPriceOverviewError("family_price_groups_topic_missing", topic)
++
++    matched: FamilyPriceSituationGroup | None = None
++    for group in topic_groups.groups:
++        if group.id == group_eff:
++            matched = group
++            break
++    if matched is None:
++        raise TargetFamilyPriceOverviewError("family_price_group_missing", (topic, group_eff))
++
++    entries: list[FamilyPriceOverviewServiceEntry] = []
++    for order, entry in enumerate(matched.entries):
++        offer = resolve_group_entry_to_offer(
++            bundle,
++            doctor_catalog,
++            turn_topic=topic,
++            entry=entry,
++        )
++        service = bundle.services[offer.service_id]
++        entries.append(
+             FamilyPriceOverviewServiceEntry(
+-                service_id=service_id,
++                service_id=offer.service_id,
+                 service_name=service.name,
+                 offer_id=offer.offer_id,
+-                catalog_order=catalog_order,
++                catalog_order=order,
+                 role_rank=_role_rank(tuple(service.roles)),
+             )
+         )
++    return FamilyPriceOverviewSelection(turn_topic=topic, entries=tuple(entries))
++
++
++def select_family_price_overview_services(
++    bundle: ResponseSchemaBundle,
++    doctor_catalog: TargetDoctorCatalog,
++    *,
++    turn_topic: str,
++    max_services: int = FAMILY_PRICE_OVERVIEW_MAX_SERVICES,
++) -> FamilyPriceOverviewSelection:
++    """Backward-compatible alias: group drill-down uses explicit groups; menu uses anchors."""
+ 
+-    candidates.sort(key=lambda entry: (entry.role_rank, entry.catalog_order))
+-    limited = tuple(candidates[:max_services])
+-    return FamilyPriceOverviewSelection(turn_topic=topic, entries=limited)
++    _ = max_services
++    return select_family_price_situation_menu_anchors(
++        bundle,
++        doctor_catalog,
++        turn_topic=turn_topic,
++        max_anchors=max_services,
++    )
+ 
+ 
+ def assemble_family_price_overview_materials(
+@@ -125,17 +323,27 @@ def assemble_family_price_overview_materials(
+     doctor_catalog: TargetDoctorCatalog,
+     selection: FamilyPriceOverviewSelection,
+ ) -> TargetOfflineResponseMaterials:
+-    """Build price-only materials for a multi-service family overview."""
+-
+     offers: list[TargetOffer] = []
+     for entry in selection.entries:
+-        offer = _representative_offer(bundle, doctor_catalog, entry.service_id)
++        offer = _offer_by_id(bundle).get(entry.offer_id)
++        if offer is None:
++            offer = _representative_offer(bundle, doctor_catalog, entry.service_id)
+         if offer is None or offer.offer_id != entry.offer_id:
+             raise TargetFamilyPriceOverviewError(
+                 "family_overview_offer_mismatch",
+                 (entry.service_id, entry.offer_id),
+             )
+-        offers.append(offer.model_copy(deep=True))
++        offer_copy = offer.model_copy(deep=True)
++        service = bundle.services.get(entry.service_id)
++        if service is not None and entry.service_name != service.name:
++            offer_copy = offer_copy.model_copy(
++                update={
++                    "package": offer_copy.package.model_copy(
++                        update={"label": entry.service_name}
++                    )
++                }
++            )
++        offers.append(offer_copy)
+ 
+     return TargetOfflineResponseMaterials(
+         service_id=None,
+@@ -162,6 +370,52 @@ def assemble_family_price_overview_materials(
+     )
+ 
+ 
++def assemble_family_price_situation_menu_package(
++    bundle: ResponseSchemaBundle,
++    doctor_catalog: TargetDoctorCatalog,
++    external_index: ResponseSchemaExternalIndex,
++    consultation_values: Sequence[ServiceConsultationValue],
++    *,
++    selection: FamilyPriceOverviewSelection,
++    md_root: Path,
++) -> TargetOfflineResponsePackage:
++    """Situation menu: compact anchors + client-owned group buttons (bypass S29/S30)."""
++
++    _ = external_index, consultation_values, md_root
++    materials = assemble_family_price_overview_materials(bundle, doctor_catalog, selection)
++    plan = build_target_response_materialization_plan(
++        materials,
++        required_components=("price",),
++    )
++    topic_groups = get_family_price_topic_groups(bundle, turn_topic=selection.turn_topic)
++    if topic_groups is None:
++        raise TargetFamilyPriceOverviewError(
++            "family_price_groups_topic_missing",
++            selection.turn_topic,
++        )
++    group_followups = build_family_price_situation_followups(
++        topic_groups,
++        turn_topic=selection.turn_topic,
++    )
++    selected_followups = TargetResponseFollowupSelection(
++        source="family_price_group",
++        content=(),
++        price=(),
++        group=tuple(group_followups),
++    )
++    return TargetOfflineResponsePackage(
++        materials=materials,
++        plan=plan,
++        followup_candidates=TargetResponseFollowupSelection(
++            source=None,
++            content=(),
++            price=(),
++            group=(),
++        ),
++        selected_followups=selected_followups,
++    )
++
++
+ def assemble_family_price_overview_package(
+     bundle: ResponseSchemaBundle,
+     doctor_catalog: TargetDoctorCatalog,
+@@ -171,9 +425,8 @@ def assemble_family_price_overview_package(
+     selection: FamilyPriceOverviewSelection,
+     md_root: Path,
+ ) -> TargetOfflineResponsePackage:
+-    """Assemble S27-S30 package for family price overview (price-only, no follow-ups)."""
++    """Group drill-down: price-only multi-offer package without situation buttons."""
+ 
+-    _ = external_index, consultation_values
+     materials = assemble_family_price_overview_materials(
+         bundle,
+         doctor_catalog,
+diff --git a/core/target_response_followup_policy.py b/core/target_response_followup_policy.py
+index cbd0126..efdf6f8 100644
+--- a/core/target_response_followup_policy.py
++++ b/core/target_response_followup_policy.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ 
+ from dataclasses import dataclass
+ 
++from contracts.target_family_price_group_followup import TargetFamilyPriceGroupFollowup
+ from contracts.target_response_spec import TargetFollowupSource
+ from core.target_response_followup_materializer import (
+     TargetContentFollowup,
+@@ -20,6 +21,7 @@ class TargetResponseFollowupSelection:
+     source: TargetFollowupSource | None
+     content: tuple[TargetContentFollowup, ...]
+     price: tuple[TargetPriceFollowup, ...]
++    group: tuple[TargetFamilyPriceGroupFollowup, ...] = ()
+ 
+ 
+ class TargetResponseFollowupPolicyError(ValueError):
+diff --git a/core/target_response_policy.py b/core/target_response_policy.py
+index 41d8de7..982ae49 100644
+--- a/core/target_response_policy.py
++++ b/core/target_response_policy.py
+@@ -17,6 +17,8 @@ class TargetResponsePolicyBuildError(ValueError):
+ 
+ def _followup_source(request: TargetResponsePolicyRequest) -> TargetFollowupSource | None:
+     if request.family_price_overview_topic is not None:
++        if request.family_price_group_id is None:
++            return "family_price_group"
+         return None
+     if request.response_mode in {"clarify", "defer"}:
+         return None
+@@ -45,6 +47,7 @@ def build_target_response_spec(
+         response_mode=request.response_mode,
+         service_id=request.service_id,
+         family_price_overview_topic=request.family_price_overview_topic,
++        family_price_group_id=request.family_price_group_id,
+         tone_key=request.tone_key,
+         allowed_topics=request.allowed_topics,
+         forbidden_topics=request.forbidden_topics,
+diff --git a/core/target_runtime_turn.py b/core/target_runtime_turn.py
+index fb46535..a12036b 100644
+--- a/core/target_runtime_turn.py
++++ b/core/target_runtime_turn.py
+@@ -34,6 +34,7 @@ from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
+ from core.target_runtime_strategy import resolve_target_runtime_strategy_context
+ from core.target_runtime_turn_frame_hydration import (
+     hydrate_target_runtime_turn_frame_from_session,
++    read_runtime_nav_ref,
+ )
+ from core.target_runtime_turn_frame_bridge import (
+     TargetRuntimeTurnFrameError,
+@@ -112,6 +113,7 @@ def run_target_fullcontext_runtime_turn(
+         user_message=user_message,
+         session_state=session_state,
+         allowed_service_ids=frozenset(context.bundle.services.keys()),
++        nav_ref=read_runtime_nav_ref(),
+     )
+ 
+     try:
+diff --git a/core/target_runtime_turn_frame_hydration.py b/core/target_runtime_turn_frame_hydration.py
+index 6104459..201c483 100644
+--- a/core/target_runtime_turn_frame_hydration.py
++++ b/core/target_runtime_turn_frame_hydration.py
+@@ -3,19 +3,77 @@
+ from __future__ import annotations
+ 
+ from contracts.turn_frame import FieldMeta, TurnFrame
++from contracts.target_family_price_group_followup import (
++    build_family_price_group_ref,
++    parse_family_price_group_ref,
++)
++from core.target_runtime_session import TargetRuntimeSessionState
++
+ from core.attribute_followup import (
+     detect_vague_attribute_kinds,
+     is_vague_attribute_followup_any,
+ )
+-from core.target_runtime_session import TargetRuntimeSessionState
+ 
+ _SESSION_FOLLOWUP_ASPECTS = frozenset({"price", "payment"})
+ 
+ 
++def read_runtime_nav_ref() -> str | None:
++    try:
++        from flask import has_request_context, request
++    except ImportError:
++        return None
++    if not has_request_context():
++        return None
++    raw = request.ctx.get("nav_ref")
++    if raw is None:
++        return None
++    text = str(raw).strip()
++    return text or None
++
++
+ def _field_meta(*, provenance: str) -> FieldMeta:
+     return FieldMeta(confidence=1.0, provenance=provenance, status="valid")
+ 
+ 
++def _hydrate_family_price_group_nav(
++    turn_frame: TurnFrame,
++    *,
++    nav_ref: str | None,
++    provenance: str,
++) -> TurnFrame | None:
++    parsed = parse_family_price_group_ref(str(nav_ref or "").strip())
++    if parsed is None and turn_frame.followup_of is not None:
++        parsed = parse_family_price_group_ref(str(turn_frame.followup_of))
++    if parsed is None:
++        return None
++    topic, group_id = parsed
++    group_ref = build_family_price_group_ref(topic=topic, group_id=group_id)
++    topic_meta = _field_meta(provenance=provenance)
++    follow_meta = _field_meta(provenance=provenance)
++    aspects = list(turn_frame.aspects)
++    if "price" not in aspects:
++        aspects.append("price")
++    return turn_frame.model_copy(
++        update={
++            "topic": topic,
++            "service_id": None,
++            "follow_up": True,
++            "followup_of": group_ref,
++            "aspects": aspects,
++            "primary_aspect": "price",
++            "field_meta": turn_frame.field_meta.model_copy(
++                update={
++                    "topic": topic_meta,
++                    "service_id": _field_meta(provenance=provenance),
++                    "follow_up": follow_meta,
++                    "followup_of": follow_meta,
++                    "primary_aspect": _field_meta(provenance=provenance),
++                }
++            ),
++        }
++    )
++
++
+ def _is_session_contextual_followup(
+     turn_frame: TurnFrame,
+     user_message: str,
+@@ -41,9 +99,18 @@ def hydrate_target_runtime_turn_frame_from_session(
+     user_message: str,
+     session_state: TargetRuntimeSessionState,
+     allowed_service_ids: frozenset[str],
++    nav_ref: str | None = None,
+ ) -> TurnFrame:
+     """Restore service continuity for contextual follow-ups when shadow frame lost it."""
+ 
++    group_hydrated = _hydrate_family_price_group_nav(
++        turn_frame,
++        nav_ref=nav_ref,
++        provenance="target_runtime.family_price_group_nav",
++    )
++    if group_hydrated is not None:
++        return group_hydrated
++
+     if turn_frame.service_id is not None:
+         return turn_frame
+     if not _is_session_contextual_followup(turn_frame, user_message):
+diff --git a/core/target_runtime_widget.py b/core/target_runtime_widget.py
+index df96a3b..aee09b8 100644
+--- a/core/target_runtime_widget.py
++++ b/core/target_runtime_widget.py
+@@ -13,10 +13,7 @@ from contracts.target_turn_frame_dispatch import (
+ )
+ from contracts.turn_frame import TurnFrame
+ from core.target_family_price_overview import is_family_price_overview_spec
+-from core.target_response_followup_materializer import (
+-    TargetContentFollowup,
+-    TargetPriceFollowup,
+-)
++from contracts.target_family_price_group_followup import TargetFamilyPriceGroupFollowup
+ from core.target_response_verifier import TargetVerifiedComposedResponse
+ from core.target_runtime_client_context import TargetRuntimeClientContext
+ from core.client_config_loader import load_lead_cta_variants
+@@ -99,13 +96,20 @@ def _base_meta(
+ 
+ def _followups_to_quick_replies(
+     *,
+-    content: tuple[TargetContentFollowup, ...],
+-    price: tuple[TargetPriceFollowup, ...],
++    content: tuple[object, ...],
++    price: tuple[object, ...],
++    group: tuple[TargetFamilyPriceGroupFollowup, ...] = (),
+ ) -> list[dict[str, str]]:
+     quick: list[dict[str, str]] = []
+     for item in content:
+-        quick.append({"label": item.label, "ref": item.ref})
++        quick.append({"label": item.label, "ref": item.ref})  # type: ignore[attr-defined]
+     for item in price:
++        quick.append({"label": item.label, "ref": item.ref})  # type: ignore[attr-defined]
++    seen: set[str] = set()
++    for item in group:
++        if item.ref in seen:
++            continue
++        seen.add(item.ref)
+         quick.append({"label": item.label, "ref": item.ref})
+     return quick
+ 
+@@ -138,6 +142,7 @@ def materialize_verified_widget_payload(
+     quick_replies = _followups_to_quick_replies(
+         content=followups.content,
+         price=followups.price,
++        group=followups.group,  # type: ignore[arg-type]
+     )
+     spec = verified.spec
+     ui_family = _materialized_ui_source_family(spec)
+diff --git a/core/target_scoped_response_evidence.py b/core/target_scoped_response_evidence.py
+index edc1077..6cf0a13 100644
+--- a/core/target_scoped_response_evidence.py
++++ b/core/target_scoped_response_evidence.py
+@@ -12,7 +12,11 @@ from pydantic import TypeAdapter, ValidationError
+ from yaml.nodes import MappingNode
+ 
+ from contracts.target_response_spec import CanonicalToken, TargetResponseSpec
+-from core.target_family_price_overview import is_family_price_overview_spec
++from core.target_family_price_overview import (
++    is_family_price_group_drilldown_spec,
++    is_family_price_overview_spec,
++    is_family_price_situation_menu_spec,
++)
+ from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+ from core.target_offline_response_assembly import TargetOfflineResponseMaterials
+ from core.target_offline_response_package import TargetOfflineResponsePackage
+@@ -229,7 +233,7 @@ def build_target_scoped_response_evidence(
+             covered_fact_ids=plan.commercial_fact_ids,
+         )
+ 
+-    if is_family_price_overview_spec(spec):
++    if is_family_price_situation_menu_spec(spec) or is_family_price_group_drilldown_spec(spec):
+         package = bound_package.package
+         plan = package.plan
+         materials = package.materials
+@@ -249,19 +253,31 @@ def build_target_scoped_response_evidence(
+         if any(offer_id not in offers_by_id for offer_id in plan.offer_ids):
+             _error("scoped_evidence_package_inconsistent", "offer_ids")
+         overview_topic = spec.family_price_overview_topic
+-        records = [
+-            TargetEvidenceScopeRecord(
+-                ref=f"offer:{offer_id}",
+-                topics=(overview_topic,),
+-                fact_ids=(),
+-            )
+-            for offer_id in plan.offer_ids
+-        ]
++        if is_family_price_situation_menu_spec(spec):
++            records = [
++                TargetEvidenceScopeRecord(
++                    ref=f"offer:{overview_topic}.menu_anchor.{index}",
++                    topics=(overview_topic,),
++                    fact_ids=(),
++                )
++                for index in range(len(materials.offers))
++            ]
++            offer_ids = tuple(offer.offer_id for offer in materials.offers)
++        else:
++            records = [
++                TargetEvidenceScopeRecord(
++                    ref=f"offer:{offer.offer_id}",
++                    topics=(overview_topic,),
++                    fact_ids=(),
++                )
++                for offer in materials.offers
++            ]
++            offer_ids = tuple(offer.offer_id for offer in materials.offers)
+         return TargetScopedResponseEvidence(
+             spec=spec,
+             service_id=None,
+             primary_content_ref=None,
+-            offer_ids=plan.offer_ids,
++            offer_ids=offer_ids,
+             doctor_ids=(),
+             commercial_fact_ids=(),
+             external_source_refs=(),
+diff --git a/core/target_spec_offline_response_package.py b/core/target_spec_offline_response_package.py
+index 214484f..3986a7f 100644
+--- a/core/target_spec_offline_response_package.py
++++ b/core/target_spec_offline_response_package.py
+@@ -20,8 +20,12 @@ from contracts.service_consultation import ServiceConsultationValue
+ from contracts.target_response_spec import TargetResponseSpec
+ from core.target_family_price_overview import (
+     assemble_family_price_overview_package,
++    assemble_family_price_situation_menu_package,
++    is_family_price_group_drilldown_spec,
+     is_family_price_overview_spec,
+-    select_family_price_overview_services,
++    is_family_price_situation_menu_spec,
++    select_family_price_group_drilldown,
++    select_family_price_situation_menu_anchors,
+ )
+ from core.target_fullcontext_content_package import (
+     assemble_target_fullcontext_content_bound_package,
+@@ -100,7 +104,7 @@ def assemble_target_spec_offline_response_package(
+             include_consultation_close=include_consultation_close,
+             selected_cta_key=None,
+         )
+-    if is_family_price_overview_spec(spec):
++    if is_family_price_situation_menu_spec(spec):
+         if brand_term is not None or include_initial_block or marketing_scenarios != ():
+             _error("spec_package_permission_forbidden", "marketing_facts")
+         if include_consultation_close:
+@@ -109,48 +113,43 @@ def assemble_target_spec_offline_response_package(
+             _error("spec_package_permission_forbidden", "cta")
+         if spec.family_price_overview_topic is None:
+             _error("spec_package_not_materializable", "family_price_overview_topic")
+-        selection = select_family_price_overview_services(
++        selection = select_family_price_situation_menu_anchors(
+             bundle,
+             doctor_catalog,
+             turn_topic=spec.family_price_overview_topic,
+         )
+         if not selection.entries:
+-            _error("spec_package_not_materializable", "family_price_overview_empty")
+-        if len(selection.entries) == 1:
+-            single_service_id = selection.entries[0].service_id
+-            single_spec = spec.model_copy(
+-                update={
+-                    "service_id": single_service_id,
+-                    "family_price_overview_topic": None,
+-                    "followup_source": "price",
+-                }
+-            )
+-            package = assemble_target_offline_response_package(
+-                bundle,
+-                doctor_catalog,
+-                external_index,
+-                consultation_values,
+-                service_term=single_service_id,
+-                brand_term=brand_term,
+-                strategy_context=strategy_context,
+-                semantic_context=semantic_context,
+-                today=today,
+-                include_initial_block=include_initial_block,
+-                include_consultation_close=include_consultation_close,
+-                required_components=single_spec.required_components,
+-                followup_source=single_spec.followup_source,
+-                md_root=md_root,
+-                marketing_scenarios=marketing_scenarios,
+-                shown_fact_ids=shown_fact_ids,
+-                shown_amplifier_refs=shown_amplifier_refs,
+-                shown_consultation_value_refs=shown_consultation_value_refs,
+-            )
+-            selected_cta_key = package.plan.cta_key if include_cta and single_spec.allow_cta else None
+-            return TargetSpecBoundOfflineResponsePackage(
+-                spec=single_spec,
+-                package=package,
+-                selected_cta_key=selected_cta_key,
+-            )
++            _error("spec_package_not_materializable", "family_price_situation_menu_empty")
++        package = assemble_family_price_situation_menu_package(
++            bundle,
++            doctor_catalog,
++            external_index,
++            consultation_values,
++            selection=selection,
++            md_root=md_root,
++        )
++        return TargetSpecBoundOfflineResponsePackage(
++            spec=spec,
++            package=package,
++            selected_cta_key=None,
++        )
++    if is_family_price_group_drilldown_spec(spec):
++        if brand_term is not None or include_initial_block or marketing_scenarios != ():
++            _error("spec_package_permission_forbidden", "marketing_facts")
++        if include_consultation_close:
++            _error("spec_package_permission_forbidden", "consultation_close")
++        if include_cta:
++            _error("spec_package_permission_forbidden", "cta")
++        if spec.family_price_overview_topic is None or spec.family_price_group_id is None:
++            _error("spec_package_not_materializable", "family_price_group_drilldown")
++        selection = select_family_price_group_drilldown(
++            bundle,
++            doctor_catalog,
++            turn_topic=spec.family_price_overview_topic,
++            group_id=spec.family_price_group_id,
++        )
++        if not selection.entries:
++            _error("spec_package_not_materializable", "family_price_group_empty")
+         package = assemble_family_price_overview_package(
+             bundle,
+             doctor_catalog,
+diff --git a/core/target_turn_frame_dispatch.py b/core/target_turn_frame_dispatch.py
+index 38b497e..ed81a80 100644
+--- a/core/target_turn_frame_dispatch.py
++++ b/core/target_turn_frame_dispatch.py
+@@ -14,6 +14,7 @@ from contracts.target_turn_frame_dispatch import (
+     TargetTurnFrameTerminalMode,
+ )
+ from contracts.target_turn_frame_policy_envelope import TargetTurnFramePolicyEnvelope
++from contracts.target_family_price_group_followup import parse_family_price_group_ref
+ from core.target_response_policy import build_target_response_spec
+ 
+ _ASPECT_TO_COMPONENT: dict[AspectKind, TargetResponseComponent] = {
+@@ -218,30 +219,39 @@ def _materialize_fullcontext_content_policy_request(
+     )
+ 
+ 
++def _family_price_group_context(turn_frame: TurnFrame) -> tuple[str, str] | None:
++    raw = turn_frame.followup_of
++    if raw is None:
++        return None
++    return parse_family_price_group_ref(str(raw))
++
++
+ def _materialize_family_price_overview_policy_request(
+     *,
+     response_mode: TargetResponseMode,
+     turn_topic: str,
++    group_id: str | None = None,
+     envelope: TargetTurnFramePolicyEnvelope,
+ ) -> TargetResponsePolicyRequest:
+     if response_mode == "medical_handoff" and not envelope.forbidden_topics:
+         _fail("dispatch_medical_forbidden_empty", envelope.forbidden_topics)
+-    return TargetResponsePolicyRequest.model_validate(
+-        {
+-            "response_mode": response_mode,
+-            "service_id": None,
+-            "family_price_overview_topic": turn_topic,
+-            "tone_key": envelope.tone_key,
+-            "allowed_topics": envelope.allowed_topics,
+-            "forbidden_topics": envelope.forbidden_topics,
+-            "required_fact_ids": (),
+-            "requested_components": ("price",),
+-            "primary_component": None,
+-            "allow_marketing_facts": False,
+-            "allow_consultation_close": envelope.allow_consultation_close,
+-            "allow_cta": False,
+-        }
+-    )
++    payload: dict[str, object] = {
++        "response_mode": response_mode,
++        "service_id": None,
++        "family_price_overview_topic": turn_topic,
++        "tone_key": envelope.tone_key,
++        "allowed_topics": envelope.allowed_topics,
++        "forbidden_topics": envelope.forbidden_topics,
++        "required_fact_ids": (),
++        "requested_components": ("price",),
++        "primary_component": None,
++        "allow_marketing_facts": False,
++        "allow_consultation_close": envelope.allow_consultation_close,
++        "allow_cta": False,
++    }
++    if group_id is not None:
++        payload["family_price_group_id"] = group_id
++    return TargetResponsePolicyRequest.model_validate(payload)
+ 
+ 
+ def _materialize_policy_request(
+@@ -322,9 +332,19 @@ def dispatch_target_turn_frame_response(
+             )
+         family_topic = _family_price_overview_topic(turn_frame, envelope)
+         if family_topic is not None and response_mode == "answer":
++            group_ctx = _family_price_group_context(turn_frame)
++            group_id: str | None = None
++            if group_ctx is not None:
++                nav_topic, group_id = group_ctx
++                if nav_topic != family_topic:
++                    _fail(
++                        "dispatch_family_price_group_topic_mismatch",
++                        (nav_topic, family_topic),
++                    )
+             policy_request = _materialize_family_price_overview_policy_request(
+                 response_mode=response_mode,
+                 turn_topic=family_topic,
++                group_id=group_id,
+                 envelope=envelope,
+             )
+             return TargetTurnFrameMaterializeDispatch(
+diff --git a/tests/test_demo_target_price_offers.py b/tests/test_demo_target_price_offers.py
+index 91d81a1..673f096 100644
+--- a/tests/test_demo_target_price_offers.py
++++ b/tests/test_demo_target_price_offers.py
+@@ -192,6 +192,9 @@ def _sha256(path: Path) -> str:
+ 
+ def _real_bundle() -> ResponseSchemaBundle:
+     raw_services = _load_json(TARGET_SERVICES)
++    family_price_groups = yaml.safe_load(
++        (TARGET_ROOT / "family_price_groups.yaml").read_text(encoding="utf-8")
++    )
+     return ResponseSchemaBundle.model_validate(
+         {
+             "services": {
+@@ -213,6 +216,7 @@ def _real_bundle() -> ResponseSchemaBundle:
+                 "scenario_rules": {},
+                 "cta_contexts": {"default": "validation_only"},
+             },
++            "family_price_groups": family_price_groups,
+         }
+     )
+ 
+diff --git a/tests/test_response_schema_loader.py b/tests/test_response_schema_loader.py
+index 4b1a52a..92355af 100644
+--- a/tests/test_response_schema_loader.py
++++ b/tests/test_response_schema_loader.py
+@@ -31,7 +31,7 @@ def _service_payload(*, name: str = "Service One") -> dict[str, object]:
+         "family": "implantology",
+         "roles": ["protocol"],
+         "active": True,
+-        "content_ref": "service_one.md",
++            "content_ref": "implantation__service__service_one.md",
+         "selection": {"mode": "scope", "extent": ["one_tooth"]},
+         "options": [
+             {
+@@ -136,6 +136,18 @@ scenario_rules:
+ cta_contexts:
+   service_context: consult
+   default: callback
++""",
++        encoding="utf-8",
++    )
++    (root / "family_price_groups.yaml").write_text(
++        """version: 1
++topics:
++  implantation:
++    groups:
++      - id: one_tooth
++        label: One
++        entries:
++          - service_id: service_one
+ """,
+         encoding="utf-8",
+     )
+diff --git a/tests/test_target_response_followup_policy.py b/tests/test_target_response_followup_policy.py
+index af362cf..2832db6 100644
+--- a/tests/test_target_response_followup_policy.py
++++ b/tests/test_target_response_followup_policy.py
+@@ -55,8 +55,14 @@ def test_public_shapes_signature_and_frozen_slots() -> None:
+         "source",
+         "content",
+         "price",
++        "group",
+     ]
+-    assert TargetResponseFollowupSelection.__slots__ == ("source", "content", "price")
++    assert TargetResponseFollowupSelection.__slots__ == (
++        "source",
++        "content",
++        "price",
++        "group",
++    )
+     result = select_target_response_followups(_followups(), source=None)
+     with pytest.raises(FrozenInstanceError):
+         result.source = "content"  # type: ignore[misc]
+diff --git a/tests/test_target_response_policy.py b/tests/test_target_response_policy.py
+index a427c6f..7ff9042 100644
+--- a/tests/test_target_response_policy.py
++++ b/tests/test_target_response_policy.py
+@@ -42,6 +42,7 @@ def test_exact_request_shape_defaults_and_strict_frozen_config() -> None:
+         "response_mode",
+         "service_id",
+         "family_price_overview_topic",
++        "family_price_group_id",
+         "tone_key",
+         "allowed_topics",
+         "forbidden_topics",
+diff --git a/tests/test_target_response_spec.py b/tests/test_target_response_spec.py
+index 11dc670..c1262e7 100644
+--- a/tests/test_target_response_spec.py
++++ b/tests/test_target_response_spec.py
+@@ -35,6 +35,7 @@ def _payload(**overrides: object) -> dict[str, object]:
+         "allow_consultation_close": True,
+         "allow_cta": True,
+         "family_price_overview_topic": None,
++        "family_price_group_id": None,
+     }
+     payload.update(overrides)
+     return payload
+@@ -50,6 +51,7 @@ def test_exact_fields_defaults_aliases_and_strict_frozen_config() -> None:
+         "response_mode",
+         "service_id",
+         "family_price_overview_topic",
++        "family_price_group_id",
+         "tone_key",
+         "allowed_topics",
+         "forbidden_topics",
+@@ -62,6 +64,7 @@ def test_exact_fields_defaults_aliases_and_strict_frozen_config() -> None:
+     ]
+     assert TargetResponseSpec.model_fields["service_id"].default is None
+     assert TargetResponseSpec.model_fields["family_price_overview_topic"].default is None
++    assert TargetResponseSpec.model_fields["family_price_group_id"].default is None
+     assert TargetResponseSpec.model_fields["forbidden_topics"].default == ()
+     assert TargetResponseSpec.model_fields["required_fact_ids"].default == ()
+     assert TargetResponseSpec.model_fields["followup_source"].default is None
+@@ -77,7 +80,7 @@ def test_exact_fields_defaults_aliases_and_strict_frozen_config() -> None:
+         "medical_handoff",
+     )
+     assert get_args(TargetResponseComponent) == ("content", "price", "doctors")
+-    assert get_args(TargetFollowupSource) == ("content", "price")
++    assert get_args(TargetFollowupSource) == ("content", "price", "family_price_group")
+ 
+     spec = TargetResponseSpec.model_validate(_payload())
+     with pytest.raises(ValidationError, match="frozen_instance"):
+diff --git a/tests/test_target_turn_frame_dispatch.py b/tests/test_target_turn_frame_dispatch.py
+index 1469ce0..d159061 100644
+--- a/tests/test_target_turn_frame_dispatch.py
++++ b/tests/test_target_turn_frame_dispatch.py
+@@ -124,7 +124,7 @@ def test_needs_clarification_returns_terminal_clarify_without_materialize() -> N
+     assert result.spec.required_components == ()
+ 
+ 
+-def test_missing_service_id_with_price_intent_materializes_family_overview() -> None:
++def test_missing_service_id_with_price_intent_materializes_family_situation_menu() -> None:
+     result = dispatch_target_turn_frame_response(
+         _frame(service_id=None, aspects=["price"], primary_aspect="price"),
+         _envelope(),
+@@ -132,7 +132,46 @@ def test_missing_service_id_with_price_intent_materializes_family_overview() ->
+     assert result.kind == "materialize"
+     assert result.policy_request.service_id is None
+     assert result.policy_request.family_price_overview_topic == "implantation"
++    assert result.policy_request.family_price_group_id is None
+     assert result.policy_request.requested_components == ("price",)
++    from core.target_response_policy import build_target_response_spec
++
++    spec = build_target_response_spec(result.policy_request)  # type: ignore[arg-type]
++    assert spec.followup_source == "family_price_group"
++
++
++def test_family_price_group_nav_materializes_drilldown() -> None:
++    from contracts.target_family_price_group_followup import build_family_price_group_ref
++    from contracts.turn_frame import FieldMeta
++
++    base = _frame(
++        service_id=None,
++        aspects=["price"],
++        primary_aspect="price",
++    )
++    group_ref = build_family_price_group_ref(topic="implantation", group_id="one_tooth")
++    nav_meta = FieldMeta(
++        confidence=1.0,
++        provenance="test.family_price_group_nav",
++        status="valid",
++    )
++    frame = base.model_copy(
++        update={
++            "follow_up": True,
++            "followup_of": group_ref,
++            "field_meta": base.field_meta.model_copy(
++                update={"follow_up": nav_meta, "followup_of": nav_meta}
++            ),
++        }
++    )
++    result = dispatch_target_turn_frame_response(frame, _envelope())
++    assert result.kind == "materialize"
++    assert result.policy_request.family_price_overview_topic == "implantation"
++    assert result.policy_request.family_price_group_id == "one_tooth"
++    from core.target_response_policy import build_target_response_spec
++
++    spec = build_target_response_spec(result.policy_request)  # type: ignore[arg-type]
++    assert spec.followup_source is None
+ 
+ 
+ def test_missing_service_id_without_usable_topic_and_price_returns_defer() -> None:
+diff --git a/tests/test_w1_family_price_overview_offline.py b/tests/test_w1_family_price_overview_offline.py
+index e852c33..9a80dc7 100644
+--- a/tests/test_w1_family_price_overview_offline.py
++++ b/tests/test_w1_family_price_overview_offline.py
+@@ -42,7 +42,7 @@ def test_service_catalog_content_topic_matches_is_generic() -> None:
+     )
+ 
+ 
+-def test_implantation_family_overview_selects_multiple_priced_services() -> None:
++def test_implantation_family_overview_selects_group_anchors() -> None:
+     bundle = load_response_schema_bundle(TARGET_ROOT)
+     doctors = load_doctor_catalog(__import__("pathlib").Path("clients/demo/doctor_catalog.json"))
+     selection = select_family_price_overview_services(
+@@ -50,8 +50,9 @@ def test_implantation_family_overview_selects_multiple_priced_services() -> None
+         doctors,
+         turn_topic="implantation",
+     )
+-    assert len(selection.entries) >= 2
+-    assert len(selection.entries) <= FAMILY_PRICE_OVERVIEW_MAX_SERVICES
++    assert len(selection.entries) == 3
++    labels = [entry.service_name for entry in selection.entries]
++    assert labels == ["╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒", "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓", "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М"]
+     service_ids = selection.service_ids
+     assert "all_on_4" in service_ids
+     assert "classic" in service_ids
+@@ -64,7 +65,7 @@ def test_implantation_family_overview_selects_multiple_priced_services() -> None
+     )
+ 
+ 
+-def test_prosthetics_family_overview_excludes_implantation_services() -> None:
++def test_prosthetics_family_overview_uses_group_anchors() -> None:
+     bundle = load_response_schema_bundle(TARGET_ROOT)
+     doctors = load_doctor_catalog(__import__("pathlib").Path("clients/demo/doctor_catalog.json"))
+     selection = select_family_price_overview_services(
+@@ -72,15 +73,10 @@ def test_prosthetics_family_overview_excludes_implantation_services() -> None:
+         doctors,
+         turn_topic="prosthetics",
+     )
+-    assert len(selection.entries) >= 2
++    assert len(selection.entries) == 3
+     assert "all_on_4" not in selection.service_ids
+-    assert all(
+-        service_catalog_content_topic_matches(
+-            bundle.services[sid].content_ref,
+-            "prosthetics",
+-        )
+-        for sid in selection.service_ids
+-    )
++    labels = [entry.service_name for entry in selection.entries]
++    assert labels == ["╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒", "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓", "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М"]
+ 
+ 
+ def test_synthetic_fixture_family_overview_without_demo_hardcode(tmp_path) -> None:
+@@ -154,6 +150,22 @@ cta_contexts:
+         "version: 1\ndefault_max_options: 3\ndefault_service_priorities: {}\ndefault_offer_priorities: {}\nrules: []\n",
+         encoding="utf-8",
+     )
++    (root / "family_price_groups.yaml").write_text(
++        """version: 1
++topics:
++  alpha_topic:
++    groups:
++      - id: one_tooth
++        label: One tooth
++        entries:
++          - service_id: alpha_srv
++      - id: several_teeth
++        label: Several teeth
++        entries:
++          - service_id: beta_srv
++""",
++        encoding="utf-8",
++    )
+ 
+     bundle = load_response_schema_bundle(root)
+     doctors = load_doctor_catalog(__import__("pathlib").Path("clients/demo/doctor_catalog.json"))
+@@ -163,6 +175,10 @@ cta_contexts:
+         turn_topic="alpha_topic",
+     )
+     assert selection.service_ids == ("alpha_srv", "beta_srv")
++    assert [entry.service_name for entry in selection.entries] == [
++        "One tooth",
++        "Several teeth",
++    ]
+ 
+ 
+ def _family_overview_frame(**overrides: object):
+@@ -233,10 +249,19 @@ def test_implantation_family_price_overview_materializes_via_pipeline() -> None:
+     )
+     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+     assert result.dispatch.policy_request.family_price_overview_topic == "implantation"
++    assert result.dispatch.policy_request.family_price_group_id is None
++    assert result.verified.spec.followup_source == "family_price_group"
+     assert len(composer.invocations) == 1
+     evidence = __import__("json").loads(composer.invocations[0].primary_evidence_json)
+-    assert len(evidence) >= 2
++    assert len(evidence) == 3
+     assert all(block["kind"] == "offer" for block in evidence)
++    assert all('"payment_stages":[' not in block["text"] for block in evidence)
++    group_buttons = result.verified.selected_followups.group
++    assert [item.label for item in group_buttons] == [
++        "╨Ю╨┤╨╕╨╜ ╨╖╤Г╨▒",
++        "╨Э╨╡╤Б╨║╨╛╨╗╤М╨║╨╛ ╨╖╤Г╨▒╨╛╨▓",
++        "╨Т╤Б╤П ╤З╨╡╨╗╤О╤Б╤В╤М",
++    ]
+ 
+ 
+ def test_all_on_4_exact_price_path_unchanged() -> None:

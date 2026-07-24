@@ -1,0 +1,38 @@
+version: 1
+topics:
+  implantation:
+    groups:
+      - id: one_tooth
+        label: Один зуб
+        entries:
+          - service_id: classic
+          - service_id: one_stage
+      - id: several_teeth
+        label: Несколько зубов
+        entries:
+          - service_id: classic
+          - service_id: one_stage
+      - id: full_jaw
+        label: Вся челюсть
+        entries:
+          - service_id: all_on_4
+          - service_id: all_on_6
+          - service_id: zygomatic_implants
+  prosthetics:
+    groups:
+      - id: one_tooth
+        label: Один зуб
+        entries:
+          - offer_id: zirconia_crowns.default
+          - offer_id: implant_supported_prosthetics.default
+      - id: several_teeth
+        label: Несколько зубов
+        entries:
+          - offer_id: zirconia_crowns.default
+          - offer_id: implant_supported_prosthetics.default
+          - offer_id: clasp_dentures.default
+          - offer_id: removable_dentures.jaw.partial
+      - id: full_jaw
+        label: Вся челюсть
+        entries:
+          - offer_id: removable_dentures.jaw.full

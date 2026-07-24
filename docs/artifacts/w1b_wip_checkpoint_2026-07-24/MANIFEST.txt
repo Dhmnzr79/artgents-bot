@@ -1,0 +1,35 @@
+﻿W1b WIP checkpoint — frozen snapshot before Architecture Convergence checkpoint 0
+================================================================================
+
+PRODUCT_BASELINE: eedbd66d6a0b00ec9a186e4298fbdf9ae90e3d69
+BRANCH:           codex/stage-a
+CREATED:          2026-07-24
+TASK:             W1b Family price situation menu + grouped drill-down (INCOMPLETE — not merged)
+STATUS:           Parked; restore only by explicit owner decision
+
+Composition
+-----------
+Tracked modified (22): see status_porcelain.txt
+Untracked new (5): copied under untracked/
+
+Artifacts
+---------
+w1b_tracked.patch     — git diff of 22 tracked files against product baseline eedbd66
+diff_stat.txt         — git diff --stat
+checksums.sha256      — canonical SHA256 inventory (machine-readable)
+file_inventory.txt    — sizes
+status_porcelain.txt  — git status at park time
+RESTORE.md            — restore procedure
+
+Checksums (SHA256)
+------------------
+See checksums.sha256 (sole canonical checksum file)
+
+Restore contract
+----------------
+1. Patch created against product baseline eedbd66 (not governance HEAD).
+2. Allowed on clean descendant HEAD if none of the 22 tracked paths changed since baseline.
+3. Mandatory: verify checksums.sha256 + `git apply --check` (abort on conflict).
+4. No force apply, 3-way merge, or reset on conflict — STOP and escalate.
+5. Copy untracked/* back to repo root; re-verify file hashes.
+6. Owner approval required.

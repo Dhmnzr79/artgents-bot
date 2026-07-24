@@ -178,6 +178,38 @@ Offline S38 закладывает semantic assessment; **S51** заменил a
 
 ---
 
+## Architecture convergence — scope pipeline (2026-07-24)
+
+Единый product path для масштаба ситуации (см. также
+[`ARCHITECTURE_CONVERGENCE.md`](ARCHITECTURE_CONVERGENCE.md),
+[`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md)):
+
+```text
+message / typed UI action
+  → UiScopeAction + session patient_facts (AC1 product)
+  → EffectiveScope
+  → service_catalog.selection filter
+  → clinic_strategy rank
+  → pricebook offers
+  → ResponseSpec (+ marketing / follow-up / CTA)
+  → Composer + Verifier + widget
+```
+
+**EffectiveScope — AC1 product:** (1) explicit `UiScopeAction` → (2) fresh session
+`patient_facts` (same topic) → (3) unknown. Product path **не читает**
+`TurnFrame.patient_scope`.
+
+**Future (docs only):** current-turn A9 `patient_scope` between (1) and (2) after
+authority decision; free-text correction after A9 quality proof.
+
+**Canonical extent:** `one_tooth | few_teeth | full_arch` (+ jaw/stage). UI labels
+client-owned. `ResponseStage` — post-AC1; not in AC1 scope.
+
+**W1b WIP** припаркован; `family_price_groups` — будущий **navigation overlay** по
+extent, не второй applicability engine.
+
+---
+
 ## Целевая цепочка (TARGET)
 
 ```

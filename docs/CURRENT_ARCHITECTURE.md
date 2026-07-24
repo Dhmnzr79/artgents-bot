@@ -1,7 +1,13 @@
 # Текущая архитектура бота
 
-**Статус:** фактический runtime после Stage 3.4 и Stage 5.5.  
-**Обновлено:** 2026-07-10.  
+> **УСТАРЕЛО (2026-07-24).** Описывает pre-S69 legacy runtime (`ask_turn`, playbook,
+> `SITUATION_PRICE_ON`). **Фактический product path** — target FullContext only; канон:
+> [`S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md`](S70_FULLCONTEXT_MIGRATION_CLOSEOUT.md),
+> [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`ARCHITECTURE_CONVERGENCE.md`](ARCHITECTURE_CONVERGENCE.md).
+> Файл сохранён как историческая справка; не использовать для новых задач.
+
+**Статус:** исторический snapshot (Stage 3.4 / 5.5).
+**Обновлено:** 2026-07-10 (не отражает S61–S70).
 **Связано:** `ROUTING_MAP.md`, `MULTICLIENT.md`, `PRICEBOOK_V2.md`, `TECH_DEBT.md`.
 
 ---

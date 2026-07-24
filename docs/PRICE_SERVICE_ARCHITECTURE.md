@@ -1,7 +1,13 @@
 # Архитектура услуг и цен
 
 **Статус:** канонический target design, 18 июля 2026 года. Schema/data и pure offline
-helpers материализуются S-series; runtime/product wiring ещё не реализован.
+helpers материализуются S-series; **runtime/product wiring scope/selection/strategy —
+не реализован** (см. [`ARCHITECTURE_CONVERGENCE.md`](ARCHITECTURE_CONVERGENCE.md)).
+
+**W1b (2026-07-24):** незавершённый product WIP **припаркован** в
+[`artifacts/w1b_wip_checkpoint_2026-07-24/`](artifacts/w1b_wip_checkpoint_2026-07-24/MANIFEST.txt);
+не является authority для applicability. Следующий product slice — AC1 (scope contract),
+затем service pipeline wiring.
 
 **Назначение:** единый источник целевых правил услуг, применимости, брендов, стратегии
 клиники, коммерческих offers и ценовых ответов.

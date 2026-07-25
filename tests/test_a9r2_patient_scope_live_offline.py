@@ -173,13 +173,7 @@ def test_scalar_bridge_not_usable_in_live_projection() -> None:
     assert score["projected_usable"]["extent"] is False
 
 
-def test_harness_offline_perfect_run_writes_artifacts(
-    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
-        lambda **kwargs: None,
-    )
+def test_harness_offline_perfect_run_writes_artifacts(artifact_paths: dict[str, Path]) -> None:
     matrix = load_frozen_matrix_v2()
     responses: dict[str, dict] = {}
     for call in iter_live_planner_calls(matrix):
@@ -209,13 +203,7 @@ def test_harness_offline_perfect_run_writes_artifacts(
     assert all(path.exists() for path in artifact_paths.values())
 
 
-def test_attempt_marker_blocks_second_run_without_override(
-    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
-        lambda **kwargs: None,
-    )
+def test_attempt_marker_blocks_second_run_without_override(artifact_paths: dict[str, Path]) -> None:
     matrix = load_frozen_matrix_v2()
     responses = {
         call["question"]: {
@@ -251,13 +239,7 @@ def test_cli_live_entrypoint_exists() -> None:
     assert callable(main)
 
 
-def test_correction_and_natural_tooth_present_in_fake_run(
-    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
-        lambda **kwargs: None,
-    )
+def test_correction_and_natural_tooth_present_in_fake_run(artifact_paths: dict[str, Path]) -> None:
     matrix = load_frozen_matrix_v2()
     responses: dict[str, dict] = {}
     for call in iter_live_planner_calls(matrix):
@@ -364,14 +346,15 @@ def test_ambiguous_all_unknown_counts_as_composite_exact() -> None:
     assert score["composite_turn_exact"] is True
 
 
-def test_attempt_marker_records_started_calls(
-    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
-        lambda **kwargs: None,
+def test_attempt_marker_records_started_calls(artifact_paths: dict[str, Path]) -> None:
+    prepare_live_run(
+        attempt_marker_path=artifact_paths["attempt_marker"],
+        call_ledger_path=artifact_paths["call_ledger"],
+        raw_path=artifact_paths["raw"],
+        result_path=artifact_paths["result"],
+        manifest_path=artifact_paths["manifest"],
+        manual_review_path=artifact_paths["manual_review"],
     )
-    prepare_live_run(attempt_marker_path=artifact_paths["attempt_marker"])
     marker = load_attempt_marker(artifact_paths["attempt_marker"])
     assert marker["provider_calls_started"] == 0
     assert marker["abort_blocks_retry_without_owner_approval"] is True

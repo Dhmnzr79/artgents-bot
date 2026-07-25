@@ -21,6 +21,7 @@ from evals.v5.a9r2_patient_scope_live_contract import (
 
 _MALFORMED_STATUSES = frozenset({"invalid", "missing", "defaulted"})
 _SCOPE_META_FIELDS = ("container", "extent", "jaw", "stage", "modifiers")
+AC2_MATERIAL_AXES = frozenset({"extent", "jaw", "stage"})
 
 
 def patient_scope_axes_strict_valid(frame: TurnFrame) -> bool:
@@ -143,6 +144,8 @@ def score_planner_call(
             "malformed_projection_count": 0,
             "wrong_non_unknown_axis_count": 0,
             "false_positive_axis_count": 0,
+            "material_false_positive_axis_count": 0,
+            "diagnostic_false_positive_axis_count": 0,
             "missing_expected_positive_axis_count": 0,
             "correct_expected_axis_count": 0,
         }
@@ -213,6 +216,17 @@ def score_planner_call(
             outcome == "correct_expected_axis" for outcome in scorable
         )
 
+    material_false_positive_axis_count = sum(
+        1
+        for axis, outcome in axis_outcomes.items()
+        if outcome == "false_positive_axis" and axis in AC2_MATERIAL_AXES
+    )
+    diagnostic_false_positive_axis_count = sum(
+        1
+        for axis, outcome in axis_outcomes.items()
+        if outcome == "false_positive_axis" and axis not in AC2_MATERIAL_AXES
+    )
+
     return {
         "transport_provider_error": False,
         "axis_outcomes": axis_outcomes,
@@ -232,6 +246,8 @@ def score_planner_call(
         "malformed_projection_count": counts["malformed_invalid_defaulted_projection"],
         "wrong_non_unknown_axis_count": counts["wrong_non_unknown_axis"],
         "false_positive_axis_count": counts["false_positive_axis"],
+        "material_false_positive_axis_count": material_false_positive_axis_count,
+        "diagnostic_false_positive_axis_count": diagnostic_false_positive_axis_count,
         "missing_expected_positive_axis_count": counts["missing_expected_positive_axis"],
         "correct_expected_axis_count": counts["correct_expected_axis"],
         "simulated_session_wrote": sim.wrote,
@@ -245,6 +261,8 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
         "malformed_projection_count": 0,
         "wrong_non_unknown_axis_count": 0,
         "false_positive_axis_count": 0,
+        "material_false_positive_axis_count": 0,
+        "diagnostic_false_positive_axis_count": 0,
         "missing_expected_positive_axis_count": 0,
         "correct_expected_axis_count": 0,
         "composite_exact_turns": 0,
@@ -264,6 +282,12 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
                 score.get("wrong_non_unknown_axis_count") or 0
             )
             totals["false_positive_axis_count"] += int(score.get("false_positive_axis_count") or 0)
+            totals["material_false_positive_axis_count"] += int(
+                score.get("material_false_positive_axis_count") or 0
+            )
+            totals["diagnostic_false_positive_axis_count"] += int(
+                score.get("diagnostic_false_positive_axis_count") or 0
+            )
             totals["missing_expected_positive_axis_count"] += int(
                 score.get("missing_expected_positive_axis_count") or 0
             )
@@ -313,9 +337,14 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
     return totals
 
 
-def evaluate_proposed_gates(summary: dict[str, Any]) -> dict[str, Any]:
-    gates: dict[str, Any] = {}
-    for name, rule in PROPOSED_GATES.items():
+def evaluate_proposed_gates(
+    summary: dict[str, Any],
+    *,
+    gates: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    gate_spec = gates or PROPOSED_GATES
+    results: dict[str, Any] = {}
+    for name, rule in gate_spec.items():
         actual = summary.get(name)
         if actual is None and name == "retry_count":
             actual = 0
@@ -324,18 +353,22 @@ def evaluate_proposed_gates(summary: dict[str, Any]) -> dict[str, Any]:
             passed = float(actual) <= float(rule["max"])
         if "min" in rule and actual is not None:
             passed = float(actual) >= float(rule["min"])
-        gates[name] = {
+        results[name] = {
             "rule": rule,
             "actual": actual,
             "passed": passed,
         }
-    gates["all_passed"] = all(item["passed"] for item in gates.values())
-    return gates
+    results["all_passed"] = all(item["passed"] for item in results.values())
+    return results
 
 
-def evaluate_automated_verdict(summary: dict[str, Any]) -> str:
-    gates = evaluate_proposed_gates(summary)
-    return "AUTOMATED_PASS" if gates["all_passed"] else "AUTOMATED_FAIL"
+def evaluate_automated_verdict(
+    summary: dict[str, Any],
+    *,
+    gates: dict[str, Any] | None = None,
+) -> str:
+    gate_results = evaluate_proposed_gates(summary, gates=gates)
+    return "AUTOMATED_PASS" if gate_results["all_passed"] else "AUTOMATED_FAIL"
 
 
 def map_automated_to_final_verdict(automated_verdict: str) -> str:

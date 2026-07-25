@@ -560,9 +560,12 @@ python evals/v5/run_a9r2b_patient_scope_live.py --dry-run
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `74e6820` |
-| PRE-CODE | |
-| COMPLETION | |
+| Governance HEAD | `17a0cd6` |
+| PRE-CODE | ✅ (governance) |
+| COMPLETION | ✅ |
+| Tests | 103 passed, 0 skipped |
 | Matrix v2 blob | `6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57` (unchanged) |
-| Matrix v3 blob | |
+| Matrix v3 blob | `8ccd9bdc140a192981fcc48ad7ed0367a40b0a84` |
+| v3 label delta | `a9r_stage_02` extent `unknown`→`one_tooth` |
 | Live blocked | `--live` not enabled |
 | A9R2 artifacts | byte-identical |

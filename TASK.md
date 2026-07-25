@@ -645,7 +645,7 @@ Official PASS only when automated gates pass **and** manual review complete for 
 
 # TASK — A9R2b post-live metric correction + A9R2c pre-live
 
-**Status:** governance → implementation · **NO LIVE / NO LLM / NO A9R3**
+**Status:** COMPLETION ✅ · **NO LIVE / NO LLM / NO A9R3**
 
 **Baseline:** `5cd5015` (A9R2b live complete)
 
@@ -718,7 +718,7 @@ python evals/v5/run_a9r2c_patient_scope_live.py --dry-run
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `5cd5015` |
-| PRE-CODE | |
-| COMPLETION | |
+| PRE-CODE | ✅ (governance `8ea1f34`) |
+| COMPLETION | ✅ |
 | Corrected A9R2b composite | 11/17 = 0.647 |
 | A9R2c live blocked | `--live` not enabled |

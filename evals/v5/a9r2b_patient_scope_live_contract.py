@@ -95,6 +95,10 @@ FROZEN_A9R2B_LIVE_ARTIFACT_SHA256: dict[str, str] = {
 OFFICIAL_A9R2B_LIVE_VERDICT = "AUTOMATED_FAIL"
 OFFICIAL_A9R2B_STATUS = "A9R2B_NOT_PASSED"
 
+LIVE_DIAGNOSTIC_RECOMPUTE_PATH = (
+    LIVE_ARTIFACTS_DIR / "a9r2b_patient_scope_live_diagnostic_recompute.json"
+)
+
 
 def assert_frozen_a9r2b_live_artifacts_unchanged() -> None:
     for name, expected in FROZEN_A9R2B_LIVE_ARTIFACT_SHA256.items():

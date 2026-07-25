@@ -24,6 +24,37 @@ _SCOPE_META_FIELDS = ("container", "extent", "jaw", "stage", "modifiers")
 AC2_MATERIAL_AXES = frozenset({"extent", "jaw", "stage"})
 
 
+def aggregate_material_per_axis_diagnostic(
+    call_results: list[dict[str, Any]],
+) -> dict[str, dict[str, int]]:
+    """Per-axis material diagnostic counts (extent/jaw/stage only)."""
+
+    totals = {
+        axis: {
+            "correct": 0,
+            "miss": 0,
+            "false_positive": 0,
+            "wrong": 0,
+        }
+        for axis in AC2_MATERIAL_AXES
+    }
+    for row in call_results:
+        score = row.get("score") or {}
+        if score.get("transport_provider_error"):
+            continue
+        for axis in AC2_MATERIAL_AXES:
+            outcome = (score.get("axis_outcomes") or {}).get(axis)
+            if outcome == "correct_expected_axis":
+                totals[axis]["correct"] += 1
+            elif outcome == "missing_expected_positive_axis":
+                totals[axis]["miss"] += 1
+            elif outcome == "false_positive_axis":
+                totals[axis]["false_positive"] += 1
+            elif outcome == "wrong_non_unknown_axis":
+                totals[axis]["wrong"] += 1
+    return totals
+
+
 def patient_scope_axes_strict_valid(frame: TurnFrame) -> bool:
     """True when every patient_scope axis meta is strict-valid for scope scoring."""
 
@@ -267,6 +298,7 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
         "correct_expected_axis_count": 0,
         "composite_exact_turns": 0,
         "composite_scored_turns": 0,
+        "composite_eligible_turns": 0,
         "positive_axis_expected": 0,
         "positive_axis_correct": 0,
         "correction_turns": 0,
@@ -296,11 +328,8 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
             )
             if score.get("composite_turn_exact"):
                 totals["composite_exact_turns"] += 1
-            if any(
-                outcome not in ("not_applicable",)
-                for outcome in (score.get("axis_outcomes") or {}).values()
-            ):
-                totals["composite_scored_turns"] += 1
+            totals["composite_eligible_turns"] += 1
+            totals["composite_scored_turns"] += 1
 
             category = str(row.get("category") or "")
             if category in POSITIVE_CATEGORIES:
@@ -324,10 +353,14 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
         if totals["positive_axis_expected"]
         else 1.0
     )
-    totals["composite_exact_turn_rate"] = (
-        totals["composite_exact_turns"] / totals["composite_scored_turns"]
-        if totals["composite_scored_turns"]
+    totals["true_composite_exact_turn_rate"] = (
+        totals["composite_exact_turns"] / totals["composite_eligible_turns"]
+        if totals["composite_eligible_turns"]
         else 1.0
+    )
+    totals["composite_exact_turn_rate"] = totals["true_composite_exact_turn_rate"]
+    totals["material_per_axis_diagnostic"] = aggregate_material_per_axis_diagnostic(
+        call_results
     )
     totals["correction_success_rate"] = (
         totals["correction_successes"] / totals["correction_turns"]

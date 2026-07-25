@@ -796,7 +796,7 @@ Official PASS only when automated gates pass **and** manual review complete for 
 
 # TASK — A9R2c model-pin incident capture + A9R2d wiring correction
 
-**Status:** governance → implementation · **NO LIVE / NO LLM / NO A9R3**
+**Status:** COMPLETION ✅ · **NO LIVE / NO LLM / NO A9R3**
 
 **Baseline:** `c519dd4` (A9R2c live complete)
 
@@ -862,7 +862,7 @@ python evals/v5/run_a9r2d_patient_scope_live.py --dry-run
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `c519dd4` |
-| PRE-CODE | |
-| COMPLETION | |
+| PRE-CODE | ✅ (governance `9fd94a3`) |
+| COMPLETION | ✅ |
 | A9R2c status | `A9R2C_NOT_VALID_FOR_PLUS` |
 | A9R2d live blocked | `--live` subprocess only; no provider calls in checkpoint |

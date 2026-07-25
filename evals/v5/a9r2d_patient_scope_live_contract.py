@@ -1,4 +1,4 @@
-"""Frozen contract for A9R2c patient-scope planner live eval (pre-live prep)."""
+"""Frozen contract for A9R2d patient-scope planner live eval (model-pin wiring)."""
 
 from __future__ import annotations
 
@@ -41,11 +41,13 @@ from evals.v5.fullcontext_response_eval_contract import (
     LiveArtifactExistsError,
     prepare_json_artifact_payload,
 )
+from evals.v5.patient_scope_live_model_pin import build_model_provenance
 
-MEASUREMENT_ID = "a9r2c_patient_scope_live"
-SUITE_ID = "a9r2c_patient_scope_live"
+MEASUREMENT_ID = "a9r2d_patient_scope_live"
+SUITE_ID = "a9r2d_patient_scope_live"
 CLIENT_ID = "demo"
 OWNER_APPROVED_PLANNER_MODEL = "qwen3.7-plus"
+REQUIRES_PLANNER_MODEL_PIN = True
 
 PROPOSED_GATES: dict[str, Any] = {
     "wrong_non_unknown_axis_count": {"max": 0},
@@ -61,14 +63,14 @@ PROPOSED_GATES: dict[str, Any] = {
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 LIVE_ARTIFACTS_DIR = _REPO_ROOT / "evals" / "v5" / "artifacts"
-LIVE_RAW_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2c_patient_scope_live_raw.json"
-LIVE_RESULT_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2c_patient_scope_live_result.json"
-LIVE_MANIFEST_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2c_patient_scope_live_manifest.json"
+LIVE_RAW_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2d_patient_scope_live_raw.json"
+LIVE_RESULT_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2d_patient_scope_live_result.json"
+LIVE_MANIFEST_ARTIFACT_PATH = LIVE_ARTIFACTS_DIR / "a9r2d_patient_scope_live_manifest.json"
 LIVE_MANUAL_REVIEW_ARTIFACT_PATH = (
-    LIVE_ARTIFACTS_DIR / "a9r2c_patient_scope_live_manual_review.json"
+    LIVE_ARTIFACTS_DIR / "a9r2d_patient_scope_live_manual_review.json"
 )
-LIVE_ATTEMPT_MARKER_PATH = LIVE_ARTIFACTS_DIR / "a9r2c_patient_scope_live_attempt.json"
-LIVE_CALL_LEDGER_PATH = LIVE_ARTIFACTS_DIR / "a9r2c_patient_scope_live_call_ledger.jsonl"
+LIVE_ATTEMPT_MARKER_PATH = LIVE_ARTIFACTS_DIR / "a9r2d_patient_scope_live_attempt.json"
+LIVE_CALL_LEDGER_PATH = LIVE_ARTIFACTS_DIR / "a9r2d_patient_scope_live_call_ledger.jsonl"
 
 DEFAULT_LIVE_ARTIFACT_PATHS = (
     LIVE_RAW_ARTIFACT_PATH,
@@ -78,47 +80,6 @@ DEFAULT_LIVE_ARTIFACT_PATHS = (
     LIVE_ATTEMPT_MARKER_PATH,
     LIVE_CALL_LEDGER_PATH,
 )
-
-FROZEN_A9R2C_LIVE_ARTIFACT_SHA256: dict[str, str] = {
-    "a9r2c_patient_scope_live_raw.json": (
-        "b476dd2aab06af6be2dcfbfacabed88c1ab9a1d42dd06f8bed0c742d5345d5c5"
-    ),
-    "a9r2c_patient_scope_live_result.json": (
-        "f5ddf7945c4c04d7d64496143c022601f82689b0bfe36e9c0e34567b66f28707"
-    ),
-    "a9r2c_patient_scope_live_attempt.json": (
-        "8027190e23d060d4ce01dafdc6b42e34a9f956c47ad05860598bfaa28f8882b0"
-    ),
-    "a9r2c_patient_scope_live_call_ledger.jsonl": (
-        "9c174dc3650503e3429f934570057268d066d54c84cb26f9693c618f9a8c72e2"
-    ),
-    "a9r2c_patient_scope_live_manual_review.json": (
-        "eb00f8832345849c912e4f4d42490122bd677dca87c07c6b92b25ca30723d907"
-    ),
-}
-
-OFFICIAL_A9R2C_LIVE_VERDICT = "AUTOMATED_FAIL"
-OFFICIAL_A9R2C_STATUS = "A9R2C_NOT_VALID_FOR_PLUS"
-A9R2C_INCIDENT_DECLARED_MODEL = "qwen3.7-plus"
-A9R2C_INCIDENT_CONFIGURED_MODEL = "qwen3.6-flash"
-A9R2C_INCIDENT_OBSERVED_MODEL = "qwen3.6-flash"
-A9R2C_INCIDENT_PROVIDER_CALLS = 17
-A9R2C_PLUS_VALIDATION = False
-A9R2C_RERUN_BLOCKED = True
-
-
-def assert_frozen_a9r2c_live_artifacts_unchanged() -> None:
-    from evals.v5.fullcontext_response_eval_contract import sha256_file_hex
-
-    for name, expected in FROZEN_A9R2C_LIVE_ARTIFACT_SHA256.items():
-        path = LIVE_ARTIFACTS_DIR / name
-        if not path.exists():
-            raise HarnessConfigError(f"frozen A9R2c live artifact missing: {path}")
-        actual = sha256_file_hex(path)
-        if actual != expected:
-            raise HarnessConfigError(
-                f"frozen A9R2c live artifact sha256 mismatch path={path} expected={expected} actual={actual}"
-            )
 
 
 def assert_attempt_marker_absent(
@@ -182,7 +143,12 @@ def build_attempt_marker_payload(
             "measurement_id": MEASUREMENT_ID,
             "suite_id": SUITE_ID,
             "matrix_blob": matrix_blob,
-            "planner_model": planner_model,
+            "owner_requested_model": planner_model,
+            "model_provenance": build_model_provenance(
+                owner_requested_model=planner_model,
+                configured_model=planner_model,
+                provider_observed_models=[],
+            ),
             "max_planner_calls": MAX_PLANNER_CALLS,
             "retry_count_max": RETRY_COUNT_MAX,
             "provider_calls_started": 0,
@@ -209,7 +175,6 @@ __all__ = [
     "CLIENT_ID",
     "DEFAULT_LIVE_ARTIFACT_PATHS",
     "FinalVerdict",
-    "FROZEN_A9R2C_LIVE_ARTIFACT_SHA256",
     "LIVE_ATTEMPT_MARKER_PATH",
     "LIVE_CALL_LEDGER_PATH",
     "LIVE_CASE_COUNT",
@@ -223,23 +188,15 @@ __all__ = [
     "MAX_PLANNER_CALLS",
     "MEASUREMENT_ID",
     "NEGATIVE_AMBIGUOUS_CATEGORIES",
-    "OFFICIAL_A9R2C_LIVE_VERDICT",
-    "OFFICIAL_A9R2C_STATUS",
-    "A9R2C_INCIDENT_DECLARED_MODEL",
-    "A9R2C_INCIDENT_CONFIGURED_MODEL",
-    "A9R2C_INCIDENT_OBSERVED_MODEL",
-    "A9R2C_INCIDENT_PROVIDER_CALLS",
-    "A9R2C_PLUS_VALIDATION",
-    "A9R2C_RERUN_BLOCKED",
     "OWNER_APPROVED_PLANNER_MODEL",
     "POSITIVE_CATEGORIES",
     "PROPOSED_GATES",
+    "REQUIRES_PLANNER_MODEL_PIN",
     "RETRY_COUNT_MAX",
     "SCORABLE_AXES",
     "SUITE_ID",
     "append_call_ledger_entry",
     "assert_attempt_marker_absent",
-    "assert_frozen_a9r2c_live_artifacts_unchanged",
     "assert_live_artifacts_absent",
     "assert_matrix_v1_frozen",
     "assert_matrix_v2_frozen",

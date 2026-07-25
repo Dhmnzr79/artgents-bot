@@ -50,13 +50,32 @@ def _git_head_commit() -> str:
     ).strip()
 
 
+def _contract_requires_model_pin(contract: LiveContract) -> bool:
+    return bool(getattr(contract, "REQUIRES_PLANNER_MODEL_PIN", False))
+
+
+def _sid_prefix_for_contract(contract: LiveContract) -> str:
+    measurement_id = str(getattr(contract, "MEASUREMENT_ID", "a9r2"))
+    if measurement_id.startswith("a9r2d"):
+        return "a9r2d"
+    if measurement_id.startswith("a9r2c"):
+        return "a9r2c"
+    if measurement_id.startswith("a9r2b"):
+        return "a9r2b"
+    return "a9r2"
+
+
 def configure_live_env(*, contract: LiveContract | None = None) -> None:
-    """Pin planner model for owner-approved patient-scope live attempt."""
+    """Pin planner model env for owner-approved patient-scope live attempt."""
 
     import os
 
     c = _resolve_contract(contract)
     os.environ["TURN_PLANNER_LLM_MODEL"] = c.OWNER_APPROVED_PLANNER_MODEL
+    if _contract_requires_model_pin(c):
+        from evals.v5.patient_scope_live_model_pin import assert_planner_model_pin_before_marker
+
+        assert_planner_model_pin_before_marker(c.OWNER_APPROVED_PLANNER_MODEL)
 
 
 def prepare_live_run(
@@ -108,9 +127,15 @@ def prepare_live_run(
     if using_custom_outputs:
         excluded |= {path.resolve() for path in c.DEFAULT_LIVE_ARTIFACT_PATHS}
     c.assert_live_artifacts_absent(exclude_paths=excluded)
+    marker_payload = c.build_attempt_marker_payload()
+    if _contract_requires_model_pin(c):
+        from evals.v5.patient_scope_live_model_pin import assert_planner_model_pin_before_marker
+
+        provenance = assert_planner_model_pin_before_marker(c.OWNER_APPROVED_PLANNER_MODEL)
+        marker_payload["model_provenance"] = provenance
     c.create_attempt_marker_exclusive(
         attempt_marker_path,
-        c.build_attempt_marker_payload(),
+        marker_payload,
     )
 
 
@@ -188,14 +213,26 @@ def run_planner_harness(
     )
     matrix = load_matrix()
     call_specs = c.iter_live_planner_calls(matrix)
-    sid_prefix = "a9r2b" if c.MEASUREMENT_ID.startswith("a9r2b") else "a9r2"
-    sid = f"{sid_prefix}-{uuid.uuid4().hex[:12]}"
+    sid = f"{_sid_prefix_for_contract(c)}-{uuid.uuid4().hex[:12]}"
     prior_session: SessionPatientFacts | None = None
     prev_case_id: str | None = None
     raw_calls: list[dict[str, Any]] = []
     scored_calls: list[dict[str, Any]] = []
     aborted = False
     abort_reason: str | None = None
+    model_pin_required = _contract_requires_model_pin(c)
+    provider_observed_models: list[str] = []
+    model_provenance: dict[str, Any] | None = None
+    if model_pin_required:
+        from evals.v5.patient_scope_live_model_pin import (
+            assert_planner_model_pin_before_marker,
+            assert_provider_model_matches,
+            build_model_provenance,
+            make_model_tracked_planner,
+        )
+
+        model_provenance = assert_planner_model_pin_before_marker(c.OWNER_APPROVED_PLANNER_MODEL)
+        planner_fn = make_model_tracked_planner(planner_fn, provider_observed_models)
 
     try:
         for index, call_spec in enumerate(call_specs, start=1):
@@ -238,6 +275,18 @@ def run_planner_harness(
             )
             scored_calls.append(row)
 
+            if model_pin_required and index == 1 and provider_observed_models:
+                assert_provider_model_matches(
+                    owner_requested_model=c.OWNER_APPROVED_PLANNER_MODEL,
+                    configured_model=str(model_provenance["configured_model"]),
+                    observed_model=provider_observed_models[0],
+                )
+                model_provenance = build_model_provenance(
+                    owner_requested_model=c.OWNER_APPROVED_PLANNER_MODEL,
+                    configured_model=str(model_provenance["configured_model"]),
+                    provider_observed_models=provider_observed_models,
+                )
+
             if record_dialog_history:
                 mem_add_user(sid, call_spec["question"])
                 mem_add_bot(sid, "Понял.")
@@ -276,7 +325,17 @@ def run_planner_harness(
             {
                 "measurement_id": c.MEASUREMENT_ID,
                 "matrix_blob": c.MATRIX_V3_BLOB if hasattr(c, "MATRIX_V3_BLOB") else c.MATRIX_V2_BLOB,
-                "planner_model": c.OWNER_APPROVED_PLANNER_MODEL,
+                **(
+                    {
+                        "model_provenance": build_model_provenance(
+                            owner_requested_model=c.OWNER_APPROVED_PLANNER_MODEL,
+                            configured_model=str(model_provenance["configured_model"]),
+                            provider_observed_models=provider_observed_models,
+                        )
+                    }
+                    if model_pin_required and model_provenance is not None
+                    else {"planner_model": c.OWNER_APPROVED_PLANNER_MODEL}
+                ),
                 "calls": raw_calls,
                 "aborted": aborted,
                 "abort_reason": abort_reason,
@@ -299,7 +358,17 @@ def run_planner_harness(
                 "measurement_id": c.MEASUREMENT_ID,
                 "git_head": _git_head_commit(),
                 "matrix_blob": c.MATRIX_V3_BLOB if hasattr(c, "MATRIX_V3_BLOB") else c.MATRIX_V2_BLOB,
-                "planner_model": c.OWNER_APPROVED_PLANNER_MODEL,
+                **(
+                    {
+                        "model_provenance": build_model_provenance(
+                            owner_requested_model=c.OWNER_APPROVED_PLANNER_MODEL,
+                            configured_model=str(model_provenance["configured_model"]),
+                            provider_observed_models=provider_observed_models,
+                        )
+                    }
+                    if model_pin_required and model_provenance is not None
+                    else {"planner_model": c.OWNER_APPROVED_PLANNER_MODEL}
+                ),
                 "planner_calls": summary["planner_calls"],
                 "artifact_paths": {
                     "raw": str(raw_path),
@@ -334,6 +403,79 @@ def run_planner_harness(
             "ledger_sha256": sha256_file_hex(call_ledger_path),
         }
     except Exception as error:
+        from evals.v5.patient_scope_live_model_pin import ProviderModelMismatchError, build_model_provenance
+
+        if isinstance(error, ProviderModelMismatchError):
+            aborted = True
+            abort_reason = error.code
+            if model_pin_required and model_provenance is not None:
+                model_provenance = build_model_provenance(
+                    owner_requested_model=c.OWNER_APPROVED_PLANNER_MODEL,
+                    configured_model=str(model_provenance["configured_model"]),
+                    provider_observed_models=provider_observed_models,
+                )
+            summary = aggregate_call_results(scored_calls) if scored_calls else {"planner_calls": 0}
+            summary["retry_count"] = c.RETRY_COUNT_MAX
+            proposed_gates = evaluate_proposed_gates(summary, gates=c.PROPOSED_GATES)
+            automated_verdict = "AUTOMATED_FAIL"
+            final_verdict = map_automated_to_final_verdict(automated_verdict)
+            raw_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": c.MEASUREMENT_ID,
+                    "matrix_blob": c.MATRIX_V3_BLOB if hasattr(c, "MATRIX_V3_BLOB") else c.MATRIX_V2_BLOB,
+                    "model_provenance": model_provenance,
+                    "calls": raw_calls,
+                    "aborted": True,
+                    "abort_reason": abort_reason,
+                }
+            )
+            result_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": c.MEASUREMENT_ID,
+                    "summary": summary,
+                    "automated_verdict": automated_verdict,
+                    "final_verdict": final_verdict,
+                    "proposed_gates": proposed_gates,
+                    "call_results": scored_calls,
+                    "ledger_balanced": c.ledger_entries_balanced(call_ledger_path),
+                    "authority_enabled": False,
+                    "abort_reason": abort_reason,
+                }
+            )
+            manifest_artifact = prepare_json_artifact_payload(
+                {
+                    "measurement_id": c.MEASUREMENT_ID,
+                    "git_head": _git_head_commit(),
+                    "matrix_blob": c.MATRIX_V3_BLOB if hasattr(c, "MATRIX_V3_BLOB") else c.MATRIX_V2_BLOB,
+                    "model_provenance": model_provenance,
+                    "planner_calls": summary.get("planner_calls", 0),
+                    "artifact_paths": {
+                        "raw": str(raw_path),
+                        "result": str(result_path),
+                        "manifest": str(manifest_path),
+                        "manual_review": str(manual_review_path),
+                        "attempt_marker": str(attempt_marker_path),
+                        "call_ledger": str(call_ledger_path),
+                    },
+                    "automated_verdict": automated_verdict,
+                    "final_verdict": final_verdict,
+                    "abort_reason": abort_reason,
+                }
+            )
+            manual_seed = c.build_manual_review_seed(automated_verdict=automated_verdict)  # type: ignore[arg-type]
+            c.write_json_exclusive(raw_path, raw_artifact)
+            c.write_json_exclusive(result_path, result_artifact)
+            c.write_json_exclusive(manifest_path, manifest_artifact)
+            c.write_json_exclusive(manual_review_path, manual_seed)
+            c.finalize_attempt_marker(
+                attempt_marker_path,
+                status="aborted_model_mismatch",
+                automated_verdict=automated_verdict,
+            )
+            raise HarnessConfigError(
+                f"{c.MEASUREMENT_ID} aborted after provider model mismatch; "
+                "retry requires new owner approval"
+            ) from error
         c.finalize_attempt_marker(
             attempt_marker_path,
             status="aborted",

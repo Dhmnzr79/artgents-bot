@@ -366,3 +366,80 @@ python evals/v5/run_a9r2_patient_scope_live.py --dry-run
 | `automated_verdict` | `AUTOMATED_FAIL` |
 | `final_verdict` | `PENDING_MANUAL_REVIEW` |
 | Authority | not enabled |
+
+---
+
+# TASK — A9R2 post-live offline correction (Checkpoint A + B)
+
+**Status:** governance → implementation · **NO LIVE / NO LLM / NO A9R3**
+
+**Baseline:** `2b8bd23` (A9R2 live complete)
+
+**Frozen live artifacts (byte-identical, do not modify):**
+- `evals/v5/artifacts/a9r2_patient_scope_live_raw.json`
+- `evals/v5/artifacts/a9r2_patient_scope_live_result.json`
+- `evals/v5/artifacts/a9r2_patient_scope_live_attempt.json`
+- `evals/v5/artifacts/a9r2_patient_scope_live_call_ledger.jsonl`
+
+Official `AUTOMATED_FAIL` on frozen result is immutable. Diagnostic recompute is read-only; no retroactive PASS.
+
+## Checkpoint A — scorer/audit correction
+
+| Deliverable | Role |
+|-------------|------|
+| `evals/v5/a9r2_patient_scope_live_scoring.py` | `partial` ≠ transport when patient_scope strict-valid; scope scoring isolated from unrelated axes |
+| `evals/v5/a9r2_patient_scope_live_diagnostic_recompute.py` | Read-only recompute from frozen raw |
+| `docs/evidence/a9r2/A9R2_POST_LIVE_SCORER_CORRECTION_AUDIT.md` | Corrected metrics + `A9R2_NOT_PASSED` |
+| `evals/v5/artifacts/a9r2_patient_scope_live_diagnostic_recompute.json` | New diagnostic artifact (not frozen live) |
+| `tests/test_a9r2_scorer_correction_offline.py` | Scorer + frozen raw recompute tests |
+
+**Corrected expectations on frozen raw:** `correction:turn2` → exact `one_tooth`; `ambiguous_01` → all-unknown.
+
+## Checkpoint B — minimal planner prompt calibration
+
+| Deliverable | Role |
+|-------------|------|
+| `core/turn_planner_llm.py` | Semantic `_PATIENT_SCOPE_PROMPT` only (same single LLM call) |
+| `tests/test_a9r2_planner_prompt_calibration_offline.py` | Blast-radius offline fixtures |
+
+**Forbidden:** filters, regex, dictionaries, second classifier, new LLM call, A9R3 wiring, live rerun, editing frozen live artifacts.
+
+## Allowlist (A9R2 post-live)
+
+| File | Checkpoint |
+|------|------------|
+| `TASK.md` | governance + completion |
+| `evals/v5/a9r2_patient_scope_live_scoring.py` | A |
+| `evals/v5/a9r2_patient_scope_live_contract.py` | A (frozen SHA pins) |
+| `evals/v5/a9r2_patient_scope_live_diagnostic_recompute.py` | A |
+| `docs/evidence/a9r2/A9R2_POST_LIVE_SCORER_CORRECTION_AUDIT.md` | A |
+| `evals/v5/artifacts/a9r2_patient_scope_live_diagnostic_recompute.json` | A (new) |
+| `core/turn_planner_llm.py` | B |
+| `tests/test_a9r2_scorer_correction_offline.py` | A |
+| `tests/test_a9r2_planner_prompt_calibration_offline.py` | B |
+| `tests/test_a9r2_patient_scope_live_offline.py` | A (partial scoring tests) |
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-a9r2-post-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_a9r2_scorer_correction_offline.py `
+  tests/test_a9r2_planner_prompt_calibration_offline.py `
+  tests/test_a9r2_patient_scope_live_offline.py `
+  tests/test_patient_scope_projection.py `
+  tests/test_ac3_scope_price_flow_offline.py -q
+```
+
+**STOP after COMPLETION ✅. A9R2b pre-live is separate owner GO.**
+
+## Completion record (A9R2 post-live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `2b8bd23` |
+| PRE-CODE | |
+| COMPLETION | |
+| Official live verdict | `AUTOMATED_FAIL` (immutable) |
+| Diagnostic status | `A9R2_NOT_PASSED` |

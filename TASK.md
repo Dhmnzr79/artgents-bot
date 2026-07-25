@@ -360,9 +360,9 @@ python evals/v5/run_a9r2_patient_scope_live.py --dry-run
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `6b75214` |
-| Live delegate HEAD | (implementation commit) |
-| Live artifacts HEAD | (audit commit) |
-| COMPLETION | |
+| Live delegate HEAD | `5107a17` |
+| Live artifacts HEAD | `5107a17` |
+| COMPLETION | ✅ |
 | `automated_verdict` | `AUTOMATED_FAIL` |
 | `final_verdict` | `PENDING_MANUAL_REVIEW` |
 | Authority | not enabled |

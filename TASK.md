@@ -439,7 +439,13 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `2b8bd23` |
-| PRE-CODE | |
-| COMPLETION | |
+| Governance HEAD | `1ad3683` |
+| PRE-CODE | ✅ (governance) |
+| COMPLETION | ✅ |
+| Tests | 51 passed, 0 skipped |
 | Official live verdict | `AUTOMATED_FAIL` (immutable) |
 | Diagnostic status | `A9R2_NOT_PASSED` |
+| Corrected transport count | 0 (was 2) |
+| Corrected correction success | 1.0 |
+| Corrected composite rate | 0.714 (10/14) |
+| Remaining neg/amb FP | 3 axes / 2 cases |

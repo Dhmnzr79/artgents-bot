@@ -20,6 +20,34 @@ from evals.v5.a9r2_patient_scope_live_contract import (
 )
 
 _MALFORMED_STATUSES = frozenset({"invalid", "missing", "defaulted"})
+_SCOPE_META_FIELDS = ("container", "extent", "jaw", "stage", "modifiers")
+
+
+def patient_scope_axes_strict_valid(frame: TurnFrame) -> bool:
+    """True when every patient_scope axis meta is strict-valid for scope scoring."""
+
+    meta = frame.field_meta.patient_scope
+    for subfield in _SCOPE_META_FIELDS:
+        field_meta = getattr(meta, subfield)
+        if field_meta.status in ("invalid", "missing"):
+            return False
+    return True
+
+
+def is_scope_scoring_transport_error(
+    *,
+    planner_status: str,
+    frame: TurnFrame | None,
+) -> bool:
+    """Transport/backend failure or unreadable patient_scope payload only."""
+
+    if planner_status in ("degraded", "not_available"):
+        return True
+    if frame is None:
+        return True
+    if not patient_scope_axes_strict_valid(frame):
+        return True
+    return False
 
 
 def _expected_axis_values(expected_scope: dict[str, Any]) -> dict[str, str | None]:
@@ -107,7 +135,7 @@ def score_planner_call(
     prior_session: object | None = None,
     session_turn_count: int = 1,
 ) -> dict[str, Any]:
-    if planner_status != "ok" or frame is None:
+    if is_scope_scoring_transport_error(planner_status=planner_status, frame=frame):
         return {
             "transport_provider_error": True,
             "axis_outcomes": {},
@@ -168,14 +196,22 @@ def score_planner_call(
     if call_spec["category"] in NEGATIVE_AMBIGUOUS_CATEGORIES:
         session_overwrite_safe = sim.wrote is False
 
-    scorable = [
-        outcome
-        for axis, outcome in axis_outcomes.items()
-        if outcome != "not_applicable"
-    ]
-    composite_turn_exact = bool(scorable) and all(
-        outcome == "correct_expected_axis" for outcome in scorable
-    )
+    if call_spec["category"] in NEGATIVE_AMBIGUOUS_CATEGORIES:
+        composite_turn_exact = (
+            counts["false_positive_axis"] == 0
+            and counts["wrong_non_unknown_axis"] == 0
+            and counts["malformed_invalid_defaulted_projection"] == 0
+            and counts["missing_expected_positive_axis"] == 0
+        )
+    else:
+        scorable = [
+            outcome
+            for axis, outcome in axis_outcomes.items()
+            if outcome != "not_applicable"
+        ]
+        composite_turn_exact = bool(scorable) and all(
+            outcome == "correct_expected_axis" for outcome in scorable
+        )
 
     return {
         "transport_provider_error": False,
@@ -222,37 +258,37 @@ def aggregate_call_results(call_results: list[dict[str, Any]]) -> dict[str, Any]
         score = row.get("score") or {}
         if score.get("transport_provider_error"):
             totals["transport_provider_error_count"] += 1
-            continue
-        totals["malformed_projection_count"] += int(score.get("malformed_projection_count") or 0)
-        totals["wrong_non_unknown_axis_count"] += int(
-            score.get("wrong_non_unknown_axis_count") or 0
-        )
-        totals["false_positive_axis_count"] += int(score.get("false_positive_axis_count") or 0)
-        totals["missing_expected_positive_axis_count"] += int(
-            score.get("missing_expected_positive_axis_count") or 0
-        )
-        totals["correct_expected_axis_count"] += int(
-            score.get("correct_expected_axis_count") or 0
-        )
-        if score.get("composite_turn_exact"):
-            totals["composite_exact_turns"] += 1
-        if any(
-            outcome not in ("not_applicable",)
-            for outcome in (score.get("axis_outcomes") or {}).values()
-        ):
-            totals["composite_scored_turns"] += 1
+        else:
+            totals["malformed_projection_count"] += int(score.get("malformed_projection_count") or 0)
+            totals["wrong_non_unknown_axis_count"] += int(
+                score.get("wrong_non_unknown_axis_count") or 0
+            )
+            totals["false_positive_axis_count"] += int(score.get("false_positive_axis_count") or 0)
+            totals["missing_expected_positive_axis_count"] += int(
+                score.get("missing_expected_positive_axis_count") or 0
+            )
+            totals["correct_expected_axis_count"] += int(
+                score.get("correct_expected_axis_count") or 0
+            )
+            if score.get("composite_turn_exact"):
+                totals["composite_exact_turns"] += 1
+            if any(
+                outcome not in ("not_applicable",)
+                for outcome in (score.get("axis_outcomes") or {}).values()
+            ):
+                totals["composite_scored_turns"] += 1
 
-        category = str(row.get("category") or "")
-        if category in POSITIVE_CATEGORIES:
-            for outcome in (score.get("axis_outcomes") or {}).values():
-                if outcome in (
-                    "correct_expected_axis",
-                    "missing_expected_positive_axis",
-                    "wrong_non_unknown_axis",
-                ):
-                    totals["positive_axis_expected"] += 1
-                    if outcome == "correct_expected_axis":
-                        totals["positive_axis_correct"] += 1
+            category = str(row.get("category") or "")
+            if category in POSITIVE_CATEGORIES:
+                for outcome in (score.get("axis_outcomes") or {}).values():
+                    if outcome in (
+                        "correct_expected_axis",
+                        "missing_expected_positive_axis",
+                        "wrong_non_unknown_axis",
+                    ):
+                        totals["positive_axis_expected"] += 1
+                        if outcome == "correct_expected_axis":
+                            totals["positive_axis_correct"] += 1
 
         if row.get("is_correction_turn"):
             totals["correction_turns"] += 1

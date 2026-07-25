@@ -79,6 +79,28 @@ DEFAULT_LIVE_ARTIFACT_PATHS = (
     LIVE_CALL_LEDGER_PATH,
 )
 
+FROZEN_A9R2_LIVE_ARTIFACT_SHA256: dict[str, str] = {
+    "a9r2_patient_scope_live_raw.json": (
+        "486ca05b579556224ba662fb47a08370759b2bc2785d1f03416b601daac148b5"
+    ),
+    "a9r2_patient_scope_live_result.json": (
+        "17153a6eecd1366a571e410ae2786465b0dd21033f05f7ef2bbdbabdeb97ad80"
+    ),
+    "a9r2_patient_scope_live_attempt.json": (
+        "88fb22e6630ba6917249e8a379d8a6ea09d256e173e42ebce321f9461c5e7442"
+    ),
+    "a9r2_patient_scope_live_call_ledger.jsonl": (
+        "185dc26210ab74db36722d73a80df2aaac82b91348ee254bfbefbdf2cda5c5fa"
+    ),
+}
+
+OFFICIAL_A9R2_LIVE_VERDICT = "AUTOMATED_FAIL"
+OFFICIAL_A9R2_STATUS = "A9R2_NOT_PASSED"
+
+LIVE_DIAGNOSTIC_RECOMPUTE_PATH = (
+    LIVE_ARTIFACTS_DIR / "a9r2_patient_scope_live_diagnostic_recompute.json"
+)
+
 ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
 AxisOutcome = Literal[
     "correct_expected_axis",
@@ -105,6 +127,18 @@ def assert_matrix_v1_frozen() -> None:
 def assert_matrix_v2_frozen() -> None:
     if _git_blob_hash(MATRIX_V2_PATH) != MATRIX_V2_BLOB:
         raise HarnessConfigError("frozen A9R v2 matrix blob mismatch")
+
+
+def assert_frozen_a9r2_live_artifacts_unchanged() -> None:
+    for name, expected in FROZEN_A9R2_LIVE_ARTIFACT_SHA256.items():
+        path = LIVE_ARTIFACTS_DIR / name
+        if not path.exists():
+            raise HarnessConfigError(f"frozen A9R2 live artifact missing: {path}")
+        actual = sha256_file_hex(path)
+        if actual != expected:
+            raise HarnessConfigError(
+                f"frozen A9R2 live artifact sha256 mismatch path={path} expected={expected} actual={actual}"
+            )
 
 
 def load_frozen_matrix_v2() -> dict[str, Any]:

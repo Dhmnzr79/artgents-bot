@@ -26,6 +26,8 @@ from evals.v5.a9r2_patient_scope_live_contract import (
 from evals.v5.a9r2_patient_scope_live_harness import prepare_live_run, run_planner_harness
 from evals.v5.a9r2_patient_scope_live_scoring import (
     evaluate_proposed_gates,
+    is_scope_scoring_transport_error,
+    patient_scope_axes_strict_valid,
     score_axis,
     score_planner_call,
 )
@@ -171,7 +173,13 @@ def test_scalar_bridge_not_usable_in_live_projection() -> None:
     assert score["projected_usable"]["extent"] is False
 
 
-def test_harness_offline_perfect_run_writes_artifacts(artifact_paths: dict[str, Path]) -> None:
+def test_harness_offline_perfect_run_writes_artifacts(
+    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
+        lambda **kwargs: None,
+    )
     matrix = load_frozen_matrix_v2()
     responses: dict[str, dict] = {}
     for call in iter_live_planner_calls(matrix):
@@ -201,7 +209,13 @@ def test_harness_offline_perfect_run_writes_artifacts(artifact_paths: dict[str, 
     assert all(path.exists() for path in artifact_paths.values())
 
 
-def test_attempt_marker_blocks_second_run_without_override(artifact_paths: dict[str, Path]) -> None:
+def test_attempt_marker_blocks_second_run_without_override(
+    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
+        lambda **kwargs: None,
+    )
     matrix = load_frozen_matrix_v2()
     responses = {
         call["question"]: {
@@ -237,7 +251,13 @@ def test_cli_live_entrypoint_exists() -> None:
     assert callable(main)
 
 
-def test_correction_and_natural_tooth_present_in_fake_run(artifact_paths: dict[str, Path]) -> None:
+def test_correction_and_natural_tooth_present_in_fake_run(
+    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
+        lambda **kwargs: None,
+    )
     matrix = load_frozen_matrix_v2()
     responses: dict[str, dict] = {}
     for call in iter_live_planner_calls(matrix):
@@ -300,7 +320,57 @@ def test_cli_dry_run() -> None:
     assert main(["--dry-run"]) == 0
 
 
-def test_attempt_marker_records_started_calls(artifact_paths: dict[str, Path]) -> None:
+def test_partial_planner_status_not_transport_when_patient_scope_valid() -> None:
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": ["overview"],
+            "primary_aspect": "overview",
+            "topic": None,
+            "topic_confidence": 0.0,
+            "patient_scope": {
+                "extent": "unknown",
+                "jaw": "unknown",
+                "stage": "unknown",
+                "modifiers": [],
+            },
+        },
+        allowed_topics=_ALLOWED_TOPICS,
+        allowed_service_ids=_ALLOWED_SERVICES,
+    )
+    assert patient_scope_axes_strict_valid(frame)
+    assert is_scope_scoring_transport_error(planner_status="partial", frame=frame) is False
+
+
+def test_ambiguous_all_unknown_counts_as_composite_exact() -> None:
+    frame = _frame_from_scope(
+        {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []}
+    )
+    score = score_planner_call(
+        frame=frame,
+        planner_status="partial",
+        call_spec={
+            "expected_scope": {
+                "extent": "unknown",
+                "jaw": "unknown",
+                "stage": "unknown",
+                "modifiers": [],
+            },
+            "category": "ambiguous",
+            "topic": "implantation",
+        },
+    )
+    assert score["transport_provider_error"] is False
+    assert score["composite_turn_exact"] is True
+
+
+def test_attempt_marker_records_started_calls(
+    artifact_paths: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "evals.v5.a9r2_patient_scope_live_harness.assert_live_artifacts_absent",
+        lambda **kwargs: None,
+    )
     prepare_live_run(attempt_marker_path=artifact_paths["attempt_marker"])
     marker = load_attempt_marker(artifact_paths["attempt_marker"])
     assert marker["provider_calls_started"] == 0

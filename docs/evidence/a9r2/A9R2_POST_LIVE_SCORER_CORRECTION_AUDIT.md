@@ -73,3 +73,16 @@ Semantic `_PATIENT_SCOPE_PROMPT` rules added in `core/turn_planner_llm.py` (same
 - Manual review complete; automated fail → final FAIL in audit authority, not product authority.
 - Diagnostic recompute confirms transport miscount only; planner false positives remain → `A9R2_NOT_PASSED`.
 - **STOP before A9R2b pre-live checkpoint.**
+
+## Addendum (2026-07-25): shared composite denominator fix
+
+After the shared `composite_eligible_turns` fix in `a9r2_patient_scope_live_scoring.py` (A9R2b metric-correction checkpoint `c22f948`), a read-only recompute of frozen A9R2 live raw with the corrected scorer yields:
+
+| Metric | Prior diagnostic (this doc) | Updated diagnostic (denominator fix) |
+|--------|----------------------------|--------------------------------------|
+| `composite_exact_turn_rate` | **0.714** (10/14) | **0.588** (10/17) |
+| `composite_eligible_turns` | 14 (inflated) | **17** (all non-transport turns) |
+
+The original §「Corrected metrics」table above remains the historical record of the transport-scorer fix at checkpoint time. The denominator inflation is the same class of bug later fixed for A9R2b (see `A9R2B_POST_LIVE_METRIC_CORRECTION_AUDIT.md`).
+
+**Immutable:** frozen `a9r2_patient_scope_live_*` artifacts, official `AUTOMATED_FAIL` / `FAIL`, and `A9R2_NOT_PASSED` status are unchanged. No retroactive PASS.

@@ -722,3 +722,71 @@ python evals/v5/run_a9r2c_patient_scope_live.py --dry-run
 | COMPLETION | ✅ |
 | Corrected A9R2b composite | 11/17 = 0.647 |
 | A9R2c live blocked | `--live` not enabled |
+
+---
+
+# TASK — A9R2c planner-only live eval (owner GO)
+
+**Status:** owner-approved live · **ONE ATTEMPT ONLY**
+
+**Baseline:** `c22f948` (A9R2c pre-live COMPLETION ✅)
+
+**Owner GO (2026-07-25):** exactly one planner-only live attempt. No owner override. No rerun.
+
+## Frozen inputs
+
+| Item | Value |
+|------|-------|
+| Matrix v3 blob | `8ccd9bdc140a192981fcc48ad7ed0367a40b0a84` |
+| Model | `qwen3.7-plus` |
+| Planner calls | ≤ 17 |
+| Composer/Verifier/boundary/runtime | 0 |
+| Product authority | not enabled |
+
+## Owner ruling: `reported_context`
+
+- Diagnostic-only axis; not a material gate axis
+- **A9R3:** does **not** receive authority from A9
+- **Product:** do not write `reported_context` from A9 into session; do not pass to AC2
+- `extent` / `jaw` / `stage` remain authority-candidate axes
+
+## Approved gates
+
+| Gate | Threshold |
+|------|-----------|
+| wrong concrete material axis | 0 |
+| material false-positive (extent/jaw/stage) | 0 |
+| positive-axis recall | ≥ 0.85 |
+| correction success | 100% |
+| `true_composite_exact_turn_rate` (all non-transport turns) | ≥ 0.85 |
+| malformed/transport/provider errors | 0 |
+| calls | ≤ 17 |
+| retry | 0 |
+
+Official PASS only when automated gates pass **and** manual review complete for all 17 turns. Even on PASS, show result to owner before any authority decision.
+
+## Allowlist (A9R2c live)
+
+| File | Purpose |
+|------|---------|
+| `TASK.md` | live completion record |
+| `evals/v5/a9r2c_patient_scope_live_contract.py` | frozen SHA pins post-live |
+| `evals/v5/a9r2c_patient_scope_live_manual_review_builder.py` | manual review from result |
+| `docs/evidence/a9r2/A9R2C_LIVE_ATTEMPT_AUDIT.md` | audit |
+| `evals/v5/artifacts/a9r2c_patient_scope_live_*` | immutable live artifacts |
+| `tests/test_a9r2c_patient_scope_live_offline.py` | rerun-block + frozen pins |
+
+**Forbidden:** rerun; owner override; A9R3 wiring; product authority; editing A9/A9R/A9R2/A9R2b/W1b/S-series frozen artifacts.
+
+## Completion record (A9R2c live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `c22f948` |
+| Live GO HEAD | |
+| PRE-CODE | ✅ (live GO) |
+| Live HEAD | |
+| `automated_verdict` | |
+| `final_verdict` | |
+| Manual review | |
+| Rerun | blocked |

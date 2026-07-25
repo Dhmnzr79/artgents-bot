@@ -917,7 +917,7 @@ Same as A9R2c: `true_composite_exact_turn_rate` ≥ 0.85; material FP = 0; etc.
 
 # TASK — A9R3 product authority wiring (governance)
 
-**Status:** governance checkpoint only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO A9R4**
+**Status:** governance COMPLETION ✅ · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO A9R4**
 
 **Baseline:** `f1b90b8` (A9R2d live complete)
 
@@ -1030,7 +1030,7 @@ Plus Planner → TurnFrame.patient_scope → A9R1 projection → per-axis Effect
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `f1b90b8` |
-| PRE-CODE | |
-| COMPLETION | |
+| PRE-CODE | ✅ (governance `059569f`) |
+| COMPLETION | ✅ (governance only) |
 | Implementation | blocked |
 | Model-tuning cycles | **stopped** |

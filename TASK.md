@@ -866,3 +866,49 @@ python evals/v5/run_a9r2d_patient_scope_live.py --dry-run
 | COMPLETION | ✅ |
 | A9R2c status | `A9R2C_NOT_VALID_FOR_PLUS` |
 | A9R2d live blocked | `--live` subprocess only; no provider calls in checkpoint |
+
+---
+
+# TASK — A9R2d planner-only live eval (owner GO)
+
+**Status:** owner-approved live · **ONE ATTEMPT ONLY**
+
+**Baseline:** `e50647c` (A9R2d wiring COMPLETION ✅)
+
+**Owner GO (2026-07-25):** exactly one planner-only live attempt with model-pin verified Plus. No owner override. No rerun.
+
+## Frozen inputs
+
+| Item | Value |
+|------|-------|
+| Matrix v3 blob | `8ccd9bdc140a192981fcc48ad7ed0367a40b0a84` |
+| Model | `qwen3.7-plus` (requested/configured/observed) |
+| Planner calls | ≤ 17 |
+| Composer/Verifier/boundary/runtime | 0 |
+
+## Approved gates
+
+Same as A9R2c: `true_composite_exact_turn_rate` ≥ 0.85; material FP = 0; etc.
+
+## Allowlist (A9R2d live)
+
+| File | Purpose |
+|------|---------|
+| `TASK.md` | live completion record |
+| `evals/v5/a9r2d_patient_scope_live_contract.py` | frozen SHA pins post-live |
+| `docs/evidence/a9r2/A9R2D_LIVE_ATTEMPT_AUDIT.md` | audit |
+| `evals/v5/artifacts/a9r2d_patient_scope_live_*` | immutable live artifacts |
+| `tests/test_a9r2d_patient_scope_live_offline.py` | rerun-block + frozen pins |
+
+## Completion record (A9R2d live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `e50647c` |
+| Live HEAD | |
+| `automated_verdict` | `AUTOMATED_FAIL` |
+| `final_verdict` | `FAIL` (manual review 17/17) |
+| `provider_model_verified` | true (`qwen3.7-plus` × 17) |
+| `true_composite_exact_turn_rate` | 0.882 (15/17) |
+| Material FP | 1 |
+| Rerun | blocked |

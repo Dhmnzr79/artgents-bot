@@ -191,5 +191,12 @@ def test_frozen_neighbor_artifacts_unchanged() -> None:
     assert_frozen_a9r2_live_artifacts_unchanged()
     a9r2b_contract.assert_frozen_a9r2b_live_artifacts_unchanged()
     a9r2c_contract.assert_frozen_a9r2c_live_artifacts_unchanged()
+    contract.assert_frozen_a9r2d_live_artifacts_unchanged()
     _a9_shadow_blobs_unchanged()
     test_w1b_snapshot_checksums_unchanged()
+
+
+def test_cli_live_rerun_blocked() -> None:
+    from evals.v5.run_a9r2d_patient_scope_live import main
+
+    assert main(["--live"]) == 4

@@ -1,0 +1,755 @@
+{
+  "measurement_id": "a9r2d_patient_scope_live",
+  "automated_verdict": "AUTOMATED_FAIL",
+  "final_verdict": "FAIL",
+  "manual_review_completed": true,
+  "manual_review_required": true,
+  "authority_enabled": false,
+  "planner_calls_actual": 17,
+  "owner_note": "Single owner-approved A9R2d live attempt. Provider model verified qwen3.7-plus on all 17 calls. No rerun without new owner approval.",
+  "reported_context_ruling": "diagnostic_only_not_authority_candidate",
+  "misses": [
+    {
+      "call_id": "a9r_stage_02_natural_tooth_present",
+      "axis": "extent",
+      "expected": "one_tooth"
+    }
+  ],
+  "wrong_concrete_values": [],
+  "material_false_positives": [
+    {
+      "call_id": "a9r_jaw_03_both",
+      "axis": "extent",
+      "observed": "full_arch",
+      "category": "jaw_positive",
+      "outcome": "false_positive_axis"
+    }
+  ],
+  "negative_ambiguous_material_false_positives": [],
+  "diagnostic_reported_context_false_positives": [],
+  "transport_errors": [],
+  "turns": [
+    {
+      "turn": 1,
+      "call_id": "a9r_extent_01_full_arch_price_question",
+      "question": "Сколько стоит имплантация всей челюсти?",
+      "expected_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "full_arch",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 2,
+      "call_id": "a9r_extent_02_one_tooth_restore",
+      "question": "Нужно восстановить один зуб",
+      "expected_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "one_tooth",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 3,
+      "call_id": "a9r_extent_03_few_teeth_missing",
+      "question": "Нет нескольких зубов",
+      "expected_scope": {
+        "extent": "few_teeth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "few_teeth",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "few_teeth",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 4,
+      "call_id": "a9r_jaw_01_upper",
+      "question": "Нет зубов на верхней челюсти",
+      "expected_scope": {
+        "extent": "full_arch",
+        "jaw": "upper",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "full_arch",
+        "jaw": "upper",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "correct_expected_axis",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "full_arch",
+        "merged_jaw": "upper",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 5,
+      "call_id": "a9r_jaw_02_lower",
+      "question": "Восстановление нужно на нижней челюсти",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "lower",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "lower",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "correct_expected_axis",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "lower",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 6,
+      "call_id": "a9r_jaw_03_both",
+      "question": "Нужно восстановить обе челюсти",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "both",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "full_arch",
+        "jaw": "both",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "false_positive_axis",
+        "jaw": "correct_expected_axis",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "full_arch",
+        "merged_jaw": "both",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": false,
+      "transport_error": false,
+      "material_false_positive_axis_count": 1,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 7,
+      "call_id": "a9r_stage_01_implant_placed",
+      "question": "Имплант уже установлен, сколько будет коронка?",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "implant_placed",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "implant_placed",
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "not_applicable",
+        "stage": "correct_expected_axis",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": "implant_placed"
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 8,
+      "call_id": "a9r_stage_02_natural_tooth_present",
+      "question": "Свой зуб ещё сохранился, можно ли поставить коронку?",
+      "expected_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "natural_tooth_present",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "natural_tooth_present",
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "missing_expected_positive_axis",
+        "jaw": "not_applicable",
+        "stage": "correct_expected_axis",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": "natural_tooth_present"
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": false,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 9,
+      "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn1",
+      "question": "Нужно восстановить всю челюсть",
+      "expected_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "full_arch",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 10,
+      "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn2",
+      "question": "Нет, речь об одном зубе",
+      "expected_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": true,
+        "correction_success": true,
+        "merged_extent": "one_tooth",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 11,
+      "call_id": "a9r_typo_01_chelyust",
+      "question": "Сколько стоит имплантация всей чилюсти?",
+      "expected_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "full_arch",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "full_arch",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 12,
+      "call_id": "a9r_typo_02_odin_zub_colloquial",
+      "question": "Один зубик сломался, сколько восстановление?",
+      "expected_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "one_tooth",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "correct_expected_axis",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": true,
+        "session_overwrite_safe": null,
+        "correction_success": null,
+        "merged_extent": "one_tooth",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 13,
+      "call_id": "a9r_negative_01_all_on_4_info",
+      "question": "Что такое All-on-4?",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": true,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 14,
+      "call_id": "a9r_negative_02_all_on_4_price",
+      "question": "Сколько стоит All-on-4?",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": true,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 15,
+      "call_id": "a9r_negative_03_implant_word_only",
+      "question": "Расскажите про имплант",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": true,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "ok",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 16,
+      "call_id": "a9r_ambiguous_01_contradictory_extent",
+      "question": "Один зуб, ну или может вся челюсть, не знаю",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": true,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    },
+    {
+      "turn": 17,
+      "call_id": "a9r_ambiguous_02_vague_several",
+      "question": "Зубов не хватает",
+      "expected_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": "unknown",
+        "modifiers": []
+      },
+      "observed_scope": {
+        "extent": "unknown",
+        "jaw": "unknown",
+        "stage": null,
+        "reported_context": null
+      },
+      "axis_classification": {
+        "extent": "not_applicable",
+        "jaw": "not_applicable",
+        "stage": "not_applicable",
+        "reported_context": "not_applicable"
+      },
+      "session_effect": {
+        "simulated_session_wrote": false,
+        "session_overwrite_safe": true,
+        "correction_success": null,
+        "merged_extent": "unknown",
+        "merged_jaw": "unknown",
+        "merged_stage": null
+      },
+      "planner_status": "partial",
+      "composite_turn_exact": true,
+      "transport_error": false,
+      "material_false_positive_axis_count": 0,
+      "diagnostic_false_positive_axis_count": 0
+    }
+  ],
+  "summary": {
+    "planner_calls": 17,
+    "transport_provider_error_count": 0,
+    "malformed_projection_count": 0,
+    "wrong_non_unknown_axis_count": 0,
+    "false_positive_axis_count": 1,
+    "material_false_positive_axis_count": 1,
+    "diagnostic_false_positive_axis_count": 0,
+    "missing_expected_positive_axis_count": 1,
+    "correct_expected_axis_count": 13,
+    "composite_exact_turns": 15,
+    "composite_scored_turns": 17,
+    "composite_eligible_turns": 17,
+    "positive_axis_expected": 14,
+    "positive_axis_correct": 13,
+    "correction_turns": 1,
+    "correction_successes": 1,
+    "positive_axis_recall": 0.9285714285714286,
+    "true_composite_exact_turn_rate": 0.8823529411764706,
+    "composite_exact_turn_rate": 0.8823529411764706,
+    "material_per_axis_diagnostic": {
+      "extent": {
+        "correct": 8,
+        "miss": 1,
+        "false_positive": 1,
+        "wrong": 0
+      },
+      "jaw": {
+        "correct": 3,
+        "miss": 0,
+        "false_positive": 0,
+        "wrong": 0
+      },
+      "stage": {
+        "correct": 2,
+        "miss": 0,
+        "false_positive": 0,
+        "wrong": 0
+      }
+    },
+    "correction_success_rate": 1.0,
+    "retry_count": 0
+  },
+  "proposed_gates": {
+    "wrong_non_unknown_axis_count": {
+      "rule": {
+        "max": 0
+      },
+      "actual": 0,
+      "passed": true
+    },
+    "material_false_positive_axis_count": {
+      "rule": {
+        "max": 0
+      },
+      "actual": 1,
+      "passed": false
+    },
+    "correction_success_rate": {
+      "rule": {
+        "min": 1.0
+      },
+      "actual": 1.0,
+      "passed": true
+    },
+    "positive_axis_recall": {
+      "rule": {
+        "min": 0.85
+      },
+      "actual": 0.9285714285714286,
+      "passed": true
+    },
+    "true_composite_exact_turn_rate": {
+      "rule": {
+        "min": 0.85
+      },
+      "actual": 0.8823529411764706,
+      "passed": true
+    },
+    "malformed_projection_count": {
+      "rule": {
+        "max": 0
+      },
+      "actual": 0,
+      "passed": true
+    },
+    "transport_provider_error_count": {
+      "rule": {
+        "max": 0
+      },
+      "actual": 0,
+      "passed": true
+    },
+    "planner_calls": {
+      "rule": {
+        "max": 17
+      },
+      "actual": 17,
+      "passed": true
+    },
+    "retry_count": {
+      "rule": {
+        "max": 0
+      },
+      "actual": 0,
+      "passed": true
+    },
+    "all_passed": false
+  },
+  "suite_id": "a9r2d_patient_scope_live"
+}

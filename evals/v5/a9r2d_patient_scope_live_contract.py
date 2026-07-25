@@ -81,6 +81,42 @@ DEFAULT_LIVE_ARTIFACT_PATHS = (
     LIVE_CALL_LEDGER_PATH,
 )
 
+FROZEN_A9R2D_LIVE_ARTIFACT_SHA256: dict[str, str] = {
+    "a9r2d_patient_scope_live_raw.json": (
+        "1dcac8378e3096fdc83f96a6be561c1bd2fa120566237bf723531f7857a0f3b2"
+    ),
+    "a9r2d_patient_scope_live_result.json": (
+        "073d2143d9c606ff84008a4d2081b90feb33d019939de1c59756411cd3c2c423"
+    ),
+    "a9r2d_patient_scope_live_attempt.json": (
+        "ce58abcaef2a8c6864758d93dd6412cb15df29ef273efbe2e910f750d790b495"
+    ),
+    "a9r2d_patient_scope_live_call_ledger.jsonl": (
+        "eec8b8fefbfc3bbff573a49327d32e3b0b5c3b92da5c7297fc650cfaf6aacfe6"
+    ),
+    "a9r2d_patient_scope_live_manual_review.json": (
+        "f2f533b5c9afb2757c626ddb9e505f7f8a81c681511d6b2dce5d56f92b582415"
+    ),
+}
+
+OFFICIAL_A9R2D_LIVE_VERDICT = "AUTOMATED_FAIL"
+OFFICIAL_A9R2D_STATUS = "A9R2D_NOT_PASSED"
+OFFICIAL_A9R2D_PROVIDER_MODEL_VERIFIED = True
+
+
+def assert_frozen_a9r2d_live_artifacts_unchanged() -> None:
+    from evals.v5.fullcontext_response_eval_contract import sha256_file_hex
+
+    for name, expected in FROZEN_A9R2D_LIVE_ARTIFACT_SHA256.items():
+        path = LIVE_ARTIFACTS_DIR / name
+        if not path.exists():
+            raise HarnessConfigError(f"frozen A9R2d live artifact missing: {path}")
+        actual = sha256_file_hex(path)
+        if actual != expected:
+            raise HarnessConfigError(
+                f"frozen A9R2d live artifact sha256 mismatch path={path} expected={expected} actual={actual}"
+            )
+
 
 def assert_attempt_marker_absent(
     path: Path | None = None,
@@ -175,6 +211,7 @@ __all__ = [
     "CLIENT_ID",
     "DEFAULT_LIVE_ARTIFACT_PATHS",
     "FinalVerdict",
+    "FROZEN_A9R2D_LIVE_ARTIFACT_SHA256",
     "LIVE_ATTEMPT_MARKER_PATH",
     "LIVE_CALL_LEDGER_PATH",
     "LIVE_CASE_COUNT",
@@ -188,6 +225,9 @@ __all__ = [
     "MAX_PLANNER_CALLS",
     "MEASUREMENT_ID",
     "NEGATIVE_AMBIGUOUS_CATEGORIES",
+    "OFFICIAL_A9R2D_LIVE_VERDICT",
+    "OFFICIAL_A9R2D_PROVIDER_MODEL_VERIFIED",
+    "OFFICIAL_A9R2D_STATUS",
     "OWNER_APPROVED_PLANNER_MODEL",
     "POSITIVE_CATEGORIES",
     "PROPOSED_GATES",
@@ -197,6 +237,7 @@ __all__ = [
     "SUITE_ID",
     "append_call_ledger_entry",
     "assert_attempt_marker_absent",
+    "assert_frozen_a9r2d_live_artifacts_unchanged",
     "assert_live_artifacts_absent",
     "assert_matrix_v1_frozen",
     "assert_matrix_v2_frozen",

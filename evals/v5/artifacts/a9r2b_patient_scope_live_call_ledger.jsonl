@@ -1,0 +1,34 @@
+{"event": "planner_call_started", "call_id": "a9r_extent_01_full_arch_price_question", "question": "Сколько стоит имплантация всей челюсти?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_extent_01_full_arch_price_question", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_extent_02_one_tooth_restore", "question": "Нужно восстановить один зуб", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_extent_02_one_tooth_restore", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_extent_03_few_teeth_missing", "question": "Нет нескольких зубов", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_extent_03_few_teeth_missing", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_jaw_01_upper", "question": "Нет зубов на верхней челюсти", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_jaw_01_upper", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_jaw_02_lower", "question": "Восстановление нужно на нижней челюсти", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_jaw_02_lower", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_jaw_03_both", "question": "Нужно восстановить обе челюсти", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_jaw_03_both", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_stage_01_implant_placed", "question": "Имплант уже установлен, сколько будет коронка?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_stage_01_implant_placed", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_stage_02_natural_tooth_present", "question": "Свой зуб ещё сохранился, можно ли поставить коронку?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_stage_02_natural_tooth_present", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn1", "question": "Нужно восстановить всю челюсть", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn1", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn2", "question": "Нет, речь об одном зубе", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_correction_01_one_tooth_after_full_arch:turn2", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_typo_01_chelyust", "question": "Сколько стоит имплантация всей чилюсти?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_typo_01_chelyust", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_typo_02_odin_zub_colloquial", "question": "Один зубик сломался, сколько восстановление?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_typo_02_odin_zub_colloquial", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_negative_01_all_on_4_info", "question": "Что такое All-on-4?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_negative_01_all_on_4_info", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_negative_02_all_on_4_price", "question": "Сколько стоит All-on-4?", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_negative_02_all_on_4_price", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_negative_03_implant_word_only", "question": "Расскажите про имплант", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_negative_03_implant_word_only", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_ambiguous_01_contradictory_extent", "question": "Один зуб, ну или может вся челюсть, не знаю", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_ambiguous_01_contradictory_extent", "planner_status": "ok", "has_frame": true}
+{"event": "planner_call_started", "call_id": "a9r_ambiguous_02_vague_several", "question": "Зубов не хватает", "retry_count": 0}
+{"event": "planner_call_completed", "call_id": "a9r_ambiguous_02_vague_several", "planner_status": "ok", "has_frame": true}

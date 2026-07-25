@@ -632,9 +632,11 @@ Official PASS only when automated gates pass **and** manual review complete for 
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `83709c5` |
-| PRE-CODE | |
+| Live GO HEAD | `8782092` |
+| PRE-CODE | ✅ (live GO) |
 | Live HEAD | |
-| `automated_verdict` | |
-| `final_verdict` | |
-| Manual review | |
+| `automated_verdict` | `AUTOMATED_FAIL` |
+| `final_verdict` | `FAIL` (manual review complete) |
+| Manual review | ✅ 17/17 turns |
+| Material FP (neg/amb) | 0 |
 | Rerun | blocked |

@@ -265,5 +265,12 @@ def test_attempt_marker_before_provider_call(artifact_paths: dict[str, Path]) ->
 def test_frozen_neighbor_artifacts_unchanged() -> None:
     test_a9r_v2_matrix_blob_frozen()
     a9r2_contract.assert_frozen_a9r2_live_artifacts_unchanged()
+    contract.assert_frozen_a9r2b_live_artifacts_unchanged()
     _a9_shadow_blobs_unchanged()
     test_w1b_snapshot_checksums_unchanged()
+
+
+def test_cli_live_rerun_blocked() -> None:
+    from evals.v5.run_a9r2b_patient_scope_live import main
+
+    assert main(["--live"]) == 4

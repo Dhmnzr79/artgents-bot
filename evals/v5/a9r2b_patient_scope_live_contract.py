@@ -19,16 +19,12 @@ from evals.v5.a9r2_patient_scope_live_contract import (
     SCORABLE_AXES,
     _git_blob_hash,
     append_call_ledger_entry,
-    assert_attempt_marker_absent,
     assert_matrix_v1_frozen,
     assert_matrix_v2_frozen,
     build_manual_review_seed as _build_manual_review_seed,
     create_attempt_marker_exclusive,
-    finalize_attempt_marker,
     ledger_entries_balanced,
-    load_attempt_marker,
     persist_attempt_marker,
-    record_provider_call_started,
     write_json_exclusive,
 )
 from evals.v5.a9r2_patient_scope_live_scoring import AC2_MATERIAL_AXES
@@ -37,6 +33,7 @@ from evals.v5.fullcontext_response_eval_contract import (
     HarnessConfigError,
     LiveArtifactExistsError,
     prepare_json_artifact_payload,
+    sha256_file_hex,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -79,6 +76,36 @@ DEFAULT_LIVE_ARTIFACT_PATHS = (
     LIVE_ATTEMPT_MARKER_PATH,
     LIVE_CALL_LEDGER_PATH,
 )
+
+FROZEN_A9R2B_LIVE_ARTIFACT_SHA256: dict[str, str] = {
+    "a9r2b_patient_scope_live_raw.json": (
+        "19cad2154c9fb654cc29e7cf337ede05ee361bd266aa7509f7687b4137c876a0"
+    ),
+    "a9r2b_patient_scope_live_result.json": (
+        "9a91a66d3a23b0beb2f6936ebe9d44e431a98ee3cb09a6e3b7960e2271fd83ba"
+    ),
+    "a9r2b_patient_scope_live_attempt.json": (
+        "5616d6a4a10a9b7945c9a63a1dbb6014d7759a48cf91faa974f990f2e778baec"
+    ),
+    "a9r2b_patient_scope_live_call_ledger.jsonl": (
+        "6a69c518b6dd5b0311616c3ac22b6d0a839c4e7853c486bd1df18fd0387efddb"
+    ),
+}
+
+OFFICIAL_A9R2B_LIVE_VERDICT = "AUTOMATED_FAIL"
+OFFICIAL_A9R2B_STATUS = "A9R2B_NOT_PASSED"
+
+
+def assert_frozen_a9r2b_live_artifacts_unchanged() -> None:
+    for name, expected in FROZEN_A9R2B_LIVE_ARTIFACT_SHA256.items():
+        path = LIVE_ARTIFACTS_DIR / name
+        if not path.exists():
+            raise HarnessConfigError(f"frozen A9R2b live artifact missing: {path}")
+        actual = sha256_file_hex(path)
+        if actual != expected:
+            raise HarnessConfigError(
+                f"frozen A9R2b live artifact sha256 mismatch path={path} expected={expected} actual={actual}"
+            )
 
 
 def assert_matrix_v3_frozen() -> None:
@@ -146,6 +173,45 @@ def iter_live_planner_calls(matrix: dict[str, Any]) -> list[dict[str, Any]]:
     return calls
 
 
+def assert_attempt_marker_absent(
+    path: Path | None = None,
+    *,
+    owner_override: bool = False,
+) -> None:
+    from evals.v5.a9r2_patient_scope_live_contract import (
+        assert_attempt_marker_absent as _assert,
+    )
+
+    _assert(path or LIVE_ATTEMPT_MARKER_PATH, owner_override=owner_override)
+
+
+def record_provider_call_started(path: Path | None = None) -> None:
+    from evals.v5.a9r2_patient_scope_live_contract import (
+        record_provider_call_started as _record,
+    )
+
+    _record(path or LIVE_ATTEMPT_MARKER_PATH)
+
+
+def finalize_attempt_marker(
+    path: Path,
+    *,
+    status: str,
+    automated_verdict: AutomatedVerdict,
+) -> None:
+    from evals.v5.a9r2_patient_scope_live_contract import (
+        finalize_attempt_marker as _finalize,
+    )
+
+    _finalize(path, status=status, automated_verdict=automated_verdict)
+
+
+def load_attempt_marker(path: Path | None = None) -> dict[str, Any]:
+    from evals.v5.a9r2_patient_scope_live_contract import load_attempt_marker as _load
+
+    return _load(path or LIVE_ATTEMPT_MARKER_PATH)
+
+
 def assert_live_artifacts_absent(
     *,
     exclude_paths: frozenset[Path] | None = None,
@@ -194,6 +260,7 @@ __all__ = [
     "CLIENT_ID",
     "DEFAULT_LIVE_ARTIFACT_PATHS",
     "FinalVerdict",
+    "FROZEN_A9R2B_LIVE_ARTIFACT_SHA256",
     "LIVE_ATTEMPT_MARKER_PATH",
     "LIVE_CALL_LEDGER_PATH",
     "LIVE_CASE_COUNT",
@@ -207,7 +274,8 @@ __all__ = [
     "MAX_PLANNER_CALLS",
     "MEASUREMENT_ID",
     "NEGATIVE_AMBIGUOUS_CATEGORIES",
-    "OWNER_APPROVED_PLANNER_MODEL",
+    "OFFICIAL_A9R2B_LIVE_VERDICT",
+    "OFFICIAL_A9R2B_STATUS",
     "POSITIVE_CATEGORIES",
     "PROPOSED_GATES",
     "RETRY_COUNT_MAX",
@@ -216,6 +284,7 @@ __all__ = [
     "append_call_ledger_entry",
     "assert_attempt_marker_absent",
     "assert_live_artifacts_absent",
+    "assert_frozen_a9r2b_live_artifacts_unchanged",
     "assert_matrix_v1_frozen",
     "assert_matrix_v2_frozen",
     "assert_matrix_v3_frozen",

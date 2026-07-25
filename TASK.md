@@ -791,3 +791,78 @@ Official PASS only when automated gates pass **and** manual review complete for 
 | Manual review | ✅ 17/17 turns |
 | Provider model incident | logs show `qwen3.6-flash` not `qwen3.7-plus` |
 | Rerun | blocked |
+
+---
+
+# TASK — A9R2c model-pin incident capture + A9R2d wiring correction
+
+**Status:** governance → implementation · **NO LIVE / NO LLM / NO A9R3**
+
+**Baseline:** `c519dd4` (A9R2c live complete)
+
+## Checkpoint A — A9R2c incident capture
+
+| Deliverable | Role |
+|-------------|------|
+| `A9R2C_MODEL_PIN_INCIDENT_CAPTURE.md` | 17 Flash calls; `A9R2C_NOT_VALID_FOR_PLUS`; frozen artifacts unchanged |
+| `a9r2c_patient_scope_live_contract.py` | Incident status constants only (no artifact rewrite) |
+
+**Frozen A9R2c artifacts byte-identical.** Rerun A9R2c blocked.
+
+## Checkpoint B — A9R2d model-pin wiring
+
+| Deliverable | Role |
+|-------------|------|
+| `patient_scope_live_model_pin.py` | Bootstrap + pre-marker assert + provider model tracking |
+| `a9r2_patient_scope_live_harness.py` | Model-pin path; `MODEL_MISMATCH` abort after 1st observed response |
+| `a9r2d_patient_scope_live_contract.py` | Isolated `a9r2d_*`; `REQUIRES_PLANNER_MODEL_PIN` |
+| `run_a9r2d_patient_scope_live.py` | Subprocess inner runner; env before import |
+| `a9r2d_patient_scope_live_inner.py` | Clean-process live entry |
+| `tests/test_a9r2d_model_pin_subprocess_offline.py` | Subprocess pin tests |
+| `tests/test_a9r2d_patient_scope_live_offline.py` | Harness offline + mismatch abort |
+
+Manifest uses `model_provenance` (not owner config alone). Matrix v3 and prompt unchanged.
+
+## Allowlist
+
+| File | Checkpoint |
+|------|------------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/a9r2/A9R2C_MODEL_PIN_INCIDENT_CAPTURE.md` | A |
+| `evals/v5/a9r2c_patient_scope_live_contract.py` | A (status constants) |
+| `evals/v5/patient_scope_live_model_pin.py` | B |
+| `evals/v5/a9r2_patient_scope_live_harness.py` | B |
+| `evals/v5/a9r2d_patient_scope_live_contract.py` | B |
+| `evals/v5/run_a9r2d_patient_scope_live.py` | B |
+| `evals/v5/a9r2d_patient_scope_live_inner.py` | B |
+| `evals/v5/a9r2d_patient_scope_live_manual_review_builder.py` | B |
+| `tests/test_a9r2d_model_pin_subprocess_offline.py` | B |
+| `tests/test_a9r2d_patient_scope_live_offline.py` | B |
+| `tests/test_a9r2c_patient_scope_live_offline.py` | A/B regression |
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-a9r2d-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_a9r2d_model_pin_subprocess_offline.py `
+  tests/test_a9r2d_patient_scope_live_offline.py `
+  tests/test_a9r2c_patient_scope_live_offline.py `
+  tests/test_a9r2b_patient_scope_live_offline.py `
+  tests/test_a9r2c_planner_blast_radius_offline.py `
+  tests/test_ac3_scope_price_flow_offline.py -q
+python evals/v5/run_a9r2d_patient_scope_live.py --dry-run
+```
+
+**STOP after COMPLETION ✅. A9R2d live is separate owner GO.**
+
+## Completion record (A9R2c incident + A9R2d wiring)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `c519dd4` |
+| PRE-CODE | |
+| COMPLETION | |
+| A9R2c status | `A9R2C_NOT_VALID_FOR_PLUS` |
+| A9R2d live blocked | `--live` subprocess only; no provider calls in checkpoint |

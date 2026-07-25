@@ -449,3 +449,120 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 | Corrected correction success | 1.0 |
 | Corrected composite rate | 0.714 (10/14) |
 | Remaining neg/amb FP | 3 axes / 2 cases |
+
+---
+
+# TASK — A9R2b patient scope planner live eval (pre-live checkpoint)
+
+**Status:** governance → implementation · **NO LIVE / NO LLM / NO A9R3 / NO PRODUCT AUTHORITY**
+
+**Baseline:** `74e6820` (A9R2 post-live COMPLETION ✅)
+
+**Frozen (byte-identical, do not modify):**
+- A9R v2 matrix blob `6a9cc6f7…`
+- All `a9r2_patient_scope_live_*` artifacts (SHA256 pins in contract)
+
+## Goal (A9R2b)
+
+Second owner-approved live measurement after independent label review and calibrated planner prompt. Reuses existing A9R2 runner/scorer/planner backend with isolated artifact namespace and matrix v3 (if label fix warranted).
+
+| Deliverable | Role |
+|-------------|------|
+| `docs/evidence/a9r2/A9R2B_LABEL_REVIEW_AUDIT.md` | Independent semantic label review (no model-output fitting) |
+| `patient_scope_a9r_matrix_v3.json` | v3 matrix only if independently justified label fix; v2 frozen |
+| `a9r2b_patient_scope_live_contract.py` | Isolated suite/artifact namespace + authority-readiness gates |
+| `run_a9r2b_patient_scope_live.py` | CLI dry-run only until owner GO |
+| Harness/scorer reuse | Parameterized A9R2 harness; material vs diagnostic FP split |
+
+**Label review outcome (governance):** one v3 fix — `a9r_stage_02_natural_tooth_present` extent `unknown` → `one_tooth` («свой зуб» = explicit singular tooth). All other live-case labels confirmed.
+
+## Proposed authority-readiness gates (A9R2b)
+
+| Gate | Threshold |
+|------|-----------|
+| wrong concrete axis | 0 |
+| material false-positive axis | 0 |
+| positive-axis recall | ≥ 0.85 |
+| correction success | 100% |
+| composite exact turn rate | ≥ 0.85 |
+| malformed/transport/provider errors | 0 |
+| planner calls | ≤ 17 |
+| retry | 0 |
+
+Material axis = extent/jaw/stage (AC2 applicability). `reported_context` FP tracked as diagnostic only.
+
+## Live parameters (future run, not in this checkpoint)
+
+- Planner: existing `plan_turn_attempt()`
+- Model: `qwen3.6-flash`
+- 16 cases / 17 planner calls
+- Composer/Verifier/boundary/runtime = 0
+- retry = 0; hard budget 17
+- Attempt marker before first provider call; abort after first call blocks rerun
+- Manual review required for all turns; `AUTOMATED_PASS` → `PENDING_MANUAL_REVIEW` only
+
+## Artifact namespace (A9R2b)
+
+| Artifact | Path |
+|----------|------|
+| raw | `a9r2b_patient_scope_live_raw.json` |
+| result | `a9r2b_patient_scope_live_result.json` |
+| manifest | `a9r2b_patient_scope_live_manifest.json` |
+| attempt marker | `a9r2b_patient_scope_live_attempt.json` |
+| call ledger | `a9r2b_patient_scope_live_call_ledger.jsonl` |
+| manual review | `a9r2b_patient_scope_live_manual_review.json` |
+
+## Allowlist (A9R2b pre-live)
+
+| File | Purpose |
+|------|---------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/a9r2/A9R2B_LABEL_REVIEW_AUDIT.md` | label review |
+| `evals/v5/demo/patient_scope_a9r_matrix_v3.json` | frozen v3 matrix |
+| `evals/v5/a9r2b_patient_scope_live_contract.py` | A9R2b contract |
+| `evals/v5/a9r2_patient_scope_live_harness.py` | parameterized suite reuse |
+| `evals/v5/a9r2_patient_scope_live_scoring.py` | material FP + gate param |
+| `evals/v5/run_a9r2b_patient_scope_live.py` | CLI |
+| `tests/test_patient_scope_a9r_matrix_v3_contract.py` | v3 blob + v2 deep-equality |
+| `tests/test_a9r2b_patient_scope_live_offline.py` | offline harness tests |
+| `tests/test_a9r2_scorer_correction_offline.py` | frozen A9R2 artifact pins |
+| `tests/test_a9r2_planner_prompt_calibration_offline.py` | prompt blast-radius |
+| `tests/test_a9r2_patient_scope_live_offline.py` | A9R2 regression |
+| `tests/test_patient_scope_a9r_matrix_v2_contract.py` | v2 frozen |
+| `tests/test_a9r1_offline_harness.py` | A9R1 neighbor |
+| `tests/test_patient_scope_projection.py` | projection |
+| `tests/test_ac3_scope_price_flow_offline.py` | AC1–AC3 neighbor |
+
+**Forbidden:** live run; LLM calls; A9R3 wiring; product authority; editing v2 matrix or A9R2 frozen live artifacts; label changes not independently justified.
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-a9r2b-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_patient_scope_a9r_matrix_v3_contract.py `
+  tests/test_a9r2b_patient_scope_live_offline.py `
+  tests/test_a9r2_scorer_correction_offline.py `
+  tests/test_a9r2_planner_prompt_calibration_offline.py `
+  tests/test_a9r2_patient_scope_live_offline.py `
+  tests/test_patient_scope_a9r_matrix_v2_contract.py `
+  tests/test_a9r1_offline_harness.py `
+  tests/test_patient_scope_projection.py `
+  tests/test_ac3_scope_price_flow_offline.py -q
+python evals/v5/run_a9r2b_patient_scope_live.py --dry-run
+```
+
+**STOP after COMPLETION ✅. A9R2b live is separate owner GO.**
+
+## Completion record (A9R2b pre-live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `74e6820` |
+| PRE-CODE | |
+| COMPLETION | |
+| Matrix v2 blob | `6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57` (unchanged) |
+| Matrix v3 blob | |
+| Live blocked | `--live` not enabled |
+| A9R2 artifacts | byte-identical |

@@ -569,3 +569,72 @@ python evals/v5/run_a9r2b_patient_scope_live.py --dry-run
 | v3 label delta | `a9r_stage_02` extent `unknown`→`one_tooth` |
 | Live blocked | `--live` not enabled |
 | A9R2 artifacts | byte-identical |
+
+---
+
+# TASK — A9R2b planner-only live eval (owner GO)
+
+**Status:** owner-approved live · **ONE ATTEMPT ONLY**
+
+**Baseline:** `83709c5` (A9R2b pre-live COMPLETION ✅)
+
+**Owner GO (2026-07-25):** exactly one planner-only live attempt. No owner override. No rerun.
+
+## Frozen inputs
+
+| Item | Value |
+|------|-------|
+| Matrix v3 blob | `8ccd9bdc140a192981fcc48ad7ed0367a40b0a84` |
+| Model | `qwen3.6-flash` |
+| Planner calls | ≤ 17 |
+| Composer/Verifier/boundary/runtime | 0 |
+| Product authority | not enabled |
+
+## Owner ruling: `reported_context`
+
+- **A9R2b:** diagnostic-only axis; not a material gate axis
+- **A9R3:** does **not** receive authority from A9
+- **Product:** do not write `reported_context` from A9 into session; do not pass to AC2
+- Separate authority only after dedicated eval
+- `extent` / `jaw` / `stage` remain authority-candidate axes
+
+## Approved gates
+
+| Gate | Threshold |
+|------|-----------|
+| wrong concrete material axis | 0 |
+| material false-positive (extent/jaw/stage) | 0 |
+| positive-axis recall | ≥ 0.85 |
+| correction success | 100% |
+| composite exact rate | ≥ 0.85 |
+| malformed/transport/provider errors | 0 |
+| calls | ≤ 17 |
+| retry | 0 |
+
+Official PASS only when automated gates pass **and** manual review complete for all 17 turns.
+
+## Allowlist (A9R2b live)
+
+| File | Purpose |
+|------|---------|
+| `TASK.md` | live completion record |
+| `evals/v5/a9r2b_patient_scope_live_contract.py` | frozen SHA pins post-live |
+| `evals/v5/run_a9r2b_patient_scope_live.py` | live delegate (if needed) |
+| `evals/v5/a9r2b_patient_scope_live_manual_review_builder.py` | manual review from result |
+| `docs/evidence/a9r2/A9R2B_LIVE_ATTEMPT_AUDIT.md` | audit |
+| `evals/v5/artifacts/a9r2b_patient_scope_live_*` | immutable live artifacts |
+| `tests/test_a9r2b_patient_scope_live_offline.py` | rerun-block + frozen pins |
+
+**Forbidden:** rerun; owner override; A9R3 wiring; product authority; editing A9R2/v2 frozen artifacts.
+
+## Completion record (A9R2b live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `83709c5` |
+| PRE-CODE | |
+| Live HEAD | |
+| `automated_verdict` | |
+| `final_verdict` | |
+| Manual review | |
+| Rerun | blocked |

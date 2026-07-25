@@ -77,7 +77,7 @@ See `docs/A9R_GOVERNANCE.md` for full audit. Headlines @ `aa8e6dd`:
 | **A9R** (this) | Audit, TASK, docs, frozen A9R matrix, PRE-CODE | forbidden |
 | **A9R1** | Offline projection + merge module + deterministic harness for A9R matrix | forbidden |
 | **A9R2** | One owner-approved live eval via existing planner; new raw artifact | measurement only |
-| **A9R3** | `resolve_effective_scope` authority wiring after quality gates | owner GO |
+| **A9R3** | `resolve_effective_scope` authority wiring | **owner GO (2026-07-25)** — measured risk accepted; model-tuning stopped |
 | Post-authority | Widget E2E offline (+ optional live) | separate TASK |
 
 ---
@@ -912,3 +912,125 @@ Same as A9R2c: `true_composite_exact_turn_rate` ≥ 0.85; material FP = 0; etc.
 | `true_composite_exact_turn_rate` | 0.882 (15/17) |
 | Material FP | 1 |
 | Rerun | blocked |
+
+---
+
+# TASK — A9R3 product authority wiring (governance)
+
+**Status:** governance checkpoint only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO A9R4**
+
+**Baseline:** `f1b90b8` (A9R2d live complete)
+
+**Owner decision (2026-07-25):** **stop A9 model-tuning cycles** (no A9R2e, no further live eval loops, no prompt/regex/filter tuning). Proceed to A9R3 product authority wiring with measured risk acceptance.
+
+## Owner rulings (binding)
+
+| Ruling | Value |
+|--------|-------|
+| Runtime planner model | **`qwen3.7-plus`** (accepted) |
+| Measured risk accepted | one directionally plausible extent FP on «восстановить обе челюсти» (`a9r_jaw_03_both`) |
+| A9R2d official verdict | **`AUTOMATED_FAIL` / `FAIL` immutable** — no retroactive PASS |
+| Authority axes | **`extent`, `jaw`, `stage` only** |
+| `reported_context` | **diagnostic/shadow-only** — not session, not AC2 |
+| Forbidden now | prompt tuning, live eval loops, filters, regex, synonym tables, extra LLM calls |
+
+## Target chain
+
+```
+Plus Planner → TurnFrame.patient_scope → A9R1 projection → per-axis EffectiveScope merge → AC2 → AC3
+```
+
+## Merge / persistence rules
+
+1. typed UI action (current turn) **above** A9
+2. usable current-turn A9 **above** same-topic session
+3. current `unknown` **does not erase** session
+4. explicit correction **replaces** axis
+5. topic change / reset / SID isolation / freshness **preserved**
+6. **valid native planner provenance only** — scalar bridge not authority
+7. persist extent/jaw/stage **only after materialized turn**; terminal/error **must not** overwrite prior facts
+8. no second session scope store
+
+## Seam audit
+
+`docs/evidence/a9r2/A9R3_PRODUCT_AUTHORITY_SEAM_AUDIT.md` — read-only wiring points in `target_runtime_turn.py`, `resolve_effective_scope`, session write, AC2/AC3 handoff.
+
+## Acceptance matrix (A9R3 implementation — protected)
+
+| # | Input / action | Expected A9 | Expected AC2/AC3 |
+|---|----------------|-------------|------------------|
+| AC3-1 | «Сколько стоит имплантация всей челюсти?» | `extent=full_arch` | scoped price answer; **no scope nav buttons** |
+| AC3-2 | «Сколько стоит имплантация?» | all unknown | broad anchors + **scope buttons** |
+| AC3-3 | «Сколько стоит All-on-4?» | no invented patient scope | concrete **service** path; no extent/jaw/stage FP from protocol name |
+| AC3-4 | «Имплант уже установлен, сколько коронка?» | `stage=implant_placed`, topic prosthetics | scoped prosthetics price path |
+| AC3-5 | follow-up «Нет, речь об одном зубе» | correction `extent=one_tooth` | **replaces** session `full_arch` |
+| AC3-6 | UI scope click | — | UI extent **wins** over planner inference |
+| AC3-7 | ambiguous/vague input | unknown axes | **does not overwrite** session |
+| AC3-8 | terminal/error turn | — | **no A9 session write** |
+| AC3-9 | `/ask` and `/ask/stream` | parity | same EffectiveScope path |
+| AC3-10 | price amounts/units | — | **pricebook only** — no LLM prices |
+| AC3-11 | routing | — | **no** legacy/W1b/family-group routes |
+
+## Planner (implementation deliverable)
+
+| Item | Target |
+|------|--------|
+| `TURN_PLANNER_LLM_MODEL` default | `qwen3.7-plus` |
+| env override | ordinary model config only — not architecture kill-switch |
+| verification | runtime tests confirm Plus in product path |
+
+## Allowlist (A9R3 governance — this commit)
+
+| File | Role |
+|------|------|
+| `TASK.md` | A9R3 governance + acceptance matrix |
+| `docs/evidence/a9r2/A9R3_PRODUCT_AUTHORITY_SEAM_AUDIT.md` | seam audit |
+
+## Allowlist (A9R3 implementation — future owner GO)
+
+| File | Role |
+|------|------|
+| `core/target_effective_scope.py` | merge-aware resolver |
+| `core/target_runtime_turn.py` | project + wire + session persist |
+| `core/target_runtime_session.py` | A9 session writer (extent/jaw/stage) |
+| `config.py` | default Plus |
+| `docs/FLAGS_AND_STATUS.md` | `A9_PATIENT_SCOPE_AUTHORITY` (default OFF until flip) |
+| `tests/test_effective_scope_merge.py` | regression |
+| `tests/test_session_patient_facts_offline.py` | persistence |
+| `tests/test_ac3_scope_price_flow_offline.py` | acceptance |
+| `tests/test_ui_scope_click_http_offline.py` | UI priority |
+| `tests/test_turn_frame_shadow.py` | controlled read |
+| `tests/test_a9r3_*` | new implementation tests per TASK |
+
+**Frozen (byte-identical):** A9/A9R/A9R2*/W1b/S-series artifacts and matrices.
+
+## Forbidden
+
+- Implementation in this governance commit
+- Live / LLM eval loops
+- Prompt tuning, filters, regex, synonym tables, second classifier
+- `reported_context` authority
+- A9 service/offer/strategy/ResponseStage selection
+- Editing frozen eval/live artifacts
+- Retroactive A9R2d PASS
+
+## Gate sequence (updated)
+
+| Gate | Status |
+|------|--------|
+| A9R2d Plus live + model-pin | complete (`f1b90b8`) |
+| **A9R3 governance (this)** | in progress |
+| A9R3 implementation | **blocked** until separate owner GO |
+| Widget E2E | after A9R3 implementation |
+
+**STOP after governance PRE-CODE ✅. No A9R3 implementation without separate owner GO.**
+
+## Completion record (A9R3 governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `f1b90b8` |
+| PRE-CODE | |
+| COMPLETION | |
+| Implementation | blocked |
+| Model-tuning cycles | **stopped** |

@@ -1034,3 +1034,112 @@ Plus Planner → TurnFrame.patient_scope → A9R1 projection → per-axis Effect
 | COMPLETION | ✅ (governance only) |
 | Implementation | blocked |
 | Model-tuning cycles | **stopped** |
+
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E (governance + offline pre-live)
+
+**Status:** governance COMPLETION ✅ · **NO LIVE / NO LLM**
+
+**Baseline:** `70a96c1` (A9R3 implementation complete)
+
+**Owner sequence:** FINAL live widget E2E (one attempt) → on PASS remove `A9_PATIENT_SCOPE_AUTHORITY` kill-switch → unconditional A9 authority.
+
+## Goal
+
+One terminal runtime/widget E2E covering implantation + prosthetics scope/price flows:
+
+- `A9_PATIENT_SCOPE_AUTHORITY=1` set **before** config import (harness only until closeout)
+- Planner **`qwen3.7-plus`** (requested/configured/observed)
+- Real `/ask` and `/ask/stream`
+- AC1 → A9R3 → AC2 → AC3 end-to-end
+- Actual widget payload, session, refs, CTA
+- No legacy/fallback routes
+
+## Frozen turn matrix (protected)
+
+`evals/v5/demo/final_scope_widget_e2e_turns.json`
+**Blob:** `f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f`
+
+| # | Session | Endpoint | Action | Expected |
+|---|---------|----------|--------|----------|
+| 1 | A | `/ask` | «Сколько стоит имплантация?» | broad; 3 scope buttons; no payment stages |
+| 2 | A | `/ask` | click «Вся челюсть» | scoped offers; no scope nav; session `full_arch` |
+| 3 | A | `/ask` | «Нет, речь об одном зубе» | A9 correction → `one_tooth` |
+| 4 | B fresh | `/ask/stream` | «Сколько стоит имплантация всей челюсти?» | A9 `full_arch`; scoped; no scope nav |
+| 5 | C fresh | `/ask` | «Сколько стоит протезирование?» | broad prosthetics + scope buttons |
+| 6 | C | `/ask` | click «Один зуб» | stage clarification when required |
+| 7 | C | `/ask` | click «Имплант установлен» | scoped offers; no repeat scope/stage nav |
+| 8 | D fresh | `/ask/stream` | «Имплант уже установлен, сколько будет коронка?» | A9 `implant_placed`; prosthetics scoped |
+
+## Provider call budget
+
+| Role | Budget |
+|------|--------|
+| ingress | 5 (text turns only) |
+| planner | 8 |
+| medical_boundary | 8 |
+| composer | 8 |
+| semantic_verifier | 8 |
+| **total hard stop** | **40** |
+
+`RETRY_COUNT_MAX = 0`. FullContext build once. Manual review of all user answers mandatory.
+
+Seam audit: `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_SEAM_AUDIT.md`
+
+## Allowlist (this checkpoint)
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_SEAM_AUDIT.md` | seam audit + call budget |
+| `docs/FLAGS_AND_STATUS.md` | E2E note |
+| `evals/v5/demo/final_scope_widget_e2e_turns.json` | frozen turns |
+| `evals/v5/final_scope_widget_e2e_live_contract.py` | contract |
+| `evals/v5/final_scope_widget_e2e_live_harness.py` | HTTP harness |
+| `evals/v5/final_scope_widget_e2e_live_provider_audit.py` | provider ledger |
+| `evals/v5/run_final_scope_widget_e2e_live.py` | CLI |
+| `tests/test_final_scope_widget_e2e_live_harness.py` | offline tests |
+
+**Frozen (byte-identical):** S62/S63/S66/A9/A9R* artifacts and matrices.
+
+## Forbidden
+
+- Live run in this checkpoint
+- LLM / provider calls
+- Product code changes (incl. removing `A9_PATIENT_SCOPE_AUTHORITY` — post-E2E closeout only)
+- Editing frozen prior live artifacts
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_live_harness.py `
+  tests/test_a9r3_completion_offline.py -q
+python evals/v5/run_final_scope_widget_e2e_live.py --dry-run
+git diff --check
+```
+
+**STOP after COMPLETION ✅. Live E2E is separate owner GO.**
+
+## Post-E2E closeout (future — blocked)
+
+| Deliverable | Action |
+|-------------|--------|
+| `config.A9_PATIENT_SCOPE_AUTHORITY` | **delete** flag |
+| `core/target_effective_scope.py` | unconditional A9 merge |
+| `core/target_runtime_turn.py` | always project + merge |
+| `docs/FLAGS_AND_STATUS.md` | remove kill-switch row |
+| tests | drop flag-enable fixtures; authority always on |
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `70a96c1` |
+| PRE-CODE | ✅ (this commit) |
+| COMPLETION | ✅ (governance + offline pre-live only) |
+| Live | **blocked** until owner GO |
+| Post-E2E flag removal | **blocked** until live PASS |

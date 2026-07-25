@@ -44,10 +44,12 @@
 
 | Флаг | Что делает | Дефолт |
 |---|---|---|
-| `A9_PATIENT_SCOPE_AUTHORITY` | Включает merge `TurnFrame.patient_scope` (extent/jaw/stage) в `EffectiveScope` и session write после materialized turn | **OFF** (`0`) |
+| `A9_PATIENT_SCOPE_AUTHORITY` | Включает merge `TurnFrame.patient_scope` (extent/jaw/stage) в `EffectiveScope` и session write после materialized turn | **OFF** (`0`) — **FINAL widget E2E live требует `1`; после PASS closeout флаг удаляется** |
 | `TURN_PLANNER_LLM_MODEL` | Модель единственного turn planner | **`qwen3.7-plus`** (env override — обычная model config) |
 
 `reported_context` остаётся diagnostic-only: не входит в product AC2 и session persistence.
+
+**FINAL_SCOPE_WIDGET_E2E:** governance + offline pre-live @ `70a96c1`; live harness `evals/v5/run_final_scope_widget_e2e_live.py --dry-run`. One live attempt blocked until owner GO.
 
 ---
 

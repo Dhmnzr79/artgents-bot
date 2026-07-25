@@ -14,6 +14,11 @@ from evals.v5 import a9r2c_patient_scope_live_contract as contract
 from evals.v5.a9r2_patient_scope_live_contract import assert_frozen_a9r2_live_artifacts_unchanged
 from evals.v5.a9r2_patient_scope_live_harness import prepare_live_run, run_planner_harness
 from evals.v5.a9r2_patient_scope_live_scoring import evaluate_proposed_gates
+from tests.test_a9r1_offline_harness import (
+    test_a9_v1_v2_matrix_blobs_unchanged as _a9_shadow_blobs_unchanged,
+)
+from tests.test_ac3_scope_price_flow_offline import test_w1b_snapshot_checksums_unchanged
+from tests.test_patient_scope_a9r_matrix_v2_contract import test_a9r_v2_matrix_blob_frozen
 
 _ALLOWED_TOPICS = frozenset({"implantation", "prosthetics"})
 _ALLOWED_SERVICES = frozenset({"all_on_4", "classic"})
@@ -138,3 +143,19 @@ def test_attempt_marker_before_provider_call(artifact_paths: dict[str, Path]) ->
 def test_frozen_prior_live_artifacts_unchanged() -> None:
     assert_frozen_a9r2_live_artifacts_unchanged()
     a9r2b_contract.assert_frozen_a9r2b_live_artifacts_unchanged()
+    contract.assert_frozen_a9r2c_live_artifacts_unchanged()
+
+
+def test_frozen_neighbor_artifacts_unchanged() -> None:
+    test_a9r_v2_matrix_blob_frozen()
+    assert_frozen_a9r2_live_artifacts_unchanged()
+    a9r2b_contract.assert_frozen_a9r2b_live_artifacts_unchanged()
+    contract.assert_frozen_a9r2c_live_artifacts_unchanged()
+    _a9_shadow_blobs_unchanged()
+    test_w1b_snapshot_checksums_unchanged()
+
+
+def test_cli_live_rerun_blocked() -> None:
+    from evals.v5.run_a9r2c_patient_scope_live import main
+
+    assert main(["--live"]) == 4

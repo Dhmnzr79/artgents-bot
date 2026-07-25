@@ -1,0 +1,13 @@
+{
+  "measurement_id": "a9r2c_patient_scope_live",
+  "suite_id": "a9r2c_patient_scope_live",
+  "matrix_blob": "8ccd9bdc140a192981fcc48ad7ed0367a40b0a84",
+  "planner_model": "qwen3.7-plus",
+  "max_planner_calls": 17,
+  "retry_count_max": 0,
+  "provider_calls_started": 17,
+  "provider_calls_completed": 0,
+  "status": "completed",
+  "abort_blocks_retry_without_owner_approval": true,
+  "automated_verdict": "AUTOMATED_FAIL"
+}

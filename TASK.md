@@ -783,10 +783,11 @@ Official PASS only when automated gates pass **and** manual review complete for 
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `c22f948` |
-| Live GO HEAD | |
+| Live GO HEAD | `dae92a4` |
 | PRE-CODE | ✅ (live GO) |
 | Live HEAD | |
-| `automated_verdict` | |
-| `final_verdict` | |
-| Manual review | |
+| `automated_verdict` | `AUTOMATED_FAIL` |
+| `final_verdict` | `FAIL` (manual review complete) |
+| Manual review | ✅ 17/17 turns |
+| Provider model incident | logs show `qwen3.6-flash` not `qwen3.7-plus` |
 | Rerun | blocked |

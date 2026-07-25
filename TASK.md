@@ -905,7 +905,7 @@ Same as A9R2c: `true_composite_exact_turn_rate` ≥ 0.85; material FP = 0; etc.
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `e50647c` |
-| Live HEAD | |
+| Live HEAD | `f1b90b8` |
 | `automated_verdict` | `AUTOMATED_FAIL` |
 | `final_verdict` | `FAIL` (manual review 17/17) |
 | `provider_model_verified` | true (`qwen3.7-plus` × 17) |

@@ -57,6 +57,7 @@ from core.target_effective_scope_merge import (
     simulate_session_patient_facts_after_turn,
 )
 from core.target_patient_scope_projection import project_patient_scope_from_turn_frame
+from session import mem_add_bot, mem_add_user, mem_reset
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -69,6 +70,14 @@ def _git_head_commit() -> str:
         cwd=_REPO_ROOT,
         text=True,
     ).strip()
+
+
+def configure_live_env() -> None:
+    """Pin planner model for the one owner-approved A9R2 live attempt."""
+
+    import os
+
+    os.environ["TURN_PLANNER_LLM_MODEL"] = OWNER_APPROVED_PLANNER_MODEL
 
 
 def prepare_live_run(
@@ -129,7 +138,6 @@ def _execute_planner_call(
 def run_planner_harness(
     *,
     planner_fn: PlannerFn,
-    live: bool = False,
     attempt_marker_path: Path = LIVE_ATTEMPT_MARKER_PATH,
     call_ledger_path: Path = LIVE_CALL_LEDGER_PATH,
     raw_path: Path = LIVE_RAW_ARTIFACT_PATH,
@@ -137,12 +145,8 @@ def run_planner_harness(
     manifest_path: Path = LIVE_MANIFEST_ARTIFACT_PATH,
     manual_review_path: Path = LIVE_MANUAL_REVIEW_ARTIFACT_PATH,
     owner_override_attempt_marker: bool = False,
+    record_dialog_history: bool = False,
 ) -> dict[str, Any]:
-    if live:
-        raise HarnessConfigError(
-            "A9R2 live planner calls require separate owner GO after pre-live checkpoint"
-        )
-
     prepare_live_run(
         attempt_marker_path=attempt_marker_path,
         owner_override_attempt_marker=owner_override_attempt_marker,
@@ -151,6 +155,7 @@ def run_planner_harness(
     call_specs = iter_live_planner_calls(matrix)
     sid = f"a9r2-{uuid.uuid4().hex[:12]}"
     prior_session: SessionPatientFacts | None = None
+    prev_case_id: str | None = None
     raw_calls: list[dict[str, Any]] = []
     scored_calls: list[dict[str, Any]] = []
     aborted = False
@@ -162,6 +167,11 @@ def run_planner_harness(
                 aborted = True
                 abort_reason = "planner_call_budget_exceeded"
                 break
+            if call_spec["case_id"] != prev_case_id:
+                if record_dialog_history:
+                    mem_reset(sid)
+                prior_session = None
+                prev_case_id = call_spec["case_id"]
             execution = _execute_planner_call(
                 planner_fn=planner_fn,
                 call_spec=call_spec,
@@ -190,6 +200,10 @@ def run_planner_harness(
                 }
             )
             scored_calls.append(row)
+
+            if record_dialog_history:
+                mem_add_user(sid, call_spec["question"])
+                mem_add_bot(sid, "Понял.")
 
             if (
                 not score.get("transport_provider_error")
@@ -295,6 +309,7 @@ def run_planner_harness(
 
 
 __all__ = [
+    "configure_live_env",
     "prepare_live_run",
     "run_planner_harness",
 ]

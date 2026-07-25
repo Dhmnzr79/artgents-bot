@@ -187,7 +187,6 @@ def test_harness_offline_perfect_run_writes_artifacts(artifact_paths: dict[str, 
 
     payload = run_planner_harness(
         planner_fn=_fake_planner_factory(responses),
-        live=False,
         attempt_marker_path=artifact_paths["attempt_marker"],
         call_ledger_path=artifact_paths["call_ledger"],
         raw_path=artifact_paths["raw"],
@@ -218,7 +217,6 @@ def test_attempt_marker_blocks_second_run_without_override(artifact_paths: dict[
     }
     kwargs = {
         "planner_fn": _fake_planner_factory(responses),
-        "live": False,
         **{f"{key}_path": artifact_paths[key] for key in (
             "attempt_marker",
             "call_ledger",
@@ -233,9 +231,10 @@ def test_attempt_marker_blocks_second_run_without_override(artifact_paths: dict[
         run_planner_harness(**kwargs)
 
 
-def test_live_flag_blocked() -> None:
-    with pytest.raises(HarnessConfigError, match="separate owner GO"):
-        run_planner_harness(planner_fn=lambda *a, **k: PlannerAttempt(frame=None, status="ok"), live=True)
+def test_cli_live_entrypoint_exists() -> None:
+    from evals.v5.run_a9r2_patient_scope_live import main
+
+    assert callable(main)
 
 
 def test_correction_and_natural_tooth_present_in_fake_run(artifact_paths: dict[str, Path]) -> None:
@@ -253,7 +252,6 @@ def test_correction_and_natural_tooth_present_in_fake_run(artifact_paths: dict[s
         }
     payload = run_planner_harness(
         planner_fn=_fake_planner_factory(responses),
-        live=False,
         attempt_marker_path=artifact_paths["attempt_marker"],
         call_ledger_path=artifact_paths["call_ledger"],
         raw_path=artifact_paths["raw"],
@@ -300,12 +298,6 @@ def test_cli_dry_run() -> None:
     from evals.v5.run_a9r2_patient_scope_live import main
 
     assert main(["--dry-run"]) == 0
-
-
-def test_cli_live_blocked_exit_code() -> None:
-    from evals.v5.run_a9r2_patient_scope_live import main
-
-    assert main(["--live"]) == 3
 
 
 def test_attempt_marker_records_started_calls(artifact_paths: dict[str, Path]) -> None:

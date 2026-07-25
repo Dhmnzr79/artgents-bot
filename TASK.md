@@ -348,4 +348,21 @@ python evals/v5/run_a9r2_patient_scope_live.py --dry-run
 | A9R2 pre-live HEAD | `82a9829` |
 | Matrix v1 blob | `36d137112007a3fb0a96ad0759aa111af6115a35` (unchanged) |
 | Matrix v2 blob | `6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57` |
-| Live blocked | `--live` returns exit 3 until owner GO |
+| Live blocked | `--live` executed once (owner GO 2026-07-25); **rerun blocked** |
+| Live attempt | `AUTOMATED_FAIL` → manual review `PENDING_MANUAL_REVIEW` |
+| Planner calls (live) | 17 |
+| Audit | `docs/evidence/a9r2/A9R2_LIVE_ATTEMPT_AUDIT.md` |
+
+---
+
+## Completion record (A9R2 live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `6b75214` |
+| Live delegate HEAD | (implementation commit) |
+| Live artifacts HEAD | (audit commit) |
+| COMPLETION | |
+| `automated_verdict` | `AUTOMATED_FAIL` |
+| `final_verdict` | `PENDING_MANUAL_REVIEW` |
+| Authority | not enabled |

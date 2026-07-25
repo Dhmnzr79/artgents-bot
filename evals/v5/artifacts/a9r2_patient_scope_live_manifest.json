@@ -1,0 +1,17 @@
+{
+  "measurement_id": "a9r2_patient_scope_live",
+  "git_head": "6b75214bed020601cbd140d5dbfd85ec27a6e82e",
+  "matrix_blob": "6a9cc6f7a964d0ab3ead79e5dd2cf0a64d743f57",
+  "planner_model": "qwen3.6-flash",
+  "planner_calls": 17,
+  "artifact_paths": {
+    "raw": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\a9r2_patient_scope_live_raw.json",
+    "result": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\a9r2_patient_scope_live_result.json",
+    "manifest": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\a9r2_patient_scope_live_manifest.json",
+    "manual_review": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\a9r2_patient_scope_live_manual_review.json",
+    "attempt_marker": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\a9r2_patient_scope_live_attempt.json",
+    "call_ledger": "C:\\Cursor Projects\\demo-bot-local\\evals\\v5\\artifacts\\a9r2_patient_scope_live_call_ledger.jsonl"
+  },
+  "automated_verdict": "AUTOMATED_FAIL",
+  "final_verdict": "FAIL"
+}

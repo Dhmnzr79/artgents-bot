@@ -40,6 +40,15 @@
 
 **Offline tests** используют fake/recording backends.
 
+### A9 patient scope authority (A9R3)
+
+| Флаг | Что делает | Дефолт |
+|---|---|---|
+| `A9_PATIENT_SCOPE_AUTHORITY` | Включает merge `TurnFrame.patient_scope` (extent/jaw/stage) в `EffectiveScope` и session write после materialized turn | **OFF** (`0`) |
+| `TURN_PLANNER_LLM_MODEL` | Модель единственного turn planner | **`qwen3.7-plus`** (env override — обычная model config) |
+
+`reported_context` остаётся diagnostic-only: не входит в product AC2 и session persistence.
+
 ---
 
 ## Выключено по умолчанию — по причине, а не «недоделано»

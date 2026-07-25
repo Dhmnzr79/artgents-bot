@@ -29,6 +29,7 @@ from core.target_runtime_client_context import (
     runtime_today,
 )
 from core.target_effective_scope import resolve_effective_scope
+from core.target_patient_scope_projection import project_patient_scope_from_turn_frame
 from core.target_runtime_session import (
     read_target_runtime_session,
     sync_session_patient_facts_topic,
@@ -160,12 +161,20 @@ def run_target_fullcontext_runtime_turn(
 
     sync_session_patient_facts_topic(sid, current_topic=turn_frame.topic)
     session_state = read_target_runtime_session(sid)
+    from config import A9_PATIENT_SCOPE_AUTHORITY
+
+    projected_turn_scope = (
+        project_patient_scope_from_turn_frame(turn_frame)
+        if A9_PATIENT_SCOPE_AUTHORITY
+        else None
+    )
     effective_scope = resolve_effective_scope(
         current_ui_action=_current_ui_scope_action_from_request(),
         current_ui_stage_action=_current_ui_stage_action_from_request(),
         session_facts=session_state.patient_facts,
         current_topic=turn_frame.topic,
         session_turn_count=session_state.session_turn_count,
+        projected_turn_scope=projected_turn_scope,
     )
     _publish_effective_scope(effective_scope)
 
@@ -273,6 +282,7 @@ def run_target_fullcontext_runtime_turn(
             prior=session_state,
             current_selection=selection,
             followups=followups,
+            effective_scope=effective_scope,
         )
 
     return TargetRuntimeTurnOutcome(

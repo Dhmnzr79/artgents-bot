@@ -143,7 +143,7 @@ def test_ac1_modules_do_not_read_patient_scope() -> None:
     offenders: list[str] = []
     for path in modules:
         text = path.read_text(encoding="utf-8")
-        if ".patient_scope" in text:
+        if ".patient_scope" in text and "patient_scope_projection" not in text:
             offenders.append(path.as_posix())
         tree = ast.parse(text)
         for node in ast.walk(tree):

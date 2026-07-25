@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from contracts.effective_scope import EffectiveScope, EffectiveScopeJaw
+from contracts.effective_scope import (
+    EffectiveScope,
+    EffectiveScopeJaw,
+    ScopeAxisProvenance,
+)
+from contracts.patient_scope_projection import ProjectedPatientScope
 from contracts.target_service_applicability import PatientStage, ReportedContext
 from contracts.ui_scope_action import ScopeExtent, UiScopeAction
 from contracts.ui_stage_action import UiStageAction
@@ -29,6 +34,22 @@ class SessionPatientFacts:
         return age <= int(THRESHOLDS.follow_up.max_service_focus_turn_age)
 
 
+def strip_reported_context_for_product(scope: EffectiveScope) -> EffectiveScope:
+    """Remove diagnostic-only reported_context before AC2/session product boundaries."""
+
+    if scope.reported_context is None and scope.reported_context_axis.source == "unknown":
+        return scope
+    return scope.model_copy(
+        update={
+            "reported_context": None,
+            "reported_context_axis": ScopeAxisProvenance(
+                source="unknown",
+                provenance="unknown",
+            ),
+        }
+    )
+
+
 def resolve_effective_scope(
     *,
     current_ui_action: UiScopeAction | None,
@@ -36,8 +57,29 @@ def resolve_effective_scope(
     session_facts: SessionPatientFacts | None,
     current_topic: str | None,
     session_turn_count: int,
+    projected_turn_scope: ProjectedPatientScope | None = None,
 ) -> EffectiveScope:
-    """Priority: explicit UiScopeAction > explicit UiStageAction > fresh session > unknown."""
+    """Priority: UI actions > A9 projection (when enabled) > fresh session > unknown."""
+
+    from config import A9_PATIENT_SCOPE_AUTHORITY
+
+    if A9_PATIENT_SCOPE_AUTHORITY:
+        from core.target_effective_scope_merge import (
+            EffectiveScopeMergeInputs,
+            merge_effective_scope_axes,
+        )
+
+        merged = merge_effective_scope_axes(
+            EffectiveScopeMergeInputs(
+                current_topic=current_topic,
+                session_turn_count=session_turn_count,
+                session_facts=session_facts,
+                current_ui_scope_action=current_ui_action,
+                current_ui_stage_action=current_ui_stage_action,
+                projected_turn_scope=projected_turn_scope,
+            )
+        )
+        return strip_reported_context_for_product(merged)
 
     if current_ui_action is not None:
         stage = current_ui_stage_action.stage if current_ui_stage_action else None

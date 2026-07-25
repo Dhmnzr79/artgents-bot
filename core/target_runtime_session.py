@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from contracts.effective_scope import EffectiveScope
 from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_stage_action import UiStageAction
@@ -281,6 +282,67 @@ def sync_session_patient_facts_topic(
             _persist_unlocked(sid, st)
 
 
+def _apply_a9_patient_facts_to_state(
+    st: dict[str, Any],
+    *,
+    effective_scope: EffectiveScope,
+    prior: SessionPatientFacts | None,
+    current_topic: str | None,
+) -> None:
+    from config import A9_PATIENT_SCOPE_AUTHORITY
+
+    if not A9_PATIENT_SCOPE_AUTHORITY:
+        return
+
+    from core.target_effective_scope_merge import simulate_session_patient_facts_after_turn
+
+    turn_count = int(st.get("session_turn_count") or 0)
+    if prior is None:
+        prior = read_session_patient_facts(st.get(_PATIENT_FACTS_KEY))
+    sim = simulate_session_patient_facts_after_turn(
+        merged=effective_scope,
+        prior=prior,
+        current_topic=current_topic,
+        session_turn_count=turn_count,
+    )
+    if not sim.wrote or sim.facts is None:
+        return
+    facts = SessionPatientFacts(
+        extent=sim.facts.extent,
+        topic=sim.facts.topic,
+        provenance=sim.facts.provenance,
+        ref=sim.facts.ref,
+        set_at_turn=sim.facts.set_at_turn,
+        stage=sim.facts.stage,
+        stage_ref=sim.facts.stage_ref,
+        jaw=sim.facts.jaw,
+        reported_context=None,
+    )
+    st[_PATIENT_FACTS_KEY] = patient_facts_payload(facts)
+
+
+def write_session_patient_facts_from_a9_materialized(
+    sid: str,
+    *,
+    effective_scope: EffectiveScope,
+    prior: SessionPatientFacts | None,
+    current_topic: str | None,
+) -> None:
+    """Persist extent/jaw/stage from A9 merge after materialized turn; never reported_context."""
+
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        _apply_a9_patient_facts_to_state(
+            st,
+            effective_scope=effective_scope,
+            prior=prior,
+            current_topic=current_topic,
+        )
+        _persist_unlocked(sid, st)
+
+
 def write_target_runtime_session_after_materialized(
     sid: str,
     *,
@@ -289,6 +351,7 @@ def write_target_runtime_session_after_materialized(
     prior: TargetRuntimeSessionState,
     current_selection: TargetMaterializedSessionSelection,
     followups: tuple[TargetRuntimeFollowupItem, ...],
+    effective_scope: EffectiveScope | None = None,
 ) -> None:
     """Persist target continuity only after a successful materialized response."""
 
@@ -335,4 +398,11 @@ def write_target_runtime_session_after_materialized(
         st[_TARGET_FOLLOWUPS_KEY] = [
             {"ref": item.ref, "label": item.label} for item in followups if item.ref
         ]
+        if effective_scope is not None:
+            _apply_a9_patient_facts_to_state(
+                st,
+                effective_scope=effective_scope,
+                prior=prior.patient_facts,
+                current_topic=turn_frame.topic,
+            )
         _persist_unlocked(sid, st)

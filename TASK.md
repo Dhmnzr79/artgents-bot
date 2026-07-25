@@ -640,3 +640,85 @@ Official PASS only when automated gates pass **and** manual review complete for 
 | Manual review | ✅ 17/17 turns |
 | Material FP (neg/amb) | 0 |
 | Rerun | blocked |
+
+---
+
+# TASK — A9R2b post-live metric correction + A9R2c pre-live
+
+**Status:** governance → implementation · **NO LIVE / NO LLM / NO A9R3**
+
+**Baseline:** `5cd5015` (A9R2b live complete)
+
+**Frozen (byte-identical):** A9R2/A9R2b live artifacts; matrix v3 blob `8ccd9bdc…`
+
+## Checkpoint A — composite denominator correction
+
+| Deliverable | Role |
+|-------------|------|
+| `a9r2_patient_scope_live_scoring.py` | Fix composite eligibility: all non-transport turns in numerator/denominator |
+| `a9r2b_patient_scope_live_diagnostic_recompute.py` | Read-only recompute from frozen A9R2b raw |
+| `A9R2B_POST_LIVE_METRIC_CORRECTION_AUDIT.md` | Official 0.917 inflated vs corrected 0.647; per-axis diagnostic |
+| `tests/test_a9r2b_metric_correction_offline.py` | Regression anti-inflation |
+
+**Expected corrected A9R2b:** 11 exact / 17 eligible = 0.647. Per-axis: extent 8/1/1, jaw 3/1 FP, stage 2/3 FP. Official `AUTOMATED_FAIL`/`FAIL` immutable.
+
+## Checkpoint B — A9R2c pre-live
+
+| Deliverable | Role |
+|-------------|------|
+| `a9r2c_patient_scope_live_contract.py` | Isolated `a9r2c_*` namespace; model `qwen3.7-plus` |
+| `run_a9r2c_patient_scope_live.py` | CLI dry-run only |
+| `a9r2c_patient_scope_live_manual_review_builder.py` | Manual review builder |
+| `tests/test_a9r2c_patient_scope_live_offline.py` | Harness offline |
+| `tests/test_a9r2c_planner_blast_radius_offline.py` | Full planner blast-radius |
+
+**A9R2c gates:** `true_composite_exact_turn_rate` ≥ 0.85 (all non-transport turns); material FP = 0; reported_context diagnostic-only.
+
+**Forbidden:** live; LLM; matrix edit; A9R3; product authority; changing frozen A9R2/A9R2b artifacts.
+
+## Allowlist
+
+| File | Checkpoint |
+|------|------------|
+| `TASK.md` | governance + completion |
+| `evals/v5/a9r2_patient_scope_live_scoring.py` | A |
+| `evals/v5/a9r2b_patient_scope_live_contract.py` | A (diagnostic path) |
+| `evals/v5/a9r2b_patient_scope_live_diagnostic_recompute.py` | A |
+| `docs/evidence/a9r2/A9R2B_POST_LIVE_METRIC_CORRECTION_AUDIT.md` | A |
+| `evals/v5/artifacts/a9r2b_patient_scope_live_diagnostic_recompute.json` | A (new) |
+| `evals/v5/a9r2c_patient_scope_live_contract.py` | B |
+| `evals/v5/run_a9r2c_patient_scope_live.py` | B |
+| `evals/v5/a9r2c_patient_scope_live_manual_review_builder.py` | B |
+| `tests/test_a9r2b_metric_correction_offline.py` | A |
+| `tests/test_a9r2c_patient_scope_live_offline.py` | B |
+| `tests/test_a9r2c_planner_blast_radius_offline.py` | B |
+| `tests/test_a9r2b_patient_scope_live_offline.py` | A/B regression |
+| `tests/test_a9r2c_*` neighbors per TASK tests block | B |
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-a9r2bc-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_a9r2b_metric_correction_offline.py `
+  tests/test_a9r2c_patient_scope_live_offline.py `
+  tests/test_a9r2c_planner_blast_radius_offline.py `
+  tests/test_a9r2b_patient_scope_live_offline.py `
+  tests/test_a9r2_scorer_correction_offline.py `
+  tests/test_patient_scope_a9r_matrix_v3_contract.py `
+  tests/test_ac3_scope_price_flow_offline.py -q
+python evals/v5/run_a9r2c_patient_scope_live.py --dry-run
+```
+
+**STOP after COMPLETION ✅. A9R2c live is separate owner GO.**
+
+## Completion record (A9R2b metric + A9R2c pre-live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `5cd5015` |
+| PRE-CODE | |
+| COMPLETION | |
+| Corrected A9R2b composite | 11/17 = 0.647 |
+| A9R2c live blocked | `--live` not enabled |

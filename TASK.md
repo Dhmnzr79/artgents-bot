@@ -1201,4 +1201,171 @@ git diff --check
 | Baseline HEAD | `0f645cc` |
 | PRE-CODE | ✅ |
 | COMPLETION | ✅ (harness correction only) |
-| Retry1 live | **blocked** until owner GO |
+| Retry1 live | **blocked** (official FAIL @ `d76870a`) |
+
+---
+
+# TASK — FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION (governance)
+
+**Status:** governance checkpoint only · **NO LIVE / NO LLM / NO PRODUCT CODE**
+
+**Baseline:** `d76870a` (`codex/stage-a`) · RETRY1 live = official **FAIL** · live/rerun **blocked**
+
+**Owner rulings (binding):**
+
+| Ruling | Value |
+|--------|-------|
+| `A9_PATIENT_SCOPE_AUTHORITY` | **do not remove** until post-E2E closeout after live PASS |
+| RETRY1 artifacts | **frozen** byte-identical (`d76870a` SHAs) |
+| Untracked `_retry1_live_run_stdout.txt` | forensic capture only — **not** committed; retain until audit |
+| Fix approach | reuse AC1→AC2→AC3; **no** new route/selector/legacy fallback |
+| Forbidden now | LIVE, Retry2, A9 prompt tuning, regex/phrase lists, service hardcodes |
+
+Seam audit: `docs/evidence/final_scope/FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION_SEAM_AUDIT.md`
+
+---
+
+## Goal (two product defects from RETRY1)
+
+### T2 — typed UI scope click
+
+**Observed:** ref `target:ui_scope/implantation/full_arch` valid; `EffectiveScope` = `full_arch` / `ui_action`; planner `needs_clarification=true`; boundary on button label; route `terminal_medical_handoff_nonmaterializable`.
+
+**Target semantics:** Governed `UiScopeAction` = typed price-drill-down continuation. Planner/boundary must not override scope resolved by AC1. Materialize scoped price via existing AC2→AC3 path.
+
+### T5 — broad prosthetics price
+
+**Observed:** `topic=prosthetics`, `aspect=price`, `extent=unknown`, `needs_clarification=true` → `terminal_clarify`.
+
+**Target semantics:**
+
+```
+known topic + price aspect + service_id=null + extent=unknown
+  → broad_family_price + 3 scope-nav buttons
+```
+
+`needs_clarification` preserved for non-price ambiguity and service_id ambiguity. Data-gap → existing typed fail-closed / `stage_clarify`.
+
+### Harness evidence correction (implementation deliverable)
+
+| Item | Requirement |
+|------|-------------|
+| UTF-8 capture | `₽` in logs/artifacts without `UnicodeEncodeError` or cp1251 mojibake |
+| Fake-provider replay | all **8** matrix HTTP turns through **real** target runtime (not mocked orchestrate) |
+| Gates | T2/T5 routes materialized; scope buttons present when matrix expects |
+
+---
+
+## Acceptance matrix (protected — implementation)
+
+Matrix blob: `f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f` (**immutable**)
+
+| ID | Scenario | Route / UI expectation |
+|----|----------|------------------------|
+| AM-1 | broad implantation «Сколько стоит имплантация?» | `materialized` · `broad_family_price` · 3 scope buttons |
+| AM-2 | broad prosthetics «Сколько стоит протезирование?» (planner `needs_clarify=true` OK) | same · prosthetics topic |
+| AM-3 | typed scope click `full_arch` (implantation) | scoped materialized · no scope nav · session `full_arch` |
+| AM-4 | typed scope click `one_tooth` / `few_teeth` | scoped or `stage_clarify` per AC3 |
+| AM-5 | prosthetics stage_clarify + stage click `implant_placed` | scoped offers · no repeat nav |
+| AM-6 | free-text full_arch implantation | A9 `full_arch` · scoped materialized |
+| AM-7 | free-text `implant_placed` prosthetics crown | A9 stage · scoped materialized |
+| AM-8 | ordinary medical free-text (non-UI) | boundary `medical_handoff` behavior **unchanged** |
+| AM-9 | ambiguous non-price question | `terminal_clarify` **preserved** |
+| AM-10 | invalid / unshown ref click | fail-closed unknown-ref clarify |
+| AM-11 | `/ask` and `/ask/stream` | EffectiveScope + route class parity |
+| AM-12 | terminal/error turn | **no** session `patient_facts` overwrite |
+| AM-13 | 8-turn widget matrix offline replay | 8/8 HTTP completed · automated gates pass |
+| AM-14 | price amounts/units | pricebook only · no LLM prices |
+
+RETRY1 live turns 1–8 remain the canonical E2E oracle (`final_scope_widget_e2e_turns.json`).
+
+---
+
+## Blast-radius tests (implementation allowlist)
+
+| File | Extend for |
+|------|------------|
+| `tests/test_target_turn_frame_dispatch.py` | T2/T5 dispatch precedence with `needs_clarify=true` |
+| `tests/test_ac3_scope_price_flow_offline.py` | prosthetics broad + scope clicks under clarify flag |
+| `tests/test_a9r3_product_authority_offline.py` | UI click beats planner + boundary handoff |
+| `tests/test_ac3_scope_price_flow_http_offline.py` | HTTP + stream parity |
+| `tests/test_ui_scope_click_http_offline.py` | ref-only clicks |
+| `tests/test_demo_target_turn_frame_bound_response.py` | clarify vs scope-price split |
+| `tests/test_session_patient_facts_offline.py` | terminal/error no write |
+| `tests/test_final_scope_widget_e2e_retry1_live_harness.py` | real-path 8-turn fake-provider replay + UTF-8 |
+| `tests/test_final_scope_post_retry1_product_correction_governance.py` | frozen pins regression |
+
+---
+
+## Allowlist (governance — this commit)
+
+| File | Role |
+|------|------|
+| `TASK.md` | this checkpoint |
+| `docs/evidence/final_scope/FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION_SEAM_AUDIT.md` | read-only seam audit |
+| `docs/FLAGS_AND_STATUS.md` | POST_RETRY1 status note |
+| `tests/test_final_scope_post_retry1_product_correction_governance.py` | PRE-CODE checker |
+
+## Allowlist (implementation — future owner GO)
+
+| File | Role |
+|------|------|
+| `core/target_turn_frame_dispatch.py` | primary: scope-price materialize precedence |
+| `core/target_runtime_turn.py` | pass governed UI context to dispatch if needed |
+| `orchestration/pre_resolver_turn.py` | optional: neutral continuation token vs raw label |
+| `logging_setup.py` | UTF-8 stream capture for ₽ |
+| `evals/v5/final_scope_widget_e2e_live_harness.py` | harness UTF-8 + answer capture from HTTP payload |
+| `evals/v5/final_scope_widget_e2e_retry1_live_harness.py` | retry1 harness parity if needed |
+| `tests/test_target_turn_frame_dispatch.py` | dispatch blast-radius |
+| `tests/test_ac3_scope_price_flow_offline.py` | AC2/AC3 blast-radius |
+| `tests/test_a9r3_product_authority_offline.py` | A9R3 + UI priority |
+| `tests/test_ac3_scope_price_flow_http_offline.py` | HTTP/stream parity |
+| `tests/test_ui_scope_click_http_offline.py` | UI click HTTP |
+| `tests/test_demo_target_turn_frame_bound_response.py` | boundary/clarify neighbor |
+| `tests/test_session_patient_facts_offline.py` | session write guard |
+| `tests/test_final_scope_widget_e2e_retry1_live_harness.py` | 8-turn real-path replay |
+| `tests/test_final_scope_post_retry1_product_correction_governance.py` | frozen pins |
+| `TASK.md` | implementation completion record |
+
+**Frozen (byte-identical):** all RETRY1 live artifacts, preflight-abort attempt #1, widget matrix, S62/S63/A9/A9R*/W1b.
+
+## Forbidden (governance + implementation)
+
+- LIVE / LLM / Retry2 live
+- A9 planner prompt tuning
+- regex, phrase lists, service hardcodes
+- new selector, temporary route, legacy fallback
+- editing frozen RETRY1 artifacts or committed `final_scope_widget_e2e_retry1_live_stdout.log`
+- deleting `A9_PATIENT_SCOPE_AUTHORITY` flag
+- committing `_retry1_live_run_stdout.txt`
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-pc-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_post_retry1_product_correction_governance.py -q
+git diff --check
+```
+
+**Note:** `test_retry1_dry_run_cli` fails when retry1 live artifacts exist (rerun blocked) — expected post-`d76870a`; not a governance regression.
+
+## STOP conditions
+
+1. Governance commit touches product code
+2. Frozen RETRY1 artifacts modified
+3. PRE-CODE ❌ without fix path
+4. Implementation started without separate owner GO
+
+**STOP after governance PRE-CODE ✅. Implementation blocked until owner GO.**
+
+## Completion record (POST_RETRY1 governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `d76870a` |
+| PRE-CODE | ✅ |
+| COMPLETION | N/A (governance only) |
+| Implementation | **blocked** |
+| Untracked stdout forensic | captured in seam audit |

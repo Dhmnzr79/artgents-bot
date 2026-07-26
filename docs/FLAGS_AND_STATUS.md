@@ -49,9 +49,11 @@
 
 `reported_context` остаётся diagnostic-only: не входит в product AC2 и session persistence.
 
-**FINAL_SCOPE_WIDGET_E2E:** governance + offline pre-live @ `70a96c1`; live harness `evals/v5/run_final_scope_widget_e2e_live.py --dry-run`. One live attempt blocked until owner GO.
+**FINAL_SCOPE_WIDGET_E2E:** governance + offline pre-live @ `70a96c1`; live harness `evals/v5/run_final_scope_widget_e2e_live.py --dry-run`. Attempt #1 preflight-abort frozen.
 
-**FINAL_SCOPE_WIDGET_E2E_RETRY1:** harness correction @ `0f645cc`; retry1 dry-run `evals/v5/run_final_scope_widget_e2e_retry1_live.py --dry-run`. Preflight-abort attempt #1 frozen; retry1 live blocked until owner GO.
+**FINAL_SCOPE_WIDGET_E2E_RETRY1:** official live FAIL @ `d76870a`; rerun blocked.
+
+**FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION:** governance @ `d76870a`; seam audit `docs/evidence/final_scope/FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION_SEAM_AUDIT.md`. Implementation blocked until owner GO. Untracked `evals/v5/artifacts/_retry1_live_run_stdout.txt` = forensic UTF-16 duplicate; not committed.
 
 ---
 

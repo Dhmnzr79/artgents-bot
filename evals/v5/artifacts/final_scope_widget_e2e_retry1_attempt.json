@@ -1,0 +1,29 @@
+{
+  "measurement_id": "final_scope_widget_e2e_retry1",
+  "turns_git_blob_hash": "f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f",
+  "status": "attempt_aborted_mid_run",
+  "baseline_commit": "0b10b00b6e5a32d0caaf7c9396bba77c042e1f49",
+  "a9_patient_scope_authority": "1",
+  "ingress_model": "qwen3.6-flash",
+  "planner_model": "qwen3.7-plus",
+  "boundary_model": "qwen3.7-plus",
+  "composer_model": "qwen3.7-plus",
+  "verifier_model": "qwen3.7-plus",
+  "requires_planner_model_plus": true,
+  "max_provider_calls": 40,
+  "max_http_turns": 8,
+  "retry_count_max": 0,
+  "rerun_blocked_without_owner_approval": true,
+  "started_provider_calls": 20,
+  "role_counts": {
+    "composer": 3,
+    "ingress": 4,
+    "medical_boundary": 5,
+    "planner": 5,
+    "semantic_verifier": 3
+  },
+  "parent_measurement_id": "final_scope_widget_e2e",
+  "abort_reason": "HarnessConfigError: missing scope ref from_turn=5 extent=one_tooth",
+  "completed_provider_calls": 20,
+  "http_turns_completed": 5
+}

@@ -1,0 +1,40 @@
+{
+  "measurement_id": "final_scope_widget_e2e_retry1",
+  "baseline_live_commit": "0b10b00b6e5a32d0caaf7c9396bba77c042e1f49",
+  "turns_git_blob_hash": "f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f",
+  "automated_verdict": "AUTOMATED_FAIL",
+  "final_verdict": "FAIL",
+  "manual_review_required": true,
+  "abort_reason": "HarnessConfigError: missing scope ref from_turn=5 extent=one_tooth",
+  "technical": {
+    "http_turns_completed": 5,
+    "http_turns_expected": 8,
+    "all_materialized": false,
+    "no_failure_routes": false,
+    "turn_automated_pass": 3,
+    "planner_model_plus_verified": true,
+    "planner_models_observed": [
+      "qwen3.7-plus",
+      "qwen3.7-plus",
+      "qwen3.7-plus",
+      "qwen3.7-plus",
+      "qwen3.7-plus"
+    ],
+    "legacy_hits": [],
+    "fullcontext_build_count": 1
+  },
+  "provider": {
+    "total_calls": 20,
+    "role_totals": {
+      "ingress": 4,
+      "planner": 5,
+      "medical_boundary": 5,
+      "composer": 3,
+      "semantic_verifier": 3
+    },
+    "retries": 0,
+    "ledger_complete": false,
+    "ledger_balanced": true
+  },
+  "rerun_blocked_without_owner_approval": true
+}

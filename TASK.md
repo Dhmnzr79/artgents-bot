@@ -2073,3 +2073,81 @@ git diff --check
 | A9 flag | **kept** until implementation GO |
 | Closeout implementation | **STOP** |
 
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_CLOSEOUT (implementation)
+
+**Status:** implementation COMPLETION ✅ · **FINAL_SCOPE_CLOSEOUT_COMPLETE**
+
+**Baseline:** `3adc0e7` (governance COMPLETION ✅)
+
+**Owner GO:** remove `A9_PATIENT_SCOPE_AUTHORITY`; unconditional A9 projection + per-axis merge; frozen Retry1–4 artifacts immutable.
+
+Seam audit: `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_CLOSEOUT_SEAM_AUDIT.md`
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `TASK.md` | completion |
+| `config.py` | remove A9 flag |
+| `core/target_effective_scope.py` | unconditional merge |
+| `core/target_runtime_turn.py` | unconditional projection |
+| `core/target_runtime_session.py` | unconditional session write path |
+| `evals/v5/final_scope_widget_e2e_live_contract.py` | drop A9 preflight |
+| `evals/v5/final_scope_widget_e2e_live_harness.py` | drop A9 env/checks |
+| `evals/v5/final_scope_widget_e2e_retry{1,2,3,4}_live_contract.py` | drop REQUIRES_A9 export |
+| `evals/v5/run_final_scope_widget_e2e*.py` | drop dry-run A9 field |
+| `docs/FLAGS_AND_STATUS.md` | unconditional authority note |
+| `tests/test_final_scope_widget_e2e_closeout_implementation.py` | COMPLETION checker |
+| `tests/test_final_scope_widget_e2e_closeout_governance.py` | flag-absent gate |
+| `tests/test_a9r3_{completion,product_authority}_offline.py` | drop flag fixtures |
+| `tests/test_session_patient_facts_offline.py` | drop flag fixture |
+| `tests/test_final_scope_*_live_harness.py` | drop A9 env fixtures |
+| `tests/test_final_scope_post_retry3_composer_action_context_offline.py` | drop A9 env |
+
+**Frozen (byte-identical):** all Retry1–Retry4 live artifacts, A9/A9R/S-series eval artifacts, widget matrix, historical evidence docs.
+
+## Forbidden
+
+- LIVE / LLM / Retry5
+- Verifier / Planner prompt changes
+- A9 prompt tuning
+- regex/phrase lists
+- new selectors/routes
+- AC1→AC3 / typed UI TurnFrame changes
+- editing frozen live artifacts or historical seam audits
+
+## Tests (COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-closeout-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_closeout_governance.py `
+  tests/test_a9r3_product_authority_offline.py `
+  tests/test_a9r3_completion_offline.py `
+  tests/test_session_patient_facts_offline.py `
+  tests/test_final_scope_widget_e2e_retry4_live_harness.py `
+  tests/test_final_scope_post_retry3_composer_action_context_offline.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py `
+  tests/test_final_scope_post_retry3_composer_action_context_governance.py `
+  tests/test_final_scope_widget_e2e_retry3_governance.py -q
+git diff --check
+```
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E_CLOSEOUT implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `3adc0e7` |
+| COMPLETION | ✅ |
+| A9 flag removed | ✅ `config.py` + product/harness/tests |
+| Unconditional merge | ✅ `resolve_effective_scope` always merges |
+| Unconditional projection | ✅ `target_runtime_turn` always projects |
+| Session write | ✅ unconditional `_apply_a9_patient_facts_to_state` |
+| Frozen Retry4 artifacts | ✅ unchanged (`PENDING_MANUAL_REVIEW` capture) |
+| Offline pytest | ✅ 74 passed |
+| **FINAL_SCOPE_CLOSEOUT_COMPLETE** | ✅ |
+

@@ -55,14 +55,13 @@ def test_frozen_s62_s63_artifacts_unchanged() -> None:
     assert_frozen_s63_live_artifacts_unchanged()
 
 
-def test_configure_process_env_sets_authority_and_plus_planner() -> None:
+def test_configure_process_env_sets_plus_planner() -> None:
     configure_process_env()
     import importlib
 
     import config
 
     importlib.reload(config)
-    assert config.A9_PATIENT_SCOPE_AUTHORITY is True
     assert config.TURN_PLANNER_LLM_MODEL == OWNER_APPROVED_PLANNER_MODEL
 
 

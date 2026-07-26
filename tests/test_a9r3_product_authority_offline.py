@@ -35,14 +35,6 @@ _ALLOWED_TOPICS = frozenset({"implantation", "prosthetics", "doctors"})
 _ALLOWED_SERVICES = frozenset({"all_on_4", "classic", "veneers"})
 
 
-@pytest.fixture(autouse=True)
-def _enable_a9_authority(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("A9_PATIENT_SCOPE_AUTHORITY", "1")
-    import config
-
-    importlib.reload(config)
-
-
 @pytest.fixture
 def flask_ctx():
     app = Flask(__name__)

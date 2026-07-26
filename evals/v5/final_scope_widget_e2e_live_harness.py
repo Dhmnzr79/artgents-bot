@@ -116,7 +116,6 @@ def configure_process_env() -> None:
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
-    os.environ["A9_PATIENT_SCOPE_AUTHORITY"] = "1"
     os.environ["MODEL_INGRESS_CLASSIFY"] = OWNER_APPROVED_INGRESS_MODEL
     os.environ["TURN_PLANNER_LLM_MODEL"] = OWNER_APPROVED_PLANNER_MODEL
     os.environ["TARGET_FULLCONTEXT_BOUNDARY_MODEL"] = OWNER_APPROVED_BOUNDARY_MODEL
@@ -310,10 +309,6 @@ def validate_runtime_seams(
 
     if reload_runtime:
         importlib.reload(config)
-    elif not config.A9_PATIENT_SCOPE_AUTHORITY:
-        importlib.reload(config)
-    if not config.A9_PATIENT_SCOPE_AUTHORITY:
-        raise HarnessConfigError("A9_PATIENT_SCOPE_AUTHORITY must be enabled for FINAL E2E")
     if config.TURN_PLANNER_LLM_MODEL != OWNER_APPROVED_PLANNER_MODEL:
         raise HarnessConfigError(
             f"planner model must be {OWNER_APPROVED_PLANNER_MODEL}; got {config.TURN_PLANNER_LLM_MODEL}"
@@ -770,7 +765,6 @@ def run_http_harness(
                     "provider_ledger_sha256": ledger_sha256,
                     "attempt_marker_path": str(attempt_marker_path),
                     "call_ledger_path": str(call_ledger_path),
-                    "a9_patient_scope_authority": "1",
                     "planner_model": OWNER_APPROVED_PLANNER_MODEL,
                     "rerun_blocked_without_owner_approval": True,
                 }

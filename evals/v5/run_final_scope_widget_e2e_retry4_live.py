@@ -106,7 +106,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             },
             "retry_count_max": RETRY_COUNT_MAX,
             "planner_model": OWNER_APPROVED_PLANNER_MODEL,
-            "a9_patient_scope_authority": "1",
             "manual_review_rubric": {
                 str(turn): criterion for turn, criterion in sorted(MANUAL_REVIEW_RUBRIC.items())
             },

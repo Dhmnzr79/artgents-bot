@@ -111,7 +111,6 @@ def test_pre_resolver_ui_scope_click_persists_session_facts(flask_ctx) -> None:
 
 
 def test_a9_session_facts_persist_after_materialized_turn(flask_ctx, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("A9_PATIENT_SCOPE_AUTHORITY", "1")
     import importlib
     import config
 

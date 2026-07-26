@@ -289,11 +289,6 @@ def _apply_a9_patient_facts_to_state(
     prior: SessionPatientFacts | None,
     current_topic: str | None,
 ) -> None:
-    from config import A9_PATIENT_SCOPE_AUTHORITY
-
-    if not A9_PATIENT_SCOPE_AUTHORITY:
-        return
-
     from core.target_effective_scope_merge import simulate_session_patient_facts_after_turn
 
     turn_count = int(st.get("session_turn_count") or 0)

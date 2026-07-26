@@ -165,13 +165,7 @@ def run_target_fullcontext_runtime_turn(
 
     sync_session_patient_facts_topic(sid, current_topic=turn_frame.topic)
     session_state = read_target_runtime_session(sid)
-    from config import A9_PATIENT_SCOPE_AUTHORITY
-
-    projected_turn_scope = (
-        project_patient_scope_from_turn_frame(turn_frame)
-        if A9_PATIENT_SCOPE_AUTHORITY
-        else None
-    )
+    projected_turn_scope = project_patient_scope_from_turn_frame(turn_frame)
     effective_scope = resolve_effective_scope(
         current_ui_action=_current_ui_scope_action_from_request(),
         current_ui_stage_action=_current_ui_stage_action_from_request(),

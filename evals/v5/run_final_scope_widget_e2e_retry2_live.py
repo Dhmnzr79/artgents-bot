@@ -89,7 +89,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             "max_provider_calls": MAX_PROVIDER_CALLS,
             "retry_count_max": RETRY_COUNT_MAX,
             "planner_model": OWNER_APPROVED_PLANNER_MODEL,
-            "a9_patient_scope_authority": "1",
             "live_blocked": True,
             "dry_run": True,
         }

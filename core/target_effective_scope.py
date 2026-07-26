@@ -59,79 +59,24 @@ def resolve_effective_scope(
     session_turn_count: int,
     projected_turn_scope: ProjectedPatientScope | None = None,
 ) -> EffectiveScope:
-    """Priority: UI actions > A9 projection (when enabled) > fresh session > unknown."""
+    """Priority: UI actions > A9 projection > fresh session > unknown."""
 
-    from config import A9_PATIENT_SCOPE_AUTHORITY
-
-    if A9_PATIENT_SCOPE_AUTHORITY:
-        from core.target_effective_scope_merge import (
-            EffectiveScopeMergeInputs,
-            merge_effective_scope_axes,
-        )
-
-        merged = merge_effective_scope_axes(
-            EffectiveScopeMergeInputs(
-                current_topic=current_topic,
-                session_turn_count=session_turn_count,
-                session_facts=session_facts,
-                current_ui_scope_action=current_ui_action,
-                current_ui_stage_action=current_ui_stage_action,
-                projected_turn_scope=projected_turn_scope,
-            )
-        )
-        return strip_reported_context_for_product(merged)
-
-    if current_ui_action is not None:
-        stage = current_ui_stage_action.stage if current_ui_stage_action else None
-        if stage is None and session_facts is not None:
-            topic_eff = str(current_topic or "").strip().lower() or None
-            if topic_eff and session_facts.topic == topic_eff and session_facts.is_fresh(
-                session_turn_count=session_turn_count
-            ):
-                stage = session_facts.stage
-        return EffectiveScope(
-            extent=current_ui_action.extent,
-            stage=stage,
-            topic=current_ui_action.topic,
-            source="ui_action",
-            provenance=current_ui_action.ref,
-        )
-
-    if current_ui_stage_action is not None:
-        extent: ScopeExtent | Literal["unknown"] = "unknown"
-        stage = current_ui_stage_action.stage
-        topic = current_ui_stage_action.topic
-        if session_facts is not None:
-            topic_eff = str(current_topic or "").strip().lower() or None
-            if topic_eff and session_facts.topic == topic_eff and session_facts.is_fresh(
-                session_turn_count=session_turn_count
-            ):
-                extent = session_facts.extent
-        return EffectiveScope(
-            extent=extent,
-            stage=stage,
-            topic=topic,
-            source="ui_stage_action",
-            provenance=current_ui_stage_action.ref,
-        )
-
-    if session_facts is None:
-        return EffectiveScope()
-
-    topic_eff = str(current_topic or "").strip().lower() or None
-    if topic_eff and session_facts.topic != topic_eff:
-        return EffectiveScope()
-
-    if not session_facts.is_fresh(session_turn_count=session_turn_count):
-        return EffectiveScope()
-
-    return EffectiveScope(
-        extent=session_facts.extent,
-        stage=session_facts.stage,
-        topic=session_facts.topic,
-        source="session",
-        provenance=session_facts.ref,
+    from core.target_effective_scope_merge import (
+        EffectiveScopeMergeInputs,
+        merge_effective_scope_axes,
     )
+
+    merged = merge_effective_scope_axes(
+        EffectiveScopeMergeInputs(
+            current_topic=current_topic,
+            session_turn_count=session_turn_count,
+            session_facts=session_facts,
+            current_ui_scope_action=current_ui_action,
+            current_ui_stage_action=current_ui_stage_action,
+            projected_turn_scope=projected_turn_scope,
+        )
+    )
+    return strip_reported_context_for_product(merged)
 
 
 def session_patient_facts_from_ui_action(

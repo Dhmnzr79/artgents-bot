@@ -40,12 +40,13 @@
 
 **Offline tests** используют fake/recording backends.
 
-### A9 patient scope authority (A9R3)
+### A9 patient scope authority (A9R3 — unconditional post-closeout)
 
-| Флаг | Что делает | Дефолт |
-|---|---|---|
-| `A9_PATIENT_SCOPE_AUTHORITY` | Включает merge `TurnFrame.patient_scope` (extent/jaw/stage) в `EffectiveScope` и session write после materialized turn | **OFF** (`0`) — **FINAL widget E2E live требует `1`; после PASS closeout флаг удаляется** |
-| `TURN_PLANNER_LLM_MODEL` | Модель единственного turn planner | **`qwen3.7-plus`** (env override — обычная model config) |
+Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveScope` merge are **always on** in product runtime. Temporary kill-switch `A9_PATIENT_SCOPE_AUTHORITY` removed @ FINAL_SCOPE_WIDGET_E2E_CLOSEOUT (`3adc0e7` governance → implementation).
+
+| Setting | Value |
+|---|---|
+| `TURN_PLANNER_LLM_MODEL` | **`qwen3.7-plus`** (env override — обычная model config) |
 
 `reported_context` остаётся diagnostic-only: не входит в product AC2 и session persistence.
 
@@ -59,7 +60,7 @@
 
 **FINAL_SCOPE_WIDGET_E2E_RETRY4:** live AUTOMATED_PASS 8/8 + owner manual **PASS 8/8** @ `5ff9893`; immutable artifacts pinned.
 
-**FINAL_SCOPE_WIDGET_E2E_CLOSEOUT:** governance checkpoint @ `5ff9893` — manual PASS audit + closeout seam design; **A9 flag kept**; implementation **STOP** until separate owner GO.
+**FINAL_SCOPE_WIDGET_E2E_CLOSEOUT:** **FINAL_SCOPE_CLOSEOUT_COMPLETE** ✅ — A9 kill-switch removed; unconditional patient-scope authority; frozen Retry4 artifacts unchanged.
 
 ---
 

@@ -312,7 +312,6 @@ def _install_retry1_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, obj
 
 @pytest.fixture(autouse=True)
 def _retry1_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("A9_PATIENT_SCOPE_AUTHORITY", "1")
     monkeypatch.setenv("TURN_PLANNER_LLM_MODEL", OWNER_APPROVED_PLANNER_MODEL)
     monkeypatch.setenv("MODEL_INGRESS_CLASSIFY", "qwen3.6-flash")
     monkeypatch.setenv("TARGET_FULLCONTEXT_BOUNDARY_MODEL", OWNER_APPROVED_PLANNER_MODEL)
@@ -357,7 +356,6 @@ def test_fresh_subprocess_post_s69_preflight_passes() -> None:
 import os, sys, tempfile
 from pathlib import Path
 sys.path.insert(0, r"{repo}")
-os.environ["A9_PATIENT_SCOPE_AUTHORITY"] = "1"
 os.environ["TURN_PLANNER_LLM_MODEL"] = "qwen3.7-plus"
 os.environ["MODEL_INGRESS_CLASSIFY"] = "qwen3.6-flash"
 os.environ["TARGET_FULLCONTEXT_BOUNDARY_MODEL"] = "qwen3.7-plus"

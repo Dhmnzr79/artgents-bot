@@ -30,20 +30,6 @@ def test_runtime_planner_default_model_is_plus() -> None:
         importlib.reload(config)
 
 
-def test_a9_patient_scope_authority_default_off() -> None:
-    prior = os.environ.get("A9_PATIENT_SCOPE_AUTHORITY")
-    try:
-        os.environ.pop("A9_PATIENT_SCOPE_AUTHORITY", None)
-        importlib.reload(config)
-        assert config.A9_PATIENT_SCOPE_AUTHORITY is False
-    finally:
-        if prior is None:
-            os.environ.pop("A9_PATIENT_SCOPE_AUTHORITY", None)
-        else:
-            os.environ["A9_PATIENT_SCOPE_AUTHORITY"] = prior
-        importlib.reload(config)
-
-
 def test_frozen_neighbor_artifacts_unchanged() -> None:
     test_a9r_v3_matrix_blob_frozen()
     _a9_shadow_blobs_unchanged()

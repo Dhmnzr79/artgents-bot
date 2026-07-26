@@ -55,11 +55,6 @@ def _governed_invocations(
     return governed
 
 
-@pytest.fixture(autouse=True)
-def _post_retry3_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("A9_PATIENT_SCOPE_AUTHORITY", "1")
-
-
 def test_offline_t1_t8_action_context_and_widget_integrity(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

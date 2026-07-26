@@ -83,7 +83,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             "max_http_turns": MAX_HTTP_TURNS,
             "max_provider_calls": MAX_PROVIDER_CALLS,
             "planner_model": OWNER_APPROVED_PLANNER_MODEL,
-            "a9_patient_scope_authority": "1",
             "live_blocked": True,
             "dry_run": True,
         }

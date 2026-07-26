@@ -128,9 +128,9 @@ def test_frozen_widget_matrix_and_neighbor_suites_unchanged() -> None:
     assert_frozen_suite_unchanged()
 
 
-def test_a9_flag_still_present_until_closeout_implementation() -> None:
+def test_a9_flag_removed_after_closeout_implementation() -> None:
     config_text = (_REPO_ROOT / "config.py").read_text(encoding="utf-8")
-    assert "A9_PATIENT_SCOPE_AUTHORITY" in config_text
+    assert "A9_PATIENT_SCOPE_AUTHORITY" not in config_text
     assert MANUAL_REVIEW_RUBRIC[1] == "compact_overview"
     assert (
         FROZEN_RETRY4_LIVE_ARTIFACT_SHA256[

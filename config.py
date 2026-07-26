@@ -108,13 +108,6 @@ TURN_PLANNER_LLM_MODEL = (
     (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_PLUS_MODEL
 )
 
-# --- A9 patient_scope authority in EffectiveScope merge (A9R3; default OFF) ---
-A9_PATIENT_SCOPE_AUTHORITY = os.getenv("A9_PATIENT_SCOPE_AUTHORITY", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
 # --- Lead active-turn gray-zone classifier ---
 LEAD_TURN_LLM_CLASSIFY_ON = os.getenv("LEAD_TURN_LLM_CLASSIFY", "1").lower() in (
     "1",

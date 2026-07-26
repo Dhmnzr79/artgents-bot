@@ -87,7 +87,6 @@ class _ActionAwareGroundedComposerBackend(_GroundedEvidenceComposerBackend):
 
 @pytest.fixture(autouse=True)
 def _retry3_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("A9_PATIENT_SCOPE_AUTHORITY", "1")
     monkeypatch.setenv("TURN_PLANNER_LLM_MODEL", OWNER_APPROVED_PLANNER_MODEL)
     monkeypatch.setenv("MODEL_INGRESS_CLASSIFY", "qwen3.6-flash")
     monkeypatch.setenv("TARGET_FULLCONTEXT_BOUNDARY_MODEL", OWNER_APPROVED_PLANNER_MODEL)

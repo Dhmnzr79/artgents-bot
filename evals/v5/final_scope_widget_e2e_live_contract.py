@@ -32,7 +32,6 @@ MAX_COMPOSER_CALLS = 8
 MAX_VERIFIER_CALLS = 8
 RETRY_COUNT_MAX = 0
 
-REQUIRES_A9_PATIENT_SCOPE_AUTHORITY = True
 REQUIRES_PLANNER_MODEL_PLUS = True
 
 OWNER_APPROVED_INGRESS_MODEL = "qwen3.6-flash"
@@ -214,7 +213,6 @@ def build_attempt_marker_payload(
         "turns_git_blob_hash": turns_hash,
         "status": "attempt_started",
         "baseline_commit": baseline_commit,
-        "a9_patient_scope_authority": "1",
         "ingress_model": OWNER_APPROVED_INGRESS_MODEL,
         "planner_model": OWNER_APPROVED_PLANNER_MODEL,
         "boundary_model": OWNER_APPROVED_BOUNDARY_MODEL,
@@ -273,14 +271,6 @@ def assert_frozen_suite_unchanged() -> None:
 
 
 def assert_authority_env_before_import() -> None:
-    if os.environ.get("A9_PATIENT_SCOPE_AUTHORITY", "").strip().lower() not in {
-        "1",
-        "true",
-        "yes",
-    }:
-        raise AuthorityEnvError(
-            "A9_PATIENT_SCOPE_AUTHORITY must be 1 before config import for live E2E"
-        )
     planner = (os.environ.get("TURN_PLANNER_LLM_MODEL") or "").strip()
     if planner != OWNER_APPROVED_PLANNER_MODEL:
         raise AuthorityEnvError(
@@ -378,7 +368,6 @@ __all__ = [
     "OWNER_APPROVED_PLANNER_MODEL",
     "OWNER_APPROVED_VERIFIER_MODEL",
     "ProviderRoleViolationError",
-    "REQUIRES_A9_PATIENT_SCOPE_AUTHORITY",
     "REQUIRES_PLANNER_MODEL_PLUS",
     "RETRY_COUNT_MAX",
     "TURNS_PATH",

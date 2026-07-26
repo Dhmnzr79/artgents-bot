@@ -33,3 +33,4 @@ class TargetScopeAwareSelectionResult:
     offers_by_service_id: dict[str, tuple[TargetOffer, ...]] = field(default_factory=dict)
     anchors: tuple[TargetPriceAnchor, ...] = ()
     exclusions: tuple[str, ...] = ()
+    price_confirmed_extents: tuple[ScopeExtent, ...] = ()

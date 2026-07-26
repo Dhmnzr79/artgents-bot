@@ -49,5 +49,8 @@
       "action": "price_aspect"
     }
   ],
-  "brand_id": "nobel_biocare"
+  "brand_id": "nobel_biocare",
+  "applies_to_extents": [
+    "full_arch"
+  ]
 }

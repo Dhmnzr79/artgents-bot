@@ -64,7 +64,7 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_PRICE_AND_SERVICE_COVERAGE:** implementation COMPLETE @ `f5c5c96` — typed `family_prices.json` contract, deterministic family-only broad mode B, branches 1–3 verified via offline tests; rich demo unchanged.
 
-**FINAL_PRICE_SCOPE_COVERAGE_NAV:** governance @ `f5c5c96` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
+**FINAL_PRICE_SCOPE_COVERAGE_NAV:** implementation COMPLETE @ `031d766` — `applies_to_extents` on offers; AC2/AC3 filter anchors and scope-nav to confirmed price routes; `few_teeth` without route → data_gap.
 
 ---
 

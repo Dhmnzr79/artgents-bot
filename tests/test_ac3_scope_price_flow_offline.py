@@ -46,7 +46,12 @@ def test_broad_implantation_has_scope_nav_no_price_followups() -> None:
     result = _run_family_price(user_message="Сколько стоит имплантация?")
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.verified.spec.response_stage == "broad_family_price"
-    assert len(result.verified.navigation_followups) == 3
+    assert len(result.verified.navigation_followups) == 2
+    refs = {item.ref for item in result.verified.navigation_followups}
+    assert refs == {
+        "target:ui_scope/implantation/one_tooth",
+        "target:ui_scope/implantation/full_arch",
+    }
     assert result.verified.selected_followups.price == ()
 
 
@@ -120,7 +125,12 @@ def test_broad_prosthetics_materializes_when_planner_needs_clarify() -> None:
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.verified.spec.response_stage == "broad_family_price"
-    assert len(result.verified.navigation_followups) == 3
+    assert len(result.verified.navigation_followups) == 2
+    refs = {item.ref for item in result.verified.navigation_followups}
+    assert refs == {
+        "target:ui_scope/prosthetics/few_teeth",
+        "target:ui_scope/prosthetics/full_arch",
+    }
 
 
 def test_full_arch_scoped_has_no_scope_nav() -> None:
@@ -166,7 +176,12 @@ def test_topic_change_clears_scope_and_restores_broad_nav() -> None:
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.verified.spec.response_stage == "broad_family_price"
-    assert len(result.verified.navigation_followups) == 3
+    assert len(result.verified.navigation_followups) == 2
+    refs = {item.ref for item in result.verified.navigation_followups}
+    assert refs == {
+        "target:ui_scope/prosthetics/few_teeth",
+        "target:ui_scope/prosthetics/full_arch",
+    }
 
 
 def test_broad_answer_has_no_price_followups() -> None:

@@ -9,6 +9,7 @@ from contracts.response_schema import (
     TargetOffer,
     TargetStrategyMatch,
 )
+from core.target_offer_extent_applicability import filter_offers_for_extent
 from core.response_strategy import resolve_target_strategy
 from core.service_data_context import ServiceDataContext
 
@@ -77,6 +78,16 @@ def project_target_service_offers(
                 if options_by_id[offer.option_id].active is False:
                     continue
             eligible_offers.append(offer)
+
+    patient_extent = strategy_context.extent
+    if patient_extent is not None:
+        eligible_offers = list(
+            filter_offers_for_extent(
+                tuple(eligible_offers),
+                service_context.service,
+                patient_extent,  # type: ignore[arg-type]
+            )
+        )
 
     resolution = resolve_target_strategy(
         strategy,

@@ -244,7 +244,7 @@ def test_implantation_family_price_overview_materializes_via_pipeline() -> None:
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.dispatch.policy_request.response_stage == "broad_family_price"
     assert result.dispatch.policy_request.scope_price_topic == "implantation"
-    assert len(result.verified.navigation_followups) == 3
+    assert len(result.verified.navigation_followups) == 2
     assert len(composer.invocations) == 1
     evidence = __import__("json").loads(composer.invocations[0].primary_evidence_json)
     assert len(evidence) >= 2

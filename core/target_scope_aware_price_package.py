@@ -122,12 +122,16 @@ def _build_materials(
     if not offers:
         _error("scope_price_no_offers", selection.exclusions)
     service_ids = _family_service_ids(selection)
-    primary_service_id = service_ids[0] if len(service_ids) == 1 else None
-    primary_service = (
-        bundle.services[primary_service_id].model_copy(deep=True)
-        if primary_service_id is not None
-        else None
-    )
+    if selection.kind == "broad_anchors":
+        primary_service_id = None
+        primary_service = None
+    else:
+        primary_service_id = service_ids[0] if len(service_ids) == 1 else None
+        primary_service = (
+            bundle.services[primary_service_id].model_copy(deep=True)
+            if primary_service_id is not None
+            else None
+        )
     if not include_payment_stages:
         offers = tuple(
             offer.model_copy(
@@ -303,7 +307,11 @@ def assemble_scope_aware_price_package(
         navigation = (
             ()
             if family_only_broad
-            else materialize_scope_nav_followups(client_id, topic=topic)
+            else materialize_scope_nav_followups(
+                client_id,
+                topic=topic,
+                confirmed_extents=selection.price_confirmed_extents,
+            )
         )
         followup_source = None
     elif stage == "concrete_service_price" and can_collapse_to_concrete_service(selection):

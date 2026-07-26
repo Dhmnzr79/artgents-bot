@@ -2427,17 +2427,17 @@ git diff --check
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `f5c5c96` |
-| PRE-CODE | pending |
-| Seam audit | pending |
-| Implementation | **STOP** |
+| PRE-CODE | ✅ @ `031d766` |
+| Seam audit | ✅ |
+| Implementation | ✅ COMPLETE |
 
 ---
 
 # TASK — FINAL_PRICE_SCOPE_COVERAGE_NAV (implementation)
 
-**Status:** blocked until governance PRE-CODE ✅
+**Status:** COMPLETE
 
-**Baseline:** governance COMPLETION @ `f5c5c96`
+**Baseline:** governance `031d766`
 
 ## Tests (COMPLETION — after implementation)
 
@@ -2463,8 +2463,8 @@ git diff --check
 
 | Field | Value |
 |-------|-------|
-| Baseline HEAD | pending |
-| COMPLETION | pending |
-| Acceptance A–J | pending |
-| Frozen artifacts | pending |
+| Baseline HEAD | `031d766` |
+| COMPLETION | ✅ 105 passed (focused + safe-wide offline) |
+| Acceptance A–J | ✅ |
+| Frozen artifacts | ✅ unchanged |
 

@@ -47,5 +47,8 @@
       "action": "price_aspect"
     }
   ],
-  "brand_id": "impro"
+  "brand_id": "impro",
+  "applies_to_extents": [
+    "one_tooth"
+  ]
 }

@@ -21,5 +21,8 @@
     "installment_12"
   ],
   "followups": [],
-  "option_id": "full"
+  "option_id": "full",
+  "applies_to_extents": [
+    "full_arch"
+  ]
 }

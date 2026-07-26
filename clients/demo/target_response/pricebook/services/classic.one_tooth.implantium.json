@@ -47,5 +47,8 @@
       "action": "price_aspect"
     }
   ],
-  "brand_id": "implantium"
+  "brand_id": "implantium",
+  "applies_to_extents": [
+    "one_tooth"
+  ]
 }

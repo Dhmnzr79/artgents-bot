@@ -21,5 +21,8 @@
     "installment_12"
   ],
   "followups": [],
-  "option_id": "partial"
+  "option_id": "partial",
+  "applies_to_extents": [
+    "few_teeth"
+  ]
 }

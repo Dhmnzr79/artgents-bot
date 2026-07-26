@@ -140,6 +140,11 @@ def _scoped_selection(
         service_ids=resolution.service_ids,
         offers_by_service_id=offers_by_service,
         exclusions=tuple(exclusions),
+        price_confirmed_extents=(
+            (patient.extent,)  # type: ignore[return-value]
+            if offers_by_service and patient.extent is not None
+            else ()
+        ),
     )
 
 
@@ -190,27 +195,33 @@ def _broad_anchor_selection(
         if not resolution.service_ids:
             exclusions.append(f"no_anchor_ranked:{extent}")
             continue
-        top_service_id = resolution.service_ids[0]
-        offers = _project_offers_for_service(
-            bundle,
-            doctor_catalog,
-            service_id=top_service_id,
-            strategy_context=scoped_strategy,
-            selected_option_id=None,
-            selected_brand_id=None,
-            explicit_offer_id=None,
-        )
-        if not offers or offers[0].price.mode not in {"fixed", "from", "range"}:
+        anchor_offer = None
+        anchor_service_id = None
+        for top_service_id in resolution.service_ids:
+            offers = _project_offers_for_service(
+                bundle,
+                doctor_catalog,
+                service_id=top_service_id,
+                strategy_context=scoped_strategy,
+                selected_option_id=None,
+                selected_brand_id=None,
+                explicit_offer_id=None,
+            )
+            if offers and offers[0].price.mode in {"fixed", "from", "range"}:
+                anchor_offer = offers[0]
+                anchor_service_id = top_service_id
+                break
+        if anchor_offer is None:
             exclusions.append(f"no_anchor_offers:{extent}")
             continue
         anchors.append(
             TargetPriceAnchor(
                 extent=extent,
-                service_id=top_service_id,
-                offer_id=offers[0].offer_id,
+                service_id=anchor_service_id,
+                offer_id=anchor_offer.offer_id,
             )
         )
-        anchor_service_ids.append(top_service_id)
+        anchor_service_ids.append(anchor_service_id)
 
     if not anchors:
         family_records = list_family_prices_for_topic(bundle, topic)
@@ -234,6 +245,7 @@ def _broad_anchor_selection(
         offers_by_service_id={},
         anchors=tuple(anchors),
         exclusions=tuple(exclusions),
+        price_confirmed_extents=tuple(anchor.extent for anchor in anchors),
     )
 
 

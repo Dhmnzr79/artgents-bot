@@ -60,10 +60,16 @@ def materialize_scope_nav_followups(
     client_id: str,
     *,
     topic: str,
+    confirmed_extents: tuple[ScopeExtent, ...] | None = None,
 ) -> tuple[TargetNavigationFollowup, ...]:
     labels = load_scope_nav_labels(client_id, topic=topic)
+    extent_order: tuple[ScopeExtent, ...] = (
+        confirmed_extents
+        if confirmed_extents is not None
+        else ("one_tooth", "few_teeth", "full_arch")
+    )
     items: list[TargetNavigationFollowup] = []
-    for extent in ("one_tooth", "few_teeth", "full_arch"):
+    for extent in extent_order:
         label = labels.get(extent)
         if not label:
             continue

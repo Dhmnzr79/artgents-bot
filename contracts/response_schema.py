@@ -288,11 +288,25 @@ class TargetOffer(TargetSchemaModel):
     option_id: NonBlankStr | None = None
     brand_id: NonBlankStr | None = None
     active: bool = True
+    applies_to_extents: list[PatientExtent] | None = None
     price: TargetPrice
     package: TargetPricePackage
     payment_stages: list[TargetPaymentStage] | None = None
     fact_refs: list[NonBlankStr] = Field(default_factory=list)
     followups: list[TargetPriceFollowup] = Field(default_factory=list)
+
+    @field_validator("applies_to_extents", mode="after")
+    @classmethod
+    def _applies_to_extents_unique(
+        cls, value: list[str] | None
+    ) -> list[str] | None:
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("offer_applies_to_extents_empty")
+        if _duplicates(value):
+            raise ValueError("offer_applies_to_extents_duplicate")
+        return value
 
     @field_validator("payment_stages", mode="after")
     @classmethod

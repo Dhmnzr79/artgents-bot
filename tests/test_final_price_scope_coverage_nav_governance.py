@@ -74,8 +74,8 @@ def test_frozen_artifact_guards() -> None:
     assert_frozen_retry4_live_artifacts_unchanged()
 
 
-def test_implementation_module_not_started_pre_code() -> None:
+def test_implementation_artifacts_present_post_phase2() -> None:
     impl_test = _REPO_ROOT / "tests" / "test_final_price_scope_coverage_nav_implementation.py"
     extent_module = _REPO_ROOT / "core" / "target_offer_extent_applicability.py"
-    assert not impl_test.is_file(), "implementation tests must not exist before PRE-CODE"
-    assert not extent_module.is_file(), "product module must not exist before PRE-CODE"
+    assert impl_test.is_file(), "implementation tests must exist after Phase 2"
+    assert extent_module.is_file(), "extent applicability module must exist after Phase 2"

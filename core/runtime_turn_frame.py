@@ -113,6 +113,35 @@ def publish_planner_attempt_frame(*, attempt: PlannerAttempt) -> TurnFrame | Non
     if frame is None:
         _mark_runtime_turn_frame_degraded(ctx)
         return None
+    return _publish_runtime_turn_frame_snapshot(
+        ctx,
+        frame=frame,
+        status=status,
+        typed_ui=False,
+    )
+
+
+def publish_typed_ui_turn_frame(frame: TurnFrame) -> TurnFrame | None:
+    """Store governed UI-built TurnFrame on request ctx without planner involvement."""
+
+    ctx = _ctx()
+    if ctx is None:
+        return None
+    return _publish_runtime_turn_frame_snapshot(
+        ctx,
+        frame=frame,
+        status=RUNTIME_FRAME_STATUS_OK,
+        typed_ui=True,
+    )
+
+
+def _publish_runtime_turn_frame_snapshot(
+    ctx: dict[str, Any],
+    *,
+    frame: TurnFrame,
+    status: str,
+    typed_ui: bool,
+) -> TurnFrame | None:
     try:
         snapshot = frame.model_dump()
     except Exception:
@@ -122,7 +151,25 @@ def publish_planner_attempt_frame(*, attempt: PlannerAttempt) -> TurnFrame | Non
     ctx[_CTX_FRAME] = snapshot
     ctx[_CTX_STATUS] = status
     ctx.pop(_CTX_REASON, None)
+    ctx["typed_ui_turn_frame_used"] = typed_ui
+    ctx["turn_planner_used"] = not typed_ui
     _mirror_shadow_telemetry_aliases(ctx, status=status, snapshot=snapshot, reason=None)
+    if typed_ui:
+        try:
+            emit_bot_event(
+                logger,
+                "typed_ui_turn_frame_used",
+                status=RUNTIME_FRAME_STATUS_OK,
+                details={
+                    "runtime_turn_frame_status": status,
+                    "typed_ui_turn_frame_used": True,
+                    "topic": frame.topic,
+                    "intent": frame.intent,
+                    "needs_clarification": frame.needs_clarification,
+                },
+            )
+        except Exception:
+            pass
     return frame
 
 

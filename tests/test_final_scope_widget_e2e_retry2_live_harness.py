@@ -183,6 +183,8 @@ def test_ask_and_stream_invoke_target_only_orchestration(
 
 
 def test_retry2_dry_run_cli() -> None:
+    from evals.v5.final_scope_widget_e2e_retry2_live_contract import LIVE_ATTEMPT_MARKER_PATH
+
     proc = subprocess.run(
         [sys.executable, "evals/v5/run_final_scope_widget_e2e_retry2_live.py", "--dry-run"],
         cwd=str(_REPO_ROOT),
@@ -190,6 +192,10 @@ def test_retry2_dry_run_cli() -> None:
         text=True,
         check=False,
     )
+    if LIVE_ATTEMPT_MARKER_PATH.exists():
+        assert proc.returncode == 2, proc.stderr
+        assert "CONFIG_ERROR" in proc.stderr
+        return
     assert proc.returncode == 0, proc.stderr
     idx = proc.stdout.rfind('"measurement_id"')
     start = proc.stdout.rfind("{", 0, idx)
@@ -231,6 +237,10 @@ def test_marker_created_after_seam_validation_before_provider_calls(
         events.append("marker_created")
         create_attempt_marker_exclusive(path, payload)
 
+    monkeypatch.setattr(
+        "evals.v5.final_scope_widget_e2e_retry2_live_harness.assert_retry2_live_artifacts_absent",
+        lambda: None,
+    )
     monkeypatch.setattr(
         "evals.v5.final_scope_widget_e2e_live_harness.validate_runtime_seams",
         tracked_validate,

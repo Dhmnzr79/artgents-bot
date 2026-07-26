@@ -47,6 +47,7 @@ from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from orchestration.planner_turn import run_planner_turn
+from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
 from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
@@ -303,13 +304,19 @@ def _orchestrate_ask_turn(data: dict):
     if isinstance(pre, AskOrchestrationResult):
         return pre
 
-    run_planner_turn(
-        q=pre.q,
+    typed_outcome = try_run_typed_ui_planner_turn(
         sid=pre.sid,
         client_id=pre.client_id,
-        st=pre.st,
         enqueue_resolver_trace=_enqueue_v5_resolver_trace,
     )
+    if typed_outcome is None:
+        run_planner_turn(
+            q=pre.q,
+            sid=pre.sid,
+            client_id=pre.client_id,
+            st=pre.st,
+            enqueue_resolver_trace=_enqueue_v5_resolver_trace,
+        )
 
     return orchestrate_target_fullcontext_turn(
         q=pre.q,

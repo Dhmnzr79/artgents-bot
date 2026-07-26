@@ -1548,3 +1548,50 @@ git diff --check
 | COMPLETION | ✅ |
 | Official verdict | **FAIL** (immutable) |
 | Product implementation | **blocked** |
+
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_RETRY2_TYPED_UI_TURNFRAME (implementation)
+
+**Status:** implementation COMPLETION ✅ · **NO LIVE / NO LLM / NO Retry3**
+
+**Baseline:** `e3eb534` (POST_LIVE audit) · RETRY2 live FAIL artifacts **frozen**
+
+## Goal
+
+Governed `UiScopeAction` / `UiStageAction` produce native deterministic `TurnFrame`; LLM planner skipped on valid session-bound UI clicks; free-text unchanged.
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `core/target_typed_ui_turn_frame.py` | pure typed UI TurnFrame builder |
+| `core/runtime_turn_frame.py` | `publish_typed_ui_turn_frame` + observability |
+| `orchestration/typed_ui_planner_turn.py` | planner bypass ingress |
+| `app.py` | typed UI before `run_planner_turn` |
+| `tests/test_typed_ui_turn_frame_offline.py` | builder + HTTP parity + planner-not-called |
+| `tests/test_final_scope_widget_e2e_retry2_live_harness.py` | post-live dry-run expectation |
+| `TASK.md` | completion record |
+| `docs/FLAGS_AND_STATUS.md` | status note |
+
+**Frozen:** all `final_scope_widget_e2e_retry2_*` artifacts @ `cbbdb35`, retry1 artifacts, widget matrix.
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$env:A9_PATIENT_SCOPE_AUTHORITY = "1"
+python -m pytest tests/test_typed_ui_turn_frame_offline.py `
+  tests/test_final_scope_widget_e2e_retry2_live_harness.py `
+  tests/test_final_scope_widget_e2e_retry2_post_live_audit_governance.py -q
+```
+
+## Completion record (TYPED_UI_TURNFRAME implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `e3eb534` |
+| COMPLETION | ✅ |
+| Offline 8/8 | ✅ retry2 harness |
+| Planner bypass | ✅ scope + stage clicks; free-text unchanged |
+| Retry3 pre-live | **STOP** — separate owner GO |

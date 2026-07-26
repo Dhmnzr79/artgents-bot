@@ -1978,3 +1978,98 @@ git diff --check
 
 **STOP.** Owner manual review required before closeout.
 
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_CLOSEOUT (governance)
+
+**Status:** governance COMPLETION ✅ · **NO LIVE / NO LLM / NO Retry5 / NO product code**
+
+**Baseline:** `5ff9893` (`codex/stage-a`)
+
+**Prerequisites:**
+- Retry4 live `AUTOMATED_PASS` 8/8 @ `084203e` (artifacts frozen @ `5ff9893`)
+- Owner manual verdict: **PASS 8/8** (canonical product verdict)
+
+Seam audits:
+- `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY4_MANUAL_REVIEW_AUDIT.md` (Checkpoint A)
+- `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_CLOSEOUT_SEAM_AUDIT.md` (Checkpoint B design)
+
+## Goal
+
+Capture owner manual PASS as append-only audit with SHA pins to frozen Retry4 result/manifest/matrix. Design post-E2E closeout (A9 flag removal, unconditional projection/merge) without implementation.
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY4_MANUAL_REVIEW_AUDIT.md` | Checkpoint A — owner manual PASS |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_CLOSEOUT_SEAM_AUDIT.md` | Checkpoint B — read-only closeout design |
+| `docs/FLAGS_AND_STATUS.md` | closeout governance status |
+| `tests/test_final_scope_widget_e2e_closeout_governance.py` | PRE-CODE checker |
+
+**Frozen (byte-identical):** all Retry1–Retry4 live artifacts, A9/A9R/S-series eval artifacts, widget matrix, Retry4 `result.json` (`PENDING_MANUAL_REVIEW` capture).
+
+## Forbidden
+
+- LIVE / LLM / Retry5
+- Product code changes (incl. removing `A9_PATIENT_SCOPE_AUTHORITY` — **implementation** phase only)
+- Verifier changes
+- A9 prompt tuning
+- regex/phrase lists
+- new selectors/routes
+- Editing frozen Retry4 (or prior) live artifacts
+- admin/log implementation
+
+## Checkpoint A — manual PASS capture (binding)
+
+| Rule | Value |
+|------|-------|
+| Canonical owner verdict | **PASS 8/8** |
+| Frozen `result.json` `final_verdict` | `PENDING_MANUAL_REVIEW` (not edited) |
+| T1 compact | 704 chars accepted |
+| T6 wording | non-blocking defer |
+| T7 25k vs 31k | grounded; clearer explanation deferred |
+| WinError 32 rollover | deferred; not product blocker |
+
+## Checkpoint B — closeout design (implementation blocked)
+
+1. Remove `A9_PATIENT_SCOPE_AUTHORITY` from config, env, docs, tests, harness.
+2. Unconditional `project_patient_scope_from_turn_frame` + `merge_effective_scope_axes`.
+3. Planner default `qwen3.7-plus` unchanged.
+4. Authority axes: extent / jaw / stage only; `reported_context` excluded from product/session.
+5. Priority: typed UI > confident A9 current turn > fresh session > unknown.
+6. Unknown/ambiguous does not erase session.
+7. Session write only after materialized response.
+8. Terminal/error/verifier block do not persist scope.
+9. AC1→AC2→AC3 + typed UI TurnFrame unchanged.
+10. Acceptance: explicit axes, All-on-4 no scope, correction replaces axis, UI priority, freshness/SID, `/ask`+`/ask/stream` parity, no legacy, `rg` zero `A9_PATIENT_SCOPE_AUTHORITY`.
+
+## Tests (PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-closeout-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_closeout_governance.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py `
+  tests/test_final_scope_post_retry3_composer_action_context_governance.py `
+  tests/test_final_scope_widget_e2e_retry3_governance.py -q
+git diff --check
+```
+
+**STOP after COMPLETION ✅. Closeout implementation is separate owner GO.**
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E_CLOSEOUT governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `5ff9893` |
+| PRE-CODE | ✅ |
+| Checkpoint A manual PASS audit | ✅ `FINAL_SCOPE_WIDGET_E2E_RETRY4_MANUAL_REVIEW_AUDIT.md` |
+| Checkpoint B closeout seam audit | ✅ `FINAL_SCOPE_WIDGET_E2E_CLOSEOUT_SEAM_AUDIT.md` |
+| Retry4 artifacts | frozen unchanged (`PENDING_MANUAL_REVIEW` capture) |
+| Canonical owner verdict | **PASS 8/8** |
+| A9 flag | **kept** until implementation GO |
+| Closeout implementation | **STOP** |
+

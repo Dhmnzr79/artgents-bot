@@ -57,7 +57,9 @@
 
 **FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT:** implementation COMPLETION ✅ @ `6b67e35`; `TargetComposerActionContext` wired to Composer directives/invocation; `price:None` fail-closed; offline T1–T8 pass.
 
-**FINAL_SCOPE_WIDGET_E2E_RETRY4:** live AUTOMATED_PASS 8/8 @ `084203e`; immutable artifacts pinned; manual review PENDING; rerun blocked.
+**FINAL_SCOPE_WIDGET_E2E_RETRY4:** live AUTOMATED_PASS 8/8 + owner manual **PASS 8/8** @ `5ff9893`; immutable artifacts pinned.
+
+**FINAL_SCOPE_WIDGET_E2E_CLOSEOUT:** governance checkpoint @ `5ff9893` — manual PASS audit + closeout seam design; **A9 flag kept**; implementation **STOP** until separate owner GO.
 
 ---
 

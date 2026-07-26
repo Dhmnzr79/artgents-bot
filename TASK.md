@@ -2151,3 +2151,171 @@ git diff --check
 | Offline pytest | ✅ 74 passed |
 | **FINAL_SCOPE_CLOSEOUT_COMPLETE** | ✅ |
 
+---
+
+# TASK — FINAL_PRICE_AND_SERVICE_COVERAGE (governance)
+
+**Status:** governance COMPLETION pending · **NO LIVE / NO LLM / NO Retry5 / NO product code**
+
+**Baseline:** `696f77d` (`codex/stage-a`) · **FINAL_SCOPE_CLOSEOUT_COMPLETE**
+
+**Owner GO:** Phase 1 governance + PRE-CODE only. Implementation blocked until PRE-CODE ✅.
+
+Seam audit: `docs/evidence/price_service/FINAL_PRICE_AND_SERVICE_COVERAGE_SEAM_AUDIT.md`
+Canonical law: `docs/PRICE_SERVICE_ARCHITECTURE.md`
+
+## Goal
+
+Architecturally close four price/service coverage situations without breaking rich demo pricebook paths. Separate service presence, catalog detail, and price detail. Add typed **family-level price** for limited-data packs; verify existing `no_public_price`, `service_not_offered`, and clinic-authored alternatives through FullContext runtime — fix product code only on proven gap.
+
+## Four situations (binding)
+
+| # | Situation | Approach |
+|---|-----------|----------|
+| 1 | Service exists, no public price | Preserve `no_public_price` + `approved_text`; verify + offline coverage |
+| 2 | Not offered + authored alternative | Preserve ingress + `clinic_policies.yaml`; verify + offline coverage |
+| 3 | Not offered, no alternative | Preserve ingress template; verify + offline coverage |
+| 4 | Family-only price (detailed or umbrella catalog) | New `pricebook/family_prices.json` + deterministic broad mode A/B |
+
+## Price precedence (binding)
+
+1. Service-specific price
+2. Typed `no_public_price`
+3. Family-level price
+4. Controlled data-gap (no numbers)
+
+Family price **never** becomes a named protocol price.
+
+## Broad family price modes (data-driven)
+
+| Mode | Signal | Behavior |
+|------|--------|----------|
+| A | Scope-specific authored prices exist | Existing AC2/AC3 + scope-nav buttons |
+| B | Only family-level price | Single family price; no scope-nav without finer prices |
+
+## Canonical data contract (implementation)
+
+```
+clients/<client_id>/target_response/pricebook/family_prices.json
+```
+
+Fields: `topic`, `price` (`from`/`fixed`/`range`), `applies_to_service_ids`, `approved_context`. Loaded into `ResponseSchemaBundle` — **no synthetic family service**.
+
+## Allowlist (governance)
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/price_service/FINAL_PRICE_AND_SERVICE_COVERAGE_SEAM_AUDIT.md` | read-only seam audit |
+| `docs/FLAGS_AND_STATUS.md` | milestone status note |
+| `tests/test_final_price_and_service_coverage_governance.py` | PRE-CODE checker |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅)
+
+| File | Role |
+|------|------|
+| `contracts/response_schema.py` | `TargetFamilyPrice` + bundle field |
+| `core/response_schema_loader.py` | load `family_prices.json` |
+| `core/target_family_price_resolution.py` | precedence + broad mode A/B |
+| `core/target_scope_aware_selection.py` | family-only anchor path |
+| `core/target_scope_aware_price_package.py` | suppress scope-nav mode B |
+| `core/target_response_stage.py` | stage signals if needed |
+| `core/target_response_policy.py` | family-only composer directive |
+| `tests/test_final_price_and_service_coverage_implementation.py` | focused acceptance A–L |
+| `tests/test_final_price_and_service_coverage_sparse_fixtures.py` | in-memory sparse packs |
+| `tests/test_final_price_and_service_coverage_existing_paths.py` | branches 1–3 verify |
+
+**Frozen (byte-identical):** Retry1–4 live artifacts, A9/A9R/S-series, W1b checksums, widget matrix.
+
+## Forbidden
+
+- LIVE / LLM / Retry5
+- A9 / Planner prompt tuning
+- Verifier redesign
+- regex/phrase stop-lists
+- second selector, thresholds, voting, retry
+- new LLM calls, feature flags, parallel price authority
+- hardcode implantation/prosthetics in shared core
+- new parallel handlers for branches 1–3
+- editing frozen live artifacts
+- W1b restore
+- fictional runtime client packs (sparse data = in-memory test fixtures only)
+
+## Acceptance matrix (implementation)
+
+| ID | Case |
+|----|------|
+| A | Rich demo — existing behavior equivalent |
+| B | Service-specific price beats family price |
+| C | `no_public_price` beats family fallback |
+| D | Detailed catalog + family-only price — broad family; no false protocol price |
+| E | Umbrella service + family-only — family price; no scope buttons; protocol not confirmed separately |
+| F | Not offered + authored alternative — controlled + approved ref only |
+| G | Not offered, no alternative — plain controlled; no substitute buttons |
+| H | Exists + typed `no_public_price` — `approved_text`; no invented numbers |
+| I | Exists, price record missing — data-gap; no cross-service price |
+| J | `/ask` + `/ask/stream` parity |
+| K | Full rich pricebook — broad/scoped/concrete unchanged |
+| L | No `price:None/...`, false scope refs, legacy routes |
+
+## Tests (PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fpsc-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_price_and_service_coverage_governance.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+git diff --check
+```
+
+**STOP after PRE-CODE ✅. Implementation is separate step in same milestone.**
+
+## Completion record (FINAL_PRICE_AND_SERVICE_COVERAGE governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `696f77d` |
+| PRE-CODE | pending |
+| Seam audit | pending |
+| Implementation | **STOP** |
+
+---
+
+# TASK — FINAL_PRICE_AND_SERVICE_COVERAGE (implementation)
+
+**Status:** blocked until governance PRE-CODE ✅
+
+**Baseline:** governance COMPLETION @ `696f77d`
+
+## Tests (COMPLETION — after implementation)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fpsc-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_price_and_service_coverage_implementation.py `
+  tests/test_final_price_and_service_coverage_sparse_fixtures.py `
+  tests/test_final_price_and_service_coverage_existing_paths.py `
+  tests/test_final_price_and_service_coverage_governance.py `
+  tests/test_ac3_scope_price_flow_offline.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_w1_family_price_overview_offline.py `
+  tests/test_a9r3_product_authority_offline.py `
+  tests/test_final_scope_widget_e2e_retry4_live_harness.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+python -m pytest --collect-only -q
+git diff --check
+```
+
+## Completion record (FINAL_PRICE_AND_SERVICE_COVERAGE implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | pending |
+| COMPLETION | pending |
+| Acceptance A–L | pending |
+| Frozen artifacts | pending |
+

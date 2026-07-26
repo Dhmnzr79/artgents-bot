@@ -60,7 +60,9 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_SCOPE_WIDGET_E2E_RETRY4:** live AUTOMATED_PASS 8/8 + owner manual **PASS 8/8** @ `5ff9893`; immutable artifacts pinned.
 
-**FINAL_SCOPE_WIDGET_E2E_CLOSEOUT:** **FINAL_SCOPE_CLOSEOUT_COMPLETE** ✅ — A9 kill-switch removed; unconditional patient-scope authority; frozen Retry4 artifacts unchanged.
+**FINAL_SCOPE_WIDGET_E2E_CLOSEOUT:** **FINAL_SCOPE_CLOSEOUT_COMPLETE** ✅ — A9 kill-switch removed; unconditional patient-scope authority.
+
+**FINAL_PRICE_AND_SERVICE_COVERAGE:** governance @ `696f77d` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
 
 ---
 

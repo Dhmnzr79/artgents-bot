@@ -2468,3 +2468,166 @@ git diff --check
 | Acceptance A–J | ✅ |
 | Frozen artifacts | ✅ unchanged |
 
+---
+
+# TASK — FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY (governance)
+
+**Status:** governance COMPLETION pending · **NO LIVE / NO LLM / NO A9 tuning / NO product code**
+
+**Baseline:** `2b5e90d` (`codex/stage-a`) · **FINAL_PRICE_SCOPE_COVERAGE_NAV complete**
+
+**Owner GO:** Phase 1 governance + PRE-CODE only. Implementation blocked until PRE-CODE ✅.
+
+Seam audit: `docs/evidence/price_service/FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY_SEAM_AUDIT.md`
+Canonical law: `docs/PRICE_SERVICE_ARCHITECTURE.md`
+
+## Goal
+
+Fix prosthetics price navigation: `one_tooth` must be **navigable** when price is reachable via exactly one existing governed `UiStageAction`, without breaking implantation scope-nav or full pricebook paths.
+
+## Problem (binding)
+
+`price_confirmed_extents` today = immediate AC2 anchors only. Prosthetics `one_tooth` needs stage (`natural_tooth_present` → 25k; `implant_placed` → 31k) but broad nav hides the button.
+
+## Concepts (binding)
+
+| Term | Meaning |
+|------|---------|
+| **Immediate coverage** | Direct AC2 numeric offer or `no_public_price` for extent + known stage |
+| **Navigable coverage** | Immediate OR one-hop `discover_stage_clarification_stages()` + AC2 confirmed offer |
+
+Scope buttons use **navigable**; broad text anchors use **immediate** (owner demo price list).
+
+## Reachability algorithm (binding)
+
+Per authored extent:
+
+1. AC2 with extent + current stage → immediate if offer/`no_public_price`
+2. Else `discover_stage_clarification_stages()` → for each stage, AC2 trial
+3. If any stage path confirmed → navigable
+4. Max depth: **one** stage; no recursion; no LLM
+
+## Rules (binding)
+
+- Remove `offer_id` inference from `target_offer_extent_applicability.py`
+- Explicit `applies_to_extents` on rich-demo priced offers
+- No regex / phrase lists / new medical axes / second selector
+- Reuse AC1→AC2→AC3, `UiScopeAction`, `UiStageAction`, existing stage clarify
+- Implantation `few_teeth` stays hidden without confirmed path
+
+## Allowlist (governance)
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/price_service/FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY_SEAM_AUDIT.md` | seam audit |
+| `docs/FLAGS_AND_STATUS.md` | milestone note |
+| `tests/test_final_prosthetics_price_nav_reachability_governance.py` | PRE-CODE checker |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅)
+
+| File | Role |
+|------|------|
+| `core/target_offer_price_reachability.py` | immediate + navigable helper |
+| `core/target_offer_extent_applicability.py` | remove offer_id inference |
+| `contracts/target_scope_aware_selection.py` | `price_navigable_extents` |
+| `core/target_scope_aware_selection.py` | reachability integration |
+| `core/target_scope_aware_price_package.py` | navigable scope-nav |
+| `clients/demo/target_response/pricebook/services/zirconia_crowns.default.json` | explicit extents |
+| `clients/demo/target_response/pricebook/services/implant_supported_prosthetics.default.json` | explicit extents |
+| `clients/demo/target_response/pricebook/services/*.json` | remaining explicit `applies_to_extents` as needed |
+| `tests/test_final_prosthetics_price_nav_reachability_implementation.py` | acceptance 1–16 |
+| `tests/test_final_prosthetics_price_nav_reachability_sparse_fixtures.py` | in-memory sparse packs |
+
+**Frozen (byte-identical):** Retry1–4, A9/A9R/S-series, W1b, widget matrix.
+
+## Forbidden
+
+- LIVE / LLM / A9 tuning / Planner prompt changes
+- Verifier redesign
+- regex / phrase stop-lists
+- recursive stage tree / new medical axes / second selector
+- frozen live artifact edits
+- W1b restore
+
+## Acceptance matrix (implementation)
+
+| ID | Case |
+|----|------|
+| 1 | Prosthetics broad → `one_tooth` navigable via stage |
+| 2 | `one_tooth + natural_tooth_present` → 25 000 ₽ |
+| 3 | `one_tooth + implant_placed` → 31 000 ₽ |
+| 4 | Prosthetics broad → partial denture 45 000 ₽ |
+| 5 | Prosthetics broad → full denture 65 000 ₽ |
+| 6 | Scope buttons without duplicates |
+| 7 | Stage click — planner not called |
+| 8 | Invalid/unshown ref — fail-closed |
+| 9 | Implantation `few_teeth` stays hidden |
+| 10 | Implantation one tooth / full arch unchanged |
+| 11 | No `offer_id` inference for applicability |
+| 12 | Sparse: only one-tooth route → one button |
+| 13 | Sparse: stage-only path → button shown |
+| 14 | Sparse: stage paths without prices → hidden |
+| 15 | `/ask` + `/ask/stream` parity |
+| 16 | Rich pricebook + frozen artifacts unchanged |
+
+## Tests (PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-ppr-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_prosthetics_price_nav_reachability_governance.py `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+git diff --check
+```
+
+**STOP after PRE-CODE ✅.**
+
+## Completion record (FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `2b5e90d` |
+| PRE-CODE | pending |
+| Seam audit | pending |
+| Implementation | **STOP** |
+
+---
+
+# TASK — FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY (implementation)
+
+**Status:** blocked until governance PRE-CODE ✅
+
+**Baseline:** governance COMPLETION @ `2b5e90d`
+
+## Tests (COMPLETION — after implementation)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-ppr-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_prosthetics_price_nav_reachability_implementation.py `
+  tests/test_final_prosthetics_price_nav_reachability_sparse_fixtures.py `
+  tests/test_final_prosthetics_price_nav_reachability_governance.py `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_final_price_and_service_coverage_implementation.py `
+  tests/test_ac3_scope_price_flow_offline.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+python -m pytest --collect-only -q
+git diff --check
+```
+
+## Completion record (FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | pending |
+| COMPLETION | pending |
+| Acceptance 1–16 | pending |
+| Frozen artifacts | pending |
+

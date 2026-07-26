@@ -2818,8 +2818,8 @@ git diff --check
 
 # TASK — FINAL_CLIENT_PACK_DATA_CONVERGENCE (governance)
 
-**Status:** Checkpoint A implementation ✅ @ `c7c2756` (reader cutover); Checkpoint B blocked
-**Baseline:** `c7c2756`
+**Status:** Checkpoint A ✅ @ `e3730ea`; Checkpoint B governance PRE-CODE (implementation blocked)
+**Baseline:** `e3730ea` (`codex/stage-a`)
 **Mode:** governance/docs/tests only · **NO LIVE / NO LLM / NO A9 tuning**
 
 ## Goal
@@ -2900,41 +2900,183 @@ Required behavior:
 
 **STOP after A checker → commit/push. Checkpoint B requires separate owner GO.**
 
-## Checkpoint B — delete mirrors and close authoring
+Post-A seam audit:
+`docs/evidence/client_pack/FINAL_CLIENT_PACK_DATA_CONVERGENCE_B_SEAM_AUDIT.md`.
 
-Implementation is blocked until Checkpoint A checker ✅, commit/push and separate owner GO.
+## Checkpoint B — governance (PRE-CODE only)
 
-### Mandatory data deletion
+**Owner GO:** received. **Implementation/delete:** blocked until B PRE-CODE ✅.
+
+### DELETE list — legacy data (27 files)
 
 - `clients/demo/service_catalog.json`
-- `clients/demo/pricebook/**`
 - `clients/demo/marketing.yaml`
 - `clients/demo/price_brand_aliases.json`
+- `clients/demo/pricebook/facts.json`
+- `clients/demo/pricebook/manifest.json`
+- `clients/demo/pricebook/README.md`
+- `clients/demo/pricebook/services/all_on_4.json`
+- `clients/demo/pricebook/services/all_on_6.json`
+- `clients/demo/pricebook/services/aligners.json`
+- `clients/demo/pricebook/services/caries.json`
+- `clients/demo/pricebook/services/clasp_dentures.json`
+- `clients/demo/pricebook/services/classic.json`
+- `clients/demo/pricebook/services/implant_supported_prosthetics.json`
+- `clients/demo/pricebook/services/one_stage.json`
+- `clients/demo/pricebook/services/periodontitis.json`
+- `clients/demo/pricebook/services/professional_whitening.json`
+- `clients/demo/pricebook/services/pterygoid_implants.json`
+- `clients/demo/pricebook/services/pulpitis.json`
+- `clients/demo/pricebook/services/removable_dentures.json`
+- `clients/demo/pricebook/services/sinus_lift.json`
+- `clients/demo/pricebook/services/teeth_treatment.json`
+- `clients/demo/pricebook/services/temporary_teeth.json`
+- `clients/demo/pricebook/services/tomography.json`
+- `clients/demo/pricebook/services/tooth_extraction.json`
+- `clients/demo/pricebook/services/veneers.json`
+- `clients/demo/pricebook/services/zygomatic_implants.json`
+- `clients/demo/pricebook/services/zirconia_crowns.json`
 
-### Candidate code deletion
-
-Delete only after a fresh importer/writer audit proves zero product consumers:
+### DELETE list — legacy modules / scripts / contracts (21 files)
 
 - `query_selector.py`
-- `core/pricebook_loader.py`, `contracts/pricebook.py`
-- `core/price_offers.py`, `contracts/price_brand_aliases.py`
-- `core/price_scope.py`, `core/price_followup.py`
+- `core/pricebook_loader.py`
+- `core/price_offers.py`
+- `core/price_scope.py`
+- `core/price_followup.py`
 - `core/price_answer_assembler.py`
-- `core/marketing_loader.py`, `core/marketing_policy.py`, `core/promo_overview.py`
-- `core/service_selector_llm.py`, `contracts/service_selection.py`
-- `core/explicit_service.py`, `core/clarify_state.py`
-- legacy patient-situation island if the same audit proves it has no product consumers
-- old migration/lint scripts that validate only deleted schemas
-- legacy-only tests
+- `core/marketing_loader.py`
+- `core/marketing_policy.py`
+- `core/promo_overview.py`
+- `core/service_selector_llm.py`
+- `core/explicit_service.py`
+- `core/clarify_state.py`
+- `core/patient_situation.py`
+- `core/patient_situation_llm.py`
+- `core/patient_situation_routing.py`
+- `core/patient_situation_session.py`
+- `core/patient_scope_cues.py`
+- `contracts/price_brand_aliases.py`
+- `contracts/service_selection.py`
+- `contracts/pricebook.py` (after `scripts/lint_pricebook.py` target rewrite)
+- `scripts/migrate_pricebook_services.py`
 
-Do not delete `core/catalog_match.py`: adapt and retain if it is the canonical target
-service matcher.
+### DELETE list — legacy-only tests (16 files)
 
-### Authoring deliverables
+- `tests/test_catalog_typo_match.py`
+- `tests/test_explicit_service.py`
+- `tests/test_marketing_loader.py`
+- `tests/test_marketing_policy.py`
+- `tests/test_patient_situation.py`
+- `tests/test_patient_situation_routing.py`
+- `tests/test_patient_situation_session.py`
+- `tests/test_price_offers.py`
+- `tests/test_price_scope_router.py`
+- `tests/test_pricebook_golden.py`
+- `tests/test_pricebook_loader.py`
+- `tests/test_promo_overview.py`
+- `tests/test_service_selector_llm.py`
+- `tests/test_turn_planner_stage3.py`
+- `tests/test_vague_price_followup.py`
+- `tests/test_final_price_and_service_coverage_existing_paths.py`
+
+### UPDATE list (18 files)
+
+- `config.py` — remove `SERVICE_SELECT_LLM_ON`, `SERVICE_SELECT_LLM_MODEL`, `BRAND_FILTER_ON`, `PRICE_STRICT_SERVICE_ON`
+- `session.py` — remove `last_patient_situation` / `patient_situation_turn_age` APIs
+- `core/routing.yaml` — remove `patient_situation` thresholds block
+- `core/metadata_first_observability.py` — remove island `patient_situation_*` telemetry keys
+- `scripts/lint_pricebook.py` — validate `target_response/**` only
+- `.github/workflows/ci.yml` — drop deleted legacy tests; add validator + target lint
+- `evals/v5/run_patient_scope_shadow_eval.py` — remove legacy session carry simulation
+- `tests/test_dialog_focus_baseline.py` — migrate off `query_selector` / `pricebook_loader`
+- `tests/test_c2c_service_focus_age_offline.py` — migrate off legacy island
+- `tests/test_c2c_session_migration_offline.py` — migrate off legacy island
+- `tests/test_demo_doctor_catalog.py` — target catalog cross-ref only
+- `tests/test_demo_doctor_template.py` — target catalog cross-ref only
+- `tests/test_demo_target_service_catalog.py` — drop legacy CURRENT_PATH parity after delete
+- `tests/test_demo_target_price_offers.py` — drop legacy alias parity reads
+- `tests/test_metadata_first_observability.py` — remove `core.patient_situation` imports
+- `tests/test_final_client_pack_data_convergence_governance.py` — retire legacy SHA pins post-delete
+- `tests/test_final_client_pack_data_convergence_reader_cutover.py` — post-delete firewall (no legacy paths)
+- `tests/test_final_client_pack_data_convergence_sparse_pack.py` — extend validator coverage
+
+### KEEP list (firewall — do not delete in B)
+
+**Client data:** `clients/demo/target_response/**`, `clients/demo/md/**`,
+`clients/demo/doctor_catalog.json`, `clients/demo/brand.yaml`, `clients/demo/clinic_policies.yaml`,
+`clients/demo/features.yaml`, `clients/demo/lead_config.yaml`, `clients/demo/tone.yaml`,
+`clients/demo/ui.yaml`, `clients/demo/video_catalog.yaml`, `clients/demo/widget_config.json`.
+
+**Product core:** `core/target_client_data.py`, `core/target_query_cues.py`, `core/catalog_match.py`,
+`core/target_family_price_resolution.py`, `core/target_scope_aware_selection.py`,
+`core/target_scope_aware_price_package.py`, `core/target_offer_projection.py`,
+`core/target_offer_price_reachability.py`, `core/target_explicit_service_price_lookup.py`,
+`core/attribute_followup.py`, `core/price_ref_routing.py`, `core/response_schema_loader.py`,
+`core/target_runtime_client_context.py`, `core/turn_frame_from_raw.py` (scalar `patient_situation` bridge),
+`core/turn_planner_llm.py`, AC1→AC3 / A9 / Composer / Verifier modules, frozen eval artifacts.
+
+**Contracts:** `contracts/patient_situation.py` (HISTORICAL COMPATIBILITY KEEP for A9 scalar bridge).
+
+### A9 boundary (binding)
+
+| Surface | B decision |
+|---|---|
+| Legacy detect/carry island (`patient_situation*.py`, `patient_scope_cues.py`, session carry, `query_selector`) | DELETE NOW |
+| Scalar `patient_situation` in `turn_frame_from_raw` + planner enum | HISTORICAL COMPATIBILITY KEEP |
+| Remove scalar bridge / retune frozen A9 matrices | Future checkpoint — **NOT B** |
+
+### CREATE list (B implementation — blocked until PRE-CODE ✅)
+
+- `docs/CLIENT_PACK_AUTHORING.md`
+- `scripts/validate_client_pack.py`
+- `clients/_template/target_response/service_catalog.json`
+- `clients/_template/target_response/brand_catalog.json`
+- `clients/_template/target_response/marketing.yaml`
+- `clients/_template/target_response/clinic_strategy.yaml`
+- `clients/_template/target_response/pricebook/facts.json`
+- `clients/_template/target_response/pricebook/services/.gitkeep` (or minimal valid offer scaffold)
+- `clients/_template/doctor_catalog.json`
+- `clients/_template/clinic_policies.yaml`
+- `clients/_template/ui.yaml`
+- `tests/test_validate_client_pack.py`
+- `tests/test_client_pack_template_scaffold.py`
+
+### Implementation allowlist (exact union — blocked until B PRE-CODE ✅)
+
+All paths in DELETE, UPDATE, and CREATE lists above, plus:
+
+- `docs/FLAGS_AND_STATUS.md`
+- `tests/test_final_client_pack_data_convergence_b_governance.py`
+- `tests/test_c2_import_firewall_offline.py` (post-delete import graph)
+- `tests/test_price_ref_routing.py` (KEEP module regression)
+
+### Acceptance matrix (B implementation)
+
+| # | Criterion |
+|---|---|
+| 1 | Legacy data paths absent; demo loads only via `target_response/**` |
+| 2 | Legacy island modules absent; `import app` smoke green |
+| 3 | `scripts/validate_client_pack.py` passes on `clients/demo` and sparse non-demo fixture |
+| 4 | `clients/_template` validates (scaffold mode OK) without demo IDs/brands |
+| 5 | `docs/CLIENT_PACK_AUTHORING.md` maps each edit to exactly one canonical file |
+| 6 | `scripts/lint_pricebook.py` lints target pricebook only |
+| 7 | CI workflow runs validator + target tests; no deleted legacy tests |
+| 8 | Dead config flags removed; session carry APIs removed |
+| 9 | All 21 service IDs, 31 offers, 6 facts, brands preserved in target schema |
+| 10 | Checkpoint A cutover + sparse pack tests remain green |
+| 11 | AC1→AC3, A9 scalar bridge, Composer, Verifier unchanged |
+| 12 | Frozen S/A9/Retry/W1b pins unchanged |
+| 13 | Import firewall: product modules do not reference deleted paths |
+| 14 | `test_final_client_pack_data_convergence_b_governance.py` post-implementation mode green |
+| 15 | Wide safe-offline + collect-only green |
+| 16 | No new selector / second pipeline / demo hardcodes in shared core |
+
+### Authoring deliverables (implementation)
 
 1. `docs/CLIENT_PACK_AUTHORING.md` with a one-question → one-path edit map.
 2. `scripts/validate_client_pack.py` (offline/local only, no network/LLM).
-3. `_template` structural parity with canonical required files.
+3. `clients/_template` structural parity with canonical required files.
 4. Validation fixture for a non-demo client with different IDs/brands/topics.
 5. Import/read firewall proving deleted mirrors cannot return.
 
@@ -2960,14 +3102,33 @@ service matcher.
 - Focused + wide safe-offline + `tests/` collect-only + frozen pins all green.
 - NO LIVE / NO LLM / NO A9 tuning.
 
-## Governance allowlist
+## Governance allowlist (Checkpoint B PRE-CODE commit)
 
 - `TASK.md`
-- `docs/evidence/client_pack/FINAL_CLIENT_PACK_DATA_CONVERGENCE_SEAM_AUDIT.md`
+- `docs/evidence/client_pack/FINAL_CLIENT_PACK_DATA_CONVERGENCE_B_SEAM_AUDIT.md`
 - `docs/FLAGS_AND_STATUS.md`
-- `tests/test_final_client_pack_data_convergence_governance.py`
+- `tests/test_final_client_pack_data_convergence_b_governance.py`
 
-## PRE-CODE command
+Prior Checkpoint A governance files remain frozen except where B implementation explicitly updates them.
+
+## PRE-CODE command (Checkpoint B governance)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-client-pack-b-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_client_pack_data_convergence_b_governance.py `
+  tests/test_final_client_pack_data_convergence_governance.py `
+  tests/test_final_client_pack_data_convergence_reader_cutover.py `
+  tests/test_final_client_pack_data_convergence_sparse_pack.py `
+  tests/test_demo_target_service_catalog.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_demo_target_marketing_migration_audit.py `
+  tests/test_response_schema_loader.py -q
+git diff --check
+```
+
+## PRE-CODE command (Checkpoint A — historical)
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE = "1"
@@ -2981,8 +3142,89 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 git diff --check
 ```
 
+## Focused command (B implementation COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-client-pack-b-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_client_pack_data_convergence_b_governance.py `
+  tests/test_final_client_pack_data_convergence_governance.py `
+  tests/test_final_client_pack_data_convergence_reader_cutover.py `
+  tests/test_final_client_pack_data_convergence_sparse_pack.py `
+  tests/test_validate_client_pack.py `
+  tests/test_client_pack_template_scaffold.py `
+  tests/test_demo_target_service_catalog.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_demo_target_marketing_migration_audit.py `
+  tests/test_response_schema_loader.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_price_ref_routing.py -q
+git diff --check
+```
+
+## Wide safe-offline command (B implementation COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-client-pack-b-wide-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_client_pack_data_convergence_b_governance.py `
+  tests/test_final_client_pack_data_convergence_governance.py `
+  tests/test_final_client_pack_data_convergence_reader_cutover.py `
+  tests/test_final_client_pack_data_convergence_sparse_pack.py `
+  tests/test_validate_client_pack.py `
+  tests/test_client_pack_template_scaffold.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_turn_planner_wiring.py `
+  tests/test_turn_plan_protocol_guard.py `
+  tests/test_catalog_match.py `
+  tests/test_follow_up_rewrite.py `
+  tests/test_dialog_focus_baseline.py `
+  tests/test_dialog_focus_contract.py `
+  tests/test_demo_doctor_catalog.py `
+  tests/test_demo_doctor_template.py `
+  tests/test_demo_target_service_catalog.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_demo_target_marketing_policy.py `
+  tests/test_demo_target_marketing_migration_audit.py `
+  tests/test_response_schema_loader.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_final_price_and_service_coverage_implementation.py `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_final_explicit_service_price_lookup_boundary_implementation.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_price_ref_routing.py `
+  tests/test_content_linter.py -q
+python -m pytest --collect-only -q
+```
+
+## Frozen pin command (B implementation COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-client-pack-b-frozen-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_closeout_governance.py `
+  tests/test_final_explicit_service_price_lookup_boundary_governance.py `
+  tests/test_final_price_scope_coverage_nav_governance.py `
+  tests/test_ac3_scope_price_flow_offline.py::test_w1b_snapshot_checksums_unchanged -q
+```
+
+## STOP conditions (Checkpoint B)
+
+- Legacy mirror missing or byte-changed before implementation delete commit.
+- Any DELETE path still has a product importer after fresh audit.
+- Scalar A9 bridge removal attempted in B (future checkpoint only).
+- Frozen A9 matrices / evidence edited for green tests.
+- Implementation artifact created before B PRE-CODE ✅.
+- File outside implementation allowlist required.
+- `import app` fails after delete.
+- Validator passes demo but fails sparse non-demo fixture.
+- LIVE / LLM / Composer / Verifier changes required for green.
+
 ## STOP
 
-Governance PRE-CODE PASS does not authorize Checkpoint A automatically. Product/data
-implementation requires separate owner GO. Checkpoint B requires a second owner GO.
+Checkpoint B governance PRE-CODE PASS does not authorize implementation/delete.
+**STOP after B PRE-CODE ✅** before any DELETE/CREATE/UPDATE from implementation allowlist.
 

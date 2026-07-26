@@ -10,9 +10,9 @@
 
 | Флаг | Что делает |
 |---|---|
-| `SERVICE_SELECT_LLM_ON` | Модель выбирает услугу (чинит «generic → дорогой протокол») |
+| `SERVICE_SELECT_LLM_ON` | Модель выбирает услугу (legacy island — **DELETE in Checkpoint B**) |
 | `TURN_PLANNER_ON` | Один плановый вызов вместо цепочки классификаторов |
-| `PATIENT_SITUATION_LLM_ON` | Распознавание ситуации пациента («нет зуба») смыслом, не регексом |
+| `PATIENT_SITUATION_LLM_ON` | Распознавание ситуации пациента (legacy island — **DELETE in Checkpoint B**) |
 | `DIALOG_FOCUS_LLM_CLASSIFY_ON` | Перенос фокуса между ходами |
 | `LEAD_TURN_LLM_CLASSIFY_ON` | Серая зона намерения оставить контакт |
 | `BOOKING_INTENT_LLM_ON` | Намерение «записаться» |
@@ -70,12 +70,11 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY:** governance @ `19297fc` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
 
-**FINAL_CLIENT_PACK_DATA_CONVERGENCE:** Checkpoint A reader cutover ✅ @ `c7c2756`; legacy mirrors read-only; Checkpoint B blocked until separate owner GO.
-До добавления новых клиник demo pack должен перейти на один canonical FullContext source:
-`target_response/service_catalog.json`, `target_response/pricebook/**`,
-`target_response/brand_catalog.json`, `target_response/marketing.yaml`. Старые root
-mirrors пока сохранены byte-identical; product/data implementation запрещён до PRE-CODE
-и отдельного owner GO.
+**FINAL_CLIENT_PACK_DATA_CONVERGENCE:** Checkpoint A reader cutover ✅ @ `e3730ea`; Checkpoint B
+governance PRE-CODE (post-A seam audit @ `FINAL_CLIENT_PACK_DATA_CONVERGENCE_B_SEAM_AUDIT.md`).
+Legacy root mirrors (`service_catalog.json`, `pricebook/**`, `marketing.yaml`,
+`price_brand_aliases.json`) remain byte-identical on disk until B implementation delete.
+Product readers use only `target_response/**`. B implementation/delete blocked until B PRE-CODE ✅.
 
 ---
 
@@ -83,13 +82,11 @@ mirrors пока сохранены byte-identical; product/data implementation 
 
 ### Проверенные гварды — включены по умолчанию (флип 2026-07-09/10)
 
-Для demo-клиента включены насовсем: env-дефолт `"1"` (в `config.py`) + `clients/demo/features.yaml`. Env `="0"` остаётся kill-switch. «Ключей» = сколько выключателей надо, чтобы работало.
-
 | Флаг | Что делает | Ключей |
 |---|---|---|
-| `PRICE_STRICT_SERVICE_ON` | Цена без явно названной услуги → честный defer, не выдуманная цена (уважает ситуационный фокус) | 1 (env) |
+| `PRICE_STRICT_SERVICE_ON` | Цена без явно названной услуги → defer (legacy island — **DELETE in B**) | 1 (env) |
 | `BOOKING_DATE_DEFER_ON` | Не подтверждать/не эхоить дату и слот записи | 2 (env + features.yaml) |
-| `BRAND_FILTER_ON` | Бренд-фильтр + бюджетный якорь на ценовом пути имплантов: «корейские/нобель» → один бренд; «подешевле» → честный якорь (доступный + рекомендованный + платёж + консультация); прочее «дешевле» → тёплый fallback | 2 (env + features.yaml) |
+| `BRAND_FILTER_ON` | Бренд-фильтр имплантов (legacy island — **DELETE in B**) | 2 (env + features.yaml) |
 
 ### A. Ждёт доработки/решения (технически работает, но есть нюанс)
 

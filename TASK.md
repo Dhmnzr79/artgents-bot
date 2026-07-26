@@ -2319,3 +2319,152 @@ git diff --check
 | Acceptance A–L | ✅ |
 | Frozen artifacts | ✅ unchanged |
 
+---
+
+# TASK — FINAL_PRICE_SCOPE_COVERAGE_NAV (governance)
+
+**Status:** governance COMPLETION pending · **NO LIVE / NO LLM / NO product code**
+
+**Baseline:** `f5c5c96` (`codex/stage-a`) · **FINAL_PRICE_AND_SERVICE_COVERAGE complete**
+
+**Owner GO:** Phase 1 governance + PRE-CODE only. Implementation blocked until PRE-CODE ✅.
+
+Seam audit: `docs/evidence/price_service/FINAL_PRICE_SCOPE_COVERAGE_NAV_SEAM_AUDIT.md`
+Canonical law: `docs/PRICE_SERVICE_ARCHITECTURE.md`
+
+## Goal
+
+Separate service situational applicability from offer price-route applicability. Scope anchors and scope-nav buttons appear only for extents with a confirmed authored price route. Scoped `few_teeth` without a dedicated route must not inherit one-tooth price evidence.
+
+## Problem (binding)
+
+`target:ui_scope/implantation/few_teeth` is recognized correctly through AC1, but AC2 treats service applicability as price applicability (`classic` + `few_teeth` → `classic.one_tooth.*` offers).
+
+## Minimal contract
+
+`TargetOffer.applies_to_extents: list[PatientExtent]` (optional; explicit on demo rich offers).
+
+## Normative broad / nav behavior (binding)
+
+| Confirmed routes | Anchors | Buttons |
+|------------------|---------|---------|
+| `one_tooth` + `full_arch` | both | «Один зуб», «Все зубы на челюсти» |
+| `one_tooth` only | one-tooth | «Один зуб» only |
+| all three extents priced | three | three |
+| `family_only_broad` | family price | none |
+
+Scoped `few_teeth` without route: `data_gap` (no digits) or family-level with disclaimer — never one-tooth price as final.
+
+**Out of scope:** adjacent/teeth-location clarification, new patient axis, nested menus.
+
+## Allowlist (governance)
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/price_service/FINAL_PRICE_SCOPE_COVERAGE_NAV_SEAM_AUDIT.md` | seam audit |
+| `docs/FLAGS_AND_STATUS.md` | milestone note |
+| `tests/test_final_price_scope_coverage_nav_governance.py` | PRE-CODE checker |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅)
+
+| File | Role |
+|------|------|
+| `contracts/response_schema.py` | `applies_to_extents` on `TargetOffer` |
+| `contracts/target_scope_aware_selection.py` | `price_confirmed_extents` on result |
+| `core/target_offer_extent_applicability.py` | filter + default inference |
+| `core/target_offer_projection.py` | extent filter in projection |
+| `core/target_scope_aware_selection.py` | anchors + scoped gap |
+| `core/target_client_ui_nav.py` | filtered scope-nav |
+| `core/target_scope_aware_price_package.py` | wire confirmed extents |
+| `clients/demo/target_response/pricebook/services/*.json` | explicit extents on offers |
+| `tests/test_final_price_scope_coverage_nav_implementation.py` | acceptance A–J |
+| `tests/test_final_price_scope_coverage_nav_sparse_fixtures.py` | in-memory packs |
+
+**Frozen (byte-identical):** Retry1–4 live artifacts, A9/A9R/S-series, W1b checksums, widget matrix.
+
+## Forbidden
+
+- LIVE / LLM
+- Verifier redesign
+- new patient axes / quantity clarification UI
+- regex stop-lists, feature flags, second selector
+- frozen live artifact edits
+- W1b restore
+
+## Acceptance matrix (implementation)
+
+| ID | Case |
+|----|------|
+| A | Rich demo broad — anchors `one_tooth`+`full_arch`; buttons only for confirmed routes |
+| B | Only `one_tooth` priced — single anchor + single button |
+| C | All three extents priced — three anchors + three buttons |
+| D | `few_teeth` click without route — data_gap/family; no one-tooth evidence |
+| E | `one_tooth` click — scoped price unchanged |
+| F | `family_only_broad` — no scope buttons (FPS regression) |
+| G | Rich pricebook full_arch / concrete paths unchanged |
+| H | No multiply / cross-extent substitution |
+| I | `/ask` + `/ask/stream` parity smoke |
+| J | Frozen artifacts unchanged |
+
+## Tests (PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-pscn-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_price_scope_coverage_nav_governance.py `
+  tests/test_final_price_and_service_coverage_implementation.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+git diff --check
+```
+
+**STOP after PRE-CODE ✅. Implementation is separate step.**
+
+## Completion record (FINAL_PRICE_SCOPE_COVERAGE_NAV governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `f5c5c96` |
+| PRE-CODE | pending |
+| Seam audit | pending |
+| Implementation | **STOP** |
+
+---
+
+# TASK — FINAL_PRICE_SCOPE_COVERAGE_NAV (implementation)
+
+**Status:** blocked until governance PRE-CODE ✅
+
+**Baseline:** governance COMPLETION @ `f5c5c96`
+
+## Tests (COMPLETION — after implementation)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-pscn-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_final_price_scope_coverage_nav_sparse_fixtures.py `
+  tests/test_final_price_scope_coverage_nav_governance.py `
+  tests/test_final_price_and_service_coverage_implementation.py `
+  tests/test_ac3_scope_price_flow_offline.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_target_client_ui_nav.py `
+  tests/test_final_scope_widget_e2e_retry4_live_harness.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+python -m pytest --collect-only -q
+git diff --check
+```
+
+## Completion record (FINAL_PRICE_SCOPE_COVERAGE_NAV implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | pending |
+| COMPLETION | pending |
+| Acceptance A–J | pending |
+| Frozen artifacts | pending |
+

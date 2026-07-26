@@ -62,7 +62,9 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_SCOPE_WIDGET_E2E_CLOSEOUT:** **FINAL_SCOPE_CLOSEOUT_COMPLETE** ✅ — A9 kill-switch removed; unconditional patient-scope authority.
 
-**FINAL_PRICE_AND_SERVICE_COVERAGE:** implementation COMPLETE @ `bc4679b` — typed `family_prices.json` contract, deterministic family-only broad mode B, branches 1–3 verified via offline tests; rich demo unchanged.
+**FINAL_PRICE_AND_SERVICE_COVERAGE:** implementation COMPLETE @ `f5c5c96` — typed `family_prices.json` contract, deterministic family-only broad mode B, branches 1–3 verified via offline tests; rich demo unchanged.
+
+**FINAL_PRICE_SCOPE_COVERAGE_NAV:** governance @ `f5c5c96` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
 
 ---
 

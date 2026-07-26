@@ -1,7 +1,8 @@
 """Strict offline loader for the future response-data target pack (S2).
 
 The loader accepts an explicit trusted directory and returns the frozen S1 aggregate.
-It is intentionally not connected to client resolution, caches, or product runtime.
+Product runtime and planner readers should use ``core.target_client_data`` for cached
+per-client bundles; this module stays a pure path-based loader for tests and tooling.
 """
 
 from __future__ import annotations

@@ -2818,8 +2818,8 @@ git diff --check
 
 # TASK — FINAL_CLIENT_PACK_DATA_CONVERGENCE (governance)
 
-**Status:** local PRE-CODE suite ✅ (54 passed); independent PRE-CODE pending
-**Baseline:** `40ffc09`
+**Status:** Checkpoint A implementation ✅ @ `c7c2756` (reader cutover); Checkpoint B blocked
+**Baseline:** `c7c2756`
 **Mode:** governance/docs/tests only · **NO LIVE / NO LLM / NO A9 tuning**
 
 ## Goal

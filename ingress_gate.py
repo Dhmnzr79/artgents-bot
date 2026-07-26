@@ -132,19 +132,13 @@ _INGRESS_COMPARISON_HINT_RE = re.compile(
 )
 
 
-def _client_catalog_path(client_id: str) -> str:
-    root = os.path.dirname(os.path.abspath(__file__))
-    cid = (client_id or "").strip() or "default"
-    return os.path.join(root, "clients", cid, "service_catalog.json")
+from core.target_client_data import service_catalog_dict
 
 
 def _read_service_catalog(client_id: str) -> dict[str, Any]:
-    path = _client_catalog_path(client_id)
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            obj = json.load(f)
-        return obj if isinstance(obj, dict) else {}
-    except (OSError, json.JSONDecodeError):
+        return service_catalog_dict(client_id)
+    except Exception:
         return {}
 
 
@@ -203,9 +197,9 @@ def _offered_phrases(catalog: dict[str, Any]) -> list[str]:
             continue
         if svc.get("active") is False:
             continue
-        title = str(svc.get("title") or "").strip()
-        if len(title) >= 3:
-            phrases.append(_norm_text(title))
+        name = str(svc.get("name") or "").strip()
+        if len(name) >= 3:
+            phrases.append(_norm_text(name))
         for raw in svc.get("aliases") or []:
             a = _norm_text(str(raw))
             if len(a) >= 3:
@@ -238,10 +232,10 @@ def _offered_services_summary(client_id: str, *, max_items: int = 40) -> str:
     for sid, svc in catalog.items():
         if not isinstance(svc, dict) or svc.get("active") is False:
             continue
-        title = str(svc.get("title") or sid).strip()
+        name = str(svc.get("name") or sid).strip()
         aliases = svc.get("aliases") or []
         al = ", ".join(str(a) for a in aliases[:6] if str(a).strip())
-        lines.append(f"- {title}" + (f" ({al})" if al else ""))
+        lines.append(f"- {name}" + (f" ({al})" if al else ""))
         if len(lines) >= max_items:
             break
     return "\n".join(lines) if lines else "(список пуст)"

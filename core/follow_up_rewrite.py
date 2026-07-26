@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import json
-import os
 import re
 from dataclasses import dataclass
 from typing import Any
 
-from core.client_config_loader import _pack_path
+from core.target_client_data import (
+    catalog_service_label,
+    match_service_from_target_catalog,
+)
 from core.routing_loader import THRESHOLDS
 from core.service_followup import is_short_attribute_followup, normalize_service_id
 from core.target_runtime_session import (
@@ -79,29 +80,6 @@ def follow_up_ctx_from_dict(raw: dict[str, Any] | None) -> FollowUpTurnContext |
     )
 
 
-def _read_catalog(client_id: str | None) -> dict[str, Any]:
-    if not client_id:
-        return {}
-    path = _pack_path(client_id, "service_catalog.json")
-    if not os.path.isfile(path):
-        return {}
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data if isinstance(data, dict) else {}
-
-
-def catalog_service_label(client_id: str | None, service_id: str | None) -> str | None:
-    sid = normalize_service_id(service_id)
-    if not sid:
-        return None
-    entry = _read_catalog(client_id).get(sid)
-    if isinstance(entry, dict):
-        title = str(entry.get("title") or "").strip()
-        if title:
-            return title
-    return sid.replace("_", " ")
-
-
 def _service_id_from_doc_id(doc_id: str | None) -> str | None:
     raw = (doc_id or "").strip().removesuffix(".md")
     if not raw:
@@ -145,9 +123,7 @@ def resolve_focus_from_turn(
 
 
 def is_explicit_topic_change(q: str, focus: dict[str, str], *, client_id: str | None) -> bool:
-    from query_selector import match_service_from_catalog
-
-    match = match_service_from_catalog(q, client_id=client_id)
+    match = match_service_from_target_catalog(q, client_id=client_id)
     if not match.get("is_confident"):
         return False
     new_sid = normalize_service_id(str(match.get("matched_service_id") or ""))

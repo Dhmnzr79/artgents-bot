@@ -150,7 +150,8 @@ def test_audit_and_task_define_one_authority_and_two_checkpoint_stop_law() -> No
         assert required in task
 
 
-def test_implementation_has_not_started_at_governance_checkpoint() -> None:
-    assert not (ROOT / "core/target_client_data.py").exists()
+def test_checkpoint_a_loader_is_present_at_implementation() -> None:
+    assert (ROOT / "core/target_client_data.py").is_file()
+    assert (ROOT / "core/target_query_cues.py").is_file()
     assert not (ROOT / "docs/CLIENT_PACK_AUTHORING.md").exists()
     assert not (ROOT / "scripts/validate_client_pack.py").exists()

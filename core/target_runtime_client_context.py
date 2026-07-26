@@ -23,7 +23,7 @@ from contracts.service_consultation import ServiceConsultationValue, validate_se
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
-from core.response_schema_loader import load_response_schema_bundle
+from core.target_client_data import load_target_client_data
 from core.service_consultation_source import build_service_consultation_values
 from core.target_cached_full_context import (
     TargetCachedFullContextError,
@@ -91,7 +91,7 @@ def _client_paths(client_id: str) -> tuple[Path, Path]:
 def _build_context(client_id: str) -> TargetRuntimeClientContext:
     md_root, target_root = _client_paths(client_id)
     try:
-        bundle = load_response_schema_bundle(target_root)
+        bundle = load_target_client_data(client_id).bundle
     except Exception as exc:
         _fail("target_runtime_bundle_invalid", target_root, exc)
     try:

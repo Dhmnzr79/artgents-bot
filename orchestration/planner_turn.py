@@ -19,7 +19,7 @@ from core.runtime_turn_frame import (
 from core.routing_loader import THRESHOLDS
 from core.turn_planner_llm import plan_turn_attempt
 from logging_setup import get_logger, log_json
-from query_selector import commercial_info_query, consultation_info_query
+from core.target_query_cues import commercial_info_query, consultation_info_query
 
 logger = get_logger("bot")
 

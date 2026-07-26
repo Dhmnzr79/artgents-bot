@@ -8,8 +8,10 @@ from typing import Any
 from config import TURN_PLANNER_LLM_MODEL
 from contracts.planner_attempt import PlannerAttempt, turn_frame_has_invalid_or_missing
 from contracts.turn_plan import TurnPlan
-from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
-from core.service_selector_llm import build_compact_service_catalog
+from core.target_client_data import (
+    allowed_brand_filters,
+    build_compact_service_catalog,
+)
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.topic_taxonomy import load_client_topic_taxonomy
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
@@ -98,23 +100,6 @@ def _planner_chat_completions_create(**kwargs: Any):
         return chat_completions_create(**kwargs)
     return chat_client.chat.completions.create(**kwargs)
 
-
-
-def _allowed_pricebook_filters(client_id: str | None) -> tuple[frozenset[str], frozenset[str]]:
-    groups: set[str] = set()
-    brands: set[str] = set()
-    for service_id in list_pricebook_service_ids(client_id):
-        entry = load_pricebook_service(client_id, service_id)
-        if not entry:
-            continue
-        for variant in entry.variants:
-            group = str(variant.brand_group or "").strip().lower()
-            brand = str(variant.brand or "").strip().lower()
-            if group:
-                groups.add(group)
-            if brand:
-                brands.add(brand)
-    return frozenset(groups), frozenset(brands)
 
 
 def _catalog_lines(rows: list[dict[str, str]]) -> str:
@@ -215,7 +200,7 @@ def plan_turn_attempt(
     if not rows:
         return _not_available_attempt()
     allowed_ids = frozenset(r["service_id"] for r in rows)
-    allowed_groups, allowed_brands = _allowed_pricebook_filters(client_id)
+    allowed_groups, allowed_brands = allowed_brand_filters(client_id)
     allowed_topics = _resolve_allowed_topics(client_id, sid=sid)
     hist = recent_dialog_history(sid) if sid else ""
     brand_hint = ""

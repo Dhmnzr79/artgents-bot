@@ -17,7 +17,7 @@ from contracts.patient_situation import PatientSituationKind
 from contracts.planner_attempt import PlannerAttempt
 from contracts.turn_frame import PatientCareStage, PatientExtent, PatientJaw, PatientScopeModifier
 from contracts.turn_plan import TurnPlan
-from core.pricebook_loader import list_pricebook_service_ids, load_pricebook_service
+from core.target_client_data import allowed_brand_filters, build_compact_service_catalog
 from core.turn_frame_from_raw import build_turn_frame_from_raw as _real_build_turn_frame_from_raw
 from core.turn_planner_llm import (
     _PATIENT_SCOPE_PROMPT,
@@ -85,7 +85,7 @@ def _prepare_attempt(monkeypatch, payload):
         lambda _cid: _planner_catalog(),
     )
     monkeypatch.setattr(
-        "core.turn_planner_llm._allowed_pricebook_filters",
+        "core.turn_planner_llm.allowed_brand_filters",
         lambda _cid: _planner_filters(),
     )
     monkeypatch.setattr(
@@ -154,7 +154,7 @@ def test_plan_turn_attempt_survives_topic_taxonomy_loader_failure(monkeypatch):
         raise RuntimeError("secret path clients/demo/md/broken.md frontmatter leaked")
 
     monkeypatch.setattr("core.turn_planner_llm.build_compact_service_catalog", lambda _cid: _planner_catalog())
-    monkeypatch.setattr("core.turn_planner_llm._allowed_pricebook_filters", lambda _cid: _planner_filters())
+    monkeypatch.setattr("core.turn_planner_llm.allowed_brand_filters", lambda _cid: _planner_filters())
     monkeypatch.setattr("core.turn_planner_llm.load_client_topic_taxonomy", _taxonomy_boom)
     monkeypatch.setattr(
         "core.turn_planner_llm.log_json",
@@ -185,7 +185,7 @@ def test_plan_turn_attempt_survives_topic_taxonomy_loader_failure(monkeypatch):
 
 def test_plan_turn_attempt_prompt_requires_null_topic_when_taxonomy_empty(monkeypatch):
     monkeypatch.setattr("core.turn_planner_llm.build_compact_service_catalog", lambda _cid: _planner_catalog())
-    monkeypatch.setattr("core.turn_planner_llm._allowed_pricebook_filters", lambda _cid: _planner_filters())
+    monkeypatch.setattr("core.turn_planner_llm.allowed_brand_filters", lambda _cid: _planner_filters())
     monkeypatch.setattr("core.turn_planner_llm.load_client_topic_taxonomy", lambda _cid: frozenset())
     captured = _mock_llm(
         monkeypatch,
@@ -351,11 +351,11 @@ def test_planner_call_uses_qwen_controls_once_without_retry(monkeypatch):
 def test_current_demo_compact_reference_and_catalog_drift_guard():
     spec = _native_spec()
     sample = spec["completion_size_sample"]["planner_object"]
-    service_ids = list(list_pricebook_service_ids("demo"))
-    entries = [load_pricebook_service("demo", service_id) for service_id in service_ids]
-    variants = [variant for entry in entries if entry for variant in entry.variants]
-    brand_groups = [str(variant.brand_group or "") for variant in variants]
-    brands = [str(variant.brand or "") for variant in variants]
+    rows = build_compact_service_catalog("demo")
+    service_ids = [row["service_id"] for row in rows]
+    groups, brands = allowed_brand_filters("demo")
+    brand_groups = list(groups)
+    brand_tokens = list(brands)
     topics = list(load_client_topic_taxonomy("demo"))
     utf8_len = lambda value: len(str(value).encode("utf-8"))
     longest = lambda values: max(values, key=utf8_len)
@@ -367,7 +367,7 @@ def test_current_demo_compact_reference_and_catalog_drift_guard():
         "followup_of": longest(service_ids),
         "needs_clarify": True,
         "patient_situation": longest(get_args(PatientSituationKind)),
-        "brand_filter": {"brand_group": longest(brand_groups), "brand": longest(brands)},
+        "brand_filter": {"brand_group": longest(brand_groups), "brand": longest(brand_tokens)},
         "topic": longest(topics),
         "topic_confidence": 1.0,
         "patient_scope": {
@@ -378,7 +378,7 @@ def test_current_demo_compact_reference_and_catalog_drift_guard():
         },
     }
     compact_bytes = json.dumps(derived, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    assert len(compact_bytes) == 530
+    assert len(compact_bytes) == 540
     assert len(compact_bytes) < _TURN_PLANNER_MAX_COMPLETION_TOKENS
 
 
@@ -434,7 +434,7 @@ def test_plan_turn_attempt_invalid_topic_is_partial(monkeypatch):
 
 def test_plan_turn_attempt_bad_json_is_not_available(monkeypatch):
     monkeypatch.setattr("core.turn_planner_llm.build_compact_service_catalog", lambda _cid: _planner_catalog())
-    monkeypatch.setattr("core.turn_planner_llm._allowed_pricebook_filters", lambda _cid: _planner_filters())
+    monkeypatch.setattr("core.turn_planner_llm.allowed_brand_filters", lambda _cid: _planner_filters())
 
     def _bad(**_kwargs):
         class _Msg:
@@ -495,7 +495,7 @@ def test_plan_turn_attempt_makes_exactly_one_llm_call(monkeypatch):
     calls = {"count": 0}
     payload = _valid_attempt_payload()
     monkeypatch.setattr("core.turn_planner_llm.build_compact_service_catalog", lambda _cid: _planner_catalog())
-    monkeypatch.setattr("core.turn_planner_llm._allowed_pricebook_filters", lambda _cid: _planner_filters())
+    monkeypatch.setattr("core.turn_planner_llm.allowed_brand_filters", lambda _cid: _planner_filters())
     monkeypatch.setattr("core.turn_planner_llm.load_client_topic_taxonomy", lambda _cid: _DEMO_TOPICS)
 
     def _counted(**_kwargs):

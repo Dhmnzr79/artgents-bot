@@ -17,6 +17,7 @@ from contracts.turn_plan import TurnPlan
 from core.attribute_followup import catalog_match_is_authoritative, detect_vague_attribute_kinds
 from core.target_runtime_session import read_age_guarded_service_focus
 from core.service_followup import normalize_service_id
+from core.target_client_data import match_service_from_target_catalog
 from session import mem_get
 
 _PRICE_TOKEN_RE = re.compile(r"сто\w+|цен\w+|прайс|руб\w*|обойд\w*", re.I | re.U)
@@ -71,9 +72,7 @@ def _primary_attribute(q: str) -> DialogFocusAttribute:
 
 
 def _explicit_service_match(q: str, *, client_id: str | None) -> str | None:
-    from query_selector import match_service_from_catalog
-
-    match = match_service_from_catalog(q, client_id=client_id)
+    match = match_service_from_target_catalog(q, client_id=client_id)
     if not catalog_match_is_authoritative(match, q) and not bool(match.get("is_confident")):
         return None
     return normalize_service_id(str(match.get("matched_service_id") or "")) or None

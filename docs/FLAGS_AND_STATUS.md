@@ -70,7 +70,7 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY:** governance @ `19297fc` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
 
-**FINAL_CLIENT_PACK_DATA_CONVERGENCE:** governance checkpoint at baseline `40ffc09`.
+**FINAL_CLIENT_PACK_DATA_CONVERGENCE:** Checkpoint A reader cutover ✅ @ `c7c2756`; legacy mirrors read-only; Checkpoint B blocked until separate owner GO.
 До добавления новых клиник demo pack должен перейти на один canonical FullContext source:
 `target_response/service_catalog.json`, `target_response/pricebook/**`,
 `target_response/brand_catalog.json`, `target_response/marketing.yaml`. Старые root

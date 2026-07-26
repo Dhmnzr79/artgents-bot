@@ -186,6 +186,22 @@ def build_target_scoped_response_evidence(
     root = _resolved_root(md_root)
 
     spec = bound_package.spec
+    if spec.response_stage == "data_gap":
+        package = bound_package.package
+        return TargetScopedResponseEvidence(
+            spec=spec,
+            service_id=None,
+            primary_content_ref=None,
+            offer_ids=(),
+            doctor_ids=(),
+            commercial_fact_ids=(),
+            external_source_refs=(),
+            consultation_content_ref=None,
+            selected_followups=package.selected_followups,
+            selected_cta_key=bound_package.selected_cta_key,
+            scope_records=(),
+            covered_fact_ids=(),
+        )
     if is_fullcontext_content_only_spec(spec):
         if bound_package.selected_cta_key is not None:
             _error("scoped_evidence_package_inconsistent", "selected_cta_key")

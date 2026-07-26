@@ -78,7 +78,7 @@ def test_frozen_artifact_guards() -> None:
     assert_frozen_retry4_live_artifacts_unchanged()
 
 
-def test_implementation_module_not_started_pre_code() -> None:
+def test_implementation_artifacts_present_post_phase2() -> None:
     impl_test = (
         _REPO_ROOT
         / "tests"
@@ -95,7 +95,7 @@ def test_implementation_module_not_started_pre_code() -> None:
         / "test_final_explicit_service_price_lookup_boundary_cross_turn_matrix.py"
     )
     boundary = _REPO_ROOT / "core" / "target_explicit_service_price_lookup.py"
-    assert not impl_test.is_file(), "implementation tests must not exist before PRE-CODE"
-    assert not sparse_test.is_file(), "sparse fixtures must not exist before PRE-CODE"
-    assert not matrix_test.is_file(), "cross-turn matrix must not exist before PRE-CODE"
-    assert not boundary.is_file(), "boundary module must not exist before PRE-CODE"
+    assert impl_test.is_file(), "implementation tests must exist after Phase 2"
+    assert sparse_test.is_file(), "sparse fixtures must exist after Phase 2"
+    assert matrix_test.is_file(), "cross-turn matrix must exist after Phase 2"
+    assert boundary.is_file(), "boundary module must exist after Phase 2"

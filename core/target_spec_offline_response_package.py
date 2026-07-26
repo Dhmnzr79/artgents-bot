@@ -212,10 +212,14 @@ def assemble_target_spec_offline_response_package(
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
+        effective_scope=scope,
     )
+    out_spec = spec
+    if package.response_stage is not None:
+        out_spec = spec.model_copy(update={"response_stage": package.response_stage})
     selected_cta_key = package.plan.cta_key if effective_include_cta else None
     return TargetSpecBoundOfflineResponsePackage(
-        spec=spec,
+        spec=out_spec,
         package=package,
         selected_cta_key=selected_cta_key,
     )

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from contracts.doctor_schema import TargetDoctorCatalog
+from contracts.effective_scope import EffectiveScope
 from contracts.response_schema import (
     ResponseSchemaBundle,
     TargetBrand,
@@ -24,6 +25,7 @@ from core.target_marketing_selector import TargetMarketingSelection
 from core.target_offer_projection import project_target_service_offers
 from core.target_response_evidence import build_target_response_evidence_package
 from core.target_service_resolver import resolve_target_service_term
+from core.target_strategy_context import strategy_match_for_explicit_service_price_lookup
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +74,8 @@ def assemble_target_offline_response_materials(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    effective_scope: EffectiveScope | None = None,
+    explicit_service_price_lookup: bool = False,
 ) -> TargetOfflineResponseMaterials:
     """Compose existing target selectors into one final factual material boundary."""
 
@@ -108,11 +112,19 @@ def assemble_target_offline_response_materials(
 
     selected_brand_id: str | None = None
     brand: TargetBrand | None = None
+    projection_strategy = strategy_context
+    if explicit_service_price_lookup and effective_scope is not None:
+        projection_strategy = strategy_match_for_explicit_service_price_lookup(
+            effective_scope,
+            service_family=strategy_context.family,
+        )
     if brand_resolution is None:
         projection = project_target_service_offers(
             evidence.service_context,
             bundle.strategy,
-            strategy_context,
+            projection_strategy,
+            explicit_service_price_lookup=explicit_service_price_lookup,
+            effective_scope=effective_scope,
         )
     else:
         selected_brand_id = brand_resolution.brand_id

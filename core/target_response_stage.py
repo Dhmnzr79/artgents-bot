@@ -11,6 +11,9 @@ from contracts.target_service_applicability import (
 )
 from contracts.target_service_content_topic import service_catalog_content_topic_matches
 from contracts.target_scope_aware_selection import TargetScopeAwareSelectionResult
+from core.target_explicit_service_price_lookup import (
+    explicit_lookup_offer_extent_conflicts,
+)
 from core.target_family_price_resolution import resolve_explicit_service_price_stage
 from core.target_service_applicability import filter_applicable_services
 from core.target_strategy_context import selection_patient_context_from_inputs
@@ -95,6 +98,15 @@ def derive_response_stage(
             offers = selection.offers_by_service_id.get(explicit_service_id, ())
             if offers:
                 return "concrete_service_price"
+            service = bundle.services.get(explicit_service_id)
+            if service is not None and explicit_lookup_offer_extent_conflicts(
+                service,
+                (),
+                effective_scope,
+            ):
+                return "data_gap"
+            if not offers:
+                return "data_gap"
         return "concrete_service_price"
     patient = selection_patient_context_from_inputs(
         effective_scope,

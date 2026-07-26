@@ -75,9 +75,12 @@ def _service_applicable(
     patient: SelectionPatientContext,
     explicit_service_id: str | None,
     service_id: str,
+    explicit_service_price_lookup: bool = False,
 ) -> bool:
     if not service.active:
         return False
+    if explicit_service_price_lookup and explicit_service_id == service_id:
+        return True
     selection = service.selection
     mode = selection.mode
     if mode == "direct":
@@ -102,6 +105,7 @@ def filter_applicable_services(
     strategy_context: TargetStrategyMatch | None = None,
     patient: SelectionPatientContext | None = None,
     explicit_service_id: str | None = None,
+    explicit_service_price_lookup: bool = False,
 ) -> tuple[TargetApplicableService, ...]:
     """Return active topic-matched services that pass authored selection rules."""
 
@@ -129,6 +133,7 @@ def filter_applicable_services(
             patient=patient,
             explicit_service_id=explicit_service_id,
             service_id=service_id,
+            explicit_service_price_lookup=explicit_service_price_lookup,
         ):
             continue
         applicable.append(

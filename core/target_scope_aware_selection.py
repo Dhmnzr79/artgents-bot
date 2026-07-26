@@ -25,8 +25,12 @@ from core.target_offer_price_reachability import (
     assess_broad_extent_coverages,
     merge_stage_reachable_offers_by_service,
 )
+from core.target_explicit_service_price_lookup import (
+    lookup_patient_context_from_effective_scope,
+)
 from core.target_strategy_context import (
     selection_patient_context_from_inputs,
+    strategy_match_for_explicit_service_price_lookup,
     strategy_match_from_effective_scope,
 )
 
@@ -42,14 +46,22 @@ def _project_offers_for_service(
     selected_option_id: str | None,
     selected_brand_id: str | None,
     explicit_offer_id: str | None,
+    effective_scope: EffectiveScope | None = None,
+    explicit_service_price_lookup: bool = False,
 ) -> tuple[TargetOffer, ...]:
     context = build_service_data_context(bundle, doctor_catalog, service_id)
+    projection_strategy = strategy_context
+    if explicit_service_price_lookup and effective_scope is not None:
+        projection_strategy = strategy_match_for_explicit_service_price_lookup(
+            effective_scope,
+            service_family=strategy_context.family,
+        )
     if selected_brand_id:
         brand_projection = project_target_service_brand_offers(
             context,
             bundle.brands,
             bundle.strategy,
-            strategy_context,
+            projection_strategy,
             selected_brand_id=selected_brand_id,
             selected_option_id=selected_option_id,
             explicit_offer_id=explicit_offer_id,
@@ -58,9 +70,11 @@ def _project_offers_for_service(
     projection = project_target_service_offers(
         context,
         bundle.strategy,
-        strategy_context,
+        projection_strategy,
         selected_option_id=selected_option_id,
         explicit_offer_id=explicit_offer_id,
+        effective_scope=effective_scope,
+        explicit_service_price_lookup=explicit_service_price_lookup,
     )
     return projection.offers
 
@@ -77,6 +91,7 @@ def _scoped_selection(
     explicit_offer_id: str | None,
     selected_option_id: str | None,
     selected_brand_id: str | None,
+    explicit_service_price_lookup: bool = False,
 ) -> TargetScopeAwareSelectionResult:
     applicable = filter_applicable_services(
         bundle,
@@ -84,6 +99,7 @@ def _scoped_selection(
         strategy_context=strategy_context,
         patient=patient,
         explicit_service_id=explicit_service_id,
+        explicit_service_price_lookup=explicit_service_price_lookup,
     )
     if not applicable:
         return TargetScopeAwareSelectionResult(
@@ -118,6 +134,8 @@ def _scoped_selection(
             selected_option_id=option_pin,
             selected_brand_id=selected_brand_id,
             explicit_offer_id=explicit_offer_id if service_id == explicit_service_id else None,
+            effective_scope=effective_scope,
+            explicit_service_price_lookup=explicit_service_price_lookup,
         )
         if offers:
             offers_by_service[service_id] = offers
@@ -306,17 +324,19 @@ def run_target_scope_aware_selection(
     )
 
     if explicit_service_id is not None:
+        lookup_patient = lookup_patient_context_from_effective_scope(effective_scope)
         return _scoped_selection(
             bundle,
             doctor_catalog,
             effective_scope=effective_scope,
             topic=topic,
-            patient=patient,
+            patient=lookup_patient,
             strategy_context=strategy_context,
             explicit_service_id=explicit_service_id,
             explicit_offer_id=explicit_offer_id,
             selected_option_id=selected_option_id,
             selected_brand_id=selected_brand_id,
+            explicit_service_price_lookup=True,
         )
 
     if effective_scope.extent == "unknown":

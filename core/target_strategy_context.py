@@ -10,6 +10,9 @@ from contracts.target_service_applicability import (
     ReportedContext,
     SelectionPatientContext,
 )
+from core.target_explicit_service_price_lookup import (
+    lookup_patient_context_from_effective_scope,
+)
 
 
 def _selection_jaw_from_effective_scope(
@@ -41,6 +44,26 @@ def selection_patient_context_from_inputs(
             if reported_context is not None
             else effective_scope.reported_context
         ),
+    )
+
+
+def strategy_match_for_explicit_service_price_lookup(
+    effective_scope: EffectiveScope,
+    *,
+    service_family: str | None = None,
+) -> TargetStrategyMatch:
+    """Strategy match for named-service catalog lookup; session axes excluded."""
+
+    patient = lookup_patient_context_from_effective_scope(effective_scope)
+    extent = None
+    if patient.extent != "unknown":
+        extent = patient.extent
+    return TargetStrategyMatch(
+        family=service_family,
+        extent=extent,
+        stage=patient.stage,
+        jaw=patient.jaw,
+        reported_context=patient.reported_context,
     )
 
 

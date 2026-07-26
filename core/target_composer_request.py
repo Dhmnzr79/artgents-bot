@@ -582,17 +582,17 @@ def materialize_target_composer_request(
             selected_cta_key=scoped.selected_cta_key,
             )
         )
-    if is_scope_aware_price_spec(scoped.spec):
-        if scoped.spec.response_stage in {"stage_clarify", "data_gap"}:
-            return _attach_composer_action_context(
-                TargetComposerRequest(
-                user_message=user_message,
-                spec=scoped.spec,
-                evidence_blocks=(),
-                selected_followups=scoped.selected_followups,
-                selected_cta_key=scoped.selected_cta_key,
-                )
+    if scoped.spec.response_stage in {"stage_clarify", "data_gap"}:
+        return _attach_composer_action_context(
+            TargetComposerRequest(
+            user_message=user_message,
+            spec=scoped.spec,
+            evidence_blocks=(),
+            selected_followups=scoped.selected_followups,
+            selected_cta_key=scoped.selected_cta_key,
             )
+        )
+    if is_scope_aware_price_spec(scoped.spec):
         offers = _scope_price_overview_sources(scoped, bound_package, bundle)
         root = _root(md_root)
         blocks = tuple(

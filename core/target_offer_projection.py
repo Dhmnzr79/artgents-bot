@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from contracts.effective_scope import EffectiveScope
 from contracts.response_schema import (
     TargetClinicStrategy,
     TargetOffer,
     TargetStrategyMatch,
+)
+from core.target_explicit_service_price_lookup import (
+    explicit_lookup_offer_extent_conflicts,
+    filter_offers_for_explicit_lookup,
 )
 from core.target_offer_extent_applicability import filter_offers_for_extent
 from core.response_strategy import resolve_target_strategy
@@ -43,6 +48,8 @@ def project_target_service_offers(
     *,
     selected_option_id: str | None = None,
     explicit_offer_id: str | None = None,
+    effective_scope: EffectiveScope | None = None,
+    explicit_service_price_lookup: bool = False,
 ) -> TargetOfferProjection:
     """Filter and rank authored offers without selecting a service or changing money."""
 
@@ -79,13 +86,27 @@ def project_target_service_offers(
                     continue
             eligible_offers.append(offer)
 
-    patient_extent = strategy_context.extent
-    if patient_extent is not None:
+    if explicit_service_price_lookup and effective_scope is not None:
+        if explicit_lookup_offer_extent_conflicts(
+            service_context.service,
+            tuple(eligible_offers),
+            effective_scope,
+        ):
+            eligible_offers = []
+        else:
+            eligible_offers = list(
+                filter_offers_for_explicit_lookup(
+                    tuple(eligible_offers),
+                    service_context.service,
+                    effective_scope,
+                )
+            )
+    elif strategy_context.extent is not None:
         eligible_offers = list(
             filter_offers_for_extent(
                 tuple(eligible_offers),
                 service_context.service,
-                patient_extent,  # type: ignore[arg-type]
+                strategy_context.extent,  # type: ignore[arg-type]
             )
         )
 

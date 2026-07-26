@@ -30,10 +30,10 @@ from evals.v5.final_scope_widget_e2e_retry3_live_contract import (
     assert_frozen_preflight_abort_artifacts_unchanged,
     assert_frozen_retry1_live_artifacts_unchanged,
     assert_frozen_retry2_live_artifacts_unchanged,
+    assert_frozen_retry3_live_artifacts_unchanged,
     assert_frozen_s62_live_artifacts_unchanged,
     assert_frozen_s63_live_artifacts_unchanged,
     assert_frozen_suite_unchanged,
-    assert_retry3_live_artifacts_absent,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -82,8 +82,9 @@ def test_retry3_namespace_isolated() -> None:
     assert RETRY2_ATTEMPT_MARKER_PATH.is_file()
 
 
-def test_retry3_live_artifacts_absent_pre_live() -> None:
-    assert_retry3_live_artifacts_absent()
+def test_retry3_live_artifacts_present_post_live() -> None:
+    assert_frozen_retry3_live_artifacts_unchanged()
+    assert LIVE_ATTEMPT_MARKER_PATH.is_file()
 
 
 def test_retry3_budget_and_planner_expectations() -> None:

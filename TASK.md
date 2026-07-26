@@ -1677,3 +1677,175 @@ git diff --check
 | Planner skip T2/T6/T7 | ✅ 0 calls; free-text 5 calls |
 | Dry-run CLI | ✅ `run_final_scope_widget_e2e_retry3_live.py --dry-run` |
 | Live | **STOP** — separate owner GO |
+
+---
+
+# TASK — FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT (governance)
+
+**Status:** governance PRE-CODE only · **NO LIVE / NO LLM / NO PRODUCT CODE / NO Retry4**
+
+**Baseline:** `341c1eb` (Retry3 live AUTOMATED_PASS) · owner manual verdict **FAIL** · Retry3 artifacts **frozen**
+
+## Summary
+
+| Item | Value |
+|------|-------|
+| Automated | `AUTOMATED_PASS` 8/8 HTTP, 34/34 provider calls |
+| Owner manual | **FAIL** 5/8 (T1,T2,T4 widget,T6,T7) |
+| Primary defect | Typed UI sets TurnFrame/EffectiveScope/`response_stage` ✅; Composer gets `user_message="продолжить"` ❌ |
+| Secondary | `price:None/...` widget refs; T1 broad overview too long |
+| Next product | optional `TargetComposerActionContext` + compact `broad_family_price` policy |
+| Forbidden now | LIVE, Retry4, Verifier changes, regex/phrase lists, A9 tuning, new selectors, A9 flag removal |
+
+Audits:
+
+- `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY3_MANUAL_REVIEW_AUDIT.md`
+- `docs/evidence/final_scope/FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT_SEAM_AUDIT.md`
+
+## Goal
+
+Capture immutable Retry3 manual FAIL evidence; pin Retry3 live artifact SHA-256; document Composer action-context seam and follow-up integrity policy; define implementation allowlist + acceptance matrix AM-1..AM-11.
+
+## Allowlist (this governance checkpoint)
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY3_MANUAL_REVIEW_AUDIT.md` | append-only manual incident |
+| `docs/evidence/final_scope/FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT_SEAM_AUDIT.md` | read-only seam audit |
+| `docs/FLAGS_AND_STATUS.md` | status note |
+| `evals/v5/final_scope_widget_e2e_retry3_live_contract.py` | frozen retry3 SHA pins + assert |
+| `tests/test_final_scope_post_retry3_composer_action_context_governance.py` | PRE-CODE checker |
+| `tests/test_final_scope_widget_e2e_retry3_governance.py` | post-live artifact presence pin |
+
+**Frozen (byte-identical):** all `final_scope_widget_e2e_retry3_*` live artifacts @ `341c1eb`, all retry1/2 artifacts, preflight-abort attempt #1, widget matrix, S62/S63.
+
+## Forbidden (governance)
+
+- LIVE / LLM / provider calls / Retry4
+- Product code changes
+- Modify/delete/rename frozen retry3 live artifacts
+- Rerun retry3 live
+- `A9_PATIENT_SCOPE_AUTHORITY` removal
+
+## Immutable SHA pins (retry3 @ `341c1eb`)
+
+| Artifact | SHA-256 |
+|----------|---------|
+| `final_scope_widget_e2e_retry3_attempt.json` | `c3f4fe0cab32ac0a4e94c3b140f10f415036c6f34cffc8463975be47920e66d8` |
+| `final_scope_widget_e2e_retry3_call_ledger.jsonl` | `1eeed9f6682e849020e54a51db8a0502046b69993ebc8f5bf74350d6a321dbd4` |
+| `final_scope_widget_e2e_retry3_live_stdout.log` | `1b74cc08844a02c540231167fe91dfac25a5f0edeee441442c550633107b7e49` |
+| `final_scope_widget_e2e_retry3_result.json` | `bbab70c9e55392d037921c091a1ed75c26cf06a6673d9d3181cbe650d3c1fb81` |
+| `final_scope_widget_e2e_retry3_manifest.json` | `c64e4054e5107c88e0ad69478100b6310fd4ea2ea41021034e535d5caa3cb3d3` |
+
+**Ledger (completed):** ingress=5, planner=5, boundary=8, composer=8, verifier=8, total=34.
+
+## Tests (PRE-CODE + COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-r3pl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_post_retry3_composer_action_context_governance.py `
+  tests/test_final_scope_widget_e2e_retry3_governance.py `
+  tests/test_final_scope_widget_e2e_retry2_post_live_audit_governance.py `
+  tests/test_final_scope_post_retry1_product_correction_governance.py -q
+git diff --check
+```
+
+**Note:** `run_final_scope_widget_e2e_retry3_live.py --dry-run` exits 2 when retry3 artifacts exist (rerun blocked) — expected post-live.
+
+**STOP after COMPLETION ✅. Product implementation blocked until separate owner GO.**
+
+## Completion record (POST_RETRY3 governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `341c1eb` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| Official automated verdict | **AUTOMATED_PASS** (immutable) |
+| Owner manual verdict | **FAIL** (immutable) |
+| Product implementation | **blocked** |
+
+---
+
+# TASK — FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT (implementation)
+
+**Status:** **blocked** until owner GO · **NO LIVE / NO LLM / NO Retry4**
+
+**Baseline:** POST_RETRY3 governance COMPLETION @ `341c1eb` · Retry3 live artifacts **frozen**
+
+## Goal
+
+Pass governed UI click semantics to Composer via optional typed `TargetComposerActionContext`; compact `broad_family_price` responses; eliminate `price:None/...` follow-up refs; preserve free-text and verifier paths.
+
+## Allowlist (implementation — owner GO required)
+
+| File | Role |
+|------|------|
+| `contracts/target_composer_action_context.py` | typed action context contract |
+| `core/target_composer_action_context.py` | builder from validated session-bound UI action |
+| `core/target_composer_request.py` | optional action context on request |
+| `core/target_composer_executor.py` | invocation + directive wiring |
+| `core/target_runtime_llm_messages.py` | structured action context in Composer SDK template |
+| `core/target_boundary_enforced_fullcontext_response.py` | pass-through to pipeline |
+| `core/target_policy_bound_verified_response_pipeline.py` | action context threading |
+| `core/target_runtime_turn.py` | build context from request ctx UI action |
+| `core/target_response_followup_materializer.py` | fail-closed: no `price:None/...` |
+| `core/target_response_followup_policy.py` | multi-service family ref policy |
+| `core/target_response_policy.py` | compact `broad_family_price` directives |
+| `core/target_spec_offline_response_package.py` | broad-family response directives |
+| `core/target_turn_frame_dispatch.py` | stage/directive hints if needed |
+| `tests/test_target_composer_action_context.py` | unit: builder + request/invocation |
+| `tests/test_final_scope_post_retry3_composer_action_context_offline.py` | T1–T8 offline real-runtime replay |
+| `tests/test_final_scope_widget_e2e_retry3_live_harness.py` | harness expectation updates |
+| `TASK.md` | completion record |
+
+**Frozen (do not edit):** Retry1/2/3 live artifacts, widget matrix `f4eecf75…`, protected acceptance targets.
+
+## Forbidden
+
+- LIVE / Retry4
+- Verifier changes (`core/target_response_verifier.py`, semantic verifier policy)
+- Regex / phrase lists
+- A9 prompt tuning
+- New selectors or legacy fallback routes
+- Temporary family route without architecture decision
+- `A9_PATIENT_SCOPE_AUTHORITY` removal
+
+## Acceptance matrix (AM-1..AM-11)
+
+See `docs/evidence/final_scope/FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT_SEAM_AUDIT.md`.
+
+| ID | Key check |
+|----|-----------|
+| AM-1 | T1 compact broad implantation overview + 3 scope buttons |
+| AM-2 | T2 scoped full_arch prices; Composer has typed action context |
+| AM-3 | T3 one-tooth correction unchanged |
+| AM-4 | T4 stream prices; no `price:None/...` |
+| AM-5 | T5 broad prosthetics unchanged PASS bar |
+| AM-6 | T6 `stage_clarify` concise; action context present |
+| AM-7 | T7 crown on implant; action context present |
+| AM-8 | T8 A9 crown stream unchanged |
+| AM-9 | `price:None/...` fail-closed |
+| AM-10 | Free-text medical/clarify regression unchanged |
+| AM-11 | `/ask` ≡ `/ask/stream` Composer action wiring |
+
+## Tests (implementation COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$env:A9_PATIENT_SCOPE_AUTHORITY = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-r3impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_target_composer_action_context.py `
+  tests/test_final_scope_post_retry3_composer_action_context_offline.py `
+  tests/test_final_scope_widget_e2e_retry3_live_harness.py `
+  tests/test_final_scope_post_retry3_composer_action_context_governance.py `
+  tests/test_final_scope_widget_e2e_retry3_governance.py -q
+git diff --check
+```
+
+**STOP after COMPLETION ✅. No LIVE without separate owner GO.**
+

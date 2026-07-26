@@ -55,7 +55,7 @@
 
 **FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION:** COMPLETION ✅ @ `c670b96`; T2/T5 product correction landed. Forensic `_retry1_live_run_stdout.txt` verified and removed @ RETRY2 pre-live.
 
-**FINAL_SCOPE_WIDGET_E2E_RETRY3:** pre-live COMPLETION ✅ @ `b4b47bc`; namespace `final_scope_widget_e2e_retry3_*`; offline 8/8 + planner budget proof; live **blocked** until owner GO. CLI: `evals/v5/run_final_scope_widget_e2e_retry3_live.py --dry-run`.
+**FINAL_SCOPE_WIDGET_E2E_RETRY3:** live AUTOMATED_PASS @ `341c1eb`; owner manual **FAIL**; rerun blocked. POST_RETRY3 governance: Composer action-context seam + `price:None` integrity. Product implementation **blocked** until owner GO. Frozen artifacts pinned in `evals/v5/final_scope_widget_e2e_retry3_live_contract.py`.
 
 ---
 

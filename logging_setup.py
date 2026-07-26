@@ -134,8 +134,14 @@ def get_logger(name="bot"):
         _LOG_PURGE_DONE = True
         purge_old_log_files()
     logger.setLevel(logging.INFO)
+    stream = sys.stdout
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     fh = RotatingFileHandler(LOG_FILE, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
-    ch = logging.StreamHandler(sys.stdout)
+    ch = logging.StreamHandler(stream)
     fmt = JsonLineFormatter()
     fh.setFormatter(fmt)
     ch.setFormatter(fmt)

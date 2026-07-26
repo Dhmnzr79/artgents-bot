@@ -263,9 +263,7 @@ def run_pre_resolver_turn(
                     request.ctx["current_ui_scope_action"] = ui_resolution.action.model_dump()
                 except Exception:
                     pass
-                if ui_resolution.planner_message:
-                    q = ui_resolution.planner_message
-                elif not q:
+                if not q:
                     q = "продолжить"
             elif is_ui_stage_ref(ref_eff):
                 ui_resolution = resolve_ui_stage_ref_click(
@@ -295,9 +293,7 @@ def run_pre_resolver_turn(
                     request.ctx["current_ui_stage_action"] = ui_resolution.action.model_dump()
                 except Exception:
                     pass
-                if ui_resolution.planner_message:
-                    q = ui_resolution.planner_message
-                elif not q:
+                if not q:
                     q = "продолжить"
             else:
                 nav = resolve_target_followup_navigation(

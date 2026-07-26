@@ -89,7 +89,7 @@ def test_http_ask_ref_only_ui_scope_click(monkeypatch: pytest.MonkeyPatch) -> No
         json={"q": "", "ref": UI_REF, "sid": sid, "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert captured["q"] == "Один зуб"
+    assert captured["q"] == "продолжить"
     assert captured["ui_scope"]["extent"] == "one_tooth"
 
 

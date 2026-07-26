@@ -124,6 +124,77 @@ def test_needs_clarification_returns_terminal_clarify_without_materialize() -> N
     assert result.spec.required_components == ()
 
 
+def test_needs_clarification_broad_prosthetics_price_materializes() -> None:
+    from contracts.effective_scope import EffectiveScope
+
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": ["price"],
+            "primary_aspect": "price",
+            "service_id": None,
+            "topic": "prosthetics",
+            "topic_confidence": 0.9,
+            "needs_clarify": True,
+        },
+        allowed_topics=frozenset({"implantation", "prosthetics", "doctors"}),
+        allowed_service_ids=frozenset({"all_on_4"}),
+    )
+    result = dispatch_target_turn_frame_response(
+        frame,
+        _envelope(allowed_topics=("implantation", "prosthetics", "doctors")),
+        effective_scope=EffectiveScope(
+            extent="unknown",
+            topic="prosthetics",
+            source="unknown",
+            provenance="unknown",
+        ),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.response_stage == "broad_family_price"
+    assert result.policy_request.scope_price_topic == "prosthetics"
+
+
+def test_ui_scope_click_with_medical_handoff_materializes_scoped_price() -> None:
+    from contracts.effective_scope import EffectiveScope
+
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            needs_clarify=True,
+            service_id=None,
+            route="price_lookup",
+            aspects=["price"],
+            primary_aspect="price",
+        ),
+        _envelope(boundary_decision="medical_handoff"),
+        effective_scope=EffectiveScope(
+            extent="full_arch",
+            topic="implantation",
+            source="ui_action",
+            provenance="target:ui_scope/implantation/full_arch",
+        ),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.response_mode == "answer"
+    assert result.policy_request.scope_price_topic == "implantation"
+    assert result.policy_request.response_stage is None
+
+
+def test_medical_handoff_price_without_ui_scope_stays_terminal() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            service_id=None,
+            aspects=["price"],
+            primary_aspect="price",
+            needs_clarify=False,
+        ),
+        _envelope(boundary_decision="medical_handoff"),
+        effective_scope=None,
+    )
+    assert result.kind == "terminal"
+    assert result.terminal_mode == "medical_handoff_nonmaterializable"
+
+
 def test_missing_service_id_with_price_intent_materializes_scope_price() -> None:
     result = dispatch_target_turn_frame_response(
         _frame(service_id=None, aspects=["price"], primary_aspect="price"),

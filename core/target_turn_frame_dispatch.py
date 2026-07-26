@@ -285,6 +285,29 @@ def _materialize_policy_request(
     )
 
 
+def _scope_price_materialize_topic(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+    effective_scope: EffectiveScope | None,
+) -> str | None:
+    """Scope-price path that preempts terminal clarify or UI-label medical handoff."""
+
+    if _service_id_is_usable(turn_frame, envelope):
+        return None
+    scope_topic = _scope_price_topic(turn_frame, envelope)
+    if scope_topic is None:
+        return None
+    if (
+        effective_scope is not None
+        and effective_scope.source == "ui_action"
+        and effective_scope.extent != "unknown"
+    ):
+        return scope_topic
+    if envelope.boundary_decision == "medical_handoff":
+        return None
+    return scope_topic
+
+
 def _is_fullcontext_content_only_components(
     components: tuple[TargetResponseComponent, ...],
     response_mode: TargetResponseMode,
@@ -311,6 +334,23 @@ def dispatch_target_turn_frame_response(
         _reject_invalid(turn_frame.field_meta.needs_clarification, "needs_clarification")
     if turn_frame.service_id is not None:
         _reject_invalid(turn_frame.field_meta.service_id, "service_id")
+
+    scope_price_topic = _scope_price_materialize_topic(
+        turn_frame,
+        envelope,
+        effective_scope,
+    )
+    if scope_price_topic is not None:
+        policy_request = _materialize_scope_price_policy_request(
+            response_mode="answer",
+            turn_topic=scope_price_topic,
+            effective_scope=effective_scope,
+            envelope=envelope,
+        )
+        return TargetTurnFrameMaterializeDispatch(
+            kind="materialize",
+            policy_request=policy_request,
+        )
 
     if envelope.boundary_decision == "medical_handoff":
         response_mode: TargetResponseMode = "medical_handoff"

@@ -104,6 +104,25 @@ def test_broad_prosthetics_same_mechanism() -> None:
     assert result.verified.spec.scope_price_topic == "prosthetics"
 
 
+def test_broad_prosthetics_materializes_when_planner_needs_clarify() -> None:
+    frame = _family_overview_frame(topic="prosthetics", needs_clarify=True)
+    composer = RecordingComposerBackend(text="Обзор протезирования.")
+    semantic = RecordingSemanticBackend()
+    inputs = _pipeline_inputs()
+    inputs["user_message"] = "Сколько стоит протезирование?"
+    result = run_target_offline_turn_frame_bound_response(
+        frame,
+        _envelope(allowed_topics=("implantation", "prosthetics", "doctors")),
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+        client_id="demo",
+    )
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.verified.spec.response_stage == "broad_family_price"
+    assert len(result.verified.navigation_followups) == 3
+
+
 def test_full_arch_scoped_has_no_scope_nav() -> None:
     scope = EffectiveScope(
         extent="full_arch",

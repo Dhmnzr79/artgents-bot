@@ -1207,7 +1207,7 @@ git diff --check
 
 # TASK — FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION (governance)
 
-**Status:** governance checkpoint only · **NO LIVE / NO LLM / NO PRODUCT CODE**
+**Status:** implementation COMPLETION ✅ · **NO LIVE / NO LLM / NO Retry2**
 
 **Baseline:** `d76870a` (`codex/stage-a`) · RETRY1 live = official **FAIL** · live/rerun **blocked**
 
@@ -1369,3 +1369,17 @@ git diff --check
 | COMPLETION | N/A (governance only) |
 | Implementation | **blocked** |
 | Untracked stdout forensic | captured in seam audit |
+
+## Completion record (POST_RETRY1 implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `f480670` (governance) |
+| PRE-CODE | ✅ (governance checker unchanged) |
+| COMPLETION | ✅ |
+| Pytest | 87 passed, 1 skipped (`test_retry1_dry_run_cli` — live artifacts present) |
+| Fake-provider 8/8 | ✅ `test_fake_provider_executes_all_eight_http_turns_without_network` |
+| T2 fix | `UiScopeAction` + scope-price dispatch preempts `needs_clarification` / `medical_handoff` on typed click |
+| T5 fix | broad prosthetics price materializes via `broad_family_price` despite planner `needs_clarify` |
+| UTF-8 | `logging_setup.py` + harness `configure_process_env()` reconfigure stdout/stderr |
+| Live | **STOP** — separate owner GO for Retry1 re-run |

@@ -10,7 +10,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -29,6 +28,7 @@ from evals.v5.final_scope_widget_e2e_live_harness import (
     configure_process_env,
     run_non_network_preflight,
     validate_runtime_seams,
+    _scope_nav_refs,
 )
 from evals.v5.final_scope_widget_e2e_live_provider_audit import (
     get_audit_state,
@@ -40,6 +40,7 @@ from evals.v5.final_scope_widget_e2e_retry1_live_contract import (
     DEFAULT_LIVE_ARTIFACT_PATHS,
     LIVE_ATTEMPT_MARKER_PATH,
     LIVE_CALL_LEDGER_PATH,
+    LIVE_RAW_ARTIFACT_PATH,
     MEASUREMENT_ID,
     S69_DELETED_LEGACY_MODULES,
     S69_FORBIDDEN_HARNESS_IMPORT_PATTERNS,
@@ -75,6 +76,17 @@ def _turn_frame_for_number(turn_number: int):
                 "modifiers": [],
             }
         )
+    if turn_number == 2:
+        return _family_overview_frame(
+            route="price_lookup",
+            needs_clarify=True,
+            patient_scope={
+                "extent": "full_arch",
+                "jaw": "unknown",
+                "stage": "unknown",
+                "modifiers": [],
+            },
+        )
     if turn_number == 3:
         return _family_overview_frame(
             patient_scope={
@@ -96,12 +108,35 @@ def _turn_frame_for_number(turn_number: int):
     if turn_number == 5:
         return _family_overview_frame(
             topic="prosthetics",
+            needs_clarify=True,
             patient_scope={
                 "extent": "unknown",
                 "jaw": "unknown",
                 "stage": "unknown",
                 "modifiers": [],
-            }
+            },
+        )
+    if turn_number == 6:
+        return _family_overview_frame(
+            topic="prosthetics",
+            route="price_lookup",
+            patient_scope={
+                "extent": "one_tooth",
+                "jaw": "unknown",
+                "stage": "unknown",
+                "modifiers": [],
+            },
+        )
+    if turn_number == 7:
+        return _family_overview_frame(
+            topic="prosthetics",
+            route="price_lookup",
+            patient_scope={
+                "extent": "one_tooth",
+                "jaw": "unknown",
+                "stage": "implant_placed",
+                "modifiers": [],
+            },
         )
     if turn_number == 8:
         return _family_overview_frame(
@@ -123,91 +158,70 @@ def _turn_frame_for_number(turn_number: int):
     )
 
 
-def _scope_buttons(topic: str) -> list[dict[str, str]]:
-    return [
-        {
-            "label": "Один зуб",
-            "ref": build_ui_scope_ref(topic=topic, extent="one_tooth"),
-        },
-        {
-            "label": "Несколько зубов",
-            "ref": build_ui_scope_ref(topic=topic, extent="few_teeth"),
-        },
-        {
-            "label": "Вся челюсть",
-            "ref": build_ui_scope_ref(topic=topic, extent="full_arch"),
-        },
-    ]
+
+class _GroundedEvidenceComposerBackend:
+    """Composer stub that echoes only evidence-grounded offer prices for verifier parity."""
+
+    def __init__(self) -> None:
+        self.invocations: list[object] = []
+
+    def generate(self, invocation: object, /) -> str:
+        self.invocations.append(invocation)
+        import json
+
+        blocks = json.loads(str(getattr(invocation, "primary_evidence_json", "[]")))
+        parts = ["Стоимость зависит от метода лечения."]
+        for block in blocks:
+            if not isinstance(block, dict) or block.get("kind") != "offer":
+                continue
+            inner_raw = block.get("text")
+            if not isinstance(inner_raw, str) or not inner_raw.strip():
+                continue
+            try:
+                inner = json.loads(inner_raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(inner, dict):
+                continue
+            price = inner.get("price")
+            if not isinstance(price, dict):
+                continue
+            service_id = str(inner.get("service_id") or "услуга")
+            mode = str(price.get("mode") or "")
+            if mode == "fixed":
+                amount = int(price.get("amount") or 0)
+                parts.append(f"от {amount:,} ₽".replace(",", " "))
+            elif mode == "from":
+                amount = int(price.get("min_amount") or 0)
+                parts.append(f"от {amount:,} ₽".replace(",", " "))
+            elif mode == "range":
+                lo = int(price.get("min_amount") or 0)
+                hi = int(price.get("max_amount") or 0)
+                parts.append(f"от {lo:,} до {hi:,} ₽".replace(",", " "))
+        if len(parts) == 1:
+            return "Краткий обзор цен."
+        return " ".join(parts)
 
 
-def _stage_buttons(topic: str) -> list[dict[str, str]]:
-    return [
-        {
-            "label": "Имплант установлен",
-            "ref": build_ui_stage_ref(topic=topic, stage="implant_placed"),
-        },
-        {
-            "label": "Свой зуб сохранился",
-            "ref": build_ui_stage_ref(topic=topic, stage="natural_tooth_present"),
-        },
-    ]
-
-
-def _service_payload(
-    *,
-    answer: str = "Краткий обзор цен.",
-    quick_replies: list[dict[str, str]] | None = None,
-    response_stage: str | None = None,
-) -> dict[str, object]:
-    meta: dict[str, object] = {
-        "service_route": "target_fullcontext_materialized",
-        "answer_path": "target_fullcontext",
-    }
-    if response_stage:
-        meta["response_stage"] = response_stage
-    return {
-        "answer": answer,
-        "quick_replies": list(quick_replies or []),
-        "meta": meta,
-    }
-
-
-def _canned_orchestration_result(
-    turn_number: int,
-    kwargs: dict[str, object],
-) -> AskOrchestrationResult:
-    sid = str(kwargs["sid"])
-    q = str(kwargs.get("q") or "")
-    if turn_number == 1:
-        payload = _service_payload(
-            quick_replies=_scope_buttons("implantation"),
-            response_stage="broad_family_price",
-        )
-    elif turn_number == 5:
-        payload = _service_payload(
-            quick_replies=_scope_buttons("prosthetics"),
-            response_stage="broad_family_price",
-        )
-    elif turn_number == 6:
-        payload = _service_payload(quick_replies=_stage_buttons("prosthetics"))
-    else:
-        payload = _service_payload(quick_replies=[])
-    return AskOrchestrationResult(
-        kind="service_reply",
-        q=q,
-        sid=sid,
-        client_id=str(kwargs["client_id"]),
-        service_payload=payload,
-        service_route="target_fullcontext_materialized",
+def _install_retry1_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    import importlib
+    import app as app_module
+    import core.target_cached_full_context as cached_module
+    import core.target_runtime_client_context as runtime_context_module
+    from evals.v5 import final_scope_widget_e2e_live_harness as harness_module
+    from evals.v5.final_scope_widget_e2e_live_provider_audit import record_fullcontext_build
+    from ingress_gate import IngressRouteResult
+    from core.target_runtime_client_context import clear_target_runtime_client_context_cache
+    from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn as real_orchestrate
+    from tests.test_s61_correction_target_runtime import (
+        BackendPayload,
+        RecordingBoundaryBackend,
+        RecordingSemanticBackend,
     )
 
-
-def _install_retry1_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, MagicMock]:
-    import app as app_module
-    from evals.v5 import final_scope_widget_e2e_live_harness as harness_module
-    from ingress_gate import IngressRouteResult
-
-    orchestrate_calls: list[str] = []
+    cached_module = importlib.reload(cached_module)
+    runtime_context_module = importlib.reload(runtime_context_module)
+    original_fullcontext_build = cached_module.build_target_cached_full_context
     original_resolve = harness_module._resolve_request_body
 
     def fake_resolve_request_body(
@@ -246,7 +260,7 @@ def _install_retry1_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, Mag
             reason="test",
             policy_key=None,
             requested_service=None,
-            source="test",
+            source="skipped",
             is_urgent=False,
         )
 
@@ -255,27 +269,45 @@ def _install_retry1_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, Mag
         frame = _turn_frame_for_number(turn_number)
         return PlannerAttempt(frame=frame, status="ok")
 
-    def fake_orchestrate_target_fullcontext_turn(**kwargs: object) -> AskOrchestrationResult:
+    fullcontext_cache: dict[str, object] = {"value": None}
+    clear_target_runtime_client_context_cache()
+
+    def cached_fullcontext_build(*args: object, **kwargs: object):
+        if fullcontext_cache["value"] is None:
+            record_fullcontext_build()
+            fullcontext_cache["value"] = original_fullcontext_build(*args, **kwargs)
+        return fullcontext_cache["value"]
+
+    def orchestrate_with_fakes(**kwargs: object) -> AskOrchestrationResult:
         turn_number = get_audit_state().current_turn or 1
-        orchestrate_calls.append(str(kwargs.get("q") or ""))
-        return _canned_orchestration_result(turn_number, kwargs)
-
-    original_orchestrate = app_module._orchestrate_ask_turn
-
-    def traced_orchestrate(data: dict) -> AskOrchestrationResult:
-        return original_orchestrate(data)
+        if turn_number == 2:
+            boundary = RecordingBoundaryBackend(BackendPayload("medical_handoff", 0.9))
+        else:
+            boundary = RecordingBoundaryBackend(BackendPayload("none", 0.95))
+        return real_orchestrate(
+            q=str(kwargs["q"]),
+            sid=str(kwargs["sid"]),
+            client_id=str(kwargs["client_id"]),
+            data=kwargs.get("data") if isinstance(kwargs.get("data"), dict) else None,
+            composer_backend=_GroundedEvidenceComposerBackend(),
+            semantic_backend=RecordingSemanticBackend(),
+            boundary_backend=boundary,
+        )
 
     monkeypatch.setattr("ingress_gate.classify_ingress", fake_classify_ingress)
+    monkeypatch.setattr("orchestration.pre_resolver_turn.classify_ingress", fake_classify_ingress)
     monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", fake_plan_turn_attempt)
+    monkeypatch.setattr("orchestration.planner_turn.plan_turn_attempt", fake_plan_turn_attempt)
+    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", orchestrate_with_fakes)
+    monkeypatch.setattr(cached_module, "build_target_cached_full_context", cached_fullcontext_build)
     monkeypatch.setattr(
-        app_module,
-        "orchestrate_target_fullcontext_turn",
-        fake_orchestrate_target_fullcontext_turn,
+        runtime_context_module,
+        "build_target_cached_full_context",
+        cached_fullcontext_build,
     )
     monkeypatch.setattr(harness_module, "_resolve_request_body", fake_resolve_request_body)
-    spy = MagicMock(side_effect=traced_orchestrate)
-    monkeypatch.setattr(app_module, "_orchestrate_ask_turn", spy)
-    return {"orchestrate_ask_turn": spy, "orchestrate_calls": orchestrate_calls}
+
+    return {"orchestrate_with_fakes": orchestrate_with_fakes}
 
 
 @pytest.fixture(autouse=True)
@@ -446,7 +478,7 @@ def test_fake_provider_executes_all_eight_http_turns_without_network(
         marker,
         build_retry1_attempt_marker_payload(baseline_commit="retry1-offline"),
     )
-    fakes = _install_retry1_http_fakes(monkeypatch)
+    _install_retry1_http_fakes(monkeypatch)
 
     payload = run_http_harness(
         live=False,
@@ -459,7 +491,15 @@ def test_fake_provider_executes_all_eight_http_turns_without_network(
 
     assert len(payload["turn_results"]) == MAX_HTTP_TURNS
     assert all(row["status_code"] == 200 for row in payload["turn_results"])
-    assert fakes["orchestrate_ask_turn"].call_count == MAX_HTTP_TURNS
+    assert all(row["automated_turn_verdict"] == "PASS" for row in payload["turn_results"])
+    assert payload["summary"]["technical"]["turn_automated_pass"] == MAX_HTTP_TURNS
+    assert payload["summary"]["technical"]["all_materialized"] is True
+    assert payload["summary"]["technical"]["fullcontext_build_count"] == 1
+    turn2 = payload["turn_results"][1]
+    assert "terminal" not in str((turn2.get("meta") or {}).get("service_route") or "")
+    turn5 = payload["turn_results"][4]
+    assert len(_scope_nav_refs(list(turn5.get("quick_replies") or []))) == 3
+    assert "₽" in str(turn5.get("answer_text") or "")
     stream_turns = [row for row in payload["turn_results"] if row["endpoint"] == "/ask/stream"]
     assert len(stream_turns) == 2
     assert all("event: ui" in str(row.get("stream_text") or "") for row in stream_turns)
@@ -483,7 +523,7 @@ def test_ask_and_stream_invoke_target_only_orchestration(
         marker,
         build_retry1_attempt_marker_payload(baseline_commit="retry1-route"),
     )
-    fakes = _install_retry1_http_fakes(monkeypatch)
+    _install_retry1_http_fakes(monkeypatch)
     payload = run_http_harness(
         live=False,
         skip_live_prepare=True,
@@ -496,10 +536,12 @@ def test_ask_and_stream_invoke_target_only_orchestration(
     stream_count = sum(1 for row in payload["turn_results"] if row["endpoint"] == "/ask/stream")
     assert ask_count == 6
     assert stream_count == 2
-    assert fakes["orchestrate_ask_turn"].call_count == MAX_HTTP_TURNS
+    assert all(row["automated_turn_verdict"] == "PASS" for row in payload["turn_results"])
 
 
 def test_retry1_dry_run_cli() -> None:
+    if LIVE_RAW_ARTIFACT_PATH.exists():
+        pytest.skip("retry1 live artifacts present; dry-run blocked until artifacts removed")
     proc = subprocess.run(
         [sys.executable, "evals/v5/run_final_scope_widget_e2e_retry1_live.py", "--dry-run"],
         cwd=str(_REPO_ROOT),

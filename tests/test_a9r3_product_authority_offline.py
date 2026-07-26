@@ -253,6 +253,48 @@ def test_ac3_6_ui_scope_click_beats_planner_extent(flask_ctx) -> None:
     assert scope["source"] == "ui_action"
 
 
+def test_ui_scope_full_arch_beats_medical_handoff_and_needs_clarify(flask_ctx) -> None:
+    sid = f"s-a9r3-ui-handoff-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid)
+    ui_ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
+    request.ctx["current_ui_scope_action"] = UiScopeAction(
+        extent="full_arch",
+        topic="implantation",
+        ref=ui_ref,
+    ).model_dump()
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "price_lookup",
+            "aspects": ["price"],
+            "primary_aspect": "price",
+            "service_id": None,
+            "topic": "implantation",
+            "topic_confidence": 0.9,
+            "needs_clarify": True,
+            "patient_scope": {
+                "extent": "full_arch",
+                "jaw": "unknown",
+                "stage": "unknown",
+                "modifiers": [],
+            },
+        },
+        allowed_topics=_ALLOWED_TOPICS,
+        allowed_service_ids=_ALLOWED_SERVICES,
+    )
+    _install_turn_frame(frame)
+    outcome = run_target_fullcontext_runtime_turn(
+        client_id="demo",
+        sid=sid,
+        user_message="продолжить",
+        composer_backend=RecordingComposerBackend("318 000 ₽ за All-on-4."),
+        semantic_backend=RecordingSemanticBackend(),
+        boundary_backend=RecordingBoundaryBackend(BackendPayload("medical_handoff", 0.9)),
+    )
+    assert outcome.widget.kind == "materialized"
+    route = str((outcome.widget.payload.get("meta") or {}).get("service_route") or "")
+    assert "terminal" not in route
+
+
 def test_ac3_7_ambiguous_turn_does_not_overwrite_session(flask_ctx) -> None:
     sid = f"s-a9r3-7-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)

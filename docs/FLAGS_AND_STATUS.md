@@ -66,7 +66,9 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_PRICE_SCOPE_COVERAGE_NAV:** implementation COMPLETE @ `2b5e90d` — `applies_to_extents` on offers; AC2/AC3 filter anchors and scope-nav to confirmed price routes; `few_teeth` without route → data_gap.
 
-**FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY:** governance @ `2b5e90d` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
+**FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY:** implementation COMPLETE @ `19297fc` — one-hop navigable scope-nav; explicit `applies_to_extents` on demo prosthetics offers.
+
+**FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY:** governance @ `19297fc` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
 
 ---
 

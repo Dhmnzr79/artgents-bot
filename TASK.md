@@ -2626,8 +2626,190 @@ git diff --check
 
 | Field | Value |
 |-------|-------|
+| Baseline HEAD | `2b5e90d` |
+| Implementation HEAD | `19297fc` |
+| COMPLETION | ✅ |
+| Acceptance 1–16 | ✅ |
+| Frozen artifacts | ✅ |
+
+---
+
+# TASK — FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY (governance)
+
+**Status:** governance COMPLETION pending · **NO LIVE / NO LLM / NO A9 tuning / NO product code**
+
+**Baseline:** `19297fc` (`codex/stage-a`) · **FINAL_PROSTHETICS_PRICE_NAV_REACHABILITY complete**
+
+**Owner GO:** Phase 1 governance + PRE-CODE only. Implementation blocked until PRE-CODE ✅.
+
+Seam audit: `docs/evidence/price_service/FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY_SEAM_AUDIT.md`
+Canonical law: `docs/PRICE_SERVICE_ARCHITECTURE.md`
+
+## Goal
+
+Separate **commercial catalog lookup** (user explicitly names a service and asks price) from **patient applicability** (broad/scoped recommendation) inside existing AC2/AC3 — without a second pipeline, session reset, or eligibility claims.
+
+## Problem (binding)
+
+Cross-turn: session `extent=full_arch` → user asks «А сколько стоит одномоментная имплантация?» with `service_id=one_stage`. Inherited session scope filters out the service (`one_stage` requires `one_tooth|few_teeth` + `extraction_context`) → empty evidence → `target_fullcontext_error`.
+
+## Normative rule (binding)
+
+When **all** hold:
+
+- `service_id` explicitly and confidently set on current turn;
+- intent/aspect includes price;
+- service active in client catalog;
+
+execute **explicit service price lookup**:
+
+- target via existing `explicit_service_id` / `spec.service_id`;
+- inherited session patient scope **must not block** structured price lookup;
+- missing `extraction_context` **must not block** `one_stage` catalog price;
+- offers only from canonical target pricebook;
+- `applies_to_extents` + billing unit remain authoritative for value/unit;
+- response **must not** claim patient eligibility;
+- optional brief note that applicability is determined after diagnostics.
+
+**Current-turn incompatible scope** (e.g. named per-tooth service + current-turn `full_arch`): fail-closed `data_gap`/clarification — no jaw math, no family fallback.
+
+Distinguish axes by existing provenance (`extent_axis.source`: `session` vs `a9_turn` / `ui_action` / `ui_stage_action`). **No regex.**
+
+## Session semantics (binding)
+
+- Do not clear session or `patient_facts`.
+- Do not write service name as patient fact.
+- Vague follow-up without new `service_id` keeps existing session focus.
+- Materialized answer may update ordinary service focus.
+
+## Unchanged (binding)
+
+AC1 typed UI · AC2 broad applicability · AC3 broad/scoped family price · offer reachability · Planner · A9 · Verifier · medical boundary · session schema · service similarity · logging · frozen artifacts.
+
+## Allowlist (governance)
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/price_service/FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY_SEAM_AUDIT.md` | seam audit |
+| `docs/FLAGS_AND_STATUS.md` | milestone note |
+| `tests/test_final_explicit_service_price_lookup_boundary_governance.py` | PRE-CODE checker |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅)
+
+| File | Role |
+|------|------|
+| `core/target_explicit_service_price_lookup.py` | lookup vs applicability boundary helpers |
+| `core/target_service_applicability.py` | explicit lookup bypass inherited session gate |
+| `core/target_offer_projection.py` | lookup context for extent filter |
+| `core/target_offline_response_assembly.py` | wire lookup into S23 |
+| `core/target_scope_aware_selection.py` | explicit_service_id lookup path |
+| `core/target_response_stage.py` | incompatible current-turn → data_gap |
+| `core/target_strategy_context.py` | lookup patient context from axis provenance |
+| `tests/test_final_explicit_service_price_lookup_boundary_implementation.py` | acceptance 1–18 |
+| `tests/test_final_explicit_service_price_lookup_boundary_sparse_fixtures.py` | in-memory multiclient packs |
+| `tests/test_final_explicit_service_price_lookup_boundary_cross_turn_matrix.py` | parameterized cross-turn regression |
+
+**Frozen (byte-identical):** Retry1–4, A9/A9R/S-series, W1b, widget matrix.
+
+## Forbidden
+
+- LIVE / LLM / A9 tuning / Planner prompt changes
+- Verifier redesign
+- regex / phrase stop-lists
+- session clear workaround
+- `one_stage` hardcode
+- demo client IDs in shared core
+- new pricing route / selector
+- family price fallback for named protocol
+- eligibility claims
+- frozen live artifact edits
+
+## Acceptance matrix (implementation)
+
+| ID | Case |
+|----|------|
+| 1 | Session `full_arch` → explicit `one_stage` price materialized |
+| 2 | Session `one_tooth` → explicit `all_on_4` jaw prices |
+| 3 | Session `full_arch` → explicit zirconia from 25 000 ₽ |
+| 4 | Explicit `one_stage`, stage unknown — price shown |
+| 5 | Explicit service + compatible current-turn scope |
+| 6 | Explicit service + incompatible current-turn scope → data_gap |
+| 7 | Named service, no public price → existing path |
+| 8 | Named service absent → not-offered path |
+| 9 | Vague follow-up without new `service_id` — session continuity |
+| 10 | Broad implantation overview unchanged |
+| 11 | Typed scope/stage clicks unchanged |
+| 12 | Informational turn without price — no lookup |
+| 13 | No eligibility / treatment choice claims |
+| 14 | Exact prices, brands, billing units preserved |
+| 15 | `/ask` + `/ask/stream` parity |
+| 16 | SID isolation / reset / terminal rules unchanged |
+| 17 | Sparse multiclient fixture — no demo IDs in core |
+| 18 | Frozen artifacts byte-identical |
+
+**Cross-turn matrix (offline):** each authored session extent × each active priced service explicit ask — no generic error; exact applicability + billing unit.
+
+## Tests (PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-espl-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_explicit_service_price_lookup_boundary_governance.py `
+  tests/test_final_prosthetics_price_nav_reachability_implementation.py `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+git diff --check
+```
+
+**STOP after PRE-CODE ✅.**
+
+## Completion record (FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `19297fc` |
+| PRE-CODE | ✅ |
+| Seam audit | ✅ |
+| Implementation | **STOP** |
+
+---
+
+# TASK — FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY (implementation)
+
+**Status:** blocked until governance PRE-CODE ✅
+
+**Baseline:** governance COMPLETION @ `19297fc`
+
+## Tests (COMPLETION — after implementation)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-espl-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_explicit_service_price_lookup_boundary_implementation.py `
+  tests/test_final_explicit_service_price_lookup_boundary_sparse_fixtures.py `
+  tests/test_final_explicit_service_price_lookup_boundary_cross_turn_matrix.py `
+  tests/test_final_explicit_service_price_lookup_boundary_governance.py `
+  tests/test_final_prosthetics_price_nav_reachability_implementation.py `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_ac3_scope_price_flow_offline.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_final_scope_widget_e2e_closeout_implementation.py `
+  tests/test_final_scope_widget_e2e_retry4_governance.py -q
+python -m pytest --collect-only -q
+git diff --check
+```
+
+## Completion record (FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY implementation)
+
+| Field | Value |
+|-------|-------|
 | Baseline HEAD | pending |
 | COMPLETION | pending |
-| Acceptance 1–16 | pending |
+| Acceptance 1–18 | pending |
+| Cross-turn matrix | pending |
 | Frozen artifacts | pending |
 

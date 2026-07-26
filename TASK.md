@@ -1461,3 +1461,90 @@ git diff --check
 | Dry-run CLI | ✅ `run_final_scope_widget_e2e_retry2_live.py --dry-run` |
 | Forensic stdout | verified SHA `d3e3f159…` then removed (no `git clean`) |
 | Live | **STOP** — separate owner GO |
+
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_RETRY2_POST_LIVE_AUDIT (governance)
+
+**Status:** governance COMPLETION ✅ · **NO LIVE / NO LLM / NO PRODUCT CODE**
+
+**Baseline:** `cbbdb35` (`codex/stage-a`) · RETRY2 live = official **FAIL** · rerun **blocked**
+
+**Owner rulings (binding):**
+
+| Ruling | Value |
+|--------|-------|
+| `A9_PATIENT_SCOPE_AUTHORITY` | **do not remove** until post-E2E closeout after live PASS |
+| RETRY2 artifacts @ `cbbdb35` | **frozen** byte-identical (attempt + ledger + stdout) — **do not rewrite** attempt marker |
+| RETRY1 artifacts | **frozen** byte-identical |
+| Primary cause | neutral `продолжить` → partial planner `TurnFrame`; typed `UiScopeAction` on ctx but no authoritative commercial frame |
+| Secondary | `missing implant_placed` harness abort; WinError 32 logging rollover (non-blocking, separate) |
+| Next milestone | typed UI TurnFrame producer or validated overlay; AC1→AC2→AC3 only |
+| Forbidden now | LIVE, rerun, product code, regex/phrase lists, A9 tuning, legacy fallback |
+
+Audits:
+
+- `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY2_LIVE_ATTEMPT_AUDIT.md`
+- `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY2_POST_LIVE_SEAM_AUDIT.md`
+
+## Goal
+
+Capture immutable RETRY2 live FAIL evidence; pin attempt/ledger/stdout SHA-256; document corrected ledger counts; design next offline product milestone for governed typed UI `TurnFrame` authority.
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY2_LIVE_ATTEMPT_AUDIT.md` | live attempt audit |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY2_POST_LIVE_SEAM_AUDIT.md` | next milestone seam audit |
+| `docs/FLAGS_AND_STATUS.md` | status note |
+| `evals/v5/final_scope_widget_e2e_retry2_live_contract.py` | frozen retry2 SHA pins + assert |
+| `tests/test_final_scope_widget_e2e_retry2_post_live_audit_governance.py` | PRE-CODE checker |
+| `tests/test_final_scope_widget_e2e_retry2_governance.py` | post-live artifact presence pin |
+
+**Frozen (byte-identical):** all `final_scope_widget_e2e_retry2_*` live artifacts @ `cbbdb35`, all retry1 artifacts, preflight-abort attempt #1, widget matrix, S62/S63.
+
+## Forbidden
+
+- LIVE / LLM / provider calls
+- Product code changes
+- Modify/delete/rename frozen retry2 attempt/ledger/stdout
+- Rerun retry2 live
+- `A9_PATIENT_SCOPE_AUTHORITY` removal
+
+## Immutable SHA pins (retry2 @ `cbbdb35`)
+
+| Artifact | SHA-256 |
+|----------|---------|
+| `final_scope_widget_e2e_retry2_attempt.json` | `deb0e00b0fccc0d3ab6f5e65a67caaacf90677231898e10dc3e9f3893e160671` |
+| `final_scope_widget_e2e_retry2_call_ledger.jsonl` | `db430edc71ff8e3954a83e8d8f1ee9db610755a7549b5e105986940444f460ea` |
+| `final_scope_widget_e2e_retry2_live_stdout.log` | `32b6a1f45660deb171b882bcc568807a5bec6a0c2479917f10e04a48439a00aa` |
+
+**Corrected ledger:** ingress=4, planner=6, boundary=6, composer=4, verifier=4, total=24.
+
+## Tests (PRE-CODE + COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-r2pl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_retry2_post_live_audit_governance.py `
+  tests/test_final_scope_widget_e2e_retry2_governance.py `
+  tests/test_final_scope_post_retry1_product_correction_governance.py -q
+git diff --check
+```
+
+**Note:** `run_final_scope_widget_e2e_retry2_live.py --dry-run` exits 2 when retry2 artifacts exist (rerun blocked) — expected post-live.
+
+**STOP after COMPLETION ✅. Typed UI TurnFrame product implementation blocked until separate owner GO.**
+
+## Completion record (RETRY2 POST_LIVE_AUDIT governance)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `cbbdb35` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| Official verdict | **FAIL** (immutable) |
+| Product implementation | **blocked** |

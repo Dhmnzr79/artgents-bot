@@ -26,10 +26,10 @@ from evals.v5.final_scope_widget_e2e_retry2_live_contract import (
     VERIFIED_FORENSIC_RETRY1_STDOUT_SIZE,
     assert_frozen_preflight_abort_artifacts_unchanged,
     assert_frozen_retry1_live_artifacts_unchanged,
+    assert_frozen_retry2_live_artifacts_unchanged,
     assert_frozen_s62_live_artifacts_unchanged,
     assert_frozen_s63_live_artifacts_unchanged,
     assert_frozen_suite_unchanged,
-    assert_retry2_live_artifacts_absent,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -77,8 +77,9 @@ def test_retry2_namespace_isolated_from_retry1() -> None:
     assert RETRY1_RAW_ARTIFACT_PATH.is_file()
 
 
-def test_retry2_live_artifacts_absent_pre_live() -> None:
-    assert_retry2_live_artifacts_absent()
+def test_retry2_live_artifacts_present_post_live() -> None:
+    assert_frozen_retry2_live_artifacts_unchanged()
+    assert LIVE_ATTEMPT_MARKER_PATH.is_file()
 
 
 def test_retry2_budget_and_authority_constants() -> None:

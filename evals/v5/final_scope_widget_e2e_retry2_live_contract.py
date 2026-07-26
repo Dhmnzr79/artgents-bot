@@ -121,6 +121,20 @@ FROZEN_RETRY1_LIVE_ARTIFACT_SHA256: dict[str, str] = {
     ),
 }
 
+FROZEN_RETRY2_LIVE_ARTIFACT_SHA256: dict[str, str] = {
+    "evals/v5/artifacts/final_scope_widget_e2e_retry2_attempt.json": (
+        "deb0e00b0fccc0d3ab6f5e65a67caaacf90677231898e10dc3e9f3893e160671"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry2_call_ledger.jsonl": (
+        "db430edc71ff8e3954a83e8d8f1ee9db610755a7549b5e105986940444f460ea"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry2_live_stdout.log": (
+        "32b6a1f45660deb171b882bcc568807a5bec6a0c2479917f10e04a48439a00aa"
+    ),
+}
+
+FROZEN_RETRY2_LIVE_STDOUT_SIZE = 386_867
+
 VERIFIED_FORENSIC_RETRY1_STDOUT_PATH = (
     LIVE_ARTIFACTS_DIR / "_retry1_live_run_stdout.txt"
 )
@@ -207,6 +221,19 @@ def assert_retry2_live_artifacts_absent() -> None:
     assert_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
 
 
+def assert_frozen_retry2_live_artifacts_unchanged() -> None:
+    for rel, expected in FROZEN_RETRY2_LIVE_ARTIFACT_SHA256.items():
+        path = _REPO_ROOT / rel
+        if not path.is_file():
+            raise HarnessConfigError(f"frozen retry2 artifact missing: {rel}")
+        actual = sha256_file_hex(path)
+        if actual != expected:
+            raise HarnessConfigError(
+                f"frozen retry2 artifact sha256 mismatch for {rel}: "
+                f"expected={expected} actual={actual}"
+            )
+
+
 __all__ = [
     "ALLOWED_PROVIDER_ROLES",
     "ATTEMPT_MARKER_EXISTS_CODE",
@@ -217,6 +244,8 @@ __all__ = [
     "FROZEN_PREFLIGHT_ABORT_ATTEMPT_MARKER_SHA256",
     "FROZEN_PREFLIGHT_ABORT_AUDIT_PATH",
     "FROZEN_PREFLIGHT_ABORT_AUDIT_SHA256",
+    "FROZEN_RETRY2_LIVE_ARTIFACT_SHA256",
+    "FROZEN_RETRY2_LIVE_STDOUT_SIZE",
     "FROZEN_RETRY1_LIVE_ARTIFACT_SHA256",
     "FROZEN_S62_LIVE_ARTIFACT_SHA256",
     "FROZEN_S63_LIVE_ARTIFACT_SHA256",
@@ -260,6 +289,7 @@ __all__ = [
     "assert_frozen_s63_live_artifacts_unchanged",
     "assert_frozen_suite_unchanged",
     "assert_live_artifacts_absent",
+    "assert_frozen_retry2_live_artifacts_unchanged",
     "assert_retry2_live_artifacts_absent",
     "build_manual_review_seed",
     "build_retry2_attempt_marker_payload",

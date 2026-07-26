@@ -55,7 +55,7 @@
 
 **FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION:** COMPLETION ✅ @ `c670b96`; T2/T5 product correction landed. Forensic `_retry1_live_run_stdout.txt` verified and removed @ RETRY2 pre-live.
 
-**FINAL_SCOPE_WIDGET_E2E_RETRY2:** pre-live COMPLETION ✅ @ `c670b96`; namespace `final_scope_widget_e2e_retry2_*`; offline 8/8 proven; live **blocked** until owner GO. CLI: `evals/v5/run_final_scope_widget_e2e_retry2_live.py --dry-run`.
+**FINAL_SCOPE_WIDGET_E2E_RETRY2:** official live **FAIL** @ `cbbdb35`; partial 6/8 HTTP; rerun **blocked**. POST_LIVE audit COMPLETION ✅. Next: typed UI TurnFrame milestone (governance only — **no product code yet**).
 
 ---
 

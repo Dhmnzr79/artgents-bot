@@ -110,6 +110,35 @@ DEFAULT_LIVE_ARTIFACT_PATHS = (
     LIVE_STDOUT_LOG_PATH,
 )
 
+FROZEN_RETRY4_LIVE_ARTIFACT_SHA256: dict[str, str] = {
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_attempt.json": (
+        "3459868df40d47c841ad2ef4eacb38a69be7bb73b42694af30279940dfabc0df"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_call_ledger.jsonl": (
+        "1028f978742ed84480a9f6d22c0b86110bbcecfd3115ccfd55d19c4d9c7112ae"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_live_stdout.log": (
+        "4e140d20b4ffee4abdcf23998e9391ae6e2bf4ac23a1082b20c8a483ddac60eb"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_result.json": (
+        "8778278802f4f4f474cfe8dbb4118f684208a1605aec5cc40b5b3bf003207a03"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_raw.json": (
+        "8778278802f4f4f474cfe8dbb4118f684208a1605aec5cc40b5b3bf003207a03"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_manifest.json": (
+        "46f5ea55537e3514dd8b40d44f37d08f60a4324646aabbecc74d444acc1fba90"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_manual_review.json": (
+        "4bd76e3eb73d25b2002fcb078ce536b7b4acf7ffade8098e86bb0dc570bb2459"
+    ),
+    "evals/v5/artifacts/final_scope_widget_e2e_retry4_audit.log": (
+        "2f55b8991b2775e02f798daf948057bd8d7f73208a66993be18d772a43a0ac2a"
+    ),
+}
+
+FROZEN_RETRY4_LIVE_STDOUT_SIZE = 1_064_490
+
 S69_DELETED_LEGACY_MODULES = frozenset(
     {
         "chunk_responder",
@@ -166,6 +195,19 @@ def assert_retry4_live_artifacts_absent() -> None:
     assert_live_artifacts_absent(DEFAULT_LIVE_ARTIFACT_PATHS)
 
 
+def assert_frozen_retry4_live_artifacts_unchanged() -> None:
+    for rel, expected in FROZEN_RETRY4_LIVE_ARTIFACT_SHA256.items():
+        path = _REPO_ROOT / rel
+        if not path.is_file():
+            raise HarnessConfigError(f"frozen retry4 artifact missing: {rel}")
+        actual = sha256_file_hex(path)
+        if actual != expected:
+            raise HarnessConfigError(
+                f"frozen retry4 artifact sha256 mismatch for {rel}: "
+                f"expected={expected} actual={actual}"
+            )
+
+
 __all__ = [
     "ALLOWED_PROVIDER_ROLES",
     "ATTEMPT_MARKER_EXISTS_CODE",
@@ -178,6 +220,8 @@ __all__ = [
     "FROZEN_RETRY2_LIVE_STDOUT_SIZE",
     "FROZEN_RETRY3_LIVE_ARTIFACT_SHA256",
     "FROZEN_RETRY3_LIVE_STDOUT_SIZE",
+    "FROZEN_RETRY4_LIVE_ARTIFACT_SHA256",
+    "FROZEN_RETRY4_LIVE_STDOUT_SIZE",
     "FROZEN_S62_LIVE_ARTIFACT_SHA256",
     "FROZEN_S63_LIVE_ARTIFACT_SHA256",
     "FROZEN_TURNS_HASH",
@@ -225,6 +269,7 @@ __all__ = [
     "assert_frozen_retry1_live_artifacts_unchanged",
     "assert_frozen_retry2_live_artifacts_unchanged",
     "assert_frozen_retry3_live_artifacts_unchanged",
+    "assert_frozen_retry4_live_artifacts_unchanged",
     "assert_frozen_s62_live_artifacts_unchanged",
     "assert_frozen_s63_live_artifacts_unchanged",
     "assert_frozen_suite_unchanged",

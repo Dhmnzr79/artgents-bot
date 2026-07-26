@@ -1,7 +1,8 @@
-"""PRE-CODE / COMPLETION checker for FINAL_SCOPE_WIDGET_E2E_RETRY4 pre-live."""
+"""PRE-CODE / COMPLETION checker for FINAL_SCOPE_WIDGET_E2E_RETRY4."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from evals.v5.final_scope_widget_e2e_live_contract import FROZEN_TURNS_HASH, sha256_file_hex
@@ -17,7 +18,11 @@ from evals.v5.final_scope_widget_e2e_retry3_live_contract import (
 from evals.v5.final_scope_widget_e2e_retry4_live_contract import (
     DEFAULT_LIVE_ARTIFACT_PATHS,
     EXPECTED_FREE_TEXT_PLANNER_CALLS,
+    FROZEN_RETRY4_LIVE_ARTIFACT_SHA256,
+    FROZEN_RETRY4_LIVE_STDOUT_SIZE,
     LIVE_ATTEMPT_MARKER_PATH,
+    LIVE_CALL_LEDGER_PATH,
+    LIVE_STDOUT_LOG_PATH,
     MANUAL_REVIEW_RUBRIC,
     MAX_BOUNDARY_CALLS,
     MAX_COMPOSER_CALLS,
@@ -35,13 +40,22 @@ from evals.v5.final_scope_widget_e2e_retry4_live_contract import (
     assert_frozen_retry1_live_artifacts_unchanged,
     assert_frozen_retry2_live_artifacts_unchanged,
     assert_frozen_retry3_live_artifacts_unchanged,
+    assert_frozen_retry4_live_artifacts_unchanged,
     assert_frozen_s62_live_artifacts_unchanged,
     assert_frozen_s63_live_artifacts_unchanged,
     assert_frozen_suite_unchanged,
-    assert_retry4_live_artifacts_absent,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+
+CORRECTED_RETRY4_LEDGER_ROLE_COUNTS = {
+    "ingress": 5,
+    "planner": 5,
+    "medical_boundary": 8,
+    "composer": 8,
+    "semantic_verifier": 8,
+}
+CORRECTED_RETRY4_LEDGER_TOTAL = 34
 
 SEAM_AUDIT_PATH = (
     _REPO_ROOT
@@ -93,9 +107,41 @@ def test_retry4_namespace_isolated() -> None:
     assert RETRY3_ATTEMPT_MARKER_PATH.is_file()
 
 
-def test_retry4_live_artifacts_absent_pre_live() -> None:
-    assert_retry4_live_artifacts_absent()
-    assert not LIVE_ATTEMPT_MARKER_PATH.exists()
+def test_retry4_live_artifacts_present_post_live() -> None:
+    assert_frozen_retry4_live_artifacts_unchanged()
+    assert LIVE_ATTEMPT_MARKER_PATH.is_file()
+
+
+def test_retry4_attempt_marker_role_counts_match_completed_ledger() -> None:
+    marker = json.loads(LIVE_ATTEMPT_MARKER_PATH.read_text(encoding="utf-8"))
+    assert marker["status"] == "attempt_completed"
+    assert marker["completed_provider_calls"] == CORRECTED_RETRY4_LEDGER_TOTAL
+    assert marker["role_counts"] == CORRECTED_RETRY4_LEDGER_ROLE_COUNTS
+    assert marker["manual_review_rubric"] == {
+        "1": "compact_overview",
+        "2": "full_arch_prices",
+        "6": "concise_stage_clarification",
+        "7": "crown_price",
+    }
+
+
+def test_retry4_stdout_size_pinned() -> None:
+    assert LIVE_STDOUT_LOG_PATH.is_file()
+    assert LIVE_STDOUT_LOG_PATH.stat().st_size == FROZEN_RETRY4_LIVE_STDOUT_SIZE
+    assert sha256_file_hex(LIVE_STDOUT_LOG_PATH) == (
+        FROZEN_RETRY4_LIVE_ARTIFACT_SHA256[
+            "evals/v5/artifacts/final_scope_widget_e2e_retry4_live_stdout.log"
+        ]
+    )
+
+
+def test_retry4_ledger_sha_pinned() -> None:
+    assert LIVE_CALL_LEDGER_PATH.is_file()
+    assert sha256_file_hex(LIVE_CALL_LEDGER_PATH) == (
+        FROZEN_RETRY4_LIVE_ARTIFACT_SHA256[
+            "evals/v5/artifacts/final_scope_widget_e2e_retry4_call_ledger.jsonl"
+        ]
+    )
 
 
 def test_retry4_budget_planner_and_manual_rubric() -> None:

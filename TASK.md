@@ -1948,5 +1948,33 @@ git diff --check
 | Manual rubric gates | ✅ T1 compact / T2 full_arch / T6 concise / T7 crown |
 | Action context + no price:None | ✅ governed refs T2/T7; all turns ref scan |
 | Dry-run CLI | ✅ `run_final_scope_widget_e2e_retry4_live.py --dry-run` |
-| Live | **STOP** — separate owner GO |
+| Live | ✅ see live record below |
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E_RETRY4 live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `084203e` |
+| Live run | ✅ `run_final_scope_widget_e2e_retry4_live.py --live` |
+| Automated verdict | **AUTOMATED_PASS** (8/8) |
+| Final verdict | `PENDING_MANUAL_REVIEW` |
+| Provider budget | 34/34 (retry=0) |
+| Planner | 5 calls on turns 1,3,4,5,8 — `qwen3.7-plus` |
+| Typed UI planner skip | ✅ T2/T6/T7 |
+| `price:None/...` | ✅ none observed |
+| Manual review artifact | `final_scope_widget_e2e_retry4_manual_review.json` |
+| Rerun | **BLOCKED** without new owner GO |
+| A9 flag | **kept** (not auto-removed) |
+
+### Immutable SHA pins (retry4 live @ `084203e`)
+
+| Artifact | SHA256 |
+|----------|--------|
+| `final_scope_widget_e2e_retry4_attempt.json` | `3459868df40d47c841ad2ef4eacb38a69be7bb73b42694af30279940dfabc0df` |
+| `final_scope_widget_e2e_retry4_call_ledger.jsonl` | `1028f978742ed84480a9f6d22c0b86110bbcecfd3115ccfd55d19c4d9c7112ae` |
+| `final_scope_widget_e2e_retry4_live_stdout.log` | `4e140d20b4ffee4abdcf23998e9391ae6e2bf4ac23a1082b20c8a483ddac60eb` |
+| `final_scope_widget_e2e_retry4_result.json` | `8778278802f4f4f474cfe8dbb4118f684208a1605aec5cc40b5b3bf003207a03` |
+| `final_scope_widget_e2e_retry4_manifest.json` | `46f5ea55537e3514dd8b40d44f37d08f60a4324646aabbecc74d444acc1fba90` |
+
+**STOP.** Owner manual review required before closeout.
 

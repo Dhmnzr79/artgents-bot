@@ -1,0 +1,68 @@
+{"timestamp_utc": "2026-07-26T12:49:10.956538+00:00", "sequence": 1, "turn_number": 1, "role": "ingress", "model": "qwen3.6-flash", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:13.704911+00:00", "sequence": 1, "turn_number": 1, "role": "ingress", "phase": "call_complete", "usage": {"prompt_tokens": 577, "completion_tokens": 79, "total_tokens": 656}}
+{"timestamp_utc": "2026-07-26T12:49:13.787559+00:00", "sequence": 2, "turn_number": 1, "role": "planner", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:18.053124+00:00", "sequence": 2, "turn_number": 1, "role": "planner", "phase": "call_complete", "usage": {"prompt_tokens": 1549, "completion_tokens": 136, "total_tokens": 1685}}
+{"timestamp_utc": "2026-07-26T12:49:18.549542+00:00", "sequence": 3, "turn_number": 1, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:19.851213+00:00", "sequence": 3, "turn_number": 1, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 197, "completion_tokens": 21, "total_tokens": 218}}
+{"timestamp_utc": "2026-07-26T12:49:19.874821+00:00", "sequence": 4, "turn_number": 1, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:26.196147+00:00", "sequence": 4, "turn_number": 1, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 32199, "completion_tokens": 201, "total_tokens": 32400}}
+{"timestamp_utc": "2026-07-26T12:49:26.241663+00:00", "sequence": 5, "turn_number": 1, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:28.057662+00:00", "sequence": 5, "turn_number": 1, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 32187, "completion_tokens": 4, "total_tokens": 32191}}
+{"timestamp_utc": "2026-07-26T12:49:28.205130+00:00", "sequence": 6, "turn_number": 2, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:29.211385+00:00", "sequence": 6, "turn_number": 2, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 193, "completion_tokens": 21, "total_tokens": 214}}
+{"timestamp_utc": "2026-07-26T12:49:29.228371+00:00", "sequence": 7, "turn_number": 2, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:34.549424+00:00", "sequence": 7, "turn_number": 2, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 33434, "completion_tokens": 206, "total_tokens": 33640}}
+{"timestamp_utc": "2026-07-26T12:49:34.606031+00:00", "sequence": 8, "turn_number": 2, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:35.762175+00:00", "sequence": 8, "turn_number": 2, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 33378, "completion_tokens": 4, "total_tokens": 33382}}
+{"timestamp_utc": "2026-07-26T12:49:35.824675+00:00", "sequence": 9, "turn_number": 3, "role": "ingress", "model": "qwen3.6-flash", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:37.082474+00:00", "sequence": 9, "turn_number": 3, "role": "ingress", "phase": "call_complete", "usage": {"prompt_tokens": 576, "completion_tokens": 73, "total_tokens": 649}}
+{"timestamp_utc": "2026-07-26T12:49:37.115478+00:00", "sequence": 10, "turn_number": 3, "role": "planner", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:39.710690+00:00", "sequence": 10, "turn_number": 3, "role": "planner", "phase": "call_complete", "usage": {"prompt_tokens": 1995, "completion_tokens": 135, "total_tokens": 2130}}
+{"timestamp_utc": "2026-07-26T12:49:39.769718+00:00", "sequence": 11, "turn_number": 3, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:41.174590+00:00", "sequence": 11, "turn_number": 3, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 196, "completion_tokens": 21, "total_tokens": 217}}
+{"timestamp_utc": "2026-07-26T12:49:41.199322+00:00", "sequence": 12, "turn_number": 3, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:47.081874+00:00", "sequence": 12, "turn_number": 3, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 32313, "completion_tokens": 237, "total_tokens": 32550}}
+{"timestamp_utc": "2026-07-26T12:49:47.136991+00:00", "sequence": 13, "turn_number": 3, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:48.635753+00:00", "sequence": 13, "turn_number": 3, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 32380, "completion_tokens": 4, "total_tokens": 32384}}
+{"timestamp_utc": "2026-07-26T12:49:48.795981+00:00", "sequence": 14, "turn_number": 4, "role": "ingress", "model": "qwen3.6-flash", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:49.949450+00:00", "sequence": 14, "turn_number": 4, "role": "ingress", "phase": "call_complete", "usage": {"prompt_tokens": 580, "completion_tokens": 80, "total_tokens": 660}}
+{"timestamp_utc": "2026-07-26T12:49:49.980012+00:00", "sequence": 15, "turn_number": 4, "role": "planner", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:52.481856+00:00", "sequence": 15, "turn_number": 4, "role": "planner", "phase": "call_complete", "usage": {"prompt_tokens": 1552, "completion_tokens": 132, "total_tokens": 1684}}
+{"timestamp_utc": "2026-07-26T12:49:52.501122+00:00", "sequence": 16, "turn_number": 4, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:53.730448+00:00", "sequence": 16, "turn_number": 4, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 200, "completion_tokens": 21, "total_tokens": 221}}
+{"timestamp_utc": "2026-07-26T12:49:53.752197+00:00", "sequence": 17, "turn_number": 4, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:49:58.598674+00:00", "sequence": 17, "turn_number": 4, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 33348, "completion_tokens": 226, "total_tokens": 33574}}
+{"timestamp_utc": "2026-07-26T12:49:58.689344+00:00", "sequence": 18, "turn_number": 4, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:00.106749+00:00", "sequence": 18, "turn_number": 4, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 33398, "completion_tokens": 4, "total_tokens": 33402}}
+{"timestamp_utc": "2026-07-26T12:50:00.198811+00:00", "sequence": 19, "turn_number": 5, "role": "ingress", "model": "qwen3.6-flash", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:01.419724+00:00", "sequence": 19, "turn_number": 5, "role": "ingress", "phase": "call_complete", "usage": {"prompt_tokens": 579, "completion_tokens": 82, "total_tokens": 661}}
+{"timestamp_utc": "2026-07-26T12:50:01.452282+00:00", "sequence": 20, "turn_number": 5, "role": "planner", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:03.844770+00:00", "sequence": 20, "turn_number": 5, "role": "planner", "phase": "call_complete", "usage": {"prompt_tokens": 1551, "completion_tokens": 130, "total_tokens": 1681}}
+{"timestamp_utc": "2026-07-26T12:50:03.903719+00:00", "sequence": 21, "turn_number": 5, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:05.252197+00:00", "sequence": 21, "turn_number": 5, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 199, "completion_tokens": 21, "total_tokens": 220}}
+{"timestamp_utc": "2026-07-26T12:50:05.271261+00:00", "sequence": 22, "turn_number": 5, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:08.311803+00:00", "sequence": 22, "turn_number": 5, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 32013, "completion_tokens": 88, "total_tokens": 32101}}
+{"timestamp_utc": "2026-07-26T12:50:08.359439+00:00", "sequence": 23, "turn_number": 5, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:10.878664+00:00", "sequence": 23, "turn_number": 5, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 31886, "completion_tokens": 4, "total_tokens": 31890}}
+{"timestamp_utc": "2026-07-26T12:50:10.996306+00:00", "sequence": 24, "turn_number": 6, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:12.423431+00:00", "sequence": 24, "turn_number": 6, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 193, "completion_tokens": 21, "total_tokens": 214}}
+{"timestamp_utc": "2026-07-26T12:50:12.440015+00:00", "sequence": 25, "turn_number": 6, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:15.468673+00:00", "sequence": 25, "turn_number": 6, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 31941, "completion_tokens": 27, "total_tokens": 31968}}
+{"timestamp_utc": "2026-07-26T12:50:15.583515+00:00", "sequence": 26, "turn_number": 6, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:17.245288+00:00", "sequence": 26, "turn_number": 6, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 31683, "completion_tokens": 4, "total_tokens": 31687}}
+{"timestamp_utc": "2026-07-26T12:50:17.344818+00:00", "sequence": 27, "turn_number": 7, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:18.656108+00:00", "sequence": 27, "turn_number": 7, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 193, "completion_tokens": 21, "total_tokens": 214}}
+{"timestamp_utc": "2026-07-26T12:50:18.673792+00:00", "sequence": 28, "turn_number": 7, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:22.009272+00:00", "sequence": 28, "turn_number": 7, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 32188, "completion_tokens": 98, "total_tokens": 32286}}
+{"timestamp_utc": "2026-07-26T12:50:22.120197+00:00", "sequence": 29, "turn_number": 7, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:23.523166+00:00", "sequence": 29, "turn_number": 7, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 32018, "completion_tokens": 4, "total_tokens": 32022}}
+{"timestamp_utc": "2026-07-26T12:50:23.600474+00:00", "sequence": 30, "turn_number": 8, "role": "ingress", "model": "qwen3.6-flash", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:24.816186+00:00", "sequence": 30, "turn_number": 8, "role": "ingress", "phase": "call_complete", "usage": {"prompt_tokens": 582, "completion_tokens": 77, "total_tokens": 659}}
+{"timestamp_utc": "2026-07-26T12:50:24.842878+00:00", "sequence": 31, "turn_number": 8, "role": "planner", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:27.426568+00:00", "sequence": 31, "turn_number": 8, "role": "planner", "phase": "call_complete", "usage": {"prompt_tokens": 1554, "completion_tokens": 140, "total_tokens": 1694}}
+{"timestamp_utc": "2026-07-26T12:50:27.446750+00:00", "sequence": 32, "turn_number": 8, "role": "medical_boundary", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:28.795627+00:00", "sequence": 32, "turn_number": 8, "role": "medical_boundary", "phase": "call_complete", "usage": {"prompt_tokens": 202, "completion_tokens": 21, "total_tokens": 223}}
+{"timestamp_utc": "2026-07-26T12:50:28.816768+00:00", "sequence": 33, "turn_number": 8, "role": "composer", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:32.480845+00:00", "sequence": 33, "turn_number": 8, "role": "composer", "phase": "call_complete", "usage": {"prompt_tokens": 31969, "completion_tokens": 130, "total_tokens": 32099}}
+{"timestamp_utc": "2026-07-26T12:50:32.560825+00:00", "sequence": 34, "turn_number": 8, "role": "semantic_verifier", "model": "qwen3.7-plus", "phase": "call_start"}
+{"timestamp_utc": "2026-07-26T12:50:33.928251+00:00", "sequence": 34, "turn_number": 8, "role": "semantic_verifier", "phase": "call_complete", "usage": {"prompt_tokens": 31923, "completion_tokens": 4, "total_tokens": 31927}}

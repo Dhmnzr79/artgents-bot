@@ -1,0 +1,39 @@
+{
+  "technical": {
+    "http_turns_completed": 8,
+    "target_answer_path": 8,
+    "legacy_hits": [],
+    "fullcontext_build_count": 1,
+    "all_materialized": true,
+    "no_failure_routes": true,
+    "turn_automated_pass": 8,
+    "planner_model_plus_verified": true,
+    "planner_models_observed": [
+      "qwen3.7-plus",
+      "qwen3.7-plus",
+      "qwen3.7-plus",
+      "qwen3.7-plus",
+      "qwen3.7-plus"
+    ]
+  },
+  "provider": {
+    "total_calls": 34,
+    "role_totals": {
+      "composer": 8,
+      "ingress": 5,
+      "medical_boundary": 8,
+      "planner": 5,
+      "semantic_verifier": 8
+    },
+    "retries": 0,
+    "ledger_complete": true,
+    "ledger_balanced": true
+  },
+  "automated_verdict": "AUTOMATED_PASS",
+  "final_verdict": "PENDING_MANUAL_REVIEW",
+  "rerun_blocked_without_owner_approval": true,
+  "manual_review_required": true,
+  "baseline_live_commit": "084203e51581c8074cbaf519fffb530de1685037",
+  "primary_sid": "fsw-live-21f0acbdaabf",
+  "live_run": true
+}

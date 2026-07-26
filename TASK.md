@@ -2808,7 +2808,7 @@ git diff --check
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `10e6926` |
-| Implementation HEAD | `0a92465` |
+| Implementation HEAD | `836250f` |
 | COMPLETION | ✅ |
 | Acceptance 1–18 | ✅ |
 | Cross-turn matrix | ✅ |

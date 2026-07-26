@@ -55,7 +55,7 @@
 
 **FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION:** COMPLETION ✅ @ `c670b96`; T2/T5 product correction landed. Forensic `_retry1_live_run_stdout.txt` verified and removed @ RETRY2 pre-live.
 
-**FINAL_SCOPE_WIDGET_E2E_RETRY3:** live AUTOMATED_PASS @ `341c1eb`; owner manual **FAIL**; rerun blocked. POST_RETRY3 governance: Composer action-context seam + `price:None` integrity. Product implementation **blocked** until owner GO. Frozen artifacts pinned in `evals/v5/final_scope_widget_e2e_retry3_live_contract.py`.
+**FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT:** implementation COMPLETION ✅ @ governance+product; `TargetComposerActionContext` wired to Composer directives/invocation; `price:None` fail-closed; offline T1–T8 pass. **NO LIVE / Retry4** until separate owner GO.
 
 ---
 

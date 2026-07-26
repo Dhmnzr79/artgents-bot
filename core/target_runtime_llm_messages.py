@@ -11,6 +11,7 @@ _COMPOSER_USER_TEMPLATE = (
     "Compose the patient-facing answer using the inputs below.\n\n"
     "CACHED_FULL_CONTEXT:\n{cached_full_context}\n\n"
     "RESPONSE_DIRECTIVES_JSON:\n{response_directives_json}\n\n"
+    "GOVERNED_ACTION_CONTEXT_JSON:\n{governed_action_context_json}\n\n"
     "PRIMARY_EVIDENCE_JSON:\n{primary_evidence_json}\n\n"
     "USER_MESSAGE:\n{user_message}"
 )
@@ -46,6 +47,9 @@ def build_composer_sdk_messages(
             "content": _COMPOSER_USER_TEMPLATE.format(
                 cached_full_context=invocation.cached_full_context,
                 response_directives_json=invocation.response_directives_json,
+                governed_action_context_json=(
+                    invocation.governed_action_context_json or "null"
+                ),
                 primary_evidence_json=invocation.primary_evidence_json,
                 user_message=invocation.user_message,
             ),

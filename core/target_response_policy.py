@@ -38,6 +38,30 @@ def _followup_source(request: TargetResponsePolicyRequest) -> TargetFollowupSour
     return None
 
 
+def broad_family_price_directive_overlay(response_stage: str | None) -> dict[str, object]:
+    if response_stage != "broad_family_price":
+        return {}
+    return {
+        "broad_family_price_compact": True,
+        "max_price_anchors": 4,
+        "omit_sections": (
+            "payment_stages",
+            "package_composition",
+            "long_bonus_lists",
+        ),
+        "include_scale_clarify": True,
+    }
+
+
+def stage_clarify_directive_overlay(response_stage: str | None) -> dict[str, object]:
+    if response_stage != "stage_clarify":
+        return {}
+    return {
+        "stage_clarify_concise": True,
+        "answer_mode": "short_stage_question_only",
+    }
+
+
 def build_target_response_spec(
     request: TargetResponsePolicyRequest,
 ) -> TargetResponseSpec:

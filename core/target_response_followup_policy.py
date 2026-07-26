@@ -13,6 +13,11 @@ from core.target_response_followup_materializer import (
 
 
 _SOURCES = frozenset({"content", "price"})
+_INVALID_PRICE_REF_PREFIX = "price:None/"
+
+
+def _valid_price_followup_ref(ref: str) -> bool:
+    return ref.startswith("price:") and not ref.startswith(_INVALID_PRICE_REF_PREFIX)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,9 +69,14 @@ def select_target_response_followups(
             price=(),
         )
     if source == "price" and followups.price:
+        valid_price = tuple(
+            item for item in followups.price if _valid_price_followup_ref(item.ref)
+        )
+        if not valid_price:
+            return TargetResponseFollowupSelection(source=None, content=(), price=())
         return TargetResponseFollowupSelection(
             source="price",
             content=(),
-            price=followups.price,
+            price=valid_price,
         )
     return TargetResponseFollowupSelection(source=None, content=(), price=())

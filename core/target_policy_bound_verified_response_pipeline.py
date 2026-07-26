@@ -126,6 +126,11 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
 ) -> tuple[TargetVerifiedComposedResponse, TargetMaterializedSessionSelection]:
+    """Build spec-bound package and return one exact verified target response.
+
+    Composer governed UI action context is resolved from the runtime turn binding
+    established in ``target_runtime_turn``.
+    """
     bound_package = _assemble_bound_package(
         policy_request,
         bundle,

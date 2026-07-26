@@ -75,7 +75,11 @@ def run_target_offline_boundary_enforced_fullcontext_response(
     | TargetTurnFrameBoundMaterializeResponse
     | TargetTurnFrameBoundTerminalResponse
 ):
-    """Enforce medical boundary once, then run S41 FullContext response or return terminal."""
+    """Enforce medical boundary once, then run S41 FullContext response or return terminal.
+
+    Governed UI action context for Composer is bound in ``target_runtime_turn`` via
+    ``bind_pending_ui_actions_for_composer`` and resolved during Composer materialization.
+    """
 
     enforcement = enforce_target_medical_boundary_on_envelope(
         boundary,

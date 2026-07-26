@@ -47,6 +47,7 @@ from evals.v5.final_scope_widget_e2e_retry3_live_harness import (
     run_http_harness,
 )
 from tests.test_final_scope_widget_e2e_retry1_live_harness import (
+    _GroundedEvidenceComposerBackend,
     _install_retry1_http_fakes,
     _turn_frame_for_number,
 )
@@ -58,6 +59,30 @@ _RETRY3_HARNESS_FILES = (
     _REPO_ROOT / "evals" / "v5" / "final_scope_widget_e2e_retry3_live_harness.py",
     _REPO_ROOT / "evals" / "v5" / "run_final_scope_widget_e2e_retry3_live.py",
 )
+
+
+class _ActionAwareGroundedComposerBackend(_GroundedEvidenceComposerBackend):
+    """Composer stub that honors governed UI action context for typed clicks."""
+
+    def generate(self, invocation: object, /) -> str:
+        import json
+
+        governed_raw = getattr(invocation, "governed_action_context_json", None)
+        if isinstance(governed_raw, str) and governed_raw.strip():
+            governed = json.loads(governed_raw)
+            response_stage = str(governed.get("response_stage") or "")
+            if response_stage == "stage_clarify":
+                return (
+                    "Подскажите, на каком этапе вы сейчас — "
+                    "свой зуб, удаление или имплант уже установлен?"
+                )
+        text = super().generate(invocation)
+        if isinstance(governed_raw, str) and governed_raw.strip():
+            if text == "Краткий обзор цен.":
+                action_kind = json.loads(governed_raw).get("action_kind")
+                if action_kind == "ui_stage":
+                    return "Стоимость коронки на имплант от 31 000 ₽."
+        return text
 
 
 @pytest.fixture(autouse=True)
@@ -75,6 +100,13 @@ def _install_retry3_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, obj
         record_fullcontext_build as retry3_record_fullcontext_build,
         set_current_turn as retry3_set_current_turn,
     )
+    import app as app_module
+    from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn as real_orchestrate
+    from tests.test_s61_correction_target_runtime import (
+        BackendPayload,
+        RecordingBoundaryBackend,
+        RecordingSemanticBackend,
+    )
 
     monkeypatch.setattr(
         "evals.v5.final_scope_widget_e2e_live_provider_audit.record_fullcontext_build",
@@ -86,6 +118,7 @@ def _install_retry3_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, obj
     )
     state = _install_retry1_http_fakes(monkeypatch)
     planner_calls_by_turn: dict[int, int] = {}
+    composer_backend = _ActionAwareGroundedComposerBackend()
 
     def counting_plan_turn_attempt(q: str, sid: str, client_id: str) -> PlannerAttempt:
         turn_number = get_audit_state().current_turn or 0
@@ -95,7 +128,26 @@ def _install_retry3_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, obj
 
     monkeypatch.setattr("core.turn_planner_llm.plan_turn_attempt", counting_plan_turn_attempt)
     monkeypatch.setattr("orchestration.planner_turn.plan_turn_attempt", counting_plan_turn_attempt)
+
+    def orchestrate_with_action_aware(**kwargs: object):
+        turn_number = get_audit_state().current_turn or 1
+        if turn_number == 2:
+            boundary = RecordingBoundaryBackend(BackendPayload("medical_handoff", 0.9))
+        else:
+            boundary = RecordingBoundaryBackend(BackendPayload("none", 0.95))
+        return real_orchestrate(
+            q=str(kwargs["q"]),
+            sid=str(kwargs["sid"]),
+            client_id=str(kwargs["client_id"]),
+            data=kwargs.get("data") if isinstance(kwargs.get("data"), dict) else None,
+            composer_backend=composer_backend,
+            semantic_backend=RecordingSemanticBackend(),
+            boundary_backend=boundary,
+        )
+
+    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", orchestrate_with_action_aware)
     state["planner_calls_by_turn"] = planner_calls_by_turn
+    state["composer_backend"] = composer_backend
     return state
 
 
@@ -178,6 +230,11 @@ def test_fake_provider_executes_all_eight_http_turns_without_network(
     assert payload["summary"]["technical"]["fullcontext_build_count"] == 1
     turn2 = payload["turn_results"][1]
     assert "terminal" not in str((turn2.get("meta") or {}).get("service_route") or "")
+    turn2_refs = [str(item.get("ref") or "") for item in (turn2.get("quick_replies") or [])]
+    assert not any(ref.startswith("price:None/") for ref in turn2_refs)
+    turn4 = payload["turn_results"][3]
+    turn4_refs = [str(item.get("ref") or "") for item in (turn4.get("quick_replies") or [])]
+    assert not any(ref.startswith("price:None/") for ref in turn4_refs)
     turn5 = payload["turn_results"][4]
     assert len(_scope_nav_refs(list(turn5.get("quick_replies") or []))) == 3
     assert "₽" in str(turn5.get("answer_text") or "")

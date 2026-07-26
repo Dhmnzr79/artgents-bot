@@ -257,6 +257,8 @@ def _price_followups(
     plan: TargetResponseMaterializationPlan,
     materials: TargetOfflineResponseMaterials,
 ) -> tuple[TargetPriceFollowup, ...]:
+    if not plan.service_id:
+        return ()
     offers_by_id = {offer.offer_id: offer for offer in materials.offers}
     order: list[str] = []
     payloads: dict[str, tuple[str, str, list[str]]] = {}

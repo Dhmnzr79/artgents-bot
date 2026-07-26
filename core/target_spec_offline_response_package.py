@@ -8,7 +8,7 @@ boundary's selected CTA key.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import NoReturn
@@ -31,6 +31,7 @@ from core.target_scope_aware_price_package import (
     assemble_scope_aware_price_package,
     is_scope_aware_price_spec,
 )
+from core.target_response_followup_policy import TargetResponseFollowupSelection
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +154,18 @@ def assemble_target_spec_offline_response_package(
                     "response_stage": "concrete_service_price",
                     "followup_source": "price",
                 }
+            )
+        if out_spec.service_id is None and (
+            out_spec.followup_source == "price" or package.selected_followups.price
+        ):
+            out_spec = out_spec.model_copy(update={"followup_source": None})
+            package = replace(
+                package,
+                selected_followups=TargetResponseFollowupSelection(
+                    source=None,
+                    content=package.selected_followups.content,
+                    price=(),
+                ),
             )
         selected_cta_key = None
         effective_stage = out_spec.response_stage

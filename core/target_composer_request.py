@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Literal, NoReturn, TypeAlias
 
@@ -16,7 +16,9 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetCommercialFact, TargetOffer
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
+from contracts.target_composer_action_context import TargetComposerActionContext
 from core.service_data_context import ServiceDoctorContext
+from core.target_composer_action_context import resolve_target_composer_action_context
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
@@ -69,6 +71,7 @@ class TargetComposerRequest:
     evidence_blocks: tuple[TargetComposerEvidenceBlock, ...]
     selected_followups: TargetResponseFollowupSelection
     selected_cta_key: str | None
+    action_context: TargetComposerActionContext | None = None
 
 
 class TargetComposerRequestError(ValueError):
@@ -506,6 +509,17 @@ def _block(
     )
 
 
+def _attach_composer_action_context(request: TargetComposerRequest) -> TargetComposerRequest:
+    if request.action_context is not None:
+        return request
+    action_context = resolve_target_composer_action_context(
+        response_stage=request.spec.response_stage,
+    )
+    if action_context is None:
+        return request
+    return replace(request, action_context=action_context)
+
+
 def materialize_target_composer_request(
     bound_package: TargetSpecBoundOfflineResponsePackage,
     bundle: ResponseSchemaBundle,
@@ -528,12 +542,14 @@ def materialize_target_composer_request(
     scoped = build_target_scoped_response_evidence(bound_package, md_root=md_root)
     if is_fullcontext_content_only_spec(scoped.spec):
         if not scoped.scope_records:
-            return TargetComposerRequest(
+            return _attach_composer_action_context(
+                TargetComposerRequest(
                 user_message=user_message,
                 spec=scoped.spec,
                 evidence_blocks=(),
                 selected_followups=scoped.selected_followups,
                 selected_cta_key=scoped.selected_cta_key,
+                )
             )
         facts_by_id = {
             fact.id: fact for fact in bound_package.package.materials.commercial_facts
@@ -557,21 +573,25 @@ def materialize_target_composer_request(
         )
         if projected != expected:
             _error("composer_request_output_inconsistent", (projected, expected))
-        return TargetComposerRequest(
+        return _attach_composer_action_context(
+            TargetComposerRequest(
             user_message=user_message,
             spec=scoped.spec,
             evidence_blocks=blocks,
             selected_followups=scoped.selected_followups,
             selected_cta_key=scoped.selected_cta_key,
+            )
         )
     if is_scope_aware_price_spec(scoped.spec):
         if scoped.spec.response_stage in {"stage_clarify", "data_gap"}:
-            return TargetComposerRequest(
+            return _attach_composer_action_context(
+                TargetComposerRequest(
                 user_message=user_message,
                 spec=scoped.spec,
                 evidence_blocks=(),
                 selected_followups=scoped.selected_followups,
                 selected_cta_key=scoped.selected_cta_key,
+                )
             )
         offers = _scope_price_overview_sources(scoped, bound_package, bundle)
         root = _root(md_root)
@@ -593,12 +613,14 @@ def materialize_target_composer_request(
         )
         if projected != expected:
             _error("composer_request_output_inconsistent", (projected, expected))
-        return TargetComposerRequest(
+        return _attach_composer_action_context(
+            TargetComposerRequest(
             user_message=user_message,
             spec=scoped.spec,
             evidence_blocks=blocks,
             selected_followups=scoped.selected_followups,
             selected_cta_key=scoped.selected_cta_key,
+            )
         )
     offers, doctors, facts, consultations_by_ref = _exact_sources(
         scoped,
@@ -626,10 +648,12 @@ def materialize_target_composer_request(
     )
     if projected != expected:
         _error("composer_request_output_inconsistent", (projected, expected))
-    return TargetComposerRequest(
+    return _attach_composer_action_context(
+        TargetComposerRequest(
         user_message=user_message,
         spec=scoped.spec,
         evidence_blocks=blocks,
         selected_followups=scoped.selected_followups,
         selected_cta_key=scoped.selected_cta_key,
+        )
     )

@@ -11,6 +11,10 @@ from contracts.target_turn_frame_dispatch import (
 from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_stage_action import UiStageAction
+from core.target_composer_action_context import (
+    bind_pending_ui_actions_for_composer,
+    reset_pending_ui_actions_for_composer,
+)
 from core.target_boundary_enforced_fullcontext_response import (
     run_target_offline_boundary_enforced_fullcontext_response,
 )
@@ -205,64 +209,71 @@ def run_target_fullcontext_runtime_turn(
         service_family=catalog_strategy.family,
     )
 
+    ui_action_tokens = bind_pending_ui_actions_for_composer(
+        scope_action=_current_ui_scope_action_from_request(),
+        stage_action=_current_ui_stage_action_from_request(),
+    )
     try:
-        result = run_target_offline_boundary_enforced_fullcontext_response(
-            turn_frame,
-            boundary,
-            context.bundle,
-            context.doctor_catalog,
-            context.external_index,
-            context.consultation_values,
-            tone_key="commercial_warm",
-            allowed_topics=context.allowed_topics,
-            forbidden_topics=("diagnosis", "personal_eligibility"),
-            required_fact_ids=(),
-            allow_marketing_facts=True,
-            allow_consultation_close=True,
-            allow_cta=True,
-            min_topic_confidence=0.5,
-            min_service_confidence=0.0,
-            min_intent_confidence=0.0,
-            brand_term=brand_term,
-            strategy_context=strategy_context,
-            semantic_context=context.semantic_context,
-            today=runtime_today(),
-            md_root=context.md_root,
-            cached_full_context=context.cached_full_context,
-            include_initial_block=context.include_initial_block,
-            include_consultation_close=context.include_consultation_close,
-            include_cta=context.cta_capability,
-            user_message=user_message,
-            tone=context.tone,
-            composer_backend=composer_backend,
-            semantic_backend=semantic_backend,
-            marketing_scenarios=(),
-            shown_fact_ids=session_state.shown_fact_ids,
-            shown_amplifier_refs=session_state.shown_amplifier_refs,
-            shown_consultation_value_refs=session_state.shown_consultation_value_refs,
-            effective_scope=effective_scope,
-            client_id=client_id,
-        )
-    except TargetResponseVerificationError as exc:
-        return TargetRuntimeTurnOutcome(
-            widget=materialize_target_error_payload(
+        try:
+            result = run_target_offline_boundary_enforced_fullcontext_response(
+                turn_frame,
+                boundary,
+                context.bundle,
+                context.doctor_catalog,
+                context.external_index,
+                context.consultation_values,
+                tone_key="commercial_warm",
+                allowed_topics=context.allowed_topics,
+                forbidden_topics=("diagnosis", "personal_eligibility"),
+                required_fact_ids=(),
+                allow_marketing_facts=True,
+                allow_consultation_close=True,
+                allow_cta=True,
+                min_topic_confidence=0.5,
+                min_service_confidence=0.0,
+                min_intent_confidence=0.0,
+                brand_term=brand_term,
+                strategy_context=strategy_context,
+                semantic_context=context.semantic_context,
+                today=runtime_today(),
+                md_root=context.md_root,
+                cached_full_context=context.cached_full_context,
+                include_initial_block=context.include_initial_block,
+                include_consultation_close=context.include_consultation_close,
+                include_cta=context.cta_capability,
+                user_message=user_message,
+                tone=context.tone,
+                composer_backend=composer_backend,
+                semantic_backend=semantic_backend,
+                marketing_scenarios=(),
+                shown_fact_ids=session_state.shown_fact_ids,
+                shown_amplifier_refs=session_state.shown_amplifier_refs,
+                shown_consultation_value_refs=session_state.shown_consultation_value_refs,
+                effective_scope=effective_scope,
                 client_id=client_id,
-                sid=sid,
-                error_code=exc.code,
-            ),
-            pipeline_result=None,
-            turn_frame=turn_frame,
-        )
-    except Exception as exc:
-        return TargetRuntimeTurnOutcome(
-            widget=materialize_target_error_payload(
-                client_id=client_id,
-                sid=sid,
-                error_code=f"target_runtime_pipeline_failed:{type(exc).__name__}",
-            ),
-            pipeline_result=None,
-            turn_frame=turn_frame,
-        )
+            )
+        except TargetResponseVerificationError as exc:
+            return TargetRuntimeTurnOutcome(
+                widget=materialize_target_error_payload(
+                    client_id=client_id,
+                    sid=sid,
+                    error_code=exc.code,
+                ),
+                pipeline_result=None,
+                turn_frame=turn_frame,
+            )
+        except Exception as exc:
+            return TargetRuntimeTurnOutcome(
+                widget=materialize_target_error_payload(
+                    client_id=client_id,
+                    sid=sid,
+                    error_code=f"target_runtime_pipeline_failed:{type(exc).__name__}",
+                ),
+                pipeline_result=None,
+                turn_frame=turn_frame,
+            )
+    finally:
+        reset_pending_ui_actions_for_composer(ui_action_tokens)
 
     widget = widget_payload_from_runtime_result(
         client_id=client_id,

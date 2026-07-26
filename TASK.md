@@ -1772,7 +1772,7 @@ git diff --check
 
 # TASK — FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT (implementation)
 
-**Status:** **blocked** until owner GO · **NO LIVE / NO LLM / NO Retry4**
+**Status:** implementation COMPLETION ✅ · **NO LIVE / NO LLM / NO Retry4**
 
 **Baseline:** POST_RETRY3 governance COMPLETION @ `341c1eb` · Retry3 live artifacts **frozen**
 
@@ -1848,4 +1848,17 @@ git diff --check
 ```
 
 **STOP after COMPLETION ✅. No LIVE without separate owner GO.**
+
+## Completion record (POST_RETRY3 implementation)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `2f41fdb` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| Offline T1–T8 | ✅ `test_offline_t1_t8_action_context_and_widget_integrity` |
+| Typed UI governed context | ✅ T2 `scoped_family_price`, T7 `ui_stage`; stage_clarify directive |
+| `price:None/...` | ✅ fail-closed materializer + policy + spec package |
+| `broad_family_price` compact | ✅ directive overlay in Composer |
+| Live / Retry4 | **STOP** — separate owner GO |
 

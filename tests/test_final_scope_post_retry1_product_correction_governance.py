@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from evals.v5.final_scope_widget_e2e_live_contract import FROZEN_TURNS_HASH, sha256_file_hex
 from evals.v5.final_scope_widget_e2e_retry1_live_contract import (
     assert_frozen_preflight_abort_artifacts_unchanged,
@@ -62,10 +60,6 @@ FROZEN_RETRY1_LIVE_ARTIFACT_SHA256: dict[str, str] = {
 }
 
 FROZEN_COMMITTED_STDOUT_SIZE = 328_159
-FROZEN_UNTRACKED_STDOUT_SIZE = 634_914
-FROZEN_UNTRACKED_STDOUT_SHA256 = (
-    "d3e3f159e37e94e0f04b6e1e30a6a7675a2c093c9121f72d78248813c9c3f946"
-)
 
 
 def test_seam_audit_exists() -> None:
@@ -95,21 +89,13 @@ def test_frozen_neighbor_suites_unchanged() -> None:
     assert_frozen_suite_unchanged()
 
 
-def test_untracked_retry1_stdout_forensic_capture() -> None:
-    """Append-only forensic: untracked duplicate must exist until owner review."""
+def test_untracked_retry1_stdout_forensic_removed_after_retry2_checkpoint() -> None:
+    """Forensic UTF-16 duplicate verified @ RETRY2 pre-live; file must not remain."""
+    assert not UNTRACKED_RETRY1_STDOUT.exists()
     assert COMMITTED_RETRY1_STDOUT.is_file()
-    assert UNTRACKED_RETRY1_STDOUT.is_file(), (
-        "untracked _retry1_live_run_stdout.txt must be retained for audit capture"
-    )
-    committed_size = COMMITTED_RETRY1_STDOUT.stat().st_size
-    untracked_size = UNTRACKED_RETRY1_STDOUT.stat().st_size
-    assert committed_size == FROZEN_COMMITTED_STDOUT_SIZE
-    assert untracked_size == FROZEN_UNTRACKED_STDOUT_SIZE
+    assert COMMITTED_RETRY1_STDOUT.stat().st_size == FROZEN_COMMITTED_STDOUT_SIZE
     assert sha256_file_hex(COMMITTED_RETRY1_STDOUT) == (
         FROZEN_RETRY1_LIVE_ARTIFACT_SHA256[
             "evals/v5/artifacts/final_scope_widget_e2e_retry1_live_stdout.log"
         ]
     )
-    assert sha256_file_hex(UNTRACKED_RETRY1_STDOUT) == FROZEN_UNTRACKED_STDOUT_SHA256
-    assert COMMITTED_RETRY1_STDOUT.read_bytes() != UNTRACKED_RETRY1_STDOUT.read_bytes()
-    assert UNTRACKED_RETRY1_STDOUT.read_bytes()[:2] == b"\xff\xfe"

@@ -1383,3 +1383,81 @@ git diff --check
 | T5 fix | broad prosthetics price materializes via `broad_family_price` despite planner `needs_clarify` |
 | UTF-8 | `logging_setup.py` + harness `configure_process_env()` reconfigure stdout/stderr |
 | Live | **STOP** — separate owner GO for Retry1 re-run |
+
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_RETRY2 (pre-live checkpoint)
+
+**Status:** governance + offline wiring COMPLETION ✅ · **NO LIVE / NO LLM**
+
+**Baseline:** `c670b96` (POST_RETRY1 product correction COMPLETION ✅)
+
+**Owner GO:** isolated namespace `final_scope_widget_e2e_retry2_*`; same frozen 8-turn matrix; Retry1 FAIL artifacts immutable; forensic UTF-16 stdout verified and removed.
+
+Seam audit: `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY2_SEAM_AUDIT.md`
+
+## Goal
+
+Wire retry2 live harness namespace for first post-correction live attempt. Re-prove offline real-path 8/8 through post-correction target runtime. Do **not** modify or bypass Retry1 frozen artifacts.
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY2_SEAM_AUDIT.md` | seam audit |
+| `docs/FLAGS_AND_STATUS.md` | retry2 status note |
+| `evals/v5/final_scope_widget_e2e_retry2_live_contract.py` | retry2 namespace + frozen pins |
+| `evals/v5/final_scope_widget_e2e_retry2_live_harness.py` | retry2 harness wrapper |
+| `evals/v5/run_final_scope_widget_e2e_retry2_live.py` | retry2 CLI |
+| `tests/test_final_scope_widget_e2e_retry2_governance.py` | PRE-CODE / COMPLETION checker |
+| `tests/test_final_scope_widget_e2e_retry2_live_harness.py` | offline 8/8 + dry-run |
+| `tests/test_final_scope_post_retry1_product_correction_governance.py` | forensic removal pin update |
+
+**Frozen (byte-identical):** all `final_scope_widget_e2e_retry1_*` live artifacts, preflight-abort attempt #1, widget matrix, S62/S63.
+
+## Forbidden
+
+- LIVE / LLM / provider calls
+- Product code changes
+- Modify/delete/rename Retry1 frozen artifacts
+- Bypass Retry1 attempt marker (use new retry2 namespace)
+- `git clean` for forensic removal
+- Committing removed forensic file
+
+## Constants (binding)
+
+| Constant | Value |
+|----------|-------|
+| `MAX_HTTP_TURNS` | 8 |
+| `MAX_PROVIDER_CALLS` | 40 |
+| `RETRY_COUNT_MAX` | 0 |
+| Planner | `qwen3.7-plus` |
+| `A9_PATIENT_SCOPE_AUTHORITY` | ON before import |
+
+## Tests (PRE-CODE + COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-r2-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_retry2_governance.py `
+  tests/test_final_scope_widget_e2e_retry2_live_harness.py `
+  tests/test_final_scope_post_retry1_product_correction_governance.py -q
+python evals/v5/run_final_scope_widget_e2e_retry2_live.py --dry-run
+git diff --check
+```
+
+**STOP after COMPLETION ✅. Retry2 live is separate owner GO.**
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E_RETRY2 pre-live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `c670b96` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| Offline 8/8 | ✅ `test_fake_provider_executes_all_eight_http_turns_without_network` |
+| Dry-run CLI | ✅ `run_final_scope_widget_e2e_retry2_live.py --dry-run` |
+| Forensic stdout | verified SHA `d3e3f159…` then removed (no `git clean`) |
+| Live | **STOP** — separate owner GO |

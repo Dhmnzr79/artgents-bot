@@ -55,7 +55,7 @@
 
 **FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION:** COMPLETION ✅ @ `c670b96`; T2/T5 product correction landed. Forensic `_retry1_live_run_stdout.txt` verified and removed @ RETRY2 pre-live.
 
-**FINAL_SCOPE_WIDGET_E2E_RETRY2_TYPED_UI_TURNFRAME:** COMPLETION ✅ @ `e3eb534+`; governed UI clicks use native TurnFrame (planner skipped); offline 8/8 proven. Retry3 pre-live **blocked** until owner GO.
+**FINAL_SCOPE_WIDGET_E2E_RETRY3:** pre-live COMPLETION ✅ @ `b4b47bc`; namespace `final_scope_widget_e2e_retry3_*`; offline 8/8 + planner budget proof; live **blocked** until owner GO. CLI: `evals/v5/run_final_scope_widget_e2e_retry3_live.py --dry-run`.
 
 ---
 

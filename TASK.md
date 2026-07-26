@@ -1595,3 +1595,85 @@ python -m pytest tests/test_typed_ui_turn_frame_offline.py `
 | Offline 8/8 | ✅ retry2 harness |
 | Planner bypass | ✅ scope + stage clicks; free-text unchanged |
 | Retry3 pre-live | **STOP** — separate owner GO |
+
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_RETRY3 (pre-live checkpoint)
+
+**Status:** governance + offline wiring COMPLETION ✅ · **NO LIVE / NO LLM**
+
+**Baseline:** `b4b47bc` (TYPED_UI_TURNFRAME COMPLETION ✅)
+
+**Owner GO:** isolated namespace `final_scope_widget_e2e_retry3_*`; same frozen 8-turn matrix; Retry1/Retry2 artifacts immutable.
+
+Seam audit: `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY3_SEAM_AUDIT.md`
+
+## Goal
+
+Wire retry3 live harness for first post-typed-UI live attempt. Re-prove offline real-path 8/8 with planner skip on T2/T6/T7 and tighter provider budget (34 total).
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY3_SEAM_AUDIT.md` | seam audit |
+| `docs/FLAGS_AND_STATUS.md` | retry3 status note |
+| `evals/v5/final_scope_widget_e2e_retry3_live_contract.py` | retry3 namespace + frozen pins + budget caps |
+| `evals/v5/final_scope_widget_e2e_retry3_live_provider_audit.py` | retry3 provider audit |
+| `evals/v5/final_scope_widget_e2e_retry3_live_harness.py` | retry3 harness wrapper |
+| `evals/v5/run_final_scope_widget_e2e_retry3_live.py` | retry3 CLI |
+| `tests/test_final_scope_widget_e2e_retry3_governance.py` | PRE-CODE / COMPLETION checker |
+| `tests/test_final_scope_widget_e2e_retry3_live_harness.py` | offline 8/8 + planner budget proof |
+
+**Frozen (byte-identical):** all `final_scope_widget_e2e_retry1_*` and `final_scope_widget_e2e_retry2_*` live artifacts, preflight-abort attempt #1, widget matrix.
+
+## Forbidden
+
+- LIVE / LLM / provider calls
+- Product code changes
+- Modify/delete/rename Retry1/Retry2 frozen artifacts
+- Owner override attempt marker
+- Retry3 live before separate owner GO
+
+## Constants (binding)
+
+| Constant | Value |
+|----------|-------|
+| `MAX_HTTP_TURNS` | 8 |
+| `MAX_PROVIDER_CALLS` | 34 |
+| ingress / planner / boundary / composer / verifier | 5 / 5 / 8 / 8 / 8 |
+| `RETRY_COUNT_MAX` | 0 |
+| Planner | `qwen3.7-plus` |
+| `A9_PATIENT_SCOPE_AUTHORITY` | ON before import |
+| Free-text planner calls | 5 |
+| Typed UI turns (no planner) | T2, T6, T7 |
+
+## Tests (PRE-CODE + COMPLETION)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$env:A9_PATIENT_SCOPE_AUTHORITY = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-r3-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_retry3_governance.py `
+  tests/test_final_scope_widget_e2e_retry3_live_harness.py `
+  tests/test_final_scope_widget_e2e_retry2_post_live_audit_governance.py `
+  tests/test_final_scope_post_retry1_product_correction_governance.py -q
+python evals/v5/run_final_scope_widget_e2e_retry3_live.py --dry-run
+git diff --check
+```
+
+**STOP after COMPLETION ✅. Retry3 live is separate owner GO.**
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E_RETRY3 pre-live)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `b4b47bc` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ |
+| Offline 8/8 | ✅ `test_fake_provider_executes_all_eight_http_turns_without_network` |
+| Planner skip T2/T6/T7 | ✅ 0 calls; free-text 5 calls |
+| Dry-run CLI | ✅ `run_final_scope_widget_e2e_retry3_live.py --dry-run` |
+| Live | **STOP** — separate owner GO |

@@ -55,7 +55,9 @@
 
 **FINAL_SCOPE_POST_RETRY1_PRODUCT_CORRECTION:** COMPLETION ✅ @ `c670b96`; T2/T5 product correction landed. Forensic `_retry1_live_run_stdout.txt` verified and removed @ RETRY2 pre-live.
 
-**FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT:** implementation COMPLETION ✅ @ governance+product; `TargetComposerActionContext` wired to Composer directives/invocation; `price:None` fail-closed; offline T1–T8 pass. **NO LIVE / Retry4** until separate owner GO.
+**FINAL_SCOPE_POST_RETRY3_COMPOSER_ACTION_CONTEXT:** implementation COMPLETION ✅ @ `6b67e35`; `TargetComposerActionContext` wired to Composer directives/invocation; `price:None` fail-closed; offline T1–T8 pass.
+
+**FINAL_SCOPE_WIDGET_E2E_RETRY4:** pre-live governance + offline wiring @ `6b67e35`; isolated `final_scope_widget_e2e_retry4_*` namespace; Retry1/2/3 artifacts frozen; manual rubric T1/T2/T6/T7; **NO LIVE** until separate owner GO.
 
 ---
 

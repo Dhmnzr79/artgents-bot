@@ -15,7 +15,6 @@ from core.response_schema_kb_index import build_response_schema_kb_refs
 
 DEMO_ROOT = Path("clients/demo")
 TARGET_PATH = DEMO_ROOT / "target_response/service_catalog.json"
-CURRENT_PATH = DEMO_ROOT / "service_catalog.json"
 DOCTOR_PATH = DEMO_ROOT / "doctor_catalog.json"
 MD_ROOT = DEMO_ROOT / "md"
 
@@ -231,24 +230,6 @@ def test_duplicate_keys_are_rejected_at_nested_json_levels() -> None:
         json.loads(duplicate, object_pairs_hook=_reject_duplicate_pairs)
 
 
-def test_current_content_identity_projects_exactly_without_legacy_fields() -> None:
-    target, _ = _load_target()
-    current = _load_json_mapping(CURRENT_PATH)
-
-    assert tuple(current) == SERVICE_IDS
-    for service_id in SERVICE_IDS:
-        legacy = current[service_id]
-        record = target[service_id]
-        assert record["name"] == legacy["title"]
-        assert record["aliases"] == legacy["aliases"]
-        assert record["active"] is legacy["active"]
-        if legacy["md_entry_ref"] is None:
-            assert service_id == "tomography"
-            assert "content_ref" not in record
-        else:
-            assert record["content_ref"] == f'{legacy["md_entry_ref"]}.md'
-
-
 def test_family_roles_and_selection_match_normative_inventory() -> None:
     raw, _ = _load_target()
 
@@ -269,17 +250,25 @@ def test_only_semantic_options_exist_and_match_authored_source_labels() -> None:
 
     assert actual == EXPECTED_OPTIONS
     for service_id, expected in EXPECTED_OPTIONS.items():
-        price_source = _load_json_mapping(
-            DEMO_ROOT / f"pricebook/services/{service_id}.json"
+        offer_paths = sorted(
+            (DEMO_ROOT / "target_response/pricebook/services").glob(f"{service_id}.*.json")
         )
-        source_identity = [
-            (variant["brand"], variant["brand_label"])
-            for variant in price_source["variants"]
-        ]
+        assert offer_paths, service_id
+        brands = _load_json_mapping(DEMO_ROOT / "target_response/brand_catalog.json")["brands"]
         target_identity = [
             (option["option_id"], option["name"]) for option in expected
         ]
-        assert target_identity == source_identity
+        offer_identity = []
+        for path in offer_paths:
+            offer = _load_json_mapping(path)
+            option_id = offer.get("option_id")
+            brand_id = offer.get("brand_id")
+            if option_id:
+                name = next(opt["name"] for opt in expected if opt["option_id"] == option_id)
+                offer_identity.append((option_id, name))
+            elif brand_id:
+                offer_identity.append((brand_id, brands[brand_id]["canonical_name"]))
+        assert sorted(target_identity) == sorted(offer_identity)
         assert all("brand" not in option and "brand_id" not in option for option in expected)
 
 
@@ -308,16 +297,12 @@ def test_content_refs_and_doctor_service_links_are_complete() -> None:
 def test_real_sources_are_read_only_and_test_has_no_product_wiring() -> None:
     paths = [
         TARGET_PATH,
-        CURRENT_PATH,
         DOCTOR_PATH,
-        DEMO_ROOT / "pricebook/services/removable_dentures.json",
-        DEMO_ROOT / "pricebook/services/sinus_lift.json",
         *sorted(MD_ROOT.glob("*.md")),
     ]
     before = {path: _sha256(path) for path in paths}
 
     _load_target()
-    _load_json_mapping(CURRENT_PATH)
     load_doctor_catalog(DOCTOR_PATH)
     build_response_schema_kb_refs(MD_ROOT)
 

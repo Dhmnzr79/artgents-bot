@@ -53,7 +53,9 @@ IMPLEMENTATION_BASELINE = "bc4679b"
 def test_implementation_artifacts_present() -> None:
     assert (_REPO_ROOT / "core" / "target_family_price_resolution.py").is_file()
     assert (_REPO_ROOT / "tests" / "test_final_price_and_service_coverage_sparse_fixtures.py").is_file()
-    assert (_REPO_ROOT / "tests" / "test_final_price_and_service_coverage_existing_paths.py").is_file()
+    assert not (
+        _REPO_ROOT / "tests" / "test_final_price_and_service_coverage_existing_paths.py"
+    ).exists()
 
 
 def test_family_price_resolution_has_no_topic_hardcode() -> None:

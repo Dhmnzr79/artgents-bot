@@ -213,12 +213,11 @@ def test_new_sid_does_not_inherit_prior_service_focus() -> None:
     assert focus_dict_from_session_state(mem_get(sid2)) is None
 
 
-def test_query_selector_price_route_uses_target_runtime_state() -> None:
-    from query_selector import select_price_service_route
+def test_price_followup_uses_target_runtime_state() -> None:
+    from core.dialog_focus import build_dialog_focus_decision
 
     sid = f"c2c-price-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
     _seed_target_runtime_state(sid, last_service_id="all_on_4", last_topic="implantation")
-    route = select_price_service_route("А сколько стоит?", client_id="demo", sid=sid)
-    assert route.get("mode") == "matched"
-    assert route.get("matched_service_id") == "all_on_4"
+    focus = build_dialog_focus_decision("А сколько стоит?", sid=sid, client_id="demo")
+    assert focus.resolved_service_id == "all_on_4"

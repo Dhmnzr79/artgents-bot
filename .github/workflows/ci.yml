@@ -44,8 +44,11 @@ jobs:
       - name: Lint client md (all packs)
         run: python scripts/lint_content.py --client all
 
-      - name: Lint pricebook (money invariants)
+      - name: Lint pricebook (target_response invariants)
         run: python scripts/lint_pricebook.py
+
+      - name: Validate client pack (demo)
+        run: python scripts/validate_client_pack.py --client-id demo
 
       - name: App import smoke
         run: python -c "import app"
@@ -69,10 +72,7 @@ jobs:
             tests/test_e2e_smoke_infer.py \
             tests/test_source_routing_golden.py \
             tests/test_aspect_metadata.py \
-            tests/test_price_offers.py \
-            tests/test_price_group_overview.py \
-            tests/test_price_scope_router.py \
-            tests/test_price_layer_parity.py \
             tests/test_price_ref_routing.py \
-            tests/test_pricebook_golden.py \
+            tests/test_validate_client_pack.py \
+            tests/test_final_client_pack_data_convergence_b_governance.py \
             -q --tb=short

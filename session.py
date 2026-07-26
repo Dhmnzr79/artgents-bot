@@ -89,9 +89,7 @@ def _fresh_defaults() -> dict:
         "topic_state": {},
         "last_content_ui_payload": None,
         "last_catalog_service_id": None,
-        "last_patient_situation": None,
         "last_aspect": None,
-        "patient_situation_turn_age": 0,
         "pending_lead_offer": False,
         "user_turn_timestamps": [],
         "consult_streak": 0,
@@ -172,10 +170,6 @@ def mem_get(session_id: str) -> dict:
 def mem_add_user(session_id: str, text: str) -> None:
     with _lock:
         st = mem_get(session_id)
-        if isinstance(st.get("last_patient_situation"), dict) and str(
-            st["last_patient_situation"].get("kind") or ""
-        ).strip():
-            st["patient_situation_turn_age"] = int(st.get("patient_situation_turn_age") or 0) + 1
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
         st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
         ts_list = list(st.get("user_turn_timestamps") or [])
@@ -413,61 +407,16 @@ def set_last_catalog_service(session_id: str, service_id: str) -> None:
         _persist_unlocked(session_id, st)
 
 
-def get_last_patient_situation(session_id: str) -> dict | None:
-    from core.routing_loader import THRESHOLDS
-
-    st = mem_get(session_id)
-    snap = st.get("last_patient_situation")
-    if not isinstance(snap, dict) or not str(snap.get("kind") or "").strip():
-        return None
-    age = int(st.get("patient_situation_turn_age") or 0)
-    if age > int(THRESHOLDS.patient_situation.max_turn_age):
-        return None
-    return dict(snap)
-
-
-def patient_situation_turn_age(session_id: str) -> int:
-    st = mem_get(session_id)
-    return int(st.get("patient_situation_turn_age") or 0)
-
-
-def set_last_patient_situation(session_id: str, snapshot: dict) -> None:
-    kind = str((snapshot or {}).get("kind") or "").strip()
-    if not kind or kind == "unknown":
-        return
-    with _lock:
-        st = mem_get(session_id)
-        st["last_patient_situation"] = dict(snapshot)
-        st["patient_situation_turn_age"] = 0
-        _persist_unlocked(session_id, st)
-
-
-def clear_last_patient_situation(session_id: str) -> None:
-    with _lock:
-        st = mem_get(session_id)
-        if st.get("last_patient_situation") is None and int(st.get("patient_situation_turn_age") or 0) == 0:
-            return
-        st["last_patient_situation"] = None
-        st["patient_situation_turn_age"] = 0
-        _persist_unlocked(session_id, st)
-
-
 def clear_focus_context(session_id: str) -> None:
-    """Reset dialog focus: target service focus, aspect, patient_situation turn ages."""
+    """Reset dialog focus: target service focus and aspect."""
     from core.target_runtime_session import clear_target_service_focus
 
     clear_target_service_focus(session_id)
     with _lock:
         st = mem_get(session_id)
-        if (
-            st.get("last_aspect") is None
-            and st.get("last_patient_situation") is None
-            and int(st.get("patient_situation_turn_age") or 0) == 0
-        ):
+        if st.get("last_aspect") is None:
             return
         st["last_aspect"] = None
-        st["last_patient_situation"] = None
-        st["patient_situation_turn_age"] = 0
         _persist_unlocked(session_id, st)
 
 

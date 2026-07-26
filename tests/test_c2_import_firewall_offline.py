@@ -79,7 +79,6 @@ files = [
     "core/target_runtime_session.py",
     "core/dialog_focus.py",
     "core/follow_up_rewrite.py",
-    "query_selector.py",
     "core/answer_planner.py",
 ]
 patterns = [

@@ -30,15 +30,15 @@ from core.response_schema_kb_index import build_response_schema_kb_refs
 
 DEMO_ROOT = Path("clients/demo")
 TARGET_ROOT = DEMO_ROOT / "target_response"
-CURRENT_MARKETING = DEMO_ROOT / "marketing.yaml"
+CURRENT_MARKETING = Path("tests/fixtures/demo_legacy_marketing.yaml")
 CURRENT_TONE = DEMO_ROOT / "tone.yaml"
-CURRENT_PRICE_SERVICES = DEMO_ROOT / "pricebook/services"
+TARGET_OFFERS = TARGET_ROOT / "pricebook/services"
+CURRENT_PRICE_SERVICES = TARGET_OFFERS
 MD_ROOT = DEMO_ROOT / "md"
 TARGET_SERVICES = TARGET_ROOT / "service_catalog.json"
 TARGET_BRANDS = TARGET_ROOT / "brand_catalog.json"
 TARGET_FACTS = TARGET_ROOT / "pricebook/facts.json"
 TARGET_STRATEGY = TARGET_ROOT / "clinic_strategy.yaml"
-TARGET_OFFERS = TARGET_ROOT / "pricebook/services"
 DOCTOR_CATALOG = DEMO_ROOT / "doctor_catalog.json"
 AUDIT_DOC = Path("docs/MARKETING_TARGET_MIGRATION_AUDIT.md")
 
@@ -284,10 +284,6 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
         )
         assert len(matches) == 1
         md_keys.extend(matches)
-    price_keys = [
-        _load_json(path)["cta_key"]
-        for path in sorted(CURRENT_PRICE_SERVICES.glob("*.json"))
-    ]
     marketing_keys = [
         entry["primary_cta_key"]
         for entry in _load_yaml(CURRENT_MARKETING)["service_marketing"].values()
@@ -303,7 +299,7 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
         "plan": 25,
         "price": 2,
     }
-    assert len(price_keys) == 21 and Counter(price_keys) == {"price": 21}
+    assert len(list(TARGET_OFFERS.glob("*.json"))) == 31
     assert Counter(marketing_keys) == {"doctor": 10, "consult": 3}
     assert "ct_consultation" not in tone_keys
 

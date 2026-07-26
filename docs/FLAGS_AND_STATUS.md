@@ -10,9 +10,7 @@
 
 | Флаг | Что делает |
 |---|---|
-| `SERVICE_SELECT_LLM_ON` | Модель выбирает услугу (legacy island — **DELETE in Checkpoint B**) |
 | `TURN_PLANNER_ON` | Один плановый вызов вместо цепочки классификаторов |
-| `PATIENT_SITUATION_LLM_ON` | Распознавание ситуации пациента (legacy island — **DELETE in Checkpoint B**) |
 | `DIALOG_FOCUS_LLM_CLASSIFY_ON` | Перенос фокуса между ходами |
 | `LEAD_TURN_LLM_CLASSIFY_ON` | Серая зона намерения оставить контакт |
 | `BOOKING_INTENT_LLM_ON` | Намерение «записаться» |
@@ -70,11 +68,9 @@ Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveSco
 
 **FINAL_EXPLICIT_SERVICE_PRICE_LOOKUP_BOUNDARY:** governance @ `19297fc` — seam audit + PRE-CODE; implementation **STOP** until PRE-CODE ✅.
 
-**FINAL_CLIENT_PACK_DATA_CONVERGENCE:** Checkpoint A reader cutover ✅ @ `e3730ea`; Checkpoint B
-governance PRE-CODE (post-A seam audit @ `FINAL_CLIENT_PACK_DATA_CONVERGENCE_B_SEAM_AUDIT.md`).
-Legacy root mirrors (`service_catalog.json`, `pricebook/**`, `marketing.yaml`,
-`price_brand_aliases.json`) remain byte-identical on disk until B implementation delete.
-Product readers use only `target_response/**`. B implementation/delete blocked until B PRE-CODE ✅.
+**FINAL_CLIENT_PACK_DATA_CONVERGENCE:** Checkpoint B implementation complete — demo pack uses only
+`target_response/**`; legacy root mirrors deleted; `scripts/validate_client_pack.py` +
+`docs/CLIENT_PACK_AUTHORING.md` + `clients/_template` scaffold in place.
 
 ---
 
@@ -82,11 +78,11 @@ Product readers use only `target_response/**`. B implementation/delete blocked u
 
 ### Проверенные гварды — включены по умолчанию (флип 2026-07-09/10)
 
+Для demo-клиента включены насовсем: env-дефолт `"1"` (в `config.py`) + `clients/demo/features.yaml`.
+
 | Флаг | Что делает | Ключей |
 |---|---|---|
-| `PRICE_STRICT_SERVICE_ON` | Цена без явно названной услуги → defer (legacy island — **DELETE in B**) | 1 (env) |
 | `BOOKING_DATE_DEFER_ON` | Не подтверждать/не эхоить дату и слот записи | 2 (env + features.yaml) |
-| `BRAND_FILTER_ON` | Бренд-фильтр имплантов (legacy island — **DELETE in B**) | 2 (env + features.yaml) |
 
 ### A. Ждёт доработки/решения (технически работает, но есть нюанс)
 
@@ -111,7 +107,7 @@ _Удалено в C1:_ `ANSWER_PACKET_ASSEMBLER_ON`.
 Чтобы красный в тесте означал настоящую проблему, а не «забыл флаг». Стандартный композер-прогон (PowerShell):
 
 ```powershell
-$env:SERVICE_SELECT_LLM_ON="1"; $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
+$env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
 ```
 
 **Кейсы, зависящие от доп. флагов** (без них краснеют «ложно»):

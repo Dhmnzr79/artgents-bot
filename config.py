@@ -77,33 +77,7 @@ BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
     "yes",
 )
 
-# --- Brand filter + budget anchor on implant price path (money-path marketing; default ON, env "0" = kill-switch) ---
-BRAND_FILTER_ON = os.getenv("BRAND_FILTER_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- Strict service match for price: no explicitly-named service -> honest defer, never a fuzzy price ---
-# Default ON (env "0" = kill-switch). Situation-focus gap fixed: shared price_query_has_session_focus
-# now honors patient-situation focus, so ps03-class follow-ups get the per-unit price, not a defer.
-PRICE_STRICT_SERVICE_ON = os.getenv("PRICE_STRICT_SERVICE_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-
-# --- LLM service selection in composer price path (step 2) ---
-SERVICE_SELECT_LLM_ON = os.getenv("SERVICE_SELECT_LLM_ON", "1").lower() in (
-    "1",
-    "true",
-    "yes",
-)
-SERVICE_SELECT_LLM_MODEL = (
-    (os.getenv("SERVICE_SELECT_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
-)
-
-# --- Single turn planner (full-context roadmap stage 4; always on post-C2b) ---
+# --- Booking date defer (default ON) ---
 TURN_PLANNER_LLM_MODEL = (
     (os.getenv("TURN_PLANNER_LLM_MODEL") or "").strip() or QWEN_PLUS_MODEL
 )

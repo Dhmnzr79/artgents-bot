@@ -27,7 +27,7 @@ TARGET_ROOT = DEMO_ROOT / "target_response"
 MD_ROOT = DEMO_ROOT / "md"
 DOCTOR_CATALOG = DEMO_ROOT / "doctor_catalog.json"
 TONE = DEMO_ROOT / "tone.yaml"
-CURRENT_MARKETING = DEMO_ROOT / "marketing.yaml"
+CURRENT_MARKETING = Path("tests/fixtures/demo_legacy_marketing.yaml")
 
 EXPECTED_INITIAL_REFS = [
     "fact:free_implant_consult",

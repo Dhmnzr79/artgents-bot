@@ -23,7 +23,7 @@ from core.response_schema_kb_index import build_response_schema_kb_refs
 
 _ROOT = Path(__file__).resolve().parents[1]
 _MD_ROOT = _ROOT / "clients" / "demo" / "md"
-_CATALOG_PATH = _ROOT / "clients" / "demo" / "service_catalog.json"
+_CATALOG_PATH = _ROOT / "clients" / "demo" / "target_response" / "service_catalog.json"
 _OVERVIEW_NAME = "doctors__doctor__overview.md"
 _PERSONAL_GLOB = "doctors__doctor__*.md"
 _TRANSITIONAL_KEYS = {

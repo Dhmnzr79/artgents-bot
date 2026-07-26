@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Offline client pack validator — strict schema, refs, no network/LLM."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from contracts.doctor_schema_refs import (  # noqa: E402
+    DoctorCatalogExternalIndex,
+    build_doctor_source_refs,
+    validate_doctor_catalog_external_refs,
+)
+from contracts.response_schema_refs import (  # noqa: E402
+    ResponseSchemaExternalIndex,
+    validate_response_schema_external_refs,
+)
+from core.doctor_schema_loader import load_doctor_catalog  # noqa: E402
+from core.response_schema_kb_index import build_response_schema_kb_refs  # noqa: E402
+from core.response_schema_loader import (  # noqa: E402
+    DuplicateKeyError,
+    ResponseSchemaLoadError,
+    load_response_schema_bundle,
+)
+
+LEGACY_MIRROR_RELATIVE = (
+    "service_catalog.json",
+    "marketing.yaml",
+    "price_brand_aliases.json",
+    "pricebook",
+)
+
+
+def _resolve_pack_root(client_id: str | None, pack_path: str | None) -> Path:
+    if pack_path:
+        root = Path(pack_path).expanduser().resolve()
+        if not root.is_dir():
+            raise FileNotFoundError(f"pack_path_not_found:{root}")
+        return root
+    if not client_id:
+        raise ValueError("client_id_or_pack_path_required")
+    root = ROOT / "clients" / client_id
+    if not root.is_dir():
+        raise FileNotFoundError(f"client_pack_not_found:{root}")
+    return root
+
+
+def validate_client_pack(
+    pack_root: Path,
+    *,
+    scaffold: bool = False,
+) -> list[str]:
+    errors: list[str] = []
+    rel = lambda suffix: pack_root / suffix  # noqa: E731
+
+    if not scaffold:
+        for legacy in LEGACY_MIRROR_RELATIVE:
+            path = rel(legacy)
+            if path.exists():
+                errors.append(f"{path.relative_to(pack_root).as_posix()}: legacy_mirror_forbidden")
+
+    md_root = rel("md")
+    if not md_root.is_dir():
+        errors.append("md/: directory_missing")
+    elif not any(md_root.glob("*.md")) and not scaffold:
+        errors.append("md/: no_markdown_files")
+
+    target_root = rel("target_response")
+    if not target_root.is_dir():
+        errors.append("target_response/: directory_missing")
+        return errors
+
+    required_target = (
+        "service_catalog.json",
+        "brand_catalog.json",
+        "marketing.yaml",
+        "clinic_strategy.yaml",
+        "pricebook/facts.json",
+    )
+    for piece in required_target:
+        path = target_root / piece
+        if not path.is_file():
+            errors.append(f"target_response/{piece}: file_missing")
+
+    services_dir = target_root / "pricebook" / "services"
+    if not services_dir.is_dir():
+        errors.append("target_response/pricebook/services/: directory_missing")
+    elif not list(services_dir.glob("*.json")) and not scaffold:
+        errors.append("target_response/pricebook/services/: no_offer_files")
+
+    doctor_path = rel("doctor_catalog.json")
+    if not doctor_path.is_file():
+        errors.append("doctor_catalog.json: file_missing")
+
+    for operational in ("brand.yaml", "clinic_policies.yaml", "features.yaml", "lead_config.yaml", "tone.yaml", "widget_config.json"):
+        if not rel(operational).is_file():
+            errors.append(f"{operational}: file_missing")
+
+    if errors:
+        return errors
+
+    try:
+        bundle = load_response_schema_bundle(target_root)
+    except (ResponseSchemaLoadError, DuplicateKeyError, ValueError) as exc:
+        errors.append(f"target_response/: schema_load_failed:{exc}")
+        return errors
+
+    if not bundle.services:
+        errors.append("target_response/service_catalog.json: empty_services")
+    if not bundle.offers and not scaffold:
+        errors.append("target_response/pricebook/services/: empty_offers")
+
+    try:
+        doctors = load_doctor_catalog(doctor_path)
+    except Exception as exc:
+        errors.append(f"doctor_catalog.json: schema_invalid:{exc}")
+        return errors
+
+    kb_refs = build_response_schema_kb_refs(md_root) if md_root.is_dir() else frozenset()
+    doctor_index = DoctorCatalogExternalIndex(
+        service_ids=tuple(bundle.services),
+        kb_refs=kb_refs,
+    )
+    try:
+        validate_doctor_catalog_external_refs(doctors, doctor_index)
+    except Exception as exc:
+        errors.append(f"doctor_catalog.json: external_ref_invalid:{exc}")
+
+    external_index = ResponseSchemaExternalIndex(
+        kb_refs=kb_refs,
+        doctor_refs=build_doctor_source_refs(doctors),
+    )
+    try:
+        validate_response_schema_external_refs(bundle, external_index)
+    except Exception as exc:
+        errors.append(f"target_response/: external_ref_invalid:{exc}")
+
+    return errors
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Validate canonical client pack (offline).")
+    parser.add_argument("--client-id", dest="client_id", default=None)
+    parser.add_argument("--path", dest="pack_path", default=None)
+    parser.add_argument(
+        "--scaffold",
+        action="store_true",
+        help="Allow placeholder template packs with minimal offers.",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        pack_root = _resolve_pack_root(args.client_id, args.pack_path)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    errors = validate_client_pack(pack_root, scaffold=args.scaffold)
+    if errors:
+        for err in errors:
+            print(f"ERROR: {err}", file=sys.stderr)
+        print(f"\n{len(errors)} validation error(s)", file=sys.stderr)
+        return 1
+
+    label = pack_root.name
+    print(f"OK: client pack valid ({label})")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,17 @@
+{
+  "offer_id": "sample_service.default",
+  "service_id": "sample_service",
+  "active": true,
+  "brand_id": "template_brand",
+  "price": {
+    "mode": "fixed",
+    "amount": 10000,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "процедура",
+    "includes": []
+  },
+  "followups": []
+}

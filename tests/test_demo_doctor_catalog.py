@@ -25,7 +25,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 _DEMO_ROOT = _ROOT / "clients" / "demo"
 _MD_ROOT = _DEMO_ROOT / "md"
 _DOCTOR_CATALOG_PATH = _DEMO_ROOT / "doctor_catalog.json"
-_SERVICE_CATALOG_PATH = _DEMO_ROOT / "service_catalog.json"
+_SERVICE_CATALOG_PATH = _DEMO_ROOT / "target_response" / "service_catalog.json"
 _OVERVIEW_NAME = "doctors__doctor__overview.md"
 _DOCTOR_FIELDS = {
     "experience_years",

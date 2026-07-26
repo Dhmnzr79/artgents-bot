@@ -8,7 +8,10 @@ from core.attribute_followup import (
     is_vague_attribute_followup,
     query_has_explicit_service_object,
 )
-from core.price_followup import is_vague_price_followup
+
+
+def is_vague_price_followup(q: str) -> bool:
+    return is_vague_attribute_followup(q, "price")
 
 # --- audit phrases (stem/stop; not route→file) ---
 

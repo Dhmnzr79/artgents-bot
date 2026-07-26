@@ -23,6 +23,7 @@ def _write_json(path: Path, payload: object) -> None:
 
 def _build_sparse_pack(tmp_path: Path) -> Path:
     pack = tmp_path / "clients" / "sparse_clinic"
+    template = Path(__file__).resolve().parents[1] / "clients" / "_template"
     md = pack / "md"
     md.mkdir(parents=True)
     (md / "whitening__service__teeth_whitening.md").write_text(
@@ -96,6 +97,16 @@ def _build_sparse_pack(tmp_path: Path) -> Path:
             "doctors": {},
         },
     )
+    for name in (
+        "brand.yaml",
+        "clinic_policies.yaml",
+        "features.yaml",
+        "lead_config.yaml",
+        "tone.yaml",
+        "ui.yaml",
+        "widget_config.json",
+    ):
+        (pack / name).write_text((template / name).read_text(encoding="utf-8"), encoding="utf-8")
     return target
 
 
@@ -150,3 +161,10 @@ def test_sparse_pack_catalog_match_and_brand_filters(
     assert match.get("is_confident") is True
 
     clear_target_client_data_cache()
+
+
+def test_sparse_pack_passes_offline_validator(tmp_path: Path) -> None:
+    pack = _build_sparse_pack(tmp_path).parent
+    from scripts.validate_client_pack import validate_client_pack
+
+    assert validate_client_pack(pack) == []

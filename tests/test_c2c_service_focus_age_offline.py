@@ -17,7 +17,6 @@ from core.target_runtime_session import (
 from core.target_runtime_turn_frame_hydration import hydrate_target_runtime_turn_frame_from_session
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.target_runtime_session import TargetRuntimeSessionState
-from query_selector import select_price_service_route
 from session import mem_add_user, mem_get, mem_reset
 from tests.test_s61_correction_target_runtime import (
     BackendPayload,
@@ -97,8 +96,8 @@ def test_stale_focus_not_used_for_price_route() -> None:
 
     with _lock:
         _persist_unlocked(sid, st)
-    route = select_price_service_route("А сколько стоит?", client_id="demo", sid=sid)
-    assert route.get("mode") == "clarify"
+    focus = build_dialog_focus_decision("А сколько стоит?", sid=sid, client_id="demo")
+    assert focus.resolved_service_id is None
 
 
 def test_hydration_respects_service_focus_age() -> None:

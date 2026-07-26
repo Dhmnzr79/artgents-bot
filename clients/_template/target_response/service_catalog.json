@@ -1,0 +1,12 @@
+{
+  "sample_service": {
+    "name": "Sample Service",
+    "aliases": ["sample", "example service"],
+    "family": "aesthetics",
+    "roles": [],
+    "active": true,
+    "content_ref": "sample__service__example.md",
+    "selection": {"mode": "direct"},
+    "options": []
+  }
+}

@@ -651,27 +651,11 @@ def _default_reset_session(sid: str) -> None:
 
 
 def _default_read_snapshot(sid: str) -> dict[str, Any] | None:
-    from session import get_last_patient_situation
-
-    return get_last_patient_situation(sid)
+    return None
 
 
 def _default_age_snapshot(sid: str) -> dict[str, Any]:
-    from core.routing_loader import THRESHOLDS
-    from session import (
-        get_last_patient_situation,
-        mem_add_user,
-        patient_situation_turn_age,
-    )
-
-    if get_last_patient_situation(sid) is None:
-        return {"prepared": False, "reason": "snapshot_missing_after_turn_1"}
-    max_age = int(THRESHOLDS.patient_situation.max_turn_age)
-    while patient_situation_turn_age(sid) <= max_age:
-        mem_add_user(sid, "")
-    if get_last_patient_situation(sid) is not None:
-        return {"prepared": False, "reason": "snapshot_not_expired"}
-    return {"prepared": True, "reason": "exact"}
+    return {"prepared": False, "reason": "legacy_session_carry_removed"}
 
 
 def _extract_live_observation(

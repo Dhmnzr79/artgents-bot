@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+_DEMO = _REPO_ROOT / "clients" / "demo"
 
 _CUTOVER_MODULES = (
     "core/turn_planner_llm.py",
@@ -17,6 +18,13 @@ _CUTOVER_MODULES = (
     "ingress_gate.py",
     "doctors_lookup.py",
     "orchestration/planner_turn.py",
+)
+
+_LEGACY_MIRROR_PATHS = (
+    _DEMO / "service_catalog.json",
+    _DEMO / "marketing.yaml",
+    _DEMO / "price_brand_aliases.json",
+    _DEMO / "pricebook",
 )
 
 
@@ -60,14 +68,9 @@ def test_startup_check_validates_target_response_not_root_pricebook() -> None:
     assert "service_catalog.json" not in source
 
 
-def test_demo_target_and_legacy_service_ids_stay_aligned() -> None:
-    import json
-
-    legacy = json.loads((_REPO_ROOT / "clients/demo/service_catalog.json").read_text(encoding="utf-8"))
-    target = json.loads(
-        (_REPO_ROOT / "clients/demo/target_response/service_catalog.json").read_text(encoding="utf-8")
-    )
-    assert set(legacy) == set(target)
+def test_legacy_root_mirrors_are_absent_post_checkpoint_b() -> None:
+    for path in _LEGACY_MIRROR_PATHS:
+        assert not path.exists(), path.as_posix()
 
 
 def test_product_py_has_no_root_service_catalog_reads_in_cutover_modules() -> None:

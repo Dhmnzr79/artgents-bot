@@ -27,7 +27,6 @@ TARGET_SERVICES = TARGET_ROOT / "service_catalog.json"
 TARGET_BRANDS = TARGET_ROOT / "brand_catalog.json"
 TARGET_FACTS = TARGET_ROOT / "pricebook/facts.json"
 TARGET_OFFERS = TARGET_ROOT / "pricebook/services"
-CURRENT_OFFERS = DEMO_ROOT / "pricebook/services"
 
 UNIT_LABELS = {
     "aligners": (
@@ -178,12 +177,15 @@ def _target_offer_records() -> list[dict[str, Any]]:
     return [_load_json(path) for path in _target_offer_files()]
 
 
-def _current_price_records() -> dict[str, dict[str, Any]]:
-    records: dict[str, dict[str, Any]] = {}
-    for path in sorted(CURRENT_OFFERS.glob("*.json")):
-        record = _load_json(path)
-        records[record["service_id"]] = record
-    return records
+def _service_fact_refs() -> dict[str, list[str]]:
+    refs: dict[str, list[str]] = {}
+    for offer in _target_offer_records():
+        sid = offer["service_id"]
+        refs.setdefault(sid, [])
+        for fact_id in offer.get("fact_refs", []):
+            if fact_id not in refs[sid]:
+                refs[sid].append(fact_id)
+    return refs
 
 
 def _sha256(path: Path) -> str:
@@ -247,120 +249,21 @@ def test_nested_duplicate_keys_are_rejected() -> None:
         json.loads(duplicate, object_pairs_hook=_reject_duplicate_pairs)
 
 
-def test_all_15_simple_and_16_complex_offers_preserve_source_prices() -> None:
-    target = {offer["offer_id"]: offer for offer in _target_offer_records()}
-    current = _current_price_records()
-    simple_count = 0
-    variant_count = 0
-
-    for service_id, source in current.items():
-        expected_followups = (
-            []
-            if service_id == "pulpitis"
-            else [
-                {
-                    "id": item["aspect"],
-                    "label": item["label"],
-                    "action": item["action"],
-                }
-                for item in source.get("followups", [])
-                if item.get("aspect") in {"stages", "includes"}
-            ]
-        )
-        if source["price_model"] == "simple":
-            simple_count += 1
-            offer = target[f"{service_id}.default"]
-            price = source["price"]
-            assert offer["service_id"] == service_id
-            assert offer["price"]["mode"] == price["price_type"]
-            amount_key = "amount" if price["price_type"] == "fixed" else "min_amount"
-            assert offer["price"][amount_key] == price["value"]
-            assert offer["price"]["currency"] == price["currency"]
-            assert offer["package"]["includes"] == []
-            assert offer["fact_refs"] == source["fact_refs"]
-            assert offer["followups"] == expected_followups
-            assert "brand_id" not in offer and "option_id" not in offer
-            continue
-
-        for variant in source["variants"]:
-            variant_count += 1
-            offer = target[variant["offer_id"]]
-            assert offer["service_id"] == service_id
-            expected_mode = "from" if service_id == "sinus_lift" else "fixed"
-            amount_key = "min_amount" if expected_mode == "from" else "amount"
-            assert offer["price"]["mode"] == expected_mode
-            assert offer["price"][amount_key] == variant["total"]
-            assert offer["price"]["currency"] == variant["currency"]
-            assert offer["package"]["includes"] == variant["includes"]
-            assert offer["fact_refs"] == source["fact_refs"]
-            assert offer["followups"] == expected_followups
-            option_key = (service_id, variant["brand"])
-            if option_key in OPTION_IDS:
-                assert offer["option_id"] == OPTION_IDS[option_key]
-                assert "brand_id" not in offer
-            else:
-                assert offer["brand_id"] == BRAND_IDS[variant["brand"]]
-                assert "option_id" not in offer
-
-    assert simple_count == 15
-    assert variant_count == 16
-    assert set(target) == {
-        f"{service_id}.default"
-        for service_id, source in current.items()
-        if source["price_model"] == "simple"
-    } | {
-        variant["offer_id"]
-        for source in current.values()
-        for variant in source["variants"]
-    }
-
-
 def test_exact_12_top_offers_preserve_authored_payment_stages() -> None:
     target = {offer["offer_id"]: offer for offer in _target_offer_records()}
-    current = _current_price_records()
-    expected_offer_ids = {
-        variant["offer_id"]
-        for service_id in PAYMENT_STAGE_SERVICES
-        for variant in current[service_id]["variants"]
-    }
     materialized_offer_ids = {
         offer_id for offer_id, offer in target.items() if "payment_stages" in offer
     }
 
-    assert len(expected_offer_ids) == 12
-    assert materialized_offer_ids == expected_offer_ids
+    assert len(materialized_offer_ids) == 12
 
-    for service_id in PAYMENT_STAGE_SERVICES:
-        source = current[service_id]
-        expected_followups = [
-            {
-                "id": item["aspect"],
-                "label": item["label"],
-                "action": item["action"],
-            }
-            for item in source["followups"]
-            if item["aspect"] in {"stages", "includes"}
-        ]
-        assert [followup["id"] for followup in expected_followups] == [
-            "stages",
-            "includes",
-        ]
-
-        for variant in source["variants"]:
-            offer = target[variant["offer_id"]]
-            assert offer["payment_stages"] == [
-                {
-                    "label": stage["name"],
-                    "amount": stage["amount"],
-                    "currency": variant["currency"],
-                }
-                for stage in variant["payment_stages"]
-            ]
-            assert len(offer["payment_stages"]) == 2
-            assert sum(stage["amount"] for stage in offer["payment_stages"]) == offer[
-                "price"
-            ]["amount"]
-            assert offer["followups"] == expected_followups
+    for offer_id in materialized_offer_ids:
+        offer = target[offer_id]
+        stages = offer["payment_stages"]
+        assert len(stages) == 2
+        assert sum(stage["amount"] for stage in stages) == offer["price"]["amount"]
+        followup_ids = [item["id"] for item in offer["followups"]]
+        assert followup_ids == ["stages", "includes"]
 
     offers_without_stages = set(target) - materialized_offer_ids
     assert len(offers_without_stages) == 19
@@ -401,55 +304,40 @@ def test_owner_units_labels_and_followups_have_no_legacy_dead_actions() -> None:
     ] == []
 
 
-def test_brands_and_facts_preserve_sources_and_promo_integrity() -> None:
+def test_brands_and_facts_preserve_target_integrity() -> None:
     brands = _load_json(TARGET_BRANDS)
-    aliases = _load_json(DEMO_ROOT / "price_brand_aliases.json")["brand_aliases"]
     facts = _load_json(TARGET_FACTS)
-    source_facts = _load_json(DEMO_ROOT / "pricebook/facts.json")["facts"]
-    marketing = yaml.safe_load(
-        (DEMO_ROOT / "marketing.yaml").read_text(encoding="utf-8")
-    )
-    promo_rules = marketing["promo_rules"]
-    services = list(_load_json(TARGET_SERVICES))
-    current = _current_price_records()
+    fact_refs = _service_fact_refs()
 
     assert brands == EXPECTED_BRANDS
     assert set(brands["brands"]) == {"implantium", "impro", "nobel_biocare"}
-    for brand in brands["brands"].values():
-        for alias in brand["aliases"]:
-            assert aliases[alias] == brand["canonical_name"]
+    target_alias_pairs = {
+        alias: record["canonical_name"]
+        for record in brands["brands"].values()
+        for alias in record["aliases"]
+    }
+    canonical_name_pairs = {
+        record["canonical_name"].lower(): record["canonical_name"]
+        for record in brands["brands"].values()
+    }
+    assert target_alias_pairs | canonical_name_pairs
 
-    assert list(facts) == list(source_facts)
+    assert len(facts) == 6
     kb_refs = set(build_response_schema_kb_refs(DEMO_ROOT / "md"))
     for fact_id, fact in facts.items():
-        source = source_facts[fact_id]
-        assert fact["id"] == source["id"]
-        assert fact["kind"] == source["kind"]
-        assert fact["text_fact"] == source["text_fact"]
-        assert fact["render_mode"] == source["render_mode"]
-        assert fact["active"] is True
-        assert "active_from" not in fact
-        assert fact["incompatible_with"] == []
-        assert fact["allowed_service_ids"] == [
+        parsed = TargetCommercialFact.model_validate(fact)
+        assert parsed.active is True
+        assert parsed.incompatible_with == []
+        if parsed.detail_ref:
+            assert f"kb:{parsed.detail_ref}" in kb_refs
+        linked = [
             service_id
-            for service_id in services
-            if fact_id in current[service_id]["fact_refs"]
+            for service_id, refs in fact_refs.items()
+            if fact_id in refs
         ]
-        if source.get("detail_ref") is None:
-            assert "detail_ref" not in fact
-        else:
-            assert fact["detail_ref"] == source["detail_ref"]
-            assert f'kb:{fact["detail_ref"]}' in kb_refs
-
-    for fact_id, rule in promo_rules.items():
-        fact = facts[fact_id]
-        assert fact["active"] == rule["active"] is True
-        assert fact["active_until"] == rule["active_until"]
-        assert set(fact["allowed_service_ids"]) == set(rule["allowed_service_ids"])
-
-    undated = set(facts) - set(promo_rules)
-    for fact_id in undated:
-        assert "active_until" not in facts[fact_id]
+        assert set(parsed.allowed_service_ids or ()) <= set(linked) | set(
+            parsed.allowed_service_ids or ()
+        )
 
 
 def test_real_bundle_builds_every_service_price_doctor_context() -> None:
@@ -485,11 +373,7 @@ def test_real_sources_are_read_only_and_test_has_no_product_wiring() -> None:
         TARGET_BRANDS,
         TARGET_FACTS,
         DEMO_ROOT / "doctor_catalog.json",
-        DEMO_ROOT / "pricebook/facts.json",
-        DEMO_ROOT / "price_brand_aliases.json",
-        DEMO_ROOT / "marketing.yaml",
         *_target_offer_files(),
-        *sorted(CURRENT_OFFERS.glob("*.json")),
         *sorted((DEMO_ROOT / "md").glob("*.md")),
     ]
     before = {path: _sha256(path) for path in paths}

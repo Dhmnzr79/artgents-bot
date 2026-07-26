@@ -1,0 +1,19 @@
+guided_menu:
+  answer: "Чем могу помочь?"
+  quick_replies: []
+
+continuation_clarify:
+  answer: "Уточните вопрос."
+
+fallback_menu:
+  low_score:
+    answer: "Не нашла точного ответа. Переформулируйте вопрос."
+    cta_action: lead
+  no_candidates:
+    answer: "Не нашла ответа. Уточните услугу или ситуацию."
+  offtopic:
+    answer: "Я помогаю по вопросам клиники."
+  empty_question:
+    answer: "Уточните вопрос."
+  bare_affirmative:
+    answer: "Напишите ваш вопрос."

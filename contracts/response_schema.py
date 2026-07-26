@@ -252,6 +252,11 @@ TargetPrice: TypeAlias = Annotated[
     Field(discriminator="mode"),
 ]
 
+FamilyLevelPrice: TypeAlias = Annotated[
+    TargetFixedPrice | TargetFromPrice | TargetRangePrice,
+    Field(discriminator="mode"),
+]
+
 
 class TargetPricePackage(TargetSchemaModel):
     label: NonBlankStr
@@ -418,6 +423,34 @@ class TargetScenarioRule(TargetSchemaModel):
         return self
 
 
+class TargetFamilyPrice(TargetSchemaModel):
+    family_price_id: NonBlankStr
+    topic: NonBlankStr
+    price: FamilyLevelPrice
+    applies_to_service_ids: list[NonBlankStr]
+    approved_context: NonBlankStr
+
+    @field_validator("applies_to_service_ids", mode="after")
+    @classmethod
+    def _applies_unique_non_empty(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("family_price_applies_empty")
+        if _duplicates(value):
+            raise ValueError("family_price_applies_duplicate")
+        return value
+
+
+class TargetFamilyPriceCatalog(TargetSchemaModel):
+    version: Annotated[StrictInt, Field(ge=1)] = 1
+    records: list[TargetFamilyPrice] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _record_ids_unique(self) -> "TargetFamilyPriceCatalog":
+        if _duplicates([record.family_price_id for record in self.records]):
+            raise ValueError("family_price_id_duplicate")
+        return self
+
+
 class TargetMarketingPolicy(TargetSchemaModel):
     version: Annotated[StrictInt, Field(ge=1)] = 1
     limits: TargetMarketingLimits
@@ -443,6 +476,9 @@ class ResponseSchemaBundle(TargetSchemaModel):
     facts: dict[NonBlankStr, TargetCommercialFact]
     strategy: TargetClinicStrategy
     marketing: TargetMarketingPolicy
+    family_prices: TargetFamilyPriceCatalog = Field(
+        default_factory=TargetFamilyPriceCatalog
+    )
 
     @model_validator(mode="after")
     def _local_references_exist(self) -> "ResponseSchemaBundle":
@@ -497,6 +533,14 @@ class ResponseSchemaBundle(TargetSchemaModel):
         for ref in self._marketing_refs():
             if ref.startswith("fact:") and ref.removeprefix("fact:") not in self.facts:
                 raise ValueError("bundle_marketing_fact_missing")
+
+        for record in self.family_prices.records:
+            if any(
+                service_id not in self.services
+                for service_id in record.applies_to_service_ids
+            ):
+                raise ValueError("bundle_family_price_service_missing")
+
         return self
 
     def _marketing_refs(self) -> list[str]:
@@ -519,6 +563,8 @@ S1_MODEL_TYPES = (
     TargetFromPrice,
     TargetRangePrice,
     TargetNoPublicPrice,
+    TargetFamilyPrice,
+    TargetFamilyPriceCatalog,
     TargetPricePackage,
     TargetPaymentStage,
     TargetPriceFollowup,

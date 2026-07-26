@@ -87,7 +87,15 @@ _BRAND_CATALOG = Path("brand_catalog.json")
 _CLINIC_STRATEGY = Path("clinic_strategy.yaml")
 _MARKETING = Path("marketing.yaml")
 _FACTS = Path("pricebook/facts.json")
+_FAMILY_PRICES = Path("pricebook/family_prices.json")
 _SERVICES_DIR = Path("pricebook/services")
+
+
+def _load_family_prices(root: Path) -> dict[str, object]:
+    path = root / _FAMILY_PRICES
+    if not path.is_file():
+        return {"version": 1, "records": []}
+    return _read_json_mapping(path, _FAMILY_PRICES)
 
 
 def _require_pack_root(pack_root: object) -> Path:
@@ -229,6 +237,7 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
         _read_json_mapping(path, relative_path)
         for path, relative_path in _list_offer_files(root, services_dir)
     ]
+    family_prices = _load_family_prices(root)
 
     try:
         return ResponseSchemaBundle.model_validate(
@@ -239,6 +248,7 @@ def load_response_schema_bundle(pack_root: Path) -> ResponseSchemaBundle:
                 "facts": facts,
                 "strategy": strategy,
                 "marketing": marketing,
+                "family_prices": family_prices,
             }
         )
     except ValidationError as exc:

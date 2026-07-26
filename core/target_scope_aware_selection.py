@@ -16,6 +16,11 @@ from core.service_data_context import build_service_data_context
 from core.target_brand_offer_projection import project_target_service_brand_offers
 from core.target_offer_projection import project_target_service_offers
 from core.target_service_applicability import filter_applicable_services
+from core.target_family_price_resolution import (
+    PROTOCOL_PRICE_UNCONFIRMED_PREFIX,
+    build_family_only_broad_selection,
+    list_family_prices_for_topic,
+)
 from core.target_strategy_context import (
     selection_patient_context_from_inputs,
     strategy_match_from_effective_scope,
@@ -117,6 +122,14 @@ def _scoped_selection(
 
     if not offers_by_service:
         exclusions.append("no_applicable_offers")
+    elif (
+        explicit_service_id is not None
+        and explicit_service_id not in offers_by_service
+        and explicit_service_id in bundle.services
+        and bundle.services[explicit_service_id].active
+        and list_family_prices_for_topic(bundle, topic)
+    ):
+        exclusions.append(f"{PROTOCOL_PRICE_UNCONFIRMED_PREFIX}{explicit_service_id}")
 
     return TargetScopeAwareSelectionResult(
         topic=topic,
@@ -187,7 +200,7 @@ def _broad_anchor_selection(
             selected_brand_id=None,
             explicit_offer_id=None,
         )
-        if not offers:
+        if not offers or offers[0].price.mode not in {"fixed", "from", "range"}:
             exclusions.append(f"no_anchor_offers:{extent}")
             continue
         anchors.append(
@@ -198,6 +211,18 @@ def _broad_anchor_selection(
             )
         )
         anchor_service_ids.append(top_service_id)
+
+    if not anchors:
+        family_records = list_family_prices_for_topic(bundle, topic)
+        if family_records:
+            return build_family_only_broad_selection(
+                bundle,
+                family_price=family_records[0],
+                topic=topic,
+                effective_scope=effective_scope,
+                strategy_context=strategy_context,
+                matched_rule_id=None,
+            )
 
     return TargetScopeAwareSelectionResult(
         topic=topic,

@@ -2155,11 +2155,11 @@ git diff --check
 
 # TASK — FINAL_PRICE_AND_SERVICE_COVERAGE (governance)
 
-**Status:** governance COMPLETION pending · **NO LIVE / NO LLM / NO Retry5 / NO product code**
+**Status:** implementation COMPLETE · **NO LIVE / NO LLM / NO Retry5**
 
-**Baseline:** `696f77d` (`codex/stage-a`) · **FINAL_SCOPE_CLOSEOUT_COMPLETE**
+**Baseline:** `bc4679b` governance · implementation @ `codex/stage-a`
 
-**Owner GO:** Phase 1 governance + PRE-CODE only. Implementation blocked until PRE-CODE ✅.
+**Owner GO:** Phase 2 implementation + COMPLETION checker + commit/push.
 
 Seam audit: `docs/evidence/price_service/FINAL_PRICE_AND_SERVICE_COVERAGE_SEAM_AUDIT.md`
 Canonical law: `docs/PRICE_SERVICE_ARCHITECTURE.md`
@@ -2277,17 +2277,17 @@ git diff --check
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `696f77d` |
-| PRE-CODE | pending |
-| Seam audit | pending |
-| Implementation | **STOP** |
+| PRE-CODE | ✅ @ `bc4679b` |
+| Seam audit | ✅ |
+| Implementation | ✅ COMPLETE |
 
 ---
 
 # TASK — FINAL_PRICE_AND_SERVICE_COVERAGE (implementation)
 
-**Status:** blocked until governance PRE-CODE ✅
+**Status:** COMPLETE
 
-**Baseline:** governance COMPLETION @ `696f77d`
+**Baseline:** governance `bc4679b` · implementation pending commit
 
 ## Tests (COMPLETION — after implementation)
 
@@ -2314,8 +2314,8 @@ git diff --check
 
 | Field | Value |
 |-------|-------|
-| Baseline HEAD | pending |
-| COMPLETION | pending |
-| Acceptance A–L | pending |
-| Frozen artifacts | pending |
+| Baseline HEAD | `bc4679b` |
+| COMPLETION | ✅ 125 passed (focused + safe-wide offline) |
+| Acceptance A–L | ✅ |
+| Frozen artifacts | ✅ unchanged |
 

@@ -38,18 +38,38 @@ def _followup_source(request: TargetResponsePolicyRequest) -> TargetFollowupSour
     return None
 
 
-def broad_family_price_directive_overlay(response_stage: str | None) -> dict[str, object]:
+def broad_family_price_directive_overlay(
+    response_stage: str | None,
+    *,
+    family_only: bool = False,
+) -> dict[str, object]:
     if response_stage != "broad_family_price":
         return {}
-    return {
+    overlay: dict[str, object] = {
         "broad_family_price_compact": True,
-        "max_price_anchors": 4,
+        "max_price_anchors": 1 if family_only else 4,
         "omit_sections": (
             "payment_stages",
             "package_composition",
             "long_bonus_lists",
         ),
-        "include_scale_clarify": True,
+        "include_scale_clarify": not family_only,
+    }
+    if family_only:
+        overlay["family_only_broad_price"] = True
+    return overlay
+
+
+def data_gap_protocol_unconfirmed_directive_overlay(
+    response_stage: str | None,
+    *,
+    protocol_unconfirmed: bool = False,
+) -> dict[str, object]:
+    if response_stage != "data_gap" or not protocol_unconfirmed:
+        return {}
+    return {
+        "data_gap_protocol_unconfirmed": True,
+        "answer_mode": "topic_confirmed_protocol_not_priced_separately",
     }
 
 

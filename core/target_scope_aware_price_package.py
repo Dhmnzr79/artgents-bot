@@ -40,6 +40,10 @@ from core.target_response_stage import (
     derive_response_stage,
     discover_stage_clarification_stages,
 )
+from core.target_family_price_resolution import (
+    is_family_only_broad_mode,
+    resolve_explicit_service_price_stage,
+)
 from core.target_scope_aware_selection import run_target_scope_aware_selection
 from core.target_strategy_context import selection_patient_context_from_inputs
 
@@ -70,6 +74,7 @@ def _offers_from_selection(
     if selection.kind == "broad_anchors":
         offers_by_id = {offer.offer_id: offer for offer in bundle.offers}
         seen_offer_ids: set[str] = set()
+        collected: list[TargetOffer] = []
         for anchor in selection.anchors:
             if anchor.offer_id in seen_offer_ids:
                 continue
@@ -79,14 +84,21 @@ def _offers_from_selection(
                     (offer for offer in service_offers if offer.offer_id == anchor.offer_id),
                     service_offers[0],
                 )
-                offers.append(match.model_copy(deep=True))
+                collected.append(match.model_copy(deep=True))
                 seen_offer_ids.add(anchor.offer_id)
                 continue
             matched = offers_by_id.get(anchor.offer_id)
             if matched is not None:
-                offers.append(matched.model_copy(deep=True))
+                collected.append(matched.model_copy(deep=True))
                 seen_offer_ids.add(anchor.offer_id)
-        return tuple(offers)
+        if collected:
+            return tuple(collected)
+        if selection.offers_by_service_id:
+            family_offers: list[TargetOffer] = []
+            for service_offers in selection.offers_by_service_id.values():
+                family_offers.extend(offer.model_copy(deep=True) for offer in service_offers)
+            return tuple(family_offers)
+        return ()
     for service_id in selection.service_ids:
         offers.extend(selection.offers_by_service_id.get(service_id, ()))
     return tuple(offer.model_copy(deep=True) for offer in offers)
@@ -185,6 +197,16 @@ def assemble_scope_aware_price_package(
         bundle=bundle,
         selection=selection,
     )
+    if spec.service_id is not None and stage == "concrete_service_price":
+        protocol_stage = resolve_explicit_service_price_stage(
+            bundle,
+            explicit_service_id=spec.service_id,
+            topic=topic,
+            selection=selection,
+        )
+        if protocol_stage is not None:
+            stage = protocol_stage  # type: ignore[assignment]
+    family_only_broad = is_family_only_broad_mode(selection)
     navigation: tuple[TargetNavigationFollowup, ...] = ()
     followup_source = spec.followup_source
     marketing_selection = TargetMarketingSelection(
@@ -278,7 +300,11 @@ def assemble_scope_aware_price_package(
             marketing_selection=marketing_selection,
             include_payment_stages=False,
         )
-        navigation = materialize_scope_nav_followups(client_id, topic=topic)
+        navigation = (
+            ()
+            if family_only_broad
+            else materialize_scope_nav_followups(client_id, topic=topic)
+        )
         followup_source = None
     elif stage == "concrete_service_price" and can_collapse_to_concrete_service(selection):
         service_id = selection.service_ids[0]

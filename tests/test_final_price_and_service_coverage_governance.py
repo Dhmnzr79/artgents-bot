@@ -73,12 +73,8 @@ def test_frozen_artifact_guards() -> None:
     assert_frozen_retry4_live_artifacts_unchanged()
 
 
-def test_implementation_module_not_started_pre_code() -> None:
+def test_implementation_artifacts_present_post_phase2() -> None:
     impl_test = _REPO_ROOT / "tests" / "test_final_price_and_service_coverage_implementation.py"
     family_resolution = _REPO_ROOT / "core" / "target_family_price_resolution.py"
-    family_prices_demo = (
-        _REPO_ROOT / "clients" / "demo" / "target_response" / "pricebook" / "family_prices.json"
-    )
-    assert not impl_test.is_file(), "implementation tests must not exist before PRE-CODE"
-    assert not family_resolution.is_file(), "product module must not exist before PRE-CODE"
-    assert not family_prices_demo.is_file(), "demo family_prices.json must not exist before PRE-CODE"
+    assert impl_test.is_file(), "implementation tests must exist after Phase 2"
+    assert family_resolution.is_file(), "family price resolution module must exist after Phase 2"

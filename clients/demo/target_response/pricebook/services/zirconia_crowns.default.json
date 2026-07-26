@@ -16,5 +16,9 @@
     "free_implant_consult",
     "installment_12"
   ],
-  "followups": []
+  "followups": [],
+  "applies_to_extents": [
+    "one_tooth",
+    "few_teeth"
+  ]
 }

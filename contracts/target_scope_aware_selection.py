@@ -34,3 +34,4 @@ class TargetScopeAwareSelectionResult:
     anchors: tuple[TargetPriceAnchor, ...] = ()
     exclusions: tuple[str, ...] = ()
     price_confirmed_extents: tuple[ScopeExtent, ...] = ()
+    price_navigable_extents: tuple[ScopeExtent, ...] = ()

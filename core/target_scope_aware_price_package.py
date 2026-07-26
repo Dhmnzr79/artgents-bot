@@ -65,6 +65,15 @@ def is_scope_aware_price_spec(spec: TargetResponseSpec) -> bool:
     )
 
 
+def _offer_sort_amount(offer: TargetOffer) -> int:
+    price = offer.price
+    if price.mode == "fixed" and price.amount is not None:
+        return int(price.amount)
+    if price.mode in {"from", "range"} and price.min_amount is not None:
+        return int(price.min_amount)
+    return 0
+
+
 def _offers_from_selection(
     selection,
     *,
@@ -75,6 +84,12 @@ def _offers_from_selection(
         offers_by_id = {offer.offer_id: offer for offer in bundle.offers}
         seen_offer_ids: set[str] = set()
         collected: list[TargetOffer] = []
+        for service_offers in selection.offers_by_service_id.values():
+            for offer in service_offers:
+                if offer.offer_id in seen_offer_ids:
+                    continue
+                collected.append(offer.model_copy(deep=True))
+                seen_offer_ids.add(offer.offer_id)
         for anchor in selection.anchors:
             if anchor.offer_id in seen_offer_ids:
                 continue
@@ -92,12 +107,7 @@ def _offers_from_selection(
                 collected.append(matched.model_copy(deep=True))
                 seen_offer_ids.add(anchor.offer_id)
         if collected:
-            return tuple(collected)
-        if selection.offers_by_service_id:
-            family_offers: list[TargetOffer] = []
-            for service_offers in selection.offers_by_service_id.values():
-                family_offers.extend(offer.model_copy(deep=True) for offer in service_offers)
-            return tuple(family_offers)
+            return tuple(sorted(collected, key=_offer_sort_amount))
         return ()
     for service_id in selection.service_ids:
         offers.extend(selection.offers_by_service_id.get(service_id, ()))
@@ -106,6 +116,8 @@ def _offers_from_selection(
 
 def _family_service_ids(selection) -> tuple[str, ...]:
     if selection.kind == "broad_anchors":
+        if selection.service_ids:
+            return selection.service_ids
         return tuple(anchor.service_id for anchor in selection.anchors)
     return selection.service_ids
 
@@ -310,7 +322,7 @@ def assemble_scope_aware_price_package(
             else materialize_scope_nav_followups(
                 client_id,
                 topic=topic,
-                confirmed_extents=selection.price_confirmed_extents,
+                confirmed_extents=selection.price_navigable_extents,
             )
         )
         followup_source = None

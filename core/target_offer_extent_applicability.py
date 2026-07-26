@@ -15,14 +15,6 @@ def resolve_offer_applies_to_extents(
     if offer.applies_to_extents is not None:
         return tuple(offer.applies_to_extents)  # type: ignore[return-value]
 
-    offer_id = offer.offer_id
-    if ".one_tooth." in offer_id or offer_id.endswith(".one_tooth"):
-        return ("one_tooth",)
-    if ".few_teeth." in offer_id or offer_id.endswith(".few_teeth"):
-        return ("few_teeth",)
-    if ".jaw." in offer_id or ".full_arch." in offer_id or offer_id.endswith(".jaw"):
-        return ("full_arch",)
-
     selection = service.selection
     if selection.extent:
         return tuple(selection.extent)  # type: ignore[return-value]

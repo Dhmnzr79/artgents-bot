@@ -78,12 +78,12 @@ def test_frozen_artifact_guards() -> None:
     assert_frozen_retry4_live_artifacts_unchanged()
 
 
-def test_implementation_module_not_started_pre_code() -> None:
+def test_implementation_module_present_post_code() -> None:
     impl_test = (
         _REPO_ROOT
         / "tests"
         / "test_final_prosthetics_price_nav_reachability_implementation.py"
     )
     reachability = _REPO_ROOT / "core" / "target_offer_price_reachability.py"
-    assert not impl_test.is_file(), "implementation tests must not exist before PRE-CODE"
-    assert not reachability.is_file(), "reachability module must not exist before PRE-CODE"
+    assert impl_test.is_file(), "implementation tests must exist after PRE-CODE"
+    assert reachability.is_file(), "reachability module must exist after PRE-CODE"

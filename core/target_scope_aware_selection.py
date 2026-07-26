@@ -21,6 +21,10 @@ from core.target_family_price_resolution import (
     build_family_only_broad_selection,
     list_family_prices_for_topic,
 )
+from core.target_offer_price_reachability import (
+    assess_broad_extent_coverages,
+    merge_stage_reachable_offers_by_service,
+)
 from core.target_strategy_context import (
     selection_patient_context_from_inputs,
     strategy_match_from_effective_scope,
@@ -145,6 +149,11 @@ def _scoped_selection(
             if offers_by_service and patient.extent is not None
             else ()
         ),
+        price_navigable_extents=(
+            (patient.extent,)  # type: ignore[return-value]
+            if offers_by_service and patient.extent is not None
+            else ()
+        ),
     )
 
 
@@ -223,6 +232,23 @@ def _broad_anchor_selection(
         )
         anchor_service_ids.append(anchor_service_id)
 
+    coverages = assess_broad_extent_coverages(
+        bundle,
+        doctor_catalog,
+        effective_scope=effective_scope,
+        topic=topic,
+        base_patient=base_patient,
+        anchor_extents=_BROAD_ANCHOR_EXTENTS,
+        stage=stage,
+        jaw=jaw,
+        reported_context=reported_context,
+    )
+    price_navigable_extents = tuple(
+        coverage.extent for coverage in coverages if coverage.navigable
+    )
+    stage_offers_by_service = merge_stage_reachable_offers_by_service(coverages)
+    stage_service_ids = tuple(stage_offers_by_service.keys())
+
     if not anchors:
         family_records = list_family_prices_for_topic(bundle, topic)
         if family_records:
@@ -241,11 +267,12 @@ def _broad_anchor_selection(
         kind="broad_anchors",
         strategy_context=strategy_context,
         matched_rule_id=None,
-        service_ids=tuple(dict.fromkeys(anchor_service_ids)),
-        offers_by_service_id={},
+        service_ids=tuple(dict.fromkeys((*anchor_service_ids, *stage_service_ids))),
+        offers_by_service_id=stage_offers_by_service,
         anchors=tuple(anchors),
         exclusions=tuple(exclusions),
         price_confirmed_extents=tuple(anchor.extent for anchor in anchors),
+        price_navigable_extents=price_navigable_extents,
     )
 
 

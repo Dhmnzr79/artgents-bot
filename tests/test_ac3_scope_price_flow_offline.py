@@ -125,9 +125,10 @@ def test_broad_prosthetics_materializes_when_planner_needs_clarify() -> None:
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.verified.spec.response_stage == "broad_family_price"
-    assert len(result.verified.navigation_followups) == 2
+    assert len(result.verified.navigation_followups) == 3
     refs = {item.ref for item in result.verified.navigation_followups}
     assert refs == {
+        "target:ui_scope/prosthetics/one_tooth",
         "target:ui_scope/prosthetics/few_teeth",
         "target:ui_scope/prosthetics/full_arch",
     }
@@ -176,9 +177,10 @@ def test_topic_change_clears_scope_and_restores_broad_nav() -> None:
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.verified.spec.response_stage == "broad_family_price"
-    assert len(result.verified.navigation_followups) == 2
+    assert len(result.verified.navigation_followups) == 3
     refs = {item.ref for item in result.verified.navigation_followups}
     assert refs == {
+        "target:ui_scope/prosthetics/one_tooth",
         "target:ui_scope/prosthetics/few_teeth",
         "target:ui_scope/prosthetics/full_arch",
     }

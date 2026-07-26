@@ -18,5 +18,8 @@
     "installment_12",
     "implant_same_day_discount"
   ],
-  "followups": []
+  "followups": [],
+  "applies_to_extents": [
+    "full_arch"
+  ]
 }

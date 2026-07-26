@@ -1,0 +1,34 @@
+{
+  "measurement_id": "final_scope_widget_e2e_retry3",
+  "turns_git_blob_hash": "f4eecf7532481a288d1db6a6ee107dd147117dae44afc991451836dd3589434f",
+  "status": "attempt_completed",
+  "baseline_commit": "bb2c871554c0d145da0789d0e55958a5c8678c75",
+  "a9_patient_scope_authority": "1",
+  "ingress_model": "qwen3.6-flash",
+  "planner_model": "qwen3.7-plus",
+  "boundary_model": "qwen3.7-plus",
+  "composer_model": "qwen3.7-plus",
+  "verifier_model": "qwen3.7-plus",
+  "requires_planner_model_plus": true,
+  "max_provider_calls": 34,
+  "max_http_turns": 8,
+  "retry_count_max": 0,
+  "rerun_blocked_without_owner_approval": true,
+  "started_provider_calls": 34,
+  "role_counts": {
+    "composer": 8,
+    "ingress": 5,
+    "medical_boundary": 8,
+    "planner": 5,
+    "semantic_verifier": 8
+  },
+  "parent_measurement_id": "final_scope_widget_e2e_retry2",
+  "role_budget_caps": {
+    "ingress": 5,
+    "planner": 5,
+    "medical_boundary": 8,
+    "composer": 8,
+    "semantic_verifier": 8
+  },
+  "completed_provider_calls": 34
+}

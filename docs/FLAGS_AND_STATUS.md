@@ -51,6 +51,8 @@
 
 **FINAL_SCOPE_WIDGET_E2E:** governance + offline pre-live @ `70a96c1`; live harness `evals/v5/run_final_scope_widget_e2e_live.py --dry-run`. One live attempt blocked until owner GO.
 
+**FINAL_SCOPE_WIDGET_E2E_RETRY1:** harness correction @ `0f645cc`; retry1 dry-run `evals/v5/run_final_scope_widget_e2e_retry1_live.py --dry-run`. Preflight-abort attempt #1 frozen; retry1 live blocked until owner GO.
+
 ---
 
 ## Выключено по умолчанию — по причине, а не «недоделано»

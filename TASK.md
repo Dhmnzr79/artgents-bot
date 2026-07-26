@@ -1143,3 +1143,62 @@ git diff --check
 | COMPLETION | ✅ (governance + offline pre-live only) |
 | Live | **blocked** until owner GO |
 | Post-E2E flag removal | **blocked** until live PASS |
+
+---
+
+# TASK — FINAL_SCOPE_WIDGET_E2E_RETRY1 (harness correction only)
+
+**Status:** governance + implementation · **NO LIVE / NO LLM / NO PRODUCT CODE**
+
+**Baseline:** `0f645cc` (preflight-abort audit)
+
+**Owner GO:** offline checkpoint RETRY1 — harness correction only; frozen preflight-abort marker/audit byte-identical; new isolated namespace `final_scope_widget_e2e_retry1_*`.
+
+## Goal
+
+Fix post-S69 harness preflight: remove stale `orchestration.ask_turn` import; validate `app._orchestrate_ask_turn` target-only path; create retry1 attempt marker **after** seam validation, **before** first provider call.
+
+## Allowlist
+
+| File | Role |
+|------|------|
+| `TASK.md` | governance + completion |
+| `docs/evidence/final_scope/FINAL_SCOPE_WIDGET_E2E_RETRY1_SEAM_AUDIT.md` | post-S69 seam audit |
+| `docs/FLAGS_AND_STATUS.md` | retry1 note |
+| `evals/v5/final_scope_widget_e2e_live_harness.py` | preflight fix (no stale import) |
+| `evals/v5/final_scope_widget_e2e_retry1_live_contract.py` | retry1 namespace + frozen pins |
+| `evals/v5/final_scope_widget_e2e_retry1_live_harness.py` | retry1 harness wrapper |
+| `evals/v5/run_final_scope_widget_e2e_retry1_live.py` | retry1 CLI |
+| `tests/test_final_scope_widget_e2e_retry1_live_harness.py` | offline tests |
+
+**Frozen (byte-identical):** `final_scope_widget_e2e_attempt.json`, `FINAL_SCOPE_WIDGET_E2E_LIVE_ATTEMPT_AUDIT.md`, S62/S63/S66/A9/A9R* artifacts.
+
+## Forbidden
+
+- Live / LLM / provider calls
+- Product code changes
+- Reclaim/rename/delete preflight-abort attempt #1 artifacts
+- Retry1 live without new owner GO
+
+## Tests
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-fsw-r1-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_scope_widget_e2e_retry1_live_harness.py `
+  tests/test_final_scope_widget_e2e_live_harness.py -q
+python evals/v5/run_final_scope_widget_e2e_retry1_live.py --dry-run
+git diff --check
+```
+
+**STOP after COMPLETION ✅. Retry1 live is separate owner GO.**
+
+## Completion record (FINAL_SCOPE_WIDGET_E2E_RETRY1)
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `0f645cc` |
+| PRE-CODE | ✅ |
+| COMPLETION | ✅ (harness correction only) |
+| Retry1 live | **blocked** until owner GO |

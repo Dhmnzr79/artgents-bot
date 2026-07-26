@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -71,6 +73,26 @@ _TERMINAL_ROUTE_MARKERS = (
     "target_fullcontext_terminal_clarify",
     "target_fullcontext_boundary_uncertain",
 )
+
+S69_FORBIDDEN_APP_SYMBOLS = frozenset(
+    {
+        "orchestrate_routing_after_resolver",
+        "TARGET_FULLCONTEXT_DEV",
+    }
+)
+
+_LEGACY_GUARD_TARGETS = {
+    "orchestration.pre_resolver_turn": (
+        "get_chunk_by_ref",
+        "orchestrate_price_widget_ref",
+        "orchestrate_consult_symptom_ref",
+        "build_promo_overview_payload",
+    ),
+    "core.md_chunks": "get_chunk_by_ref",
+    "core.price_ref_routing": "orchestrate_price_widget_ref",
+    "core.price_symptom_consult": "orchestrate_consult_symptom_ref",
+    "core.promo_overview": "build_promo_overview_payload",
+}
 
 
 def _git_head_commit() -> str:
@@ -221,28 +243,21 @@ def install_legacy_guards(monkeypatch: Any | None = None) -> None:
 
         return _forbidden
 
-    targets = {
-        "orchestration.ask_turn": "orchestrate_routing_after_resolver",
-        "orchestration.pre_resolver_turn": (
-            "get_chunk_by_ref",
-            "orchestrate_price_widget_ref",
-            "orchestrate_consult_symptom_ref",
-            "build_promo_overview_payload",
-        ),
-        "core.md_chunks": "get_chunk_by_ref",
-        "core.price_ref_routing": "orchestrate_price_widget_ref",
-        "core.price_symptom_consult": "orchestrate_consult_symptom_ref",
-        "core.promo_overview": "build_promo_overview_payload",
-    }
-    for module_name, attrs in targets.items():
+    for module_name, attrs in _LEGACY_GUARD_TARGETS.items():
+        if importlib.util.find_spec(module_name) is None:
+            continue
         attr_names = attrs if isinstance(attrs, tuple) else (attrs,)
         for attr in attr_names:
             replacement = guard(f"{module_name}.{attr}")
             if monkeypatch is not None:
-                monkeypatch.setattr(module_name, attr, replacement)
+                module = importlib.import_module(module_name)
+                if not hasattr(module, attr):
+                    continue
+                monkeypatch.setattr(module, attr, replacement)
             else:
-                module = __import__(module_name, fromlist=[attr])
-                setattr(module, attr, replacement)
+                module = importlib.import_module(module_name)
+                if hasattr(module, attr):
+                    setattr(module, attr, replacement)
 
 
 def install_fullcontext_build_counter(monkeypatch: Any | None = None) -> None:
@@ -258,6 +273,83 @@ def install_fullcontext_build_counter(monkeypatch: Any | None = None) -> None:
         monkeypatch.setattr(cached_module, "build_target_cached_full_context", counted_build)
     else:
         cached_module.build_target_cached_full_context = counted_build
+
+
+def _assert_post_s69_target_only_app(app_module: Any) -> None:
+    if not hasattr(app_module, "_orchestrate_ask_turn"):
+        raise HarnessConfigError("app._orchestrate_ask_turn missing (post-S69 target-only required)")
+    for symbol in S69_FORBIDDEN_APP_SYMBOLS:
+        if hasattr(app_module, symbol):
+            raise HarnessConfigError(f"forbidden legacy app symbol present: {symbol}")
+    app_path = Path(app_module.__file__).resolve()
+    app_source = app_path.read_text(encoding="utf-8")
+    if "orch_r = _orchestrate_ask_turn(data)" not in app_source:
+        raise HarnessConfigError("/ask must dispatch via _orchestrate_ask_turn")
+    if app_source.count("orch_r = _orchestrate_ask_turn(data)") < 2:
+        raise HarnessConfigError("/ask and /ask/stream must both call _orchestrate_ask_turn")
+
+
+def validate_runtime_seams(
+    monkeypatch: Any | None = None,
+    *,
+    reload_runtime: bool = True,
+) -> dict[str, Any]:
+    """Import runtime, verify post-S69 target-only seams, return app client."""
+
+    import config
+
+    if reload_runtime:
+        importlib.reload(config)
+    elif not config.A9_PATIENT_SCOPE_AUTHORITY:
+        importlib.reload(config)
+    if not config.A9_PATIENT_SCOPE_AUTHORITY:
+        raise HarnessConfigError("A9_PATIENT_SCOPE_AUTHORITY must be enabled for FINAL E2E")
+    if config.TURN_PLANNER_LLM_MODEL != OWNER_APPROVED_PLANNER_MODEL:
+        raise HarnessConfigError(
+            f"planner model must be {OWNER_APPROVED_PLANNER_MODEL}; got {config.TURN_PLANNER_LLM_MODEL}"
+        )
+
+    install_fullcontext_build_counter(monkeypatch)
+    install_legacy_guards(monkeypatch)
+
+    from core.target_runtime_client_context import clear_target_runtime_client_context_cache
+
+    clear_target_runtime_client_context_cache()
+
+    import app as app_module
+
+    if reload_runtime:
+        importlib.reload(app_module)
+    _assert_post_s69_target_only_app(app_module)
+    install_legacy_guards(monkeypatch)
+
+    return {
+        "app_module": app_module,
+        "client": app_module.app.test_client(),
+        "config": config,
+    }
+
+
+def run_non_network_preflight(
+    *,
+    attempt_marker_path: Path,
+    artifact_paths: tuple[Path, ...],
+    monkeypatch: Any | None = None,
+    assert_frozen_neighbors: Any | None = None,
+) -> dict[str, Any]:
+    configure_process_env()
+    if assert_frozen_neighbors is not None:
+        assert_frozen_neighbors()
+    else:
+        assert_frozen_suite_unchanged()
+    load_frozen_turns()
+    excluded = {attempt_marker_path.resolve()}
+    preflight_paths = tuple(
+        path for path in artifact_paths if path.resolve() not in excluded
+    )
+    assert_live_artifacts_absent(preflight_paths)
+    assert_attempt_marker_absent(attempt_marker_path, owner_override=False)
+    return validate_runtime_seams(monkeypatch)
 
 
 def _execute_http_turn(
@@ -458,8 +550,10 @@ def prepare_live_run(
     artifact_paths: tuple[Path, ...] = DEFAULT_LIVE_ARTIFACT_PATHS,
     owner_override_attempt_marker: bool = False,
     baseline_commit: str | None = None,
+    build_marker_payload: Any | None = None,
+    assert_frozen_neighbors: Any | None = None,
+    monkeypatch: Any | None = None,
 ) -> None:
-    configure_process_env()
     if attempt_marker_path.exists():
         marker = load_attempt_marker(attempt_marker_path)
         started_calls = int(marker.get("started_provider_calls", 0))
@@ -479,14 +573,21 @@ def prepare_live_run(
             attempt_marker_path,
             owner_override=owner_override_attempt_marker,
         )
-    excluded = {attempt_marker_path.resolve()}
-    preflight_paths = tuple(
-        path for path in artifact_paths if path.resolve() not in excluded
+    run_non_network_preflight(
+        attempt_marker_path=attempt_marker_path,
+        artifact_paths=artifact_paths,
+        monkeypatch=monkeypatch,
+        assert_frozen_neighbors=assert_frozen_neighbors,
     )
-    assert_live_artifacts_absent(preflight_paths)
+    marker_builder = build_marker_payload or (
+        lambda *, baseline_commit, turns_hash: build_attempt_marker_payload(
+            baseline_commit=baseline_commit,
+            turns_hash=turns_hash,
+        )
+    )
     create_attempt_marker_exclusive(
         attempt_marker_path,
-        build_attempt_marker_payload(
+        marker_builder(
             baseline_commit=baseline_commit or _git_head_commit(),
             turns_hash=FROZEN_TURNS_HASH,
         ),
@@ -545,6 +646,9 @@ def run_http_harness(
     owner_override_attempt_marker: bool = False,
     monkeypatch: Any | None = None,
     skip_live_prepare: bool = False,
+    measurement_id: str = MEASUREMENT_ID,
+    build_marker_payload: Any | None = None,
+    assert_frozen_neighbors: Any | None = None,
 ) -> dict[str, Any]:
     configure_process_env()
     turns_spec = load_frozen_turns()
@@ -557,33 +661,29 @@ def run_http_harness(
             artifact_paths=artifact_paths,
             owner_override_attempt_marker=owner_override_attempt_marker,
             baseline_commit=baseline_commit,
+            build_marker_payload=build_marker_payload,
+            assert_frozen_neighbors=assert_frozen_neighbors,
+            monkeypatch=monkeypatch,
+        )
+        seam_ctx = validate_runtime_seams(monkeypatch)
+    elif skip_live_prepare and attempt_marker_path.exists():
+        configure_process_env()
+        if assert_frozen_neighbors is not None:
+            assert_frozen_neighbors()
+        else:
+            assert_frozen_suite_unchanged()
+        load_frozen_turns()
+        seam_ctx = validate_runtime_seams(monkeypatch, reload_runtime=False)
+    else:
+        seam_ctx = run_non_network_preflight(
+            attempt_marker_path=attempt_marker_path,
+            artifact_paths=artifact_paths,
+            monkeypatch=monkeypatch,
+            assert_frozen_neighbors=assert_frozen_neighbors,
         )
 
-    import importlib
-
-    import config
-
-    importlib.reload(config)
-    if not config.A9_PATIENT_SCOPE_AUTHORITY:
-        raise HarnessConfigError("A9_PATIENT_SCOPE_AUTHORITY must be enabled for FINAL E2E")
-    if config.TURN_PLANNER_LLM_MODEL != OWNER_APPROVED_PLANNER_MODEL:
-        raise HarnessConfigError(
-            f"planner model must be {OWNER_APPROVED_PLANNER_MODEL}; got {config.TURN_PLANNER_LLM_MODEL}"
-        )
-
-    install_fullcontext_build_counter(monkeypatch)
-    install_legacy_guards(monkeypatch)
-
-    from core.target_runtime_client_context import clear_target_runtime_client_context_cache
-
-    clear_target_runtime_client_context_cache()
-
-    import app as app_module
-    from orchestration.ask_turn import orchestrate_routing_after_resolver
-
-    importlib.reload(app_module)
-    install_legacy_guards(monkeypatch)
-    setattr(app_module, "orchestrate_routing_after_resolver", orchestrate_routing_after_resolver)
+    app_module = seam_ctx["app_module"]
+    client = seam_ctx["client"]
 
     turn_results: list[dict[str, Any]] = []
     turn_outputs: dict[int, dict[str, Any]] = {}
@@ -592,7 +692,6 @@ def run_http_harness(
         attempt_marker_path=attempt_marker_path,
         call_ledger_path=call_ledger_path,
     ) as audit:
-        client = app_module.app.test_client()
         for spec in turns_spec["turns"]:
             turn_number = int(spec["turn"])
             if spec.get("fresh_sid"):
@@ -654,7 +753,7 @@ def run_http_harness(
             write_json_exclusive(manual_review_path, manual_seed)
             manifest = prepare_json_artifact_payload(
                 {
-                    "measurement_id": MEASUREMENT_ID,
+                    "measurement_id": measurement_id,
                     "baseline_live_commit": baseline_commit,
                     "turns_git_blob_hash": FROZEN_TURNS_HASH,
                     "result_sha256": result_sha256,
@@ -690,4 +789,6 @@ __all__ = [
     "pick_stage_ref",
     "prepare_live_run",
     "run_http_harness",
+    "run_non_network_preflight",
+    "validate_runtime_seams",
 ]

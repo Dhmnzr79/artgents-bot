@@ -2814,3 +2814,175 @@ git diff --check
 | Cross-turn matrix | ✅ |
 | Frozen artifacts | ✅ |
 
+---
+
+# TASK — FINAL_CLIENT_PACK_DATA_CONVERGENCE (governance)
+
+**Status:** local PRE-CODE suite ✅ (54 passed); independent PRE-CODE pending
+**Baseline:** `40ffc09`
+**Mode:** governance/docs/tests only · **NO LIVE / NO LLM / NO A9 tuning**
+
+## Goal
+
+Свести `clients/demo` к одному FullContext authoring source на каждый домен до
+добавления двух новых клиник. Demo становится reference pack; новая клиника не должна
+создавать или синхронизировать legacy mirror-файлы.
+
+Canonical seam audit:
+`docs/evidence/client_pack/FINAL_CLIENT_PACK_DATA_CONVERGENCE_SEAM_AUDIT.md`.
+
+## Canonical ownership
+
+| Данные | Единственный целевой источник |
+|---|---|
+| Services, aliases, applicability, options | `target_response/service_catalog.json` |
+| Offers, amounts, packages, billing units, payment | `target_response/pricebook/services/*.json` |
+| Promotions, installment, warranty, consultation facts | `target_response/pricebook/facts.json` |
+| Optional broad family price | `target_response/pricebook/family_prices.json` |
+| Product brands and aliases | `target_response/brand_catalog.json` |
+| Marketing source policy | `target_response/marketing.yaml` |
+| Service/offer priorities | `target_response/clinic_strategy.yaml` |
+| Clinic content | `md/*.md` |
+| Doctors | `doctor_catalog.json` |
+| Operational clinic restrictions/hours/contacts | `clinic_policies.yaml` |
+| Widget clinic identity | `brand.yaml` |
+| Visible UI labels | `ui.yaml` / `tone.yaml` |
+
+`brand.yaml` ≠ `target_response/brand_catalog.json`;
+`clinic_policies.yaml` ≠ `target_response/clinic_strategy.yaml`.
+
+## Checkpoint A — canonical reader convergence
+
+Implementation is blocked until PRE-CODE ✅ and separate owner GO.
+
+Required behavior:
+
+1. One client-aware cached loader exposes the target response bundle to Planner and
+   response runtime.
+2. Planner compact services use target `name`, aliases, family/selection metadata.
+   Legacy free-form service `facts` are not copied into Planner.
+3. Planner allowed brand/group values derive from target brands/offers.
+4. Catalog matching, follow-up labels and doctor topic availability use target services.
+5. Startup validates canonical MD + target response schema + doctors + external refs.
+6. Product modules have zero reads/import dependency on root legacy catalog/pricebook/
+   marketing/brand aliases.
+7. Old sources remain byte-identical during A only for parity/delta proof.
+8. Rich demo behavior and sparse second-client fixtures remain green.
+
+### Checkpoint A implementation allowlist
+
+- `core/target_client_data.py` (new)
+- `core/target_query_cues.py` (new)
+- `core/response_schema_loader.py`
+- `core/target_runtime_client_context.py`
+- `core/catalog_match.py`
+- `core/turn_planner_llm.py`
+- `core/follow_up_rewrite.py`
+- `core/dialog_focus.py`
+- `core/startup_check.py`
+- `orchestration/planner_turn.py`
+- `doctors_lookup.py`
+- `ingress_gate.py`
+- `tests/test_final_client_pack_data_convergence_reader_cutover.py` (new)
+- `tests/test_final_client_pack_data_convergence_sparse_pack.py` (new)
+- `tests/test_final_client_pack_data_convergence_governance.py`
+- `tests/test_turn_planner_llm.py`
+- `tests/test_catalog_match.py`
+- `tests/test_follow_up_rewrite.py`
+- `tests/test_dialog_focus_baseline.py`
+- `tests/test_demo_doctor_catalog.py`
+- `tests/test_demo_doctor_template.py`
+- `tests/test_response_schema_loader.py`
+- `tests/test_c2_import_firewall_offline.py`
+- `tests/test_demo_target_service_catalog.py`
+- `tests/test_demo_target_price_offers.py`
+- `TASK.md`, seam/status docs
+
+**STOP after A checker → commit/push. Checkpoint B requires separate owner GO.**
+
+## Checkpoint B — delete mirrors and close authoring
+
+Implementation is blocked until Checkpoint A checker ✅, commit/push and separate owner GO.
+
+### Mandatory data deletion
+
+- `clients/demo/service_catalog.json`
+- `clients/demo/pricebook/**`
+- `clients/demo/marketing.yaml`
+- `clients/demo/price_brand_aliases.json`
+
+### Candidate code deletion
+
+Delete only after a fresh importer/writer audit proves zero product consumers:
+
+- `query_selector.py`
+- `core/pricebook_loader.py`, `contracts/pricebook.py`
+- `core/price_offers.py`, `contracts/price_brand_aliases.py`
+- `core/price_scope.py`, `core/price_followup.py`
+- `core/price_answer_assembler.py`
+- `core/marketing_loader.py`, `core/marketing_policy.py`, `core/promo_overview.py`
+- `core/service_selector_llm.py`, `contracts/service_selection.py`
+- `core/explicit_service.py`, `core/clarify_state.py`
+- legacy patient-situation island if the same audit proves it has no product consumers
+- old migration/lint scripts that validate only deleted schemas
+- legacy-only tests
+
+Do not delete `core/catalog_match.py`: adapt and retain if it is the canonical target
+service matcher.
+
+### Authoring deliverables
+
+1. `docs/CLIENT_PACK_AUTHORING.md` with a one-question → one-path edit map.
+2. `scripts/validate_client_pack.py` (offline/local only, no network/LLM).
+3. `_template` structural parity with canonical required files.
+4. Validation fixture for a non-demo client with different IDs/brands/topics.
+5. Import/read firewall proving deleted mirrors cannot return.
+
+## Data-retention decisions
+
+- Target service identity, aliases, active flags and content refs must preserve old values.
+- Target offers/facts/brands must preserve exact price and product identity.
+- Old `price_key`, `price_ref`, `price_display`, `response_mode`, route/aspect policy fields
+  are retired mechanics, not migrated schema.
+- 24 ungrounded `clinic_proof` / `consult_reasons` strings from root marketing are retired.
+  A future clinic claim must be authored as KB, doctor or typed fact source.
+- Root service `facts` are not copied to target service records; Planner is a classifier,
+  not a second content store.
+
+## Global acceptance
+
+- One authority per domain; no duplicate files with the same clinic fact.
+- AC1→AC2→AC3, A9 authority, typed UI TurnFrame, Composer and light Verifier unchanged.
+- Exact prices/units/packages/brands/fact dates/doctor links preserved.
+- No new selector, regex list, fallback response path or demo hardcode.
+- Existing demo full-price paths remain green.
+- A sparse second-client pack validates without creating legacy mirrors.
+- Focused + wide safe-offline + `tests/` collect-only + frozen pins all green.
+- NO LIVE / NO LLM / NO A9 tuning.
+
+## Governance allowlist
+
+- `TASK.md`
+- `docs/evidence/client_pack/FINAL_CLIENT_PACK_DATA_CONVERGENCE_SEAM_AUDIT.md`
+- `docs/FLAGS_AND_STATUS.md`
+- `tests/test_final_client_pack_data_convergence_governance.py`
+
+## PRE-CODE command
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-client-pack-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_client_pack_data_convergence_governance.py `
+  tests/test_demo_target_service_catalog.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_demo_target_marketing_migration_audit.py `
+  tests/test_response_schema_loader.py -q
+git diff --check
+```
+
+## STOP
+
+Governance PRE-CODE PASS does not authorize Checkpoint A automatically. Product/data
+implementation requires separate owner GO. Checkpoint B requires a second owner GO.
+

@@ -19,6 +19,11 @@ from core.target_response_followup_materializer import (
     TargetPriceFollowup,
 )
 from core.target_response_verifier import TargetVerifiedComposedResponse
+from core.target_presentation_decision import (
+    TargetPresentationCadenceState,
+    TargetPresentationCadenceUpdate,
+    decide_target_presentation,
+)
 from core.target_runtime_client_context import TargetRuntimeClientContext
 from core.client_config_loader import load_lead_cta_variants
 
@@ -29,6 +34,7 @@ AttributionKind = Literal["content", "plain", "lead"]
 class TargetRuntimeMaterializedPayload:
     kind: Literal["materialized"]
     payload: dict
+    presentation_cadence_update: TargetPresentationCadenceUpdate | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,13 +169,21 @@ def materialize_verified_widget_payload(
     sid: str,
     verified: TargetVerifiedComposedResponse,
     turn_frame: TurnFrame,
+    cadence: TargetPresentationCadenceState | None = None,
+    allow_situation: bool = True,
 ) -> TargetRuntimeMaterializedPayload:
     followups = verified.selected_followups
-    quick_replies = _merge_quick_replies(
-        navigation=verified.navigation_followups,
-        content=followups.content,
-        price=followups.price,
+    presentation = decide_target_presentation(
+        client_id=context.client_id,
+        md_root=getattr(context, "md_root", None),
+        spec=verified.spec,
+        navigation_followups=verified.navigation_followups,
+        selected_followups=followups,
+        primary_content_ref=verified.primary_content_ref,
+        cadence=cadence or TargetPresentationCadenceState(),
+        allow_situation=allow_situation,
     )
+    quick_replies = list(presentation.quick_replies)
     spec = verified.spec
     ui_family = _materialized_ui_source_family(spec)
     meta = _base_meta(
@@ -187,23 +201,33 @@ def materialize_verified_widget_payload(
         meta["response_stage"] = spec.response_stage
         if spec.scope_price_topic:
             meta["scope_price_topic"] = spec.scope_price_topic
-    if verified.selected_cta_key:
-        meta["cta_key"] = verified.selected_cta_key
-        meta["cta_action"] = "lead"
+    if verified.primary_content_ref:
+        meta["primary_content_ref"] = verified.primary_content_ref
+    if verified.used_content_refs:
+        meta["used_content_refs"] = list(verified.used_content_refs)
+    if presentation.dropped:
+        meta["presentation_dropped"] = list(presentation.dropped)
     cta = build_target_runtime_widget_cta(
         client_id=context.client_id,
         selected_cta_key=verified.selected_cta_key,
     )
+    if verified.selected_cta_key:
+        meta["cta_key"] = verified.selected_cta_key
+        meta["cta_action"] = "lead"
     payload = {
         "answer": verified.text,
         "quick_replies": quick_replies,
         "cta": cta,
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
+        "video": presentation.video,
+        "situation": presentation.situation,
         "offer": None,
         "meta": meta,
     }
-    return TargetRuntimeMaterializedPayload(kind="materialized", payload=payload)
+    return TargetRuntimeMaterializedPayload(
+        kind="materialized",
+        payload=payload,
+        presentation_cadence_update=presentation.cadence_update,
+    )
 
 
 def materialize_boundary_uncertain_payload(
@@ -304,6 +328,8 @@ def widget_payload_from_runtime_result(
     context: TargetRuntimeClientContext,
     result: object,
     turn_frame: TurnFrame,
+    cadence: TargetPresentationCadenceState | None = None,
+    allow_situation: bool = True,
 ) -> TargetRuntimeWidgetPayload:
     if type(result) is TargetMedicalBoundaryTerminalEnforcement:
         return materialize_boundary_uncertain_payload(client_id=client_id, sid=sid)
@@ -319,6 +345,8 @@ def widget_payload_from_runtime_result(
             sid=sid,
             verified=result.verified,
             turn_frame=turn_frame,
+            cadence=cadence,
+            allow_situation=allow_situation,
         )
     return materialize_target_error_payload(
         client_id=client_id,

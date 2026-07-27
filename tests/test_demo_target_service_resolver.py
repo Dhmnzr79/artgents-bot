@@ -32,7 +32,7 @@ def test_all_real_authored_service_labels_resolve_to_their_exact_active_id() -> 
     bundle = _bundle()
     checked = 0
 
-    assert len(bundle.services) == 21
+    assert len(bundle.services) == 22
     assert all(service.active for service in bundle.services.values())
     for service_id, service in bundle.services.items():
         for term in (service_id, service.name, *service.aliases):
@@ -43,7 +43,7 @@ def test_all_real_authored_service_labels_resolve_to_their_exact_active_id() -> 
             assert resolution.service is not service
             checked += 1
 
-    assert checked == 199
+    assert checked == 209
 
 
 def test_real_catalog_has_no_normalized_cross_service_label_collisions() -> None:
@@ -56,7 +56,7 @@ def test_real_catalog_has_no_normalized_cross_service_label_collisions() -> None
             if service_id not in owners[normalized]:
                 owners[normalized].append(service_id)
 
-    assert sum(2 + len(service.aliases) for service in bundle.services.values()) == 199
+    assert sum(2 + len(service.aliases) for service in bundle.services.values()) == 209
     assert {label: ids for label, ids in owners.items() if len(ids) > 1} == {}
 
 

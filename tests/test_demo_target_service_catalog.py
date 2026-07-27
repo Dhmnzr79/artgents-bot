@@ -33,6 +33,7 @@ SERVICE_IDS = (
     "tooth_extraction",
     "periodontitis",
     "aligners",
+    "bone_graft",
     "veneers",
     "zirconia_crowns",
     "clasp_dentures",
@@ -92,6 +93,7 @@ INVENTORY: dict[str, tuple[str, list[str], dict[str, object]]] = {
     "tooth_extraction": ("surgery", [], {"mode": "direct"}),
     "periodontitis": ("periodontology", [], {"mode": "direct"}),
     "aligners": ("orthodontics", [], {"mode": "context"}),
+    "bone_graft": ("implantology", [], {"mode": "direct"}),
     "veneers": ("aesthetics", [], {"mode": "context"}),
     "zirconia_crowns": (
         "prosthodontics",
@@ -206,7 +208,7 @@ def test_real_target_catalog_is_strict_complete_s1_wire_data() -> None:
 
     assert tuple(raw) == SERVICE_IDS
     assert tuple(INVENTORY) == SERVICE_IDS
-    assert len(raw) == 21
+    assert len(raw) == 22
     for service_id, record in raw.items():
         expected_fields = {
             "name",

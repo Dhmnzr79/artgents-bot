@@ -72,7 +72,7 @@
       "client_id": "demo",
       "question": "Если кости мало, что делать?",
       "expected_route": "retrieval_chunk",
-      "expected_doc_id": "implantation__info__bone_graft",
+      "expected_doc_id": "implantation__service__bone_graft",
       "forbidden_doc_id": ["implantation__service__classic"],
       "answer_signals_any": ["кост", "наращ", "пластик"],
       "testability": "strong"

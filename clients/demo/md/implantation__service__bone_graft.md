@@ -1,6 +1,6 @@
 ---
-doc_id: implantation__info__bone_graft
-doc_type: info
+doc_id: implantation__service__bone_graft
+doc_type: service
 topic: implantation
 subtopic: bone_graft
 

@@ -299,7 +299,7 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
         "plan": 25,
         "price": 2,
     }
-    assert len(list(TARGET_OFFERS.glob("*.json"))) == 31
+    assert len(list(TARGET_OFFERS.glob("*.json"))) == 32
     assert Counter(marketing_keys) == {"doctor": 10, "consult": 3}
     assert "ct_consultation" not in tone_keys
 

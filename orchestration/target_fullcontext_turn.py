@@ -59,13 +59,21 @@ def orchestrate_target_fullcontext_turn(
     payload = outcome.widget.payload
     meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
     route = str(meta.get("service_route") or "target_fullcontext")
+    doc_id = None
+    if isinstance(result := outcome.pipeline_result, object):
+        from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundMaterializeResponse
+
+        if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
+            primary = result.verified.primary_content_ref
+            if primary:
+                doc_id = primary.removesuffix(".md")
     return AskOrchestrationResult(
         kind="service_reply",
         q=q,
         sid=sid,
         client_id=client_id,
         service_payload=payload,
-        service_doc_id=None,
+        service_doc_id=doc_id,
         service_track_user=True,
         service_route=route,
     )

@@ -40,6 +40,13 @@ from core.target_runtime_session import (
     write_target_runtime_session_after_materialized,
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
+from core.target_presentation_decision import TargetPresentationCadenceState
+from core.target_presentation_turn_projection import (
+    derive_marketing_scenarios,
+    provisional_spec_from_turn_frame,
+    resolve_target_semantic_context,
+    should_include_initial_marketing_block,
+)
 from core.target_runtime_strategy import resolve_target_runtime_strategy_context
 from core.target_strategy_context import strategy_match_from_effective_scope
 from core.target_runtime_turn_frame_hydration import (
@@ -207,6 +214,26 @@ def run_target_fullcontext_runtime_turn(
         scope_action=_current_ui_scope_action_from_request(),
         stage_action=_current_ui_stage_action_from_request(),
     )
+    presentation_cadence = TargetPresentationCadenceState(
+        shown_video_ids=frozenset(session_state.shown_video_ids),
+        shown_content_followup_refs=frozenset(session_state.shown_content_followup_refs),
+        shown_price_followup_refs=frozenset(session_state.shown_price_followup_refs),
+        situation_offered=session_state.situation_offered,
+    )
+    provisional_spec = provisional_spec_from_turn_frame(
+        turn_frame,
+        allowed_topics=context.allowed_topics,
+        tone_key="commercial_warm",
+    )
+    semantic_context = resolve_target_semantic_context(turn_frame, provisional_spec)
+    include_initial_block = (
+        boundary.decision == "none"
+        and should_include_initial_marketing_block(turn_frame, provisional_spec)
+    )
+    marketing_scenarios = (
+        derive_marketing_scenarios(turn_frame) if include_initial_block else ()
+    )
+    allow_situation = not turn_frame.needs_clarification
     try:
         try:
             result = run_target_offline_boundary_enforced_fullcontext_response(
@@ -228,18 +255,18 @@ def run_target_fullcontext_runtime_turn(
                 min_intent_confidence=0.0,
                 brand_term=brand_term,
                 strategy_context=strategy_context,
-                semantic_context=context.semantic_context,
+                semantic_context=semantic_context,
                 today=runtime_today(),
                 md_root=context.md_root,
                 cached_full_context=context.cached_full_context,
-                include_initial_block=context.include_initial_block,
+                include_initial_block=include_initial_block,
                 include_consultation_close=context.include_consultation_close,
                 include_cta=context.cta_capability,
                 user_message=user_message,
                 tone=context.tone,
                 composer_backend=composer_backend,
                 semantic_backend=semantic_backend,
-                marketing_scenarios=(),
+                marketing_scenarios=marketing_scenarios,
                 shown_fact_ids=session_state.shown_fact_ids,
                 shown_amplifier_refs=session_state.shown_amplifier_refs,
                 shown_consultation_value_refs=session_state.shown_consultation_value_refs,
@@ -275,7 +302,13 @@ def run_target_fullcontext_runtime_turn(
         context=context,
         result=result,
         turn_frame=turn_frame,
+        cadence=presentation_cadence,
+        allow_situation=allow_situation,
     )
+
+    presentation_update = None
+    if widget.kind == "materialized":
+        presentation_update = widget.presentation_cadence_update
 
     if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
         selection = result.session_selection or TargetMaterializedSessionSelection((), (), ())
@@ -288,6 +321,7 @@ def run_target_fullcontext_runtime_turn(
             current_selection=selection,
             followups=followups,
             effective_scope=effective_scope,
+            presentation_cadence_update=presentation_update,
         )
 
     return TargetRuntimeTurnOutcome(

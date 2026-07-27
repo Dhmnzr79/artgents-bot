@@ -1,0 +1,18 @@
+{
+  "offer_id": "bone_graft.default",
+  "service_id": "bone_graft",
+  "active": true,
+  "price": {
+    "mode": "no_public_price",
+    "approved_text": "Стоимость костной пластики рассчитывается после КТ и зависит от необходимого объёма и выбранной методики."
+  },
+  "package": {
+    "label": "точная стоимость определяется после КТ и плана лечения",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_implant_consult",
+    "installment_12"
+  ],
+  "followups": []
+}

@@ -48,9 +48,9 @@ def normalize_policy_payload(payload: dict) -> dict:
         meta["followups"] = followups[:2]
 
     refs = list(payload.get("quick_replies") or [])
-    if family == "md_navigation" and len(refs) > 1:
+    if family == "md_navigation" and len(refs) > 2:
         dropped.append("suggest_refs_over_limit")
-        payload["quick_replies"] = refs[:1]
+        payload["quick_replies"] = refs[:2]
 
     if dropped:
         meta["ui_dropped"] = dropped

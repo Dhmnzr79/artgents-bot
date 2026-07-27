@@ -150,8 +150,8 @@ def test_real_demo_target_pack_loads_with_exact_marketing_policy() -> None:
         "doctors": "doctor",
         "default": "callback",
     }
-    assert len(bundle.services) == 21
-    assert len(bundle.offers) == 31
+    assert len(bundle.services) == 22
+    assert len(bundle.offers) == 32
     assert len(bundle.facts) == 6
 
 

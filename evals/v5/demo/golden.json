@@ -317,7 +317,7 @@
         "catalog_md_first"
       ],
       "expected_doc_id_any": [
-        "implantation__info__bone_graft",
+        "implantation__service__bone_graft",
         "implantation__service__classic"
       ],
       "answer_signals_any": [

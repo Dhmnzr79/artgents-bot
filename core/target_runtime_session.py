@@ -10,6 +10,7 @@ from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_stage_action import UiStageAction
 from core.routing_loader import THRESHOLDS
+from core.target_presentation_decision import TargetPresentationCadenceUpdate
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_effective_scope import (
     SessionPatientFacts,
@@ -125,6 +126,10 @@ class TargetRuntimeSessionState:
     shown_fact_ids: tuple[str, ...]
     shown_amplifier_refs: tuple[str, ...]
     shown_consultation_value_refs: tuple[str, ...]
+    shown_video_ids: tuple[str, ...]
+    shown_content_followup_refs: tuple[str, ...]
+    shown_price_followup_refs: tuple[str, ...]
+    situation_offered: bool
     followups: tuple[TargetRuntimeFollowupItem, ...]
     patient_facts: SessionPatientFacts | None = None
 
@@ -181,6 +186,10 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             shown_fact_ids=(),
             shown_amplifier_refs=(),
             shown_consultation_value_refs=(),
+            shown_video_ids=(),
+            shown_content_followup_refs=(),
+            shown_price_followup_refs=(),
+            situation_offered=False,
             followups=followups,
             patient_facts=patient_facts,
         )
@@ -205,6 +214,20 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             for x in raw.get("shown_consultation_value_refs") or []
             if str(x).strip()
         ),
+        shown_video_ids=tuple(
+            str(x).strip() for x in raw.get("shown_video_ids") or [] if str(x).strip()
+        ),
+        shown_content_followup_refs=tuple(
+            str(x).strip()
+            for x in raw.get("shown_content_followup_refs") or []
+            if str(x).strip()
+        ),
+        shown_price_followup_refs=tuple(
+            str(x).strip()
+            for x in raw.get("shown_price_followup_refs") or []
+            if str(x).strip()
+        ),
+        situation_offered=bool(raw.get("situation_offered")),
         followups=followups,
         patient_facts=patient_facts,
     )
@@ -347,6 +370,7 @@ def write_target_runtime_session_after_materialized(
     current_selection: TargetMaterializedSessionSelection,
     followups: tuple[TargetRuntimeFollowupItem, ...],
     effective_scope: EffectiveScope | None = None,
+    presentation_cadence_update: TargetPresentationCadenceUpdate | None = None,
 ) -> None:
     """Persist target continuity only after a successful materialized response."""
 
@@ -362,6 +386,25 @@ def write_target_runtime_session_after_materialized(
         prior.shown_consultation_value_refs,
         current_selection.shown_consultation_value_refs,
     )
+    shown_video_ids = _merge_unique(
+        prior.shown_video_ids,
+        presentation_cadence_update.shown_video_ids if presentation_cadence_update else (),
+    )
+    shown_content_followup_refs = _merge_unique(
+        prior.shown_content_followup_refs,
+        presentation_cadence_update.shown_content_followup_refs
+        if presentation_cadence_update
+        else (),
+    )
+    shown_price_followup_refs = _merge_unique(
+        prior.shown_price_followup_refs,
+        presentation_cadence_update.shown_price_followup_refs
+        if presentation_cadence_update
+        else (),
+    )
+    situation_offered = prior.situation_offered or bool(
+        presentation_cadence_update and presentation_cadence_update.situation_offered
+    )
     with _lock:
         st = mem_get(sid)
         turn_count = int(st.get("session_turn_count") or 0)
@@ -369,6 +412,10 @@ def write_target_runtime_session_after_materialized(
             "shown_fact_ids": list(shown_fact_ids),
             "shown_amplifier_refs": list(shown_amplifier_refs),
             "shown_consultation_value_refs": list(shown_consultation_value_refs),
+            "shown_video_ids": list(shown_video_ids),
+            "shown_content_followup_refs": list(shown_content_followup_refs),
+            "shown_price_followup_refs": list(shown_price_followup_refs),
+            "situation_offered": situation_offered,
         }
         service_id = str(turn_frame.service_id or "").strip() or None
         if service_id:

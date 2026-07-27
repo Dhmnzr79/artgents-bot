@@ -14,7 +14,10 @@ from core.target_composer_executor import (
     TargetComposerTone,
     execute_target_composer,
 )
-from core.target_composer_request import materialize_target_composer_request
+from core.target_composer_request import (
+    TargetComposerRequest,
+    materialize_target_composer_request,
+)
 from core.target_response_verifier import (
     TargetSemanticVerifierBackend,
     TargetVerifiedComposedResponse,
@@ -60,4 +63,22 @@ def run_target_offline_verified_response_pipeline(
         cached_full_context=cached_full_context,
         semantic_backend=semantic_backend,
         navigation_followups=bound_package.package.navigation_followups,
+        md_root=md_root,
+        primary_content_ref=bound_package.package.plan.primary_content_ref,
+        used_content_refs=_used_content_refs_from_package(bound_package, request),
     )
+
+
+def _used_content_refs_from_package(
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+    request: TargetComposerRequest,
+) -> tuple[str, ...]:
+    refs: list[str] = []
+    primary = bound_package.package.plan.primary_content_ref
+    if primary:
+        refs.append(primary)
+    for block in request.evidence_blocks:
+        ref = str(block.ref or "")
+        if ref.startswith("content:"):
+            refs.append(ref.removeprefix("content:"))
+    return tuple(refs)

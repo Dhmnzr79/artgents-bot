@@ -7,6 +7,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Literal, NoReturn, Protocol, TypeAlias
 
 from contracts.target_cached_full_context import TargetCachedFullContext
@@ -14,6 +15,7 @@ from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import TargetUnverifiedComposedResponse
 from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+from core.target_presentation_source_identity import validate_used_content_refs
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
     TargetComposerRequest,
@@ -105,6 +107,8 @@ class TargetVerifiedComposedResponse:
     selected_followups: TargetResponseFollowupSelection
     selected_cta_key: str | None
     navigation_followups: tuple[TargetNavigationFollowup, ...] = ()
+    primary_content_ref: str | None = None
+    used_content_refs: tuple[str, ...] = ()
     verification_status: Literal["verified"] = "verified"
 
 
@@ -634,6 +638,9 @@ def verify_target_composed_response(
     cached_full_context: TargetCachedFullContext,
     semantic_backend: TargetSemanticVerifierBackend,
     navigation_followups: tuple[TargetNavigationFollowup, ...] = (),
+    md_root: Path | None = None,
+    primary_content_ref: str | None = None,
+    used_content_refs: tuple[str, ...] = (),
 ) -> TargetVerifiedComposedResponse:
     """Verify one adjacent S37 response without modifying or repairing its text."""
 
@@ -682,10 +689,29 @@ def verify_target_composed_response(
             "target_verifier_semantic_rejected",
             tuple((issue.kind, issue.offending_span) for issue in blocking),
         )
+    validated_primary: str | None = None
+    validated_used: tuple[str, ...] = ()
+    if md_root is not None:
+        candidates = tuple(
+            ref
+            for ref in (
+                *(used_content_refs or ()),
+                *((primary_content_ref,) if primary_content_ref else ()),
+            )
+            if ref
+        )
+        validated_used = validate_used_content_refs(md_root, candidates)
+        if primary_content_ref:
+            normalized_primary = validate_used_content_refs(md_root, (primary_content_ref,))
+            validated_primary = normalized_primary[0] if normalized_primary else None
+        elif validated_used:
+            validated_primary = validated_used[0]
     return TargetVerifiedComposedResponse(
         text=response.text,
         spec=response.spec,
         selected_followups=response.selected_followups,
         selected_cta_key=response.selected_cta_key,
         navigation_followups=navigation_followups,
+        primary_content_ref=validated_primary,
+        used_content_refs=validated_used,
     )

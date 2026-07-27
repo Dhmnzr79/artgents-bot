@@ -225,8 +225,8 @@ def test_target_files_are_strict_complete_frozen_wire_data() -> None:
     brands_raw = _load_json(TARGET_BRANDS)
     facts_raw = _load_json(TARGET_FACTS)
 
-    assert len(offer_files) == len(offers) == 31
-    assert len({offer["offer_id"] for offer in offers}) == 31
+    assert len(offer_files) == len(offers) == 32
+    assert len({offer["offer_id"] for offer in offers}) == 32
     for path, offer in zip(offer_files, offers, strict=True):
         assert path.name == f'{offer["offer_id"]}.json'
     for offer in offers:
@@ -266,7 +266,7 @@ def test_exact_12_top_offers_preserve_authored_payment_stages() -> None:
         assert followup_ids == ["stages", "includes"]
 
     offers_without_stages = set(target) - materialized_offer_ids
-    assert len(offers_without_stages) == 19
+    assert len(offers_without_stages) == 20
     assert {
         "sinus_lift.one_site.closed",
         "sinus_lift.one_site.open",
@@ -344,8 +344,8 @@ def test_real_bundle_builds_every_service_price_doctor_context() -> None:
     bundle = _real_bundle()
     doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
 
-    assert len(bundle.services) == 21
-    assert len(bundle.offers) == 31
+    assert len(bundle.services) == 22
+    assert len(bundle.offers) == 32
     for service_id in bundle.services:
         context = build_service_data_context(bundle, doctors, service_id)
         expected_offers = [

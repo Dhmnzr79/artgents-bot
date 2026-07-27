@@ -29,6 +29,7 @@
       "zirconia_crowns",
       "clasp_dentures",
       "sinus_lift",
+      "bone_graft",
       "zygomatic_implants",
       "pterygoid_implants",
       "removable_dentures"
@@ -53,6 +54,7 @@
       "zirconia_crowns",
       "clasp_dentures",
       "sinus_lift",
+      "bone_graft",
       "zygomatic_implants",
       "pterygoid_implants",
       "removable_dentures"
@@ -94,6 +96,7 @@
       "all_on_4",
       "all_on_6",
       "sinus_lift",
+      "bone_graft",
       "zygomatic_implants",
       "pterygoid_implants"
     ],

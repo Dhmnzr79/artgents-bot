@@ -75,19 +75,23 @@ def test_patient_options_keep_only_option_buttons():
     assert out["cta"] == {"label": "Записаться", "action": "lead"}
 
 
-def test_md_navigation_still_limits_suggest_refs_to_one():
+def test_md_navigation_allows_two_secondary_slots():
     payload = {
         "answer": "Ответ по статье.",
         "quick_replies": [
             {"label": "Первое", "ref": "a.md#one"},
             {"label": "Второе", "ref": "a.md#two"},
+            {"label": "Третье", "ref": "a.md#three"},
         ],
         "meta": {"ui_source_family": "md_navigation", "followups": []},
     }
 
     normalize_policy_payload(payload)
 
-    assert payload["quick_replies"] == [{"label": "Первое", "ref": "a.md#one"}]
+    assert payload["quick_replies"] == [
+        {"label": "Первое", "ref": "a.md#one"},
+        {"label": "Второе", "ref": "a.md#two"},
+    ]
     assert payload["meta"]["ui_dropped"] == ["suggest_refs_over_limit"]
 
 

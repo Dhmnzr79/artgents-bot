@@ -720,19 +720,19 @@ def verify_target_composed_response(
         ):
             _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
     for block in request.evidence_blocks:
-        if (
-            block.kind == "commercial_fact"
-            and block.must_preserve_exact
-            and block.text not in response.text
-        ):
-            _error("target_verifier_strict_fact_missing", block.fact_ids[0])
+        if block.kind != "commercial_fact" or not block.must_preserve_exact:
+            continue
+        if block.fact_ids and block.fact_ids[0] in request.spec.required_fact_ids:
+            if block.text not in response.text:
+                _error("target_verifier_strict_fact_missing", block.fact_ids[0])
     has_clinic_contact = any(block.kind == "clinic_contact" for block in request.evidence_blocks)
     if has_clinic_contact:
         contact_blocks = [
             block for block in request.evidence_blocks if block.kind == "clinic_contact"
         ]
-        if not any(block.text in response.text for block in contact_blocks):
-            _error("target_verifier_clinic_contact_missing", "clinic_contact")
+        for block in contact_blocks:
+            if block.text not in response.text:
+                _error("target_verifier_clinic_contact_missing", block.ref)
     try:
         assess = getattr(semantic_backend, "assess")
     except Exception:

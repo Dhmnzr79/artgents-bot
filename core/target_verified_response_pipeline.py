@@ -40,7 +40,7 @@ def run_target_offline_verified_response_pipeline(
     tone: TargetComposerTone,
     composer_backend: TargetComposerBackend,
     semantic_backend: TargetSemanticVerifierBackend,
-    contact_aspect: str | None = None,
+    contact_fields: tuple[str, ...] | None = None,
     client_id: str = "demo",
 ) -> TargetVerifiedComposedResponse:
     """Materialize, compose and verify one exact target response without wiring it."""
@@ -52,7 +52,7 @@ def run_target_offline_verified_response_pipeline(
         consultation_values,
         user_message=user_message,
         md_root=md_root,
-        contact_aspect=contact_aspect,
+        contact_fields=contact_fields,
         client_id=client_id,
     )
     unverified = execute_target_composer(

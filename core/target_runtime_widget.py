@@ -296,6 +296,8 @@ def materialize_target_error_payload(
     client_id: str,
     sid: str,
     error_code: str,
+    pipeline_stage: str | None = None,
+    pipeline_value: object | None = None,
 ) -> TargetRuntimeErrorPayload:
     if error_code.startswith("target_verifier_"):
         answer = fallback_answer_with_phone(
@@ -309,6 +311,11 @@ def materialize_target_error_payload(
             client_id=client_id,
         )
         route = "target_fullcontext_error"
+    meta_extra: dict[str, object] = {"target_error_code": error_code}
+    if pipeline_stage is not None:
+        meta_extra["pipeline_failure_stage"] = pipeline_stage
+    if pipeline_value is not None:
+        meta_extra["pipeline_failure_value"] = pipeline_value
     payload = {
         "answer": answer,
         "quick_replies": [],
@@ -322,7 +329,7 @@ def materialize_target_error_payload(
             route=route,
             attribution_kind="plain",
             ui_source_family="guided_fallback",
-            target_error_code=error_code,
+            **meta_extra,
         ),
     }
     return TargetRuntimeErrorPayload(kind="error", payload=payload, error_code=error_code)

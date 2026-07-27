@@ -60,9 +60,11 @@ _BONE_GRAFT_TEXT = (
     "Костная пластика помогает восстановить объём кости для имплантации."
 )
 _DOCTORS_TEXT = "Орлов Никита Владимирович — врач-имплантолог."
-_CONTACTS_TEXT = materialize_clinic_contact_primary_evidence("demo", aspect="contacts")[
-    0
-].text
+_CONTACT_BLOCKS = materialize_clinic_contact_primary_evidence(
+    "demo",
+    fields=("phone", "whatsapp", "address", "hours", "parking"),
+)
+_CONTACTS_TEXT = "\n".join(block.text for block in _CONTACT_BLOCKS)
 _FAQ_TEXT = "Имплантация проходит поэтапно с контролем приживления."
 
 
@@ -207,12 +209,18 @@ def test_runtime_matrix_contacts_bone_graft_doctors_price_and_faq() -> None:
             "contacts",
             _frame(
                 topic="clinic",
-                aspects=["contacts"],
-                primary_aspect="contacts",
+                aspects=["contact_address", "contact_parking"],
+                primary_aspect="contact_address",
                 service_id=None,
             ),
             "а где вы находитесь и есть ли парковка?",
-            _CONTACTS_TEXT,
+            "\n".join(
+                block.text
+                for block in materialize_clinic_contact_primary_evidence(
+                    "demo",
+                    fields=("address", "parking"),
+                )
+            ),
             ("content",),
         ),
         (

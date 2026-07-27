@@ -41,6 +41,16 @@ _CONTACT_MD_FORBIDDEN = re.compile(
     r"^\s*-\s*(адрес|телефон|whatsapp|время работы|парковка)\s*:)",
     re.IGNORECASE | re.MULTILINE,
 )
+_FRONTMATTER = re.compile(
+    r"\A---[ \t]*\r?\n(?P<yaml>.*?)\r?\n---",
+    re.DOTALL,
+)
+_PRESENTATION_KEYS = (
+    "consultation_value",
+    "suggest_h3",
+    "situation_allowed",
+    "video_key",
+)
 
 
 def _resolve_pack_root(client_id: str | None, pack_path: str | None) -> Path:
@@ -163,6 +173,36 @@ def validate_client_pack(
             errors.append(
                 "md/clinic__info__contacts.md: duplicate_contact_facts_forbidden"
             )
+
+    video_keys: set[str] = set()
+    video_catalog = rel("video_catalog.yaml")
+    if video_catalog.is_file():
+        import yaml
+
+        catalog_raw = yaml.safe_load(video_catalog.read_text(encoding="utf-8")) or {}
+        videos = catalog_raw.get("videos") if isinstance(catalog_raw, dict) else {}
+        if isinstance(videos, dict):
+            video_keys = {str(key) for key in videos}
+
+    for md_path in sorted(md_root.glob("*.md")) if md_root.is_dir() else []:
+        text = md_path.read_text(encoding="utf-8")
+        match = _FRONTMATTER.search(text)
+        if not match:
+            continue
+        import yaml
+
+        meta = yaml.safe_load(match.group("yaml")) or {}
+        if not isinstance(meta, dict):
+            continue
+        rel_path = md_path.relative_to(pack_root).as_posix()
+        for key in _PRESENTATION_KEYS:
+            if key in meta and meta[key] is not None and meta[key] != "":
+                if key == "situation_allowed" and not isinstance(meta[key], bool):
+                    errors.append(f"{rel_path}: situation_allowed_invalid")
+                if key == "video_key":
+                    video_key = str(meta[key]).strip()
+                    if video_keys and video_key not in video_keys:
+                        errors.append(f"{rel_path}: video_key_missing_in_catalog")
 
     return errors
 

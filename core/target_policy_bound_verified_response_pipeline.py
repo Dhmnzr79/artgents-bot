@@ -19,6 +19,7 @@ from core.target_composer_executor import (
 )
 from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_response_policy import build_target_response_spec
+from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_response_verifier import (
     TargetSemanticVerifierBackend,
@@ -61,6 +62,10 @@ def _assemble_bound_package(
     client_id: str = "demo",
 ) -> TargetSpecBoundOfflineResponsePackage:
     spec = build_target_response_spec(policy_request)
+    if is_fullcontext_service_optional_spec(spec):
+        include_initial_block = False
+        marketing_scenarios = ()
+        brand_term = None
     if is_scope_aware_price_spec(spec):
         include_consultation_close = False
         resolved_stage = spec.response_stage
@@ -125,7 +130,7 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
     turn_topic: str | None = None,
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
-    contact_aspect: str | None = None,
+    contact_fields: tuple[str, ...] | None = None,
 ) -> tuple[TargetVerifiedComposedResponse, TargetMaterializedSessionSelection]:
     """Build spec-bound package and return one exact verified target response.
 
@@ -165,7 +170,7 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         tone=tone,
         composer_backend=composer_backend,
         semantic_backend=semantic_backend,
-        contact_aspect=contact_aspect,
+        contact_fields=contact_fields,
         client_id=client_id,
     )
     return verified, extract_target_session_selection(bound_package)
@@ -198,7 +203,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     turn_topic: str | None = None,
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
-    contact_aspect: str | None = None,
+    contact_fields: tuple[str, ...] | None = None,
 ) -> TargetVerifiedComposedResponse:
     """Build spec-bound package and return one exact verified target response."""
 
@@ -228,6 +233,6 @@ def run_target_offline_policy_bound_verified_response_pipeline(
         turn_topic=turn_topic,
         effective_scope=effective_scope,
         client_id=client_id,
-        contact_aspect=contact_aspect,
+        contact_fields=contact_fields,
     )
     return verified

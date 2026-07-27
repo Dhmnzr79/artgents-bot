@@ -9,8 +9,5 @@ admin:
 postgres_events:
   enabled: true
 
-guide_router:
-  enabled: false
-
 ingress:
   strict: true

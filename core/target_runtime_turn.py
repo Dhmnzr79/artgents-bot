@@ -41,11 +41,13 @@ from core.target_runtime_session import (
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_presentation_decision import TargetPresentationCadenceState
+from core.target_pipeline_observability import (
+    emit_target_pipeline_failure_from_exception,
+)
 from core.target_presentation_turn_projection import (
     marketing_scenarios_from_turn_frame,
     provisional_spec_from_turn_frame,
     resolve_target_semantic_context,
-    should_include_initial_marketing_block,
 )
 from core.target_runtime_strategy import resolve_target_runtime_strategy_context
 from core.target_strategy_context import strategy_match_from_effective_scope
@@ -226,13 +228,7 @@ def run_target_fullcontext_runtime_turn(
         tone_key="commercial_warm",
     )
     semantic_context = resolve_target_semantic_context(turn_frame, provisional_spec)
-    include_initial_block = (
-        boundary.decision == "none"
-        and should_include_initial_marketing_block(turn_frame, provisional_spec)
-    )
-    marketing_scenarios = (
-        marketing_scenarios_from_turn_frame(turn_frame) if include_initial_block else ()
-    )
+    marketing_scenarios = marketing_scenarios_from_turn_frame(turn_frame)
     allow_situation = not turn_frame.needs_clarification
     try:
         try:
@@ -259,7 +255,7 @@ def run_target_fullcontext_runtime_turn(
                 today=runtime_today(),
                 md_root=context.md_root,
                 cached_full_context=context.cached_full_context,
-                include_initial_block=include_initial_block,
+                include_initial_block=False,
                 include_consultation_close=context.include_consultation_close,
                 include_cta=context.cta_capability,
                 user_message=user_message,
@@ -274,21 +270,27 @@ def run_target_fullcontext_runtime_turn(
                 client_id=client_id,
             )
         except TargetResponseVerificationError as exc:
+            emit_target_pipeline_failure_from_exception(exc)
             return TargetRuntimeTurnOutcome(
                 widget=materialize_target_error_payload(
                     client_id=client_id,
                     sid=sid,
                     error_code=exc.code,
+                    pipeline_stage="verifier",
+                    pipeline_value=exc.value,
                 ),
                 pipeline_result=None,
                 turn_frame=turn_frame,
             )
         except Exception as exc:
+            stage, code, value = emit_target_pipeline_failure_from_exception(exc)
             return TargetRuntimeTurnOutcome(
                 widget=materialize_target_error_payload(
                     client_id=client_id,
                     sid=sid,
-                    error_code=f"target_runtime_pipeline_failed:{type(exc).__name__}",
+                    error_code=code,
+                    pipeline_stage=stage,
+                    pipeline_value=value,
                 ),
                 pipeline_result=None,
                 turn_frame=turn_frame,

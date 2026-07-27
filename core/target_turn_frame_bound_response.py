@@ -25,8 +25,14 @@ from core.target_composer_executor import (
 from core.target_policy_bound_verified_response_pipeline import (
     run_target_offline_policy_bound_verified_response_pipeline_with_selection,
 )
+from core.target_presentation_turn_projection import (
+    contact_fields_from_turn_frame,
+    marketing_scenarios_from_turn_frame,
+    resolve_bound_marketing_flags,
+    resolve_target_semantic_context,
+)
+from core.target_response_policy import build_target_response_spec
 from core.target_response_verifier import TargetSemanticVerifierBackend
-from core.target_presentation_turn_projection import contact_aspect_from_turn_frame
 from core.target_turn_frame_dispatch import dispatch_target_turn_frame_response
 
 
@@ -67,33 +73,50 @@ def run_target_offline_turn_frame_bound_response(
     )
     if dispatch.kind == "terminal":
         return TargetTurnFrameBoundTerminalResponse(kind="terminal", dispatch=dispatch)
+    bound_spec = build_target_response_spec(dispatch.policy_request)
+    resolved_semantic_context = resolve_target_semantic_context(turn_frame, bound_spec)
+    scenario_intent = (
+        tuple(marketing_scenarios)
+        if marketing_scenarios
+        else marketing_scenarios_from_turn_frame(turn_frame)
+    )
+    resolved_include_initial_block, resolved_scenarios, resolved_brand_term = (
+        resolve_bound_marketing_flags(
+            turn_frame,
+            bound_spec,
+            boundary_allows_marketing=True,
+            brand_term=brand_term,
+            marketing_scenarios=scenario_intent,
+        )
+    )
+    contact_fields = contact_fields_from_turn_frame(turn_frame)
     verified, session_selection = run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         dispatch.policy_request,
         bundle,
         doctor_catalog,
         external_index,
         consultation_values,
-        brand_term=brand_term,
+        brand_term=resolved_brand_term,
         strategy_context=strategy_context,
-        semantic_context=semantic_context,
+        semantic_context=resolved_semantic_context,
         today=today,
         md_root=md_root,
         cached_full_context=cached_full_context,
-        include_initial_block=include_initial_block,
+        include_initial_block=resolved_include_initial_block,
         include_consultation_close=include_consultation_close,
         include_cta=include_cta,
         user_message=user_message,
         tone=tone,
         composer_backend=composer_backend,
         semantic_backend=semantic_backend,
-        marketing_scenarios=marketing_scenarios,
+        marketing_scenarios=resolved_scenarios,
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
         turn_topic=turn_frame.topic,
         effective_scope=effective_scope,
         client_id=client_id,
-        contact_aspect=contact_aspect_from_turn_frame(turn_frame),
+        contact_fields=contact_fields,
     )
     return TargetTurnFrameBoundMaterializeResponse(
         kind="materialize",

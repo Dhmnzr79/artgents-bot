@@ -28,6 +28,11 @@ _ASPECT_TO_COMPONENT: dict[AspectKind, TargetResponseComponent] = {
     "pain": "content",
     "overview": "content",
     "contacts": "content",
+    "contact_phone": "content",
+    "contact_address": "content",
+    "contact_parking": "content",
+    "contact_hours": "content",
+    "contact_whatsapp": "content",
 }
 _COMPONENT_ORDER: tuple[TargetResponseComponent, ...] = ("content", "price", "doctors")
 _PRICE_INTENTS = frozenset({"price_lookup", "price_concern"})
@@ -164,6 +169,8 @@ def _primary_component_from_aspect(
 ) -> TargetResponseComponent:
     if aspect in {"price", "payment", "included"}:
         return "price"
+    if aspect.startswith("contact_") or aspect == "contacts":
+        return "content"
     return "content"
 
 

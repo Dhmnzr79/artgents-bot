@@ -526,13 +526,13 @@ def _prepend_contact_evidence(
     blocks: tuple[TargetComposerEvidenceBlock, ...],
     *,
     client_id: str,
-    contact_aspect: str | None,
+    contact_fields: tuple[str, ...] | None = None,
 ) -> tuple[TargetComposerEvidenceBlock, ...]:
-    if contact_aspect is None:
+    if contact_fields is None:
         return blocks
     contact_blocks = materialize_clinic_contact_primary_evidence(
         client_id,
-        aspect=contact_aspect,
+        fields=contact_fields,  # type: ignore[arg-type]
     )
     if not contact_blocks:
         return blocks
@@ -547,7 +547,7 @@ def materialize_target_composer_request(
     *,
     user_message: str,
     md_root: Path,
-    contact_aspect: str | None = None,
+    contact_fields: tuple[str, ...] | None = None,
     client_id: str = "demo",
 ) -> TargetComposerRequest:
     """Create model-ready primary evidence without executing a Composer model."""
@@ -567,7 +567,7 @@ def materialize_target_composer_request(
             blocks = _prepend_contact_evidence(
                 blocks,
                 client_id=client_id,
-                contact_aspect=contact_aspect,
+                contact_fields=contact_fields,
             )
             return _attach_composer_action_context(
                 TargetComposerRequest(
@@ -603,7 +603,7 @@ def materialize_target_composer_request(
         blocks = _prepend_contact_evidence(
             blocks,
             client_id=client_id,
-            contact_aspect=contact_aspect,
+            contact_fields=contact_fields,
         )
         return _attach_composer_action_context(
             TargetComposerRequest(
@@ -683,7 +683,7 @@ def materialize_target_composer_request(
     blocks = _prepend_contact_evidence(
         blocks,
         client_id=client_id,
-        contact_aspect=contact_aspect,
+        contact_fields=contact_fields,
     )
     return _attach_composer_action_context(
         TargetComposerRequest(

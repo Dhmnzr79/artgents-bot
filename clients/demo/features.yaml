@@ -9,12 +9,6 @@ admin:
 postgres_events:
   enabled: false
 
-guide_router:
-  enabled: false
-
-consult_nudge:
-  enabled: true
-
 situation:
   enabled: true
 

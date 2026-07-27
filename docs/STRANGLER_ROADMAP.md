@@ -676,10 +676,30 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE (governance)
+## Следующий технический checkpoint — FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING (governance)
 
-**Baseline:** `codex/stage-a` @ `c4de72c`. **Authority:** forbidden in governance commit.
+**Baseline:** `codex/stage-a` @ `a1dc4f2`. **Authority:** forbidden in governance commit.
 **Live/LLM:** forbidden.
+
+Migration loss: legacy tomography fact «свежее КТ до 1 месяца» не перенесён в MD.
+Runtime: own-scan FAQ misrouted to `service_availability` short-circuit.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/runtime/FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_tomography_existing_scan_content_routing_governance.py`.
+
+Целевые implementation seams: `diagnostics__service__tomography.md` + `content_ref`;
+Planner `_SYSTEM` semantic boundary; 16-scenario matrix (availability/price/FAQ parity).
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE (governance + implementation)
+
+**Baseline:** `codex/stage-a` @ `c4de72c` (governance) → `a1dc4f2` (implementation COMPLETE).
+**Authority:** forbidden in governance commit. **Live/LLM:** forbidden.
 
 Scoped Evidence vs Composer Request расходятся на price-only без MD: `tomography` + offer
 `tomography.default` → `composer_request_source_mismatch`.
@@ -692,7 +712,7 @@ Deliverables (Phase 1): seam audit
 Целевые implementation seams: shared `is_price_only_offer_source_sufficient`; composer/scoped/plan
 convergence; cross-turn availability→price matrix (30 scenarios).
 
-**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+**COMPLETE** @ `a1dc4f2`.
 
 ---
 

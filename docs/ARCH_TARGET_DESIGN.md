@@ -58,7 +58,23 @@ rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PR
 + `FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE`
 + `FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY`
 + `FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING`
-+ `FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE`.
++ `FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE`
++ `FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING`.
+
+### Owner decision: tomography existing-scan content routing (FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING @ `a1dc4f2`)
+
+**Migration loss:** legacy `clients/demo/service_catalog.json` contained agreed fact «при наличии свежего КТ
+(до 1 месяца)…»; Checkpoint B removed legacy catalog without MD migration.
+
+**Defect:** own/existing-scan questions misrouted to `service_availability` → deterministic yes/no instead of
+FAQ content.
+
+**Target:** canonical `diagnostics__service__tomography.md` + `tomography.content_ref`; Planner semantic
+boundary — `service_availability` only for direct procedure-offer questions; own/freshness/repeat-scan →
+`overview` + `service_id=tomography` → Composer. No regex, new route, Verifier change.
+
+Seam audit: `docs/evidence/runtime/FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### Owner decision: price-only offer source sufficiency (FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE @ `c4de72c`)
 

@@ -45,6 +45,11 @@ services: `active=false` in catalog (authored); not shown in planner compact lis
 для content-only, content+price, FAQ/description, marketing claims. Missing offer → `data_gap` /
 `no_public_price`, not source mismatch.
 
+**FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING:** FAQ про своё/имеющееся КТ — canonical MD
+(`diagnostics__service__tomography.md`) + `content_ref` в catalog. **Не** класть текст в catalog facts,
+pricebook или marketing. Availability yes/no и price 3 000 ₽ — отдельные пути (structured availability /
+price-only offer).
+
 ## Новая клиника (чеклист)
 
 1. Скопировать `clients/_template/` → `clients/{new_id}/`.

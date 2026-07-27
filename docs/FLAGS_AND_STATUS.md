@@ -65,10 +65,14 @@ Seam audit: `docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_S
 `service_availability`; ingress catalog-miss → normal; `structured_service_availability`.
 Seam audit: `docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md`.
 
-**FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE:** governance @ `c4de72c` — converge Scoped Evidence
+**FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE:** COMPLETE @ `a1dc4f2` — converge Scoped Evidence
 and Composer Request on price-only offer source sufficiency; shared predicate; cross-turn tomography price
 fixture. Seam audit:
 `docs/evidence/runtime/FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE_SEAM_AUDIT.md`.
+
+**FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING:** governance @ `a1dc4f2` — restore agreed existing-scan
+fact in MD; Planner must not route own-scan FAQ to `service_availability`. Seam audit:
+`docs/evidence/runtime/FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)

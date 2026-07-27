@@ -5466,3 +5466,133 @@ python -m pytest tests/ --collect-only -q
 
 После governance commit + PRE-CODE PASS — **остановиться**. Implementation, LIVE, E2E и Verifier changes
 запрещены до отдельного owner GO.
+
+---
+
+# TASK — FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO Verifier changes**
+
+**Baseline:** `codex/stage-a` @ `a1dc4f2`
+**Seam audit:**
+`docs/evidence/runtime/FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING_SEAM_AUDIT.md`.
+
+## Goal
+
+Восстановить согласованный demo-факт про готовое КТ (до 1 месяца) как canonical MD content и
+исправить misrouting: вопросы про своё/имеющееся КТ не должны попадать в deterministic
+`service_availability` short-circuit.
+
+## Canonical invariant (binding)
+
+1. Agreed fact (owner-confirmed, дословно в MD): при наличии свежего КТ (до 1 месяца) врач может
+   использовать уже готовое исследование.
+2. «Свежее» = до одного месяца; не выдумывать DICOM/диск/флешку/качество/место съёмки.
+3. Catalog — authority для availability + `service_id`; текст — только в `md/{content_ref}`.
+4. Цена 3 000 ₽ — только `pricebook/services/tomography.default.json`.
+5. «Делаете КТ?» → `service_availability` → deterministic yes (Composer=0) — **unchanged**.
+6. Own/existing/freshness/repeat-scan questions → `overview`/content + `service_id=tomography` → Composer.
+7. Planner semantic boundary only — **no** regex, phrase lists, new aspect, handler, route, pipeline.
+
+## Documented defect
+
+Migration loss @ Checkpoint B + runtime misroute:
+
+- legacy fact in `clients/demo/service_catalog.json` @ `50c6cf9^` not migrated;
+- «А если у меня есть своё КТ?» → `service_availability` → «Да, клиника оказывает услугу КТ»;
+- Request ID: `61efdc17-b6d0-42b8-b287-d4858527bbb9`.
+
+## Target content (Phase 2)
+
+| Item | Action |
+|------|--------|
+| `clients/demo/md/diagnostics__service__tomography.md` | CREATE — agreed fact + ≤2 `suggest_h3` follow-ups |
+| `clients/demo/target_response/service_catalog.json` | UPDATE — `tomography.content_ref` link only |
+
+**Forbidden:** catalog facts array, pricebook/marketing duplication, legacy mirror restore.
+
+## Target routing (Phase 2)
+
+`core/turn_planner_llm.py` — extend `_SYSTEM` `service_availability` semantic rules:
+
+- availability aspect **only** for direct «выполняете/оказываете/есть ли процедура»;
+- own/existing scan, freshness, repeat CT, preparation → `overview` + `service_id=tomography`.
+
+Runtime: `Planner(content/overview + tomography) → content_ref → FullContext Composer → Verifiers → presentation`.
+
+## Governance deliverables (Phase 1)
+
+| File | Action |
+|------|--------|
+| `docs/evidence/runtime/FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_tomography_existing_scan_content_routing_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE |
+| `docs/CLIENT_PACK_AUTHORING.md` | UPDATE |
+| `TASK.md` | UPDATE (this section) |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `clients/demo/md/diagnostics__service__tomography.md` | CREATE — canonical content |
+| `clients/demo/target_response/service_catalog.json` | UPDATE — `tomography.content_ref` only |
+| `core/turn_planner_llm.py` | UPDATE — Planner semantic boundary (`_SYSTEM` only) |
+| `tests/test_final_tomography_existing_scan_content_routing_implementation.py` | CREATE — 16-scenario matrix |
+| `tests/test_final_tomography_existing_scan_content_routing_harness.py` | CREATE — widget harness |
+
+**KEEP unchanged:** Semantic/Numeric/Contact Verifier, `target_structured_service_availability`,
+price-only convergence, generic FullContext, ingress, frozen pins, legacy mirrors.
+
+## Acceptance matrix (implementation — 16 scenarios)
+
+Offline widget-faithful via `_orchestrate_ask_turn`; fakes at provider boundary; **NO LIVE / NO LLM**.
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | «Делаете КТ?» | deterministic yes, Composer=0 |
+| 2 | «Сколько стоит КТ?» | 3 000 ₽ from pricebook |
+| 3 | availability → price → «А если у меня есть своё КТ?» | content materialized, not availability |
+| 4 | Direct «Можно прийти со своим свежим КТ?» | fact ≤1 month |
+| 5 | «Моему КТ два месяца» | do not claim it qualifies |
+| 6 | «Нужно ли делать новое КТ?» | ≤1 month rule, no diagnosis |
+| 7 | `primary_content_ref` valid | grounded MD ref |
+| 8 | ≤2 MD follow-ups, no duplicates | from `suggest_h3` |
+| 9 | `/ask` | parity |
+| 10 | `/ask/stream` | parity |
+| 11 | KT price unchanged | 3 000 ₽ |
+| 12 | KT availability unchanged | Composer=0 |
+| 13 | Other availability unchanged | no regression |
+| 14 | Generic FullContext unchanged | no regression |
+| 15 | No invented format requirements | text audit |
+| 16 | Demo validator passes | `validate_client_pack demo` |
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_tomography_existing_scan_content_routing_governance.py -q
+
+# Wide safe-offline (no product change expected)
+python -m pytest tests/ --collect-only -q
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно изменить protected acceptance / frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert или Verifier change;
+- появляется regex/phrase router, новый handler/selector/route/pipeline;
+- текст факта смягчается или дополняется выдуманными требованиями к снимку;
+- legacy `clients/demo/service_catalog.json` восстанавливается;
+- availability или price-only tomography paths регрессируют;
+- Generic FullContext регрессирует.
+
+## STOP (Phase 1)
+
+После governance commit + PRE-CODE PASS — **остановиться**. Implementation, demo MD/catalog changes,
+LIVE, E2E и Verifier changes запрещены до отдельного owner GO.

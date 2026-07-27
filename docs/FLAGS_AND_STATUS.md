@@ -52,10 +52,15 @@ typed contacts, verifier observability, widget-faithful offline matrix.
 **FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION:** COMPLETE @ `codex/stage-a`
 (contact value-only verifier; scenario decouple; `turn_topic` chain; layer P/R/E/S matrix).
 
-**FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE:** governance @ `529fd02` — lighten whole response
-chain; TurnFrame sufficiency for scenario-only concerns; structured-answer mode (contacts);
-verifier `client_id`; terminal phone alignment; 28-scenario matrix. Seam audit:
+**FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE:** COMPLETE @ `525474c` — scenario-only aspects;
+structured contacts (0 Boundary/Composer/Semantic); boundary uncertain degrade; verifier `client_id`;
+terminal phone alignment. Seam audit:
 `docs/evidence/runtime/FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE_SEAM_AUDIT.md`.
+
+**FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY:** governance @ `525474c` — planner-independent
+`generic_fullcontext_content` for ordinary FAQ/info; advisory `needs_clarification`; Medical Boundary
+before generic; money boundary (`allow_price=false`); 30-scenario matrix. Seam audit:
+`docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)

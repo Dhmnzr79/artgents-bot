@@ -55,7 +55,28 @@ block whole response solely for sidecar. Verifier blocking unchanged for answer/
 rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`
 + `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`
 + `FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION`
-+ `FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE`.
++ `FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE`
++ `FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY`.
+
+### Owner decision: generic FullContext content authority (FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY @ `525474c`)
+
+**`generic_fullcontext_content`:** planner-independent informational mode reusing cached FullContext,
+content-only package (`service_id=None`), Composer, source identity, verifiers, presentation. **Not** a new
+pipeline, retriever, or legacy fallback.
+
+**Planner split:** structured capabilities (price, service lookup, doctors, contacts, typed UI, AC1–AC3,
+Leadflow) — planner fields are authority; ordinary FAQ/info — topic/aspects/service_id/needs_clarification
+are **advisory** and must not terminal-block FullContext.
+
+**Clarify:** terminal only for structured actions; `needs_clarification=true` on FAQ is advisory — Composer
+gets FullContext. **Money:** generic is not a price route (`allow_price=false`); Numeric Verifier unchanged.
+
+**Order:** Medical Boundary before generic; structured contacts fast path preserved (0 Boundary/Composer/Semantic).
+
+**Data-gap:** «В материалах клиники эта информация не указана» — content gap, not phone/handoff stub.
+
+Seam audit: `docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### Owner decision: lightweight response gates (FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE @ `529fd02`)
 

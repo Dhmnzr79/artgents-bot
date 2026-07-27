@@ -26,7 +26,8 @@
 | **FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE** | gaps H–N: Composer source sidecar, contact PRIMARY_EVIDENCE, channel mutex, situation priority/HTTP tests, `time`/`result_reliability`, fallback phone — governance @ `7c716df`; partial implementation @ `84b2741`–`029c38b` |
 | **FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE** | COMPLETE @ `225ee56` — marketing-after-final-spec, typed contacts, verifier observability, widget-faithful matrix |
 | **FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION** | COMPLETE — contact value-only verifier + scenario decouple + `turn_topic` chain |
-| **FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE** | lighten response gates (dispatch sufficiency, structured contacts, verifier client_id) — governance @ `529fd02`; implementation **STOP** |
+| **FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE** | COMPLETE @ `525474c` — scenario-only aspects, structured contacts, boundary degrade, verifier client_id |
+| **FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY** | planner-independent `generic_fullcontext_content` — governance @ `525474c`; implementation **STOP** |
 | PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)

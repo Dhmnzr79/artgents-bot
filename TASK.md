@@ -4903,3 +4903,214 @@ git diff --check
 | `core/target_verified_response_pipeline.py` | pass `client_id` into verifier |
 | `tests/test_final_fullcontext_dialogue_runtime_convergence_implementation.py` | structured contact regression |
 | `tests/test_final_contact_value_verification_and_marketing_scenario_activation_implementation.py` | HTTP contact parity (0 composer) |
+
+---
+
+# TASK — FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO Semantic Verifier changes**
+
+**Baseline:** `codex/stage-a` @ `525474c`
+
+**Authority:** seam audit
+`docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`.
+
+## Goal
+
+Исправить архитектурную границу, из-за которой Composer получает FullContext только после успешной
+классификации Planner. Ввести единый режим **`generic_fullcontext_content`**: Planner помогает выбрать
+structured route, но не решает, имеет ли бот право искать обычный информационный ответ в FullContext.
+
+Режим переиспользует существующие: cached FullContext, content-only package, Composer, source identity
+sidecar, deterministic + Semantic Verifiers, presentation/widget/session. **Не** новый pipeline, **не**
+legacy fallback, **не** second selector / RAG.
+
+## Confirmed defects (offline @ `525474c`)
+
+| ID | Turn | Base fact | Planner | Pipeline stop | Composer |
+|----|------|-----------|---------|---------------|----------|
+| A | «А за сколько приёмов можно поставить новый зуб?» | `implantation__service__benefits.md` — «Новый зуб за 2 приёма» | `intent=content`, `topic=implantation`, `aspects=["duration","stages"]`, `needs_clarification=true` | `target_fullcontext_terminal_clarify` | 0 |
+| B | «А вы используете одноразовые материалы в работе?» | `implantation__faq__safety.md` — одноразовые материалы | `intent=unknown`, `topic=null`, `aspects=[]`, `needs_clarification=false` | `dispatch_field_invalid: aspects` | 0 |
+
+`FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE` @ `525474c` исправил scenario-only `aspects=[]` при valid
+`topic` + `marketing_scenarios`, но **не** generic FAQ без topic/scenarios и **не** advisory
+`needs_clarification`.
+
+## Normative pipeline order (binding)
+
+1. Pre-resolver guards → 2. Ingress → 3. Typed UI / Planner → 4. Structured capabilities (contacts,
+   governed UI, structured price, doctors, …) → 5. Medical Boundary → 6. `medical_handoff` before generic
+   → 7. Concrete service content when `service_id` usable → 8. **`generic_fullcontext_content`** →
+   9. Composer → 10. Deterministic Verifier → 11. Semantic Verifier → 12. Presentation/widget/session.
+
+Structured contacts: 0 Boundary/Composer/Semantic (preserve @ `525474c`).
+
+## Planner authority split (binding)
+
+| Class | Planner fields | Role |
+|-------|----------------|------|
+| Structured (price, service lookup, doctors, contacts, typed UI, AC1–AC3, Leadflow) | intent, topic, aspects, service_id, scope | **authority** |
+| Ordinary FAQ/info/comparison | topic, aspects, service_id, primary_aspect, needs_clarification | **advisory** |
+
+Do **not** auto-generic: completely malformed Planner output, provider failure, unknown non-null
+`service_id` — controlled technical behavior / seam audit classification.
+
+## `generic_fullcontext_content` conditions
+
+Allowed when:
+
+- Ingress `route=normal`;
+- user text non-empty;
+- not active lead/situation/booking flow;
+- no governed typed UI action;
+- no structured route selected;
+- Medical Boundary does not require handoff;
+- no hard-stop / not-offered policy;
+- Planner frame at most **partially** missing, not fully technically damaged.
+
+**Not required:** `service_id`, `topic`, `aspects`, `primary_aspect`.
+
+## Clarification policy (binding)
+
+Terminal clarify **only** for structured actions (price, scope/stage, governed menu, concrete comparison,
+Leadflow, structured service lookup). For FAQ/info: `needs_clarification=true` → advisory; dispatch must not
+return `target_fullcontext_terminal_clarify` solely for that; Composer gets FullContext; conditional answer
+allowed; no generic «уточните услугу» when FullContext has a match.
+
+## Money boundary (binding)
+
+Generic is **not** a price route. Any recognized price intent → structured pricebook or price data-gap.
+Generic package: `allow_price=false` (normative). Composer must not extract MD sums as public price.
+Money without PRIMARY_EVIDENCE still blocked. **Do not weaken** Numeric Verifier.
+
+## Missing-base answer (binding)
+
+«В материалах клиники эта информация не указана» — content data-gap, not technical fallback / handoff /
+phone stub. Absence not inferred from missing source identity alone.
+
+## Source identity + presentation (KEEP)
+
+Valid answer + valid source → text + source UI. Valid answer + missing/invalid source → text, UI hidden,
+warning. Invented refs dropped. Caps: choice≤4, secondary≤2, price≤2, video priority, situation_allowed,
+no-repeat cadence, CTA separate. Generic must not auto-expand `consultation_value`.
+
+## Semantic Verifier (KEEP)
+
+No policy/prompt change without reproducible defect:
+
+- `unsupported_clinic_claim` → blocking;
+- `personal_medical_conclusion` → blocking;
+- `material_external_medical_claim` → blocking only dangerous/absurd/material contradiction;
+- `minor_external_detail` → non-blocking.
+
+Contact Verifier `client_id` fix @ `525474c` — do not repeat.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|------|---------|
+| **Dispatch** | `needs_clarification` terminal before Composer; `aspects=[]` without topic/scenario still fail-closed |
+| **Content-only package** | exists (`service_id=None`) but unreachable for partial planner frames |
+| **Composer** | cached FullContext path exists for service-optional spec; gated by dispatch |
+| **Numeric** | corpus whitelist for general numbers («2 приёма»); money strict — KEEP |
+| **Boundary** | must stay before generic |
+| **Session** | hydration must not narrow generic FAQ to stale service focus |
+| **Marketing** | amplifiers advisory after Composer; direct duration ≠ scenario |
+
+Full checklist: seam audit §Phase 1 seam audit checklist.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_generic_fullcontext_content_authority_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — status pointer |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — milestone status |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — milestone pointer |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE — owner decision pointer |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/target_turn_frame_dispatch.py` | UPDATE — generic materialize; advisory clarify |
+| `core/target_runtime_turn.py` | UPDATE — generic after boundary, before service-only |
+| `core/target_generic_fullcontext_content.py` | CREATE — explicit generic policy request / capability tag |
+| `core/target_fullcontext_content_package.py` | UPDATE — generic metadata; explicit `allow_price=false` |
+| `core/target_composer_request.py` | UPDATE — generic FullContext-only wiring if needed |
+| `core/target_composer_executor.py` | UPDATE — generic audit tag only if needed |
+| `core/target_presentation_turn_projection.py` | UPDATE — generic marketing amplifiers |
+| `core/target_runtime_turn_frame_hydration.py` | UPDATE — no stale focus narrowing for generic FAQ |
+| `tests/test_final_generic_fullcontext_content_authority_implementation.py` | CREATE — 30-scenario matrix |
+| `tests/test_final_generic_fullcontext_content_authority_harness.py` | CREATE — widget harness |
+| `tests/test_target_turn_frame_dispatch.py` | UPDATE — generic/advisory clarify unit cases |
+
+**KEEP unchanged:** Semantic Verifier policy, Numeric Verifier strictness, structured contacts fast path,
+AC1–AC3 price routes, frozen pins, presentation limits.
+
+## Acceptance matrix (implementation — 30 scenarios)
+
+Offline widget-faithful via `_orchestrate_ask_turn`; fakes at provider boundary only; **NO LIVE / NO LLM**.
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | «Используете одноразовые материалы?» | normal generic answer from safety MD |
+| 2 | Same with `topic=null`, `aspects=[]` | same materialized generic |
+| 3 | «За сколько приёмов новый зуб?» | answer «2 приёма» with conditional implantation tie |
+| 4 | Same with `needs_clarification=true` | generic materialized, not terminal clarify |
+| 5 | Fresh SID, no prior service focus | generic not narrowed |
+| 6 | Old session focus `sinus_lift` | does not block implantation generic FAQ |
+| 7 | «Есть ли Wi-Fi?» missing in corpus | «информация не указана», no phone |
+| 8 | Generic valid answer + missing source | text yes; source UI hidden |
+| 9 | Generic valid source | followups/video/situation per policy |
+| 10 | Broad implantation price | prior structured price route |
+| 11 | Named All-on-4 price | structured PRIMARY_EVIDENCE |
+| 12 | Unusual price phrasing missed by Planner | no money from generic |
+| 13 | Money from MD without PRIMARY_EVIDENCE | verifier block |
+| 14 | Structured contacts | deterministic path, 0 Boundary/Composer/Semantic |
+| 15 | Clinic-wide doctors | prior doctors path |
+| 16 | Typed UI scope/stage | prior AC1–AC3 path |
+| 17 | Personal eligibility | medical handoff before generic |
+| 18 | Diagnosis | Semantic Verifier block |
+| 19 | Dangerous fantasy | block |
+| 20 | Harmless general detail | non-blocking `minor_external_detail` |
+| 21 | Not-offered service | Ingress policy, not generic |
+| 22 | Completely malformed Planner response | controlled technical behavior |
+| 23 | Partial but sufficient Planner response | generic materialized |
+| 24 | Composer provider failure | technical fallback with phone |
+| 25 | Source identity invented | answer retained where valid; UI removed |
+| 26 | `consultation_value` | no bleed from neighboring service |
+| 27 | Marketing scenario concern + generic content | authored amplifier |
+| 28 | Direct duration question | not marketing scenario |
+| 29 | Buttons/cadence/session unchanged | parity with baseline widget behavior |
+| 30 | `/ask` and `/ask/stream` | parity |
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_generic_fullcontext_content_authority_governance.py -q
+
+# Wide safe-offline (no product change expected)
+python -m pytest tests/ --collect-only -q
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно изменить protected acceptance / frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert или Semantic Verifier change;
+- появляется second selector, RAG/retriever, regex/phrase price routing;
+- generic ослабляет Numeric/Contact verifier;
+- `needs_clarification` снова terminal для FAQ;
+- Medical Boundary после generic;
+- structured contacts path регрессирует (LLM > 0).
+
+## STOP (Phase 1)
+
+После governance commit + PRE-CODE PASS — **остановиться**. Implementation, LIVE, новый E2E и любые
+изменения Verifier запрещены до отдельного owner GO.

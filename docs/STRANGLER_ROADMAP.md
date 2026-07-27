@@ -676,10 +676,33 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE (governance)
+## Следующий технический checkpoint — FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY (governance)
 
-**Baseline:** `codex/stage-a` @ `529fd02`. **Authority:** forbidden in governance commit.
+**Baseline:** `codex/stage-a` @ `525474c`. **Authority:** forbidden in governance commit.
 **Live/LLM:** forbidden.
+
+Planner не должен gate-ить обычный FAQ/info в FullContext. Ввести `generic_fullcontext_content`:
+reuse cached FullContext + content-only package + Composer + verifiers + presentation — не новый pipeline.
+
+Канонические дефекты: `needs_clarification=true` → terminal clarify без Composer; `topic=null` +
+`aspects=[]` → `dispatch_field_invalid` без Composer.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_generic_fullcontext_content_authority_governance.py`.
+
+Целевые implementation seams: generic dispatch after Medical Boundary; advisory clarify; explicit
+`allow_price=false`; session focus non-narrowing; 30-scenario offline matrix.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE (governance + implementation)
+
+**Baseline:** `codex/stage-a` @ `529fd02` (governance) → `525474c` (implementation COMPLETE).
+**Authority:** forbidden in governance commit. **Live/LLM:** forbidden in governance.
 
 Облегчить всю product-цепочку ответа (не только Semantic Verifier): убрать fail-closed заглушки
 вне пяти нормативных причин. Канонический дефект: `result_reliability` + `aspects=[]` →
@@ -692,8 +715,6 @@ Deliverables (Phase 1): seam audit
 
 Целевые implementation seams: TurnFrame sufficiency (scenario-only path), structured-answer mode
 (contacts), verifier `client_id`, terminal/boundary canonical phone, 28-scenario offline matrix.
-
-**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
 
 ---
 

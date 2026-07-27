@@ -473,9 +473,9 @@ def test_scenario_30_sparse_client_fixture_no_demo_hardcodes(tmp_path: Path) -> 
     )
 
 
-def test_tomography_has_no_content_ref_in_demo_pack() -> None:
+def test_tomography_content_ref_linked_in_demo_pack() -> None:
     service = load_target_client_data("demo").bundle.services["tomography"]
-    assert service.content_ref is None
+    assert service.content_ref == "diagnostics__service__tomography.md"
 
 
 def test_price_lookup_dispatch_components() -> None:

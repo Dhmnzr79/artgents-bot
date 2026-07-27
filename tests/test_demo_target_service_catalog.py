@@ -291,7 +291,7 @@ def test_content_refs_and_doctor_service_links_are_complete() -> None:
         for doctor in doctors.doctors.values()
         for service_id in doctor.service_ids
     }
-    assert without_content == ["tomography"]
+    assert without_content == []
     assert doctor_service_ids <= set(services)
     assert doctor_service_ids == set(services) - {"tomography"}
 

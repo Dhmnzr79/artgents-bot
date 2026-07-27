@@ -220,7 +220,7 @@ def test_scenario_03_tomography_active_without_content_ref() -> None:
         service_name="КТ",
     )
     service = load_target_client_data("demo").bundle.services["tomography"]
-    assert service.content_ref is None
+    assert service.content_ref == "diagnostics__service__tomography.md"
 
 
 def test_scenario_04_3d_diagnostics_no_technical_error() -> None:

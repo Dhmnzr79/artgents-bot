@@ -10,6 +10,7 @@ from core.attribute_followup import (
     detect_vague_attribute_kinds,
     is_vague_attribute_followup_any,
 )
+from core.turn_frame_from_raw import service_availability_requested
 from core.target_fullcontext_content_package import (
     GENERIC_FULLCONTEXT_ALLOW_PRICE,
     is_fullcontext_content_only_spec,
@@ -192,6 +193,8 @@ def should_skip_session_service_hydration(
 ) -> bool:
     """Standalone informational turns must not inherit stale session service focus."""
 
+    if service_availability_requested(turn_frame):
+        return True
     if turn_frame.service_id is not None:
         return False
     if not is_vague_attribute_followup_any(user_message):

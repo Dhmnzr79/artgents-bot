@@ -20,6 +20,7 @@ from core.target_generic_fullcontext_content import (
     generic_fullcontext_content_eligible,
     structured_clarification_required,
 )
+from core.turn_frame_from_raw import service_availability_requested
 from core.target_response_policy import build_target_response_spec
 
 _ASPECT_TO_COMPONENT: dict[AspectKind, TargetResponseComponent] = {
@@ -197,6 +198,8 @@ def _components_from_turn_frame(
     if _topic_is_usable(turn_frame, envelope):
         _assert_topic_scope_compatible(turn_frame.topic, envelope)  # type: ignore[arg-type]
     for aspect in turn_frame.aspects:
+        if aspect == "service_availability":
+            continue
         if aspect == "overview" and turn_frame.topic == "doctors":
             continue
         selected.add(_ASPECT_TO_COMPONENT[aspect])
@@ -441,6 +444,33 @@ def dispatch_target_turn_frame_response(
     if turn_frame.needs_clarification:
         _reject_invalid(turn_frame.field_meta.needs_clarification, "needs_clarification")
     _reject_invalid(turn_frame.field_meta.service_id, "service_id")
+
+    if service_availability_requested(turn_frame):
+        from core.target_structured_service_availability import (
+            mark_structured_service_availability_policy_request,
+        )
+
+        policy_request = mark_structured_service_availability_policy_request(
+            TargetResponsePolicyRequest.model_validate(
+                {
+                    "response_mode": "answer",
+                    "service_id": turn_frame.service_id,
+                    "tone_key": envelope.tone_key,
+                    "allowed_topics": envelope.allowed_topics,
+                    "forbidden_topics": envelope.forbidden_topics,
+                    "required_fact_ids": (),
+                    "requested_components": ("content",),
+                    "primary_component": None,
+                    "allow_marketing_facts": False,
+                    "allow_consultation_close": False,
+                    "allow_cta": False,
+                }
+            )
+        )
+        return TargetTurnFrameMaterializeDispatch(
+            kind="materialize",
+            policy_request=policy_request,
+        )
 
     scope_price_topic = _scope_price_materialize_topic(
         turn_frame,

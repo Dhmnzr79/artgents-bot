@@ -431,3 +431,42 @@ def test_import_firewall_excludes_runtime_patient_scope_and_legacy_hooks() -> No
     )
     assert "pytest.skip" not in source
     assert "xfail" not in source
+
+
+def test_service_availability_aspect_materializes_without_content_ref() -> None:
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": ["service_availability"],
+            "primary_aspect": "service_availability",
+            "service_id": "tomography",
+            "service_confidence": 0.95,
+            "topic": "clinic",
+            "topic_confidence": 0.9,
+        },
+        allowed_topics=frozenset({"implantation", "doctors", "clinic"}),
+        allowed_service_ids=frozenset({"tomography"}),
+    )
+    result = dispatch_target_turn_frame_response(frame, _envelope())
+    assert result.kind == "materialize"
+    assert result.policy_request.service_id == "tomography"  # type: ignore[union-attr]
+    assert result.policy_request.requested_components == ("content",)  # type: ignore[union-attr]
+
+
+def test_service_availability_with_price_maps_to_price_only() -> None:
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": ["service_availability", "price"],
+            "primary_aspect": "price",
+            "service_id": "tomography",
+            "service_confidence": 0.95,
+            "topic": "implantation",
+            "topic_confidence": 0.9,
+        },
+        allowed_topics=frozenset({"implantation", "doctors"}),
+        allowed_service_ids=frozenset({"tomography"}),
+    )
+    result = dispatch_target_turn_frame_response(frame, _envelope())
+    assert result.kind == "materialize"
+    assert result.policy_request.requested_components == ("price",)  # type: ignore[union-attr]

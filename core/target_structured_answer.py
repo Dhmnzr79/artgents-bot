@@ -16,22 +16,24 @@ from core.target_contact_authority import (
     materialize_clinic_contact_primary_evidence,
 )
 from core.target_presentation_turn_projection import contact_fields_from_turn_frame
+from core.turn_frame_from_raw import service_availability_requested
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 from core.target_response_policy import build_target_response_spec
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_session_selection import TargetMaterializedSessionSelection
 
-StructuredAnswerKind = Literal["clinic_contact"]
+StructuredAnswerKind = Literal["clinic_contact", "service_availability"]
 
 
 @dataclass(frozen=True, slots=True)
 class StructuredAnswerCapability:
     kind: StructuredAnswerKind
-    contact_fields: tuple[ContactFieldKind, ...]
+    contact_fields: tuple[ContactFieldKind, ...] = ()
+    service_id: str | None = None
 
 
 def resolve_structured_answer_capability(turn_frame: TurnFrame) -> StructuredAnswerCapability | None:
-    """Return structured-answer capability when TurnFrame requests exact contact authority."""
+    """Return structured-answer capability for contacts or service availability."""
 
     if turn_frame.needs_clarification:
         return None
@@ -40,12 +42,17 @@ def resolve_structured_answer_capability(turn_frame: TurnFrame) -> StructuredAns
     if turn_frame.field_meta.aspects.status == "invalid":
         return None
     fields = contact_fields_from_turn_frame(turn_frame)
-    if fields is None:
-        return None
-    return StructuredAnswerCapability(
-        kind="clinic_contact",
-        contact_fields=fields,
-    )
+    if fields is not None:
+        return StructuredAnswerCapability(
+            kind="clinic_contact",
+            contact_fields=fields,
+        )
+    if service_availability_requested(turn_frame):
+        return StructuredAnswerCapability(
+            kind="service_availability",
+            service_id=turn_frame.service_id,
+        )
+    return None
 
 
 def materialize_structured_contact_answer_text(

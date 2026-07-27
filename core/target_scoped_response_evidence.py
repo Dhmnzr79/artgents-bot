@@ -398,6 +398,35 @@ def build_target_scoped_response_evidence(
             covered_fact_ids=(),
         )
 
+    from core.target_structured_service_availability import (
+        is_structured_service_availability_spec,
+    )
+
+    if is_structured_service_availability_spec(spec):
+        package = bound_package.package
+        plan = package.plan
+        if (
+            type(package) is not TargetOfflineResponsePackage
+            or type(plan) is not TargetResponseMaterializationPlan
+            or spec.service_id is None
+            or plan.service_id != spec.service_id
+        ):
+            _error("scoped_evidence_package_inconsistent", "structured_service_availability")
+        return TargetScopedResponseEvidence(
+            spec=spec,
+            service_id=plan.service_id,
+            primary_content_ref=plan.primary_content_ref,
+            offer_ids=(),
+            doctor_ids=(),
+            commercial_fact_ids=(),
+            external_source_refs=(),
+            consultation_content_ref=None,
+            selected_followups=package.selected_followups,
+            selected_cta_key=None,
+            scope_records=(),
+            covered_fact_ids=(),
+        )
+
     package = bound_package.package
     if (
         type(spec) is not TargetResponseSpec
@@ -421,6 +450,7 @@ def build_target_scoped_response_evidence(
         canonical_plan = build_target_response_materialization_plan(
             materials,
             required_components=spec.required_components,
+            allow_missing_content=is_structured_service_availability_spec(spec),
         )
     except TargetResponseMaterializationPlanError as exc:
         _error("scoped_evidence_package_inconsistent", "plan", exc)
@@ -472,8 +502,12 @@ def build_target_scoped_response_evidence(
 
     service_content_ref = materials.selected_content_ref
     if service_content_ref is None:
-        _error("scoped_evidence_source_invalid", service_content_ref)
-    service_topic = _topic(root, service_content_ref, kb_ref=False)
+        if plan.required_components == ("price",) and plan.offer_ids:
+            service_topic = next(iter(spec.allowed_topics), "clinic")
+        else:
+            _error("scoped_evidence_source_invalid", service_content_ref)
+    else:
+        service_topic = _topic(root, service_content_ref, kb_ref=False)
 
     records: list[TargetEvidenceScopeRecord] = []
     if plan.primary_content_ref is not None:

@@ -208,6 +208,33 @@ def _offered_phrases(catalog: dict[str, Any]) -> list[str]:
     return phrases
 
 
+def _inactive_catalog_phrases(catalog: dict[str, Any]) -> list[str]:
+    phrases: list[str] = []
+    for _sid, svc in catalog.items():
+        if not isinstance(svc, dict) or svc.get("active") is not False:
+            continue
+        name = str(svc.get("name") or "").strip()
+        if len(name) >= 3:
+            phrases.append(_norm_text(name))
+        for raw in svc.get("aliases") or []:
+            alias = _norm_text(str(raw))
+            if len(alias) >= 3:
+                phrases.append(alias)
+    phrases.sort(key=len, reverse=True)
+    return phrases
+
+
+def catalog_inactive_mention(text: str, client_id: str) -> bool:
+    """True when text matches an authored inactive catalog record (exact inactive handling)."""
+    low = _norm_text(text)
+    if not low:
+        return False
+    for phrase in _inactive_catalog_phrases(_read_service_catalog(client_id)):
+        if phrase in low:
+            return True
+    return False
+
+
 def catalog_offers_mention(text: str, client_id: str) -> bool:
     """True if normalized text contains an offered catalog alias/title."""
     low = _norm_text(text)
@@ -309,6 +336,27 @@ def _apply_offered_ground_truth(
         policy_key=None,
         requested_service=None,
         source=source,
+        is_urgent=False,
+    )
+
+
+def _apply_catalog_miss_availability_policy(
+    result: IngressRouteResult, question: str, client_id: str
+) -> IngressRouteResult:
+    """Catalog miss is not proof of non-offering — route to normal Generic path."""
+    if result.route != "service_not_offered":
+        return result
+    if ingress_entity_offered(question, client_id):
+        return result
+    if catalog_inactive_mention(question, client_id):
+        return result
+    return IngressRouteResult(
+        route="normal",
+        confidence=float(result.confidence),
+        reason="catalog_miss_availability_routing",
+        policy_key=None,
+        requested_service=None,
+        source="fallback",
         is_urgent=False,
     )
 
@@ -497,6 +545,7 @@ def classify_ingress(
         )
 
     result = _apply_offered_ground_truth(result, msg, client_id)
+    result = _apply_catalog_miss_availability_policy(result, msg, client_id)
     return _apply_confidence_threshold(result)
 
 

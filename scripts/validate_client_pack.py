@@ -129,6 +129,11 @@ def validate_client_pack(
 
     if not bundle.services:
         errors.append("target_response/service_catalog.json: empty_services")
+    for service_id, service in bundle.services.items():
+        if service.active is False and not str(service.name or "").strip():
+            errors.append(
+                f"target_response/service_catalog.json:{service_id}:inactive_service_name_required"
+            )
     if not bundle.offers and not scaffold:
         errors.append("target_response/pricebook/services/: empty_offers")
 

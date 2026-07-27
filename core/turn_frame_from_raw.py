@@ -536,3 +536,27 @@ def build_turn_frame_from_raw(
             marketing_scenarios=marketing_scenarios_meta,
         ),
     )
+
+
+def service_availability_requested(turn_frame: TurnFrame) -> bool:
+    if turn_frame.field_meta.aspects.status != "valid":
+        return False
+    if "service_availability" not in turn_frame.aspects:
+        return False
+    for aspect in turn_frame.aspects:
+        if aspect == "service_availability":
+            continue
+        if aspect in {
+            "overview",
+            "duration",
+            "stages",
+            "warranty",
+            "pain",
+            "comparison",
+            "included",
+            "price",
+            "payment",
+        }:
+            return False
+    meta = turn_frame.field_meta.service_id
+    return meta.status == "valid" and turn_frame.service_id is not None

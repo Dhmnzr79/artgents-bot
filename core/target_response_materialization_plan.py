@@ -64,6 +64,7 @@ def build_target_response_materialization_plan(
     materials: TargetOfflineResponseMaterials,
     *,
     required_components: Sequence[str],
+    allow_missing_content: bool = False,
 ) -> TargetResponseMaterializationPlan:
     """Project already-selected S27 identities without selecting or rendering again."""
 
@@ -90,6 +91,8 @@ def build_target_response_materialization_plan(
     unfulfilled: list[TargetResponseComponent] = []
     for component in components:
         if component == "content" and primary_content_ref is None:
+            if allow_missing_content:
+                continue
             unfulfilled.append(component)
         elif component == "price" and not offer_ids:
             unfulfilled.append(component)

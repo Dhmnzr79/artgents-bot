@@ -3550,11 +3550,15 @@ Strict Composer JSON contract (live backend update required):
 }
 ```
 
-- `primary_content_ref` must be in `used_content_refs`.
-- Refs validated against cached FullContext MD index; invented IDs fail-closed.
-- Factual FAQ/info/comparison: missing or invalid `source_identity` → fail-closed.
-- Verifier passes validated identity only; presentation metadata from validated primary only.
-- exact-service paths unchanged.
+- `primary_content_ref` must be in `used_content_refs` when present.
+- Invented refs never used (dropped at validation).
+- **Generic FAQ/info/comparison semantics:**
+  - valid answer + valid source → answer + source-based UI;
+  - valid answer + missing/invalid source → answer shown, follow-up/video/situation suppressed, warning logged;
+  - **do not** verifier-block whole response solely for bad/missing `source_identity`.
+- Presentation metadata from validated primary only; exact-service paths unchanged.
+
+**Verifier blocking (unchanged):** missing/unparseable answer; exact clinic/commercial claims without PRIMARY_EVIDENCE; contacts without `clinic_contact` evidence; existing blocking semantic issues.
 
 ### 2. Authoritative contact data
 
@@ -3676,7 +3680,8 @@ frozen artifacts, Composer/Verifier medical policy.
 
 | # | Criterion |
 |---|---|
-| 1 | Generic pain FAQ → validated Composer source identity |
+| 1 | Generic pain FAQ + valid source → answer + source-based UI |
+| 1b | Generic FAQ + valid answer + missing/invalid source → answer only, warning, no follow-up/video/situation |
 | 2 | FAQ follow-up from `suggest_h3` on validated primary |
 | 3 | FAQ video + follow-up occupy two secondary slots |
 | 4 | Video shown → next unseen follow-ups available |
@@ -3768,16 +3773,31 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 1. **Contacts** — only `clinic_policies.yaml` `contact:`; no phone/address/hours/WhatsApp duplication in MD.
 2. **Contact routing** — typed `contacts` aspect from Turn Planner; no `policy.contacts_intent` regex on target path.
 3. **PRIMARY_EVIDENCE** — `kind=clinic_contact` (not `commercial_fact`).
-4. **Composer** — strict JSON `{ answer, source_identity }`; `primary_content_ref ∈ used_content_refs`; factual FAQ fail-closed on bad/missing source; live backend update required.
+4. **Composer** — strict JSON `{ answer, source_identity }`; `primary_content_ref ∈ used_content_refs` when present; invented refs never used; generic FAQ: missing/invalid source → answer + warning, no UI (not whole-response block); live backend update required.
 5. **Marketing** — canonical `TurnFrame.marketing_scenarios` (0–2) from planner same call; direct questions ≠ scenarios; remove `derive_marketing_scenarios` heuristics after cutover.
+
+**STOP after correction PRE-CODE ✅** — implementation still requires separate owner GO.
+
+## Governance correction — source identity fail-open for generic answer (@ post-`f91fc04`)
+
+**Mode:** docs/governance/tests only · **NO product code**
+
+### Binding clarifications
+
+For generic FAQ/info/comparison:
+
+- valid answer + valid source identity → answer + source-based UI;
+- valid answer + missing/invalid source identity → answer shown, follow-up/video/situation suppressed, warning logged;
+- invented refs never used;
+- do **not** block entire answer solely because of source-identity sidecar.
+
+Fail-closed (blocking) only for: missing/unparseable answer; exact clinic/commercial claims without PRIMARY_EVIDENCE; contacts without validated `clinic_contact` evidence; existing Verifier blocking decisions.
 
 ### Allowlist (this correction commit)
 
 - `docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`
 - `TASK.md`
 - `docs/ARCH_TARGET_DESIGN.md`
-- `docs/CLIENT_PACK_AUTHORING.md`
-- `docs/MARKETING_SCENARIO_ARCHITECTURE.md`
 - `tests/test_fullcontext_dialogue_presentation_convergence_governance.py`
 
 **STOP after correction PRE-CODE ✅** — implementation still requires separate owner GO.

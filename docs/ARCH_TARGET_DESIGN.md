@@ -48,12 +48,11 @@ session-bound refs only. Not mixed with secondary navigation in one response. CT
 video, situation action) and separate price-detail followups (authored service followups only).
 Video priority; shown/clicked refs do not auto-repeat. Marketing facts and CTA do not occupy slots.
 
-**Source identity:** validated `used_content_refs` / `primary_content_ref` from **Composer structured
-sidecar** through Verifier to presentation layer for followups, video, and `situation_allowed`.
-Refs validated against cached FullContext MD index; invented IDs fail-closed. FAQ/info MD remains
-document, not service entity. Seam audits:
-`docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`,
-`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
+**Source identity:** validated `used_content_refs` / `primary_content_ref` from Composer JSON sidecar.
+Invented refs never used. **Fail-closed for presentation UI** (follow-up/video/situation); **fail-open
+for generic answer text** — missing/invalid source → answer + warning, no source-based UI. Do not
+block whole response solely for sidecar. Verifier blocking unchanged for answer/commercial/contact
+rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`.
 
 ### Owner decision: dialogue presentation convergence (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE @ `7c716df`)
 
@@ -62,9 +61,10 @@ phone, WhatsApp, address, hours, parking. **Не дублировать** эти
 questions → TurnFrame typed `contacts` aspect (planner, no regex) → PRIMARY_EVIDENCE
 `kind=clinic_contact`. Fallback/handoff injects canonical phone only.
 
-**Composer source identity:** strict JSON `{ answer, source_identity }`; `primary_content_ref`
-must be in `used_content_refs`; factual FAQ fail-closed on missing/invalid source. Live backend
-update required.
+**Composer source identity:** strict JSON `{ answer, source_identity }`; `primary_content_ref ∈
+used_content_refs` when present; invented refs dropped. Generic FAQ: valid answer + invalid/missing
+source → answer shown, UI suppressed + warning — **not** whole-response block. Live backend update
+required.
 
 **Marketing scenarios:** canonical `TurnFrame.marketing_scenarios` (0–2) from Turn Planner same
 call — not heuristics from emotion/aspects. Direct informational questions do not create scenarios.

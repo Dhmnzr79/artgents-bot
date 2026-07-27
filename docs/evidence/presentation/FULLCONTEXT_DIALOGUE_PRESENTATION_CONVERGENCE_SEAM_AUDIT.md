@@ -43,11 +43,30 @@ Canonical typed contract on verified Composer output:
 
 Requirements:
 
-- Refs validated against cached FullContext MD index (`md_root`); invented IDs fail-closed (dropped).
+- Refs validated against cached FullContext MD index (`md_root`); **invented refs never used** (dropped).
 - No retriever, RAG, keyword routing, or second selector.
-- Verifier receives and passes only validated source identity.
+- Verifier receives and passes only validated source identity to presentation layer.
 - Presentation metadata (`suggest_h3`, `video_key`, `situation_allowed`) read **only** from validated `primary_content_ref`.
 - Exact-service paths (`service_id` + `content_ref` ownership) unchanged.
+
+**Generic FAQ/info/comparison — fail semantics (owner correction):**
+
+| Case | Answer text | Source-based UI (follow-up / video / situation) |
+|------|-------------|--------------------------------------------------|
+| Valid answer + valid source identity | ✅ show | ✅ show |
+| Valid answer + missing/invalid source identity | ✅ show | ❌ suppress; log **warning** |
+| Missing/unparseable answer | ❌ block | ❌ |
+| Invented refs in sidecar | ✅ show answer if otherwise valid | ❌ dropped; never used for UI |
+
+**Principle:** source identity is **fail-closed for presentation metadata**, **fail-open for generic answer text**.
+Do **not** verifier-block the whole response solely because `source_identity` is missing or invalid.
+
+**Verifier fail-closed (blocking) remains only for:**
+
+- missing or unparseable `answer`;
+- exact clinic/commercial claims in prose without PRIMARY_EVIDENCE support;
+- contact answers without validated `clinic_contact` PRIMARY_EVIDENCE;
+- existing blocking Verifier decisions (unsupported claims, personal medical conclusion, etc.).
 
 ### 2. Authoritative contact data
 
@@ -157,10 +176,13 @@ Live backend and offline recording backends must return **strict JSON** (not pro
 
 Rules:
 
-- `primary_content_ref` **must** be a member of `used_content_refs`.
-- For factual FAQ/info/comparison answers: missing, malformed, or invalid `source_identity` → **fail-closed** (verifier block), not silent omission.
-- Refs validated against cached FullContext MD index; invented IDs dropped fail-closed.
-- Executor parses JSON; semantic verifier still assesses `answer` prose only.
+- `primary_content_ref` **must** be a member of `used_content_refs` when present.
+- **Invented refs never used** — dropped during validation.
+- For generic FAQ/info/comparison:
+  - valid answer + valid source → answer + source-based UI;
+  - valid answer + missing/invalid source → **answer shown**, follow-up/video/situation **suppressed**, warning logged;
+  - **do not** block entire answer solely due to bad/missing `source_identity`.
+- Executor parses JSON; semantic verifier assesses `answer` prose under existing blocking rules.
 - **Requires live Composer backend + recording contract update** before cutover.
 
 Typed Python mirror (`contracts/target_composer_source_identity.py`):
@@ -172,7 +194,9 @@ class TargetComposerSourceIdentity:
     used_content_refs: tuple[str, ...]
 ```
 
-Flow: Composer backend returns JSON → executor parses → verifier validates refs against `md_root` fail-closed → presentation reads validated primary only.
+Flow: Composer backend returns JSON → executor parses → validate refs against `md_root` (drop invented) → if valid primary: enable source-based UI; else: answer-only + warning → presentation never uses unvalidated refs.
+
+**Verifier blocking (unchanged, separate from presentation metadata):** missing/unparseable answer; exact commercial/clinic claims without PRIMARY_EVIDENCE; contacts without `clinic_contact` evidence; existing semantic blocking kinds.
 
 ### Gap I — Contact authority split / no PRIMARY_EVIDENCE path
 
@@ -343,7 +367,8 @@ Session: write cadence only on materialized success.
 
 | # | Criterion |
 |---|---|
-| 1 | Generic pain FAQ → validated Composer source identity (`used_content_refs`, `primary_content_ref`) |
+| 1 | Generic pain FAQ + valid source → answer + source-based UI |
+| 1b | Generic FAQ + valid answer + missing/invalid source → answer only, no follow-up/video/situation, warning logged |
 | 2 | FAQ follow-up from `suggest_h3` on validated primary MD |
 | 3 | FAQ with video + follow-up → video + one follow-up (two secondary slots) |
 | 4 | Video already shown → next unseen follow-ups available |
@@ -381,7 +406,7 @@ Session: write cadence only on materialized success.
 TurnFrame (marketing_scenarios 0–2 from planner; contacts aspect when applicable)
   → clinic_contact PRIMARY_EVIDENCE branch (deterministic, pre-Composer)
   → Composer strict JSON { answer, source_identity }
-  → Verifier (validated refs; FAQ fail-closed on bad source_identity)
+  → Verifier (answer blocking rules unchanged; source identity gates UI only for generic FAQ)
   → decide_target_presentation (single channel mutex, correct situation priority)
   → widget (CTA separate)
   → fallback injector (canonical phone from clinic_policies.yaml only; plain attribution)
@@ -394,9 +419,22 @@ Binding clarifications from owner (docs/tests only in this commit):
 
 1. **Contacts** — only `clinic_policies.yaml`; no phone/address/hours duplication in MD.
 2. **Contact routing** — typed `contacts` aspect from Turn Planner; no regex on target path.
-3. **Composer** — strict JSON sidecar; `primary_content_ref ∈ used_content_refs`; FAQ fail-closed.
+3. **Composer** — strict JSON sidecar; `primary_content_ref ∈ used_content_refs` when present.
 4. **Evidence** — `kind=clinic_contact`, not `commercial_fact`.
 5. **Marketing** — `TurnFrame.marketing_scenarios` from planner; remove `derive_marketing_scenarios` heuristics; direct questions ≠ scenarios.
+
+## Governance correction — source identity fail-open (@ post-`f91fc04`)
+
+For generic FAQ/info/comparison:
+
+- valid answer + valid source → answer + source-based UI;
+- valid answer + missing/invalid source → answer shown, UI suppressed, warning logged;
+- invented refs never used;
+- do **not** block entire answer solely for source-identity sidecar.
+
+Fail-closed (blocking) only for: missing/unparseable answer; exact clinic/commercial claims without PRIMARY_EVIDENCE; contacts without `clinic_contact` evidence; existing Verifier blocking decisions.
+
+**Principle:** fail-closed for presentation metadata; fail-open for generic answer text.
 
 ## STOP
 

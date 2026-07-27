@@ -106,6 +106,8 @@ def test_contact_authority_composer_and_marketing_normative() -> None:
         "primary_content_ref",
         "used_content_refs",
         "fail-closed",
+        "fail-open",
+        "warning",
         "turnframe.marketing_scenarios",
         "derive_marketing_scenarios",
         "сколько длится",
@@ -134,11 +136,29 @@ def test_consultation_value_preserve_unchanged() -> None:
         assert phrase in combined, phrase
 
 
+def test_source_identity_fail_open_semantics() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = TASK_PATH.read_text(encoding="utf-8")
+    combined = re.sub(r"\*+", "", audit + "\n" + task).lower()
+    required = (
+        "fail-closed for presentation",
+        "fail-open for generic answer",
+        "warning",
+        "do not block entire answer",
+        "invented refs never used",
+        "missing/unparseable answer",
+        "clinic_contact",
+    )
+    for phrase in required:
+        assert phrase in combined, phrase
+    assert "factual faq fail-closed" not in combined
+
+
 def test_governance_correction_section_present() -> None:
     task = TASK_PATH.read_text(encoding="utf-8")
     assert "Governance correction — contacts, Composer JSON, marketing_scenarios" in task
-    assert "post-`6eb6cee`" in task
-    assert "live backend update required" in task.lower()
+    assert "Governance correction — source identity fail-open for generic answer" in task
+    assert "post-`f91fc04`" in task
 
 
 def test_frozen_artifact_guards() -> None:

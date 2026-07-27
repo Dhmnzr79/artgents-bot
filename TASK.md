@@ -4025,9 +4025,9 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 
 # TASK — MASS_COMPOSER_TEMPLATE_AND_DOCTORS_DISPATCH (governance)
 
-**Status:** governance checkpoint only · **NO PRODUCT CHANGE / NO LIVE / NO LLM**
+**Status:** implementation complete · **NO LIVE / NO LLM**
 
-**Baseline:** `codex/stage-a` @ `f556130` (`DEMO_BONE_GRAFT_PACK_CONSISTENCY` closed)
+**Baseline:** `codex/stage-a` @ `3658771` (governance Phase 1)
 
 **Authority:** seam audit
 `docs/evidence/runtime/MASS_COMPOSER_TEMPLATE_AND_DOCTORS_DISPATCH_SEAM_AUDIT.md`.
@@ -4147,6 +4147,38 @@ git diff --check
 
 ## STOP
 
-Governance PRE-CODE PASS does **not** authorize implementation.
-**STOP after governance commit + push** — await owner GO.
+~~Governance PRE-CODE PASS does **not** authorize implementation.~~
+~~**STOP after governance commit + push** — await owner GO.~~
+
+## Implementation completion record
+
+| Field | Value |
+|-------|-------|
+| Governance HEAD | `3658771` |
+| Owner GO | ✅ Phase 2 approved |
+| PRE-CODE (governance) | 19/19 ✅ |
+| COMPLETION checker | 69/69 ✅ |
+| `git diff --check` | ✅ clean |
+| LIVE / LLM | **none** |
+
+### Files changed (implementation)
+
+| File | Change |
+|------|--------|
+| `core/target_runtime_llm_messages.py` | escape JSON braces in Composer user template |
+| `core/target_turn_frame_dispatch.py` | clinic-wide doctors `aspects_empty` + doctors-only materialize |
+| `core/target_fullcontext_content_package.py` | clinic-wide doctors FullContext bound package |
+| `core/target_spec_offline_response_package.py` | route doctors-only spec |
+| `core/target_scoped_response_evidence.py` | doctors-only scoped evidence |
+| `core/target_response_verifier.py` | `clinic_contact` kind + service-optional empty evidence |
+| `core/target_composer_request.py` | service-optional fullcontext composer request |
+| `core/target_composer_executor.py` | service-optional fullcontext executor gate |
+| `tests/test_mass_composer_template_and_doctors_dispatch_implementation.py` | CREATE — COMPLETION checker + runtime matrix |
+| `tests/test_target_runtime_llm_messages.py` | CREATE — message builder unit tests |
+| `tests/test_target_turn_frame_dispatch.py` | clinic-wide doctors + non-doctors fail-closed |
+
+### Adjacent fixes (required by acceptance matrix 12–13, 18)
+
+Clinic-wide doctors materialization and `clinic_contact` verifier kind were incomplete from
+`FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE` (`84b2741`); completed without contract change.
 

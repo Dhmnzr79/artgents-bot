@@ -51,6 +51,19 @@ def _reject_invalid(meta: FieldMeta, field_name: str) -> None:
         _fail("dispatch_field_invalid", field_name)
 
 
+def _clinic_wide_doctors_empty_aspects(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    meta = turn_frame.field_meta.aspects
+    return (
+        _topic_is_usable(turn_frame, envelope)
+        and turn_frame.topic == "doctors"
+        and meta.status == "invalid"
+        and meta.error == "aspects_empty"
+    )
+
+
 def _topic_is_usable(turn_frame: TurnFrame, envelope: TargetTurnFramePolicyEnvelope) -> bool:
     meta = turn_frame.field_meta.topic
     if meta.status != "valid" or turn_frame.topic is None:
@@ -125,7 +138,8 @@ def _components_from_turn_frame(
     envelope: TargetTurnFramePolicyEnvelope,
 ) -> tuple[TargetResponseComponent, ...]:
     selected: set[TargetResponseComponent] = set()
-    _reject_invalid(turn_frame.field_meta.aspects, "aspects")
+    if not _clinic_wide_doctors_empty_aspects(turn_frame, envelope):
+        _reject_invalid(turn_frame.field_meta.aspects, "aspects")
     if _topic_is_usable(turn_frame, envelope):
         _assert_topic_scope_compatible(turn_frame.topic, envelope)  # type: ignore[arg-type]
     for aspect in turn_frame.aspects:
@@ -316,6 +330,37 @@ def _is_fullcontext_content_only_components(
     return response_mode in {"answer", "medical_handoff"} and components == ("content",)
 
 
+def _is_doctors_only_components(
+    components: tuple[TargetResponseComponent, ...],
+    response_mode: TargetResponseMode,
+) -> bool:
+    return response_mode in {"answer", "medical_handoff"} and components == ("doctors",)
+
+
+def _materialize_doctors_policy_request(
+    *,
+    response_mode: TargetResponseMode,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> TargetResponsePolicyRequest:
+    if response_mode == "medical_handoff" and not envelope.forbidden_topics:
+        _fail("dispatch_medical_forbidden_empty", envelope.forbidden_topics)
+    return TargetResponsePolicyRequest.model_validate(
+        {
+            "response_mode": response_mode,
+            "service_id": None,
+            "tone_key": envelope.tone_key,
+            "allowed_topics": envelope.allowed_topics,
+            "forbidden_topics": envelope.forbidden_topics,
+            "required_fact_ids": (),
+            "requested_components": ("doctors",),
+            "primary_component": None,
+            "allow_marketing_facts": False,
+            "allow_consultation_close": envelope.allow_consultation_close,
+            "allow_cta": False,
+        }
+    )
+
+
 def dispatch_target_turn_frame_response(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
@@ -370,6 +415,15 @@ def dispatch_target_turn_frame_response(
     if not _service_id_is_usable(turn_frame, envelope):
         if _is_fullcontext_content_only_components(components, response_mode):
             policy_request = _materialize_fullcontext_content_policy_request(
+                response_mode=response_mode,
+                envelope=envelope,
+            )
+            return TargetTurnFrameMaterializeDispatch(
+                kind="materialize",
+                policy_request=policy_request,
+            )
+        if _is_doctors_only_components(components, response_mode):
+            policy_request = _materialize_doctors_policy_request(
                 response_mode=response_mode,
                 envelope=envelope,
             )

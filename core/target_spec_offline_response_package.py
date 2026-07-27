@@ -21,7 +21,9 @@ from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_fullcontext_content_package import (
     assemble_target_fullcontext_content_bound_package,
+    assemble_target_fullcontext_doctors_bound_package,
     is_fullcontext_content_only_spec,
+    is_fullcontext_doctors_only_spec,
 )
 from core.target_offline_response_package import (
     TargetOfflineResponsePackage,
@@ -96,6 +98,20 @@ def assemble_target_spec_offline_response_package(
         if include_consultation_close and not spec.allow_consultation_close:
             _error("spec_package_permission_forbidden", "consultation_close")
         return assemble_target_fullcontext_content_bound_package(
+            spec,
+            bundle,
+            turn_topic=turn_topic,
+            today=today,
+            shown_fact_ids=shown_fact_ids,
+            include_consultation_close=include_consultation_close,
+            selected_cta_key=None,
+        )
+    if is_fullcontext_doctors_only_spec(spec):
+        if brand_term is not None or include_initial_block or marketing_scenarios != ():
+            _error("spec_package_permission_forbidden", "marketing_facts")
+        if include_consultation_close and not spec.allow_consultation_close:
+            _error("spec_package_permission_forbidden", "consultation_close")
+        return assemble_target_fullcontext_doctors_bound_package(
             spec,
             bundle,
             turn_topic=turn_topic,

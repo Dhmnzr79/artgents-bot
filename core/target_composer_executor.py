@@ -12,7 +12,7 @@ from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_composer_source_identity import TargetComposerSourceIdentity
 from core.target_composer_output import parse_composer_backend_output
 from contracts.target_response_spec import TargetResponseSpec
-from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
 from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
@@ -181,7 +181,7 @@ def _validate_request_head(request: object) -> TargetComposerRequest:
 
 
 def _fullcontext_content_only_request(request: TargetComposerRequest) -> bool:
-    return is_fullcontext_content_only_spec(request.spec)
+    return is_fullcontext_service_optional_spec(request.spec)
 
 
 def _empty_evidence_scope_price_request(request: TargetComposerRequest) -> bool:

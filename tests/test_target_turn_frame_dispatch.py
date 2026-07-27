@@ -86,6 +86,40 @@ def test_doctors_topic_with_overview_requests_doctors_only() -> None:
     assert result.policy_request.primary_component is None  # type: ignore[union-attr]
 
 
+def test_clinic_wide_doctors_topic_with_empty_aspects_requests_doctors_only() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            route="content",
+            topic="doctors",
+            topic_confidence=0.95,
+            aspects=[],
+            primary_aspect=None,
+            service_id=None,
+        ),
+        _envelope(),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.requested_components == ("doctors",)  # type: ignore[union-attr]
+    assert result.policy_request.service_id is None  # type: ignore[union-attr]
+
+
+def test_empty_aspects_for_non_doctors_topic_remains_fail_closed() -> None:
+    with pytest.raises(TargetTurnFrameDispatchError) as caught:
+        dispatch_target_turn_frame_response(
+            _frame(
+                route="content",
+                topic="implantation",
+                topic_confidence=0.95,
+                aspects=[],
+                primary_aspect=None,
+                service_id=None,
+            ),
+            _envelope(),
+        )
+    assert caught.value.code == "dispatch_field_invalid"
+    assert caught.value.value == "aspects"
+
+
 def test_incompatible_topic_raises_typed_error() -> None:
     with pytest.raises(TargetTurnFrameDispatchError) as caught:
         dispatch_target_turn_frame_response(

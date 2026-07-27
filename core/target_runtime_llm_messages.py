@@ -10,8 +10,8 @@ from core.target_response_verifier import TargetSemanticVerifierInvocation
 _COMPOSER_USER_TEMPLATE = (
     "Compose the patient-facing answer using the inputs below.\n\n"
     "Return strict JSON only: "
-    '{"answer":"<text>","source_identity":{"primary_content_ref":"<md or null>",'
-    '"used_content_refs":["<md filenames>"]}}\n\n'
+    '{{"answer":"<text>","source_identity":{{"primary_content_ref":"<md or null>",'
+    '"used_content_refs":["<md filenames>"]}}}}\n\n'
     "CACHED_FULL_CONTEXT:\n{cached_full_context}\n\n"
     "RESPONSE_DIRECTIVES_JSON:\n{response_directives_json}\n\n"
     "GOVERNED_ACTION_CONTEXT_JSON:\n{governed_action_context_json}\n\n"

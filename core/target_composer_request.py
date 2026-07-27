@@ -21,7 +21,7 @@ from core.service_data_context import ServiceDoctorContext
 from core.target_composer_action_context import resolve_target_composer_action_context
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
-from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
 from core.target_contact_authority import materialize_clinic_contact_primary_evidence
 from core.target_scoped_response_evidence import (
     TargetEvidenceScopeRecord,
@@ -561,7 +561,7 @@ def materialize_target_composer_request(
         _error("composer_request_message_invalid", user_message)
 
     scoped = build_target_scoped_response_evidence(bound_package, md_root=md_root)
-    if is_fullcontext_content_only_spec(scoped.spec):
+    if is_fullcontext_service_optional_spec(scoped.spec):
         if not scoped.scope_records:
             blocks: tuple[TargetComposerEvidenceBlock, ...] = ()
             blocks = _prepend_contact_evidence(

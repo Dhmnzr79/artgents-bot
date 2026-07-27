@@ -14,7 +14,7 @@ from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import TargetUnverifiedComposedResponse
 from contracts.target_response_stage import is_scope_aware_price_stage
-from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
 from core.target_presentation_source_identity import validate_used_content_refs
 from core.target_composer_request import (
     TargetComposerEvidenceBlock,
@@ -150,6 +150,7 @@ _KINDS = frozenset(
         "external_kb",
         "external_doctor",
         "consultation",
+        "clinic_contact",
     }
 )
 
@@ -188,7 +189,7 @@ def _validated_inputs(
     blocks = request.evidence_blocks
     if type(blocks) is not tuple:
         _error("target_verifier_input_invalid", "evidence")
-    if not blocks and not is_fullcontext_content_only_spec(spec):
+    if not blocks and not is_fullcontext_service_optional_spec(spec):
         stage = spec.response_stage
         if not (
             is_scope_aware_price_stage(stage)

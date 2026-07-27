@@ -27,7 +27,8 @@
 | **FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE** | COMPLETE @ `225ee56` — marketing-after-final-spec, typed contacts, verifier observability, widget-faithful matrix |
 | **FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION** | COMPLETE — contact value-only verifier + scenario decouple + `turn_topic` chain |
 | **FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE** | COMPLETE @ `525474c` — scenario-only aspects, structured contacts, boundary degrade, verifier client_id |
-| **FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY** | planner-independent `generic_fullcontext_content` — governance @ `525474c`; implementation **STOP** |
+| **FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY** | COMPLETE @ `d8dbe93` — planner-independent generic FAQ/info |
+| **FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING** | service availability vs clinic capability split — governance @ `d8dbe93`; implementation **STOP** |
 | PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)

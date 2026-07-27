@@ -56,7 +56,23 @@ rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PR
 + `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`
 + `FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION`
 + `FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE`
-+ `FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY`.
++ `FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY`
++ `FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING`.
+
+### Owner decision: service availability vs clinic capability (FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING @ `d8dbe93`)
+
+**Service availability:** canonical `service_catalog.json` authority. Active service presence →
+deterministic `structured_service_availability` (no `content_ref` required; 0 Boundary/Composer/Semantic).
+Inactive authored record → controlled «не оказывается». Catalog miss → **not** categorical denial.
+
+**Clinic capability/info:** technology, material, equipment, safety standard, organizational capability —
+Generic FullContext or structured authority. Found fact does **not** become a service; no price.
+
+**Ingress target:** catalog miss + possible capability → `normal` → Generic; hard non-target unchanged.
+**Planner:** typed `service_availability` aspect in same single call — no regex routing, no second classifier.
+
+Seam audit: `docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### Owner decision: generic FullContext content authority (FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY @ `525474c`)
 

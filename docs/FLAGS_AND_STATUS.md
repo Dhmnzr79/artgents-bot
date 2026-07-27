@@ -57,10 +57,14 @@ structured contacts (0 Boundary/Composer/Semantic); boundary uncertain degrade; 
 terminal phone alignment. Seam audit:
 `docs/evidence/runtime/FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE_SEAM_AUDIT.md`.
 
-**FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY:** governance @ `525474c` — planner-independent
-`generic_fullcontext_content` for ordinary FAQ/info; advisory `needs_clarification`; Medical Boundary
-before generic; money boundary (`allow_price=false`); 30-scenario matrix. Seam audit:
-`docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`.
+**FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY:** COMPLETE @ `d8dbe93` — planner-independent
+`generic_fullcontext_content`; advisory `needs_clarification`; Medical Boundary before generic.
+Seam audit: `docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`.
+
+**FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING:** governance @ `d8dbe93` — split service
+availability (catalog) vs clinic capability/info (Generic); typed `service_availability`; ingress
+catalog-miss policy; `structured_service_availability`; 30-scenario matrix. Seam audit:
+`docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)

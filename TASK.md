@@ -5114,3 +5114,216 @@ python -m pytest tests/ --collect-only -q
 
 После governance commit + PRE-CODE PASS — **остановиться**. Implementation, LIVE, новый E2E и любые
 изменения Verifier запрещены до отдельного owner GO.
+
+---
+
+# TASK — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO Verifier changes**
+
+**Baseline:** `codex/stage-a` @ `d8dbe93`
+
+**Authority:** seam audit
+`docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md`.
+
+## Goal
+
+Архитектурно разделить:
+
+1. **Service availability** — наличие самостоятельной услуги (authority: canonical `service_catalog.json`).
+2. **Clinic capability/info** — технология, материал, оборудование, стандарт, организационная возможность
+   (authority: Generic FullContext / structured authorities).
+
+Нельзя считать любой вопрос с «делаете ли» запросом на самостоятельную услугу. Решение — **semantic**:
+typed Planner output + catalog + Generic FullContext + authored client data. **No** regex/phrase lists,
+**no** second classifier.
+
+## Confirmed defects (offline @ `d8dbe93`)
+
+| ID | Turn | Runtime | Stop |
+|----|------|---------|------|
+| A | «Вы делаете 3D-диагностику?» | Planner `service_id=tomography`, active catalog, **no** `content_ref` | `scoped_evidence_component_unfulfilled: content` → Composer 0 |
+| B | «Кварцевание воздуха у вас делаете?» | Ingress `service_not_offered` | Planner/FullContext 0; fact in `implantation__faq__safety.md` |
+
+## Normative behavior (binding)
+
+### Active service availability
+
+Exact catalog match, `active=true`, question about **presence** → deterministic structured answer:
+«Да, клиника оказывает услугу „…“». No `content_ref` required. 0 Boundary/Composer/Semantic.
+
+### Inactive service
+
+Exact authored record `active=false` → «Сейчас эта услуга в клинике не оказывается».
+
+### Catalog miss
+
+No auto «не оказываем»; no auto service creation; no price. Route to Generic FullContext if informational.
+Data-gap: «В материалах клиники такая услуга или возможность не указана».
+
+### Hard non-target
+
+e.g. «пересадка сердца» → existing Ingress hard-stop policy. Not Generic.
+
+### Pack inconsistency
+
+MD must not auto-promote capability to catalog service. Validator may flag structural inconsistency;
+no semantic inference validator.
+
+## Normative routing order (binding)
+
+Pre-resolver → Ingress (no catalog-miss denial) → Planner/UI → structured contacts →
+**typed service availability** → structured price/doctors/AC1–AC3 → Medical Boundary →
+concrete service content → Generic FullContext → verifiers → presentation.
+
+## Ingress `service_not_offered` target
+
+| Case | Target route |
+|------|--------------|
+| Exact inactive authored service | `service_not_offered` or structured inactive answer |
+| Explicit hard non-target | `hard_stop_non_target` / policy |
+| Catalog miss + possible capability | `normal` → Generic |
+| Unknown dental service, no inactive record | **not** categorical denial |
+| Low confidence | `normal` → Generic |
+
+Do **not** weaken active-service guards or offered-service list integrity.
+
+## Proposed typed contract (Phase 2)
+
+### Planner extension
+
+New aspect: `service_availability` in same single planner call (extend `AspectKind`).
+
+### `TargetStructuredServiceAvailabilityAnswer`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `client_id` | str | runtime pack |
+| `service_id` | str | canonical catalog id |
+| `service_name` | str | catalog `name` |
+| `active` | bool | catalog status |
+| `provenance` | `"target_response.service_catalog"` | fixed |
+| `attribution_kind` | str | e.g. `structured_service_availability` |
+| `content_ref` | str \| None | only if authored + valid |
+
+Extends existing `structured-answer` mode (contacts pattern) — **not** separate pipeline.
+
+### Price / marketing boundary
+
+Availability answer: no family price, no MD money, no price followups, no marketing scenarios,
+no eligibility promise, no treatment recommendation.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|------|---------|
+| **Ingress** | catalog miss → categorical `service_not_offered` blocks Generic |
+| **Catalog** | compact/offered lists active-only; inactive in bundle but hidden from ingress/planner |
+| **Planner** | no `service_availability` aspect; `overview` ambiguous |
+| **Evidence** | service-bound path requires `content_ref` → tomography fails |
+| **Structured** | contacts pattern exists; availability slot missing |
+| **Generic** | ready @ `d8dbe93` for capability FAQ |
+
+Full checklist: seam audit §Phase 1 seam audit checklist.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_service_availability_and_clinic_capability_routing_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE |
+| `docs/CLIENT_PACK_AUTHORING.md` | UPDATE |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `ingress_gate.py` | UPDATE — catalog-miss → normal; inactive exact handling |
+| `contracts/answer_plan.py` | UPDATE — `service_availability` aspect |
+| `core/turn_frame_from_raw.py` | UPDATE — aspect validation |
+| `core/turn_planner_llm.py` | UPDATE — planner prompt + aspect mapping |
+| `core/target_turn_frame_dispatch.py` | UPDATE — availability vs content dispatch |
+| `core/target_structured_service_availability.py` | CREATE — deterministic availability answer |
+| `core/target_structured_answer.py` | UPDATE — resolve availability capability |
+| `core/target_runtime_turn.py` | UPDATE — short-circuit after contacts |
+| `core/target_response_materialization_plan.py` | UPDATE — availability spec without content requirement |
+| `core/target_scoped_response_evidence.py` | UPDATE — skip content unfulfilled for availability |
+| `core/target_runtime_turn_frame_hydration.py` | UPDATE — session focus guard |
+| `scripts/validate_client_pack.py` | UPDATE — inactive/content_ref rules |
+| `docs/CLIENT_PACK_AUTHORING.md` | UPDATE — availability vs capability authoring |
+| `tests/test_final_service_availability_and_clinic_capability_routing_implementation.py` | CREATE — 30-scenario matrix |
+| `tests/test_final_service_availability_and_clinic_capability_routing_harness.py` | CREATE — widget harness |
+| `tests/test_target_turn_frame_dispatch.py` | UPDATE — availability unit cases |
+
+**KEEP unchanged:** Semantic/Numeric/Contact Verifier policy, Generic FullContext, structured contacts,
+AC1–AC3 price routes, frozen pins.
+
+## Acceptance matrix (implementation — 30 scenarios)
+
+Offline widget-faithful via `_orchestrate_ask_turn`; fakes at provider boundary; **NO LIVE / NO LLM**.
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | «Делаете All-on-4?» | deterministic active service yes |
+| 2 | «У вас есть отбеливание?» | active service yes |
+| 3 | «Проводите КТ?» | tomography yes without content_ref |
+| 4 | «Делаете 3D-диагностику?» | structured availability, no technical error |
+| 5 | Active availability | Boundary/Composer/Semantic = 0 |
+| 6 | Exact inactive service fixture | «сейчас не оказывается» |
+| 7 | Unknown dental service absent everywhere | «в материалах не указана» |
+| 8 | Unknown record | no categorical «не оказываем» |
+| 9 | «Проводите кварцевание воздуха?» | Generic FullContext fact |
+| 10 | Кварцевание | not added to service catalog |
+| 11 | «Используете одноразовые материалы?» | Generic FullContext |
+| 12 | «Используете APRF?» | Generic FullContext |
+| 13 | «Есть своя лаборатория?» | Generic FullContext |
+| 14 | «Используете микроскоп?» missing | information not specified |
+| 15 | «Что такое КТ?» | informational content, not only yes |
+| 16 | «Как проходит All-on-4?» | concrete content route |
+| 17 | «Сколько стоит КТ?» | structured price route |
+| 18 | «Подходит ли КТ именно мне?» | medical policy, not availability |
+| 19 | «Делаете пересадку сердца?» | hard non-target |
+| 20 | Phrase variants (делаете/оказываете/проводите/используете/есть ли) | meaning-based, not word-based |
+| 21 | Old session full_arch | no availability distortion |
+| 22 | Unknown capability | no neighbor service bleed |
+| 23 | Service list / active services | unchanged |
+| 24 | Prices/offers | unchanged |
+| 25 | Doctors | unchanged |
+| 26 | Generic | does not declare new service |
+| 27 | Generic | no price without PRIMARY_EVIDENCE |
+| 28 | Source identity valid/missing | unchanged semantics |
+| 29 | `/ask` and `/ask/stream` | parity |
+| 30 | Sparse new-client fixture | no demo hardcodes |
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_service_availability_and_clinic_capability_routing_governance.py -q
+
+# Wide safe-offline (no product change expected)
+python -m pytest tests/ --collect-only -q
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно изменить protected acceptance / frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert или Verifier change;
+- появляется regex/phrase routing, second classifier, MD→service auto-creation;
+- ingress ослабляет active-service / hard non-target guards;
+- availability answer наследует price/marketing;
+- capability FAQ регрессирует в Generic;
+- structured contacts path регрессирует (LLM > 0).
+
+## STOP (Phase 1)
+
+После governance commit + PRE-CODE PASS — **остановиться**. Implementation, LIVE, E2E и Verifier changes
+запрещены до отдельного owner GO.

@@ -33,6 +33,12 @@
 парковку в `md/`. Прямые контактные вопросы — typed `contacts` aspect + PRIMARY_EVIDENCE
 `clinic_contact`, не regex и не MD.
 
+**FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING:** `service_catalog.json` — authority for
+**service availability** (standalone treatment/procedure). `content_ref` optional for yes/no
+availability answer. Clinic capability/info (materials, equipment, safety standards) — **only** in
+`md/` via Generic FullContext; **не добавлять** capability facts as catalog services. Inactive
+services: `active=false` in catalog (authored); not shown in planner compact list but preserved in bundle.
+
 ## Новая клиника (чеклист)
 
 1. Скопировать `clients/_template/` → `clients/{new_id}/`.

@@ -49,10 +49,13 @@ Partial implementation @ `84b2741`–`029c38b`.
 **FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE:** COMPLETE @ `225ee56` — marketing-after-final-spec,
 typed contacts, verifier observability, widget-faithful offline matrix.
 
-**FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION:** governance @ `225ee56` —
-contact value-only verifier (not full evidence line); scenario amplifiers decoupled from
-`include_initial_block`; `TargetScenarioRule.allowed_topics`. Seam audit:
-`docs/evidence/marketing/FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION_SEAM_AUDIT.md`.
+**FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION:** COMPLETE @ `codex/stage-a`
+(contact value-only verifier; scenario decouple; `turn_topic` chain; layer P/R/E/S matrix).
+
+**FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE:** governance @ `529fd02` — lighten whole response
+chain; TurnFrame sufficiency for scenario-only concerns; structured-answer mode (contacts);
+verifier `client_id`; terminal phone alignment; 28-scenario matrix. Seam audit:
+`docs/evidence/runtime/FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)

@@ -54,7 +54,28 @@ for generic answer text** — missing/invalid source → answer + warning, no so
 block whole response solely for sidecar. Verifier blocking unchanged for answer/commercial/contact
 rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`
 + `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`
-+ `FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION`.
++ `FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION`
++ `FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE`.
+
+### Owner decision: lightweight response gates (FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE @ `529fd02`)
+
+**Fail-closed stub** only for: invented clinic facts · diagnosis/personal eligibility · dangerous
+medical fantasy · booking date/time · true technical failure. Empty optional `aspects`, partial
+sufficient frames, missing presentation metadata, `data_gap`, and missing FAQ source identity are
+**not** stub reasons.
+
+**TurnFrame sufficiency:** valid `topic` + valid `marketing_scenarios` suffices for content
+materialization (scenario amplifiers) without invented aspects. Malformed topic/service_id stays
+fail-closed.
+
+**Structured-answer mode:** exact external contracts (contacts first) — deterministic assembly from
+`clinic_policies.yaml`; skip Boundary/Composer/Semantic Verifier; general capability, not
+contacts-only hack.
+
+**Semantic Verifier:** boundary unchanged without reproducible defect. **Deterministic verifier:**
+KEEP numeric/strict facts; pass runtime `client_id` to contact scalar (no hardcoded `demo`).
+
+**Fallback/handoff:** canonical phone only on terminal/error routes; no invented CTA/buttons/lead.
 
 ### Owner decision: dialogue presentation convergence (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE @ `7c716df`)
 

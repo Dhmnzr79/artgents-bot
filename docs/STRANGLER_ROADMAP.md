@@ -676,7 +676,28 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION (governance)
+## Следующий технический checkpoint — FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE (governance)
+
+**Baseline:** `codex/stage-a` @ `529fd02`. **Authority:** forbidden in governance commit.
+**Live/LLM:** forbidden.
+
+Облегчить всю product-цепочку ответа (не только Semantic Verifier): убрать fail-closed заглушки
+вне пяти нормативных причин. Канонический дефект: `result_reliability` + `aspects=[]` →
+`dispatch_field_invalid` → `target_fullcontext_error` без Composer/Verifier.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/runtime/FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_lightweight_response_gates_convergence_governance.py`.
+
+Целевые implementation seams: TurnFrame sufficiency (scenario-only path), structured-answer mode
+(contacts), verifier `client_id`, terminal/boundary canonical phone, 28-scenario offline matrix.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION (governance)
 
 **Baseline:** `codex/stage-a` @ `225ee56`. **Authority:** forbidden in governance commit.
 **Live/LLM:** forbidden.

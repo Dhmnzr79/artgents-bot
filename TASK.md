@@ -4670,3 +4670,198 @@ Contact cases (1–11) prove verifier/runtime only (layers R+E equivalent).
 Governance PRE-CODE PASS does **not** authorize implementation.
 **STOP after governance commit + push** — await owner GO.
 
+---
+
+# TASK — FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO Semantic Verifier changes**
+
+**Baseline:** `codex/stage-a` @ `529fd02`
+
+**Authority:** seam audit
+`docs/evidence/runtime/FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE_SEAM_AUDIT.md`.
+
+## Goal
+
+Архитектурно облегчить **всю** product-цепочку ответа, а не Semantic Verifier отдельно.
+Устранить fail-closed заглушки, которые не попадают в пять нормативных причин блокировки.
+
+Semantic Verifier **KEEP** (без воспроизводимого дефекта не менять):
+
+1. блокировать выдуманные/искажённые факты клиники;
+2. блокировать диагноз, персональный медицинский вывод, eligibility и выбор лечения;
+3. блокировать опасную, абсурдную или противоречащую базе медицинскую фантазию;
+4. правдоподобные общеизвестные общие детали → non-blocking `minor_external_detail`.
+
+## Confirmed defect (live + offline @ `529fd02`)
+
+| Turn | Planner | Pipeline stop | User route |
+|------|---------|---------------|------------|
+| «Вдруг имплант не приживётся?» | `topic=implantation`, `marketing_scenarios=["result_reliability"]`, `aspects=[]`, `needs_clarification=false` | `dispatch_field_invalid: aspects` | `target_fullcontext_error` (~8.27s) |
+
+Composer и Semantic Verifier **не вызывались**. Valid topic + valid marketing scenario должны быть
+достаточны для обычного информационного ответа с authored amplifier. Пустой `aspects` — warning/default,
+не fatal error. Глобально разрешать malformed Planner output **запрещено**.
+
+## Normative fail-closed policy (binding)
+
+Fail-closed stub **только** для:
+
+1. выдуманные/искажённые факты клиники (цены, числа, услуги, врачи, контакты, акции, гарантии, оплата);
+2. диагноз или персональный медицинский вывод/совет;
+3. опасное, абсурдное или прямо противоречащее базе утверждение;
+4. Leadflow согласование конкретной даты или времени;
+5. настоящая техническая ошибка (provider down, unparseable Composer, corrupted pack, missing schema authority).
+
+**Не** законные причины stub: пустой optional `aspects`; missing `primary_aspect` при определённом смысле;
+partial frame с достаточными валидными полями; неуверенность вспомогательного классификатора;
+missing presentation metadata; optional marketing fact; корректный `data_gap`; missing source identity у
+generic FAQ (текст да, source UI скрыт).
+
+## Owner decisions (binding for implementation)
+
+1. **TurnFrame sufficiency:** capability-based rule (не per-phrase). Valid `topic` + valid
+   `marketing_scenarios` + `needs_clarification=false` → materialize `content` + scenario amplifiers
+   even when `aspects=[]`. Сохранить fail-closed для malformed topic/service_id и truly empty frames.
+2. **Medical boundary:** KEEP pre-Composer layer; `uncertain`/low confidence не должны автоматически
+   давать phone-less defer, если возможен grounded educational answer без диагноза.
+3. **Structured-answer mode:** общий deterministic path для exact external contracts; contacts first —
+   Ingress + Planner only, skip Boundary/Composer/Semantic Verifier; не contacts-костыль.
+4. **Verifier `client_id`:** `canonical_contact_scalar(field, client_id=…)` must use runtime pack id,
+   not hardcoded `"demo"`.
+5. **Terminal/fallback phone:** boundary defer, terminal defer/clarify, technical/verifier errors —
+   canonical phone only; без выдуманных кнопок/заявки.
+6. **Semantic Verifier:** no policy changes without reproducible defect.
+7. **Presentation/Leadflow:** KEEP caps, cadence, channel mutex, booking date/time guard, `/ask` parity.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|------|---------|
+| **A Dispatch** | `aspects=[]` blocks scenario-only concerns; only `topic=doctors` excepted |
+| **B Medical boundary** | overlaps Semantic Verifier by design; `uncertain` → defer without phone is over-fail-closed |
+| **C Spec/evidence** | distinguish N5 corruption vs `data_gap` vs optional metadata warning |
+| **D Deterministic verifier** | KEEP strict; `client_id="demo"` hardcode in verifier |
+| **E Latency** | contacts still 4–5 LLM calls; target structured mode ≤2 |
+| **F Fallback** | terminal/boundary routes omit phone today |
+| **G Presentation** | must not regress choice≤4, secondary≤2, price≤2, source fail-open |
+
+Full gate table: seam audit §Pipeline gate inventory.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/runtime/FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_lightweight_response_gates_convergence_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — status pointer |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — milestone status |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — milestone pointer |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE — owner decision pointer |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/target_turn_frame_dispatch.py` | UPDATE — TurnFrame sufficiency / scenario-only path |
+| `core/turn_frame_from_raw.py` | UPDATE — partial-frame warning semantics if needed |
+| `core/target_runtime_turn.py` | UPDATE — structured-answer short-circuit; boundary phone |
+| `core/target_runtime_widget.py` | UPDATE — terminal/boundary canonical phone |
+| `core/target_response_verifier.py` | UPDATE — pass runtime `client_id` to contact scalar |
+| `core/target_structured_answer.py` | CREATE — deterministic structured-answer mode (contacts first) |
+| `core/target_medical_boundary.py` | UPDATE — uncertain degrade (owner-approved scope only) |
+| `tests/test_final_lightweight_response_gates_convergence_implementation.py` | CREATE — 28-scenario matrix |
+| `tests/test_final_lightweight_response_gates_convergence_harness.py` | CREATE — widget harness |
+| `tests/test_target_turn_frame_dispatch.py` | UPDATE — scenario-only sufficiency |
+
+**KEEP unchanged:** Semantic Verifier policy, numeric grounding, AC1–AC3, frozen pins, presentation limits.
+
+## Acceptance matrix (implementation — 28 scenarios)
+
+Offline widget-faithful via `_orchestrate_ask_turn`; fakes at provider boundary only; **NO LIVE / NO LLM**.
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | `result_reliability` + `aspects=[]` | materialized |
+| 2 | `time` concern + partial frame | materialized |
+| 3 | direct duration question | materialized; no marketing scenario |
+| 4 | direct warranty question | materialized; no `result_reliability` |
+| 5 | generic FAQ + missing source identity | text yes; source UI hidden |
+| 6 | contacts: address | materialized |
+| 7 | contacts: parking | materialized |
+| 8 | contacts: phone | materialized |
+| 9 | contacts: hours | materialized |
+| 10 | contacts: address+parking | both fields |
+| 11 | clinic-wide doctors | materialized |
+| 12 | broad implantation price | materialized / scope price |
+| 13 | named-service price after old session scope | materialized or honest data_gap |
+| 14 | malformed topic/service_id | fail-closed (N5) |
+| 15 | Medical Boundary low confidence | grounded answer or clarify — not silent stub |
+| 16 | Medical Boundary backend failure | technical fallback + phone |
+| 17 | numeric distortion | verifier block (N1) |
+| 18 | invented promotion | verifier block (N1) |
+| 19 | diagnosis/personal eligibility | semantic block (N2) |
+| 20 | dangerous fantasy | semantic block (N3) |
+| 21 | harmless general detail | non-blocking `minor_external_detail` |
+| 22 | typed UI click | planner skip |
+| 23 | technical Composer failure | technical fallback + phone |
+| 24 | expected missing price | data_gap / no_public_price |
+| 25 | Leadflow date/time agreement | forbidden |
+| 26 | buttons/video/situation/cadence | unchanged |
+| 27 | `/ask` and `/ask/stream` parity | same route class |
+| 28 | new client contacts | never demo authority in verifier |
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-lw-gates-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_lightweight_response_gates_convergence_governance.py `
+  tests/test_final_contact_value_verification_and_marketing_scenario_activation_governance.py -q
+git diff --check
+```
+
+### Wide safe-offline (governance regression guard)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-lw-gates-wide-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_lightweight_response_gates_convergence_governance.py `
+  tests/test_final_fullcontext_dialogue_runtime_convergence_governance.py `
+  tests/test_final_contact_value_verification_and_marketing_scenario_activation_governance.py `
+  tests/test_mass_composer_template_and_doctors_dispatch_governance.py `
+  tests/test_patient_scope_a9r_matrix_contract.py -q
+```
+
+## Tests (implementation COMPLETION — future)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-lw-gates-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_lightweight_response_gates_convergence_governance.py `
+  tests/test_final_lightweight_response_gates_convergence_implementation.py `
+  tests/test_target_turn_frame_dispatch.py `
+  tests/test_final_fullcontext_dialogue_runtime_convergence_implementation.py `
+  tests/test_final_contact_value_verification_and_marketing_scenario_activation_implementation.py -q
+git diff --check
+```
+
+## STOP conditions
+
+- Semantic Verifier change without reproducible defect
+- Per-phrase / regex routing / second pipeline / RAG
+- Weakening numeric or clinic-fact grounding
+- Frozen artifact edit for green
+- LIVE/LLM required for governance or implementation tests
+- File outside allowlist
+- Global allow-any-malformed-planner
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after governance commit + push** — await owner GO.
+

@@ -59,7 +59,7 @@ def test_task_governance_section_and_acceptance_matrix() -> None:
     assert "choice menu" in text.lower() or "Choice menu" in text
     assert "max 4" in text.lower() or "до 4" in text
     assert "secondary" in text.lower()
-    for n in range(1, 29):
+    for n in range(1, 34):
         assert f"| {n} |" in text
     assert "NO LIVE" in text
     assert "NO LLM" in text
@@ -109,6 +109,32 @@ def test_consultation_value_applicability_normative() -> None:
     )
     for phrase in required:
         assert phrase in combined, phrase
+
+def test_bone_graft_demo_data_correction_allowlist_and_acceptance() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = TASK_PATH.read_text(encoding="utf-8")
+    combined = re.sub(r"\*+", "", audit + "\n" + task).lower()
+    required = (
+        "bone_graft",
+        "implantation__info__bone_graft",
+        "implantation__service__bone_graft",
+        "no_public_price",
+        "стоимость костной пластики рассчитывается после кт",
+        "sinus_lift",
+        "что такое костная пластика",
+        "сколько стоит костная пластика",
+        "сколько стоит синус-лифтинг",
+        "family-price inheritance",
+        "consultation_value",
+        "bone_graft.default.json",
+        "22",
+        "32",
+    )
+    for phrase in required:
+        assert phrase in combined, phrase
+    assert "| 29 |" in task
+    assert "| 33 |" in task
+
 
 def test_frozen_artifact_guards() -> None:
     test_frozen_retry4_artifacts_unchanged_after_closeout()

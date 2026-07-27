@@ -3313,9 +3313,60 @@ to generic content-only FullContext. Validator checks in implementation phase.
 - `core/target_presentation_decision.py` (or equivalent typed presentation layer)
 - `tests/test_fullcontext_presentation_parity_implementation.py`
 - `tests/test_fullcontext_presentation_parity_sparse_fixtures.py` (if needed)
+- `tests/test_fullcontext_presentation_parity_bone_graft_demo_data.py` (demo data correction checks)
+- `clients/demo/target_response/pricebook/services/bone_graft.default.json`
 - Validator extensions in `scripts/validate_client_pack.py` (consultation_value, video_key)
 - `clients/_template/md/sample__service__example.md` consultation_value example (neutral)
 - `docs/CLIENT_PACK_AUTHORING.md` consultation_value + video_key sections
+
+### Demo data correction — `bone_graft` (Phase 2 implementation)
+
+**Goal:** promote bone graft from orphaned info MD to a first-class demo service with
+`no_public_price`, while keeping `sinus_lift` as the separate narrow priced procedure.
+
+| Action | Path |
+|--------|------|
+| CREATE service | `clients/demo/target_response/service_catalog.json` — add `bone_graft` |
+| RENAME MD | `clients/demo/md/implantation__info__bone_graft.md` → `implantation__service__bone_graft.md` |
+| CREATE offer | `clients/demo/target_response/pricebook/services/bone_graft.default.json` |
+
+**Service record (`bone_graft`):**
+
+- `name`: «Костная пластика»
+- `family`: `implantology` (catalog schema); MD `topic`: `implantation`
+- `aliases`: from existing MD frontmatter (not invented)
+- `content_ref`: `implantation__service__bone_graft.md`
+- `active`: `true`
+- `selection`: existing schema only — no core hardcode; owner picks applicable `mode`/axes at implementation start
+
+**Offer price (exact):**
+
+```json
+{
+  "mode": "no_public_price",
+  "approved_text": "Стоимость костной пластики рассчитывается после КТ и зависит от необходимого объёма и выбранной методики."
+}
+```
+
+**Binding constraints:**
+
+- `sinus_lift` remains a separate narrow service with existing closed/open offers and exact prices unchanged.
+- Update all authored refs from `implantation__info__bone_graft` → `implantation__service__bone_graft` / new `doc_id`.
+- Renamed MD: `doc_type: service`, `doc_id: implantation__service__bone_graft`; preserve body and `suggest_h3` followup anchors.
+- Service count becomes **22** (was 21); offer count **32** (was 31) — update non-frozen catalog/offer tests only.
+- No `consultation_value` on `bone_graft` unless explicitly authored later; comparison/FAQ docs must not trigger automatic consultation close.
+
+**Authored ref updates (implementation):**
+
+- `clients/demo/md/implantation__info__bone_graft.md` → rename + frontmatter
+- `evals/v5/demo/golden.json`
+- `evals/v5/metadata_first_golden.json`
+- `evals/v5/arbiter_golden.json`
+- `evals/routing_smoke.md`
+- `clients/demo/target_response/pricebook/facts.json` — add `bone_graft` to applicable `allowed_service_ids` where implant-adjacent facts apply (same policy as peer implant services)
+- `tests/test_demo_target_service_catalog.py`, `tests/test_demo_target_price_offers.py`, `tests/test_validate_client_pack.py` — counts and bone_graft fixtures
+
+**Frozen artifacts:** S-series/A9R/final-scope/W1b pins remain byte-identical; do not edit frozen eval matrices for this correction.
 
 ### UPDATE (expected — exact list finalized at implementation start)
 
@@ -3341,8 +3392,8 @@ frozen artifacts, existing pricebook/marketing data.
 | # | Criterion |
 |---|---|
 | 1 | All-on-4 info → 1–2 relevant secondary buttons, not artificially 1 |
-| 2 | Bone graft info → validated used document → up to 2 its followups |
-| 3 | FAQ document does not become service entity |
+| 2 | Bone graft (`bone_graft` service) → validated used service MD → up to 2 its followups |
+| 3 | Unrelated FAQ/info/comparison documents remain MD entities, not catalog services |
 | 4 | Invalid invented `used_doc_id` → rejected/omitted deterministically |
 | 5 | Content with video + followups → video + max 1 followup |
 | 6 | Content without video → max 2 followups |
@@ -3368,6 +3419,11 @@ frozen artifacts, existing pricebook/marketing data.
 | 26 | Invalid video key client pack fails validator or documented optional-policy |
 | 27 | Existing rich pricebook, A9, AC1–AC3, typed UI flows without regression |
 | 28 | Frozen S-series/A9R/final-scope/W1b artifacts byte-identical |
+| 29 | «Что такое костная пластика?» → explicit `bone_graft` service (not orphaned info doc) |
+| 30 | `bone_graft` followups from its service MD (`suggest_h3`), up to 2 secondary slots |
+| 31 | «Сколько стоит костная пластика?» → typed `no_public_price` + exact `approved_text`; no family-price inheritance |
+| 32 | «Сколько стоит синус-лифтинг?» → existing closed/open exact prices unchanged |
+| 33 | FAQ/info/comparison source identity for bone-graft topic does not extend `consultation_value` applicability |
 
 ## Tests (governance PRE-CODE)
 
@@ -3421,7 +3477,8 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 |-------|-------|
 | Baseline HEAD | `50c6cf9` |
 | Governance HEAD (Phase 1) | `e312ff7` |
-| Governance correction HEAD | pending commit |
+| Governance correction HEAD | `079de09` |
+| Demo data correction HEAD | pending commit |
 | PRE-CODE | pending |
 | Product change | **none** |
 | LIVE / LLM | **none** |
@@ -3440,4 +3497,20 @@ Clarify that generic content-only FullContext intentionally does not receive aut
 - `tests/test_fullcontext_presentation_parity_governance.py`
 
 **STOP after correction PRE-CODE ✅** — Phase 2 implementation still requires separate owner GO.
+
+## Governance correction — `bone_graft` demo data (Phase 2 allowlist)
+
+**Mode:** docs/governance/tests only · **NO product code / NO demo data change in this commit**
+
+Adds Phase 2 implementation allowlist and acceptance rows 29–33 for promoting
+`implantation__info__bone_graft` to catalog service `bone_graft` with `no_public_price`,
+while preserving `sinus_lift` as separate priced procedure.
+
+### Allowlist (this correction commit)
+
+- `docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`
+- `TASK.md`
+- `tests/test_fullcontext_presentation_parity_governance.py`
+
+**STOP after correction PRE-CODE ✅** — demo data + product implementation require separate owner GO.
 

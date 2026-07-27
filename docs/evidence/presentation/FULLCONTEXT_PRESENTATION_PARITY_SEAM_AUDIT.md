@@ -164,6 +164,26 @@ Binding rules for implementation:
 
 Demo consultation values: `classic`, `one_stage`, `all_on_4` service MDs.
 
+## Demo data gap — `bone_graft` (Phase 2 correction)
+
+**Current @ `079de09`:** `implantation__info__bone_graft.md` is an orphaned info document — not a
+catalog service, no pricebook offer, blocks acceptance rows 2/29–33.
+
+**Target (implementation):**
+
+| Item | Spec |
+|------|------|
+| Service | `bone_graft` in `service_catalog.json` — «Костная пластика», `family: implantology`, MD `topic: implantation`, aliases from existing MD, `content_ref: implantation__service__bone_graft.md`, `active: true`, `selection` per schema (no core hardcode) |
+| MD rename | `implantation__info__bone_graft.md` → `implantation__service__bone_graft.md` (`doc_type: service`, new `doc_id`) |
+| Offer | `bone_graft.default.json` with `no_public_price` + exact `approved_text` (see TASK.md) |
+| Preserve | `sinus_lift` separate service; closed/open offers and exact prices unchanged |
+| Refs | Update authored refs (`golden.json`, `metadata_first_golden.json`, `arbiter_golden.json`, `routing_smoke.md`, facts `allowed_service_ids` as applicable) |
+| consultation_value | Not applicable to generic FAQ/info/comparison on bone-graft topic; only exact `bone_graft` service/option path if authored later |
+
+**Acceptance (rows 29–33):** explicit service for «Что такое костная пластика?»; followups from
+service MD; `no_public_price` for price question without family inheritance; sinus-lift prices
+unchanged; source identity does not widen consultation_value applicability.
+
 ## Superseded / not product path
 
 | Surface | Decision |
@@ -177,8 +197,8 @@ Demo consultation values: `classic`, `one_stage`, `all_on_4` service MDs.
 | # | Criterion |
 |---|---|
 | 1 | All-on-4 info → 1–2 relevant secondary buttons, not artificially 1 |
-| 2 | Bone graft info → validated used document → up to 2 its followups |
-| 3 | FAQ document does not become service entity |
+| 2 | Bone graft (`bone_graft` service) → validated used service MD → up to 2 its followups |
+| 3 | Unrelated FAQ/info/comparison documents remain MD entities, not catalog services |
 | 4 | Invalid invented `used_doc_id` → rejected/omitted deterministically |
 | 5 | Content with video + followups → video + max 1 followup |
 | 6 | Content without video → max 2 followups |
@@ -204,6 +224,11 @@ Demo consultation values: `classic`, `one_stage`, `all_on_4` service MDs.
 | 26 | Invalid video key client pack fails validator or documented optional-policy |
 | 27 | Existing rich pricebook, A9, AC1–AC3, typed UI flows without regression |
 | 28 | Frozen S-series/A9R/final-scope/W1b artifacts byte-identical |
+| 29 | «Что такое костная пластика?» → explicit `bone_graft` service |
+| 30 | `bone_graft` followups from service MD, up to 2 secondary slots |
+| 31 | «Сколько стоит костная пластика?» → `no_public_price` + exact `approved_text`; no family-price inheritance |
+| 32 | «Сколько стоит синус-лифтинг?» → existing closed/open exact prices unchanged |
+| 33 | FAQ/info/comparison source identity does not extend `consultation_value` applicability |
 
 ## Implementation seam (target — not in this commit)
 

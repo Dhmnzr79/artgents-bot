@@ -15,6 +15,11 @@ from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameTerminalMode,
 )
 from contracts.target_turn_frame_policy_envelope import TargetTurnFramePolicyEnvelope
+from core.target_generic_fullcontext_content import (
+    build_generic_fullcontext_content_policy_request,
+    generic_fullcontext_content_eligible,
+    structured_clarification_required,
+)
 from core.target_response_policy import build_target_response_spec
 
 _ASPECT_TO_COMPONENT: dict[AspectKind, TargetResponseComponent] = {
@@ -88,14 +93,29 @@ def _scenario_concern_empty_aspects(
     )
 
 
+def _generic_faq_empty_aspects(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    aspects_meta = turn_frame.field_meta.aspects
+    if aspects_meta.status != "invalid" or aspects_meta.error != "aspects_empty":
+        return False
+    if _clinic_wide_doctors_empty_aspects(turn_frame, envelope):
+        return False
+    if _scenario_concern_empty_aspects(turn_frame, envelope):
+        return False
+    return generic_fullcontext_content_eligible(turn_frame, envelope)
+
+
 def _aspects_empty_exception(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
 ) -> bool:
-    return _clinic_wide_doctors_empty_aspects(
-        turn_frame,
-        envelope,
-    ) or _scenario_concern_empty_aspects(turn_frame, envelope)
+    return (
+        _clinic_wide_doctors_empty_aspects(turn_frame, envelope)
+        or _scenario_concern_empty_aspects(turn_frame, envelope)
+        or _generic_faq_empty_aspects(turn_frame, envelope)
+    )
 
 
 def _topic_is_usable(turn_frame: TurnFrame, envelope: TargetTurnFramePolicyEnvelope) -> bool:
@@ -182,6 +202,9 @@ def _components_from_turn_frame(
         selected.add(_ASPECT_TO_COMPONENT[aspect])
 
     if _scenario_concern_empty_aspects(turn_frame, envelope):
+        selected.add("content")
+
+    if _generic_faq_empty_aspects(turn_frame, envelope):
         selected.add("content")
 
     if turn_frame.intent in _PRICE_INTENTS and _intent_price_is_usable(
@@ -417,8 +440,7 @@ def dispatch_target_turn_frame_response(
     _reject_invalid(turn_frame.field_meta.topic, "topic")
     if turn_frame.needs_clarification:
         _reject_invalid(turn_frame.field_meta.needs_clarification, "needs_clarification")
-    if turn_frame.service_id is not None:
-        _reject_invalid(turn_frame.field_meta.service_id, "service_id")
+    _reject_invalid(turn_frame.field_meta.service_id, "service_id")
 
     scope_price_topic = _scope_price_materialize_topic(
         turn_frame,
@@ -439,24 +461,39 @@ def dispatch_target_turn_frame_response(
 
     if envelope.boundary_decision == "medical_handoff":
         response_mode: TargetResponseMode = "medical_handoff"
-    elif (
-        turn_frame.needs_clarification
-        and turn_frame.field_meta.needs_clarification.status == "valid"
-    ):
+    elif structured_clarification_required(turn_frame, envelope):
         return _terminal_spec(response_mode="clarify", envelope=envelope)
     else:
         response_mode = "answer"
 
     components = _components_from_turn_frame(turn_frame, envelope)
     if not components:
+        if generic_fullcontext_content_eligible(turn_frame, envelope):
+            policy_request = build_generic_fullcontext_content_policy_request(
+                response_mode=response_mode,
+                envelope=envelope,
+            )
+            return TargetTurnFrameMaterializeDispatch(
+                kind="materialize",
+                policy_request=policy_request,
+            )
         return _terminal_spec(response_mode="defer", envelope=envelope)
 
     if not _service_id_is_usable(turn_frame, envelope):
         if _is_fullcontext_content_only_components(components, response_mode):
-            policy_request = _materialize_fullcontext_content_policy_request(
-                response_mode=response_mode,
-                envelope=envelope,
-            )
+            if _generic_faq_empty_aspects(turn_frame, envelope) or not _topic_is_usable(
+                turn_frame,
+                envelope,
+            ):
+                policy_request = build_generic_fullcontext_content_policy_request(
+                    response_mode=response_mode,
+                    envelope=envelope,
+                )
+            else:
+                policy_request = _materialize_fullcontext_content_policy_request(
+                    response_mode=response_mode,
+                    envelope=envelope,
+                )
             return TargetTurnFrameMaterializeDispatch(
                 kind="materialize",
                 policy_request=policy_request,

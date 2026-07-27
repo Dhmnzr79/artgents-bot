@@ -103,22 +103,76 @@ def test_clinic_wide_doctors_topic_with_empty_aspects_requests_doctors_only() ->
     assert result.policy_request.service_id is None  # type: ignore[union-attr]
 
 
-def test_empty_aspects_without_marketing_scenarios_remains_fail_closed() -> None:
-    with pytest.raises(TargetTurnFrameDispatchError) as caught:
-        dispatch_target_turn_frame_response(
-            _frame(
-                route="content",
-                topic="implantation",
-                topic_confidence=0.95,
-                aspects=[],
-                primary_aspect=None,
-                service_id=None,
-                marketing_scenarios=[],
-            ),
-            _envelope(),
-        )
-    assert caught.value.code == "dispatch_field_invalid"
-    assert caught.value.value == "aspects"
+def test_empty_aspects_without_marketing_scenarios_materializes_generic() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            route="content",
+            topic="implantation",
+            topic_confidence=0.95,
+            aspects=[],
+            primary_aspect=None,
+            service_id=None,
+            marketing_scenarios=[],
+        ),
+        _envelope(),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.requested_components == ("content",)  # type: ignore[union-attr]
+    assert result.policy_request.service_id is None  # type: ignore[union-attr]
+
+
+def test_advisory_needs_clarification_materializes_content() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            route="content",
+            topic="implantation",
+            topic_confidence=0.95,
+            aspects=["duration", "stages"],
+            primary_aspect="duration",
+            service_id=None,
+            needs_clarify=True,
+        ),
+        _envelope(),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.requested_components == ("content",)  # type: ignore[union-attr]
+
+
+def test_null_topic_empty_aspects_materializes_generic() -> None:
+    result = dispatch_target_turn_frame_response(
+        build_turn_frame_from_raw(
+            {
+                "route": "content",
+                "aspects": [],
+                "primary_aspect": None,
+                "service_id": None,
+                "topic": None,
+                "topic_confidence": 0.0,
+            },
+            allowed_topics=frozenset({"implantation", "doctors"}),
+            allowed_service_ids=frozenset({"all_on_4"}),
+        ),
+        _envelope(),
+    )
+    assert result.kind == "materialize"
+    assert result.policy_request.requested_components == ("content",)  # type: ignore[union-attr]
+
+
+def test_structured_comparison_clarify_remains_terminal() -> None:
+    result = dispatch_target_turn_frame_response(
+        _frame(
+            route="content",
+            topic="implantation",
+            topic_confidence=0.95,
+            aspects=["comparison"],
+            primary_aspect="comparison",
+            service_id=None,
+            needs_clarify=True,
+        ),
+        _envelope(),
+    )
+    assert result.kind == "terminal"
+    assert result.terminal_mode == "clarify"  # type: ignore[union-attr]
 
 
 def test_scenario_concern_empty_aspects_materializes_content() -> None:

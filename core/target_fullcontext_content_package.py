@@ -7,6 +7,7 @@ from datetime import date
 from typing import NoReturn
 
 from contracts.response_schema import ResponseSchemaBundle
+from contracts.target_response_policy import TargetResponsePolicyRequest
 from contracts.target_response_spec import TargetResponseComponent, TargetResponseSpec
 from core.target_marketing_selector import TargetMarketingSelection
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
@@ -24,6 +25,9 @@ class TargetFullContextContentPackageError(ValueError):
         self.code = code
         self.value = value
         super().__init__(f"{code}: {value!r}")
+
+
+GENERIC_FULLCONTEXT_ALLOW_PRICE = False
 
 
 def _fail(code: str, value: object) -> NoReturn:
@@ -62,6 +66,24 @@ def is_fullcontext_service_optional_spec(spec: TargetResponseSpec) -> bool:
     """True when spec may materialize from cached FullContext without service_id."""
 
     return is_fullcontext_content_only_spec(spec) or is_fullcontext_doctors_only_spec(spec)
+
+
+def is_generic_fullcontext_content_package(
+    spec: TargetResponseSpec,
+    *,
+    policy_request: TargetResponsePolicyRequest | None = None,
+) -> bool:
+    """True for planner-independent generic content packages."""
+
+    from core.target_generic_fullcontext_content import (
+        is_generic_fullcontext_content_policy_request,
+    )
+
+    if not is_fullcontext_content_only_spec(spec):
+        return False
+    if policy_request is not None:
+        return is_generic_fullcontext_content_policy_request(policy_request)
+    return not GENERIC_FULLCONTEXT_ALLOW_PRICE
 
 
 def assemble_target_fullcontext_content_bound_package(

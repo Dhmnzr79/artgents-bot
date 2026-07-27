@@ -7,6 +7,7 @@ from core.attribute_followup import (
     detect_vague_attribute_kinds,
     is_vague_attribute_followup_any,
 )
+from core.target_generic_fullcontext_content import should_skip_session_service_hydration
 from core.target_runtime_session import TargetRuntimeSessionState
 
 _SESSION_FOLLOWUP_ASPECTS = frozenset({"price", "payment"})
@@ -45,6 +46,8 @@ def hydrate_target_runtime_turn_frame_from_session(
     """Restore service continuity for contextual follow-ups when shadow frame lost it."""
 
     if turn_frame.service_id is not None:
+        return turn_frame
+    if should_skip_session_service_hydration(turn_frame, user_message=user_message):
         return turn_frame
     if not _is_session_contextual_followup(turn_frame, user_message):
         return turn_frame

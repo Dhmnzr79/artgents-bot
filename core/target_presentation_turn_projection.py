@@ -8,6 +8,7 @@ from contracts.target_response_spec import TargetResponseSpec
 from contracts.turn_frame import TurnFrame
 from core.target_contact_authority import contact_fields_from_turn_aspects
 from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
+from core.target_generic_fullcontext_content import marketing_scenarios_allowed_for_turn
 
 
 def resolve_target_semantic_context(
@@ -98,7 +99,7 @@ def resolve_bound_marketing_flags(
     if (
         marketing_scenarios
         and contact_fields_from_turn_frame(turn_frame) is None
-        and not turn_frame.needs_clarification
+        and marketing_scenarios_allowed_for_turn(turn_frame)
         and bound_spec.response_mode in {"answer", "medical_handoff"}
     ):
         scenarios = tuple(marketing_scenarios)

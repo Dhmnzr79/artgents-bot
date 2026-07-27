@@ -3999,12 +3999,13 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 | `git diff --check` | ✅ clean |
 | LIVE / LLM | **none** |
 
-### Post-push verification (@ `9104212`)
+### Post-push verification (@ `e0b386d`)
 
 | Check | Result |
 |-------|--------|
-| `HEAD` == `origin/codex/stage-a` | _(after push)_ |
-| Working tree clean | _(after push)_ |
+| `HEAD` == `origin/codex/stage-a` @ `e0b386d` | ✅ |
+| Working tree clean | ✅ |
+| Implementation commit `9104212` on origin | ✅ |
 
 ### Files changed (implementation `525c18e..9104212`)
 

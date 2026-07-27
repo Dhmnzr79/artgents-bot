@@ -421,6 +421,7 @@ def test_unknown_raw_fields_do_not_enter_frame_dump():
         "followup_of",
         "needs_clarification",
         "field_meta",
+        "marketing_scenarios",
     }
 
 

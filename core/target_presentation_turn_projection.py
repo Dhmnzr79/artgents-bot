@@ -21,24 +21,18 @@ def resolve_target_semantic_context(
     return "default"
 
 
-def derive_marketing_scenarios(turn_frame: TurnFrame) -> tuple[str, ...]:
-    """Project 0–2 typed scenarios from planner TurnFrame fields only."""
+def contact_aspect_from_turn_frame(turn_frame: TurnFrame) -> str | None:
+    """Return contacts aspect when planner classified a direct contact question."""
 
-    scenarios: list[str] = []
-    if turn_frame.emotion == "fear":
-        scenarios.append("pain_fear")
-    if turn_frame.emotion == "doubt":
-        scenarios.append("doctor_trust")
-    if turn_frame.primary_aspect == "price":
-        scenarios.append("cost")
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for item in scenarios:
-        if item in seen:
-            continue
-        seen.add(item)
-        deduped.append(item)
-    return tuple(deduped[:2])
+    if turn_frame.primary_aspect == "contacts" or "contacts" in turn_frame.aspects:
+        return "contacts"
+    return None
+
+
+def marketing_scenarios_from_turn_frame(turn_frame: TurnFrame) -> tuple[str, ...]:
+    """Validated planner-owned marketing scenarios (0–2)."""
+
+    return tuple(turn_frame.marketing_scenarios)
 
 
 def should_include_initial_marketing_block(

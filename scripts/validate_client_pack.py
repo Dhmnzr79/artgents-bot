@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -33,6 +34,12 @@ LEGACY_MIRROR_RELATIVE = (
     "marketing.yaml",
     "price_brand_aliases.json",
     "pricebook",
+)
+
+_CONTACT_MD_FORBIDDEN = re.compile(
+    r"(\+7\s*\(|\+7\s*\d|"
+    r"^\s*-\s*(адрес|телефон|whatsapp|время работы|парковка)\s*:)",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
@@ -139,6 +146,23 @@ def validate_client_pack(
         validate_response_schema_external_refs(bundle, external_index)
     except Exception as exc:
         errors.append(f"target_response/: external_ref_invalid:{exc}")
+
+    policies_path = rel("clinic_policies.yaml")
+    if policies_path.is_file():
+        import yaml
+
+        raw = yaml.safe_load(policies_path.read_text(encoding="utf-8")) or {}
+        contact = raw.get("contact") if isinstance(raw.get("contact"), dict) else {}
+        phone = str(contact.get("phone_display") or "").strip()
+        if not phone:
+            errors.append("clinic_policies.yaml: contact.phone_display_required")
+    contacts_md = md_root / "clinic__info__contacts.md"
+    if contacts_md.is_file():
+        body = contacts_md.read_text(encoding="utf-8")
+        if _CONTACT_MD_FORBIDDEN.search(body):
+            errors.append(
+                "md/clinic__info__contacts.md: duplicate_contact_facts_forbidden"
+            )
 
     return errors
 

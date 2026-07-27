@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import RouteIntent
+from contracts.target_composer_source_identity import MarketingScenarioKind
 
 EmotionKind = Literal["none", "fear", "doubt"]
 SpecificityKind = Literal["unknown", "general", "specific"]
@@ -119,6 +120,7 @@ class TurnFrameMeta(BaseModel):
     follow_up: FieldMeta
     followup_of: FieldMeta
     needs_clarification: FieldMeta
+    marketing_scenarios: FieldMeta
 
 
 class TurnFrame(BaseModel):
@@ -137,7 +139,25 @@ class TurnFrame(BaseModel):
     follow_up: bool = False
     followup_of: str | None = None
     needs_clarification: bool = False
+    marketing_scenarios: list[MarketingScenarioKind] = Field(default_factory=list)
     field_meta: TurnFrameMeta
+
+    @field_validator("marketing_scenarios", mode="after")
+    @classmethod
+    def _cap_marketing_scenarios(
+        cls,
+        value: list[MarketingScenarioKind],
+    ) -> list[MarketingScenarioKind]:
+        deduped: list[MarketingScenarioKind] = []
+        seen: set[str] = set()
+        for item in value:
+            if item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+            if len(deduped) >= 2:
+                break
+        return deduped
 
     @model_validator(mode="after")
     def _primary_aspect_in_aspects(self) -> "TurnFrame":

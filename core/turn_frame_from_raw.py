@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, cast, get_args
 
 from contracts.answer_plan import AspectKind
+from contracts.target_composer_source_identity import MARKETING_SCENARIO_KINDS
 from contracts.decision_frame import RouteIntent
 from contracts.turn_frame import (
     FieldErrorReason,
@@ -34,6 +35,7 @@ _RAW_ASPECTS = "turn_plan.raw.aspects"
 _RAW_SERVICE_ID = "turn_plan.raw.service_id"
 _RAW_FOLLOWUP_OF = "turn_plan.raw.followup_of"
 _RAW_NEEDS_CLARIFY = "turn_plan.raw.needs_clarify"
+_RAW_MARKETING_SCENARIOS = "turn_plan.raw.marketing_scenarios"
 _DERIVED_FOLLOWUP_OF = "derived.followup_of"
 _SCHEMA_DEFAULT = "turn_plan.schema_default"
 _NOT_MIGRATED = "a7.not_migrated"
@@ -459,6 +461,30 @@ def _needs_clarification_from_raw(raw: dict[str, Any]) -> tuple[bool, FieldMeta]
     )
 
 
+def _marketing_scenarios_from_raw(
+    raw: dict[str, Any],
+) -> tuple[list[str], FieldMeta]:
+    if "marketing_scenarios" not in raw:
+        return [], _schema_default_meta()
+    raw_value = raw.get("marketing_scenarios")
+    if raw_value is None:
+        return [], _meta(provenance=_RAW_MARKETING_SCENARIOS, status="valid")
+    if not isinstance(raw_value, list):
+        return [], _meta(provenance=_RAW_MARKETING_SCENARIOS, status="invalid")
+    selected: list[str] = []
+    seen: set[str] = set()
+    for item in raw_value:
+        if not isinstance(item, str) or item not in MARKETING_SCENARIO_KINDS:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        selected.append(item)
+        if len(selected) >= 2:
+            break
+    return selected, _meta(provenance=_RAW_MARKETING_SCENARIOS, status="valid")
+
+
 def build_turn_frame_from_raw(
     raw: dict[str, Any],
     *,
@@ -478,6 +504,7 @@ def build_turn_frame_from_raw(
         allowed_service_ids=allowed_service_ids,
     )
     needs_clarification, needs_clarification_meta = _needs_clarification_from_raw(raw)
+    marketing_scenarios, marketing_scenarios_meta = _marketing_scenarios_from_raw(raw)
     patient_scope, patient_scope_meta = _patient_scope_from_raw(raw)
     not_migrated = _not_migrated_meta
 
@@ -493,6 +520,7 @@ def build_turn_frame_from_raw(
         follow_up=follow_up,
         followup_of=followup_of,
         needs_clarification=needs_clarification,
+        marketing_scenarios=marketing_scenarios,  # type: ignore[arg-type]
         field_meta=TurnFrameMeta(
             intent=intent_meta,
             topic=topic_meta,
@@ -505,5 +533,6 @@ def build_turn_frame_from_raw(
             follow_up=follow_up_meta,
             followup_of=followup_meta,
             needs_clarification=needs_clarification_meta,
+            marketing_scenarios=marketing_scenarios_meta,
         ),
     )

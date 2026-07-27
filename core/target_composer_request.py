@@ -22,6 +22,7 @@ from core.target_composer_action_context import resolve_target_composer_action_c
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import is_fullcontext_content_only_spec
+from core.target_contact_authority import materialize_clinic_contact_primary_evidence
 from core.target_scoped_response_evidence import (
     TargetEvidenceScopeRecord,
     TargetScopedResponseEvidence,
@@ -40,6 +41,7 @@ TargetComposerEvidenceKind: TypeAlias = Literal[
     "external_kb",
     "external_doctor",
     "consultation",
+    "clinic_contact",
 ]
 
 _FRONTMATTER = re.compile(
@@ -520,6 +522,23 @@ def _attach_composer_action_context(request: TargetComposerRequest) -> TargetCom
     return replace(request, action_context=action_context)
 
 
+def _prepend_contact_evidence(
+    blocks: tuple[TargetComposerEvidenceBlock, ...],
+    *,
+    client_id: str,
+    contact_aspect: str | None,
+) -> tuple[TargetComposerEvidenceBlock, ...]:
+    if contact_aspect is None:
+        return blocks
+    contact_blocks = materialize_clinic_contact_primary_evidence(
+        client_id,
+        aspect=contact_aspect,
+    )
+    if not contact_blocks:
+        return blocks
+    return contact_blocks + blocks
+
+
 def materialize_target_composer_request(
     bound_package: TargetSpecBoundOfflineResponsePackage,
     bundle: ResponseSchemaBundle,
@@ -528,6 +547,8 @@ def materialize_target_composer_request(
     *,
     user_message: str,
     md_root: Path,
+    contact_aspect: str | None = None,
+    client_id: str = "demo",
 ) -> TargetComposerRequest:
     """Create model-ready primary evidence without executing a Composer model."""
 
@@ -542,11 +563,17 @@ def materialize_target_composer_request(
     scoped = build_target_scoped_response_evidence(bound_package, md_root=md_root)
     if is_fullcontext_content_only_spec(scoped.spec):
         if not scoped.scope_records:
+            blocks: tuple[TargetComposerEvidenceBlock, ...] = ()
+            blocks = _prepend_contact_evidence(
+                blocks,
+                client_id=client_id,
+                contact_aspect=contact_aspect,
+            )
             return _attach_composer_action_context(
                 TargetComposerRequest(
                 user_message=user_message,
                 spec=scoped.spec,
-                evidence_blocks=(),
+                evidence_blocks=blocks,
                 selected_followups=scoped.selected_followups,
                 selected_cta_key=scoped.selected_cta_key,
                 )
@@ -573,6 +600,11 @@ def materialize_target_composer_request(
         )
         if projected != expected:
             _error("composer_request_output_inconsistent", (projected, expected))
+        blocks = _prepend_contact_evidence(
+            blocks,
+            client_id=client_id,
+            contact_aspect=contact_aspect,
+        )
         return _attach_composer_action_context(
             TargetComposerRequest(
             user_message=user_message,
@@ -648,6 +680,11 @@ def materialize_target_composer_request(
     )
     if projected != expected:
         _error("composer_request_output_inconsistent", (projected, expected))
+    blocks = _prepend_contact_evidence(
+        blocks,
+        client_id=client_id,
+        contact_aspect=contact_aspect,
+    )
     return _attach_composer_action_context(
         TargetComposerRequest(
         user_message=user_message,

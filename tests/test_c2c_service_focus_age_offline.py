@@ -110,6 +110,10 @@ def test_hydration_respects_service_focus_age() -> None:
         shown_fact_ids=(),
         shown_amplifier_refs=(),
         shown_consultation_value_refs=(),
+        shown_video_ids=(),
+        shown_content_followup_refs=(),
+        shown_price_followup_refs=(),
+        situation_offered=False,
         followups=(),
     )
     frame = build_turn_frame_from_raw(

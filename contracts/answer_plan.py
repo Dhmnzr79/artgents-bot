@@ -14,6 +14,7 @@ AspectKind = Literal[
     "comparison",
     "stages",
     "overview",
+    "contacts",
 ]
 
 PlanAppendKind = Literal["price_offer", "payment_terms", "warranty_terms", "boundary"]

@@ -43,14 +43,14 @@ def test_target_bundle_is_strict_loadable_product_authority() -> None:
     bundle = load_response_schema_bundle(TARGET)
 
     assert isinstance(bundle, ResponseSchemaBundle)
-    assert len(bundle.services) == 21
-    assert len(bundle.offers) == 31
+    assert len(bundle.services) == 22
+    assert len(bundle.offers) == 32
     assert len(bundle.facts) == 6
 
 
 def test_target_service_catalog_preserves_identity_fields() -> None:
     target = _json(TARGET / "service_catalog.json")
-    assert len(target) == 21
+    assert len(target) == 22
     for service_id, record in target.items():
         assert record["name"]
         assert isinstance(record["aliases"], list)

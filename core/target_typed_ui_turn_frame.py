@@ -80,6 +80,7 @@ def build_typed_ui_turn_frame(
             follow_up=_valid_meta(provenance=provenance),
             followup_of=service_meta,
             needs_clarification=commercial_meta,
+            marketing_scenarios=_valid_meta(provenance=provenance),
         ),
     )
 

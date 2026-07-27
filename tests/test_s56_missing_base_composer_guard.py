@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.target_composer_output import composer_test_json
 
 import pytest
 

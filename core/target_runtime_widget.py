@@ -26,6 +26,7 @@ from core.target_presentation_decision import (
 )
 from core.target_runtime_client_context import TargetRuntimeClientContext
 from core.client_config_loader import load_lead_cta_variants
+from core.target_contact_authority import fallback_answer_with_phone
 
 AttributionKind = Literal["content", "plain", "lead"]
 
@@ -297,10 +298,16 @@ def materialize_target_error_payload(
     error_code: str,
 ) -> TargetRuntimeErrorPayload:
     if error_code.startswith("target_verifier_"):
-        answer = _VERIFIER_BLOCK_TEXT
+        answer = fallback_answer_with_phone(
+            base_text=_VERIFIER_BLOCK_TEXT,
+            client_id=client_id,
+        )
         route = "target_fullcontext_verifier_blocked"
     else:
-        answer = _TECHNICAL_ERROR_TEXT
+        answer = fallback_answer_with_phone(
+            base_text=_TECHNICAL_ERROR_TEXT,
+            client_id=client_id,
+        )
         route = "target_fullcontext_error"
     payload = {
         "answer": answer,

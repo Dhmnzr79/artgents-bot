@@ -81,6 +81,7 @@ class TargetRuntimeLiveComposerBackend:
                 model=self.model,
                 temperature=0,
                 max_completion_tokens=1024,
+                response_format={"type": "json_object"},
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
                 messages=build_composer_sdk_messages(invocation),
             )

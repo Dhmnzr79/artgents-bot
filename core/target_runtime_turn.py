@@ -42,7 +42,7 @@ from core.target_runtime_session import (
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_presentation_decision import TargetPresentationCadenceState
 from core.target_presentation_turn_projection import (
-    derive_marketing_scenarios,
+    marketing_scenarios_from_turn_frame,
     provisional_spec_from_turn_frame,
     resolve_target_semantic_context,
     should_include_initial_marketing_block,
@@ -231,7 +231,7 @@ def run_target_fullcontext_runtime_turn(
         and should_include_initial_marketing_block(turn_frame, provisional_spec)
     )
     marketing_scenarios = (
-        derive_marketing_scenarios(turn_frame) if include_initial_block else ()
+        marketing_scenarios_from_turn_frame(turn_frame) if include_initial_block else ()
     )
     allow_situation = not turn_frame.needs_clarification
     try:

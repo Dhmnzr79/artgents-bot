@@ -631,6 +631,62 @@ def _validate_cached_full_context(value: object) -> TargetCachedFullContext:
     return value
 
 
+def _resolve_validated_source_identity(
+    response: TargetUnverifiedComposedResponse,
+    *,
+    md_root: Path,
+    package_primary: str | None,
+    package_used: tuple[str, ...],
+    exact_service_authority: bool,
+) -> tuple[str | None, tuple[str, ...]]:
+    if exact_service_authority and package_primary:
+        validated_used = validate_used_content_refs(
+            md_root,
+            tuple(ref for ref in package_used if ref),
+        )
+        normalized_primary = validate_used_content_refs(md_root, (package_primary,))
+        primary = normalized_primary[0] if normalized_primary else None
+        if primary and primary not in validated_used:
+            validated_used = (primary, *tuple(ref for ref in validated_used if ref != primary))
+        return primary, validated_used
+
+    if response.source_identity is not None:
+        validated_used = validate_used_content_refs(
+            md_root,
+            response.source_identity.used_content_refs,
+        )
+        primary: str | None = None
+        if response.source_identity.primary_content_ref:
+            normalized_primary = validate_used_content_refs(
+                md_root,
+                (response.source_identity.primary_content_ref,),
+            )
+            primary = normalized_primary[0] if normalized_primary else None
+        if primary is None and validated_used:
+            primary = validated_used[0]
+        if primary and primary not in validated_used:
+            validated_used = (primary, *tuple(ref for ref in validated_used if ref != primary))
+        return primary, validated_used
+
+    candidates = tuple(
+        ref
+        for ref in (
+            *(package_used or ()),
+            *((package_primary,) if package_primary else ()),
+        )
+        if ref
+    )
+    validated_used = validate_used_content_refs(md_root, candidates)
+    if package_primary:
+        normalized_primary = validate_used_content_refs(md_root, (package_primary,))
+        primary = normalized_primary[0] if normalized_primary else None
+    elif validated_used:
+        primary = validated_used[0]
+    else:
+        primary = None
+    return primary, validated_used
+
+
 def verify_target_composed_response(
     request: TargetComposerRequest,
     response: TargetUnverifiedComposedResponse,
@@ -641,6 +697,7 @@ def verify_target_composed_response(
     md_root: Path | None = None,
     primary_content_ref: str | None = None,
     used_content_refs: tuple[str, ...] = (),
+    exact_service_authority: bool = False,
 ) -> TargetVerifiedComposedResponse:
     """Verify one adjacent S37 response without modifying or repairing its text."""
 
@@ -668,6 +725,13 @@ def verify_target_composed_response(
             and block.text not in response.text
         ):
             _error("target_verifier_strict_fact_missing", block.fact_ids[0])
+    has_clinic_contact = any(block.kind == "clinic_contact" for block in request.evidence_blocks)
+    if has_clinic_contact:
+        contact_blocks = [
+            block for block in request.evidence_blocks if block.kind == "clinic_contact"
+        ]
+        if not any(block.text in response.text for block in contact_blocks):
+            _error("target_verifier_clinic_contact_missing", "clinic_contact")
     try:
         assess = getattr(semantic_backend, "assess")
     except Exception:
@@ -692,20 +756,13 @@ def verify_target_composed_response(
     validated_primary: str | None = None
     validated_used: tuple[str, ...] = ()
     if md_root is not None:
-        candidates = tuple(
-            ref
-            for ref in (
-                *(used_content_refs or ()),
-                *((primary_content_ref,) if primary_content_ref else ()),
-            )
-            if ref
+        validated_primary, validated_used = _resolve_validated_source_identity(
+            response,
+            md_root=md_root,
+            package_primary=primary_content_ref,
+            package_used=used_content_refs,
+            exact_service_authority=exact_service_authority,
         )
-        validated_used = validate_used_content_refs(md_root, candidates)
-        if primary_content_ref:
-            normalized_primary = validate_used_content_refs(md_root, (primary_content_ref,))
-            validated_primary = normalized_primary[0] if normalized_primary else None
-        elif validated_used:
-            validated_primary = validated_used[0]
     return TargetVerifiedComposedResponse(
         text=response.text,
         spec=response.spec,

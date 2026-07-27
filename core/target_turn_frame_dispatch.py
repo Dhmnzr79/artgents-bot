@@ -27,6 +27,7 @@ _ASPECT_TO_COMPONENT: dict[AspectKind, TargetResponseComponent] = {
     "duration": "content",
     "pain": "content",
     "overview": "content",
+    "contacts": "content",
 }
 _COMPONENT_ORDER: tuple[TargetResponseComponent, ...] = ("content", "price", "doctors")
 _PRICE_INTENTS = frozenset({"price_lookup", "price_concern"})

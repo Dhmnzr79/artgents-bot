@@ -378,7 +378,7 @@ def test_current_demo_compact_reference_and_catalog_drift_guard():
         },
     }
     compact_bytes = json.dumps(derived, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    assert len(compact_bytes) == 540
+    assert len(compact_bytes) == 551
     assert len(compact_bytes) < _TURN_PLANNER_MAX_COMPLETION_TOKENS
 
 

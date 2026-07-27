@@ -35,6 +35,9 @@ def normalize_policy_payload(payload: dict) -> dict:
         return payload
 
     meta = payload.setdefault("meta", {})
+    if meta.get("presentation_dropped"):
+        return payload
+
     try:
         from policy import infer_ui_source_family
 
@@ -82,12 +85,20 @@ def reset_session_response(sid: str) -> dict:
 
 
 def internal_error_response() -> dict:
+    from core.target_contact_authority import fallback_answer_with_phone
+
     return {
-        "answer": "Что-то пошло не так. Попробуйте спросить ещё раз.",
+        "answer": fallback_answer_with_phone(
+            base_text="Что-то пошло не так. Попробуйте спросить ещё раз.",
+            client_id="demo",
+        ),
         "quick_replies": [],
         "cta": None,
         "video": None,
         "situation": {"show": False, "mode": "normal"},
         "offer": None,
-        "meta": {"error": "internal"},
+        "meta": {
+            "error": "internal",
+            "attribution_kind": "plain",
+        },
     }

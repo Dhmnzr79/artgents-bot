@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.target_composer_output import composer_test_json
 
 import hashlib
 import inspect
@@ -34,7 +35,12 @@ class RecordingBackend:
 
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.invocations.append(invocation)
-        return self.output
+        if type(self.output) is not str:
+            return self.output
+        stripped = self.output.strip()
+        if not stripped:
+            return self.output
+        return composer_test_json(stripped)
 
 
 class FailingBackend:
@@ -146,12 +152,15 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "response_directives_json",
         "primary_evidence_json",
         "user_message",
+        "governed_action_context_json",
     ]
     assert [field.name for field in fields(TargetUnverifiedComposedResponse)] == [
         "text",
         "spec",
         "selected_followups",
         "selected_cta_key",
+        "source_identity",
+        "composer_warnings",
         "verification_status",
     ]
     assert list(inspect.signature(execute_target_composer).parameters) == [
@@ -170,7 +179,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "composer_executor_output_invalid",
     }
     policy_positions = [
-        TARGET_COMPOSER_SYSTEM_POLICY.index(f"{number}.") for number in range(1, 10)
+        TARGET_COMPOSER_SYSTEM_POLICY.index(f"{number}.") for number in range(1, 12)
     ]
     assert policy_positions == sorted(policy_positions)
     assert "CACHED_FULL_CONTEXT" in TARGET_COMPOSER_SYSTEM_POLICY
@@ -203,7 +212,7 @@ def test_executor_serializes_one_exact_immutable_invocation_and_keeps_sidecars_o
         '"required_fact_ids":["fact_one"],'
         '"allow_marketing_facts":true,'
         '"allow_consultation_close":false,'
-        '"allow_cta":true}'
+        '"allow_cta":true,"response_stage":null}'
     )
     evidence = json.loads(invocation.primary_evidence_json)
     assert list(evidence[0]) == [
@@ -410,7 +419,7 @@ def test_backend_validation_failure_and_output_failure_have_no_retry_or_fallback
             )
         )
         assert error.code == "composer_executor_output_invalid"
-        assert error.value is output
+        assert error.value == "TargetComposerOutputError"
         assert len(backend.invocations) == 1
 
 

@@ -16,7 +16,7 @@ from core.target_presentation_decision import (
 )
 from core.target_presentation_source_identity import is_valid_content_ref
 from core.target_presentation_turn_projection import (
-    derive_marketing_scenarios,
+    marketing_scenarios_from_turn_frame,
     resolve_target_semantic_context,
 )
 from core.target_response_followup_materializer import TargetContentFollowup
@@ -171,8 +171,8 @@ def test_semantic_context_projection() -> None:
 
 
 def test_marketing_scenarios_from_turn_frame_emotion() -> None:
-    frame = _frame().model_copy(update={"emotion": "fear"})
-    assert "pain_fear" in derive_marketing_scenarios(frame)
+    frame = _frame(marketing_scenarios=["pain_fear"])
+    assert "pain_fear" in marketing_scenarios_from_turn_frame(frame)
 
 
 def test_bone_graft_service_and_offer_in_catalog() -> None:

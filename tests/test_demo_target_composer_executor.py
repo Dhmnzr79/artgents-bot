@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.target_composer_output import composer_test_json
+
 import hashlib
 import json
 from datetime import date
@@ -46,7 +48,7 @@ class RecordingBackend:
 
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.invocations.append(invocation)
-        return "Демонстрационный непроверенный ответ."
+        return composer_test_json("Демонстрационный непроверенный ответ.")
 
 
 def _real_request():

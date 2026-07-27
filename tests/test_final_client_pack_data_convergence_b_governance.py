@@ -134,8 +134,8 @@ def test_target_bundle_strict_loadable_and_checkpoint_a_loader_present() -> None
 
     bundle = load_response_schema_bundle(_DEMO / "target_response")
     assert isinstance(bundle, ResponseSchemaBundle)
-    assert len(bundle.services) == 21
-    assert len(bundle.offers) == 31
+    assert len(bundle.services) == 22
+    assert len(bundle.offers) == 32
     assert (_REPO_ROOT / "core/target_client_data.py").is_file()
 
 

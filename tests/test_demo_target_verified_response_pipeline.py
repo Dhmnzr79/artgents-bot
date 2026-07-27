@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.target_composer_output import composer_test_json
 
 import hashlib
 from datetime import date
@@ -63,7 +64,7 @@ class RecordingComposerBackend:
 
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.invocations.append(invocation)
-        return self.text
+        return composer_test_json(self.text)
 
 
 class FailingComposerBackend:

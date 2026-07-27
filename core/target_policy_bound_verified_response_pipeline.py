@@ -125,6 +125,7 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
     turn_topic: str | None = None,
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
+    contact_aspect: str | None = None,
 ) -> tuple[TargetVerifiedComposedResponse, TargetMaterializedSessionSelection]:
     """Build spec-bound package and return one exact verified target response.
 
@@ -164,6 +165,8 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         tone=tone,
         composer_backend=composer_backend,
         semantic_backend=semantic_backend,
+        contact_aspect=contact_aspect,
+        client_id=client_id,
     )
     return verified, extract_target_session_selection(bound_package)
 
@@ -195,6 +198,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     turn_topic: str | None = None,
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
+    contact_aspect: str | None = None,
 ) -> TargetVerifiedComposedResponse:
     """Build spec-bound package and return one exact verified target response."""
 
@@ -224,5 +228,6 @@ def run_target_offline_policy_bound_verified_response_pipeline(
         turn_topic=turn_topic,
         effective_scope=effective_scope,
         client_id=client_id,
+        contact_aspect=contact_aspect,
     )
     return verified

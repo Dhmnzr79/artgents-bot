@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.target_composer_output import composer_test_json
 
 import hashlib
 import inspect
@@ -238,6 +239,8 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "selected_followups",
         "selected_cta_key",
         "navigation_followups",
+        "primary_content_ref",
+        "used_content_refs",
         "verification_status",
     ]
     assert list(inspect.signature(verify_target_composed_response).parameters) == [
@@ -246,12 +249,17 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "cached_full_context",
         "semantic_backend",
         "navigation_followups",
+        "md_root",
+        "primary_content_ref",
+        "used_content_refs",
+        "exact_service_authority",
     ]
     source = Path("core/target_response_verifier.py").read_text(encoding="utf-8")
     assert set(re.findall(r'"(target_verifier_[a-z_]+)"', source)) == {
         "target_verifier_input_invalid",
         "target_verifier_numeric_ungrounded",
         "target_verifier_strict_fact_missing",
+        "target_verifier_clinic_contact_missing",
         "target_verifier_backend_invalid",
         "target_verifier_backend_failed",
         "target_verifier_semantic_output_invalid",

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from contracts.target_response_spec import TargetResponseSpec
 from contracts.ui_scope_action import is_ui_scope_ref
 from contracts.ui_stage_action import is_ui_stage_ref
 from core.target_client_ui_nav import TargetNavigationFollowup
@@ -25,7 +26,7 @@ CHOICE_MENU_MAX = 4
 SECONDARY_CONTENT_MAX = 2
 PRICE_DETAIL_MAX = 2
 
-FollowupChannel = Literal["choice", "content", "price"]
+FollowupChannel = Literal["choice", "content", "price", "none"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +52,7 @@ class TargetPresentationDecision:
     situation: dict[str, bool | str]
     dropped: tuple[str, ...]
     cadence_update: TargetPresentationCadenceUpdate
+    channel: FollowupChannel = "none"
 
 
 def classify_followup_ref(ref: str) -> FollowupChannel:
@@ -215,6 +217,14 @@ def _cap_secondary_content(
     )
     queue = [item for item in candidates if item.ref not in shown_content]
 
+    for item in queue:
+        if slots <= 0:
+            dropped.append(f"content_over_limit:{item.ref}")
+            continue
+        selected.append(_qr(item.label, item.ref))
+        cadence_content.append(item.ref)
+        slots -= 1
+
     if (
         allow_situation
         and situation_allowed
@@ -223,14 +233,6 @@ def _cap_secondary_content(
     ):
         situation = {"show": True, "mode": "normal"}
         situation_offered = True
-        slots -= 1
-
-    for item in queue:
-        if slots <= 0:
-            dropped.append(f"content_over_limit:{item.ref}")
-            continue
-        selected.append(_qr(item.label, item.ref))
-        cadence_content.append(item.ref)
         slots -= 1
 
     update = TargetPresentationCadenceUpdate(
@@ -253,7 +255,7 @@ def decide_target_presentation(
     cadence: TargetPresentationCadenceState,
     allow_situation: bool,
 ) -> TargetPresentationDecision:
-    """Apply governed slot limits without mixing choice and secondary content."""
+    """Apply governed slot limits with exactly one navigation channel per response."""
 
     all_dropped: list[str] = []
     shown_all = cadence.shown_content_followup_refs | cadence.shown_price_followup_refs
@@ -270,16 +272,27 @@ def decide_target_presentation(
     )
     all_dropped.extend(price_dropped)
 
-    secondary_qr: tuple[dict[str, str], ...] = ()
     video: dict[str, str] | None = None
     situation = {"show": False, "mode": "normal"}
     cadence_update = TargetPresentationCadenceUpdate()
+    channel: FollowupChannel = "none"
+    quick_replies: tuple[dict[str, str], ...] = ()
 
     if choice_qr:
-        quick_replies = choice_qr + price_qr
+        channel = "choice"
+        quick_replies = choice_qr
         if selected_followups.content:
             for item in selected_followups.content:
                 all_dropped.append(f"content_suppressed_by_choice_menu:{item.ref}")
+        if price_qr:
+            for item in price_qr:
+                all_dropped.append(f"price_suppressed_by_choice_menu:{item['ref']}")
+    elif price_qr and "price" in spec.required_components:
+        channel = "price"
+        quick_replies = price_qr
+        if selected_followups.content:
+            for item in selected_followups.content:
+                all_dropped.append(f"content_suppressed_by_price_channel:{item.ref}")
     else:
         secondary_qr, video, situation, cadence_update, secondary_dropped = _cap_secondary_content(
             md_root=md_root,
@@ -290,13 +303,25 @@ def decide_target_presentation(
             allow_situation=allow_situation,
         )
         all_dropped.extend(secondary_dropped)
-        quick_replies = secondary_qr + price_qr
-        cadence_update = TargetPresentationCadenceUpdate(
-            shown_video_ids=cadence_update.shown_video_ids,
-            shown_content_followup_refs=cadence_update.shown_content_followup_refs,
-            shown_price_followup_refs=tuple(item["ref"] for item in price_qr),
-            situation_offered=cadence_update.situation_offered,
-        )
+        if secondary_qr or video is not None or situation.get("show"):
+            channel = "content"
+            quick_replies = secondary_qr
+            cadence_update = TargetPresentationCadenceUpdate(
+                shown_video_ids=cadence_update.shown_video_ids,
+                shown_content_followup_refs=cadence_update.shown_content_followup_refs,
+                shown_price_followup_refs=(),
+                situation_offered=cadence_update.situation_offered,
+            )
+        elif price_qr:
+            channel = "price"
+            quick_replies = price_qr
+            cadence_update = TargetPresentationCadenceUpdate(
+                shown_price_followup_refs=tuple(item["ref"] for item in price_qr),
+            )
+        else:
+            if price_qr:
+                for item in price_qr:
+                    all_dropped.append(f"price_suppressed_no_channel:{item['ref']}")
 
     return TargetPresentationDecision(
         quick_replies=quick_replies,
@@ -304,4 +329,5 @@ def decide_target_presentation(
         situation=situation,
         dropped=tuple(all_dropped),
         cadence_update=cadence_update,
+        channel=channel,
     )

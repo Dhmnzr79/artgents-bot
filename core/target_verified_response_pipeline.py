@@ -40,6 +40,8 @@ def run_target_offline_verified_response_pipeline(
     tone: TargetComposerTone,
     composer_backend: TargetComposerBackend,
     semantic_backend: TargetSemanticVerifierBackend,
+    contact_aspect: str | None = None,
+    client_id: str = "demo",
 ) -> TargetVerifiedComposedResponse:
     """Materialize, compose and verify one exact target response without wiring it."""
 
@@ -50,12 +52,19 @@ def run_target_offline_verified_response_pipeline(
         consultation_values,
         user_message=user_message,
         md_root=md_root,
+        contact_aspect=contact_aspect,
+        client_id=client_id,
     )
     unverified = execute_target_composer(
         request,
         composer_backend,
         tone=tone,
         cached_full_context=cached_full_context,
+    )
+    package_primary = bound_package.package.plan.primary_content_ref
+    package_used = _used_content_refs_from_package(bound_package, request)
+    exact_service_authority = bool(
+        bound_package.package.plan.service_id and package_primary
     )
     return verify_target_composed_response(
         request,
@@ -64,8 +73,9 @@ def run_target_offline_verified_response_pipeline(
         semantic_backend=semantic_backend,
         navigation_followups=bound_package.package.navigation_followups,
         md_root=md_root,
-        primary_content_ref=bound_package.package.plan.primary_content_ref,
-        used_content_refs=_used_content_refs_from_package(bound_package, request),
+        primary_content_ref=package_primary,
+        used_content_refs=package_used,
+        exact_service_authority=exact_service_authority,
     )
 
 

@@ -1,5 +1,9 @@
 contact:
   phone_display: "+7 (000) 000-00-00"
+  whatsapp_display: "+7 (000) 000-00-01"
+  address_display: "г. Город, ул. Примерная, 1"
+  hours_display: "Пн–Пт 09:00–18:00"
+  parking_display: "парковка у здания"
 
 policies: {}
 

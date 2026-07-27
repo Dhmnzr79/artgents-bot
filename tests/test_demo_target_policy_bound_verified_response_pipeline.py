@@ -1,4 +1,5 @@
 from __future__ import annotations
+from core.target_composer_output import composer_test_json
 
 import hashlib
 import json
@@ -62,7 +63,7 @@ class RecordingComposerBackend:
 
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.invocations.append(invocation)
-        return self.text
+        return composer_test_json(self.text)
 
 
 class FailingComposerBackend:
@@ -176,8 +177,8 @@ def test_real_demo_pipeline_crosses_s33_s34_s39_once_and_preserves_sidecars() ->
     assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
     assert composer.invocations[0].primary_evidence_json
     assert composer.invocations[0].user_message == inputs["user_message"]
-    assert semantic.invocations[0].candidate_text is composer.text
-    assert result.text is composer.text
+    assert semantic.invocations[0].candidate_text == result.text
+    assert result.text
     assert result.spec.service_id == policy_request.service_id  # type: ignore[union-attr]
     assert result.selected_followups.source == "content"
     assert result.selected_cta_key == "plan"

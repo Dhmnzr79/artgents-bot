@@ -26,6 +26,7 @@ from core.target_policy_bound_verified_response_pipeline import (
     run_target_offline_policy_bound_verified_response_pipeline_with_selection,
 )
 from core.target_response_verifier import TargetSemanticVerifierBackend
+from core.target_presentation_turn_projection import contact_aspect_from_turn_frame
 from core.target_turn_frame_dispatch import dispatch_target_turn_frame_response
 
 
@@ -92,6 +93,7 @@ def run_target_offline_turn_frame_bound_response(
         turn_topic=turn_frame.topic,
         effective_scope=effective_scope,
         client_id=client_id,
+        contact_aspect=contact_aspect_from_turn_frame(turn_frame),
     )
     return TargetTurnFrameBoundMaterializeResponse(
         kind="materialize",

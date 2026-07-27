@@ -24,7 +24,8 @@
 | Marketing runtime stub | partial paths still stubbed |
 | **FULLCONTEXT_PRESENTATION_PARITY** | Phase 2 @ `7c716df` — partial: presentation decision, cadence, bone_graft; gaps H–N remain |
 | **FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE** | gaps H–N: Composer source sidecar, contact PRIMARY_EVIDENCE, channel mutex, situation priority/HTTP tests, `time`/`result_reliability`, fallback phone — governance @ `7c716df`; partial implementation @ `84b2741`–`029c38b` |
-| **FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE** | widget runtime seams A–F: provisional marketing gate vs final spec, typed contacts, verifier observability, widget-faithful test matrix — governance @ `81cf09c8`; implementation **STOP** |
+| **FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE** | COMPLETE @ `225ee56` — marketing-after-final-spec, typed contacts, verifier observability, widget-faithful matrix |
+| **FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION** | contact value-only verifier + scenario decouple from initial block — governance @ `225ee56`; implementation **STOP** |
 | PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)

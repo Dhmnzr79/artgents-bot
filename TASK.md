@@ -4419,3 +4419,168 @@ allowlist; each is architecturally necessary (not convenience refactors):
 - Marketing gate resolved after bound spec (`resolve_bound_marketing_flags`), not provisional `include_initial_block`
 - Optional `strict_fact` may be absent; required stays verbatim; commercial distortion → semantic reject
 
+---
+
+# TASK — FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO A9 tuning**
+
+**Baseline:** `codex/stage-a` @ `225ee56e1823f4b72ff87de691655a008de06369`
+
+**Authority:** seam audit
+`docs/evidence/marketing/FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION_SEAM_AUDIT.md`.
+
+**Prior milestone:** `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE` COMPLETE @ `225ee56`.
+
+## Goal
+
+1. **Contacts:** Verifier must check canonical scalar values from `clinic_policies.yaml → contact`, not
+   full rendered evidence lines (`Адрес: …`). Natural-language wrappers must pass when scalar is exact.
+2. **Marketing scenarios:** Decouple scenario amplifiers from `include_initial_block`; activate authored
+   scenario rules on expressed concern; preserve safety gates and presentation limits.
+
+## Confirmed defects (live + offline @ `225ee56`)
+
+| ID | Symptom | Root cause | Proven |
+|----|---------|------------|--------|
+| **A** | «Где вы находитесь?» / «Какой адрес?» → `target_verifier_clinic_contact_missing` `clinic_contact:address` | Verifier L733–735 requires entire `block.text` substring, not canonical `address_display` | ✅ |
+| **B** | `shown_amplifier_refs=[]` after scenario turns; `shown_fact_ids` populated | `resolve_bound_marketing_flags()` zeroes `marketing_scenarios` when `include_initial_block=False` | ✅ |
+| **C** | Topic-only concern with `service_id=None` cannot select implantation amplifiers | `TargetScenarioRule` lacks `allowed_topics`; `_fact_is_eligible` blocks topic-only facts | ✅ |
+| **D** | Planner mislabels direct questions as scenarios (producer) | Planner prompt / classification — not runtime selector | ✅ observed |
+
+## Owner decisions (binding for implementation)
+
+### Contacts (value verification)
+
+1. Canonical authority: `clinic_policies.yaml → contact` only.
+2. Evidence stays typed/granular (`clinic_contact:phone`, `:address`, …).
+3. Verifier checks **exact canonical value** of each **requested** field.
+4. Label prefixes (`Адрес:`, `Телефон:`), word order, Markdown, surrounding text — **not** compared.
+5. Allowed normalization: technical Unicode/whitespace only — **no fuzzy matching**.
+6. Phone/address/hours/parking/WhatsApp values must not be altered or shortened.
+7. Mixed address+parking requires both canonical values.
+8. Unrequested contact fields must not be required.
+9. Missing requested value → governed data-gap.
+10. Fallback/handoff: canonical phone only (unchanged).
+11. Required strict commercial facts unchanged in this milestone.
+
+**Mandatory live-like test:** Composer fake uses natural wrapper, e.g.
+`Мы находимся по адресу {canonical_address}` — must pass. Changed/truncated scalar must block.
+
+### Marketing scenarios (activation)
+
+1. **Initial commercial block** and **scenario amplifiers** are independent mechanisms.
+2. Initial block = proactive commercial close; scenario amplifier = reaction to expressed fear/doubt/objection.
+3. `include_initial_block=False` must **not** auto-zero valid `marketing_scenarios`.
+4. Scenario may work with `service_id=None` when topic/family applicability is authored in client data.
+5. Extend existing `TargetScenarioRule` with `allowed_topics` — **no new selector**.
+6. Direct informational questions are **not** scenarios:
+   - «сколько стоит?» ≠ `cost`
+   - «какая гарантия?» ≠ `result_reliability`
+   - «сколько длится?» ≠ `time`
+   - «кто врач?» ≠ `doctor_trust`
+7. Expressed concerns map to scenarios:
+   - «боюсь, что дорого» → `cost`
+   - «боюсь боли» → `pain_fear`
+   - «кажется, лечение слишком долгое» → `time`
+   - «вдруг не приживётся/сломается» → `result_reliability`
+   - «боюсь, что врач неопытный» → `doctor_trust`
+8. Safety: scenarios only at boundary `none`; contacts/terminal/clarify/handoff/verifier-block → no hooks.
+9. No eligible amplifier → main answer only, no invented hook.
+10. **Forbidden:** regex/phrase lists, second classifier, retry, voting, thresholds.
+11. **Limits preserved:** scenarios ≤2, amplifiers ≤2, marketing facts ≤3, cadence via `shown_amplifier_refs`,
+    choice ≤4, secondary ≤2, price-detail ≤2, one navigation channel, CTA separate.
+
+## Production-faithful acceptance matrix (30 scenarios — implementation)
+
+**Test contour:** `app._orchestrate_ask_turn` → `/ask` and `/ask/stream` → real
+runtime/spec/package/selector/evidence/Composer parser/Verifier/widget/session.
+Fakes only at provider boundary. No working DB writes. No network.
+
+### Contacts (1–11)
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | phone natural wrapper | pass |
+| 2 | address natural wrapper | pass |
+| 3 | parking natural wrapper | pass |
+| 4 | hours natural wrapper | pass |
+| 5 | WhatsApp natural wrapper | pass |
+| 6 | address+parking mixed | pass only with both canonical values |
+| 7 | changed address | block |
+| 8 | changed phone | block |
+| 9 | omitted requested field | block |
+| 10 | unrequested contact fields | not required |
+| 11 | `/ask` and `/ask/stream` | parity |
+
+### Marketing scenarios (12–30)
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 12 | pain concern | `pain_fear` amplifier |
+| 13 | reliability concern | `result_reliability` |
+| 14 | cost concern | `cost` |
+| 15 | time concern | `time` |
+| 16 | doctor concern | `doctor_trust` |
+| 17 | direct price question | no scenario |
+| 18 | direct duration question | no scenario |
+| 19 | direct warranty question | no scenario |
+| 20 | direct doctor question | no scenario |
+| 21 | known topic + `service_id=None` | eligible amplifier when authored |
+| 22 | unrelated topic | no implantation amplifier |
+| 23 | selected amplifier | appears in evidence/materials |
+| 24 | materialized session | ref written to `shown_amplifier_refs` |
+| 25 | repeated turn | no repeat of shown amplifier |
+| 26 | initial block OFF + scenario ON | scenario works |
+| 27 | initial block ON + no scenario | independent |
+| 28 | boundary/contacts/clarify | scenarios suppressed |
+| 29 | no eligible amplifier | normal answer |
+| 30 | true HTTP/runtime path | real SDK message builder invoked |
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/marketing/FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_contact_value_verification_and_marketing_scenario_activation_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — status pointer |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — milestone status |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — milestone pointer |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE — owner decision pointer |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/target_contact_authority.py` | UPDATE — canonical scalar extraction for verifier |
+| `core/target_response_verifier.py` | UPDATE — value-only contact verify per requested field |
+| `core/target_presentation_turn_projection.py` | UPDATE — decouple `marketing_scenarios` from `include_initial_block` |
+| `core/target_policy_bound_verified_response_pipeline.py` | UPDATE — align bound pipeline with decoupled scenarios |
+| `core/target_marketing_selector.py` | UPDATE — `allowed_topics` on scenario rules; topic-only eligibility |
+| `contracts/response_schema.py` | UPDATE — `TargetScenarioRule.allowed_topics` |
+| `clients/demo/target_response/marketing.yaml` | UPDATE — authored `allowed_topics` on scenario rules |
+| `core/turn_planner_llm.py` | UPDATE — planner scenario label examples (no regex) |
+| `scripts/validate_client_pack.py` | UPDATE — validate `allowed_topics` on scenario rules |
+| `tests/test_final_contact_value_verification_and_marketing_scenario_activation_harness.py` | CREATE — shared widget harness |
+| `tests/test_final_contact_value_verification_and_marketing_scenario_activation_implementation.py` | CREATE — 30-scenario COMPLETION matrix |
+
+## CREATE / UPDATE / DELETE / KEEP
+
+| Item | Class |
+|------|-------|
+| Seam audit + TASK governance | **CREATE** |
+| Contact value-only verifier | **UPDATE** |
+| Scenario decouple from initial block | **UPDATE** |
+| `TargetScenarioRule.allowed_topics` | **UPDATE** |
+| Demo marketing.yaml topic rules | **UPDATE** |
+| Required strict commercial facts | **KEEP** |
+| Presentation limits / cadence | **KEEP** |
+| Frozen eval artifacts | **KEEP** |
+| New routes/selectors/pipelines | **FORBIDDEN** |
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after governance commit + push** — await owner GO.
+

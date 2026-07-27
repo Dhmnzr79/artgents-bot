@@ -53,7 +53,8 @@ Invented refs never used. **Fail-closed for presentation UI** (follow-up/video/s
 for generic answer text** — missing/invalid source → answer + warning, no source-based UI. Do not
 block whole response solely for sidecar. Verifier blocking unchanged for answer/commercial/contact
 rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`
-+ `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`.
++ `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`
++ `FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION`.
 
 ### Owner decision: dialogue presentation convergence (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE @ `7c716df`)
 
@@ -88,6 +89,21 @@ verifier checks used fields only; fallback canonical phone only.
 **Tests:** widget-faithful offline matrix via `_orchestrate_ask_turn`; real
 `build_composer_sdk_messages`; fakes at provider boundary only. Seam audit:
 `docs/evidence/runtime/FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE_SEAM_AUDIT.md`.
+**Status:** COMPLETE @ `225ee56`.
+
+### Owner decision: contact value verification + scenario activation (FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION @ `225ee56`)
+
+**Contact verifier:** canonical scalar from `clinic_policies.yaml → contact` per requested field;
+label prefixes, word order, Markdown wrappers not compared; Unicode/whitespace normalization only;
+no fuzzy matching. Mixed address+parking requires both values. Unrequested fields not required.
+
+**Marketing scenarios:** independent from `include_initial_block`; scenario amplifiers react to
+expressed concern at boundary `none`; direct informational questions are not scenarios.
+`TargetScenarioRule.allowed_topics` for client-authored topic applicability (no new selector).
+
+Seam audit:
+`docs/evidence/marketing/FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### Запрещено по умолчанию
 

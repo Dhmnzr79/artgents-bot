@@ -676,7 +676,28 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE (governance)
+## Следующий технический checkpoint — FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION (governance)
+
+**Baseline:** `codex/stage-a` @ `225ee56`. **Authority:** forbidden in governance commit.
+**Live/LLM:** forbidden.
+
+Закрыть оставшиеся production seams после `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`:
+
+- contact verifier: canonical scalar value, not full rendered evidence line (Seam A)
+- marketing scenarios decoupled from `include_initial_block` (Seam B)
+- `TargetScenarioRule.allowed_topics` for topic-only applicability (Seam C)
+- 30-scenario widget-faithful acceptance matrix (contacts 1–11, scenarios 12–30)
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/marketing/FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_contact_value_verification_and_marketing_scenario_activation_governance.py`.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE (governance)
 
 **Baseline:** `codex/stage-a` @ `81cf09c8`. **Authority:** forbidden in governance commit.
 **Live/LLM:** forbidden.
@@ -694,7 +715,7 @@ Deliverables (Phase 1): seam audit
 `TASK.md`, doc sync, PRE-CODE checker
 `tests/test_final_fullcontext_dialogue_runtime_convergence_governance.py`.
 
-**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+**COMPLETE** @ `225ee56`.
 
 ---
 

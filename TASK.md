@@ -4447,6 +4447,7 @@ allowlist; each is architecturally necessary (not convenience refactors):
 | **B** | `shown_amplifier_refs=[]` after scenario turns; `shown_fact_ids` populated | `resolve_bound_marketing_flags()` zeroes `marketing_scenarios` when `include_initial_block=False` | ✅ |
 | **C** | Topic-only concern with `service_id=None` cannot select implantation amplifiers | `TargetScenarioRule` lacks `allowed_topics`; `_fact_is_eligible` blocks topic-only facts | ✅ |
 | **D** | Planner mislabels direct questions as scenarios (producer) | Planner prompt / classification — not runtime selector | ✅ observed |
+| **E** | `turn_topic` not reaching `select_target_marketing` | Package assembly chain drops explicit `turn_topic` before selector | ✅ |
 
 ## Owner decisions (binding for implementation)
 
@@ -4474,28 +4475,71 @@ allowlist; each is architecturally necessary (not convenience refactors):
 3. `include_initial_block=False` must **not** auto-zero valid `marketing_scenarios`.
 4. Scenario may work with `service_id=None` when topic/family applicability is authored in client data.
 5. Extend existing `TargetScenarioRule` with `allowed_topics` — **no new selector**.
-6. Direct informational questions are **not** scenarios:
-   - «сколько стоит?» ≠ `cost`
-   - «какая гарантия?» ≠ `result_reliability`
-   - «сколько длится?» ≠ `time`
-   - «кто врач?» ≠ `doctor_trust`
-7. Expressed concerns map to scenarios:
-   - «боюсь, что дорого» → `cost`
-   - «боюсь боли» → `pain_fear`
-   - «кажется, лечение слишком долгое» → `time`
-   - «вдруг не приживётся/сломается» → `result_reliability`
-   - «боюсь, что врач неопытный» → `doctor_trust`
-8. Safety: scenarios only at boundary `none`; contacts/terminal/clarify/handoff/verifier-block → no hooks.
-9. No eligible amplifier → main answer only, no invented hook.
-10. **Forbidden:** regex/phrase lists, second classifier, retry, voting, thresholds.
-11. **Limits preserved:** scenarios ≤2, amplifiers ≤2, marketing facts ≤3, cadence via `shown_amplifier_refs`,
+6. **`turn_topic` wiring:** `TurnFrame.topic` must reach `select_target_marketing` as an explicit
+   function parameter through bound pipeline → spec package → offline package → evidence → selector.
+   **Forbidden:** ContextVar/global/session ambient reads for topic; no bypass of the parameter chain.
+7. **Planner semantic prompt rules** (`core/turn_planner_llm.py`) — binding classification table:
+
+| User intent | Example | `marketing_scenarios` |
+|---|---|---|
+| Direct price question | «сколько стоит All-on-4?» | `[]` |
+| Direct duration question | «сколько длится имплантация?» | `[]` |
+| Direct warranty question | «какая гарантия?» | `[]` |
+| Direct doctor question | «кто делать будет?» | `[]` |
+| Expressed cost concern | «боюсь, что дорого» / «переживаю, что имплантация дорогая» | `["cost"]` |
+| Expressed pain concern | «боюсь боли» | `["pain_fear"]` |
+| Expressed time concern | «кажется, лечение слишком долгое» | `["time"]` |
+| Expressed reliability concern | «боюсь, что имплант не приживётся» | `["result_reliability"]` |
+| Expressed doctor-trust concern | «боюсь, что врач неопытный» | `["doctor_trust"]` |
+
+8. Direct informational questions are **not** scenarios (normative, same as table above).
+9. Expressed concerns map to scenarios (normative, same as table above).
+10. Safety: scenarios only at boundary `none`; contacts/terminal/clarify/handoff/verifier-block → no hooks.
+11. No eligible amplifier → main answer only, no invented hook.
+12. **Forbidden:** regex/phrase lists, second classifier, retry, voting, thresholds.
+13. **Limits preserved:** scenarios ≤2, amplifiers ≤2, marketing facts ≤3, cadence via `shown_amplifier_refs`,
     choice ≤4, secondary ≤2, price-detail ≤2, one navigation channel, CTA separate.
 
-## Production-faithful acceptance matrix (30 scenarios — implementation)
+**Producer test rule:** fake Planner that pre-injects correct `marketing_scenarios` is **not**
+acceptable proof for Seam D. Producer classification must be tested via `turn_planner_llm` prompt/payload
+path (`tests/test_turn_planner_llm.py`).
+
+### `turn_topic` wiring (existing → target)
+
+```text
+TurnFrame.topic
+  → target_turn_frame_bound_response / target_runtime_turn
+  → target_policy_bound_verified_response_pipeline (turn_topic param) ✅
+  → assemble_target_spec_offline_response_package (turn_topic param) ✅
+  → assemble_target_offline_response_package ❌ missing
+  → assemble_target_offline_response_materials ❌ missing
+  → build_target_response_evidence_package ❌ missing
+  → select_target_marketing(turn_topic=…) ❌ missing
+```
+
+Implementation must complete the chain without ContextVar/global topic reads.
+
+## Production-faithful acceptance matrix (implementation)
 
 **Test contour:** `app._orchestrate_ask_turn` → `/ask` and `/ask/stream` → real
 runtime/spec/package/selector/evidence/Composer parser/Verifier/widget/session.
 Fakes only at provider boundary. No working DB writes. No network.
+
+### Verification layers (marketing scenarios)
+
+Each marketing scenario case must assert the applicable layers **separately**:
+
+| Layer | Code | What is proven |
+|---|---|---|
+| **P** — Producer | `tests/test_turn_planner_llm.py` | Planner classifies `marketing_scenarios` from user text via prompt/payload path |
+| **R** — Runtime activation | implementation harness | `resolve_bound_marketing_flags` preserves scenarios when initial block OFF |
+| **E** — Evidence | implementation harness | selected amplifier ref appears in package materials / composer evidence |
+| **S** — Session | implementation harness | materialized turn writes ref to `shown_amplifier_refs` |
+
+**Not acceptable for layer P:** harness `run_planner_turn` fake that injects `marketing_scenarios`
+without exercising `turn_planner_llm` classification.
+
+Contact cases (1–11) prove verifier/runtime only (layers R+E equivalent).
 
 ### Contacts (1–11)
 
@@ -4515,27 +4559,27 @@ Fakes only at provider boundary. No working DB writes. No network.
 
 ### Marketing scenarios (12–30)
 
-| # | Scenario | Expected |
-|---|----------|----------|
-| 12 | pain concern | `pain_fear` amplifier |
-| 13 | reliability concern | `result_reliability` |
-| 14 | cost concern | `cost` |
-| 15 | time concern | `time` |
-| 16 | doctor concern | `doctor_trust` |
-| 17 | direct price question | no scenario |
-| 18 | direct duration question | no scenario |
-| 19 | direct warranty question | no scenario |
-| 20 | direct doctor question | no scenario |
-| 21 | known topic + `service_id=None` | eligible amplifier when authored |
-| 22 | unrelated topic | no implantation amplifier |
-| 23 | selected amplifier | appears in evidence/materials |
-| 24 | materialized session | ref written to `shown_amplifier_refs` |
-| 25 | repeated turn | no repeat of shown amplifier |
-| 26 | initial block OFF + scenario ON | scenario works |
-| 27 | initial block ON + no scenario | independent |
-| 28 | boundary/contacts/clarify | scenarios suppressed |
-| 29 | no eligible amplifier | normal answer |
-| 30 | true HTTP/runtime path | real SDK message builder invoked |
+| # | Scenario | Layers | Expected |
+|---|----------|--------|----------|
+| 12 | pain concern | P+R+E+S | `pain_fear` amplifier selected and persisted |
+| 13 | reliability concern | P+R+E+S | `result_reliability` |
+| 14 | cost concern | P+R+E+S | `cost` |
+| 15 | time concern | P+R+E+S | `time` |
+| 16 | doctor concern | P+R+E+S | `doctor_trust` |
+| 17 | direct price question | **P** | `marketing_scenarios=[]` |
+| 18 | direct duration question | **P** | `marketing_scenarios=[]` |
+| 19 | direct warranty question | **P** | `marketing_scenarios=[]` |
+| 20 | direct doctor question | **P** | `marketing_scenarios=[]` |
+| 21 | known topic + `service_id=None` | R+E | eligible amplifier when `allowed_topics` authored |
+| 22 | unrelated topic | R+E | no implantation amplifier |
+| 23 | selected amplifier | **E** | ref in evidence/materials |
+| 24 | materialized session | **S** | ref in `shown_amplifier_refs` |
+| 25 | repeated turn | R+E+S | no repeat of shown amplifier |
+| 26 | initial block OFF + scenario ON | **R**+E+S | scenario survives decouple |
+| 27 | initial block ON + no scenario | **R** | independent initial block only |
+| 28 | boundary/contacts/clarify | **R** | scenarios suppressed |
+| 29 | no eligible amplifier | R+E | normal answer, no invented hook |
+| 30 | true HTTP/runtime path | R+E | real SDK message builder invoked |
 
 ## Allowlist (governance commit only)
 
@@ -4557,13 +4601,22 @@ Fakes only at provider boundary. No working DB writes. No network.
 | `core/target_response_verifier.py` | UPDATE — value-only contact verify per requested field |
 | `core/target_presentation_turn_projection.py` | UPDATE — decouple `marketing_scenarios` from `include_initial_block` |
 | `core/target_policy_bound_verified_response_pipeline.py` | UPDATE — align bound pipeline with decoupled scenarios |
-| `core/target_marketing_selector.py` | UPDATE — `allowed_topics` on scenario rules; topic-only eligibility |
+| `core/target_turn_frame_bound_response.py` | UPDATE — preserve `turn_topic=turn_frame.topic` into package chain |
+| `core/target_runtime_turn.py` | UPDATE — same `turn_topic` pass-through at runtime entry |
+| `core/target_spec_offline_response_package.py` | UPDATE — forward `turn_topic` to offline package path |
+| `core/target_offline_response_package.py` | UPDATE — accept and forward `turn_topic` |
+| `core/target_offline_response_assembly.py` | UPDATE — forward `turn_topic` to evidence package |
+| `core/target_response_evidence.py` | UPDATE — pass `turn_topic` into `select_target_marketing` |
+| `core/target_marketing_selector.py` | UPDATE — `turn_topic` + `allowed_topics` on scenario rules |
+| `core/target_scope_aware_price_package.py` | UPDATE — pass `turn_topic` where marketing selection applies |
 | `contracts/response_schema.py` | UPDATE — `TargetScenarioRule.allowed_topics` |
 | `clients/demo/target_response/marketing.yaml` | UPDATE — authored `allowed_topics` on scenario rules |
-| `core/turn_planner_llm.py` | UPDATE — planner scenario label examples (no regex) |
+| `core/turn_planner_llm.py` | UPDATE — semantic prompt rules (direct question vs expressed concern) |
 | `scripts/validate_client_pack.py` | UPDATE — validate `allowed_topics` on scenario rules |
+| `tests/test_turn_planner_llm.py` | UPDATE — producer classification tests (layer P) |
+| `tests/test_turn_planner_wiring.py` | UPDATE — planner wiring if needed for producer path |
 | `tests/test_final_contact_value_verification_and_marketing_scenario_activation_harness.py` | CREATE — shared widget harness |
-| `tests/test_final_contact_value_verification_and_marketing_scenario_activation_implementation.py` | CREATE — 30-scenario COMPLETION matrix |
+| `tests/test_final_contact_value_verification_and_marketing_scenario_activation_implementation.py` | CREATE — acceptance matrix (layers P/R/E/S) |
 
 ## CREATE / UPDATE / DELETE / KEEP
 
@@ -4573,11 +4626,21 @@ Fakes only at provider boundary. No working DB writes. No network.
 | Contact value-only verifier | **UPDATE** |
 | Scenario decouple from initial block | **UPDATE** |
 | `TargetScenarioRule.allowed_topics` | **UPDATE** |
+| `turn_topic` package → selector chain | **UPDATE** |
+| Planner semantic prompt rules | **UPDATE** |
+| Producer tests (`test_turn_planner_llm.py`) | **UPDATE** |
 | Demo marketing.yaml topic rules | **UPDATE** |
 | Required strict commercial facts | **KEEP** |
 | Presentation limits / cadence | **KEEP** |
 | Frozen eval artifacts | **KEEP** |
 | New routes/selectors/pipelines | **FORBIDDEN** |
+
+## Governance correction (post `8fd4a52`)
+
+- Added `turn_planner_llm.py` + planner tests to implementation allowlist.
+- Fixed semantic prompt rules table (direct question → `[]`; expressed concern → scenario).
+- Documented full `turn_topic` wiring gap and intermediate package files in allowlist.
+- Acceptance matrix split into verification layers P/R/E/S; fake Planner not valid for layer P.
 
 ## STOP
 

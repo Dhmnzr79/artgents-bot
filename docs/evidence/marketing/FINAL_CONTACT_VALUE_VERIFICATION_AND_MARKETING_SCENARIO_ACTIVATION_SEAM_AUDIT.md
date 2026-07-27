@@ -27,8 +27,13 @@ contact evidence blocks, but two production seams remain:
 | **B** | `shown_fact_ids` populated; `shown_amplifier_refs=[]` after scenario turns | `resolve_bound_marketing_flags()` zeroes scenarios when `include_initial_block=False` |
 | **C** | `service_id=None` + valid topic cannot select topic-scoped amplifiers | Selector eligibility + scenario rule schema gap (`allowed_topics`) |
 | **D** | Planner mislabels some turns (producer) | Planner prompt / classification — **not** runtime selector; document only |
+| **E** | `turn_topic` stops before `select_target_marketing` | Explicit param in bound pipeline; not forwarded through offline package → selector |
 
 Lower-level tests that copy evidence text verbatim into Composer fakes **overstate** contact pass rate.
+
+**Fake Planner with pre-injected `marketing_scenarios` does not prove Seam D (producer) fix.**
+Producer proof requires classification through `core/turn_planner_llm.py` prompt/payload path
+(unit tests or provider-boundary fixture), not runtime harness overrides.
 
 ---
 
@@ -204,7 +209,64 @@ Live planner observations (not fixed in this milestone's runtime scope):
 | «кто делать будет?» | `doctor_trust` | **none** without expressed doubt |
 
 Planner prompt already states direct-question ≠ scenario (`core/turn_planner_llm.py` L86–89).
-Implementation may refine prompt examples; **no regex routing**.
+Implementation must strengthen **semantic prompt rules** (no regex routing):
+
+| User intent class | Example | `marketing_scenarios` |
+|---|---|---|
+| Direct price question | «сколько стоит All-on-4?» | `[]` |
+| Direct duration question | «сколько длится имплантация?» | `[]` |
+| Direct warranty question | «какая гарантия?» | `[]` |
+| Direct doctor question | «кто делать будет?» | `[]` |
+| Expressed cost concern | «боюсь, что дорого» / «переживаю, что имплантация дорогая» | `["cost"]` |
+| Expressed pain concern | «боюсь боли» | `["pain_fear"]` |
+| Expressed time concern | «кажется, лечение слишком долгое» | `["time"]` |
+| Expressed reliability concern | «боюсь, что имплант не приживётся» | `["result_reliability"]` |
+| Expressed doctor-trust concern | «боюсь, что врач неопытный» | `["doctor_trust"]` |
+
+Producer tests belong in `tests/test_turn_planner_llm.py` (and wiring tests if needed).
+**Forbidden:** harness `run_planner_turn` override that injects correct `marketing_scenarios` as
+producer-seam proof.
+
+---
+
+## Seam E — `turn_topic` wiring gap (package → selector)
+
+### Existing chain (read-only @ `225ee56`)
+
+```text
+Turn Planner → TurnFrame.topic (canonical topic string)
+  → target_turn_frame_bound_response L116: turn_topic=turn_frame.topic
+  → target_policy_bound_verified_response_pipeline._assemble_bound_package L100
+  → assemble_target_spec_offline_response_package(turn_topic=…)
+      ├─ fullcontext content/doctors path → target_fullcontext_content_package
+      │     turn_topic used only for select_topic_scoped_consultation_fact (consultation close)
+      └─ service path → assemble_target_offline_response_package
+            → assemble_target_offline_response_materials
+            → build_target_response_evidence_package
+            → select_target_marketing(...)   # ← turn_topic NOT passed
+```
+
+Parallel runtime entry: `core/target_runtime_turn.py` → bound response (same `turn_frame.topic`).
+
+`select_target_marketing` signature has **no** `turn_topic` parameter. Topic-scoped scenario
+applicability (`TargetScenarioRule.allowed_topics`) cannot be enforced without completing this chain.
+
+### Governance rule
+
+- `turn_topic` must flow as an **explicit function parameter** through package assembly into
+  `select_target_marketing`.
+- **Forbidden:** reading topic from ContextVar, module global, or ambient session outside the
+  TurnFrame argument already passed into bound response.
+- `target_composer_action_context.py` ContextVars are UI-action only — not a topic carrier.
+
+### Seam E verdict
+
+| Item | Status |
+|---|---|
+| `TurnFrame.topic` produced | **Connected** (planner) |
+| Bound pipeline receives `turn_topic` | **Connected** |
+| Offline package → evidence → selector | **Disconnected** |
+| ContextVar bypass | **Forbidden** |
 
 ---
 
@@ -224,14 +286,20 @@ accumulates amplifier cadence.
 
 ## Proposed implementation surface (governance allowlist — not executed here)
 
-| Area | Files (candidate) |
+| Area | Files |
 |---|---|
 | Contact value verify | `core/target_contact_authority.py`, `core/target_response_verifier.py` |
 | Decouple scenarios | `core/target_presentation_turn_projection.py` (`resolve_bound_marketing_flags`) |
+| Bound pipeline alignment | `core/target_policy_bound_verified_response_pipeline.py` |
+| `turn_topic` chain completion | `core/target_spec_offline_response_package.py`, `core/target_offline_response_package.py`, `core/target_offline_response_assembly.py`, `core/target_response_evidence.py` |
 | Selector applicability | `core/target_marketing_selector.py`, `contracts/response_schema.py` |
-| Demo policy data | `clients/demo/target_response/marketing.yaml`, `pricebook/facts.json` (if needed) |
-| Planner prompt | `core/turn_planner_llm.py` (label examples only) |
-| Tests | harness + implementation checker (30 scenarios) |
+| Price-path marketing | `core/target_scope_aware_price_package.py` (pass `turn_topic` where applicable) |
+| Runtime entry | `core/target_turn_frame_bound_response.py`, `core/target_runtime_turn.py` |
+| Demo policy data | `clients/demo/target_response/marketing.yaml` |
+| Planner semantic rules | `core/turn_planner_llm.py` |
+| Validator | `scripts/validate_client_pack.py` |
+| Planner producer tests | `tests/test_turn_planner_llm.py`, `tests/test_turn_planner_wiring.py` |
+| Runtime matrix tests | harness + implementation checker |
 
 ---
 

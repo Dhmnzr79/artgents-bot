@@ -17,6 +17,7 @@ services:
   - classic
   - one_stage
   - sinus_lift
+  - bone_graft
   - all_on_4
   - all_on_6
   - temporary_teeth

@@ -3893,12 +3893,12 @@ Wide failures identical on `204da81` and `18e4d47` — **not** H–N regression.
 
 | Decision | Proposed | Status |
 |----------|----------|--------|
-| `bone_graft` → orlov | yes (MD: костная пластика) | **PENDING** |
-| `bone_graft` → volkov | yes (surgical implantologist) | **PENDING** |
-| `bone_graft` → kuznetsov | **no** | **PENDING** |
-| No bone_graft-specific promotion | yes | **PENDING** |
-| Remove legacy marketing hash pin | yes | **PENDING** |
-| `UNIT_LABELS` numeric-only | yes | **PENDING** |
+| `bone_graft` → orlov | yes (MD: костная пластика) | **APPROVED** |
+| `bone_graft` → volkov | yes (surgical implantologist) | **APPROVED** |
+| `bone_graft` → kuznetsov | **no** | **APPROVED** |
+| No bone_graft-specific promotion | yes | **APPROVED** |
+| Remove legacy marketing hash pin | yes | **APPROVED** |
+| `UNIT_LABELS` numeric-only | yes | **APPROVED** |
 
 ## Acceptance matrix (implementation)
 
@@ -3980,4 +3980,34 @@ python -m pytest --collect-only -q
 
 Governance PRE-CODE PASS does **not** authorize implementation.
 **STOP after governance commit + push** — await owner GO.
+
+## Implementation completion record
+
+| Field | Value |
+|-------|-------|
+| Governance HEAD | `525c18e` |
+| Implementation HEAD | `05d0033` |
+| Owner GO | ✅ Phase 2 approved |
+| PRE-CODE (governance) | 10/10 ✅ |
+| COMPLETION (focused) | 44/44 ✅ |
+| Wide safe-offline (corrected) | 263/263 ✅ |
+| collect-only `tests/` | 2772 ✅ |
+| `validate_client_pack` demo + `_template` | ✅ |
+| `import app` | ✅ |
+| frozen pins | ✅ unchanged |
+| LIVE / LLM | **none** |
+
+### Files changed (implementation)
+
+| File | Change |
+|------|--------|
+| `clients/demo/doctor_catalog.json` | `bone_graft` → orlov + volkov |
+| `clients/demo/md/doctors__doctor__orlov.md` | `services` frontmatter + `bone_graft` |
+| `clients/demo/md/doctors__doctor__volkov.md` | `services` frontmatter + `bone_graft` |
+| `tests/test_demo_target_price_offers.py` | `UNIT_LABELS` numeric-only scope |
+| `tests/test_demo_target_marketing_policy.py` | drop legacy hash pin; digest 36 files |
+| `tests/test_demo_target_marketing_migration_audit.py` | facts superset parity |
+| `tests/test_demo_doctor_catalog.py` | `_EXPECTED_CATALOG` snapshot sync |
+| `docs/evidence/client_pack/fixtures/demo_legacy_marketing.yaml` | historical isolate (moved) |
+| `tests/test_demo_bone_graft_pack_consistency_implementation.py` | CREATE COMPLETION checker |
 

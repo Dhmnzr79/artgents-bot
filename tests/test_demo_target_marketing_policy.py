@@ -27,8 +27,6 @@ TARGET_ROOT = DEMO_ROOT / "target_response"
 MD_ROOT = DEMO_ROOT / "md"
 DOCTOR_CATALOG = DEMO_ROOT / "doctor_catalog.json"
 TONE = DEMO_ROOT / "tone.yaml"
-CURRENT_MARKETING = Path("tests/fixtures/demo_legacy_marketing.yaml")
-
 EXPECTED_INITIAL_REFS = [
     "fact:free_implant_consult",
     "fact:installment_12",
@@ -82,11 +80,10 @@ EXPECTED_SCENARIOS = {
     },
 }
 EXPECTED_CURRENT_HASHES = {
-    CURRENT_MARKETING: "e958fcd14be057a3e9867ec133175f4024f90178fbfedec8d3d1421f8e2c1eae",
     TONE: "b357142967527e0cdd50387efbeaf2d8d3b2a7218a1c5cd8112a316e17f6076f",
 }
 EXPECTED_PREEXISTING_TARGET_DIGEST = (
-    "214b6eaac7b6995e2e63f1d92f928f66370d879e05354f65a400ea2342bb639d"
+    "9049b656346bb101cf9a70633d02c515f86613126aeabff952130ff570f2defb"
 )
 
 
@@ -116,7 +113,7 @@ def _preexisting_target_digest() -> str:
         for path in TARGET_ROOT.rglob("*")
         if path.is_file() and path.name != "marketing.yaml"
     )
-    assert len(paths) == 35
+    assert len(paths) == 36
     for path in paths:
         digest.update(path.relative_to(TARGET_ROOT).as_posix().encode("utf-8"))
         digest.update(b"\0")

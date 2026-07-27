@@ -278,11 +278,27 @@ def test_exact_12_top_offers_preserve_authored_payment_stages() -> None:
         assert all(followup["id"] != "stages" for followup in offer["followups"])
 
 
+def _numeric_price_service_ids() -> set[str]:
+    return {
+        offer["service_id"]
+        for offer in _target_offer_records()
+        if offer.get("price", {}).get("mode") != "no_public_price"
+    }
+
+
 def test_owner_units_labels_and_followups_have_no_legacy_dead_actions() -> None:
     offers = _target_offer_records()
+    catalog_services = set(_load_json(TARGET_SERVICES))
+    numeric_services = _numeric_price_service_ids()
 
-    assert set(UNIT_LABELS) == set(_load_json(TARGET_SERVICES))
+    assert set(UNIT_LABELS) == numeric_services
+    assert numeric_services <= catalog_services
+    assert "bone_graft" in catalog_services
+    assert "bone_graft" not in UNIT_LABELS
     for offer in offers:
+        if offer.get("price", {}).get("mode") == "no_public_price":
+            assert "billing_unit" not in offer.get("price", {})
+            continue
         unit, label = UNIT_LABELS[offer["service_id"]]
         assert offer["price"]["billing_unit"] == unit
         assert offer["package"]["label"] == label

@@ -18,6 +18,7 @@ services:
   - classic
   - one_stage
   - sinus_lift
+  - bone_graft
   - zygomatic_implants
   - pterygoid_implants
   - all_on_4

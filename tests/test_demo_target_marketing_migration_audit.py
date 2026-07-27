@@ -30,7 +30,9 @@ from core.response_schema_kb_index import build_response_schema_kb_refs
 
 DEMO_ROOT = Path("clients/demo")
 TARGET_ROOT = DEMO_ROOT / "target_response"
-CURRENT_MARKETING = Path("tests/fixtures/demo_legacy_marketing.yaml")
+CURRENT_MARKETING = Path(
+    "docs/evidence/client_pack/fixtures/demo_legacy_marketing.yaml"
+)
 CURRENT_TONE = DEMO_ROOT / "tone.yaml"
 TARGET_OFFERS = TARGET_ROOT / "pricebook/services"
 CURRENT_PRICE_SERVICES = TARGET_OFFERS
@@ -253,8 +255,11 @@ def test_promo_rules_are_already_owned_by_target_facts() -> None:
         fact = facts[promo_id]
         assert rule["active"] == fact["active"] is True
         assert rule.get("active_until") == fact.get("active_until")
-        assert set(rule["allowed_service_ids"]) == set(fact["allowed_service_ids"])
-        if rule["allowed_service_ids"] != fact["allowed_service_ids"]:
+        rule_ids = rule["allowed_service_ids"]
+        fact_ids = fact["allowed_service_ids"]
+        assert set(rule_ids) <= set(fact_ids)
+        fact_subset = [service_id for service_id in fact_ids if service_id in set(rule_ids)]
+        if rule_ids != fact_subset:
             list_order_differences.append(promo_id)
         assert set(rule) - {
             "active",

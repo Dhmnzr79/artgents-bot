@@ -4642,6 +4642,29 @@ Contact cases (1–11) prove verifier/runtime only (layers R+E equivalent).
 - Documented full `turn_topic` wiring gap and intermediate package files in allowlist.
 - Acceptance matrix split into verification layers P/R/E/S; fake Planner not valid for layer P.
 
+## Implementation completion record
+
+**Status:** COMPLETE — Phase 2 @ `codex/stage-a`
+
+| Item | Result |
+|------|--------|
+| Contact value-only verifier | ✅ `canonical_contact_scalar` + normalized substring check |
+| Scenario decouple from initial block | ✅ `resolve_bound_marketing_flags` |
+| `turn_topic` → selector chain | ✅ package assembly + `select_target_marketing(turn_topic=…)` |
+| `TargetScenarioRule.allowed_topics` | ✅ schema + demo `marketing.yaml` |
+| Planner semantic rules | ✅ `turn_planner_llm.py` + layer P tests |
+| Content-only scenario evidence | ✅ `target_scoped_response_evidence.py` (allowlist deviation) |
+| COMPLETION matrix | ✅ 31 tests in implementation checker |
+| Governance PRE-CODE | ✅ 17 passed |
+| Frozen pins | ✅ unchanged |
+
+**Allowlist deviations:**
+
+| File | Reason |
+|------|--------|
+| `core/target_scoped_response_evidence.py` | KB scenario amplifiers must reach composer on content-only path |
+| `tests/test_target_marketing_selector.py` | `turn_topic` signature pin update |
+
 ## STOP
 
 Governance PRE-CODE PASS does **not** authorize implementation.

@@ -727,11 +727,24 @@ def verify_target_composed_response(
                 _error("target_verifier_strict_fact_missing", block.fact_ids[0])
     has_clinic_contact = any(block.kind == "clinic_contact" for block in request.evidence_blocks)
     if has_clinic_contact:
+        from core.target_contact_authority import (
+            canonical_contact_scalar,
+            contact_field_from_evidence_ref,
+            normalize_contact_scalar,
+        )
+
         contact_blocks = [
             block for block in request.evidence_blocks if block.kind == "clinic_contact"
         ]
+        normalized_answer = normalize_contact_scalar(response.text)
         for block in contact_blocks:
-            if block.text not in response.text:
+            field = contact_field_from_evidence_ref(block.ref)
+            if field is None:
+                _error("target_verifier_clinic_contact_missing", block.ref)
+            canonical = canonical_contact_scalar(field, client_id="demo")
+            if not canonical:
+                _error("target_verifier_clinic_contact_missing", block.ref)
+            if normalize_contact_scalar(canonical) not in normalized_answer:
                 _error("target_verifier_clinic_contact_missing", block.ref)
     try:
         assess = getattr(semantic_backend, "assess")

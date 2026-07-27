@@ -40,3 +40,14 @@ def test_general_contacts_returns_all_fields() -> None:
     assert fields is not None
     blocks = materialize_clinic_contact_primary_evidence("demo", fields=fields)
     assert len(blocks) >= 3
+
+
+def test_canonical_contact_scalar_matches_policy() -> None:
+    from core.target_contact_authority import canonical_contact_scalar, normalize_contact_scalar
+
+    scalar = canonical_contact_scalar("address", "demo")
+    assert scalar
+    assert "Тверская" in scalar
+    assert normalize_contact_scalar(scalar) in normalize_contact_scalar(
+        f"Мы находимся по адресу {scalar}"
+    )

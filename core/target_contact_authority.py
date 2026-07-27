@@ -189,3 +189,42 @@ def fallback_answer_with_phone(*, base_text: str, client_id: str | None) -> str:
     if phone in base_text:
         return base_text
     return f"{base_text.rstrip()} Пожалуйста, позвоните нам: {phone}."
+
+
+def contact_field_from_evidence_ref(ref: str) -> ContactFieldKind | None:
+    if not ref.startswith("clinic_contact:"):
+        return None
+    field = ref.removeprefix("clinic_contact:")
+    if field in {
+        "phone",
+        "whatsapp",
+        "address",
+        "hours",
+        "parking",
+    }:
+        return field  # type: ignore[return-value]
+    return None
+
+
+def canonical_contact_scalar(
+    field: ContactFieldKind,
+    client_id: str | None,
+) -> str | None:
+    facts = load_clinic_contact_facts(client_id)
+    if field == "phone":
+        return facts.phone_display or None
+    if field == "whatsapp":
+        return facts.whatsapp_display
+    if field == "address":
+        return facts.address_display
+    if field == "hours":
+        return facts.hours_display
+    if field == "parking":
+        return facts.parking_display
+    return None
+
+
+def normalize_contact_scalar(text: str) -> str:
+    import unicodedata
+
+    return " ".join(unicodedata.normalize("NFC", text).split())

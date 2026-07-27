@@ -20,6 +20,9 @@ scenario_rules:
       - kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut
     allowed_semantic_contexts:
       - service
+      - default
+    allowed_topics:
+      - implantation
   cost:
     ordered_amplifier_refs:
       - fact:installment_12
@@ -30,6 +33,9 @@ scenario_rules:
     allowed_semantic_contexts:
       - service
       - price
+      - default
+    allowed_topics:
+      - implantation
   time:
     ordered_amplifier_refs:
       - kb:implantation__faq__duration.md#korotko
@@ -38,6 +44,9 @@ scenario_rules:
       - kb:implantation__info__steps.md#korotko
     allowed_semantic_contexts:
       - service
+      - default
+    allowed_topics:
+      - implantation
   doctor_trust:
     ordered_amplifier_refs:
       - doctor:doctors__doctor__volkov
@@ -47,6 +56,10 @@ scenario_rules:
     allowed_semantic_contexts:
       - service
       - doctors
+      - default
+    allowed_topics:
+      - implantation
+      - doctors
   result_reliability:
     ordered_amplifier_refs:
       - fact:implant_warranty
@@ -55,6 +68,9 @@ scenario_rules:
       - kb:clinic__info__warranty.md#korotko
     allowed_semantic_contexts:
       - service
+      - default
+    allowed_topics:
+      - implantation
 
 cta_contexts:
   service: plan

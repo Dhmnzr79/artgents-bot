@@ -113,6 +113,7 @@ def build_target_response_evidence_package(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    turn_topic: str | None = None,
 ) -> TargetResponseEvidencePackage:
     """Assemble detached target materials without selecting or rendering an answer."""
 
@@ -128,6 +129,7 @@ def build_target_response_evidence_package(
         marketing_scenarios=marketing_scenarios,
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
+        turn_topic=turn_topic,
     )
 
     consultation_records = _validated_consultation_values(consultation_values)
@@ -200,4 +202,37 @@ def build_target_response_evidence_package(
         consultation_close=consultation_close,
         marketing_slots_used=marketing_slots_used,
         amplifier_slots_used=amplifier_slots_used,
+    )
+
+
+def merge_marketing_selection_into_materials(
+    materials: object,
+    bundle: ResponseSchemaBundle,
+    selection: TargetMarketingSelection,
+) -> object:
+    """Attach scenario marketing selection to minimal FullContext materials."""
+
+    from dataclasses import replace
+
+    from core.target_offline_response_assembly import TargetOfflineResponseMaterials
+
+    if type(materials) is not TargetOfflineResponseMaterials:
+        raise TypeError("materials_must_be_target_offline_response_materials")
+
+    commercial_facts = list(materials.commercial_facts)
+    external_source_refs = list(materials.external_source_refs)
+    for ref in selection.selected_refs:
+        if ref.startswith("fact:"):
+            commercial_facts.append(
+                bundle.facts[ref.removeprefix("fact:")].model_copy(deep=True)
+            )
+        else:
+            external_source_refs.append(ref)
+    return replace(
+        materials,
+        marketing_selection=selection,
+        commercial_facts=tuple(commercial_facts),
+        external_source_refs=tuple(external_source_refs),
+        marketing_slots_used=len(selection.selected_refs),
+        amplifier_slots_used=len(selection.amplifier_refs),
     )

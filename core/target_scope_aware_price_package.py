@@ -191,6 +191,7 @@ def assemble_scope_aware_price_package(
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
+    turn_topic: str | None = None,
 ) -> TargetOfflineResponsePackage:
     topic = spec.scope_price_topic
     if topic is None:
@@ -301,6 +302,7 @@ def assemble_scope_aware_price_package(
                 marketing_scenarios=marketing_scenarios,
                 shown_fact_ids=shown_fact_ids,
                 shown_amplifier_refs=shown_amplifier_refs,
+                turn_topic=turn_topic or topic,
             )
             if len(marketing_selection.selected_refs) > 1:
                 marketing_selection = TargetMarketingSelection(

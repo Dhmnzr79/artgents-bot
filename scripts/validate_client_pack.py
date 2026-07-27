@@ -157,6 +157,13 @@ def validate_client_pack(
     except Exception as exc:
         errors.append(f"target_response/: external_ref_invalid:{exc}")
 
+    for scenario_name, rule in bundle.marketing.scenario_rules.items():
+        if rule.allowed_topics and not rule.allowed_semantic_contexts:
+            errors.append(
+                f"target_response/marketing.yaml:{scenario_name}:"
+                "allowed_topics_without_semantic_contexts"
+            )
+
     policies_path = rel("clinic_policies.yaml")
     if policies_path.is_file():
         import yaml

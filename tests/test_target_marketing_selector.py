@@ -670,6 +670,7 @@ def test_public_signature_and_source_boundary_are_exact() -> None:
         "marketing_scenarios",
         "shown_fact_ids",
         "shown_amplifier_refs",
+        "turn_topic",
     )
     assert all(
         signature.parameters[name].kind is inspect.Parameter.KEYWORD_ONLY

@@ -67,6 +67,7 @@ def assemble_target_offline_response_package(
     shown_amplifier_refs: Sequence[str] = (),
     shown_consultation_value_refs: Sequence[str] = (),
     effective_scope: EffectiveScope | None = None,
+    turn_topic: str | None = None,
 ) -> TargetOfflineResponsePackage:
     """Run the proven offline S27-S30 segment without adding decisions."""
 
@@ -89,6 +90,7 @@ def assemble_target_offline_response_package(
         shown_consultation_value_refs=shown_consultation_value_refs,
         effective_scope=effective_scope,
         explicit_service_price_lookup=price_lookup,
+        turn_topic=turn_topic,
     )
     response_stage: ResponseStage | None = None
     if (

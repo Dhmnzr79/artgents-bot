@@ -218,6 +218,8 @@ def build_target_scoped_response_evidence(
             _error("scoped_evidence_package_inconsistent", "consultation_content_ref")
         if len(plan.commercial_fact_ids) > 1:
             _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+        if plan.external_source_refs != materials.external_source_refs:
+            _error("scoped_evidence_package_inconsistent", "external_source_refs")
         records: list[TargetEvidenceScopeRecord] = []
         for fact_id in plan.commercial_fact_ids:
             fact = facts_by_id[fact_id]
@@ -233,6 +235,16 @@ def build_target_scoped_response_evidence(
                     fact_ids=(fact_id,),
                 )
             )
+        for ref in materials.external_source_refs:
+            if not ref.startswith("kb:"):
+                _error("scoped_evidence_package_inconsistent", "external_source_refs")
+            records.append(
+                TargetEvidenceScopeRecord(
+                    ref=ref,
+                    topics=(_topic(root, ref, kb_ref=True),),
+                    fact_ids=(),
+                )
+            )
         return TargetScopedResponseEvidence(
             spec=spec,
             service_id=None,
@@ -240,7 +252,7 @@ def build_target_scoped_response_evidence(
             offer_ids=(),
             doctor_ids=(),
             commercial_fact_ids=plan.commercial_fact_ids,
-            external_source_refs=(),
+            external_source_refs=materials.external_source_refs,
             consultation_content_ref=None,
             selected_followups=package.selected_followups,
             selected_cta_key=None,

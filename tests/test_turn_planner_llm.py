@@ -106,6 +106,7 @@ def _valid_attempt_payload() -> dict:
         "brand_filter": None,
         "topic": "implantation",
         "topic_confidence": 0.9,
+        "marketing_scenarios": [],
     }
 
 
@@ -549,3 +550,41 @@ def test_partial_shadow_is_not_read_by_downstream_modules():
         if "PlannerAttempt" in source or ".shadow_frame" in source:
             offenders.append(str(path))
     assert offenders == []
+
+
+def test_system_prompt_marketing_scenario_semantic_rules() -> None:
+    assert "сколько стоит All-on-4?" in _SYSTEM
+    assert "боюсь боли" in _SYSTEM
+    assert "result_reliability" in _SYSTEM
+    assert "doctor_trust" in _SYSTEM
+
+
+@pytest.mark.parametrize(
+    ("user_message", "scenarios"),
+    [
+        ("сколько стоит All-on-4?", []),
+        ("сколько длится имплантация?", []),
+        ("какая гарантия?", []),
+        ("кто делать будет?", []),
+        ("боюсь боли", ["pain_fear"]),
+        ("боюсь, что имплант не приживётся", ["result_reliability"]),
+        ("переживаю, что имплантация дорогая", ["cost"]),
+        ("кажется, лечение слишком долгое", ["time"]),
+        ("боюсь, что врач неопытный", ["doctor_trust"]),
+    ],
+)
+def test_marketing_scenarios_planner_payload_classification(
+    monkeypatch,
+    user_message: str,
+    scenarios: list[str],
+) -> None:
+    payload = _valid_attempt_payload()
+    payload["marketing_scenarios"] = scenarios
+    captured = _prepare_attempt(monkeypatch, payload)
+    attempt = plan_turn_attempt(user_message, f"attempt-mkt-{scenarios}", "demo")
+    assert attempt.shadow_status == "ok"
+    assert attempt.shadow_frame is not None
+    assert list(attempt.shadow_frame.marketing_scenarios) == scenarios
+    assert captured.get("messages")
+    user_content = str(captured["messages"][-1]["content"])
+    assert user_message in user_content

@@ -19,6 +19,8 @@ from contracts.response_schema import ResponseSchemaBundle, TargetStrategyMatch
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
+from core.target_marketing_selector import select_target_marketing
+from core.target_response_evidence import merge_marketing_selection_into_materials
 from core.target_fullcontext_content_package import (
     assemble_target_fullcontext_content_bound_package,
     assemble_target_fullcontext_doctors_bound_package,
@@ -93,11 +95,11 @@ def assemble_target_spec_offline_response_package(
     effective_include_cta = include_cta and spec.allow_cta
     scope = effective_scope or EffectiveScope()
     if is_fullcontext_content_only_spec(spec):
-        if brand_term is not None or include_initial_block or marketing_scenarios != ():
+        if brand_term is not None or include_initial_block:
             _error("spec_package_permission_forbidden", "marketing_facts")
         if include_consultation_close and not spec.allow_consultation_close:
             _error("spec_package_permission_forbidden", "consultation_close")
-        return assemble_target_fullcontext_content_bound_package(
+        bound = assemble_target_fullcontext_content_bound_package(
             spec,
             bundle,
             turn_topic=turn_topic,
@@ -106,6 +108,49 @@ def assemble_target_spec_offline_response_package(
             include_consultation_close=include_consultation_close,
             selected_cta_key=None,
         )
+        if marketing_scenarios:
+            selection = select_target_marketing(
+                bundle,
+                doctor_catalog,
+                external_index,
+                semantic_context=semantic_context,
+                service_id=None,
+                today=today,
+                include_initial_block=False,
+                marketing_scenarios=marketing_scenarios,
+                shown_fact_ids=shown_fact_ids,
+                shown_amplifier_refs=shown_amplifier_refs,
+                turn_topic=turn_topic,
+            )
+            merged_materials = merge_marketing_selection_into_materials(
+                bound.package.materials,
+                bundle,
+                selection,
+            )
+            bound = replace(
+                bound,
+                package=replace(
+                    bound.package,
+                    materials=merged_materials,
+                    plan=replace(
+                        bound.package.plan,
+                        commercial_fact_ids=tuple(
+                            dict.fromkeys(
+                                (
+                                    *bound.package.plan.commercial_fact_ids,
+                                    *(
+                                        ref.removeprefix("fact:")
+                                        for ref in selection.selected_refs
+                                        if ref.startswith("fact:")
+                                    ),
+                                )
+                            )
+                        ),
+                        external_source_refs=merged_materials.external_source_refs,
+                    ),
+                ),
+            )
+        return bound
     if is_fullcontext_doctors_only_spec(spec):
         if brand_term is not None or include_initial_block or marketing_scenarios != ():
             _error("spec_package_permission_forbidden", "marketing_facts")
@@ -149,6 +194,7 @@ def assemble_target_spec_offline_response_package(
             shown_fact_ids=shown_fact_ids,
             shown_amplifier_refs=shown_amplifier_refs,
             shown_consultation_value_refs=shown_consultation_value_refs,
+            turn_topic=turn_topic,
         )
         out_spec = spec
         collapsed_service_id = package.plan.service_id
@@ -229,6 +275,7 @@ def assemble_target_spec_offline_response_package(
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
         effective_scope=scope,
+        turn_topic=turn_topic,
     )
     out_spec = spec
     if package.response_stage is not None:

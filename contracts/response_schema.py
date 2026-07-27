@@ -427,6 +427,7 @@ class TargetInitialCommercialBlock(TargetSchemaModel):
 class TargetScenarioRule(TargetSchemaModel):
     ordered_amplifier_refs: list[SourceRef] = Field(default_factory=list)
     allowed_semantic_contexts: list[NonBlankStr] = Field(default_factory=list)
+    allowed_topics: list[NonBlankStr] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _refs_unique(self) -> "TargetScenarioRule":
@@ -434,6 +435,8 @@ class TargetScenarioRule(TargetSchemaModel):
             raise ValueError("scenario_amplifier_ref_duplicate")
         if _duplicates(self.allowed_semantic_contexts):
             raise ValueError("scenario_semantic_context_duplicate")
+        if _duplicates(self.allowed_topics):
+            raise ValueError("scenario_allowed_topic_duplicate")
         return self
 
 

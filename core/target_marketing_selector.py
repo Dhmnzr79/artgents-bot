@@ -78,6 +78,7 @@ def _fact_is_eligible(
     fact_ref: str,
     *,
     service_id: str | None,
+    turn_topic: str | None,
     today_iso: str,
     shown_fact_ids: frozenset[str],
     selected_fact_ids: set[str],
@@ -93,7 +94,8 @@ def _fact_is_eligible(
     if fact.allowed_service_ids and service_id not in fact.allowed_service_ids:
         return False
     if service_id is None and fact.allowed_topics:
-        return False
+        if not turn_topic or turn_topic not in fact.allowed_topics:
+            return False
     if (
         service_id is not None
         and fact.allowed_topics
@@ -119,6 +121,7 @@ def _candidate_is_eligible(
     ref: str,
     semantic_context: str,
     service_id: str | None,
+    turn_topic: str | None,
     today_iso: str,
     shown_fact_ids: frozenset[str],
     shown_amplifier_refs: frozenset[str],
@@ -135,6 +138,7 @@ def _candidate_is_eligible(
             bundle,
             ref,
             service_id=service_id,
+            turn_topic=turn_topic,
             today_iso=today_iso,
             shown_fact_ids=shown_fact_ids,
             selected_fact_ids=selected_fact_ids,
@@ -165,6 +169,7 @@ def select_target_marketing(
     marketing_scenarios: Sequence[str] = (),
     shown_fact_ids: Sequence[str] = (),
     shown_amplifier_refs: Sequence[str] = (),
+    turn_topic: str | None = None,
 ) -> TargetMarketingSelection:
     """Select exact automatic refs without reading or mutating product/session state."""
 
@@ -203,11 +208,19 @@ def select_target_marketing(
     )
 
     policy = bundle.marketing
+    normalized_topic = turn_topic.strip() if isinstance(turn_topic, str) and turn_topic.strip() else None
     applicable_scenarios = tuple(
         scenario
         for scenario in scenarios
         if (rule := policy.scenario_rules.get(scenario)) is not None
         and semantic_context in rule.allowed_semantic_contexts
+        and (
+            not rule.allowed_topics
+            or (
+                normalized_topic is not None
+                and normalized_topic in rule.allowed_topics
+            )
+        )
     )[: policy.limits.max_scenarios_per_turn]
 
     external_kb_refs = frozenset(external_index.kb_refs)
@@ -248,6 +261,7 @@ def select_target_marketing(
                     ref=ref,
                     semantic_context=semantic_context,
                     service_id=service_id,
+                    turn_topic=turn_topic,
                     today_iso=today_iso,
                     shown_fact_ids=shown_fact_id_set,
                     shown_amplifier_refs=shown_amplifier_ref_set,
@@ -280,6 +294,7 @@ def select_target_marketing(
                     ref=ref,
                     semantic_context=semantic_context,
                     service_id=service_id,
+                    turn_topic=turn_topic,
                     today_iso=today_iso,
                     shown_fact_ids=shown_fact_id_set,
                     shown_amplifier_refs=shown_amplifier_ref_set,

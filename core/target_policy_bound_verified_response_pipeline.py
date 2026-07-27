@@ -64,7 +64,6 @@ def _assemble_bound_package(
     spec = build_target_response_spec(policy_request)
     if is_fullcontext_service_optional_spec(spec):
         include_initial_block = False
-        marketing_scenarios = ()
         brand_term = None
     if is_scope_aware_price_spec(spec):
         include_consultation_close = False

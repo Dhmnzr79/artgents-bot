@@ -76,6 +76,7 @@ def assemble_target_offline_response_materials(
     shown_consultation_value_refs: Sequence[str] = (),
     effective_scope: EffectiveScope | None = None,
     explicit_service_price_lookup: bool = False,
+    turn_topic: str | None = None,
 ) -> TargetOfflineResponseMaterials:
     """Compose existing target selectors into one final factual material boundary."""
 
@@ -108,6 +109,7 @@ def assemble_target_offline_response_materials(
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
+        turn_topic=turn_topic,
     )
 
     selected_brand_id: str | None = None

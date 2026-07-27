@@ -94,9 +94,14 @@ def resolve_bound_marketing_flags(
     if not boundary_allows_marketing:
         return False, (), None
     include_initial_block = should_include_initial_marketing_block(turn_frame, bound_spec)
-    if not include_initial_block:
-        return False, (), None
-    scenarios = tuple(marketing_scenarios) if marketing_scenarios else ()
+    scenarios: tuple[str, ...] = ()
+    if (
+        marketing_scenarios
+        and contact_fields_from_turn_frame(turn_frame) is None
+        and not turn_frame.needs_clarification
+        and bound_spec.response_mode in {"answer", "medical_handoff"}
+    ):
+        scenarios = tuple(marketing_scenarios)
     resolved_brand = brand_term if include_initial_block else None
     return include_initial_block, scenarios, resolved_brand
 

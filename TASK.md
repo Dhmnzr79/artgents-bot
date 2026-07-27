@@ -3514,3 +3514,219 @@ while preserving `sinus_lift` as separate priced procedure.
 
 **STOP after correction PRE-CODE ✅** — demo data + product implementation require separate owner GO.
 
+---
+
+# TASK — FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE (governance)
+
+**Status:** governance checkpoint only · **NO PRODUCT CHANGE / NO LIVE / NO LLM**
+
+**Baseline:** `codex/stage-a` @ `7c716df` (`FULLCONTEXT_PRESENTATION_PARITY` Phase 2 complete)
+
+**Authority:** owner decisions §1–7; seam audit
+`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
+
+## Goal
+
+Архитектурно закрыть оставшиеся после FullContext-перехода разрывы в FAQ source identity,
+контактах, UI-каналах, situation, marketing hooks и fallback — без RAG и без временных костылей.
+
+Phase 2 `FULLCONTEXT_PRESENTATION_PARITY` (@ `7c716df`) подключил presentation decision,
+частичную source validation, marketing runtime и bone_graft demo data. Этот milestone закрывает
+оставшиеся gaps **H–N** (см. audit).
+
+## Owner decisions (binding)
+
+### 1. Source identity (generic FAQ)
+
+Structured Composer sidecar/envelope:
+
+- `text`; `used_content_refs`; `primary_content_ref`
+- refs validated against cached FullContext MD index; invented IDs fail-closed
+- Verifier passes validated identity only; presentation metadata from validated primary
+- exact-service paths unchanged
+
+### 2. Authoritative contact data
+
+One canonical structured schema (phone, WhatsApp, address, hours, parking).
+Direct contact questions → PRIMARY_EVIDENCE, not free Composer generation.
+Single authoring surface per fact class (see audit contact table).
+
+### 3. UI channel separation
+
+Choice ≤4 | content secondary ≤2 (video → follow-up → situation) | price-detail ≤2 | CTA separate.
+**One response = one navigation channel** — no `choice+price`, no `secondary+price`.
+
+### 4. Situation
+
+`situation_allowed` on validated primary; after video + follow-up; session no-repeat.
+Intake: situation → name → phone → demo_stub. HTTP tests required.
+
+### 5. Marketing hooks
+
+All typed scenarios: `pain_fear`, `cost`, `time`, `doctor_trust`, `result_reliability`.
+TurnFrame/planner only (no regex). Max 0–2 scenarios; 3/2 limits preserved.
+`consultation_value` rules unchanged.
+
+### 6. Fallback / handoff
+
+Fixed text + canonical phone only; no CTA/QR/video/situation/marketing; `attribution_kind=plain`.
+Composer must not invent phone. Internal error/reset — plain attribution, not clinic-material.
+
+### 7. Regression coverage
+
+Restore stale multi-turn tests (vague doctors/price, payment follow-up, hydration, clinic-wide
+doctors, terminal/error focus preservation).
+
+## Confirmed gaps (read-only audit @ `7c716df`)
+
+| Gap | Summary |
+|-----|---------|
+| **H** | No Composer source identity sidecar; FAQ `primary_content_ref=None`; evidence-inferred refs insufficient |
+| **I** | Contact data split; no PRIMARY_EVIDENCE contact path; free Composer generation |
+| **J** | Situation priority before content follow-ups (should be after video + follow-up) |
+| **K** | `choice_qr + price_qr` and `secondary_qr + price_qr` channel mixing |
+| **L** | Situation HTTP offline tests missing (start/back/submit/SID/PII) |
+| **M** | `time` and `result_reliability` not projected in `derive_marketing_scenarios` |
+| **N** | Fallback/error without canonical phone; `internal_error_response` missing plain attribution |
+
+Prior gaps A–G: **partially addressed** in Phase 2; residual risks in H–N and post-widget limiter.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md` | CREATE |
+| `docs/MARKETING_SCENARIO_ARCHITECTURE.md` | UPDATE — channel mutex + time/result_reliability projection |
+| `docs/MARKETING_QUESTION_FOUNDATION.md` | UPDATE — situation priority + fallback phone |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE — source identity sidecar + contact authority + channel mutex |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — checkpoint row |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — checkpoint entry |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — status entry |
+| `docs/CLIENT_PACK_AUTHORING.md` | UPDATE — canonical contact authority |
+| `tests/test_fullcontext_dialogue_presentation_convergence_governance.py` | CREATE — PRE-CODE checker |
+
+**Forbidden in governance commit:**
+
+- Product code changes
+- Data migration
+- LIVE / LLM eval runs
+- RAG/retriever, regex blocklists, Verifier policy tuning, A9 tuning
+- Frozen S-series/A9R/final-scope/W1b artifact edits
+- New answer pipeline
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+### CREATE (expected)
+
+- `contracts/target_composer_source_identity.py` (or equivalent typed contract)
+- `core/target_contact_authority.py` (structured loader → PRIMARY_EVIDENCE)
+- `tests/test_fullcontext_dialogue_presentation_convergence_implementation.py`
+- `tests/test_situation_intake_http_offline.py` (start/back/submit/SID/interrupt/PII)
+- `tests/test_target_contact_primary_evidence_offline.py`
+- `tests/test_target_presentation_channel_mutex_offline.py`
+- `tests/test_target_fallback_phone_offline.py`
+- Validator extensions: contact cross-check `clinic_policies.yaml` ↔ `clinic__info__contacts.md`
+
+### UPDATE (expected)
+
+- `core/target_composer_executor.py` — parse Composer source identity sidecar
+- `core/target_response_verifier.py` — validate sidecar refs; pass through
+- `core/target_fullcontext_content_package.py` — propagate Composer primary for content-only
+- `core/target_verified_response_pipeline.py` — prefer Composer sidecar over evidence inference
+- `core/target_presentation_decision.py` — channel mutex; situation priority fix
+- `core/target_presentation_turn_projection.py` — `time`, `result_reliability` projection
+- `core/target_runtime_widget.py` — fallback phone injection; plain attribution on all error paths
+- `ux_builder.py` — align/remove post-widget truncation; `internal_error_response` attribution
+- `clients/demo/clinic_policies.yaml` — structured `contact` block (demo)
+- `clients/_template/clinic_policies.yaml` — template schema
+- Multi-turn regression tests (see audit table)
+
+**KEEP:** `consultation_value` mechanism, AC1–AC3, A9 authority, bone_graft demo data,
+frozen artifacts, Composer/Verifier medical policy.
+
+## Acceptance matrix (implementation)
+
+| # | Criterion |
+|---|---|
+| 1 | Generic pain FAQ → validated Composer source identity |
+| 2 | FAQ follow-up from `suggest_h3` on validated primary |
+| 3 | FAQ video + follow-up occupy two secondary slots |
+| 4 | Video shown → next unseen follow-ups available |
+| 5 | Existing follow-up → situation does not displace it |
+| 6 | One follow-up + free slot → situation may show |
+| 7 | Choice menu contains no price-detail |
+| 8 | Price-detail contains no content secondary |
+| 9 | Direct phone / address / hours / WhatsApp → PRIMARY_EVIDENCE |
+| 10 | Marketing `time` scenario (0–2) via TurnFrame |
+| 11 | Marketing `result_reliability` scenario (0–2) via TurnFrame |
+| 12 | Exact-service `consultation_value` preserved |
+| 13 | Generic FAQ without neighbor `consultation_value` |
+| 14 | Technical fallback → fixed text + canonical phone only |
+| 15 | Verifier block → fixed text + canonical phone only |
+| 16 | Internal error → `attribution_kind=plain` |
+| 17 | Situation start / back / submit HTTP offline |
+| 18 | No-repeat cadence (video, followups, situation) |
+| 19 | `/ask` and `/ask/stream` parity |
+| 20 | AC1–AC3, typed UI, explicit service price lookup, pricebook — no regression |
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-dlg-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_fullcontext_dialogue_presentation_convergence_governance.py `
+  tests/test_fullcontext_presentation_parity_governance.py `
+  tests/test_final_client_pack_data_convergence_b_governance.py `
+  tests/test_final_scope_widget_e2e_closeout_governance.py -q
+git diff --check
+```
+
+## Tests (implementation COMPLETION — future)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-dlg-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_fullcontext_dialogue_presentation_convergence_governance.py `
+  tests/test_fullcontext_dialogue_presentation_convergence_implementation.py `
+  tests/test_situation_intake_http_offline.py `
+  tests/test_target_contact_primary_evidence_offline.py `
+  tests/test_target_presentation_channel_mutex_offline.py `
+  tests/test_target_fallback_phone_offline.py `
+  tests/test_fullcontext_presentation_parity_implementation.py `
+  tests/test_vague_doctor_followup.py `
+  tests/test_s62_correction_offline.py `
+  tests/test_c2c_session_migration_offline.py `
+  tests/test_ui_source_policy.py -q
+git diff --check
+```
+
+## STOP conditions
+
+1. Governance requires product code in same commit
+2. Need file outside governance allowlist
+3. Must edit frozen acceptance artifacts for green governance
+4. Retriever / legacy policy restore / second pipeline introduced
+5. Composer / Verifier medical policy change required
+6. LIVE / LLM / prompt tuning required for governance green
+7. Implementation artifact before PRE-CODE ✅
+8. Contact schema requires mandatory duplicate mirrors across pack files
+9. Channel mutex solved by post-hoc widget truncation only
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after PRE-CODE ✅** — request separate owner GO before Phase 2.
+
+## Governance completion record
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `7c716df` |
+| Governance HEAD (Phase 1) | pending |
+| PRE-CODE | pending |
+| Product change | **none** |
+| LIVE / LLM | **none** |
+

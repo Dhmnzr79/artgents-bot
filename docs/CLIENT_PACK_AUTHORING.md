@@ -16,7 +16,8 @@
 | Приоритеты услуг/offers | `clients/{id}/target_response/clinic_strategy.yaml` |
 | Текст услуги / FAQ (FullContext) | `clients/{id}/md/{content_ref}` |
 | Врачи и привязка к услугам | `clients/{id}/doctor_catalog.json` |
-| Контакты, часы, «не оказываем» | `clients/{id}/clinic_policies.yaml` |
+| Контакты, часы, «не оказываем» | `clients/{id}/clinic_policies.yaml` → `contact:` (structured: phone, whatsapp, address, hours, parking) |
+| Контактный narrative / aliases (FullContext) | `clients/{id}/md/clinic__info__contacts.md` — must match `contact:` values |
 | Виджет: имя, цвета, логотип | `clients/{id}/brand.yaml` |
 | CTA-формулировки | `clients/{id}/tone.yaml` |
 | UI labels / fallback меню | `clients/{id}/ui.yaml` |
@@ -27,6 +28,11 @@
 
 `brand.yaml` ≠ `target_response/brand_catalog.json`  
 `clinic_policies.yaml` ≠ `target_response/clinic_strategy.yaml`
+
+**FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE:** canonical structured contact facts live only in
+`clinic_policies.yaml` `contact:` block. Do not duplicate phone/WhatsApp/address/hours in other
+YAML files. `clinic__info__contacts.md` is patient-facing prose; validator cross-checks against
+`contact:` at implementation.
 
 ## Новая клиника (чеклист)
 

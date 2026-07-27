@@ -152,12 +152,22 @@ Owner decision: `FULLCONTEXT_PRESENTATION_PARITY` @ `50c6cf9` (2026-07-27).
 CTA не занимает secondary UI slots. Pure clarify использует только свои уточняющие
 кнопки и не добавляет content follow-up/video. Содержательный content-ответ имеет **два**
 secondary slots: video показывается один раз с приоритетом на первом ответе по материалу,
-остальные места получают следующие ещё не показанные follow-up. Sliding-window повторов
-нет; новый материал создаёт новый набор кандидатов. Service-detail и «Рассказать о
-ситуации» конкурируют за те же два места. Текстовые усилители к UI slots не относятся.
+остальные места получают следующие ещё не показанные follow-up; **затем** «Рассказать о
+ситуации», если остался слот. Sliding-window повторов
+нет; новый материал создаёт новый набор кандидатов. «Рассказать о ситуации» — после video
+и обычных follow-up, только если остался слот. Текстовые усилители к UI slots не относятся.
 
 **Важно:** secondary slots (max 2) и choice menu (max 4) — **разные каналы**. Scope/stage
 choice menu относится к лимиту 4, а не к price-detail или content secondary slots.
+
+**Channel mutex (`FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE` @ `7c716df`):** один ответ —
+ровно один navigation channel: choice **или** content secondary **или** price-detail.
+Запрещено `choice+price` и `secondary+price` в одном `quick_replies`. CTA отдельно.
+
+**Marketing scenario projection:** все пять typed scenarios (`pain_fear`, `cost`, `time`,
+`doctor_trust`, `result_reliability`) проецируются из TurnFrame/planner — без regex lists.
+`time` и `result_reliability` обязательны в acceptance; см.
+`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
 
 Price-ответ имеет отдельные два navigation slots и не смешивается с content follow-up.
 Кнопками становятся только элементы из `service.followups`; `fact_refs` добавляют

@@ -22,7 +22,8 @@
 | ~~`ResponseStage` не в коде~~ | **Fixed @ AC3** |
 | A9 free-text scope | **A9R governance** — authority still forbidden |
 | Marketing runtime stub | partial paths still stubbed |
-| **FULLCONTEXT_PRESENTATION_PARITY** | gaps A–G: source identity, 2-slot secondary UI, video, situation, marketing scenarios runtime, CTA context, session cadence — governance @ `50c6cf9`; implementation blocked |
+| **FULLCONTEXT_PRESENTATION_PARITY** | Phase 2 @ `7c716df` — partial: presentation decision, cadence, bone_graft; gaps H–N remain |
+| **FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE** | gaps H–N: Composer source sidecar, contact PRIMARY_EVIDENCE, channel mutex, situation priority/HTTP tests, `time`/`result_reliability`, fallback phone — governance @ `7c716df`; implementation blocked |
 | PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)
@@ -84,8 +85,9 @@ Scope **не выбирает** лечение, протокол или `service
 3. ~~**AC2**~~ (`5a3a2f8`)
 4. ~~**AC3**~~ (`aa8e6dd`)
 5. **A9R** — governance re-audit + frozen matrix (`TASK.md`) → A9R1 offline → A9R2 live → A9R3 authority
-6. **FULLCONTEXT_PRESENTATION_PARITY** — presentation/marketing seam restore (governance @ `50c6cf9`) → implementation after owner GO
-7. Post-A9 widget E2E
-8. Provider prompt caching
+6. **FULLCONTEXT_PRESENTATION_PARITY** — Phase 2 partial @ `7c716df`
+7. **FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE** — dialogue/presentation closure (governance @ `7c716df`) → implementation after owner GO
+8. Post-A9 widget E2E
+9. Provider prompt caching
 
 См. также: [`A9R_GOVERNANCE.md`](A9R_GOVERNANCE.md), [`ARCH_TARGET_DESIGN.md`](ARCH_TARGET_DESIGN.md), [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), [`PATIENT_SCOPE_DESIGN_A9.md`](PATIENT_SCOPE_DESIGN_A9.md).

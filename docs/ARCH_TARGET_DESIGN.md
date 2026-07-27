@@ -48,9 +48,27 @@ session-bound refs only. Not mixed with secondary navigation in one response. CT
 video, situation action) and separate price-detail followups (authored service followups only).
 Video priority; shown/clicked refs do not auto-repeat. Marketing facts and CTA do not occupy slots.
 
-**Source identity:** validated `used_doc_ids`/`content_ref` from Composer flow through Verifier to
-presentation layer for followups, video, and `situation_allowed`. FAQ/info MD remains document, not
-service entity. Seam audit: `docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`.
+**Source identity:** validated `used_content_refs` / `primary_content_ref` from **Composer structured
+sidecar** through Verifier to presentation layer for followups, video, and `situation_allowed`.
+Refs validated against cached FullContext MD index; invented IDs fail-closed. FAQ/info MD remains
+document, not service entity. Seam audits:
+`docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`,
+`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
+
+### Owner decision: dialogue presentation convergence (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE @ `7c716df`)
+
+**Contact authority:** structured `contact:` in `clinic_policies.yaml` — canonical phone, WhatsApp,
+address, hours, parking. Direct contact questions → PRIMARY_EVIDENCE deterministic block, not free
+Composer generation. `clinic__info__contacts.md` — narrative/aliases only; must match structured
+values (validator cross-check). Fallback/handoff injects canonical phone only.
+
+**UI channel mutex:** one response uses exactly one navigation channel among choice menu (≤4),
+content secondary (≤2: video → follow-up → situation), or price-detail (≤2). No mixing
+`choice+price` or `secondary+price`. CTA remains separate.
+
+**Marketing projection:** all five typed scenarios (`pain_fear`, `cost`, `time`, `doctor_trust`,
+`result_reliability`) via TurnFrame/planner fields — no regex lists. `consultation_value` unchanged
+(exact service/option only).
 
 ### Запрещено по умолчанию
 

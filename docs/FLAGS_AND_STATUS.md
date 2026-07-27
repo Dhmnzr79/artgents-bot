@@ -38,11 +38,13 @@
 
 **Offline tests** используют fake/recording backends.
 
-**FULLCONTEXT_PRESENTATION_PARITY:** governance @ `50c6cf9` — seam audit +
-`TASK.md` + PRE-CODE checker. Restores presentation/marketing mechanisms lost in
-FullContext-only cutover (source identity, 2-slot secondary UI, video, situation,
-marketing scenarios runtime, CTA semantic context, session cadence) **without** legacy
-RAG/policy path or second pipeline. Implementation **STOP** until PRE-CODE ✅ + owner GO.
+**FULLCONTEXT_PRESENTATION_PARITY:** governance @ `50c6cf9`; Phase 2 partial @ `7c716df`.
+
+**FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE:** governance @ `7c716df` — Composer source
+identity sidecar, contact PRIMARY_EVIDENCE, UI channel mutex, situation priority/HTTP tests,
+`time`/`result_reliability` projection, fallback canonical phone. Seam audit:
+`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)
 

@@ -676,10 +676,32 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FULLCONTEXT_PRESENTATION_PARITY (governance)
+## Следующий технический checkpoint — FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE (governance)
 
-**Baseline:** `codex/stage-a` @ `50c6cf9`. **Authority:** forbidden in governance commit.
-**Live/LLM:** forbidden.
+**Baseline:** `codex/stage-a` @ `7c716df` (Phase 2 `FULLCONTEXT_PRESENTATION_PARITY` complete).
+**Authority:** forbidden in governance commit. **Live/LLM:** forbidden.
+
+Закрыть оставшиеся dialogue/presentation gaps без RAG и без второго pipeline:
+
+- Composer source identity sidecar for generic FAQ
+- canonical contact PRIMARY_EVIDENCE
+- UI channel mutex (no choice+price / secondary+price)
+- situation priority + HTTP tests
+- marketing `time` / `result_reliability` projection
+- fallback canonical phone + plain attribution
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_fullcontext_dialogue_presentation_convergence_governance.py`.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FULLCONTEXT_PRESENTATION_PARITY (governance + Phase 2)
+
+**Baseline:** `codex/stage-a` @ `50c6cf9`. Phase 2 @ `7c716df`.
 
 Восстановить механизмы представления и маркетинга, потерянные при переходе на
 FullContext-only, без возврата legacy policy/RAG и без второго pipeline.
@@ -693,12 +715,7 @@ Deliverables (Phase 1): read-only seam audit
 (`docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`), `TASK.md`,
 doc sync, PRE-CODE checker `tests/test_fullcontext_presentation_parity_governance.py`.
 
-Gate sequence after PRE-CODE ✅:
-
-1. **Implementation** — typed presentation layer on ResponseSpec + validated source identity
-2. Post-implementation COMPLETION + frozen pin guards
-
-Gaps A–G documented in seam audit. **NO PRODUCT CHANGE** in governance commit.
+Gaps A–G documented in seam audit. Phase 2 partial @ `7c716df`.
 
 ---
 

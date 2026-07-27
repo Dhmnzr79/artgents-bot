@@ -79,9 +79,19 @@ CTA choice slot не занимает. Choice menu не смешивается �
 только уточняющие кнопки и не добавляет content follow-up/video. После содержательного
 content-ответа доступны два secondary UI slots: video имеет приоритет и показывается один
 раз при первом ответе по соответствующему материалу, оставшиеся места занимают следующие
-ещё не показанные follow-up. Показанные/нажатые follow-up механически не повторяются; при
+ещё не показанные follow-up; **затем** «Рассказать о ситуации», только если остался слот.
+Показанные/нажатые follow-up механически не повторяются; при
 переходе к другому материалу набор рассчитывается заново. Service-detail и «Рассказать
-о ситуации» конкурируют за те же два места. Усилители идут текстом и UI slots не занимают.
+о ситуации» конкурирует за оставшийся слот **после** video и обычных follow-up.
+Усилители идут текстом и UI slots не занимают.
+
+**Channel mutex (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE):** один ответ использует ровно
+один navigation channel — choice menu (≤4) **или** content secondary (≤2) **или** price-detail
+(≤2). Нельзя смешивать choice+price или secondary+price в одном `quick_replies`. CTA отдельно.
+
+**Fallback/handoff:** technical error, verifier block, nonmaterializable handoff — фиксированный
+текст + только подтверждённый телефон из `clinic_policies.yaml` `contact:`; без CTA/QR/video/
+situation/marketing; `attribution_kind=plain`.
 
 Price-ответ имеет отдельные два navigation slots и не смешивает их с content follow-up.
 Scope/stage choice menu относится к лимиту 4, а не к price-detail slots.

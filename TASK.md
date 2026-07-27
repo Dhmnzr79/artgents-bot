@@ -3986,18 +3986,27 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 | Field | Value |
 |-------|-------|
 | Governance HEAD | `525c18e` |
-| Implementation HEAD | `05d0033` |
+| Implementation HEAD | `9104212` |
 | Owner GO | ✅ Phase 2 approved |
 | PRE-CODE (governance) | 10/10 ✅ |
 | COMPLETION (focused) | 44/44 ✅ |
+| COMPLETION (full diff `525c18e..9104212`) | 44/44 ✅ |
 | Wide safe-offline (corrected) | 263/263 ✅ |
 | collect-only `tests/` | 2772 ✅ |
 | `validate_client_pack` demo + `_template` | ✅ |
 | `import app` | ✅ |
 | frozen pins | ✅ unchanged |
+| `git diff --check` | ✅ clean |
 | LIVE / LLM | **none** |
 
-### Files changed (implementation)
+### Post-push verification (@ `9104212`)
+
+| Check | Result |
+|-------|--------|
+| `HEAD` == `origin/codex/stage-a` | _(after push)_ |
+| Working tree clean | _(after push)_ |
+
+### Files changed (implementation `525c18e..9104212`)
 
 | File | Change |
 |------|--------|

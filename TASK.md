@@ -4021,3 +4021,132 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 | `docs/evidence/client_pack/fixtures/demo_legacy_marketing.yaml` | historical isolate (moved) |
 | `tests/test_demo_bone_graft_pack_consistency_implementation.py` | CREATE COMPLETION checker |
 
+---
+
+# TASK — MASS_COMPOSER_TEMPLATE_AND_DOCTORS_DISPATCH (governance)
+
+**Status:** governance checkpoint only · **NO PRODUCT CHANGE / NO LIVE / NO LLM**
+
+**Baseline:** `codex/stage-a` @ `f556130` (`DEMO_BONE_GRAFT_PACK_CONSISTENCY` closed)
+
+**Authority:** seam audit
+`docs/evidence/runtime/MASS_COMPOSER_TEMPLATE_AND_DOCTORS_DISPATCH_SEAM_AUDIT.md`.
+
+## Goal
+
+Архитектурно устранить два подтверждённых массовых runtime-дефекта без точечных костылей:
+
+- **A:** `KeyError: '"answer"'` в `build_composer_sdk_messages` — literal JSON в `.format()` template
+- **B:** `dispatch_field_invalid: aspects` для clinic-wide `topic=doctors` + `aspects=[]`
+
+## Confirmed defects (offline @ `f556130`)
+
+| ID | Symptom | Root cause |
+|----|---------|------------|
+| **A** | All materialized Composer paths → `target_fullcontext_error` | Unescaped `{`/`}` in `_COMPOSER_USER_TEMPLATE` JSON example |
+| **B** | «Кто ваши врачи?» → dispatch error before doctors component | `_reject_invalid(aspects)` before `topic=doctors` rule |
+
+Live corroboration: `logs/demo-app.jsonl` — composer `llm_error` `'"answer"'` on bone_graft;
+doctors query with `aspects=[]`, no composer call, `target_fullcontext_error`.
+
+## Owner decisions (binding for implementation)
+
+1. **Template fix:** escape literal JSON braces (`{{`/`}}`) or static contract fragment — **not** post-hoc replace, **not** try/except `KeyError`.
+2. **Doctors dispatch:** typed exception for governed `topic=doctors` + `aspects_empty` only; non-doctors `aspects=[]` stays fail-closed.
+3. **Contract:** `answer + source_identity` unchanged; Verifier unchanged.
+4. **Tests:** must call real `TargetComposerInvocation` → `build_composer_sdk_messages` chain.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/runtime/MASS_COMPOSER_TEMPLATE_AND_DOCTORS_DISPATCH_SEAM_AUDIT.md` | CREATE |
+| `tests/test_mass_composer_template_and_doctors_dispatch_governance.py` | CREATE — PRE-CODE |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/target_runtime_llm_messages.py` | UPDATE — safe JSON example in Composer user template |
+| `core/target_turn_frame_dispatch.py` | UPDATE — doctors `aspects_empty` typed dispatch |
+| `tests/test_mass_composer_template_and_doctors_dispatch_implementation.py` | CREATE — COMPLETION checker |
+| `tests/test_target_runtime_llm_messages.py` | CREATE — direct message builder tests |
+| `tests/test_target_turn_frame_dispatch.py` | UPDATE — clinic-wide doctors `aspects=[]` |
+
+## Acceptance matrix (implementation)
+
+| # | Criterion |
+|---|-----------|
+| 1 | `build_composer_sdk_messages()` does not raise |
+| 2 | Rendered message contains exact JSON output contract |
+| 3 | All placeholders substituted |
+| 4 | Input values with `{`/`}` not corrupted |
+| 5 | Contacts offline runtime → materialized |
+| 6 | bone_graft FAQ → materialized |
+| 7 | Ordinary price answer → materialized |
+| 8 | Generic FAQ → materialized |
+| 9 | Materialized cases: Composer exactly once |
+| 10 | Materialized cases: Verifier exactly once |
+| 11 | No `target_fullcontext_error` in matrix |
+| 12 | `topic=doctors` + `aspects=[]` → doctors materialization |
+| 13 | Clinic-wide doctors needs no invented `service_id` |
+| 14 | Service-scoped doctors continuity preserved |
+| 15 | Non-doctors `aspects=[]` remains fail-closed |
+| 16 | Terminal/lead/booking guards unchanged |
+| 17 | Composer/source-identity contract unchanged |
+| 18 | Contacts use validated `clinic_contact` |
+| 19 | Frozen artifacts byte-identical |
+| 20 | NO LIVE / NO LLM |
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-composer-doctors-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_mass_composer_template_and_doctors_dispatch_governance.py `
+  tests/test_demo_bone_graft_pack_consistency_governance.py -q
+git diff --check
+```
+
+## Tests (implementation COMPLETION — future)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-composer-doctors-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_mass_composer_template_and_doctors_dispatch_governance.py `
+  tests/test_mass_composer_template_and_doctors_dispatch_implementation.py `
+  tests/test_target_runtime_llm_messages.py `
+  tests/test_target_turn_frame_dispatch.py `
+  tests/test_target_composer_action_context.py `
+  tests/test_fullcontext_dialogue_presentation_convergence_implementation.py `
+  tests/test_demo_bone_graft_pack_consistency_implementation.py -q
+git diff --check
+```
+
+### Offline runtime matrix (implementation must cover)
+
+| Case | Query |
+|------|-------|
+| Contacts | адрес + парковка |
+| bone_graft FAQ | «Что такое костная пластика?» |
+| Clinic doctors | «Кто ваши врачи?» |
+| Price | ordinary explicit price lookup |
+| Generic FAQ | corpus-grounded info question |
+
+## STOP conditions
+
+- Per-route / per-service hardcode required
+- Composer contract or Verifier change required
+- try/except `KeyError` or Composer bypass proposed
+- LIVE/LLM required for green
+- Frozen artifact edit
+- File outside implementation allowlist
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after governance commit + push** — await owner GO.
+

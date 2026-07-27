@@ -61,10 +61,14 @@ terminal phone alignment. Seam audit:
 `generic_fullcontext_content`; advisory `needs_clarification`; Medical Boundary before generic.
 Seam audit: `docs/evidence/runtime/FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY_SEAM_AUDIT.md`.
 
-**FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING:** governance @ `d8dbe93` — split service
-availability (catalog) vs clinic capability/info (Generic); typed `service_availability`; ingress
-catalog-miss policy; `structured_service_availability`; 30-scenario matrix. Seam audit:
-`docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md`.
+**FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING:** COMPLETE @ `c4de72c` — typed
+`service_availability`; ingress catalog-miss → normal; `structured_service_availability`.
+Seam audit: `docs/evidence/runtime/FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING_SEAM_AUDIT.md`.
+
+**FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE:** governance @ `c4de72c` — converge Scoped Evidence
+and Composer Request on price-only offer source sufficiency; shared predicate; cross-turn tomography price
+fixture. Seam audit:
+`docs/evidence/runtime/FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)

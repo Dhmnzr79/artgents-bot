@@ -676,10 +676,30 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance)
+## Следующий технический checkpoint — FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE (governance)
 
-**Baseline:** `codex/stage-a` @ `d8dbe93`. **Authority:** forbidden in governance commit.
+**Baseline:** `codex/stage-a` @ `c4de72c`. **Authority:** forbidden in governance commit.
 **Live/LLM:** forbidden.
+
+Scoped Evidence vs Composer Request расходятся на price-only без MD: `tomography` + offer
+`tomography.default` → `composer_request_source_mismatch`.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/runtime/FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_price_only_source_sufficiency_convergence_governance.py`.
+
+Целевые implementation seams: shared `is_price_only_offer_source_sufficient`; composer/scoped/plan
+convergence; cross-turn availability→price matrix (30 scenarios).
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
+
+**Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).
+**Authority:** forbidden in governance commit. **Live/LLM:** forbidden in governance.
 
 Разделить service availability (catalog) и clinic capability/info (Generic). Канонические дефекты:
 `tomography` без `content_ref` → technical error; «кварцевание воздуха» → ingress `service_not_offered`.
@@ -692,7 +712,7 @@ Deliverables (Phase 1): seam audit
 Целевые implementation seams: typed `service_availability`; `structured_service_availability`;
 ingress catalog-miss → normal; inactive service fixture; 30-scenario offline matrix.
 
-**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+**COMPLETE** @ `c4de72c`.
 
 ---
 

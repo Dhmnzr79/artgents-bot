@@ -57,7 +57,24 @@ rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PR
 + `FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION`
 + `FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE`
 + `FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY`
-+ `FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING`.
++ `FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING`
++ `FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE`.
+
+### Owner decision: price-only offer source sufficiency (FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE @ `c4de72c`)
+
+**Defect:** Scoped Evidence allows price-only without MD `content_ref` when validated offers exist;
+Composer `_exact_sources` still requires `selected_content_ref in owned_content_refs` →
+`composer_request_source_mismatch` for `tomography` follow-up «А сколько стоит?».
+
+**Target:** one shared pure predicate `is_price_only_offer_source_sufficient(...)` used by materialization
+plan, scoped evidence, composer request — not a Composer-only local `if`.
+
+**When sufficient:** components strictly `("price",)`, validated active offers, empty unfulfilled, not
+Generic FullContext, not content+price, not family inheritance — Composer evidence = `offer:*` only;
+Numeric Verifier unchanged.
+
+Seam audit: `docs/evidence/runtime/FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### Owner decision: service availability vs clinic capability (FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING @ `d8dbe93`)
 

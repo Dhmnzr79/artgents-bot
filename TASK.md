@@ -5327,3 +5327,142 @@ python -m pytest tests/ --collect-only -q
 
 После governance commit + PRE-CODE PASS — **остановиться**. Implementation, LIVE, E2E и Verifier changes
 запрещены до отдельного owner GO.
+
+---
+
+# TASK — FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO Verifier changes**
+
+**Baseline:** `codex/stage-a` @ `c4de72c`  
+**Seam audit:**
+`docs/evidence/runtime/FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE_SEAM_AUDIT.md`.
+
+## Goal
+
+Устранить расхождение Scoped Evidence (price-only без MD допустим) и Composer Request
+(`composer_request_source_mismatch` при `selected_content_ref=None`). Одно каноническое правило
+**price-only offer source sufficiency** — shared pure predicate, не локальный Composer `if`.
+
+## Canonical invariant (binding)
+
+MD `content_ref` не требуется только если одновременно:
+
+1. valid exact `service_id`;
+2. components строго `("price",)`;
+3. ≥1 validated active offer в plan;
+4. каждый offer принадлежит `service_id`;
+5. triple match: bundle + materials + scoped evidence;
+6. spec разрешает price; не Generic FullContext;
+7. `unfulfilled_components` пуст;
+8. не content+price;
+9. не family/broad price inheritance для named protocol.
+
+Тогда: `selected_content_ref=None`, `primary_content_ref=None`, Composer evidence = `offer:*` only;
+Numeric Verifier по PRIMARY_EVIDENCE; без source-driven followups/video/situation.
+
+## Documented defect
+
+Cross-turn: availability `tomography` → «А сколько стоит?» → `composer_request_source_mismatch`
+при наличии `tomography.default` (3 000 RUB). Direct «Сколько стоит КТ?» — тот же seam.
+
+## Shared API (Phase 2 target)
+
+`contracts/price_only_source_sufficiency.py` — `is_price_only_offer_source_sufficient(...)` (или эквивалент).
+
+Consumers: materialization plan, scoped evidence, composer request, package validation.
+
+## Governance deliverables (Phase 1)
+
+| File | Action |
+|------|--------|
+| `docs/evidence/runtime/FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_price_only_source_sufficiency_convergence_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE |
+| `docs/CLIENT_PACK_AUTHORING.md` | UPDATE |
+| `TASK.md` | UPDATE (this section) |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `contracts/price_only_source_sufficiency.py` | CREATE — shared predicate + context type |
+| `core/target_response_materialization_plan.py` | UPDATE — use shared predicate |
+| `core/target_scoped_response_evidence.py` | UPDATE — replace ad-hoc price-only branch |
+| `core/target_composer_request.py` | UPDATE — `_exact_sources` convergence |
+| `core/target_response_evidence.py` | UPDATE — align if selected_content_ref gate diverges |
+| `core/target_offline_response_package.py` | UPDATE — only if package validation needs predicate |
+| `tests/test_final_price_only_source_sufficiency_convergence_implementation.py` | CREATE — 30-scenario matrix |
+| `tests/test_final_price_only_source_sufficiency_convergence_harness.py` | CREATE — widget harness |
+| `tests/test_target_composer_request.py` | UPDATE — tomography price-only unit cases |
+
+**KEEP unchanged:** Semantic/Numeric/Contact Verifier, Generic FullContext, structured availability,
+structured contacts, AC1–AC3 / family / scope price routes, frozen pins.
+
+## Acceptance matrix (implementation — 30 scenarios)
+
+Offline widget-faithful via `_orchestrate_ask_turn`; fakes at provider boundary; **NO LIVE / NO LLM**.
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | Availability tomography | materialized yes |
+| 2 | Follow-up «а сколько стоит?» | 3 000 ₽ materialized |
+| 3 | Follow-up preserves `service_id=tomography` | continuity |
+| 4 | Direct «Сколько стоит КТ?» | 3 000 ₽ |
+| 5 | Price-only + offer + content_ref=None | allowed |
+| 6 | Composer evidence `offer:tomography.default` | present |
+| 7 | No fake content evidence block | absent |
+| 8 | Numeric Verifier accepts 3 000 ₽ | verified |
+| 9 | Wrong amount blocked | semantic/numeric block |
+| 10 | Offer wrong service_id | block |
+| 11 | Offer missing from bundle | block |
+| 12 | Inactive offer | not used |
+| 13 | Price-only no offer | data-gap / no_public_price |
+| 14 | Content-only no MD | no price-only exception |
+| 15 | Content+price no MD | no exception |
+| 16 | Generic FullContext | no money permission |
+| 17 | Named protocol | no family price inherit |
+| 18 | Broad family price | unchanged |
+| 19 | Implantation scope price | unchanged |
+| 20 | Prosthetics stage price | unchanged |
+| 21 | Availability path | 0 Boundary/Composer/Semantic |
+| 22 | Price follow-up | normal price pipeline |
+| 23 | Missing MD | no source-driven buttons/video |
+| 24 | CTA policy | unchanged |
+| 25 | Invented source refs | dropped |
+| 26 | `/ask` | parity |
+| 27 | `/ask/stream` | parity |
+| 28 | Fresh SID direct price | works |
+| 29 | SID isolation | no bleed |
+| 30 | Sparse client fixture | no demo hardcodes |
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_price_only_source_sufficiency_convergence_governance.py -q
+
+# Wide safe-offline (no product change expected)
+python -m pytest tests/ --collect-only -q
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно изменить protected acceptance / frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert или Verifier change;
+- появляется локальный Composer-only `if` без shared predicate;
+- Numeric grounding ослабляется или fake content_ref добавляется;
+- family/broad/scope price paths регрессируют;
+- Generic FullContext получает price permission;
+- structured availability path регрессирует (LLM > 0 on availability).
+
+## STOP (Phase 1)
+
+После governance commit + PRE-CODE PASS — **остановиться**. Implementation, LIVE, E2E и Verifier changes
+запрещены до отдельного owner GO.

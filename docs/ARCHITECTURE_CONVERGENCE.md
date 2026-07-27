@@ -28,7 +28,8 @@
 | **FINAL_CONTACT_VALUE_VERIFICATION_AND_MARKETING_SCENARIO_ACTIVATION** | COMPLETE — contact value-only verifier + scenario decouple + `turn_topic` chain |
 | **FINAL_LIGHTWEIGHT_RESPONSE_GATES_CONVERGENCE** | COMPLETE @ `525474c` — scenario-only aspects, structured contacts, boundary degrade, verifier client_id |
 | **FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY** | COMPLETE @ `d8dbe93` — planner-independent generic FAQ/info |
-| **FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING** | service availability vs clinic capability split — governance @ `d8dbe93`; implementation **STOP** |
+| **FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING** | COMPLETE @ `c4de72c` — service availability vs clinic capability |
+| **FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE** | governance @ `c4de72c` — shared price-only source predicate; implementation **STOP** |
 | PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)

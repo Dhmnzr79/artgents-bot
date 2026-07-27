@@ -39,6 +39,12 @@ availability answer. Clinic capability/info (materials, equipment, safety standa
 `md/` via Generic FullContext; **не добавлять** capability facts as catalog services. Inactive
 services: `active=false` in catalog (authored); not shown in planner compact list but preserved in bundle.
 
+**FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE:** service may have **price offer without `content_ref`**
+(e.g. `tomography` + `pricebook/services/tomography.default.json`). Price-only answers use structured
+`offer:*` evidence — **не** добавлять MD-заглушку только ради Composer. `content_ref` остаётся обязательным
+для content-only, content+price, FAQ/description, marketing claims. Missing offer → `data_gap` /
+`no_public_price`, not source mismatch.
+
 ## Новая клиника (чеклист)
 
 1. Скопировать `clients/_template/` → `clients/{new_id}/`.

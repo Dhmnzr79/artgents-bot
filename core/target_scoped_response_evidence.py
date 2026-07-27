@@ -12,6 +12,13 @@ from pydantic import TypeAdapter, ValidationError
 from yaml.nodes import MappingNode
 
 from contracts.target_response_spec import CanonicalToken, TargetResponseSpec
+from contracts.price_only_source_sufficiency import (
+    PriceOnlySourceContext,
+    is_price_only_offer_source_sufficient,
+    offer_identity_rows,
+    price_only_topic_fallback,
+)
+from core.target_generic_fullcontext_content import is_generic_fullcontext_content_spec
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import (
     is_fullcontext_content_only_spec,
@@ -451,6 +458,13 @@ def build_target_scoped_response_evidence(
             materials,
             required_components=spec.required_components,
             allow_missing_content=is_structured_service_availability_spec(spec),
+            requested_components=spec.required_components,
+            response_stage=spec.response_stage,
+            is_generic_fullcontext=is_generic_fullcontext_content_spec(spec),
+            is_scope_aware_price=is_scope_aware_price_spec(spec),
+            is_structured_service_availability=is_structured_service_availability_spec(
+                spec
+            ),
         )
     except TargetResponseMaterializationPlanError as exc:
         _error("scoped_evidence_package_inconsistent", "plan", exc)
@@ -501,9 +515,25 @@ def build_target_scoped_response_evidence(
         _error("scoped_evidence_component_unfulfilled", plan.unfulfilled_components)
 
     service_content_ref = materials.selected_content_ref
+    offer_rows = offer_identity_rows(tuple(materials.offers), plan.offer_ids)
+    price_only_ctx = PriceOnlySourceContext(
+        service_id=plan.service_id,
+        required_components=plan.required_components,
+        requested_components=spec.required_components,
+        offer_ids=plan.offer_ids,
+        offer_service_ids=tuple(row[0] for row in offer_rows),
+        offer_active_flags=tuple(row[1] for row in offer_rows),
+        selected_content_ref=materials.selected_content_ref,
+        primary_content_ref=plan.primary_content_ref,
+        unfulfilled_components=plan.unfulfilled_components,
+        response_stage=spec.response_stage,
+        is_generic_fullcontext=is_generic_fullcontext_content_spec(spec),
+        is_scope_aware_price=is_scope_aware_price_spec(spec),
+        is_structured_service_availability=is_structured_service_availability_spec(spec),
+    )
     if service_content_ref is None:
-        if plan.required_components == ("price",) and plan.offer_ids:
-            service_topic = next(iter(spec.allowed_topics), "clinic")
+        if is_price_only_offer_source_sufficient(price_only_ctx):
+            service_topic = price_only_topic_fallback(spec.allowed_topics)
         else:
             _error("scoped_evidence_source_invalid", service_content_ref)
     else:

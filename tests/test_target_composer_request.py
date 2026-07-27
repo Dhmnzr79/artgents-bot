@@ -295,6 +295,7 @@ def test_exact_shapes_signature_errors_and_frozen_slots(md_root: Path) -> None:
         "evidence_blocks",
         "selected_followups",
         "selected_cta_key",
+        "action_context",
     ]
     assert list(inspect.signature(materialize_target_composer_request).parameters) == [
         "bound_package",
@@ -303,6 +304,8 @@ def test_exact_shapes_signature_errors_and_frozen_slots(md_root: Path) -> None:
         "consultation_values",
         "user_message",
         "md_root",
+        "contact_fields",
+        "client_id",
     ]
     with pytest.raises(FrozenInstanceError):
         result.user_message = "changed"  # type: ignore[misc]
@@ -598,6 +601,111 @@ def test_medical_handoff_is_preserved_without_generating_prose(md_root: Path) ->
     assert result.spec.response_mode == "medical_handoff"
     assert result.evidence_blocks[0].kind == "content"
     assert not hasattr(result, "answer")
+
+
+def _tomography_bundle() -> ResponseSchemaBundle:
+    return ResponseSchemaBundle.model_validate(
+        {
+            "services": {
+                "tomography": {
+                    "name": "КТ",
+                    "aliases": ["кт"],
+                    "family": "diagnostics",
+                    "roles": ["supporting"],
+                    "active": True,
+                    "selection": {"mode": "direct"},
+                    "options": [],
+                }
+            },
+            "brands": {"version": 1, "brands": {}},
+            "offers": [
+                {
+                    "offer_id": "tomography.default",
+                    "service_id": "tomography",
+                    "option_id": None,
+                    "brand_id": None,
+                    "active": True,
+                    "price": {
+                        "mode": "fixed",
+                        "amount": 3000,
+                        "currency": "RUB",
+                        "billing_unit": "procedure",
+                    },
+                    "package": {"label": "procedure", "includes": []},
+                    "fact_refs": [],
+                    "followups": [],
+                }
+            ],
+            "facts": {},
+            "strategy": {"version": 1, "default_max_options": 3, "rules": []},
+            "marketing": {
+                "version": 1,
+                "limits": {
+                    "max_marketing_facts_per_turn": 0,
+                    "max_amplifiers_per_turn": 0,
+                    "max_scenarios_per_turn": 0,
+                },
+                "initial_commercial_blocks": {},
+                "scenario_rules": {},
+                "cta_contexts": {"default": "callback"},
+            },
+        }
+    )
+
+
+def _tomography_inputs(md_root: Path) -> dict[str, object]:
+    bundle = _tomography_bundle()
+    doctors = _doctors()
+    spec = build_target_response_spec(
+        TargetResponsePolicyRequest.model_validate(
+            {
+                "response_mode": "answer",
+                "service_id": "tomography",
+                "tone_key": "commercial_warm",
+                "allowed_topics": ("implantation", "clinic"),
+                "forbidden_topics": ("diagnosis", "personal_eligibility"),
+                "required_fact_ids": (),
+                "requested_components": ("price",),
+                "primary_component": None,
+                "allow_marketing_facts": False,
+                "allow_consultation_close": False,
+                "allow_cta": True,
+            }
+        )
+    )
+    bound = assemble_target_spec_offline_response_package(
+        bundle,
+        doctors,
+        ResponseSchemaExternalIndex(kb_refs=(), doctor_refs=()),
+        (),
+        spec=spec,
+        brand_term=None,
+        strategy_context=TargetStrategyMatch(family="diagnostics"),
+        semantic_context="service",
+        today=TODAY,
+        md_root=md_root,
+        include_initial_block=False,
+        include_consultation_close=False,
+        include_cta=True,
+    )
+    return {
+        "bound_package": bound,
+        "bundle": bundle,
+        "doctor_catalog": doctors,
+        "consultation_values": (),
+        "user_message": "Сколько стоит КТ?",
+        "md_root": md_root,
+    }
+
+
+def test_tomography_price_only_without_content_ref_materializes_offer_evidence(
+    md_root: Path,
+) -> None:
+    result = _materialize(_tomography_inputs(md_root))
+    assert [block.kind for block in result.evidence_blocks] == ["offer"]
+    assert result.evidence_blocks[0].ref == "offer:tomography.default"
+    payload = json.loads(result.evidence_blocks[0].text)
+    assert payload["price"]["amount"] == 3000
 
 
 def test_s35_called_once_and_import_firewall(md_root: Path, monkeypatch) -> None:

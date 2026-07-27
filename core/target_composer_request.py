@@ -16,10 +16,16 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle, TargetCommercialFact, TargetOffer
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_response_spec import TargetResponseSpec
+from contracts.price_only_source_sufficiency import (
+    PriceOnlySourceContext,
+    is_price_only_offer_source_sufficient,
+    offer_identity_rows,
+)
 from contracts.target_composer_action_context import TargetComposerActionContext
 from core.service_data_context import ServiceDoctorContext
 from core.target_composer_action_context import resolve_target_composer_action_context
 from core.target_response_followup_policy import TargetResponseFollowupSelection
+from core.target_generic_fullcontext_content import is_generic_fullcontext_content_spec
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
 from core.target_contact_authority import materialize_clinic_contact_primary_evidence
@@ -337,7 +343,25 @@ def _exact_sources(
         if ref is not None
     }
     if materials.selected_content_ref not in owned_content_refs:
-        _source_mismatch(("content", materials.selected_content_ref))
+        plan = bound_package.package.plan
+        offer_rows = offer_identity_rows(tuple(materials.offers), scoped.offer_ids)
+        price_only_ctx = PriceOnlySourceContext(
+            service_id=scoped.service_id,
+            required_components=plan.required_components,
+            requested_components=scoped.spec.required_components,
+            offer_ids=plan.offer_ids,
+            offer_service_ids=tuple(row[0] for row in offer_rows),
+            offer_active_flags=tuple(row[1] for row in offer_rows),
+            selected_content_ref=materials.selected_content_ref,
+            primary_content_ref=plan.primary_content_ref,
+            unfulfilled_components=plan.unfulfilled_components,
+            response_stage=scoped.spec.response_stage,
+            is_generic_fullcontext=is_generic_fullcontext_content_spec(scoped.spec),
+            is_scope_aware_price=is_scope_aware_price_spec(scoped.spec),
+            is_structured_service_availability=False,
+        )
+        if not is_price_only_offer_source_sufficient(price_only_ctx):
+            _source_mismatch(("content", materials.selected_content_ref))
 
     source_offers: dict[str, TargetOffer] = {}
     material_offers = {offer.offer_id: offer for offer in materials.offers}

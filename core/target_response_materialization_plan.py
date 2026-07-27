@@ -5,6 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from contracts.price_only_source_sufficiency import (
+    PriceOnlySourceContext,
+    is_price_only_offer_source_sufficient,
+    offer_identity_rows,
+)
 from contracts.target_response_spec import TargetResponseComponent
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
 
@@ -65,6 +70,11 @@ def build_target_response_materialization_plan(
     *,
     required_components: Sequence[str],
     allow_missing_content: bool = False,
+    requested_components: Sequence[str] | None = None,
+    response_stage: str | None = None,
+    is_generic_fullcontext: bool = False,
+    is_scope_aware_price: bool = False,
+    is_structured_service_availability: bool = False,
 ) -> TargetResponseMaterializationPlan:
     """Project already-selected S27 identities without selecting or rendering again."""
 
@@ -82,6 +92,26 @@ def build_target_response_materialization_plan(
         if "price" in components
         else ()
     )
+    offer_rows = offer_identity_rows(tuple(materials.offers), offer_ids)
+    requested = tuple(requested_components or components)
+    price_only_ctx = PriceOnlySourceContext(
+        service_id=materials.service_id,
+        required_components=components,
+        requested_components=requested,
+        offer_ids=offer_ids,
+        offer_service_ids=tuple(row[0] for row in offer_rows),
+        offer_active_flags=tuple(row[1] for row in offer_rows),
+        selected_content_ref=materials.selected_content_ref,
+        primary_content_ref=(
+            materials.selected_content_ref if "content" in components else None
+        ),
+        unfulfilled_components=(),
+        response_stage=response_stage,
+        is_generic_fullcontext=is_generic_fullcontext,
+        is_scope_aware_price=is_scope_aware_price,
+        is_structured_service_availability=is_structured_service_availability,
+    )
+    price_only_sufficient = is_price_only_offer_source_sufficient(price_only_ctx)
     doctor_ids = (
         tuple(doctor.doctor_id for doctor in materials.doctors)
         if "doctors" in components
@@ -91,7 +121,7 @@ def build_target_response_materialization_plan(
     unfulfilled: list[TargetResponseComponent] = []
     for component in components:
         if component == "content" and primary_content_ref is None:
-            if allow_missing_content:
+            if allow_missing_content or price_only_sufficient:
                 continue
             unfulfilled.append(component)
         elif component == "price" and not offer_ids:

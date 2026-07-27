@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from evals.v5.final_scope_widget_e2e_live_contract import FROZEN_TURNS_HASH, sha256_file_hex
@@ -87,6 +88,27 @@ def test_owner_decision_docs_synced() -> None:
         _REPO_ROOT / "docs" / "FLAGS_AND_STATUS.md"
     ).read_text(encoding="utf-8")
 
+
+def test_consultation_value_applicability_normative() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = TASK_PATH.read_text(encoding="utf-8")
+    combined = re.sub(r"\*+", "", audit + "\n" + task).lower()
+    required = (
+        "intentionally not applicable to generic content-only fullcontext",
+        "validator gap remains",
+        "automatic `consultation_value`",
+        "exact выбора service/option",
+        "generic faq/info/comparison",
+        "не должен",
+        "получать `consultation_value`",
+        "прямой вопрос о консультации",
+        "не automatic consultation close",
+        "не занимает automatic marketing/amplifier slots",
+        "не должна расширять applicability",
+        "произвольные `used_doc_ids`",
+    )
+    for phrase in required:
+        assert phrase in combined, phrase
 
 def test_frozen_artifact_guards() -> None:
     test_frozen_retry4_artifacts_unchanged_after_closeout()

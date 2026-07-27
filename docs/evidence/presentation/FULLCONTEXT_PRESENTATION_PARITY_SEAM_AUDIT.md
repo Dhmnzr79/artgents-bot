@@ -59,7 +59,7 @@ For ordinary informational, marketing, and price follow-ups:
 | 7 | Marketing scenarios | `docs/MARKETING_SCENARIO_ARCHITECTURE.md`; `docs/MARKETING_QUESTION_TECH.md` | Selector: `core/target_marketing_selector.py`; offline assembly exists | Runtime hard-off: `core/target_runtime_client_context.py` L148–149; `core/target_runtime_turn.py` L242 `marketing_scenarios=()` | `shown_fact_ids`, `shown_amplifier_refs` after materialize | answer text (not widget slots) | **Disconnected** at runtime producer — **Gap E** |
 | 8 | CTA semantic context | `docs/MARKETING_SCENARIO_ARCHITECTURE.md` §CTA; `clients/demo/target_response/marketing.yaml` | `core/target_marketing_selector.py`; `core/target_runtime_widget.py` `build_target_runtime_widget_cta` | Hardcoded `semantic_context="service"` in `core/target_runtime_client_context.py` L148 | `selected_cta_key` in meta only | `static/widget/widget.js` CTA | CTA key→label connected; context selection frozen — **Gap F** |
 | 9 | Session cadence | `docs/MARKETING_SCENARIO_ARCHITECTURE.md` §Session; `core/target_runtime_session.py` | Read/write target session | `core/target_runtime_turn.py` reads `shown_*` | `target_runtime_state`, `target_runtime_followups` | pre-resolver ref gate | **Partially connected** — facts/amplifiers OK; missing video + followup no-repeat ledger — **Gap G** |
-| 10 | `consultation_value` | `docs/MARKETING_SCENARIO_ARCHITECTURE.md` §consultation_value; `core/service_consultation_source.py` | `build_service_consultation_values` → runtime context | Wired when `include_consultation_close=True` + service `selected_content_ref` | `shown_consultation_value_refs` | answer text amplifier | **Connected** on service-bound path; broken for content-only FullContext; validator gap |
+| 10 | `consultation_value` | `docs/MARKETING_SCENARIO_ARCHITECTURE.md` §consultation_value; `core/service_consultation_source.py` | `build_service_consultation_values` → runtime context | Wired when `include_consultation_close=True` + exact service/option `selected_content_ref` | `shown_consultation_value_refs` | answer text amplifier | **Connected** on exact service/option path; intentionally not applicable to generic content-only FullContext; validator gap remains |
 
 ## Confirmed gaps A–G
 
@@ -130,20 +130,37 @@ For ordinary informational, marketing, and price follow-ups:
 | Terminal guard | Session write only on `TargetTurnFrameBoundMaterializeResponse` | `core/target_runtime_turn.py` L280–291 |
 | **State** | **Partially connected** |
 
+## consultation_value — normative applicability
+
+**Status @ `50c6cf9`:** Connected on exact service/option path; intentionally not applicable to
+generic content-only FullContext; validator gap remains.
+
+Binding rules for implementation:
+
+1. **Automatic `consultation_value`** используется только после **exact выбора service/option**
+   (`selected_content_ref` того же service/option answer).
+2. **Generic FAQ/info/comparison content-only** ответ **не должен** получать `consultation_value`
+   соседней услуги или произвольного used MD document.
+3. **Прямой вопрос о консультации** отвечает из соответствующего MD или structured commercial
+   fact как **основной content**; это не automatic consultation close.
+4. Direct consultation answer **не занимает** automatic marketing/amplifier slots.
+5. **Source identity implementation** (Gap A) **не должна** расширять applicability
+   `consultation_value` на произвольные `used_doc_ids` — только exact service/option ownership.
+
 ## consultation_value — preserve checklist
 
 | Check | Status @ `50c6cf9` |
 |-------|-------------------|
 | Value from exact `content_ref` frontmatter only | ✅ offline |
 | Frontmatter excluded from FullContext body (S36) | ✅ by design |
-| Only under matching service answer | ✅ |
-| 1 marketing slot + 1 amplifier slot | ✅ selector |
+| Only under matching exact service/option answer | ✅ |
+| 1 marketing slot + 1 amplifier slot (automatic close only) | ✅ selector |
 | Max one automatic show per session per exact ref | ✅ session |
 | Shown-state only after materialized inclusion | ✅ |
 | Terminal/error do not update shown-state | ✅ |
-| Direct consultation question = primary content | ✅ |
-| `validate_client_pack.py` checks | ❌ missing |
-| Content-only FullContext path | ❌ no `selected_content_ref` |
+| Direct consultation question = primary content (not automatic close) | ✅ normative |
+| Generic content-only FullContext — no automatic consultation_value | ✅ intentional N/A |
+| `validate_client_pack.py` checks | ❌ missing (validator gap) |
 
 Demo consultation values: `classic`, `one_stage`, `all_on_4` service MDs.
 
@@ -180,7 +197,7 @@ Demo consultation values: `classic`, `one_stage`, `all_on_4` service MDs.
 | 19 | Marketing limits 3/2 enforced in runtime |
 | 20 | price/doctors/service get matching CTA keys |
 | 21 | CTA suppression boundaries preserved |
-| 22 | consultation_value first show / no repeat / exact ownership |
+| 22 | consultation_value first show / no repeat / exact service/option ownership only |
 | 23 | terminal/error do not write shown-state |
 | 24 | New sparse client pack passes without video/consultation_value |
 | 25 | Invalid consultation_value client pack fails validator |

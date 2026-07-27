@@ -3274,7 +3274,15 @@ Price-detail: max 2 authored service followups; не смешивать с conte
 | **F** | `semantic_context="service"` hardcoded |
 | **G** | Session cadence incomplete (video, followup no-repeat ledger) |
 
-`consultation_value` — preserve; add validator checks in implementation phase.
+`consultation_value` — preserve on exact service/option path; **intentionally not applicable**
+to generic content-only FullContext. Validator checks in implementation phase.
+
+### consultation_value (normative)
+
+- Automatic `consultation_value` — только после exact выбора service/option.
+- Generic FAQ/info/comparison content-only ответ **не должен** получать `consultation_value` соседней услуги.
+- Прямой вопрос о консультации — основной content из MD/structured commercial fact; это не automatic consultation close; не занимает automatic marketing/amplifier slots.
+- Source identity implementation (Gap A) **не должна** расширять applicability `consultation_value` на произвольные `used_doc_ids`.
 
 ## Allowlist (governance commit only)
 
@@ -3353,7 +3361,7 @@ frozen artifacts, existing pricebook/marketing data.
 | 19 | Marketing limits 3/2 enforced in runtime |
 | 20 | price/doctors/service get matching CTA keys |
 | 21 | CTA suppression boundaries preserved |
-| 22 | consultation_value first show / no repeat / exact ownership |
+| 22 | consultation_value first show / no repeat / exact service/option ownership only |
 | 23 | terminal/error do not write shown-state |
 | 24 | New sparse client pack passes without video/consultation_value |
 | 25 | Invalid consultation_value client pack fails validator |
@@ -3412,8 +3420,24 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 | Field | Value |
 |-------|-------|
 | Baseline HEAD | `50c6cf9` |
-| Governance HEAD | pending commit |
+| Governance HEAD (Phase 1) | `e312ff7` |
+| Governance correction HEAD | pending commit |
 | PRE-CODE | pending |
 | Product change | **none** |
 | LIVE / LLM | **none** |
+
+## Governance correction — consultation_value applicability
+
+**Mode:** docs/governance only · **NO product code**
+
+Clarify that generic content-only FullContext intentionally does not receive automatic
+`consultation_value`; only exact service/option selection triggers automatic close.
+
+### Allowlist (correction commit)
+
+- `docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`
+- `TASK.md`
+- `tests/test_fullcontext_presentation_parity_governance.py`
+
+**STOP after correction PRE-CODE ✅** — Phase 2 implementation still requires separate owner GO.
 

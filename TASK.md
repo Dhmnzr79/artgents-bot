@@ -3538,18 +3538,31 @@ Phase 2 `FULLCONTEXT_PRESENTATION_PARITY` (@ `7c716df`) подключил prese
 
 ### 1. Source identity (generic FAQ)
 
-Structured Composer sidecar/envelope:
+Strict Composer JSON contract (live backend update required):
 
-- `text`; `used_content_refs`; `primary_content_ref`
-- refs validated against cached FullContext MD index; invented IDs fail-closed
-- Verifier passes validated identity only; presentation metadata from validated primary
-- exact-service paths unchanged
+```json
+{
+  "answer": "...",
+  "source_identity": {
+    "primary_content_ref": "...",
+    "used_content_refs": ["..."]
+  }
+}
+```
+
+- `primary_content_ref` must be in `used_content_refs`.
+- Refs validated against cached FullContext MD index; invented IDs fail-closed.
+- Factual FAQ/info/comparison: missing or invalid `source_identity` → fail-closed.
+- Verifier passes validated identity only; presentation metadata from validated primary only.
+- exact-service paths unchanged.
 
 ### 2. Authoritative contact data
 
-One canonical structured schema (phone, WhatsApp, address, hours, parking).
-Direct contact questions → PRIMARY_EVIDENCE, not free Composer generation.
-Single authoring surface per fact class (see audit contact table).
+**Only** `clients/{id}/clinic_policies.yaml` → structured `contact:` (phone, WhatsApp, address,
+hours, parking). **Do not duplicate** phone/address/hours in MD.
+
+Direct contact questions: TurnFrame typed **`contacts` aspect** from Turn Planner (same LLM call,
+no regex) → PRIMARY_EVIDENCE `kind=clinic_contact` (not `commercial_fact`).
 
 ### 3. UI channel separation
 
@@ -3563,9 +3576,18 @@ Intake: situation → name → phone → demo_stub. HTTP tests required.
 
 ### 5. Marketing hooks
 
-All typed scenarios: `pain_fear`, `cost`, `time`, `doctor_trust`, `result_reliability`.
-TurnFrame/planner only (no regex). Max 0–2 scenarios; 3/2 limits preserved.
-`consultation_value` rules unchanged.
+Canonical `TurnFrame.marketing_scenarios: list[pain_fear|cost|time|doctor_trust|result_reliability]`
+(0–2), from Turn Planner **same LLM call** — no extra classifiers, no regex.
+
+Rules:
+
+- Direct informational question ≠ scenario («Сколько длится?» ≠ `time`; «Какая гарантия?` ≠
+  `result_reliability`; «Кто врач?» ≠ `doctor_trust`).
+- Scenario only on expressed fear/doubt/objection.
+- Runtime uses only validated `TurnFrame.marketing_scenarios`; remove `derive_marketing_scenarios`
+  after cutover; malformed → empty list.
+- Max 0–2 scenarios; 3/2 limits preserved; marketing facts ≠ UI slots.
+- `consultation_value` rules unchanged.
 
 ### 6. Fallback / handoff
 
@@ -3586,7 +3608,7 @@ doctors, terminal/error focus preservation).
 | **J** | Situation priority before content follow-ups (should be after video + follow-up) |
 | **K** | `choice_qr + price_qr` and `secondary_qr + price_qr` channel mixing |
 | **L** | Situation HTTP offline tests missing (start/back/submit/SID/PII) |
-| **M** | `time` and `result_reliability` not projected in `derive_marketing_scenarios` |
+| **M** | `TurnFrame.marketing_scenarios` missing; heuristic `derive_marketing_scenarios` wrong for time/result_reliability |
 | **N** | Fallback/error without canonical phone; `internal_error_response` missing plain attribution |
 
 Prior gaps A–G: **partially addressed** in Phase 2; residual risks in H–N and post-widget limiter.
@@ -3626,11 +3648,16 @@ Prior gaps A–G: **partially addressed** in Phase 2; residual risks in H–N an
 - `tests/test_target_contact_primary_evidence_offline.py`
 - `tests/test_target_presentation_channel_mutex_offline.py`
 - `tests/test_target_fallback_phone_offline.py`
-- Validator extensions: contact cross-check `clinic_policies.yaml` ↔ `clinic__info__contacts.md`
+- Validator: structured `contact:` required; **forbid** duplicate contact facts in MD
 
 ### UPDATE (expected)
 
-- `core/target_composer_executor.py` — parse Composer source identity sidecar
+- `contracts/turn_frame.py` — `marketing_scenarios` + `contacts` in `AspectKind`
+- `contracts/answer_plan.py` — `contacts` aspect
+- `core/turn_frame_from_raw.py` / planner prompt — `marketing_scenarios` + `contacts` sanitization
+- `core/target_composer_executor.py` — parse strict JSON sidecar; live backend contract
+- `core/target_runtime_llm_backends.py` — live Composer JSON response
+- `core/target_presentation_turn_projection.py` — **delete** `derive_marketing_scenarios` after cutover
 - `core/target_response_verifier.py` — validate sidecar refs; pass through
 - `core/target_fullcontext_content_package.py` — propagate Composer primary for content-only
 - `core/target_verified_response_pipeline.py` — prefer Composer sidecar over evidence inference
@@ -3712,8 +3739,10 @@ git diff --check
 5. Composer / Verifier medical policy change required
 6. LIVE / LLM / prompt tuning required for governance green
 7. Implementation artifact before PRE-CODE ✅
-8. Contact schema requires mandatory duplicate mirrors across pack files
+8. Contact facts duplicated in MD instead of `clinic_policies.yaml` only
 9. Channel mutex solved by post-hoc widget truncation only
+10. Marketing scenarios inferred from aspects/emotion instead of `TurnFrame.marketing_scenarios`
+11. Contact routing via regex instead of typed `contacts` aspect
 
 ## STOP
 
@@ -3729,4 +3758,27 @@ Governance PRE-CODE PASS does **not** authorize implementation.
 | PRE-CODE | pending |
 | Product change | **none** |
 | LIVE / LLM | **none** |
+
+## Governance correction — contacts, Composer JSON, marketing_scenarios (@ post-`6eb6cee`)
+
+**Mode:** docs/governance/tests only · **NO product code**
+
+### Binding clarifications
+
+1. **Contacts** — only `clinic_policies.yaml` `contact:`; no phone/address/hours/WhatsApp duplication in MD.
+2. **Contact routing** — typed `contacts` aspect from Turn Planner; no `policy.contacts_intent` regex on target path.
+3. **PRIMARY_EVIDENCE** — `kind=clinic_contact` (not `commercial_fact`).
+4. **Composer** — strict JSON `{ answer, source_identity }`; `primary_content_ref ∈ used_content_refs`; factual FAQ fail-closed on bad/missing source; live backend update required.
+5. **Marketing** — canonical `TurnFrame.marketing_scenarios` (0–2) from planner same call; direct questions ≠ scenarios; remove `derive_marketing_scenarios` heuristics after cutover.
+
+### Allowlist (this correction commit)
+
+- `docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`
+- `TASK.md`
+- `docs/ARCH_TARGET_DESIGN.md`
+- `docs/CLIENT_PACK_AUTHORING.md`
+- `docs/MARKETING_SCENARIO_ARCHITECTURE.md`
+- `tests/test_fullcontext_dialogue_presentation_convergence_governance.py`
+
+**STOP after correction PRE-CODE ✅** — implementation still requires separate owner GO.
 

@@ -57,18 +57,24 @@ document, not service entity. Seam audits:
 
 ### Owner decision: dialogue presentation convergence (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE @ `7c716df`)
 
-**Contact authority:** structured `contact:` in `clinic_policies.yaml` — canonical phone, WhatsApp,
-address, hours, parking. Direct contact questions → PRIMARY_EVIDENCE deterministic block, not free
-Composer generation. `clinic__info__contacts.md` — narrative/aliases only; must match structured
-values (validator cross-check). Fallback/handoff injects canonical phone only.
+**Contact authority:** structured `contact:` in `clinic_policies.yaml` — **единственный** источник
+phone, WhatsApp, address, hours, parking. **Не дублировать** эти факты в MD. Direct contact
+questions → TurnFrame typed `contacts` aspect (planner, no regex) → PRIMARY_EVIDENCE
+`kind=clinic_contact`. Fallback/handoff injects canonical phone only.
+
+**Composer source identity:** strict JSON `{ answer, source_identity }`; `primary_content_ref`
+must be in `used_content_refs`; factual FAQ fail-closed on missing/invalid source. Live backend
+update required.
+
+**Marketing scenarios:** canonical `TurnFrame.marketing_scenarios` (0–2) from Turn Planner same
+call — not heuristics from emotion/aspects. Direct informational questions do not create scenarios.
+Remove `derive_marketing_scenarios` after cutover. Malformed → empty list.
 
 **UI channel mutex:** one response uses exactly one navigation channel among choice menu (≤4),
 content secondary (≤2: video → follow-up → situation), or price-detail (≤2). No mixing
 `choice+price` or `secondary+price`. CTA remains separate.
 
-**Marketing projection:** all five typed scenarios (`pain_fear`, `cost`, `time`, `doctor_trust`,
-`result_reliability`) via TurnFrame/planner fields — no regex lists. `consultation_value` unchanged
-(exact service/option only).
+**`consultation_value`:** unchanged (exact service/option only).
 
 ### Запрещено по умолчанию
 

@@ -36,14 +36,15 @@ def test_seam_audit_exists_and_covers_dialogue_gaps() -> None:
     assert GOVERNANCE_BASELINE_HEAD in text
     for gap in ("Gap H", "Gap I", "Gap J", "Gap K", "Gap L", "Gap M", "Gap N"):
         assert gap in text
-    assert "source identity" in text.lower() or "used_content_refs" in text
-    assert "PRIMARY_EVIDENCE" in text
+    assert "source_identity" in text
+    assert '"answer"' in text
+    assert "primary_content_ref" in text
+    assert "used_content_refs" in text
+    assert "clinic_contact" in text
+    assert "contacts aspect" in text.lower() or "typed `contacts`" in text
+    assert "TurnFrame.marketing_scenarios" in text or "marketing_scenarios" in text
+    assert "derive_marketing_scenarios" in text
     assert "one navigation channel" in text.lower() or "channel mutex" in text.lower()
-    assert "situation" in text.lower()
-    assert "time" in text and "result_reliability" in text
-    assert "canonical phone" in text.lower() or "fallback" in text.lower()
-    assert "attribution_kind" in text
-    assert "Acceptance matrix" in text or "acceptance matrix" in text.lower()
     assert "NO PRODUCT CHANGE" in text or "NO LIVE" in text
 
 
@@ -53,9 +54,9 @@ def test_task_governance_section_and_acceptance_matrix() -> None:
     assert GOVERNANCE_BASELINE_HEAD in text
     assert "PRE-CODE" in text
     assert "test_fullcontext_dialogue_presentation_convergence_governance.py" in text
-    assert "Gap H" in text or "source identity sidecar" in text.lower()
-    assert "channel" in text.lower()
-    assert "PRIMARY_EVIDENCE" in text
+    assert "source_identity" in text
+    assert "clinic_contact" in text
+    assert "marketing_scenarios" in text
     for n in range(1, 21):
         assert f"| {n} |" in text
     assert "NO LIVE" in text
@@ -79,6 +80,7 @@ def test_owner_decision_docs_synced() -> None:
     for doc_text in (marketing_arch, foundation, arch_target):
         assert "FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE" in doc_text
     assert "clinic_policies.yaml" in authoring
+    assert "не дублировать" in authoring.lower() or "do not duplicate" in authoring.lower()
     assert "FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE" in (
         _REPO_ROOT / "docs" / "ARCHITECTURE_CONVERGENCE.md"
     ).read_text(encoding="utf-8")
@@ -90,27 +92,33 @@ def test_owner_decision_docs_synced() -> None:
     ).read_text(encoding="utf-8")
 
 
-def test_contact_authority_and_fallback_normative() -> None:
+def test_contact_authority_composer_and_marketing_normative() -> None:
     audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
     task = TASK_PATH.read_text(encoding="utf-8")
     combined = re.sub(r"\*+", "", audit + "\n" + task).lower()
     required = (
-        "primary_evidence",
         "clinic_policies.yaml",
-        "clinic__info__contacts",
-        "whatsapp",
+        "clinic_contact",
+        "contacts aspect",
+        "primary_evidence",
+        '"answer"',
+        "source_identity",
+        "primary_content_ref",
+        "used_content_refs",
+        "fail-closed",
+        "turnframe.marketing_scenarios",
+        "derive_marketing_scenarios",
+        "сколько длится",
+        "result_reliability",
         "canonical phone",
         "attribution_kind=plain",
-        "composer must not invent phone",
         "consultation_value",
-        "generic faq",
-        "time",
-        "result_reliability",
         "one response",
         "navigation channel",
     )
     for phrase in required:
         assert phrase in combined, phrase
+    assert "clinic__info__contacts" not in combined or "duplicate" in combined
 
 
 def test_consultation_value_preserve_unchanged() -> None:
@@ -124,6 +132,13 @@ def test_consultation_value_preserve_unchanged() -> None:
         "do not widen",
     ):
         assert phrase in combined, phrase
+
+
+def test_governance_correction_section_present() -> None:
+    task = TASK_PATH.read_text(encoding="utf-8")
+    assert "Governance correction — contacts, Composer JSON, marketing_scenarios" in task
+    assert "post-`6eb6cee`" in task
+    assert "live backend update required" in task.lower()
 
 
 def test_frozen_artifact_guards() -> None:

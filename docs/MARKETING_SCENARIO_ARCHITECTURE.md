@@ -164,9 +164,12 @@ choice menu относится к лимиту 4, а не к price-detail или
 ровно один navigation channel: choice **или** content secondary **или** price-detail.
 Запрещено `choice+price` и `secondary+price` в одном `quick_replies`. CTA отдельно.
 
-**Marketing scenario projection:** все пять typed scenarios (`pain_fear`, `cost`, `time`,
-`doctor_trust`, `result_reliability`) проецируются из TurnFrame/planner — без regex lists.
-`time` и `result_reliability` обязательны в acceptance; см.
+**Marketing scenario projection (`FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`):** canonical
+`TurnFrame.marketing_scenarios: list[pain_fear|cost|time|doctor_trust|result_reliability]` (0–2),
+emitted by Turn Planner in the **same** LLM call. No extra classifiers, no regex. Direct
+informational questions do **not** create scenarios (duration ≠ time, warranty ≠ result_reliability,
+doctors info ≠ doctor_trust). Runtime uses only validated `TurnFrame.marketing_scenarios`; remove
+heuristic `derive_marketing_scenarios` after cutover. Malformed → empty list. See
 `docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
 
 Price-ответ имеет отдельные два navigation slots и не смешивается с content follow-up.

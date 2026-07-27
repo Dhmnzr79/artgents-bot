@@ -141,39 +141,76 @@ Restore stale multi-turn tests after presentation session fields: vague doctors,
 | Effect | Generic pain FAQ cannot bind `suggest_h3` / `video_key` / `situation_allowed` to Composer-selected MD |
 | **State** | **Disconnected** for generic FAQ |
 
-**Proposed contract (`contracts/target_composer_source_identity.py` or envelope on `TargetUnverifiedComposedResponse`):**
+**Proposed contract — strict Composer JSON (owner correction @ `6eb6cee`):**
+
+Live backend and offline recording backends must return **strict JSON** (not prose-only):
+
+```json
+{
+  "answer": "...",
+  "source_identity": {
+    "primary_content_ref": "implantation__faq__pain.md",
+    "used_content_refs": ["implantation__faq__pain.md"]
+  }
+}
+```
+
+Rules:
+
+- `primary_content_ref` **must** be a member of `used_content_refs`.
+- For factual FAQ/info/comparison answers: missing, malformed, or invalid `source_identity` → **fail-closed** (verifier block), not silent omission.
+- Refs validated against cached FullContext MD index; invented IDs dropped fail-closed.
+- Executor parses JSON; semantic verifier still assesses `answer` prose only.
+- **Requires live Composer backend + recording contract update** before cutover.
+
+Typed Python mirror (`contracts/target_composer_source_identity.py`):
 
 ```python
 @dataclass(frozen=True)
 class TargetComposerSourceIdentity:
-    primary_content_ref: str | None
+    primary_content_ref: str
     used_content_refs: tuple[str, ...]
 ```
 
-Flow: Composer backend returns sidecar → executor parses → verifier validates against `md_root` fail-closed → presentation reads validated primary only.
+Flow: Composer backend returns JSON → executor parses → verifier validates refs against `md_root` fail-closed → presentation reads validated primary only.
 
 ### Gap I — Contact authority split / no PRIMARY_EVIDENCE path
 
 | Source | Fields today |
 |--------|--------------|
-| `clients/demo/clinic_policies.yaml` | `contact.phone_display` only |
-| `clients/demo/md/clinic__info__contacts.md` | address, hours prose, phone, WhatsApp, parking (body) |
+| `clients/demo/clinic_policies.yaml` | `contact.phone_display` only — **incomplete structured schema** |
+| `clients/demo/md/clinic__info__contacts.md` | **duplicate** phone, address, hours, WhatsApp, parking in MD body |
 | `core/clinic_hours.py` | expects `hours.weekly` in policies — **demo pack has none** |
 | `core/clinic_policies_loader.py` | phone for `manual_contact_template` |
-| `policy.contacts_intent` | legacy regex — **not** target product path |
+| `policy.contacts_intent` | legacy regex — **forbidden on target path** |
 | Target FullContext | contact Q → Composer + FullContext — **free generation** |
 
-**Proposed canonical authority (owner decision):**
+**Proposed canonical authority (owner correction):**
 
 | Fact class | Canonical file | Notes |
 |------------|----------------|-------|
-| phone, whatsapp, address, parking, structured hours | `clients/{id}/clinic_policies.yaml` → `contact:` block | single structured schema |
-| Patient-facing narrative / aliases | `clients/{id}/md/clinic__info__contacts.md` | must match structured values; validator cross-check |
-| Fallback / handoff phone | loader from `contact.phone_display` (or `phone_e164`) | Composer forbidden |
+| phone, whatsapp, address, parking, structured hours | `clients/{id}/clinic_policies.yaml` → `contact:` block | **единственный** источник правды |
+| MD contact duplicates | **forbidden** | не дублировать телефон, адрес, часы в `md/` |
 
-**Removal plan:** no new mirrors; deprecate duplicate phone in MD body via validator sync; `clinic_hours.py` reads structured hours from same `contact`/`hours` block.
+**Removal plan:** expand structured `contact:` in `clinic_policies.yaml`; remove or strip factual contact fields from `clinic__info__contacts.md` (no dual-edit surfaces). `clinic_hours.py` reads structured hours from same block.
 
-**PRIMARY_EVIDENCE path:** TurnFrame `topic=clinic` + aspect `contacts` OR dedicated contact intent from planner → `materialize_contact_primary_evidence(client_id)` → Composer evidence block `kind=clinic_contact`, `must_preserve_exact=true`.
+**Contact question routing (no regex):**
+
+- Add typed `contacts` to `AspectKind` / TurnFrame.
+- Turn Planner (same LLM call) sets `primary_aspect=contacts` or `aspects` contains `contacts` for direct contact questions («Какой телефон?», «Есть WhatsApp?», «Где вы?», «Как работаете?»).
+- Target runtime branches on validated TurnFrame — **not** `policy.contacts_intent` regex.
+
+**PRIMARY_EVIDENCE path:**
+
+`TurnFrame` with `contacts` aspect → `materialize_clinic_contact_primary_evidence(client_id)` → evidence block:
+
+| Field | Value |
+|-------|-------|
+| `kind` | `clinic_contact` (**not** `commercial_fact`) |
+| `must_preserve_exact` | `true` |
+| `text` | structured fields from `clinic_policies.yaml` only |
+
+Composer must not invent or paraphrase contact numbers/address/hours.
 
 ### Gap J — Situation priority inverted
 
@@ -198,19 +235,42 @@ Intake wired in `flow_handlers.py` (`situation_action` start/back, `situation_pe
 
 **No** dedicated HTTP offline tests for: start, back, submit, SID isolation, interrupt/resume, PII withholding on `/ask` path.
 
-### Gap M — Marketing `time` and `result_reliability` unreachable
+### Gap M — Marketing scenarios: heuristic projection wrong; TurnFrame field missing
 
-`derive_marketing_scenarios` (@ `target_presentation_turn_projection.py`) maps only:
+**Owner correction:** `time` and `result_reliability` **cannot** be inferred from `duration`/`warranty` aspects or direct informational questions. A direct question is **not** a marketing objection.
 
-| TurnFrame signal | Scenario |
-|------------------|----------|
-| `emotion == "fear"` | `pain_fear` |
-| `emotion == "doubt"` | `doctor_trust` |
-| `primary_aspect == "price"` | `cost` |
+| Anti-pattern | Why wrong |
+|--------------|-----------|
+| `primary_aspect == "duration"` → `time` | «Сколько длится имплантация?» = informational, not objection |
+| `primary_aspect == "warranty"` → `result_reliability` | «Какая гарантия?» = direct fact question |
+| `topic == "doctors"` → `doctor_trust` | «Кто врач?» = informational |
 
-**Missing:** typed projection for `time`, `result_reliability` (planner fields TBD — must not use regex).
+**Current interim (to remove):** `derive_marketing_scenarios` maps `emotion`/`price` heuristically — **superseded**.
 
-`marketing.yaml` already authors amplifiers for both scenarios.
+**Canonical contract — add to `TurnFrame`:**
+
+```python
+marketing_scenarios: list[
+    Literal["pain_fear", "cost", "time", "doctor_trust", "result_reliability"]
+]  # 0–2 values, from Turn Planner same LLM call
+```
+
+Rules:
+
+- Turn Planner emits 0–2 scenarios in the **same** planner invocation; no extra classifiers, no regex.
+- Scenario only on **expressed fear, doubt, or objection** — not on neutral/direct questions.
+- Examples:
+  - «Боюсь, что это слишком долго» → `time`
+  - «А вдруг имплант не приживётся?» → `result_reliability`
+  - «Не доверяю врачу без опыта» → `doctor_trust`
+  - «Сколько длится имплантация?» → **no** `time`
+  - «Какая гарантия?» → **no** `result_reliability`
+  - «Кто врач?» → **no** `doctor_trust`
+- Runtime uses **only** validated `TurnFrame.marketing_scenarios`; delete `derive_marketing_scenarios` after cutover.
+- Malformed/unknown values → sanitized to empty list.
+- Implementation requires: contract field, sanitization, planner prompt update, blast-radius tests.
+
+`marketing.yaml` already authors amplifiers for all five scenarios.
 
 ### Gap N — Fallback without canonical phone
 
@@ -257,16 +317,18 @@ Post: normalize_policy_payload must NOT re-truncate governed decision.
 Session: write cadence only on materialized success.
 ```
 
-## Contact audit — current demo sources
+## Contact audit — target path (@ `7c716df` + owner correction)
 
-| Question | Current path @ `7c716df` | Target path |
-|----------|--------------------------|-------------|
-| «Какой телефон?» | Composer + FullContext | PRIMARY_EVIDENCE `contact.phone` exact |
-| «Есть WhatsApp?» | Composer + FullContext | PRIMARY_EVIDENCE `contact.whatsapp` |
-| «Где вы?» | Composer + FullContext | PRIMARY_EVIDENCE `contact.address` |
-| «Как работаете?» | Composer + FullContext / hours helper empty | PRIMARY_EVIDENCE `contact.hours_display` |
-| Manual-contact hard-stop | `clinic_policies.yaml` templates + `phone_display` | keep; same canonical phone |
+| Question | Current path | Target path |
+|----------|--------------|-------------|
+| «Какой телефон?» | Composer + FullContext | TurnFrame `contacts` aspect → PRIMARY_EVIDENCE `clinic_contact` |
+| «Есть WhatsApp?» | Composer + FullContext | same |
+| «Где вы?» | Composer + FullContext | same |
+| «Как работаете?» | Composer + FullContext | same |
+| Manual-contact hard-stop | `clinic_policies.yaml` templates | same canonical `contact:` phone |
 | Fallback/error | fixed text, no phone | fixed text + canonical phone only |
+
+**Authoring:** edit **only** `clinic_policies.yaml` `contact:` — never duplicate phone/address/hours in MD.
 
 ## consultation_value — preserve (unchanged from prior milestone)
 
@@ -316,15 +378,25 @@ Session: write cadence only on materialized success.
 ## Implementation seam (target — not in this commit)
 
 ```text
-TurnFrame (marketing_scenarios 0–2 incl. time/result_reliability)
-  → contact PRIMARY_EVIDENCE branch (deterministic, pre-Composer)
-  → Composer + source identity sidecar
-  → Verifier (validated refs)
+TurnFrame (marketing_scenarios 0–2 from planner; contacts aspect when applicable)
+  → clinic_contact PRIMARY_EVIDENCE branch (deterministic, pre-Composer)
+  → Composer strict JSON { answer, source_identity }
+  → Verifier (validated refs; FAQ fail-closed on bad source_identity)
   → decide_target_presentation (single channel mutex, correct situation priority)
   → widget (CTA separate)
-  → fallback injector (canonical phone, plain attribution)
+  → fallback injector (canonical phone from clinic_policies.yaml only; plain attribution)
   → session cadence write (materialized only)
 ```
+
+## Governance correction (@ post-`6eb6cee`)
+
+Binding clarifications from owner (docs/tests only in this commit):
+
+1. **Contacts** — only `clinic_policies.yaml`; no phone/address/hours duplication in MD.
+2. **Contact routing** — typed `contacts` aspect from Turn Planner; no regex on target path.
+3. **Composer** — strict JSON sidecar; `primary_content_ref ∈ used_content_refs`; FAQ fail-closed.
+4. **Evidence** — `kind=clinic_contact`, not `commercial_fact`.
+5. **Marketing** — `TurnFrame.marketing_scenarios` from planner; remove `derive_marketing_scenarios` heuristics; direct questions ≠ scenarios.
 
 ## STOP
 

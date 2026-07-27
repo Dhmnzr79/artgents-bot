@@ -4862,6 +4862,44 @@ git diff --check
 
 ## STOP
 
-Governance PRE-CODE PASS does **not** authorize implementation.
-**STOP after governance commit + push** — await owner GO.
+~~Governance PRE-CODE PASS does **not** authorize implementation.~~
+~~**STOP after governance commit + push** — await owner GO.~~
 
+## Implementation completion record
+
+**Status:** COMPLETE — Phase 2 @ `codex/stage-a` · Owner GO ✅
+
+| Item | Result |
+|------|--------|
+| Governance HEAD | `ac11d5f` |
+| Scenario-only dispatch sufficiency | ✅ |
+| Structured contact answer mode | ✅ |
+| Boundary uncertain degrade | ✅ |
+| Verifier `client_id` | ✅ |
+| Terminal/boundary phone | ✅ |
+| COMPLETION matrix | ✅ 33 tests |
+| Focused COMPLETION command | ✅ 167/167 |
+| Wide safe-offline governance | ✅ 55/55 |
+| `validate_client_pack` demo | ✅ |
+| `import app` | ✅ |
+| `collect-only tests/` | ✅ 2984 |
+| Frozen pins | ✅ unchanged |
+| LIVE / LLM | **none** |
+
+### Gates changed
+
+| Gate | Before | After |
+|------|--------|-------|
+| Dispatch `aspects=[]` | fail-closed (except doctors) | materialize when valid `topic` + `marketing_scenarios` |
+| Structured contacts | 4–5 LLM calls | 0 boundary/composer/semantic |
+| Boundary `uncertain` | terminal defer, no phone | degrade to materialize; backend-failure terminal with phone |
+| Terminal defer/clarify | no phone | canonical phone |
+| Verifier contacts | `client_id="demo"` | runtime `client_id` |
+
+### Allowlist deviations
+
+| File | Reason |
+|------|--------|
+| `core/target_verified_response_pipeline.py` | pass `client_id` into verifier |
+| `tests/test_final_fullcontext_dialogue_runtime_convergence_implementation.py` | structured contact regression |
+| `tests/test_final_contact_value_verification_and_marketing_scenario_activation_implementation.py` | HTTP contact parity (0 composer) |

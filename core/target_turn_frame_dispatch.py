@@ -69,6 +69,35 @@ def _clinic_wide_doctors_empty_aspects(
     )
 
 
+def _scenario_concern_empty_aspects(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    """Valid topic + marketing scenarios suffice for content when aspects are empty only."""
+
+    aspects_meta = turn_frame.field_meta.aspects
+    scenarios_meta = turn_frame.field_meta.marketing_scenarios
+    return (
+        _topic_is_usable(turn_frame, envelope)
+        and not turn_frame.needs_clarification
+        and turn_frame.field_meta.needs_clarification.status != "invalid"
+        and aspects_meta.status == "invalid"
+        and aspects_meta.error == "aspects_empty"
+        and scenarios_meta.status == "valid"
+        and bool(turn_frame.marketing_scenarios)
+    )
+
+
+def _aspects_empty_exception(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    return _clinic_wide_doctors_empty_aspects(
+        turn_frame,
+        envelope,
+    ) or _scenario_concern_empty_aspects(turn_frame, envelope)
+
+
 def _topic_is_usable(turn_frame: TurnFrame, envelope: TargetTurnFramePolicyEnvelope) -> bool:
     meta = turn_frame.field_meta.topic
     if meta.status != "valid" or turn_frame.topic is None:
@@ -143,7 +172,7 @@ def _components_from_turn_frame(
     envelope: TargetTurnFramePolicyEnvelope,
 ) -> tuple[TargetResponseComponent, ...]:
     selected: set[TargetResponseComponent] = set()
-    if not _clinic_wide_doctors_empty_aspects(turn_frame, envelope):
+    if not _aspects_empty_exception(turn_frame, envelope):
         _reject_invalid(turn_frame.field_meta.aspects, "aspects")
     if _topic_is_usable(turn_frame, envelope):
         _assert_topic_scope_compatible(turn_frame.topic, envelope)  # type: ignore[arg-type]
@@ -151,6 +180,9 @@ def _components_from_turn_frame(
         if aspect == "overview" and turn_frame.topic == "doctors":
             continue
         selected.add(_ASPECT_TO_COMPONENT[aspect])
+
+    if _scenario_concern_empty_aspects(turn_frame, envelope):
+        selected.add("content")
 
     if turn_frame.intent in _PRICE_INTENTS and _intent_price_is_usable(
         turn_frame, envelope

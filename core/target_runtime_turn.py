@@ -22,6 +22,7 @@ from core.target_composer_executor import TargetComposerBackend
 from core.target_medical_boundary import (
     TargetMedicalBoundaryBackend,
     execute_target_medical_boundary_classification,
+    normalize_boundary_for_pipeline,
 )
 from core.target_response_verifier import (
     TargetResponseVerificationError,
@@ -63,6 +64,10 @@ from core.target_runtime_widget import (
     TargetRuntimeWidgetPayload,
     materialize_target_error_payload,
     widget_payload_from_runtime_result,
+)
+from core.target_structured_answer import (
+    materialize_structured_contact_turn_response,
+    resolve_structured_answer_capability,
 )
 
 
@@ -185,6 +190,62 @@ def run_target_fullcontext_runtime_turn(
     )
     _publish_effective_scope(effective_scope)
 
+    structured_capability = resolve_structured_answer_capability(turn_frame)
+    if structured_capability is not None and structured_capability.kind == "clinic_contact":
+        try:
+            result = materialize_structured_contact_turn_response(
+                client_id=client_id,
+                turn_frame=turn_frame,
+                contact_fields=structured_capability.contact_fields,
+                allowed_topics=context.allowed_topics,
+            )
+        except Exception as exc:
+            stage, code, value = emit_target_pipeline_failure_from_exception(exc)
+            return TargetRuntimeTurnOutcome(
+                widget=materialize_target_error_payload(
+                    client_id=client_id,
+                    sid=sid,
+                    error_code=code,
+                    pipeline_stage=stage,
+                    pipeline_value=value,
+                ),
+                pipeline_result=None,
+                turn_frame=turn_frame,
+            )
+        presentation_cadence = TargetPresentationCadenceState(
+            shown_video_ids=frozenset(session_state.shown_video_ids),
+            shown_content_followup_refs=frozenset(session_state.shown_content_followup_refs),
+            shown_price_followup_refs=frozenset(session_state.shown_price_followup_refs),
+            situation_offered=session_state.situation_offered,
+        )
+        widget = widget_payload_from_runtime_result(
+            client_id=client_id,
+            sid=sid,
+            context=context,
+            result=result,
+            turn_frame=turn_frame,
+            cadence=presentation_cadence,
+            allow_situation=not turn_frame.needs_clarification,
+        )
+        if widget.kind == "materialized":
+            selection = result.session_selection or TargetMaterializedSessionSelection((), (), ())
+            followups = _followups_from_widget(widget)
+            write_target_runtime_session_after_materialized(
+                sid,
+                turn_frame=turn_frame,
+                verified=result.verified,
+                prior=session_state,
+                current_selection=selection,
+                followups=followups,
+                effective_scope=effective_scope,
+                presentation_cadence_update=widget.presentation_cadence_update,
+            )
+        return TargetRuntimeTurnOutcome(
+            widget=widget,
+            pipeline_result=result,
+            turn_frame=turn_frame,
+        )
+
     try:
         boundary = execute_target_medical_boundary_classification(
             user_message,
@@ -192,6 +253,7 @@ def run_target_fullcontext_runtime_turn(
             min_confidence_none=0.80,
             min_confidence_medical_handoff=0.70,
         )
+        boundary = normalize_boundary_for_pipeline(boundary)
     except Exception as exc:
         return TargetRuntimeTurnOutcome(
             widget=materialize_target_error_payload(

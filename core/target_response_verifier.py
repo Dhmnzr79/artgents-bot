@@ -699,6 +699,7 @@ def verify_target_composed_response(
     primary_content_ref: str | None = None,
     used_content_refs: tuple[str, ...] = (),
     exact_service_authority: bool = False,
+    client_id: str | None = None,
 ) -> TargetVerifiedComposedResponse:
     """Verify one adjacent S37 response without modifying or repairing its text."""
 
@@ -741,7 +742,10 @@ def verify_target_composed_response(
             field = contact_field_from_evidence_ref(block.ref)
             if field is None:
                 _error("target_verifier_clinic_contact_missing", block.ref)
-            canonical = canonical_contact_scalar(field, client_id="demo")
+            canonical = canonical_contact_scalar(
+                field,
+                client_id=client_id or "demo",
+            )
             if not canonical:
                 _error("target_verifier_clinic_contact_missing", block.ref)
             if normalize_contact_scalar(canonical) not in normalized_answer:

@@ -76,6 +76,7 @@ def run_target_offline_verified_response_pipeline(
         primary_content_ref=package_primary,
         used_content_refs=package_used,
         exact_service_authority=exact_service_authority,
+        client_id=client_id,
     )
 
 

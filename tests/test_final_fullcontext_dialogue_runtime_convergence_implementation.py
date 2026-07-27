@@ -81,6 +81,8 @@ from tests.test_target_boundary_enforced_fullcontext_response import (
     PAIN_GROUNDED_TEXT,
     PRICE_TEXT,
 )
+def _contact_blocks(*fields: str):
+    return materialize_clinic_contact_primary_evidence("demo", fields=fields)  # type: ignore[arg-type]
 from tests.test_target_response_verifier import (
     RecordingBackend,
     _cached_context,
@@ -132,34 +134,34 @@ def _contact_text(*fields: str) -> str:
 
 
 def _check_phone(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    _assert_materialized(outcome, composer, expect_composer=False)
     assert canonical_contact_phone("demo") in outcome.widget.payload["answer"]
 
 
 def _check_address(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    _assert_materialized(outcome, composer, expect_composer=False)
     answer = outcome.widget.payload["answer"]
     assert "Тверская" in answer
     assert "Парковка:" not in answer
 
 
 def _check_parking(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    _assert_materialized(outcome, composer, expect_composer=False)
     assert "Парковка:" in outcome.widget.payload["answer"]
 
 
 def _check_hours(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    _assert_materialized(outcome, composer, expect_composer=False)
     assert "09:00" in outcome.widget.payload["answer"]
 
 
 def _check_whatsapp(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    _assert_materialized(outcome, composer, expect_composer=False)
     assert "WhatsApp" in outcome.widget.payload["answer"]
 
 
 def _check_address_parking(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    _assert_materialized(outcome, composer, expect_composer=False)
     answer = outcome.widget.payload["answer"]
     assert "Адрес:" in answer
     assert "Парковка:" in answer
@@ -167,7 +169,15 @@ def _check_address_parking(outcome, composer: MessageBuildingComposerBackend) ->
 
 
 def _check_materialized_only(outcome, composer: MessageBuildingComposerBackend) -> None:
-    _assert_materialized(outcome, composer)
+    expect_composer = "contact" not in str(outcome.turn_frame.aspects if outcome.turn_frame else "")
+    if outcome.turn_frame and outcome.turn_frame.aspects == ["contacts"]:
+        expect_composer = False
+    if outcome.turn_frame and any(
+        aspect.startswith("contact_") or aspect == "contacts"
+        for aspect in outcome.turn_frame.aspects
+    ):
+        expect_composer = False
+    _assert_materialized(outcome, composer, expect_composer=expect_composer)
 
 
 def _check_clinic_doctors(outcome, composer: MessageBuildingComposerBackend) -> None:
@@ -220,16 +230,24 @@ class RuntimeCase:
     check: Callable[[object, MessageBuildingComposerBackend], None]
 
 
-def _assert_materialized(outcome, composer: MessageBuildingComposerBackend) -> None:
+def _assert_materialized(
+    outcome,
+    composer: MessageBuildingComposerBackend,
+    *,
+    expect_composer: bool = True,
+) -> None:
     meta = outcome.widget.payload.get("meta") or {}
     assert_materialized_route(meta)
     assert_not_error_route(meta)
     assert outcome.widget.payload.get("answer")
-    assert len(composer.invocations) == 1
-    assert len(composer.sdk_messages) == 1
-    user_content = composer.sdk_messages[0][1]["content"]
-    assert '"answer":"<text>"' in user_content
-    assert '"source_identity"' in user_content
+    if expect_composer:
+        assert len(composer.invocations) == 1
+        assert len(composer.sdk_messages) == 1
+        user_content = composer.sdk_messages[0][1]["content"]
+        assert '"answer":"<text>"' in user_content
+        assert '"source_identity"' in user_content
+    else:
+        assert len(composer.invocations) == 0
 
 
 RUNTIME_MATRIX: tuple[RuntimeCase, ...] = (
@@ -573,22 +591,22 @@ def test_bone_graft_runtime_with_marketing_scenarios_materializes() -> None:
 
 def test_target_pipeline_failure_observability() -> None:
     frame = _demo_frame(
-        topic="clinic",
-        aspects=["contact_address"],
-        primary_aspect="contact_address",
+        topic="implantation",
+        aspects=["overview"],
+        primary_aspect="overview",
+        service_id="bone_graft",
     )
     with patch("core.target_runtime_turn.emit_target_pipeline_failure_from_exception") as emit:
         emit.side_effect = lambda exc, **k: ("verifier", exc.code, exc.value)
         outcome, _composer = _run(
             frame,
-            user_message="Где вы?",
-            composer_text="Неверный адрес без канонических фактов.",
+            user_message="Что такое костная пластика?",
+            composer_text="Неверный адрес без канонических фактов и 999 999 рублей.",
         )
     emit.assert_called_once()
     meta = outcome.widget.payload.get("meta") or {}
     assert meta.get("service_route") == "target_fullcontext_verifier_blocked"
     assert meta.get("pipeline_failure_stage") == "verifier"
-    assert meta.get("pipeline_failure_value") == "clinic_contact:address"
 
 
 def test_marketing_gate_after_final_spec_contacts() -> None:
@@ -737,24 +755,28 @@ def test_optional_commercial_claim_distortion_rejected_by_semantic_layer() -> No
 
 
 def test_contact_verifier_blocks_missing_typed_address_parking_field() -> None:
-    frame = _demo_frame(
-        topic="clinic",
-        aspects=["contact_address", "contact_parking"],
-        primary_aspect="contact_address",
-    )
     full_text = _contact_text("address", "parking")
     address_only = _contact_text("address")
-    outcome_ok, _ = _run(frame, user_message="Где вы и есть ли парковка?", composer_text=full_text)
-    assert_materialized_route(outcome_ok.widget.payload.get("meta") or {})
-    with patch("core.target_runtime_turn.emit_target_pipeline_failure_from_exception"):
-        outcome_bad, _ = _run(
-            frame,
-            user_message="Где вы и есть ли парковка?",
-            composer_text=address_only,
+    request = _request(
+        spec=_spec(required_components=("content",), required_fact_ids=()),
+        blocks=_contact_blocks("address", "parking"),
+    )
+    verify_target_composed_response(
+        request,
+        _response(request, full_text),
+        cached_full_context=_cached_context(),
+        semantic_backend=RecordingBackend(),
+        client_id="demo",
+    )
+    with pytest.raises(TargetResponseVerificationError) as exc:
+        verify_target_composed_response(
+            request,
+            _response(request, address_only),
+            cached_full_context=_cached_context(),
+            semantic_backend=RecordingBackend(),
+            client_id="demo",
         )
-    meta = outcome_bad.widget.payload.get("meta") or {}
-    assert meta.get("service_route") == "target_fullcontext_verifier_blocked"
-    assert meta.get("pipeline_failure_value") == "clinic_contact:parking"
+    assert exc.value.code == "target_verifier_clinic_contact_missing"
 
 
 def test_acceptance_matrix_covers_all_46_scenarios() -> None:
@@ -795,9 +817,12 @@ def test_production_seam_via_orchestrate_ask_turn_http(
         composer_text=text_factory(),
     )
     assert_body(body)
-    assert len(composer.invocations) == 1
-    assert len(composer.sdk_messages) == 1
-    assert '"source_identity"' in composer.sdk_messages[0][1]["content"]
+    if case_name.startswith("contact_"):
+        assert len(composer.invocations) == 0
+    else:
+        assert len(composer.invocations) == 1
+        assert len(composer.sdk_messages) == 1
+        assert '"source_identity"' in composer.sdk_messages[0][1]["content"]
 
 
 def test_production_seam_orchestrate_ask_turn_direct() -> None:
@@ -1244,5 +1269,5 @@ def test_scenario_46_ask_stream_parity_subset(monkeypatch: pytest.MonkeyPatch) -
     )
     assert ask["meta"]["service_route"] == stream["meta"]["service_route"]
     assert ask["answer"] == stream["answer"]
-    assert len(composer_ask.sdk_messages) == 1
-    assert len(composer_stream.sdk_messages) == 1
+    assert len(composer_ask.invocations) == 0
+    assert len(composer_stream.invocations) == 0

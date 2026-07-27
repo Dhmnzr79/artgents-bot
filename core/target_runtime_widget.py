@@ -231,13 +231,21 @@ def materialize_verified_widget_payload(
     )
 
 
+def _terminal_answer_with_phone(*, base_text: str, client_id: str) -> str:
+    return fallback_answer_with_phone(base_text=base_text, client_id=client_id)
+
+
 def materialize_boundary_uncertain_payload(
     *,
     client_id: str,
     sid: str,
 ) -> TargetRuntimeTerminalPayload:
+    answer = _terminal_answer_with_phone(
+        base_text=_CONSULTATION_DEFER_TEXT,
+        client_id=client_id,
+    )
     payload = {
-        "answer": _CONSULTATION_DEFER_TEXT,
+        "answer": answer,
         "quick_replies": [],
         "cta": None,
         "video": None,
@@ -267,11 +275,12 @@ def materialize_s41_terminal_payload(
 ) -> TargetRuntimeTerminalPayload:
     mode = terminal.dispatch.terminal_mode
     if mode == "clarify":
-        answer = _CLARIFY_TEXT
+        base_answer = _CLARIFY_TEXT
     elif mode == "defer":
-        answer = _CONSULTATION_DEFER_TEXT
+        base_answer = _CONSULTATION_DEFER_TEXT
     else:
-        answer = _CONSULTATION_DEFER_TEXT
+        base_answer = _CONSULTATION_DEFER_TEXT
+    answer = _terminal_answer_with_phone(base_text=base_answer, client_id=client_id)
     payload = {
         "answer": answer,
         "quick_replies": [],

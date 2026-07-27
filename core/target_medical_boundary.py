@@ -221,3 +221,20 @@ def execute_target_medical_boundary_classification(
         min_confidence_none=min_confidence_none,
         min_confidence_medical_handoff=min_confidence_medical_handoff,
     )
+
+
+def normalize_boundary_for_pipeline(
+    boundary: TargetMedicalBoundaryResult,
+) -> TargetMedicalBoundaryResult:
+    """Degrade auxiliary uncertainty to materialize path; semantic verifier remains gate."""
+
+    if boundary.decision != "uncertain":
+        return boundary
+    if boundary.reason_code == "boundary_uncertain_backend_failure":
+        return boundary
+    return TargetMedicalBoundaryResult(
+        decision="none",
+        confidence=1.0,
+        reason_code="boundary_none_confident",
+        source="backend",
+    )

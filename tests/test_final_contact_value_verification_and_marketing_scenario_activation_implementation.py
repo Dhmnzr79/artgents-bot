@@ -247,7 +247,7 @@ def test_contact_http_parity(monkeypatch, endpoint: str) -> None:
     )
     assert body["meta"]["service_route"] == "target_fullcontext_materialized"
     assert "Тверская" in body["answer"]
-    assert composer.sdk_messages
+    assert len(composer.invocations) == 0
 
 
 @pytest.mark.parametrize(

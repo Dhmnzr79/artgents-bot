@@ -3802,3 +3802,14 @@ Fail-closed (blocking) only for: missing/unparseable answer; exact clinic/commer
 
 **STOP after correction PRE-CODE ✅** — implementation still requires separate owner GO.
 
+## Implementation completion record
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `204da81` |
+| Implementation HEAD | `84b2741` |
+| PRE-CODE | 11/11 ✅ |
+| COMPLETION (focused) | 106/106 ✅ |
+| Product change | gaps H–N implemented |
+| LIVE / LLM | **none** |
+

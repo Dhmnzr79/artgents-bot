@@ -3228,3 +3228,192 @@ python -m pytest -p no:cacheprovider --basetemp $bt `
 Checkpoint B governance PRE-CODE PASS does not authorize implementation/delete.
 **STOP after B PRE-CODE ✅** before any DELETE/CREATE/UPDATE from implementation allowlist.
 
+---
+
+# TASK — FULLCONTEXT_PRESENTATION_PARITY (governance)
+
+**Status:** governance checkpoint only · **NO PRODUCT CHANGE / NO LIVE / NO LLM**
+
+**Baseline:** `codex/stage-a` @ `50c6cf9` (`FINAL_CLIENT_PACK_DATA_CONVERGENCE B complete`)
+
+**Authority:** owner decisions on UI slots (choice menu max 4, secondary max 2); seam audit
+`docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`.
+
+## Goal
+
+Восстановить механизмы представления и маркетинга, потерянные при переходе на
+FullContext-only, не возвращая legacy policy/RAG и не создавая второй pipeline.
+
+Лёгкий typed presentation layer поверх существующих: ResponseSpec, validated source
+identity, selected followups, governed UI actions, marketing selection, target session.
+
+## Owner decisions (binding)
+
+### 1. Choice menu — до 4 кнопок
+
+Governed branch selection по typed action/ref (`UiScopeAction`, `UiStageAction`, другие
+governed clarification choices). Max 4; deterministic ordering; dedup по ref;
+session-bound refs only; fail-closed on invalid ref. Не смешивается с secondary navigation.
+CTA не занимает choice slot. Без regex/phrase lists.
+
+### 2. Secondary UI — максимум 2 слота
+
+Content: `suggest_h3`, FAQ/info, service-detail, video (приоритет, 1 sidecar), situation.
+Price-detail: max 2 authored service followups; не смешивать с content; scope/stage menu —
+лимит 4, не price slots. Shown/clicked не повторяются. CTA и marketing facts слоты не занимают.
+
+## Confirmed gaps (read-only audit)
+
+| Gap | Summary |
+|-----|---------|
+| **A** | No validated `used_doc_ids`/`content_ref` on verified response → followups/video/situation disconnected |
+| **B** | `normalize_policy_payload` caps `md_navigation` to 1 QR vs normative 2 secondary slots |
+| **C** | Target widget hardcodes `video=None` despite MD `video_key` + catalog |
+| **D** | Target widget hardcodes `situation.show=False` |
+| **E** | Runtime passes `marketing_scenarios=()`, `include_initial_block=False` |
+| **F** | `semantic_context="service"` hardcoded |
+| **G** | Session cadence incomplete (video, followup no-repeat ledger) |
+
+`consultation_value` — preserve; add validator checks in implementation phase.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md` | CREATE |
+| `docs/MARKETING_SCENARIO_ARCHITECTURE.md` | UPDATE — choice menu 4 + slot clarity |
+| `docs/MARKETING_QUESTION_FOUNDATION.md` | UPDATE — choice menu 4 + slot clarity |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE — owner decision §presentation slots |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — gap row + checkpoint |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — checkpoint entry |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — status entry |
+| `tests/test_fullcontext_presentation_parity_governance.py` | CREATE — PRE-CODE checker |
+
+**Forbidden in governance commit:**
+
+- Product code (`core/target*.py`, `orchestration/*.py`, `ux_builder.py`, `app.py`, widget)
+- Live / LLM eval runs
+- Composer / Verifier medical policy changes
+- Frozen S-series/A9R/final-scope/W1b artifact edits
+- Implementation tests or presentation modules
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+### CREATE (expected)
+
+- `core/target_presentation_decision.py` (or equivalent typed presentation layer)
+- `tests/test_fullcontext_presentation_parity_implementation.py`
+- `tests/test_fullcontext_presentation_parity_sparse_fixtures.py` (if needed)
+- Validator extensions in `scripts/validate_client_pack.py` (consultation_value, video_key)
+- `clients/_template/md/sample__service__example.md` consultation_value example (neutral)
+- `docs/CLIENT_PACK_AUTHORING.md` consultation_value + video_key sections
+
+### UPDATE (expected — exact list finalized at implementation start)
+
+- `core/target_response_verifier.py` — validated source refs on verified response
+- `core/target_fullcontext_content_package.py` — source identity path
+- `orchestration/target_fullcontext_turn.py` — propagate validated doc refs
+- `core/target_runtime_widget.py` — video, situation, slot separation
+- `core/target_runtime_turn.py` — marketing_scenarios, semantic_context
+- `core/target_runtime_client_context.py` — remove hardcoded marketing off-switch
+- `core/target_runtime_session.py` — full session cadence fields
+- `ux_builder.py` — align limiter to 4/2 presentation decision
+- `tests/test_ui_source_policy.py` — replace stale 1-QR test
+- `contracts/turn_frame.py` — `marketing_scenarios` field (if Planner wire required)
+- `core/turn_frame_from_raw.py` / planner bridge (if TurnFrame field added)
+
+**KEEP:** `consultation_value` mechanism, AC1–AC3, A9 authority, Composer/Verifier medical policy,
+frozen artifacts, existing pricebook/marketing data.
+
+**DELETE:** none in this milestone (no legacy restore).
+
+## Acceptance matrix (implementation)
+
+| # | Criterion |
+|---|---|
+| 1 | All-on-4 info → 1–2 relevant secondary buttons, not artificially 1 |
+| 2 | Bone graft info → validated used document → up to 2 its followups |
+| 3 | FAQ document does not become service entity |
+| 4 | Invalid invented `used_doc_id` → rejected/omitted deterministically |
+| 5 | Content with video + followups → video + max 1 followup |
+| 6 | Content without video → max 2 followups |
+| 7 | Situation action uses one of two content slots |
+| 8 | Choice scope menu with 3 options → all 3 shown |
+| 9 | Choice menu fixture with 4 options → all 4 shown |
+| 10 | Choice menu with 5 options → deterministic first 4 + audit/drop reason |
+| 11 | Choice menu not mixed with secondary navigation |
+| 12 | Price details → max 2 |
+| 13 | Scope/stage menu not cut by price-detail limiter |
+| 14 | JSON/SSE parity |
+| 15 | Previously shown/clicked followup does not auto-repeat |
+| 16 | Video shown automatically once per session cadence |
+| 17 | Reset/SID isolation clear cadence |
+| 18 | Marketing scenarios 0–2 reach Planner → selector |
+| 19 | Marketing limits 3/2 enforced in runtime |
+| 20 | price/doctors/service get matching CTA keys |
+| 21 | CTA suppression boundaries preserved |
+| 22 | consultation_value first show / no repeat / exact ownership |
+| 23 | terminal/error do not write shown-state |
+| 24 | New sparse client pack passes without video/consultation_value |
+| 25 | Invalid consultation_value client pack fails validator |
+| 26 | Invalid video key client pack fails validator or documented optional-policy |
+| 27 | Existing rich pricebook, A9, AC1–AC3, typed UI flows without regression |
+| 28 | Frozen S-series/A9R/final-scope/W1b artifacts byte-identical |
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-pres-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_fullcontext_presentation_parity_governance.py `
+  tests/test_final_client_pack_data_convergence_b_governance.py `
+  tests/test_final_scope_widget_e2e_closeout_governance.py `
+  tests/test_final_explicit_service_price_lookup_boundary_governance.py `
+  tests/test_final_price_scope_coverage_nav_governance.py -q
+git diff --check
+```
+
+## Tests (implementation COMPLETION — future)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-pres-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_fullcontext_presentation_parity_governance.py `
+  tests/test_fullcontext_presentation_parity_implementation.py `
+  tests/test_validate_client_pack.py `
+  tests/test_ui_source_policy.py `
+  tests/test_w1_widget_followup_contract_offline.py `
+  tests/test_target_response_followup_materializer.py `
+  tests/test_demo_target_marketing_selection.py `
+  tests/test_s61_correction_target_runtime.py -q
+git diff --check
+```
+
+## STOP conditions
+
+1. Governance requires product code in same commit
+2. Need file outside governance allowlist
+3. Must edit frozen acceptance artifacts for green governance
+4. Retriever / legacy policy restore / second pipeline introduced
+5. Composer / Verifier medical policy change required
+6. LIVE / LLM / prompt tuning required for governance green
+7. Implementation artifact before PRE-CODE ✅
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after PRE-CODE ✅** — request separate owner GO before Phase 2.
+
+## Governance completion record
+
+| Field | Value |
+|-------|-------|
+| Baseline HEAD | `50c6cf9` |
+| Governance HEAD | pending commit |
+| PRE-CODE | pending |
+| Product change | **none** |
+| LIVE / LLM | **none** |
+

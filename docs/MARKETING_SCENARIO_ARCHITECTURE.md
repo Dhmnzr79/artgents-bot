@@ -131,14 +131,33 @@ CTA не показывается:
 
 Видимая подпись CTA и первая lead-flow реакция остаются в CTA/tone config. Это UI/lead copy, а не заготовка сценарного ответа.
 
-### Content navigation slots
+### Choice menu (governed branch selection)
+
+Когда бот предлагает пациенту **выбрать ветку диалога** (объём лечения, этап, вариант
+ситуации, typed clarification/action), допускается до **четырёх** governed-кнопок в одном
+ответе.
+
+- Классификация — по **типу typed action/ref** (`UiScopeAction`, `UiStageAction`, другие
+  governed clarification choices), **не** по тексту кнопки.
+- Максимум 4; deterministic ordering; dedup по ref; только валидные session-bound refs.
+- Invalid/unshown ref → существующий fail-closed.
+- Choice menu **не смешивается** в одном ответе с обычными secondary navigation buttons.
+- CTA остаётся отдельным элементом и **не занимает** choice slot.
+- Regex/phrase lists для определения типа меню запрещены.
+
+Owner decision: `FULLCONTEXT_PRESENTATION_PARITY` @ `50c6cf9` (2026-07-27).
+
+### Content navigation slots (secondary UI)
 
 CTA не занимает secondary UI slots. Pure clarify использует только свои уточняющие
-кнопки и не добавляет content follow-up/video. Содержательный content-ответ имеет два
+кнопки и не добавляет content follow-up/video. Содержательный content-ответ имеет **два**
 secondary slots: video показывается один раз с приоритетом на первом ответе по материалу,
 остальные места получают следующие ещё не показанные follow-up. Sliding-window повторов
 нет; новый материал создаёт новый набор кандидатов. Service-detail и «Рассказать о
 ситуации» конкурируют за те же два места. Текстовые усилители к UI slots не относятся.
+
+**Важно:** secondary slots (max 2) и choice menu (max 4) — **разные каналы**. Scope/stage
+choice menu относится к лимиту 4, а не к price-detail или content secondary slots.
 
 Price-ответ имеет отдельные два navigation slots и не смешивается с content follow-up.
 Кнопками становятся только элементы из `service.followups`; `fact_refs` добавляют

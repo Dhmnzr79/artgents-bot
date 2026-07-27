@@ -676,6 +676,32 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
+## Следующий технический checkpoint — FULLCONTEXT_PRESENTATION_PARITY (governance)
+
+**Baseline:** `codex/stage-a` @ `50c6cf9`. **Authority:** forbidden in governance commit.
+**Live/LLM:** forbidden.
+
+Восстановить механизмы представления и маркетинга, потерянные при переходе на
+FullContext-only, без возврата legacy policy/RAG и без второго pipeline.
+
+Owner decisions (binding):
+
+- **Choice menu — max 4** governed buttons (`UiScopeAction`, `UiStageAction`, typed choices).
+- **Secondary UI — max 2** slots (content followups, video, situation; separate price-detail slots).
+
+Deliverables (Phase 1): read-only seam audit
+(`docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`), `TASK.md`,
+doc sync, PRE-CODE checker `tests/test_fullcontext_presentation_parity_governance.py`.
+
+Gate sequence after PRE-CODE ✅:
+
+1. **Implementation** — typed presentation layer on ResponseSpec + validated source identity
+2. Post-implementation COMPLETION + frozen pin guards
+
+Gaps A–G documented in seam audit. **NO PRODUCT CHANGE** in governance commit.
+
+---
+
 ## Historical — A9 One-run Live Re-audit (v2, superseded by A9R gate plan)
 
 Frozen matrix/harness v2 подготовлены и независимо проверены **до** live. Первый A9 raw, v1 matrix/harness/summary и исторический audit не переписаны. Product path и ответы бота не менялись; patient-scope authority остаётся запрещённой.

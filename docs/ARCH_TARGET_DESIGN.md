@@ -38,6 +38,20 @@
 5. **`used_doc_ids` / source refs** — для аудита, follow-up и grounding verification, **не** как
    предварительный RAG-router.
 
+### Owner decision: presentation UI slots (FULLCONTEXT_PRESENTATION_PARITY @ `50c6cf9`)
+
+**Choice menu — max 4:** governed branch selection (`UiScopeAction`, `UiStageAction`, typed
+clarification choices) by action/ref type, not button label. Deterministic order, dedup by ref,
+session-bound refs only. Not mixed with secondary navigation in one response. CTA separate.
+
+**Secondary UI — max 2:** content followups (`suggest_h3`, FAQ/info navigation, service-detail,
+video, situation action) and separate price-detail followups (authored service followups only).
+Video priority; shown/clicked refs do not auto-repeat. Marketing facts and CTA do not occupy slots.
+
+**Source identity:** validated `used_doc_ids`/`content_ref` from Composer flow through Verifier to
+presentation layer for followups, video, and `situation_allowed`. FAQ/info MD remains document, not
+service entity. Seam audit: `docs/evidence/presentation/FULLCONTEXT_PRESENTATION_PARITY_SEAM_AUDIT.md`.
+
 ### Запрещено по умолчанию
 
 - маршрутизация ответа по **отдельным MD** или тематическим document routers;

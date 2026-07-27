@@ -38,6 +38,12 @@
 
 **Offline tests** используют fake/recording backends.
 
+**FULLCONTEXT_PRESENTATION_PARITY:** governance @ `50c6cf9` — seam audit +
+`TASK.md` + PRE-CODE checker. Restores presentation/marketing mechanisms lost in
+FullContext-only cutover (source identity, 2-slot secondary UI, video, situation,
+marketing scenarios runtime, CTA semantic context, session cadence) **without** legacy
+RAG/policy path or second pipeline. Implementation **STOP** until PRE-CODE ✅ + owner GO.
+
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)
 
 Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveScope` merge are **always on** in product runtime. Temporary kill-switch `A9_PATIENT_SCOPE_AUTHORITY` removed @ FINAL_SCOPE_WIDGET_E2E_CLOSEOUT (`3adc0e7` governance → implementation).

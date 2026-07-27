@@ -4190,3 +4190,193 @@ git diff --check
 Clinic-wide doctors materialization and `clinic_contact` verifier kind were incomplete from
 `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE` (`84b2741`); completed without contract change.
 
+---
+
+# TASK — FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO A9 tuning**
+
+**Baseline:** `codex/stage-a` @ `81cf09c8d4eb01f16402690f84923d98a37705a8`
+
+**Authority:** seam audit
+`docs/evidence/runtime/FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE_SEAM_AUDIT.md`.
+
+## Goal
+
+Системно устранить архитектурные разрывы widget runtime vs lower-level tests для цепочки
+`/ask` → orchestrate → planner → target runtime → spec/package → evidence → Composer message
+builder → Verifier → presentation → session. Не чинить отдельные формулировки.
+
+## Confirmed defects (offline + logs @ `81cf09c8`)
+
+| ID | Symptom | Root cause | Proven |
+|----|---------|------------|--------|
+| **A** | Contacts, clinic-wide doctors, generic content → `target_fullcontext_error` | Runtime computes `include_initial_block=True` from **provisional** spec; final content-only/doctors-only spec forbids marketing → `spec_package_permission_forbidden: marketing_facts` | ✅ |
+| **B** | Address-only contact cannot pass verifier; mixed questions over-deliver | Coarse `contacts` aspect; single `clinic_contact` block; verifier requires full block substring | ✅ |
+| **C** | `bone_graft` FAQ → `target_fullcontext_verifier_blocked`; no semantic LLM | Deterministic Verifier; exact `exc.code` absent from pipeline-failure events | ✅ partial (live); observability ✅ |
+| **D** | Prior runtime matrix green while widget fails | `run_target_offline_turn_frame_bound_response` + forced `include_initial_block=False` + `RecordingBackend` skips message builder | ✅ |
+
+**Not proven (honest):** exact live deterministic Verifier code for `bone_graft` (composer output not logged).
+
+**Prior fixes (do not re-litigate):** `MASS_COMPOSER` template brace + doctors dispatch @ `029c38b` — landed; widget still fails on A for contacts/doctors.
+
+## Owner decisions (binding for implementation)
+
+1. **Marketing gate ordering:** `include_initial_block` / `marketing_scenarios` computed **after** final bound `TargetResponseSpec`; intersect with `spec.allow_marketing_facts`. Optional marketing **never** blocks contacts/doctors/generic content materialization.
+2. **Contacts:** typed planner subaspects (phone, address, parking, hours, whatsapp, general, combinations) — **no regex**; separate PRIMARY_EVIDENCE blocks; verifier checks used fields only; fallback phone only.
+3. **Verifier policy unchanged:** strict commercial/numeric/contact/doctor gates; optional marketing facts not mandatory verbatim; approved corpus informational numbers allowed; no semantic layer expansion.
+4. **Observability:** structured runtime `bot_event` `target_pipeline_failure` with `{stage, code, value}` — operational, not admin viewer.
+5. **Test contour:** widget-faithful offline matrix via `_orchestrate_ask_turn`; real `include_initial_block`; real `build_composer_sdk_messages`; fakes only at provider/network boundary.
+6. **Presentation invariants (E):** KEEP — choice ≤4, secondary ≤2, price ≤2, channel mutex, source identity fail-open for text, `consultation_value` exact-only, `bone_graft` `no_public_price`, doctors orlov+volkov.
+7. **Client pack:** extend `validate_client_pack` for presentation fields; classify `consult_nudge` + `guide_router` as DELETE (0 active consumers).
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/runtime/FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_fullcontext_dialogue_runtime_convergence_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — status pointer |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — milestone status |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — milestone pointer |
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/target_runtime_turn.py` | UPDATE — marketing gate after final spec; structured failure events |
+| `core/target_presentation_turn_projection.py` | UPDATE — final-spec-aware marketing gate helper |
+| `core/target_policy_bound_verified_response_pipeline.py` | UPDATE — align marketing flags with bound spec |
+| `core/target_contact_authority.py` | UPDATE — typed subaspect evidence blocks |
+| `core/target_presentation_turn_projection.py` | UPDATE — contact subaspect projection |
+| `core/turn_planner_llm.py` | UPDATE — planner prompt: contact subaspects |
+| `core/target_composer_request.py` | UPDATE — per-field contact evidence |
+| `core/target_response_verifier.py` | UPDATE — used-field contact verify; optional vs required strict facts |
+| `core/target_runtime_widget.py` | UPDATE — propagate structured failure meta if needed |
+| `core/logging_setup.py` or `core/runtime_turn_frame.py` | UPDATE — `target_pipeline_failure` event emitter |
+| `scripts/validate_client_pack.py` | UPDATE — consultation_value, suggest_h3, situation_allowed, video_key, follow-up refs |
+| `clients/demo/features.yaml` | DELETE — `consult_nudge`, `guide_router` blocks |
+| `clients/demo/ui.yaml` | DELETE — `consult_nudge` block |
+| `clients/_template/features.yaml` | DELETE — `guide_router` block |
+| `tests/test_final_fullcontext_dialogue_runtime_convergence_implementation.py` | CREATE — COMPLETION + widget matrix |
+| `tests/test_final_fullcontext_dialogue_runtime_convergence_harness.py` | CREATE — shared offline widget harness |
+| `tests/test_target_contact_authority.py` | CREATE — subaspect evidence unit tests |
+| `tests/test_mass_composer_template_and_doctors_dispatch_implementation.py` | UPDATE — remove forced `include_initial_block=False` where matrix requires real runtime |
+
+## CREATE / UPDATE / DELETE / KEEP
+
+| Item | Class |
+|------|-------|
+| Seam audit + TASK governance | **CREATE** |
+| Marketing-after-final-spec gate | **UPDATE** |
+| Typed contact subaspect + evidence | **UPDATE** |
+| Verifier optional/required strict facts | **UPDATE** |
+| `target_pipeline_failure` event | **CREATE** |
+| Widget-faithful test harness | **CREATE** |
+| `consult_nudge` demo yaml | **DELETE** (impl) |
+| `guide_router` demo/template yaml | **DELETE** (impl) |
+| Presentation caps / channel mutex | **KEEP** |
+| Composer `answer + source_identity` contract | **KEEP** |
+| Frozen eval artifacts | **KEEP** |
+| `MASS_COMPOSER` template/doctors fixes | **KEEP** |
+
+## Acceptance matrix (implementation — 46 scenarios)
+
+| # | Criterion |
+|---|-----------|
+| 1 | Phone direct question → materialized; canonical phone in answer |
+| 2 | Address direct → materialized; address only in evidence (no forced hours/parking) |
+| 3 | Parking direct → materialized; parking field only |
+| 4 | Hours direct → materialized; hours field only |
+| 5 | WhatsApp direct → materialized; WhatsApp field only |
+| 6 | Address + parking mixed → both fields; no unrelated contact dump |
+| 7 | General contacts → materialized; appropriate multi-field evidence |
+| 8 | Clinic-wide doctors → materialized; no invented `service_id` |
+| 9 | «Кто делает костную пластику?» → orlov + volkov |
+| 10 | «Кто делает All-on-4?» → governed doctors |
+| 11 | Generic FAQ without `service_id` → materialized; no marketing permission error |
+| 12 | Exact service FAQ → materialized + valid source identity when provided |
+| 13 | `bone_graft` overview → materialized (not verifier block on grounded answer) |
+| 14 | `bone_graft` price → `no_public_price` text |
+| 15 | Sinus lift exact price regression → 42000 / 68000 unchanged |
+| 16 | Broad implantation price → materialized |
+| 17 | Named-service price → materialized |
+| 18 | Broad prosthetics price → materialized |
+| 19 | Explicit service price after session `full_arch` → materialized |
+| 20 | Current-turn incompatible extent → `data_gap` / governed clarify |
+| 21 | Scope choice click → choice menu ≤4 |
+| 22 | Stage choice click → choice menu ≤4 |
+| 23 | Planner clarification → clarify terminal/plain |
+| 24 | Ambiguous patient scope → governed clarify |
+| 25 | Cross-topic correction → focus update |
+| 26 | Follow-up source identity → validated refs |
+| 27 | Two secondary FAQ buttons → ≤2 slots |
+| 28 | Video + follow-up priority → video first |
+| 29 | Follow-up + situation priority → situation after video/follow-up |
+| 30 | Choice menu → ≤4 elements |
+| 31 | Price-detail menu → ≤2 elements |
+| 32 | Marketing `pain_fear` on eligible service path only |
+| 33 | Marketing `time` projection |
+| 34 | Marketing `result_reliability` projection |
+| 35 | Direct informational question → no marketing scenario |
+| 36 | Situation: start/back/submit flow preserved |
+| 37 | Situation SID isolation + PII handling |
+| 38 | CTA → lead/demo_stub |
+| 39 | Lead interruption/resume |
+| 40 | Booking/situation shared guards |
+| 41 | Unsupported service with governed alternatives |
+| 42 | Unsupported service without alternatives |
+| 43 | Medical handoff materialized |
+| 44 | Technical fallback → phone only; `attribution_kind=plain` |
+| 45 | `/reset` clears session |
+| 46 | `/ask` and `/ask/stream` parity on matrix subset |
+
+Matrix must use `_orchestrate_ask_turn` (or equivalent HTTP client), real `include_initial_block`, real `build_composer_sdk_messages`, 0 network calls.
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-dialogue-runtime-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_fullcontext_dialogue_runtime_convergence_governance.py `
+  tests/test_mass_composer_template_and_doctors_dispatch_governance.py `
+  tests/test_fullcontext_dialogue_presentation_convergence_governance.py -q
+git diff --check
+```
+
+## Tests (implementation COMPLETION — future)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-dialogue-runtime-impl-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_fullcontext_dialogue_runtime_convergence_governance.py `
+  tests/test_final_fullcontext_dialogue_runtime_convergence_implementation.py `
+  tests/test_mass_composer_template_and_doctors_dispatch_implementation.py `
+  tests/test_fullcontext_dialogue_presentation_convergence_implementation.py `
+  tests/test_target_runtime_llm_messages.py `
+  tests/test_target_contact_authority.py -q
+git diff --check
+```
+
+## Wide safe-offline command (implementation COMPLETION)
+
+Reuse corrected wide command from `DEMO_BONE_GRAFT_PACK_CONSISTENCY` @ `18e4d47` (263 paths) plus new implementation checker. Do not remove existing paths.
+
+## STOP conditions
+
+- Per-route / per-question hardcode
+- Second pipeline / retriever / regex routing
+- Weakening Verifier commercial/contact/numeric gates
+- Frozen artifact edit
+- LIVE/LLM required for green matrix
+- File outside implementation allowlist
+- A9 matrix/threshold tuning in this milestone
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after governance commit + push** — await owner GO.
+

@@ -44,6 +44,12 @@
 identity sidecar, contact PRIMARY_EVIDENCE, UI channel mutex, situation priority/HTTP tests,
 `time`/`result_reliability` projection, fallback canonical phone. Seam audit:
 `docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
+Partial implementation @ `84b2741`–`029c38b`.
+
+**FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE:** governance @ `81cf09c8` — widget runtime
+seams (provisional marketing vs final spec, typed contacts, verifier observability,
+widget-faithful offline matrix). Seam audit:
+`docs/evidence/runtime/FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)

@@ -52,7 +52,8 @@ Video priority; shown/clicked refs do not auto-repeat. Marketing facts and CTA d
 Invented refs never used. **Fail-closed for presentation UI** (follow-up/video/situation); **fail-open
 for generic answer text** — missing/invalid source → answer + warning, no source-based UI. Do not
 block whole response solely for sidecar. Verifier blocking unchanged for answer/commercial/contact
-rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`.
+rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`
++ `FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE`.
 
 ### Owner decision: dialogue presentation convergence (FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE @ `7c716df`)
 
@@ -75,6 +76,18 @@ content secondary (≤2: video → follow-up → situation), or price-detail (�
 `choice+price` or `secondary+price`. CTA remains separate.
 
 **`consultation_value`:** unchanged (exact service/option only).
+
+### Owner decision: dialogue runtime convergence (FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE @ `81cf09c8`)
+
+**Marketing gate:** `include_initial_block` / `marketing_scenarios` only after final bound
+`TargetResponseSpec`; optional marketing never blocks contacts/doctors/generic content.
+
+**Contacts:** typed planner subaspects → per-field PRIMARY_EVIDENCE from `clinic_policies.yaml`;
+verifier checks used fields only; fallback canonical phone only.
+
+**Tests:** widget-faithful offline matrix via `_orchestrate_ask_turn`; real
+`build_composer_sdk_messages`; fakes at provider boundary only. Seam audit:
+`docs/evidence/runtime/FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE_SEAM_AUDIT.md`.
 
 ### Запрещено по умолчанию
 

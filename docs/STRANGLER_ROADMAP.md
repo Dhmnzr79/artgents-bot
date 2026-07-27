@@ -676,7 +676,29 @@ Gate sequence after A9R PRE-CODE ✅:
 
 ---
 
-## Следующий технический checkpoint — FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE (governance)
+## Следующий технический checkpoint — FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE (governance)
+
+**Baseline:** `codex/stage-a` @ `81cf09c8`. **Authority:** forbidden in governance commit.
+**Live/LLM:** forbidden.
+
+Системно закрыть widget runtime seams, которые дают fallback при зелёных lower-level тестах:
+
+- provisional `include_initial_block` vs final content/doctors-only spec (Seam A)
+- typed contact subaspects + per-field PRIMARY_EVIDENCE (Seam B)
+- deterministic Verifier policy + `target_pipeline_failure` observability (Seam C)
+- widget-faithful offline matrix через `_orchestrate_ask_turn` (Seam D)
+- presentation invariants KEEP (Seam E); client-pack validator + DELETE classification (Seam F)
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/runtime/FINAL_FULLCONTEXT_DIALOGUE_RUNTIME_CONVERGENCE_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_fullcontext_dialogue_runtime_convergence_governance.py`.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE (governance)
 
 **Baseline:** `codex/stage-a` @ `7c716df` (Phase 2 `FULLCONTEXT_PRESENTATION_PARITY` complete).
 **Authority:** forbidden in governance commit. **Live/LLM:** forbidden.

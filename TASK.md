@@ -3808,8 +3808,176 @@ Fail-closed (blocking) only for: missing/unparseable answer; exact clinic/commer
 |-------|-------|
 | Baseline HEAD | `204da81` |
 | Implementation HEAD | `84b2741` |
+| Governance HEAD | `18e4d47` |
 | PRE-CODE | 11/11 ✅ |
 | COMPLETION (focused) | 106/106 ✅ |
+| COMPLETION (full diff `204da81..18e4d47`) | 24/24 ✅ |
 | Product change | gaps H–N implemented |
 | LIVE / LLM | **none** |
+
+### Post-push verification verdict (@ `18e4d47`)
+
+| Check | Result |
+|-------|--------|
+| `HEAD` == `origin/codex/stage-a` | ✅ |
+| COMPLETION checker full diff `204da81..18e4d47` | ✅ 24/24 |
+| source identity / contact authority / TurnFrame / UI mutex / situation / fallback | ✅ per governance |
+| Wide safe-offline (corrected command) | ❌ 6 pre-existing failures (`bone_graft` pack consistency) |
+| Frozen pins | ✅ unchanged |
+| `import app` | ✅ |
+| collect-only `tests/` | ✅ |
+
+Wide failures identical on `204da81` and `18e4d47` — **not** H–N regression. Routed to
+`DEMO_BONE_GRAFT_PACK_CONSISTENCY`.
+
+---
+
+# TASK — DEMO_BONE_GRAFT_PACK_CONSISTENCY (governance)
+
+**Status:** governance checkpoint only · **NO PRODUCT CHANGE / NO LIVE / NO LLM**
+
+**Baseline:** `codex/stage-a` @ `18e4d47` (`FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE` complete)
+
+**Authority:** seam audit
+`docs/evidence/client_pack/DEMO_BONE_GRAFT_PACK_CONSISTENCY_SEAM_AUDIT.md`.
+
+## Goal
+
+Закрыть шесть pre-existing wide safe-offline failures после добавления first-class `bone_graft`
+в demo client pack — без выдуманных цен, units, promotions или doctor credentials.
+
+## Owner decisions (binding)
+
+1. **Doctor linkage:** `bone_graft` → `doctors__doctor__orlov` + `doctors__doctor__volkov`
+   (authored surgical/implant competence; peer to `sinus_lift`). **Not** kuznetsov.
+2. **`no_public_price`:** честный approved text; **no** fictitious `billing_unit` or `UNIT_LABELS` entry.
+3. **Marketing:** facts applicability in `facts.json` is correct; **no** bone_graft-specific promotion required.
+4. **Legacy fixture:** `tests/fixtures/demo_legacy_marketing.yaml` — historical; **not** active authority;
+   remove byte-hash active pin; do not mechanical hash-update.
+5. **`UNIT_LABELS`:** test-only legacy map — scope to numeric-price offers only; no new product service dictionary.
+6. **`sinus_lift` exact prices** (42000 / 68000): must not regress.
+
+## Confirmed failures (read-only audit @ `18e4d47`)
+
+| Test | Classification |
+|------|----------------|
+| `test_demo_doctor_catalog` | actual demo-data gap |
+| `test_demo_doctor_template` | actual demo-data gap |
+| `test_demo_target_service_catalog` | actual demo-data gap |
+| `test_demo_target_price_offers` | architectural hardcode / stale test |
+| `test_demo_target_marketing_policy` | historical fixture / stale test |
+| `test_demo_target_marketing_migration_audit` | stale test coupling |
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/client_pack/DEMO_BONE_GRAFT_PACK_CONSISTENCY_SEAM_AUDIT.md` | CREATE |
+| `tests/test_demo_bone_graft_pack_consistency_governance.py` | CREATE — PRE-CODE checker |
+
+**Forbidden in governance commit:** product/data changes, LIVE/LLM, frozen pin edits, Verifier/A9 changes.
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `clients/demo/doctor_catalog.json` | UPDATE — add `bone_graft` to orlov + volkov |
+| `tests/test_demo_target_price_offers.py` | UPDATE — numeric-only `UNIT_LABELS` scope |
+| `tests/test_demo_target_marketing_policy.py` | UPDATE — drop legacy hash active pin |
+| `tests/test_demo_target_marketing_migration_audit.py` | UPDATE — facts↔promo without legacy superset lock |
+| `tests/fixtures/demo_legacy_marketing.yaml` | DELETE or historical isolate |
+| `tests/test_demo_bone_graft_pack_consistency_implementation.py` | CREATE — COMPLETION checker |
+
+## Owner sign-off table
+
+| Decision | Proposed | Status |
+|----------|----------|--------|
+| `bone_graft` → orlov | yes (MD: костная пластика) | **PENDING** |
+| `bone_graft` → volkov | yes (surgical implantologist) | **PENDING** |
+| `bone_graft` → kuznetsov | **no** | **PENDING** |
+| No bone_graft-specific promotion | yes | **PENDING** |
+| Remove legacy marketing hash pin | yes | **PENDING** |
+| `UNIT_LABELS` numeric-only | yes | **PENDING** |
+
+## Acceptance matrix (implementation)
+
+| # | Criterion |
+|---|-----------|
+| 1 | «Кто делает костную пластику?» → orlov + volkov |
+| 2 | `no_public_price` без dummy numeric unit |
+| 3 | «Сколько стоит костная пластика?» → approved no-public-price text |
+| 4 | `sinus_lift` exact prices unchanged (42000 / 68000) |
+| 5 | No invented bone_graft promotion |
+| 6 | Marketing facts do not leak across services |
+| 7 | No legacy/hash mirror in active client pack tests |
+| 8 | `validate_client_pack` demo + `_template` green |
+| 9 | Prior COMPLETION `test_fullcontext_dialogue_presentation_convergence_*` green |
+| 10 | Corrected wide safe-offline: 0 failures |
+| 11 | collect-only `tests/` green |
+| 12 | frozen pins byte-identical |
+| 13 | `import app` green |
+| 14 | `git diff --check` clean |
+
+## Tests (governance PRE-CODE)
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-bone-graft-gov-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_demo_bone_graft_pack_consistency_governance.py `
+  tests/test_fullcontext_dialogue_presentation_convergence_governance.py `
+  tests/test_fullcontext_dialogue_presentation_convergence_implementation.py -q
+git diff --check
+```
+
+## Wide safe-offline command (corrected — implementation COMPLETION)
+
+Removed missing turn-plan protocol guard test (file absent from repo). All 26 paths verified @ `18e4d47`.
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$bt = Join-Path $env:TEMP ("demo-bot-bone-graft-wide-" + [guid]::NewGuid().ToString("n"))
+python -m pytest -p no:cacheprovider --basetemp $bt `
+  tests/test_final_client_pack_data_convergence_b_governance.py `
+  tests/test_final_client_pack_data_convergence_governance.py `
+  tests/test_final_client_pack_data_convergence_reader_cutover.py `
+  tests/test_final_client_pack_data_convergence_sparse_pack.py `
+  tests/test_validate_client_pack.py `
+  tests/test_client_pack_template_scaffold.py `
+  tests/test_turn_planner_llm.py `
+  tests/test_turn_planner_wiring.py `
+  tests/test_catalog_match.py `
+  tests/test_follow_up_rewrite.py `
+  tests/test_dialog_focus_baseline.py `
+  tests/test_dialog_focus_contract.py `
+  tests/test_demo_doctor_catalog.py `
+  tests/test_demo_doctor_template.py `
+  tests/test_demo_target_service_catalog.py `
+  tests/test_demo_target_price_offers.py `
+  tests/test_demo_target_marketing_policy.py `
+  tests/test_demo_target_marketing_migration_audit.py `
+  tests/test_response_schema_loader.py `
+  tests/test_target_scope_aware_selection_offline.py `
+  tests/test_final_price_and_service_coverage_implementation.py `
+  tests/test_final_price_scope_coverage_nav_implementation.py `
+  tests/test_final_explicit_service_price_lookup_boundary_implementation.py `
+  tests/test_c2_import_firewall_offline.py `
+  tests/test_price_ref_routing.py `
+  tests/test_content_linter.py -q
+python -m pytest --collect-only -q
+```
+
+## STOP conditions
+
+- Owner rejects doctor mapping without authored alternative.
+- Fix requires fictitious price unit, promotion, or doctor credentials.
+- Verifier/A9/AC1–AC3 or frozen pin change required.
+- File outside implementation allowlist.
+- Mechanical legacy hash update as sole fix.
+
+## STOP
+
+Governance PRE-CODE PASS does **not** authorize implementation.
+**STOP after governance commit + push** — await owner GO.
 

@@ -18,6 +18,7 @@
       "supporting"
     ],
     "active": true,
+    "content_ref": "diagnostics__service__tomography.md",
     "selection": {
       "mode": "direct"
     },

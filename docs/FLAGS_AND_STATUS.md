@@ -178,6 +178,11 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
 2. **Исторический этап 7 — концерн-схемы** (см. [`archive/FULLCONTEXT_ROADMAP.md`](archive/FULLCONTEXT_ROADMAP.md)). Его старые product-правила не являются target-каноном; актуальный контракт — [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md).
 3. Вопросы доверия («врачи опытные?», «отзывы?») — через общий target planner/scenario и doctor/content sources, без отдельного thematic route.
 4. Скорость/стриминг (крупно). Сложный расчёт («посчитайте 3 зуба») — беклог.
+   **FINAL_RESPONSE_LATENCY_OBSERVABILITY / PERF-0** (governance @ `d381bc9`) — первый этап:
+   seam audit + точные per-stage замеры (Ingress/Planner/Boundary/Composer/Verifier/widget) без
+   изменения ответов/маршрутов/LLM-вызовов/UI. Не объединять Ingress + Planner. Seam audit:
+   `docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md`.
+   Implementation **STOP** until PRE-CODE ✅ + owner GO.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 6. **FINAL_TEST_SUITE_CONVERGENCE (governance @ `1980ab7`):** 185 wide failures inventoried; TSC-A..D checkpoints defined. See `docs/TEST_SUITE_ARCHITECTURE.md`, `docs/evidence/testing/final_test_failure_inventory.json`. Implementation blocked until owner GO.
 

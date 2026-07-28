@@ -5952,3 +5952,181 @@ git diff --check
 
 После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
 отдельного owner GO.
+
+---
+
+# TASK — FINAL_RESPONSE_LATENCY_OBSERVABILITY / PERF-0 (governance)
+
+**Status:** governance only · **NO PRODUCT INSTRUMENTATION / NO PIPELINE OPTIMIZATION / NO REAL
+STREAMING / NO LLM CALL COUNT CHANGE / NO BOUNDARY BYPASS / NO VERIFIER CONTEXT CHANGE / NO PROVIDER
+PREWARM / NO ANSWER CACHE / NO UX REDESIGN / NO LIVE / NO LLM / NO E2E / NO FROZEN ARTIFACT CHANGES /
+NO TSC-C / NO TSC-D / NO INGRESS+PLANNER MERGE**
+
+**Baseline:** `codex/stage-a` @ `d381bc9`
+
+**Authority:** seam audit
+`docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md`.
+
+## Goal
+
+Получить точные измерения каждого этапа обычного FullContext-хода —
+
+```text
+Ingress → Turn Planner → Medical Boundary → Composer → Semantic Verifier → Runtime/presentation/widget
+```
+
+— **без** изменения ответов, маршрутов, числа LLM-вызовов и UI-поведения. Первый этап программы
+ускорения; **не объединять Ingress + Planner** (отдельная будущая архитектурная задача).
+
+**Motivation @ `d381bc9`:** «Я боюсь боли» ≈ 12–15s end-to-end; `/ask/stream` не несёт реального
+ответа во время Composer — `_sse_service_reply` (`app.py:428`) считает весь ход (`finalize_ask`)
+**до** входа в SSE-генератор; `typing`/`ui`/`done` уходят подряд без разрыва. Сегодня в `turn_timing`
+существует ровно одна метка (`orchestrate_done`), и она ставится **после** всей цепочки A–K.
+
+## Required metrics (binding for implementation)
+
+- request/turn start
+- `time_to_first_local_status` (виджет; сейчас не измеряется вовсе — нет client-side timing)
+- `time_to_first_server_event`
+- Ingress start/complete/duration
+- Planner start/complete/duration
+- Boundary start/complete/duration или skipped
+- Composer start
+- `time_to_first_composer_token` — **только если backend реально отдаёт token delta**; сегодня
+  Composer никогда не вызывается с `stream=True` → метрика обязана быть `not_available`/`null`,
+  не подменяться полным ответом
+- Composer complete/duration
+- Verifier start/complete/duration или skipped — отдельно deterministic-block (до LLM) и
+  semantic-block (после LLM)
+- verified answer ready
+- presentation/widget payload ready
+- `time_to_first_meaningful_text`
+- HTTP/SSE complete
+- total turn duration
+- cache hit/miss + cached token count по каждому LLM-вызову
+- модель и `call_type` по каждому LLM-вызову
+
+## Measurement rules (binding)
+
+1. Monotonic clock для всех duration.
+2. Склейка через `request_id`, `sid`, `client_id`.
+3. Не логировать телефон, имя, полный вопрос, медицинские данные, другое PII.
+4. Не выдумывать метрики: нет token delta → `not_available`/null; готовый полный ответ ≠ «первый
+   токен».
+5. Skipped deterministic stages — явная отдельная метка, не `0ms`, не отсутствие поля.
+6. Расширять существующий `turn_timing`/observability механизм (`core/turn_timing.py`,
+   `logging_setup.py`), не создавать параллельную систему логирования.
+7. Ошибки, terminal, fallback и verifier-blocked ходы получают завершённый latency trace.
+8. `/ask` и `/ask/stream` — сопоставимые метрики (одинаковые имена полей, где применимо).
+9. Замеры не влияют на текст, кнопки, CTA, session, routes.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|------|---------|
+| `core/turn_timing.py` | generic mark/duration bucket exists; only ONE mark used in product code (`orchestrate_done`, post-hoc) |
+| `/ask/stream` | `finalize_ask` (full turn) runs **before** SSE generator is entered — no real early event today |
+| Composer | never called with `stream=True` — `time_to_first_composer_token` must be `not_available` |
+| Verifier | two distinct block paths — deterministic pre-check (`target_response_verifier.py:713-752`, before LLM) vs semantic LLM rejection (`:768-773`, after LLM) — must not be conflated |
+| `request.ctx["verifier_turn"]` | dead metric slot — read in `finalize_turn.py` but never written anywhere |
+| `latency_ms` vs `total_ms` | two independent computations from the same `turn_t0_monotonic`, both already in `turn_complete` — pre-existing duplication pattern, do not repeat for new stage marks |
+| Structured-capability bypass (`clinic_contact`, `service_availability`) | skips Boundary+Composer+Verifier entirely — must be marked "skipped", not omitted |
+| Cache/token/model logging | **already solid** — `log_llm_usage`/`log_llm_stream_usage` (`logging_setup.py`) already capture `cached_tokens`, `model`, `call_type` at all 5 current LLM call sites (Ingress, Planner, Boundary, Composer, Verifier) — reuse, do not duplicate |
+| Client widget | zero timing instrumentation in `static/widget/api.js` / `static/widget/widget.js` today |
+| `core/stream_answer_text.py` | pre-existing, unwired, unrelated to PERF-0 — not touched |
+
+Full seam table (rows A–O) and 9 detailed findings:
+`docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md`.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_response_latency_observability_governance.py` | CREATE — PRE-CODE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — PERF-0 status pointer |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — Active milestone pointer |
+
+**Forbidden in governance commit:**
+
+- Product instrumentation code changes (no `mark(...)`/`timed_stage(...)` added anywhere in this commit)
+- Pipeline optimization
+- Real streaming
+- LLM call-count change
+- Boundary bypass changes
+- Verifier context/policy/prompt changes
+- Provider prewarm
+- Answer cache
+- UX redesign
+- LIVE / LLM / E2E eval runs
+- Frozen artifact / hash changes
+- TSC-C / TSC-D
+- Ingress + Planner merge
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/turn_timing.py` | UPDATE — extend mark/duration vocabulary only |
+| `orchestration/pre_resolver_turn.py` | UPDATE — mark Ingress start/end + deterministic-skip reason |
+| `ingress_gate.py` | UPDATE — mark around `_call_ingress_llm` only |
+| `orchestration/planner_turn.py` | UPDATE — mark Planner start/end |
+| `orchestration/typed_ui_planner_turn.py` | UPDATE — mark Planner "skipped: typed_ui" |
+| `core/target_runtime_turn.py` | UPDATE — mark Boundary start/end + "boundary skipped: structured_capability" |
+| `core/target_composer_executor.py` | UPDATE — mark Composer start/end around single `generate(invocation)` seam |
+| `core/target_response_verifier.py` | UPDATE — mark Verifier start + deterministic-block vs semantic-block distinction — **no verification logic/prompt change** |
+| `core/target_runtime_widget.py` | UPDATE — mark "widget payload ready" |
+| `app.py` | UPDATE — mark SSE generator entry/first-yield/complete for `/ask/stream`; keep `/ask` parity |
+| `orchestration/finalize_turn.py` | UPDATE — join per-stage marks into `turn_complete`/`target_pipeline_failure`; resolve `latency_ms`/`total_ms` duplication |
+| `static/widget/api.js` | UPDATE — `performance.now()` at SSE event receipt |
+| `static/widget/widget.js` | UPDATE — `time_to_first_local_status` at first visible typing indicator |
+| `tests/test_final_response_latency_observability_implementation.py` | CREATE — acceptance matrix |
+
+**KEEP unchanged:** Verifier/Boundary/Composer policy and prompts; routing/threshold logic; LLM call
+count per turn; session writes; widget payload content/CTA/buttons; `core/stream_answer_text.py`
+(untouched, unwired).
+
+## Acceptance matrix (implementation)
+
+| # | Scenario | Expected |
+|------|----------|----------|
+| 1 | FAQ (generic FullContext) | full stage breakdown, all durations present |
+| 2 | Price lookup | full breakdown; Ingress may show `skipped` |
+| 3 | Contacts (`structured_capability=clinic_contact`) | Boundary/Composer/Verifier marked **skipped** |
+| 4 | Service availability (`structured_capability=service_availability`) | Boundary/Composer/Verifier marked **skipped** |
+| 5 | Generic FullContext (no structured capability) | full breakdown |
+| 6 | Medical concern → `medical_handoff` | Boundary duration present; Composer still runs |
+| 7 | Terminal / fallback | trace completes; Composer/Verifier marked **skipped**; `total_ms` present |
+| 8 | Verifier blocked — deterministic | Verifier LLM call marked **not reached**; completed trace |
+| 9 | Verifier blocked — semantic | Verifier LLM duration present; completed trace |
+| 10 | `/ask` | stage trace comparable to equivalent `/ask/stream` scenario |
+| 11 | `/ask/stream` | as #10 plus `time_to_first_server_event`; no fabricated JSON-only fields |
+
+All 11 rows also require: identical `answer`, identical route, identical LLM call count, identical
+session writes vs. pre-PERF-0 baseline for the same fixture.
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_response_latency_observability_governance.py -q
+
+git diff --check
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно менять Verifier/Boundary/Composer policy, prompts или frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert;
+- метрика не измеряется реально, а «изобретается» из готового ответа;
+- меняется число LLM-вызовов, маршрут или ответ для любой fixture;
+- объединяются Ingress и Planner.
+
+## STOP (Phase 1 governance)
+
+После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
+отдельного owner GO.

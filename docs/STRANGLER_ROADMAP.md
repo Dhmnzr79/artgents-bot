@@ -830,6 +830,26 @@ Deliverables (Phase 1): seam audit
 
 ---
 
+## Active — FINAL_RESPONSE_LATENCY_OBSERVABILITY / PERF-0 (governance Phase 1)
+
+**Baseline:** `codex/stage-a` @ `d381bc9` · **NO PRODUCT INSTRUMENTATION / NO REAL STREAMING / NO LIVE / NO LLM**
+
+Первый этап программы ускорения. «Я боюсь боли» ≈ 12–15s end-to-end; `/ask/stream` считает весь ход
+(Ingress → Planner → Boundary → Composer → Verifier → widget) **до** входа в SSE-генератор — сегодня
+нет разрыва между `typing`/`ui`/`done`. В `turn_timing` существует ровно одна метка
+(`orchestrate_done`), выставляемая **после** всей цепочки — per-stage замеров нет вовсе.
+
+Цель Phase 1: seam audit + точный perf-план измерений (без изменения ответов, маршрутов, числа
+LLM-вызовов, UI). **Не объединять Ingress + Planner** — отдельная будущая архитектурная задача.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_response_latency_observability_governance.py`.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
 ## Historical — FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION (governance)
 
 **Baseline:** `codex/stage-a` @ `ce256c5`. **Authority:** forbidden in governance commit. **Live/LLM:** forbidden.

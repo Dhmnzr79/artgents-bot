@@ -5601,9 +5601,9 @@ LIVE, E2E и Verifier changes запрещены до отдельного owner
 
 # TASK — FINAL_TEST_SUITE_CONVERGENCE (governance)
 
-**Status:** TSC-A COMPLETE @ `d9e69f9` · TSC-B NOT STARTED · **NO LIVE / NO LLM / NO product changes**
+**Status:** TSC-A COMPLETE @ `d9e69f9` · TSC-B COMPLETE @ `bb89316` · TSC-C NOT STARTED · **NO LIVE / NO LLM / NO product changes**
 
-**Baseline:** `codex/stage-a` @ `d9e69f9` (governance @ `1980ab7`)
+**Baseline:** `codex/stage-a` @ `bb89316` (governance @ `1980ab7`, TSC-A @ `d9e69f9`)
 
 **Evidence:** `drafts/EXACT_WIDE_TWO_HEAD_DELTA_AUDIT.md`, `drafts/wide_two_head_delta_classification.json`
 
@@ -5701,7 +5701,7 @@ python -m pytest tests/test_s65_authority_switch_offline.py tests/test_final_tom
 
 ---
 
-### TSC-B — active current-runtime stale (50) — **NOT STARTED**
+### TSC-B — active current-runtime stale (50) — **COMPLETE**
 
 **Allowlist:** inventory `checkpoint=TSC-B` files — planner contracts, pipeline signatures,
 loader guards, AC3/explicit price, S56, S61 runtime (non-429), `test_md_chunks.py`, etc.
@@ -5714,7 +5714,7 @@ loader guards, AC3/explicit price, S56, S61 runtime (non-429), `test_md_chunks.p
 python -m pytest tests/test_planner_attempt_contract.py tests/test_c2d_loader_canonical_offline.py tests/test_target_cached_full_context.py -q
 ```
 
-**STOP:** if frozen artifact change required.
+**STOP/checker:** TSC-B governance closeout ✅; no TSC-C files.
 
 ---
 
@@ -5784,20 +5784,22 @@ python -c "import json; print('\n'.join(e['nodeid'] for e in json.load(open('doc
 python -c "import json; d=json.load(open('docs/evidence/testing/final_test_failure_inventory.json')); assert d['failure_count']==185"
 ```
 
-## Completion record (TSC-A)
+## Completion record (TSC-A + TSC-B)
 
 | Item | Status |
 |------|--------|
 | Governance PRE-CODE | ✅ @ `e31c6d6` |
 | TSC-A implementation | ✅ @ `d9e69f9` |
-| TSC-A governance closeout | ✅ |
+| TSC-A governance closeout | ✅ @ `95e5edc` |
 | TSC-A inventory (38 nodeids) | ✅ green |
-| TSC-B | **NOT STARTED** (blocked until owner GO) |
+| TSC-B implementation | ✅ @ `bb89316` |
+| TSC-B inventory (50 nodeids) | ✅ green |
+| Wide suite residual | 97 failed (TSC-C/TSC-D only) |
+| TSC-C | **NOT STARTED** (blocked until owner GO) |
 | Frozen pins | ✅ unchanged |
 | LIVE / LLM | **none** |
 
-**PRODUCT_BUG_FUTURE (TSC-B, not fixed in TSC-A):**
-`tests/test_s61_target_fullcontext_runtime.py::test_invalid_pack_fail_closed`
+**Invalid-pack product bug (TSC-B):** handled at `core/target_runtime_turn.py` `TargetRuntimeClientContextError` boundary → `target_fullcontext_error` with canonical phone; HTTP parity in `test_invalid_pack_http_ask_and_stream_fail_closed`.
 
 ## STOP conditions (implementation)
 
@@ -5810,7 +5812,7 @@ python -c "import json; d=json.load(open('docs/evidence/testing/final_test_failu
 - нужно менять product code/data для historical green;
 - появляется catalog-wide `--ignore` на `tests/**`.
 
-## STOP (TSC-A closeout)
+## STOP (TSC-B closeout)
 
-После TSC-A governance closeout commit + PRE-CODE PASS + push — **остановиться**.
-TSC-B..D implementation запрещена до отдельного owner GO.
+После TSC-B governance closeout commit + PRE-CODE PASS + push — **остановиться**.
+TSC-C..D implementation запрещена до отдельного owner GO.

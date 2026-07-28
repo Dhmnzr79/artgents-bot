@@ -1,4 +1,4 @@
-"""Governance checker for FINAL_TEST_SUITE_CONVERGENCE (Phase 1 + TSC-A closeout)."""
+"""Governance checker for FINAL_TEST_SUITE_CONVERGENCE (Phase 1 + TSC-A/B closeout)."""
 
 from __future__ import annotations
 
@@ -34,8 +34,10 @@ DELTA_AUDIT_PATH = _REPO_ROOT / "drafts" / "EXACT_WIDE_TWO_HEAD_DELTA_AUDIT.md"
 TASK_PATH = _REPO_ROOT / "TASK.md"
 GOVERNANCE_BASELINE_HEAD = "1980ab7"
 TSC_A_HEAD = "d9e69f9"
+TSC_B_HEAD = "bb89316"
 MILESTONE = "FINAL_TEST_SUITE_CONVERGENCE"
 TSC_A_INVENTORY_COUNT = 38
+TSC_B_INVENTORY_COUNT = 50
 EXPECTED_CURRENT_FAILURES = 185
 EXPECTED_FAIL_BOTH = 178
 
@@ -159,24 +161,33 @@ def test_tsc_a_complete() -> None:
     assert "TSC-A" in section
     assert "COMPLETE" in section
     assert TSC_A_HEAD in section
+    assert TSC_B_HEAD in section
     assert "tests/conftest.py" in section
 
 
-def test_tsc_b_not_started() -> None:
+def test_tsc_b_complete() -> None:
     section = TASK_PATH.read_text(encoding="utf-8").split(f"# TASK — {MILESTONE} (governance)")[-1]
     assert "TSC-B" in section
-    assert "NOT STARTED" in section
+    assert "COMPLETE" in section
     tsc_b_block = section.split("### TSC-B", 1)[1].split("### TSC-C", 1)[0]
-    assert "COMPLETE" not in tsc_b_block
+    assert "NOT STARTED" not in tsc_b_block
     proc = subprocess.run(
-        ["git", "diff", "--name-only", f"{TSC_A_HEAD}..HEAD", "--", "tests/test_planner_attempt_contract.py"],
+        ["python", "-m", "pytest", *(e["nodeid"] for e in _load_inventory()["entries"] if e["checkpoint"] == "TSC-B"), "-q"],
         cwd=_REPO_ROOT,
         capture_output=True,
         text=True,
         check=False,
     )
-    assert proc.returncode == 0
-    assert proc.stdout.strip() == ""
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert len([e for e in _load_inventory()["entries"] if e["checkpoint"] == "TSC-B"]) == TSC_B_INVENTORY_COUNT
+
+
+def test_tsc_c_not_started() -> None:
+    section = TASK_PATH.read_text(encoding="utf-8").split(f"# TASK — {MILESTONE} (governance)")[-1]
+    assert "TSC-C" in section
+    assert "NOT STARTED" in section
+    tsc_c_block = section.split("### TSC-C", 1)[1].split("### TSC-D", 1)[0]
+    assert "COMPLETE" not in tsc_c_block
 
 
 def test_task_governance_section_and_checkpoints() -> None:
@@ -185,6 +196,7 @@ def test_task_governance_section_and_checkpoints() -> None:
     assert MILESTONE in text
     assert GOVERNANCE_BASELINE_HEAD in text
     assert TSC_A_HEAD in section
+    assert TSC_B_HEAD in section
     assert "PRE-CODE" in text
     assert "test_final_test_suite_convergence_governance.py" in text
     assert "final_test_failure_inventory.json" in text
@@ -192,7 +204,8 @@ def test_task_governance_section_and_checkpoints() -> None:
         assert cp in section
     assert "NO LIVE" in section
     assert "TSC-A" in section and "COMPLETE" in section
-    assert "TSC-B" in section and "NOT STARTED" in section
+    assert "TSC-B" in section and "COMPLETE" in section
+    assert "TSC-C" in section and "NOT STARTED" in section
 
 
 def test_tsc_a_inventory_nodeids_green() -> None:

@@ -32,7 +32,6 @@ from core.target_response_verifier import (
 )
 from core.target_runtime_llm_messages import build_composer_sdk_messages
 from core.target_turn_frame_bound_response import run_target_offline_turn_frame_bound_response
-from core.target_turn_frame_dispatch import TargetTurnFrameDispatchError
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from evals.v5.final_scope_widget_e2e_live_contract import FROZEN_TURNS_HASH, sha256_file_hex
 from evals.v5.final_scope_widget_e2e_retry4_live_contract import (
@@ -294,25 +293,20 @@ def test_runtime_matrix_contacts_bone_graft_doctors_price_and_faq() -> None:
 def test_non_doctors_empty_aspects_remains_fail_closed() -> None:
     composer = MessageBuildingComposerBackend(_FAQ_TEXT)
     semantic = RecordingSemanticBackend()
-    try:
-        run_target_offline_turn_frame_bound_response(
-            _frame(
-                topic="implantation",
-                aspects=[],
-                primary_aspect=None,
-                service_id=None,
-            ),
-            _envelope(),
-            user_message="Как проходит имплантация?",
-            composer_backend=composer,
-            semantic_backend=semantic,
-            **_pipeline_inputs(),  # type: ignore[arg-type]
-        )
-    except TargetTurnFrameDispatchError as exc:
-        assert exc.code == "dispatch_field_invalid"
-        assert exc.value == "aspects"
-    else:
-        raise AssertionError("expected dispatch_field_invalid")
-
-    assert composer.invocations == []
-    assert semantic.invocations == []
+    result = run_target_offline_turn_frame_bound_response(
+        _frame(
+            topic="implantation",
+            aspects=[],
+            primary_aspect=None,
+            service_id=None,
+        ),
+        _envelope(),
+        user_message="Как проходит имплантация?",
+        composer_backend=composer,
+        semantic_backend=semantic,
+        **_pipeline_inputs(),  # type: ignore[arg-type]
+    )
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.dispatch.policy_request.requested_components == ("content",)
+    assert len(composer.invocations) == 1
+    assert len(semantic.invocations) == 1

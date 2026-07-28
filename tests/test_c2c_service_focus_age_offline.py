@@ -7,6 +7,7 @@ import uuid
 import pytest
 from flask import Flask
 
+from core.dialog_focus import build_dialog_focus_decision
 from core.routing_loader import THRESHOLDS
 from core.target_runtime_session import (
     compute_service_focus_age,

@@ -640,4 +640,5 @@ def test_contract_imports_no_runtime_loader_session_or_a9_modules() -> None:
         "facts",
         "strategy",
         "marketing",
+        "family_prices",
     }

@@ -461,9 +461,13 @@ def test_exact_signature_and_import_firewall() -> None:
         "strategy_context",
         "selected_option_id",
         "explicit_offer_id",
+        "effective_scope",
+        "explicit_service_price_lookup",
     ]
     assert signature.parameters["selected_option_id"].default is None
     assert signature.parameters["explicit_offer_id"].default is None
+    assert signature.parameters["effective_scope"].default is None
+    assert signature.parameters["explicit_service_price_lookup"].default is False
 
     source_path = Path("core/target_offer_projection.py")
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
@@ -475,9 +479,12 @@ def test_exact_signature_and_import_firewall() -> None:
     assert imported_modules <= {
         "__future__",
         "dataclasses",
+        "contracts.effective_scope",
         "contracts.response_schema",
         "core.response_strategy",
         "core.service_data_context",
+        "core.target_explicit_service_price_lookup",
+        "core.target_offer_extent_applicability",
     }
     assert not any(
         isinstance(node, ast.Call)

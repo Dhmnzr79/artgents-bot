@@ -4,6 +4,7 @@ import ast
 import hashlib
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,9 +18,18 @@ from core.target_verified_response_pipeline import (
 )
 
 
+def _bound_package() -> SimpleNamespace:
+    return SimpleNamespace(
+        package=SimpleNamespace(
+            plan=SimpleNamespace(primary_content_ref=None, service_id=None),
+            navigation_followups=(),
+        )
+    )
+
+
 def _arguments() -> dict[str, object]:
     return {
-        "bound_package": object(),
+        "bound_package": _bound_package(),
         "bundle": object(),
         "doctor_catalog": object(),
         "consultation_values": object(),
@@ -51,6 +61,8 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         "tone",
         "composer_backend",
         "semantic_backend",
+        "contact_fields",
+        "client_id",
     ]
     assert inspect.signature(
         run_target_offline_verified_response_pipeline
@@ -70,6 +82,8 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
     assert called_names == [
         "materialize_target_composer_request",
         "execute_target_composer",
+        "_used_content_refs_from_package",
+        "bool",
         "verify_target_composed_response",
     ]
 
@@ -78,7 +92,7 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     values = _arguments()
-    request = object()
+    request = SimpleNamespace(evidence_blocks=())
     unverified = object()
     verified = object()
     calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
@@ -112,6 +126,8 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
     assert calls[0][2] == {
         "user_message": values["user_message"],
         "md_root": values["md_root"],
+        "contact_fields": None,
+        "client_id": "demo",
     }
     assert calls[1][1] == (request, values["composer_backend"])
     assert calls[1][2] == {
@@ -122,6 +138,12 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
     assert calls[2][2] == {
         "cached_full_context": values["cached_full_context"],
         "semantic_backend": values["semantic_backend"],
+        "navigation_followups": values["bound_package"].package.navigation_followups,
+        "md_root": values["md_root"],
+        "primary_content_ref": values["bound_package"].package.plan.primary_content_ref,
+        "used_content_refs": (),
+        "exact_service_authority": False,
+        "client_id": "demo",
     }
 
 
@@ -144,7 +166,7 @@ def test_existing_typed_errors_propagate_unchanged_and_short_circuit(
     failed_stage: str,
     error: Exception,
 ) -> None:
-    request = object()
+    request = SimpleNamespace(evidence_blocks=())
     unverified = object()
     calls: list[str] = []
 

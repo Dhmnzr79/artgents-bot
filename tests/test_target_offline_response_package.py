@@ -79,12 +79,16 @@ def test_exact_frozen_shape_signature_and_defaults() -> None:
         "plan",
         "followup_candidates",
         "selected_followups",
+        "navigation_followups",
+        "response_stage",
     ]
     assert TargetOfflineResponsePackage.__slots__ == (
         "materials",
         "plan",
         "followup_candidates",
         "selected_followups",
+        "navigation_followups",
+        "response_stage",
     )
     signature = inspect.signature(assemble_target_offline_response_package)
     assert list(signature.parameters) == [
@@ -106,6 +110,8 @@ def test_exact_frozen_shape_signature_and_defaults() -> None:
         "shown_fact_ids",
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
+        "effective_scope",
+        "turn_topic",
     ]
     for name in (
         "service_term",
@@ -128,6 +134,8 @@ def test_exact_frozen_shape_signature_and_defaults() -> None:
         "shown_consultation_value_refs",
     ):
         assert signature.parameters[name].default == ()
+    assert signature.parameters["effective_scope"].default is None
+    assert signature.parameters["turn_topic"].default is None
 
 
 def test_exact_stage_order_forwarding_and_result_identity(

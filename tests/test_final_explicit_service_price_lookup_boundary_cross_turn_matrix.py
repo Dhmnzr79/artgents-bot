@@ -70,9 +70,12 @@ def test_cross_turn_session_extent_explicit_lookup_materializes_offers(
     offers = selection.offers_by_service_id.get(service_id, ())
     assert offers, f"{service_id} under session {session_extent} must not be empty"
     for offer in offers:
+        assert offer.price.mode in {"fixed", "from", "range", "no_public_price"}
+        if offer.price.mode == "no_public_price":
+            assert offer.price.approved_text
+            continue
         unit = getattr(offer.price, "billing_unit", None)
         assert unit is not None
-        assert offer.price.mode in {"fixed", "from", "range", "no_public_price"}
 
 
 def test_cross_turn_matrix_covers_demo_priced_catalog() -> None:

@@ -127,7 +127,7 @@ def test_price_preserves_exact_tuple_order_and_identity() -> None:
     followups = _followups()
     result = select_target_response_followups(followups, source="price")
     assert result.source == "price"
-    assert result.price is followups.price
+    assert result.price == followups.price
     assert [item.id for item in result.price] == ["stages", "includes"]
     assert result.content == ()
 

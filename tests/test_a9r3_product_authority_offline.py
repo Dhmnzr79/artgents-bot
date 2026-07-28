@@ -146,7 +146,12 @@ def test_ac3_2_broad_price_has_three_scope_buttons(flask_ctx) -> None:
     assert outcome.widget.kind == "materialized"
     scope = _effective_scope_from_ctx()
     assert scope["extent"] == "unknown"
-    assert len(_scope_nav_refs(_quick_refs(outcome))) == 3
+    scope_refs = _scope_nav_refs(_quick_refs(outcome))
+    assert len(scope_refs) == 2
+    assert scope_refs == [
+        "target:ui_scope/implantation/one_tooth",
+        "target:ui_scope/implantation/full_arch",
+    ]
 
 
 def test_ac3_3_all_on_4_does_not_invent_patient_scope(flask_ctx) -> None:

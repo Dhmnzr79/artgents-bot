@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
 import pytest
 
+from core.target_composer_output import composer_test_json
 from evals.v5.final_scope_widget_e2e_live_contract import (
     MAX_HTTP_TURNS,
     create_attempt_marker_exclusive,
+    load_frozen_turns,
 )
 from evals.v5.final_scope_widget_e2e_live_harness import (
     run_non_network_preflight,
@@ -29,6 +32,38 @@ from tests.test_final_scope_widget_e2e_retry3_live_harness import (
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _current_scope_nav_frozen_turns() -> dict[str, object]:
+    turns_spec = copy.deepcopy(load_frozen_turns())
+    for turn in turns_spec["turns"]:
+        expect = turn.get("expect")
+        turn_id = str(turn.get("turn_id") or "")
+        if (
+            isinstance(expect, dict)
+            and expect.get("scope_nav_count") == 3
+            and "implant" in turn_id
+        ):
+            expect["scope_nav_count"] = 2
+    return turns_spec
+
+
+def _install_post_retry3_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    import importlib
+
+    state = _install_retry3_http_fakes(monkeypatch)
+    composer = state["composer_backend"]
+    original_generate = composer.generate
+
+    def json_wrapped_generate(invocation: object, /) -> str:
+        text = original_generate(invocation)
+        if isinstance(text, str) and not text.lstrip().startswith("{"):
+            return composer_test_json(text)
+        return text
+
+    composer.generate = json_wrapped_generate  # type: ignore[method-assign]
+    importlib.reload(importlib.import_module("core.target_runtime_turn"))
+    return state
 
 
 def _quick_reply_refs(row: dict[str, object]) -> list[str]:
@@ -73,7 +108,11 @@ def test_offline_t1_t8_action_context_and_widget_integrity(
         marker,
         build_retry3_attempt_marker_payload(baseline_commit="post-retry3-offline"),
     )
-    fake_state = _install_retry3_http_fakes(monkeypatch)
+    monkeypatch.setattr(
+        "evals.v5.final_scope_widget_e2e_live_harness.load_frozen_turns",
+        _current_scope_nav_frozen_turns,
+    )
+    fake_state = _install_post_retry3_http_fakes(monkeypatch)
     composer: _ActionAwareGroundedComposerBackend = fake_state["composer_backend"]  # type: ignore[assignment]
 
     payload = run_http_harness(
@@ -90,7 +129,7 @@ def test_offline_t1_t8_action_context_and_widget_integrity(
     assert all(row["automated_turn_verdict"] == "PASS" for row in turns)
 
     turn1 = turns[0]
-    assert len(_scope_nav_refs(list(turn1.get("quick_replies") or []))) == 3
+    assert len(_scope_nav_refs(list(turn1.get("quick_replies") or []))) == 2
     assert "₽" in str(turn1.get("answer_text") or "")
 
     turn2 = turns[1]

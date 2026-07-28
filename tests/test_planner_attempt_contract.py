@@ -88,6 +88,7 @@ def _frame_meta(**overrides: FieldMeta | PatientScopeFrameMeta) -> TurnFrameMeta
         "follow_up": base,
         "followup_of": base,
         "needs_clarification": base,
+        "marketing_scenarios": base,
     }
     defaults.update(overrides)
     return TurnFrameMeta(**defaults)

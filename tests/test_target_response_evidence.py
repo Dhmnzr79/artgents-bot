@@ -585,6 +585,7 @@ def test_exact_signature_and_import_firewall() -> None:
         "shown_fact_ids",
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
+        "turn_topic",
     ]
     source_path = Path("core/target_response_evidence.py")
     source = source_path.read_text(encoding="utf-8")

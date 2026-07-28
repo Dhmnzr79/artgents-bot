@@ -70,6 +70,24 @@ class RecordingBoundaryBackend:
         return self.payload
 
 
+def _bind_invalid_pack_load_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    from core.target_runtime_client_context import TargetRuntimeClientContextError
+
+    def _raise_invalid(client_id: str):
+        raise TargetRuntimeClientContextError("target_runtime_bundle_invalid", "bad")
+
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.load_target_runtime_client_context",
+        _raise_invalid,
+    )
+    monkeypatch.setattr(
+        "core.target_runtime_turn.load_target_runtime_client_context",
+        _raise_invalid,
+    )
+    importlib.reload(importlib.import_module("core.target_runtime_turn"))
+    importlib.reload(importlib.import_module("orchestration.target_fullcontext_turn"))
+
+
 def _issue(kind: str, span: str) -> TargetSemanticIssue:
     return TargetSemanticIssue(kind=kind, offending_span=span)  # type: ignore[arg-type]
 
@@ -171,15 +189,7 @@ def test_bootstrap_builds_fullcontext_once_per_client() -> None:
 
 
 def test_invalid_pack_fail_closed(monkeypatch: pytest.MonkeyPatch, flask_ctx) -> None:
-    from core.target_runtime_client_context import TargetRuntimeClientContextError
-
-    def _raise_invalid(client_id: str):
-        raise TargetRuntimeClientContextError("target_runtime_bundle_invalid", "bad")
-
-    monkeypatch.setattr(
-        "core.target_runtime_turn.load_target_runtime_client_context",
-        _raise_invalid,
-    )
+    _bind_invalid_pack_load_failure(monkeypatch)
     _install_turn_frame(_turn_frame())
     outcome = run_target_fullcontext_runtime_turn(
         client_id="demo",
@@ -193,6 +203,51 @@ def test_invalid_pack_fail_closed(monkeypatch: pytest.MonkeyPatch, flask_ctx) ->
     )
     assert outcome.widget.kind == "error"
     assert outcome.widget.error_code == "target_runtime_bundle_invalid"
+
+
+def test_invalid_pack_http_ask_and_stream_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    import uuid
+
+    import app as app_module
+    from session import mem_reset
+
+    from tests.test_s65_authority_switch_offline import (
+        _ask_context,
+        _stub_pre_to_context,
+        _stub_resolver,
+    )
+
+    _bind_invalid_pack_load_failure(monkeypatch)
+    monkeypatch.setattr(
+        app_module,
+        "orchestrate_target_fullcontext_turn",
+        importlib.import_module(
+            "orchestration.target_fullcontext_turn"
+        ).orchestrate_target_fullcontext_turn,
+    )
+    monkeypatch.setattr("core.target_runtime_turn.load_runtime_turn_frame", lambda: _turn_frame())
+    client = app_module.app.test_client()
+    for endpoint in ("/ask", "/ask/stream"):
+        sid = f"s61-invalid-{uuid.uuid4().hex[:8]}"
+        mem_reset(sid)
+        _stub_pre_to_context(monkeypatch, app_module, _ask_context(q="test", sid=sid))
+        _stub_resolver(monkeypatch, app_module)
+        resp = client.post(
+            endpoint,
+            json={"q": "test", "sid": sid, "client_id": "demo"},
+        )
+        assert resp.status_code == 200
+        if endpoint == "/ask":
+            body = resp.get_json()
+            assert body is not None
+            assert body["meta"]["service_route"] == "target_fullcontext_error"
+            assert body["meta"]["target_error_code"] == "target_runtime_bundle_invalid"
+            assert "администратор" in body["answer"].lower()
+        else:
+            text = resp.data.decode("utf-8")
+            assert "event: ui" in text
+            assert "target_fullcontext_error" in text
+            assert "target_runtime_bundle_invalid" in text
 
 
 def test_turn_frame_bridge_reads_runtime_frame(flask_ctx) -> None:
@@ -237,6 +292,11 @@ def test_s46_called_once_on_target_turn(monkeypatch: pytest.MonkeyPatch, flask_c
     assert outcome.widget.kind == "materialized"
 
 
+class _FailingBoundaryBackend:
+    def classify(self, invocation: object, /) -> object:
+        raise RuntimeError("boundary backend unavailable")
+
+
 def test_boundary_uncertain_terminal_defer(flask_ctx) -> None:
     _install_turn_frame(_turn_frame())
     outcome = run_target_fullcontext_runtime_turn(
@@ -245,9 +305,7 @@ def test_boundary_uncertain_terminal_defer(flask_ctx) -> None:
         user_message="Можно ли мне?",
         composer_backend=RecordingComposerBackend(PRICE_TEXT),
         semantic_backend=RecordingSemanticBackend(),
-        boundary_backend=RecordingBoundaryBackend(
-            BackendPayload(decision="uncertain", confidence=0.5)
-        ),
+        boundary_backend=_FailingBoundaryBackend(),
     )
     assert outcome.widget.kind == "terminal"
     assert outcome.widget.terminal_mode == "defer"

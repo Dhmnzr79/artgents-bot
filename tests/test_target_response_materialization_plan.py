@@ -314,7 +314,16 @@ def test_repeated_calls_are_stateless_and_do_not_mutate_s27_materials() -> None:
 
 def test_exact_signature_four_error_codes_and_import_firewall() -> None:
     signature = inspect.signature(build_target_response_materialization_plan)
-    assert list(signature.parameters) == ["materials", "required_components"]
+    assert list(signature.parameters) == [
+        "materials",
+        "required_components",
+        "allow_missing_content",
+        "requested_components",
+        "response_stage",
+        "is_generic_fullcontext",
+        "is_scope_aware_price",
+        "is_structured_service_availability",
+    ]
     source_path = Path("core/target_response_materialization_plan.py")
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
     codes = {
@@ -339,6 +348,7 @@ def test_exact_signature_four_error_codes_and_import_firewall() -> None:
     assert imported_modules <= {
         "__future__",
         "collections.abc",
+        "contracts.price_only_source_sufficiency",
         "contracts.target_response_spec",
         "dataclasses",
         "typing",

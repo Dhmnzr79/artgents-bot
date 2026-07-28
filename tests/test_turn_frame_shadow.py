@@ -416,6 +416,7 @@ def test_product_sources_do_not_read_a9_nested_shadow_scope() -> None:
     allowed = {
         "core/turn_frame_from_raw.py",
         "core/target_patient_scope_projection.py",
+        "core/target_typed_ui_turn_frame.py",
     }
     forbidden = (
         "shadow_frame.patient_scope",

@@ -26,7 +26,7 @@ class RecordingComposerBackend:
 
     def generate(self, invocation: object, /) -> object:
         self.invocations.append(invocation)
-        return self.text
+        return composer_test_json(self.text)
 
 
 class RecordingSemanticBackend:

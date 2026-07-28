@@ -577,8 +577,8 @@ def test_cta_prose_from_corpus_rejected_when_allow_cta_false() -> None:
             cached_full_context=DEMO_FULL_CONTEXT,
             semantic_backend=RuleBasedSemanticBackend(mode="cta_reject"),
         )
-    assert caught.value.code == "target_verifier_semantic_rejected"
-    assert caught.value.value[0][0] == "unsupported_clinic_claim"
+    assert caught.value.code == "target_verifier_numeric_ungrounded"
+    assert caught.value.value[0] == "generic"
 
 
 def test_consultation_close_without_contacts_stays_allowed() -> None:

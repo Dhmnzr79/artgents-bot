@@ -253,6 +253,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "primary_content_ref",
         "used_content_refs",
         "exact_service_authority",
+        "client_id",
     ]
     source = Path("core/target_response_verifier.py").read_text(encoding="utf-8")
     assert set(re.findall(r'"(target_verifier_[a-z_]+)"', source)) == {

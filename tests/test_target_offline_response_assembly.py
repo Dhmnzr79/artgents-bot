@@ -478,6 +478,9 @@ def test_exact_signature_error_codes_and_import_firewall() -> None:
         "shown_fact_ids",
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
+        "effective_scope",
+        "explicit_service_price_lookup",
+        "turn_topic",
     ]
     source_path = Path("core/target_offline_response_assembly.py")
     tree = ast.parse(source_path.read_text(encoding="utf-8"))
@@ -504,6 +507,7 @@ def test_exact_signature_error_codes_and_import_firewall() -> None:
         "dataclasses",
         "datetime",
         "contracts.doctor_schema",
+        "contracts.effective_scope",
         "contracts.response_schema",
         "contracts.response_schema_refs",
         "contracts.service_consultation",
@@ -514,4 +518,5 @@ def test_exact_signature_error_codes_and_import_firewall() -> None:
         "core.target_offer_projection",
         "core.target_response_evidence",
         "core.target_service_resolver",
+        "core.target_strategy_context",
     }

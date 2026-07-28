@@ -9,7 +9,7 @@ def test_contacts_korotko_ref():
     chunk = get_chunk_by_ref(CONTACTS_CHUNK_REF, client_id="demo")
     assert isinstance(chunk, dict)
     assert chunk.get("doc_type") == "contacts"
-    assert "Москва" in str(chunk.get("text") or "")
+    assert "консультацию" in str(chunk.get("text") or "").lower()
     assert (chunk.get("h3_id") or "").lower() == "korotko"
 
 

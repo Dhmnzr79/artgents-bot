@@ -61,6 +61,15 @@ def _inputs(**overrides: object) -> dict[str, object]:
     return payload
 
 
+def _nested_package(**overrides: object) -> SimpleNamespace:
+    payload: dict[str, object] = {
+        "plan": SimpleNamespace(cta_key="consultation"),
+        "response_stage": None,
+    }
+    payload.update(overrides)
+    return SimpleNamespace(**payload)
+
+
 def test_exact_shape_signature_defaults_and_four_error_codes() -> None:
     assert [field.name for field in fields(TargetSpecBoundOfflineResponsePackage)] == [
         "spec",
@@ -92,6 +101,8 @@ def test_exact_shape_signature_defaults_and_four_error_codes() -> None:
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
         "turn_topic",
+        "effective_scope",
+        "client_id",
     ]
     for name in (
         "marketing_scenarios",
@@ -189,7 +200,7 @@ def test_nonmaterializable_specs_fail_before_s31(
 
 
 def test_include_cta_clamps_to_spec_allow_cta(monkeypatch: pytest.MonkeyPatch) -> None:
-    nested = SimpleNamespace(plan=SimpleNamespace(cta_key="consultation"))
+    nested = _nested_package()
     monkeypatch.setattr(
         spec_package_module,
         "assemble_target_offline_response_package",
@@ -224,7 +235,7 @@ def test_selection_cannot_widen_spec_permission(
 
 def test_exact_s31_mapping_once_and_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
-    nested = SimpleNamespace(plan=SimpleNamespace(cta_key="consultation"))
+    nested = _nested_package()
 
     def assembled(*args: object, **kwargs: object) -> object:
         calls.append((args, kwargs))
@@ -287,7 +298,7 @@ def test_exact_s31_mapping_once_and_identity(monkeypatch: pytest.MonkeyPatch) ->
 def test_narrower_selection_returns_no_cta_and_preserves_downstream_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    nested = SimpleNamespace(plan=SimpleNamespace(cta_key="internal_candidate"))
+    nested = _nested_package(plan=SimpleNamespace(cta_key="internal_candidate"))
     monkeypatch.setattr(
         spec_package_module,
         "assemble_target_offline_response_package",

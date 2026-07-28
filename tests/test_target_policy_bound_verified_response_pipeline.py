@@ -9,6 +9,7 @@ import pytest
 
 import core.target_policy_bound_verified_response_pipeline as pipeline_module
 from contracts.target_cached_full_context import TargetCachedFullContext
+from contracts.target_response_spec import TargetResponseSpec
 from core.target_composer_executor import TargetComposerExecutorError
 from core.target_composer_request import TargetComposerRequestError
 from core.target_response_policy import TargetResponsePolicyBuildError
@@ -17,6 +18,24 @@ from core.target_policy_bound_verified_response_pipeline import (
     run_target_offline_policy_bound_verified_response_pipeline,
 )
 from core.target_spec_offline_response_package import TargetSpecOfflineResponsePackageError
+
+
+def _spec() -> TargetResponseSpec:
+    return TargetResponseSpec.model_validate(
+        {
+            "response_mode": "answer",
+            "service_id": "service_one",
+            "tone_key": "commercial_warm",
+            "allowed_topics": ("implantation",),
+            "forbidden_topics": ("diagnosis",),
+            "required_fact_ids": (),
+            "required_components": ("content",),
+            "followup_source": "content",
+            "allow_marketing_facts": False,
+            "allow_consultation_close": False,
+            "allow_cta": False,
+        }
+    )
 
 
 def _arguments() -> dict[str, object]:
@@ -74,6 +93,9 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         "shown_amplifier_refs",
         "shown_consultation_value_refs",
         "turn_topic",
+        "effective_scope",
+        "client_id",
+        "contact_fields",
     ]
     assert inspect.signature(
         run_target_offline_policy_bound_verified_response_pipeline
@@ -99,7 +121,7 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     values = _arguments()
-    spec = object()
+    spec = _spec()
     bound = object()
     verified = object()
     calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
@@ -164,6 +186,8 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "shown_amplifier_refs": (),
         "shown_consultation_value_refs": (),
         "turn_topic": None,
+        "effective_scope": None,
+        "client_id": "demo",
     }
     assert calls[2][1] == (
         bound,
@@ -178,6 +202,8 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "tone": values["tone"],
         "composer_backend": values["composer_backend"],
         "semantic_backend": values["semantic_backend"],
+        "contact_fields": None,
+        "client_id": "demo",
     }
 
 
@@ -204,7 +230,7 @@ def test_existing_typed_errors_propagate_unchanged_and_short_circuit(
     failed_stage: str,
     error: Exception,
 ) -> None:
-    spec = object()
+    spec = _spec()
     bound = object()
     calls: list[str] = []
 

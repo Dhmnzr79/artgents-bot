@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib
 import inspect
 from pathlib import Path
 
@@ -15,6 +16,10 @@ from core.target_cached_full_context import (
     TargetCachedFullContextError,
     build_target_cached_full_context,
 )
+
+
+def _cached_module():
+    return importlib.import_module("core.target_cached_full_context")
 
 
 def _write_md(root: Path, relative: str, body: str) -> None:
@@ -73,39 +78,45 @@ def test_build_includes_every_md_once_with_stable_order_and_boundaries(tmp_path:
 
 
 def test_build_rejects_non_path_md_root() -> None:
-    with pytest.raises(TargetCachedFullContextError) as caught:
-        build_target_cached_full_context(object())  # type: ignore[arg-type]
+    cached = _cached_module()
+    with pytest.raises(cached.TargetCachedFullContextError) as caught:
+        cached.build_target_cached_full_context(object())  # type: ignore[arg-type]
     assert caught.value.code == "full_context_md_root_invalid"
 
 
 def test_build_rejects_missing_md_root(tmp_path: Path) -> None:
-    with pytest.raises(TargetCachedFullContextError) as caught:
-        build_target_cached_full_context(tmp_path / "missing")
+    cached = _cached_module()
+    with pytest.raises(cached.TargetCachedFullContextError) as caught:
+        cached.build_target_cached_full_context(tmp_path / "missing")
     assert caught.value.code == "full_context_md_root_invalid"
 
 
 def test_build_rejects_file_md_root(tmp_path: Path) -> None:
+    cached = _cached_module()
     file_path = tmp_path / "file.txt"
     file_path.write_text("x", encoding="utf-8")
-    with pytest.raises(TargetCachedFullContextError) as caught:
-        build_target_cached_full_context(file_path)
+    with pytest.raises(cached.TargetCachedFullContextError) as caught:
+        cached.build_target_cached_full_context(file_path)
     assert caught.value.code == "full_context_md_root_invalid"
 
 
 def test_build_rejects_empty_corpus(tmp_path: Path) -> None:
-    with pytest.raises(TargetCachedFullContextError) as caught:
-        build_target_cached_full_context(tmp_path)
+    cached = _cached_module()
+    with pytest.raises(cached.TargetCachedFullContextError) as caught:
+        cached.build_target_cached_full_context(tmp_path)
     assert caught.value.code == "full_context_corpus_empty"
 
 
 def test_build_rejects_empty_document(tmp_path: Path) -> None:
+    cached = _cached_module()
     _write_md(tmp_path, "empty.md", "   \n")
-    with pytest.raises(TargetCachedFullContextError) as caught:
-        build_target_cached_full_context(tmp_path)
+    with pytest.raises(cached.TargetCachedFullContextError) as caught:
+        cached.build_target_cached_full_context(tmp_path)
     assert caught.value.code == "full_context_document_empty"
 
 
 def test_unreadable_document_fail_closed(tmp_path: Path) -> None:
+    cached = _cached_module()
     _write_md(
         tmp_path,
         "broken/read.md",
@@ -113,8 +124,8 @@ def test_unreadable_document_fail_closed(tmp_path: Path) -> None:
     )
     broken = tmp_path / "broken/read.md"
     broken.write_bytes(b"\xff\xfe")
-    with pytest.raises(TargetCachedFullContextError) as caught:
-        build_target_cached_full_context(tmp_path)
+    with pytest.raises(cached.TargetCachedFullContextError) as caught:
+        cached.build_target_cached_full_context(tmp_path)
     assert caught.value.code == "full_context_document_unreadable"
 
 

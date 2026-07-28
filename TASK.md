@@ -6203,3 +6203,163 @@ tests/test_final_service_availability_and_clinic_capability_routing_implementati
 
 After completion record + push — **STOP** before PERF-1 (real streaming / optimization), per owner
 instruction.
+
+---
+
+# TASK — FINAL_EARLY_SSE_STATUS_STREAMING / PERF-1 (governance)
+
+**Status:** governance only · **NO PRODUCT IMPLEMENTATION / NO COMPOSER TOKEN STREAMING / NO TEXT_DELTA /
+NO ANSWER/ROUTE/PROMPT CHANGE / NO LLM CALL COUNT CHANGE / NO BOUNDARY BYPASS / NO VERIFIER CHANGE / NO
+PREWARM/CACHE / NO INGRESS+PLANNER MERGE / NO UX REDESIGN / NO LIVE / NO LLM / NO E2E / NO FROZEN
+ARTIFACTS / NO TSC-C / NO TSC-D**
+
+**Baseline:** `codex/stage-a` @ `228ee28`
+
+**Authority:** seam audit
+`docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`.
+
+## Goal
+
+`/ask/stream` начинает отправлять честные статусные SSE-события **во время** обработки хода, а не
+после того как весь ход (Ingress→Planner→Boundary→Composer→Verifier→widget) уже посчитан. Статусы
+берутся из **уже существующих** PERF-0 меток (`stage_start`/`stage_end`/`stage_skipped`), не из второй
+классифицирующей системы. Composer по-прежнему не стримит токены; `answer`/route/LLM-вызовы не меняются.
+
+**Motivation @ `228ee28`:** `ask_stream()` вызывает `_orchestrate_ask_turn(data)` синхронно **до**
+создания SSE-генератора — HTTP-байты клиенту не уходят, пока весь ход не посчитан целиком.
+`time_to_first_server_event` сегодня ≈ `total_ms`.
+
+## Normative behavior (binding for implementation)
+
+1. `/ask` не меняется — синхронный вызов `_orchestrate_ask_turn` на request-потоке, как сегодня.
+2. `/ask/stream` запускает **per-turn** daemon worker-поток, который выполняет **немодифицированный**
+   `_orchestrate_ask_turn(data)` в собственном, заново построенном request-контексте (Flask
+   `test_request_context()`-паттерн, засеянный `sid`/`client_id`/`request_id`/`data`), с явным
+   `bind_client_id`/`bind_session_client` на этом потоке до касания session state.
+3. Результат (`AskOrchestrationResult`) доставляется через **гарантированный** канал (не через bounded
+   очередь статусов).
+4. `stage_start`/`stage_end`/`stage_skipped` (PERF-0) получают опциональный хук уведомления в тех же
+   местах вызова — пуш в **bounded** `queue.Queue`, best-effort (`put_nowait`, drop-on-full со счётным
+   warning, по образцу `pg_sink.py`).
+5. Текст статуса — из фиксированной таблицы «имя стадии + статус → фраза» (примеры: «Проверяю вопрос»,
+   «Ищу информацию в материалах клиники», «Готовлю ответ»), никогда из `reason`/`q`/свободного текста.
+   **`stage_skipped` никогда не порождает статус-событие.**
+6. Без повторяющихся подряд одинаковых статусов (coalesce).
+7. Генератор коротким non-blocking poll вычитывает очередь, отдаёт статусы, проверяет готовность
+   результата; когда готов — ровно один `event: ui` (payload идентичен `/ask`) → ровно один `event: done`.
+8. Disconnect клиента — генератор просто прекращает yield; worker **не отменяется**, доканчивает
+   единственную запись в фоне. Никакого повторного хода, никакой второй записи.
+9. Любое исключение в worker — тот же гарантированный канал, та же `ui`/`done`-последовательность
+   (как сегодня для error-payload).
+10. `time_to_first_server_event` PERF-0-трейса переанкорить на реальный первый `yield` генератора.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|------|---------|
+| `app.py` `ask_stream()` | синхронный `_orchestrate_ask_turn` **до** создания SSE-генератора — корень задержки |
+| PERF-0 marks | `stage_start/stage_end/stage_skipped` на 6 стадиях уже есть — единственный источник статуса, не дублировать |
+| Client (`api.js`) | уже читает SSE через `fetch()+ReadableStream`, неизвестные `event:` игнорирует молча — новый `event: status` обратно совместим без всяких доп. мер |
+| Flask context | `request.ctx` — thread-local/contextvar; worker-поток не может трогать «живой» `request`, нужен собственный `test_request_context()` |
+| `session.py` | `_tls = threading.local()`; `bind_session_client` должен быть вызван **на worker-потоке** явно, иначе тихий fallback на pack `"demo"` |
+| Cancellation | нет примитива отмены blocking LLM-вызова — disconnect останавливает только релей в сокет, не сам ход |
+| Precedent | `pg_sink.py` уже использует bounded `queue.Queue` + background thread в этом проекте — паттерн not foreign |
+
+Полная таблица A/B/C/D и обоснование выбора:
+`docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`.
+
+## Chosen mechanism: B — background worker thread + bounded status queue + guaranteed result
+
+Единственный вариант, который может честно давать статус на **реальной** грануляции PERF-0-стадий
+(включая корректный skip для `clinic_contact`/`service_availability`/`typed_ui`) без второй, более
+грубой классификации и без слома return-контракта `run_target_fullcontext_runtime_turn` (на который
+завязаны все PERF-0-тесты). Вариант A (yield только между 3 верхнеуровневыми вызовами) — слишком грубый
+для honest per-stage skip-семантики. Вариант C без потока схлопывается либо в A, либо в B. Вариант D
+(asyncio) — эквивалентен B по возможностям, но с большим blast radius.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_early_sse_status_streaming_governance.py` | CREATE — PRE-CODE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — PERF-1 status pointer |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — Active milestone pointer |
+
+**Forbidden in governance commit:**
+
+- Product implementation (no worker thread, no queue, no generator restructuring)
+- Composer token streaming / `text_delta`
+- Answer/route/prompt change
+- LLM call-count change
+- Boundary bypass / Verifier change
+- Provider prewarm / answer cache
+- Ingress + Planner merge
+- UX redesign
+- LIVE / LLM / E2E eval runs
+- Frozen artifact / hash changes
+- TSC-C / TSC-D
+- Исправление постороннего тестового долга
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `app.py` | UPDATE — `/ask/stream` worker-thread + queue + generator loop; `/ask` не трогать |
+| `core/turn_timing.py` | UPDATE — опциональный notification hook в `stage_start`/`stage_end`/`stage_skipped`, только additive |
+| `orchestration/pre_resolver_turn.py` | UPDATE только если нужен узкий hook для seeding worker-контекста — без изменения stage-логики |
+| `static/widget/api.js` | UPDATE — распознавание нового `event: status` (additive, backward compatible) |
+| `static/widget/widget.js` | UPDATE — рендер текста статуса (additive) |
+| `tests/test_final_early_sse_status_streaming_implementation.py` | CREATE — acceptance matrix |
+
+**KEEP unchanged:** `/ask`; `session.py` (переиспользовать `bind_client_id`/`bind_session_client`, не
+менять их); Composer/Boundary/Verifier policy и call count; routing/threshold; session write call sites
+и их число; widget payload content/CTA/buttons; `core/stream_answer_text.py` (по-прежнему не трогается).
+
+## Acceptance matrix (implementation)
+
+| # | Scenario | Expected |
+|------|----------|----------|
+| 1 | Fake Planner >300ms | первый SSE status приходит до завершения Planner |
+| 2 | Обычный ход | измеримая пауза между первым status и финальным `ui` в тесте |
+| 3 | Generic FullContext | статусы в валидном порядке, без лишних переходов |
+| 4 | Structured contacts | Boundary/Composer/Verifier status не показаны (skipped, не «running») |
+| 5 | Structured service availability | тот же short-path гарантированно |
+| 6 | Typed UI click | Planner-status не показан |
+| 7 | Terminal / fallback | ровно один `ui` + один `done` |
+| 8 | Pipeline exception | ровно один `ui` (error payload) + один `done`, без зависания |
+| 9 | `/ask` vs `/ask/stream` | идентичный `ui` payload |
+| 10 | Любой ход | `done` ровно один и последний |
+| 11 | Любой ход | ровно одна запись session (без дублей) |
+| 12 | Симулированный disconnect | нет повторного хода, нет дублирующей записи, worker корректно завершается |
+| 13 | Любое status-событие | нет текста вопроса/ответа/PII |
+| 14 | Любой ход | PERF-0 `stages`/marks в trace сохранены и корректны |
+| 15 | Любой ход | число LLM-вызовов идентично `/ask` |
+| 16 | Старый клиент | `ui`/`done` работают, неизвестные event игнорируются |
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_early_sse_status_streaming_governance.py -q
+
+git diff --check
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно менять `/ask`, Verifier/Boundary/Composer policy, prompts или frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert;
+- статус отправляется для skipped-стадии;
+- меняется число LLM-вызовов, маршрут или ответ для любой fixture;
+- worker-поток не делает собственный `bind_session_client`;
+- disconnect приводит к повторному ходу или второй записи session.
+
+## STOP (Phase 1 governance)
+
+После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
+отдельного owner GO.

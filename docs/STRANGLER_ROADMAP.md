@@ -830,23 +830,51 @@ Deliverables (Phase 1): seam audit
 
 ---
 
-## Active — FINAL_RESPONSE_LATENCY_OBSERVABILITY / PERF-0 (governance Phase 1)
+## Active — FINAL_EARLY_SSE_STATUS_STREAMING / PERF-1 (governance Phase 1)
 
-**Baseline:** `codex/stage-a` @ `d381bc9` · **NO PRODUCT INSTRUMENTATION / NO REAL STREAMING / NO LIVE / NO LLM**
+**Baseline:** `codex/stage-a` @ `228ee28` · **NO PRODUCT IMPLEMENTATION / NO COMPOSER TOKEN STREAMING / NO LIVE / NO LLM**
 
-Первый этап программы ускорения. «Я боюсь боли» ≈ 12–15s end-to-end; `/ask/stream` считает весь ход
-(Ingress → Planner → Boundary → Composer → Verifier → widget) **до** входа в SSE-генератор — сегодня
-нет разрыва между `typing`/`ui`/`done`. В `turn_timing` существует ровно одна метка
-(`orchestrate_done`), выставляемая **после** всей цепочки — per-stage замеров нет вовсе.
+Second step of the acceleration program, after PERF-0. `/ask/stream` still calls
+`_orchestrate_ask_turn` **synchronously** before the SSE generator is even constructed — no HTTP bytes
+reach the client until the entire turn (Ingress → Planner → Boundary → Composer → Verifier → widget) is
+done. Goal: honest early SSE status events, derived from PERF-0's existing `stage_start`/`stage_end`/
+`stage_skipped` marks (no second timing/classification system), without streaming Composer tokens and
+without changing `/ask`, answers, routes, or LLM call count.
 
-Цель Phase 1: seam audit + точный perf-план измерений (без изменения ответов, маршрутов, числа
-LLM-вызовов, UI). **Не объединять Ingress + Planner** — отдельная будущая архитектурная задача.
+Chosen mechanism (of A/B/C/D compared in the seam audit): **B — background worker thread + bounded
+status queue + guaranteed-delivery result**, with the worker constructing its own fresh Flask request
+context and explicitly re-binding `session.py`'s thread-local client-pack binding — the only variant
+that can honestly reflect PERF-0's actual per-stage granularity (including skip semantics for structured
+`clinic_contact`/`service_availability`/`typed_ui`) without breaking existing return-value contracts.
 
 Deliverables (Phase 1): seam audit
-(`docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md`), `TASK.md`, doc sync,
-PRE-CODE checker `tests/test_final_response_latency_observability_governance.py`.
+(`docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_early_sse_status_streaming_governance.py`.
 
 **STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_RESPONSE_LATENCY_OBSERVABILITY / PERF-0 (governance + implementation)
+
+**Baseline:** `codex/stage-a` @ `d381bc9` (governance) → `228ee28` (implementation **COMPLETE**).
+
+Первый этап программы ускорения. «Я боюсь боли» ≈ 12–15s end-to-end; `/ask/stream` считал весь ход
+(Ingress → Planner → Boundary → Composer → Verifier → widget) **до** входа в SSE-генератор. В
+`turn_timing` существовала ровно одна метка (`orchestrate_done`), выставляемая **после** всей цепочки —
+per-stage замеров не было вовсе.
+
+Implementation: `stage_start`/`stage_end`/`stage_skipped` (status ∈ `completed|skipped|blocked|exception`)
+wired at all six seams (Ingress/Planner/Boundary/Composer/verifier_deterministic/verifier_semantic) plus
+point marks (`verified_answer_ready`, `first_meaningful_text`, `widget_payload_ready`,
+`first_server_event`, `request_complete`); `composer_first_token` honestly `not_available`; `latency_ms`
+unified with `total_ms`. No answer/route/LLM-call-count change (14-test acceptance matrix + strict
+baseline-vs-current nodeid diff).
+
+Deliverables: seam audit
+(`docs/evidence/performance/FINAL_RESPONSE_LATENCY_OBSERVABILITY_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_response_latency_observability_governance.py`, implementation
+acceptance `tests/test_final_response_latency_observability_implementation.py`.
 
 ---
 

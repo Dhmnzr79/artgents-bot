@@ -5601,9 +5601,9 @@ LIVE, E2E и Verifier changes запрещены до отдельного owner
 
 # TASK — FINAL_TEST_SUITE_CONVERGENCE (governance)
 
-**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO product changes**
+**Status:** TSC-A COMPLETE @ `d9e69f9` · TSC-B NOT STARTED · **NO LIVE / NO LLM / NO product changes**
 
-**Baseline:** `codex/stage-a` @ `1980ab7`
+**Baseline:** `codex/stage-a` @ `d9e69f9` (governance @ `1980ab7`)
 
 **Evidence:** `drafts/EXACT_WIDE_TWO_HEAD_DELTA_AUDIT.md`, `drafts/wide_two_head_delta_classification.json`
 
@@ -5664,9 +5664,9 @@ Three suites — see `docs/TEST_SUITE_ARCHITECTURE.md`:
 | `KEEP_AS_IS` | 10 |
 | `PRODUCT_BUG_FUTURE` | 1 |
 
-## Implementation checkpoints (blocked until PRE-CODE ✅ + owner GO)
+## Implementation checkpoints
 
-### TSC-A — mutable pack guards + isolation (38)
+### TSC-A — mutable pack guards + isolation (38) — **COMPLETE** @ `d9e69f9`
 
 **Allowlist:**
 
@@ -5697,11 +5697,11 @@ python -m pytest tests/test_turn_planner_llm.py tests/test_target_cached_full_co
 python -m pytest tests/test_s65_authority_switch_offline.py tests/test_final_tomography_existing_scan_content_routing_implementation.py -q
 ```
 
-**STOP/checker:** TSC-A governance re-run; no TSC-B files.
+**STOP/checker:** TSC-A governance closeout ✅; no TSC-B files.
 
 ---
 
-### TSC-B — active current-runtime stale (50)
+### TSC-B — active current-runtime stale (50) — **NOT STARTED**
 
 **Allowlist:** inventory `checkpoint=TSC-B` files — planner contracts, pipeline signatures,
 loader guards, AC3/explicit price, S56, S61 runtime (non-429), `test_md_chunks.py`, etc.
@@ -5771,15 +5771,33 @@ python -m pytest tests/ -q
 
 **Acceptance:** `pytest tests/ -q` → 0 failed.
 
-## Test commands (Phase 1)
+## Test commands
 
 ```powershell
-# PRE-CODE (governance)
+# Governance (Phase 1 + TSC-A closeout)
 python -m pytest tests/test_final_test_suite_convergence_governance.py -q
+
+# TSC-A inventory (38 nodeids @ checkpoint=TSC-A)
+python -c "import json; print('\n'.join(e['nodeid'] for e in json.load(open('docs/evidence/testing/final_test_failure_inventory.json'))['entries'] if e['checkpoint']=='TSC-A'))" | python -m pytest -q
 
 # Inventory sanity (read-only)
 python -c "import json; d=json.load(open('docs/evidence/testing/final_test_failure_inventory.json')); assert d['failure_count']==185"
 ```
+
+## Completion record (TSC-A)
+
+| Item | Status |
+|------|--------|
+| Governance PRE-CODE | ✅ @ `e31c6d6` |
+| TSC-A implementation | ✅ @ `d9e69f9` |
+| TSC-A governance closeout | ✅ |
+| TSC-A inventory (38 nodeids) | ✅ green |
+| TSC-B | **NOT STARTED** (blocked until owner GO) |
+| Frozen pins | ✅ unchanged |
+| LIVE / LLM | **none** |
+
+**PRODUCT_BUG_FUTURE (TSC-B, not fixed in TSC-A):**
+`tests/test_s61_target_fullcontext_runtime.py::test_invalid_pack_fail_closed`
 
 ## STOP conditions (implementation)
 
@@ -5792,7 +5810,7 @@ python -c "import json; d=json.load(open('docs/evidence/testing/final_test_failu
 - нужно менять product code/data для historical green;
 - появляется catalog-wide `--ignore` на `tests/**`.
 
-## STOP (Phase 1)
+## STOP (TSC-A closeout)
 
-После governance commit + PRE-CODE PASS + push — **остановиться**. TSC-A..D implementation
-запрещена до отдельного owner GO.
+После TSC-A governance closeout commit + PRE-CODE PASS + push — **остановиться**.
+TSC-B..D implementation запрещена до отдельного owner GO.

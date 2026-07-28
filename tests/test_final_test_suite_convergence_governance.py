@@ -1,4 +1,4 @@
-"""PRE-CODE checker for FINAL_TEST_SUITE_CONVERGENCE governance (Phase 1 only)."""
+"""Governance checker for FINAL_TEST_SUITE_CONVERGENCE (Phase 1 + TSC-A closeout)."""
 
 from __future__ import annotations
 
@@ -33,7 +33,9 @@ DELTA_PATH = _REPO_ROOT / "drafts" / "wide_two_head_delta_classification.json"
 DELTA_AUDIT_PATH = _REPO_ROOT / "drafts" / "EXACT_WIDE_TWO_HEAD_DELTA_AUDIT.md"
 TASK_PATH = _REPO_ROOT / "TASK.md"
 GOVERNANCE_BASELINE_HEAD = "1980ab7"
+TSC_A_HEAD = "d9e69f9"
 MILESTONE = "FINAL_TEST_SUITE_CONVERGENCE"
+TSC_A_INVENTORY_COUNT = 38
 EXPECTED_CURRENT_FAILURES = 185
 EXPECTED_FAIL_BOTH = 178
 
@@ -147,13 +149,34 @@ def test_no_new_skip_xfail_in_task_section() -> None:
     assert "pytest.mark.xfail" not in section_lower
 
 
-def test_implementation_not_started() -> None:
-    assert not (_REPO_ROOT / "tests" / "conftest.py").is_file()
-    task = TASK_PATH.read_text(encoding="utf-8")
-    section = task.split(f"# TASK — {MILESTONE} (governance)")[-1]
-    assert "NO IMPLEMENTATION" in section or "governance only" in section.lower()
-    assert "tests/conftest.py" in section
+def test_tsc_a_complete() -> None:
+    conftest = _REPO_ROOT / "tests" / "conftest.py"
+    assert conftest.is_file()
+    text = conftest.read_text(encoding="utf-8")
+    assert "_IP_RATE_BUCKETS" in text
+    assert "clear()" in text
+    section = TASK_PATH.read_text(encoding="utf-8").split(f"# TASK — {MILESTONE} (governance)")[-1]
     assert "TSC-A" in section
+    assert "COMPLETE" in section
+    assert TSC_A_HEAD in section
+    assert "tests/conftest.py" in section
+
+
+def test_tsc_b_not_started() -> None:
+    section = TASK_PATH.read_text(encoding="utf-8").split(f"# TASK — {MILESTONE} (governance)")[-1]
+    assert "TSC-B" in section
+    assert "NOT STARTED" in section
+    tsc_b_block = section.split("### TSC-B", 1)[1].split("### TSC-C", 1)[0]
+    assert "COMPLETE" not in tsc_b_block
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", f"{TSC_A_HEAD}..HEAD", "--", "tests/test_planner_attempt_contract.py"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == ""
 
 
 def test_task_governance_section_and_checkpoints() -> None:
@@ -161,13 +184,32 @@ def test_task_governance_section_and_checkpoints() -> None:
     section = text.split(f"# TASK — {MILESTONE} (governance)")[-1]
     assert MILESTONE in text
     assert GOVERNANCE_BASELINE_HEAD in text
+    assert TSC_A_HEAD in section
     assert "PRE-CODE" in text
     assert "test_final_test_suite_convergence_governance.py" in text
     assert "final_test_failure_inventory.json" in text
     for cp in ("TSC-A", "TSC-B", "TSC-C", "TSC-D"):
         assert cp in section
     assert "NO LIVE" in section
-    assert "NO IMPLEMENTATION" in section or "governance only" in section.lower()
+    assert "TSC-A" in section and "COMPLETE" in section
+    assert "TSC-B" in section and "NOT STARTED" in section
+
+
+def test_tsc_a_inventory_nodeids_green() -> None:
+    nodeids = [
+        e["nodeid"]
+        for e in _load_inventory()["entries"]
+        if e["checkpoint"] == "TSC-A"
+    ]
+    assert len(nodeids) == TSC_A_INVENTORY_COUNT
+    proc = subprocess.run(
+        ["python", "-m", "pytest", *nodeids, "-q"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
 def test_delta_artifacts_present() -> None:

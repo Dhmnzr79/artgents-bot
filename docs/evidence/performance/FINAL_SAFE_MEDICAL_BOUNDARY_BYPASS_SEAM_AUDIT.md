@@ -7,6 +7,37 @@ NO Composer/Verifier policy change / NO new LLM call / NO streaming text/text_de
 NO Ingress+Planner merge / NO LIVE / NO LLM / NO E2E / NO frozen artifacts / NO TSC-C / NO TSC-D**
 **Owner GO:** Phase 1 governance only; implementation blocked until PRE-CODE ✅ + separate owner GO
 
+## Governance correction (this revision, @ `bba9e9b` → correction)
+
+The initial revision of this audit defined `TargetMedicalBoundaryRequirement` with five members
+(`required`, `bypass_governed_ui`, `bypass_pure_price`, `bypass_exact_faq`,
+`not_applicable_structured`), even though only `bypass_governed_ui` was ever eligible and
+`not_applicable_structured` was never reachable from the resolver's own call site. The owner correctly
+flagged this as over-broad: a type should not offer values the current policy forbids returning, and a
+resolver's signature should not model a state its own call site can never produce. This revision:
+
+1. Narrows the `Literal` to exactly `{"required", "bypass_governed_ui"}`. `bypass_pure_price` and
+   `bypass_exact_faq` remain fully documented in narrative (§4B/§4C) as deferred future capabilities, but
+   are **no longer valid return values of the type** — today the resolver always returns `required` for
+   those shapes, so the type should not claim otherwise.
+2. Removes `not_applicable_structured` entirely, from both the type and the resolver's signature.
+   `resolve_structured_answer_capability`'s `clinic_contact`/`service_availability` short-circuits
+   (`core/target_runtime_turn.py:198-320`) both `return` **before** the point in the pipeline
+   (`target_runtime_turn.py:322`) where this resolver would ever be called — the resolver's production
+   call site never sees a structured-capability turn at all. Modeling a value for a state the function can
+   never observe was an unreachable-state smell, not a safety feature; removing it also drops the
+   `structured_capability` parameter from the resolver's signature, since it was only there to detect
+   this now-removed state.
+3. Tightens `bypass_governed_ui` eligibility from "governed click + deterministic frame" (true but
+   loosely specified) to an exact, field-by-field checklist (§4A, revised) — XOR presence of exactly one
+   governed action, exact required-field values, exact `field_meta.status="valid"`, exact
+   `provenance == f"governed_ui_action:{action.ref}"` per required field, and `topic == action.topic` —
+   with any mismatch, conflict, or both-actions-present case falling through to `required`. This removes
+   any residual ambiguity about what "deterministic frame" means operationally.
+
+No other section's underlying conclusion changed: `bypass_governed_ui` is still the one eligible
+category, for the same structural reasons (§3, §6).
+
 ## Preflight
 
 | Check | Result |
@@ -55,17 +86,18 @@ app.py: /ask, /ask/stream
             └─ run_target_fullcontext_runtime_turn(...)     [core/target_runtime_turn.py:138-480]
                  ├─ load_runtime_turn_frame() / hydrate / resolve_effective_scope
                  │
-                 │  ═══ THIS IS WHERE resolve_target_medical_boundary_requirement(...) WOULD BE
-                 │      CALLED IN PHASE 2 — a pure function reading only the already-materialized
-                 │      TurnFrame + structured_capability + governed UI action objects at this exact
-                 │      point. Not built in Phase 1. ═══
-                 │
                  ├─ resolve_structured_answer_capability(turn_frame)      [core/target_structured_answer.py]
                  │    if kind == "clinic_contact" or "service_availability":
                  │      stage_skipped("boundary"/"composer"/"verifier_deterministic"/"verifier_semantic",
                  │                    reason=f"structured_capability:{kind}")     [target_runtime_turn.py:198-265]
                  │      → materialize_structured_*_turn_response(...)   — deterministic, no LLM at all
-                 │      → RETURN (never reaches Boundary call below)
+                 │      → RETURN (never reaches Boundary call below, or the resolver call below)
+                 │
+                 │  ═══ THIS IS WHERE resolve_target_medical_boundary_requirement(...) WOULD BE
+                 │      CALLED IN PHASE 2 — a pure function reading only the already-materialized
+                 │      TurnFrame + governed UI action objects at this exact point (NOT
+                 │      structured_capability — by this point control flow already guarantees it was
+                 │      None, since both non-None branches returned above). Not built in Phase 1. ═══
                  │
                  ├─ stage_start("boundary")                              [target_runtime_turn.py:322]
                  │    execute_target_medical_boundary_classification(user_message, backend, ...)
@@ -171,6 +203,8 @@ earlier in this session. Any unparseable, malformed, or not-previously-shown ref
 
 ### A. Governed typed UI navigation — **ELIGIBLE for Phase 2 implementation**
 
+**Structural reasons this category is safe** (unchanged from the original audit):
+
 - `UiScopeAction`/`UiStageAction` validated against a session-bound, server-rendered-followup whitelist
   (fail-closed).
 - TurnFrame construction is deterministic code, not an LLM guess (`core/target_typed_ui_turn_frame.py`).
@@ -186,6 +220,42 @@ earlier in this session. Any unparseable, malformed, or not-previously-shown ref
   that remains in force whether or not Boundary ran.
 - Deterministic + Semantic Verifier remain unconditional after Composer (§6) — the last-line defense
   is untouched.
+
+**Exact eligibility checklist (governance correction — binding for the Phase 2 resolver):** the above
+structural reasons only hold if `resolve_target_medical_boundary_requirement(...)` verifies **every**
+one of the following, not just "a governed action is present." Any failure of any check below falls
+through to `required` — there is no partial-credit bypass.
+
+1. **Exactly one** governed action is present: `(current_ui_scope_action is not None) XOR
+   (current_ui_stage_action is not None)`. Both present, or neither present, → `required`. (Neither
+   present is already the common case for ordinary free text; both present is not a state the current
+   pre-resolver can produce today, but the resolver must not assume that invariant — it must check.)
+2. That action was already session-validated by the existing pre-resolver whitelist check
+   (`resolve_ui_scope_ref_click`/`resolve_ui_stage_ref_click`, §3) — the resolver does not re-validate
+   this itself; it trusts the action object's mere presence in `request.ctx`/the passed-in parameter as
+   proof the existing fail-closed check already ran and passed. It performs no *additional* session
+   lookup of its own (rule 4 below).
+3. `turn_frame.intent == "price_lookup"` exactly.
+4. `tuple(turn_frame.aspects) == ("price",)` — or the frame's canonical equivalent single-element
+   price-only form; any additional aspect present, or a different aspect, → `required`.
+5. `turn_frame.primary_aspect == "price"` exactly.
+6. `turn_frame.needs_clarification is False` exactly.
+7. `turn_frame.field_meta.intent.status == "valid"`, `turn_frame.field_meta.aspects.status == "valid"`,
+   `turn_frame.field_meta.primary_aspect.status == "valid"`,
+   `turn_frame.field_meta.needs_clarification.status == "valid"` — all four, not merely "not invalid."
+8. Each of those same four `field_meta` entries' `provenance` string equals exactly
+   `f"governed_ui_action:{action.ref}"` for the one action identified in step 1 — not merely
+   "starts with `governed_ui_action:`," and not the topic's or any other field's provenance; the `ref`
+   suffix must match the actual action's `ref` value.
+9. `turn_frame.topic == action.topic` for that same action.
+10. Any exception, missing attribute, type mismatch, or any single check above failing → `required`.
+    `required` is the resolver's only fallback value; there is no secondary/degraded bypass tier.
+
+This is a direct, checkable restatement of what `core/target_typed_ui_turn_frame.py`'s builder already
+guarantees by construction (§3) — the checklist exists so the *resolver* verifies those guarantees
+explicitly at its own call site, rather than assuming "if a governed action object exists in scope, the
+frame must be the deterministic one," which would be true only as long as no other code path is ever
+allowed to set those same fields a different way in the future.
 
 ### B. Pure commercial price lookup (free-text, non-click) — **NOT eligible yet; stays `required`**
 
@@ -218,13 +288,18 @@ Phase 2.** A future capability (e.g. a curated, explicitly-tagged "safe definiti
 with its own typed provenance, analogous to the governed-UI-click whitelist) would be a separate,
 later milestone with its own seam audit — not guessed here.
 
-### D. Structured contacts / service availability — **already bypassed; no new work**
+### D. Structured contacts / service availability — **already bypassed; not modeled in the resolver's type at all**
 
 `resolve_structured_answer_capability(turn_frame).kind ∈ {"clinic_contact", "service_availability"}`
 already short-circuits Boundary (and Composer and both Verifier stages) today
-(`core/target_runtime_turn.py:198-265`). PERF-2 does not add a second bypass mechanism on top of this —
-this pre-existing path is documented in the typed vocabulary below only for completeness
-(`not_applicable_structured`), not modified.
+(`core/target_runtime_turn.py:198-265`), and both branches `return` **before** the point in the pipeline
+(line 322) where `resolve_target_medical_boundary_requirement(...)` would ever be called. **The resolver's
+production call site never observes a structured-capability turn — this is not a state the function's own
+type needs to represent.** (Governance correction: the original revision of this audit modeled this as a
+fifth Literal value, `not_applicable_structured`, and passed `structured_capability` into the resolver's
+signature so it could detect this state. Both are removed — see "Governance correction" above.) PERF-2
+does not add a second bypass mechanism on top of this existing short-circuit; this section documents the
+existing behavior for completeness only, not as something the resolver's contract needs to know about.
 
 ## 5. Hard exclusions (Boundary stays `required`)
 
@@ -300,23 +375,26 @@ conversation), since each click is currently a full pipeline turn.
 
 ## 8. Decision: which paths enter PERF-2 implementation
 
-| Category | Decision |
-|---|---|
-| `bypass_governed_ui` (§4A) | **Enters Phase 2 implementation** (pending owner GO) |
-| `bypass_pure_price` (§4B) | **Stays `required`** — explicitly deferred, prerequisite (Composer price-materialization contract) not yet built |
-| `bypass_exact_faq` (§4C) | **Stays `required`** — explicitly deferred, no typed content-authority capability exists |
-| `not_applicable_structured` (§4D) | **No new work** — already bypassed via existing `structured_capability` mechanism |
-| Everything else (§5) | **Stays `required`**, unconditionally |
+| Category | In the `TargetMedicalBoundaryRequirement` type? | Decision |
+|---|---|---|
+| `bypass_governed_ui` (§4A) | **Yes** — the only bypass value | **Enters Phase 2 implementation** (pending owner GO) |
+| `bypass_pure_price` (§4B) | **No** (governance correction — removed from the Literal) | **Resolver always returns `required`** for this shape — explicitly deferred in narrative only, prerequisite (Composer price-materialization contract) not yet built |
+| `bypass_exact_faq` (§4C) | **No** (governance correction — removed from the Literal) | **Resolver always returns `required`** for this shape — explicitly deferred in narrative only, no typed content-authority capability exists |
+| Structured contacts/service availability (§4D) | **No** — not modeled at all (governance correction — `not_applicable_structured` removed; resolver's call site never observes this state) | **No new work** — already bypassed via existing `structured_capability` mechanism, entirely outside this resolver's concern |
+| Everything else (§5) | `required` (the type's default/only other member) | **Stays `required`**, unconditionally |
 
 ## 9. Proof this is not a new router/selector
 
 `resolve_target_medical_boundary_requirement(...)` (Phase 2, not built in this governance phase) would be
 a **pure function** called from exactly one place — immediately before the existing
 `turn_timing.stage_start("boundary")` call at `core/target_runtime_turn.py:322` — reading only the
-already-materialized `turn_frame`, the already-computed `structured_capability`
-(`resolve_structured_answer_capability`, already called at line 197), and the already-resolved governed UI
-action objects (`_current_ui_scope_action_from_request()`/`_current_ui_stage_action_from_request()`,
-already called at lines 188-189 for `resolve_effective_scope`). It introduces **no new inputs**, **no new
+already-materialized `turn_frame` and the already-resolved governed UI action objects
+(`_current_ui_scope_action_from_request()`/`_current_ui_stage_action_from_request()`, already called at
+lines 188-189 for `resolve_effective_scope`). **Governance correction:** the original revision also passed
+in `structured_capability`; that parameter is removed (§4D, §8) because by the time this resolver would
+run at line 322, `structured_capability` being `None` is already a control-flow guarantee (both non-`None`
+branches return at lines 198-320, strictly before line 322) — passing it in would have been a dead
+parameter the resolver could never usefully branch on. The resolver introduces **no new inputs**, **no new
 classification**, and **no new call site for routing** — it only decides, from data the pipeline has
 already deterministically computed by this point, whether to execute or skip the *existing*
 `execute_target_medical_boundary_classification` call, using exactly the same `stage_skipped(...)`
@@ -345,19 +423,23 @@ branch guarding one existing call, not a parallel decision system.
   answered, eligible turn: **2** (Composer + Semantic Verifier) instead of **3** (Boundary + Composer +
   Semantic Verifier) — exactly one fewer, never more, never a variable amount.
 
-## 11. Typed contract (names may be adjusted in Phase 2; shape is final for governance)
+## 11. Typed contract (governance correction — minimal; names may be adjusted in Phase 2, shape is final)
+
+**Governance correction:** the Literal now has exactly two members. `bypass_pure_price` and
+`bypass_exact_faq` are deliberately **not** members of the type — they remain documented, narrative-only
+future capabilities (§4B/§4C) that the resolver always resolves to `required` today; a type should not
+offer a return value that current policy forbids ever returning. `not_applicable_structured` is removed
+entirely, not renamed — it modeled a state the resolver's own call site can never observe (§4D, §8, §9).
 
 ```python
 # contracts/target_medical_boundary_requirement.py  (Phase 2 — NOT created in this governance phase)
 
 TargetMedicalBoundaryRequirement = Literal[
-    "required",                    # Boundary must run — the default, and the only outcome for
-                                    # anything not explicitly proven safe below
-    "bypass_governed_ui",          # governed UiScopeAction/UiStageAction click — ELIGIBLE, §4A
-    "bypass_pure_price",           # documented, NOT eligible today — §4B
-    "bypass_exact_faq",            # documented, NOT eligible today — §4C
-    "not_applicable_structured",   # clinic_contact / service_availability — already bypassed
-                                    # elsewhere; this value exists for vocabulary completeness only
+    "required",             # Boundary must run — the default, and the fail-safe fallback for any
+                             # missing/mismatched/ambiguous input, exception, or anything not
+                             # explicitly proven safe by every rule in §4A's checklist
+    "bypass_governed_ui",   # governed UiScopeAction XOR UiStageAction click, exact field/provenance
+                             # match per §4A's checklist — the ONLY eligible bypass, §4A
 ]
 ```
 
@@ -366,18 +448,34 @@ TargetMedicalBoundaryRequirement = Literal[
 def resolve_target_medical_boundary_requirement(
     *,
     turn_frame: TurnFrame,
-    structured_capability: StructuredAnswerCapability | None,
     current_ui_scope_action: UiScopeAction | None,
     current_ui_stage_action: UiStageAction | None,
 ) -> TargetMedicalBoundaryRequirement:
-    """Pure. No I/O, no LLM call, no raw user text read. Returns `bypass_governed_ui` only when
-    (current_ui_scope_action is not None or current_ui_stage_action is not None) AND the TurnFrame
-    was built by core/target_typed_ui_turn_frame.py (verifiable via field_meta provenance prefix
-    'governed_ui_action:'). Returns `not_applicable_structured` when structured_capability is not
-    None (kind in {clinic_contact, service_availability}) — informational only; that path already
-    returns before this function would be called. Returns `required` for everything else,
-    including bypass_pure_price/bypass_exact_faq shapes, which are recognized-but-required until a
-    later milestone builds their prerequisites (§4B/§4C)."""
+    """Pure. No I/O, no LLM call. Reads only turn_frame and the two governed-action parameters —
+    never raw user text, never request data, never session state directly (the action parameters'
+    mere presence is the caller's proof that session.py's existing ref-whitelist check already ran
+    and passed — see §4A rule 2), never a service/topic-specific ID, never confidence as
+    standalone proof, never regex/phrase-list matching of any field.
+
+    Returns "bypass_governed_ui" only if ALL of the following hold (§4A's exact checklist; any
+    single failure -> "required", no partial-credit bypass):
+      1. exactly one of current_ui_scope_action / current_ui_stage_action is not None (XOR) --
+         both-present or neither-present both fall through to "required";
+      2. turn_frame.intent == "price_lookup";
+      3. tuple(turn_frame.aspects) == ("price",) (or the frame's canonical single-price-aspect form);
+      4. turn_frame.primary_aspect == "price";
+      5. turn_frame.needs_clarification is False;
+      6. field_meta.status == "valid" for each of: intent, aspects, primary_aspect,
+         needs_clarification;
+      7. field_meta.provenance == f"governed_ui_action:{action.ref}" for each of those same four
+         fields, where `action` is the one action identified in step 1;
+      8. turn_frame.topic == action.topic.
+
+    Returns "required" for every other shape, including bypass_pure_price/bypass_exact_faq-looking
+    free-text turns (§4B/§4C — recognized in narrative as future capabilities, not returnable
+    values of this function today) and any turn where resolve_structured_answer_capability would
+    have matched (§4D — this function's production call site never actually observes that case,
+    since both structured branches return before line 322; it is not modeled here, only noted)."""
 ```
 
 ## 12. Implementation allowlist (Phase 2 — blocked until owner GO)
@@ -398,7 +496,7 @@ deterministic construction; the `structured_capability` skip mechanism (§4D, un
 forward-compatibility, but the resolver must return `required` for both today; session write-back logic;
 `/ask`/`/ask/stream` route parity; LLM call count for every non-`bypass_governed_ui` path.
 
-## 13. Acceptance matrix (Phase 2 implementation — minimum coverage, 21 scenarios)
+## 13. Acceptance matrix (Phase 2 implementation — minimum coverage, 23 scenarios)
 
 | # | Scenario | Expected |
 |---|---|---|
@@ -415,7 +513,7 @@ forward-compatibility, but the resolver must return `required` for both today; s
 | 11 | Contraindication / diabetes question | `required` |
 | 12 | Ambiguous/ill-formed `TurnFrame` (`field_meta.status` invalid/missing on any axis) | `required` |
 | 13 | Generic microfact question (free text, looks simple) | `required` — conservative default, no confidence-based override |
-| 14 | Structured `clinic_contact` short path | Unaffected — bypassed via existing `structured_capability` mechanism, not this resolver; `not_applicable_structured` if the resolver is queried for telemetry parity, but the code path returns before reaching it |
+| 14 | Structured `clinic_contact` short path | Unaffected — bypassed via the existing `structured_capability` mechanism entirely; the resolver's production call site never runs for this turn at all (control flow returns before reaching it — §4D, §9), so there is nothing for it to return |
 | 15 | Structured `service_availability` short path | Same as #14 |
 | 16 | Boundary backend failure on a `required` path | Unaffected — terminal/defer behavior identical to today (resolver never called for `required` paths in a way that changes this) |
 | 17 | Numeric Verifier after a `bypass_governed_ui` turn | Still runs, still enforces grounding exactly as today |
@@ -423,12 +521,16 @@ forward-compatibility, but the resolver must return `required` for both today; s
 | 19 | `/ask` vs `/ask/stream` parity for a governed-click turn | Identical `service_route`/payload/LLM-call-count on both endpoints |
 | 20 | PERF-0 trace for a bypassed turn | `boundary` stage shows `status="skipped", reason="bypass_governed_ui"` in `turn_complete` |
 | 21 | PERF-1 SSE status stream for a bypassed turn | No Boundary-phase status event shown (skipped stages never enqueue — existing PERF-1 rule, unchanged) |
+| 22 | Both `current_ui_scope_action` and `current_ui_stage_action` present simultaneously (constructed test fixture — not reachable via the real pre-resolver today, but the resolver must not assume that) | `required` — XOR violation, §4A rule 1 |
+| 23 | Governed click TurnFrame whose `field_meta.provenance` for a required field does not exactly equal `f"governed_ui_action:{action.ref}"` (e.g. mismatched ref, or a provenance string that only starts with the right prefix) | `required` — provenance mismatch, §4A rules 7-8 |
 
-**Cross-cutting requirement across all 21 rows:** LLM call count decreases by exactly one **only** on
+**Cross-cutting requirement across all 23 rows:** LLM call count decreases by exactly one **only** on
 rows 1/2/6/19 (and 20/21 as their telemetry/SSE counterparts) — every other row's LLM call count,
 route, final payload, and session write must be byte-identical to `aa633f2` behavior. This is the
 acceptance criterion referenced by the milestone brief's "число LLM-вызовов уменьшается ровно на один
-только на eligible paths" and "routes/final payload/session write не меняются."
+только на eligible paths" and "routes/final payload/session write не меняются." Rows 22-23 additionally
+confirm the resolver's `required` fallback triggers on structural/provenance mismatch, not only on
+"no governed action present."
 
 ## Test commands (governance)
 

@@ -1,10 +1,16 @@
 """PRE-CODE checker for FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2 (Phase 1 only).
 
-Enforces: governance-only phase (no product resolver module exists yet), no
-raw-text/regex/phrase-list/topic-hardcode bypass routing, Boundary stays required
-for medical/personal scenarios, Verifier remains unconditional, exact implementation
-allowlist documented, PERF-0/PERF-1 integration (stage_skipped reuse) documented, and
-no demo-specific service IDs baked into the governance docs.
+Covers the governance correction (minimal contract): the `TargetMedicalBoundaryRequirement`
+Literal must have exactly two members (`required`, `bypass_governed_ui`) -- dead bypass
+values (`bypass_pure_price`, `bypass_exact_faq`, `not_applicable_structured`) must not be
+returnable, only documented in narrative as deferred/unreachable. The resolver's signature
+must not take `structured_capability` (its production call site never observes that state).
+`bypass_governed_ui` eligibility must be an exact, checkable field/provenance/XOR checklist,
+not a loose "governed action present" heuristic. Also enforces: no product resolver module
+exists yet, no raw-text/regex/phrase-list/topic-hardcode bypass routing, Boundary stays
+required for medical/personal scenarios, Verifier remains unconditional, exact implementation
+allowlist documented, PERF-0/PERF-1 integration (stage_skipped reuse) documented, and no
+demo-specific service IDs hardcoded into the resolver's own decision logic.
 """
 
 from __future__ import annotations
@@ -38,6 +44,10 @@ GOVERNANCE_BASELINE_HEAD = "aa633f2"
 MILESTONE = "FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS"
 TASK_HEADER = f"# TASK — {MILESTONE} / PERF-2 (governance)"
 
+_EXPECTED_LITERAL_MEMBERS = {"required", "bypass_governed_ui"}
+_DEAD_LITERAL_MEMBERS = ("bypass_pure_price", "bypass_exact_faq", "not_applicable_structured")
+_LITERAL_STRING_RE = re.compile(r'"([a-z_]+)"')
+
 # Phase 2 files -- must NOT exist yet. Their presence would mean product implementation
 # started before PRE-CODE + a separate owner GO, which this phase forbids.
 _FORBIDDEN_PRODUCT_FILES = (
@@ -49,6 +59,21 @@ _FORBIDDEN_PRODUCT_FILES = (
 
 def _task_section() -> str:
     return TASK_PATH.read_text(encoding="utf-8").split(TASK_HEADER)[-1]
+
+
+def _literal_block(text: str) -> str:
+    """Text strictly between `Literal[` and its closing `]` (no nested brackets expected)."""
+    start = text.index("Literal[") + len("Literal[")
+    end = text.index("]", start)
+    return text[start:end]
+
+
+def _resolver_signature_block(text: str) -> str:
+    """Text strictly between the resolver's `(` and its matching `) ->`."""
+    start = text.index("def resolve_target_medical_boundary_requirement(")
+    start += len("def resolve_target_medical_boundary_requirement(")
+    end = text.index(") ->", start)
+    return text[start:end]
 
 
 def test_seam_audit_exists_and_covers_required_sections() -> None:
@@ -76,6 +101,7 @@ def test_seam_audit_exists_and_covers_required_sections() -> None:
     ):
         assert phrase in text, phrase
     for section in (
+        "## Governance correction",
         "## 1. Map:",
         "## 2. All current Boundary outcomes",
         "## 3. TurnFrame",
@@ -93,20 +119,61 @@ def test_seam_audit_exists_and_covers_required_sections() -> None:
         assert section in text, section
 
 
-def test_typed_contract_literal_documented() -> None:
-    text = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
-    task = TASK_PATH.read_text(encoding="utf-8")
-    for label, source in (("seam audit", text), ("TASK.md", task)):
-        assert "TargetMedicalBoundaryRequirement" in source, label
-        for value in (
-            '"required"',
-            '"bypass_governed_ui"',
-            '"bypass_pure_price"',
-            '"bypass_exact_faq"',
-            '"not_applicable_structured"',
-        ):
-            assert value in source, f"{label}: {value}"
-        assert "resolve_target_medical_boundary_requirement" in source, label
+def test_contract_literal_has_exactly_two_members() -> None:
+    """Governance correction: dead bypass values must not be returnable, only narrative-deferred."""
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        members = set(_LITERAL_STRING_RE.findall(_literal_block(text)))
+        assert members == _EXPECTED_LITERAL_MEMBERS, f"{label}: {members}"
+
+
+def test_dead_bypass_values_documented_as_deferred_narrative_only() -> None:
+    """bypass_pure_price/bypass_exact_faq must still be explained (deferred), just not returnable."""
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        lowered = text.lower()
+        assert "free-text price" in lowered or "pure free-text price" in lowered, label
+        assert "faq" in lowered, label
+        assert "required" in lowered, label
+
+
+def test_resolver_signature_has_no_structured_capability_param() -> None:
+    """The resolver's own call site never observes a structured-capability turn (§4D/§8/§9)."""
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        sig = _resolver_signature_block(text)
+        assert "structured_capability" not in sig, label
+        assert "turn_frame" in sig, label
+        assert "current_ui_scope_action" in sig, label
+        assert "current_ui_stage_action" in sig, label
+
+
+def test_xor_rule_documented() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        assert "XOR" in text, label
+        assert "current_ui_scope_action" in text and "current_ui_stage_action" in text, label
+
+
+def test_exact_provenance_and_topic_match_documented() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        assert "governed_ui_action:{action.ref}" in text, label
+        assert "action.topic" in text, label
+        assert "exact match" in text.lower() or "exactly" in text.lower(), label
+
+
+def test_fail_safe_default_documented() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        assert "fail-safe" in text.lower(), label
+        assert "no partial-credit bypass" in text.lower() or "partial-credit" in text.lower(), label
 
 
 def test_only_governed_ui_bypass_is_eligible() -> None:
@@ -228,7 +295,7 @@ def test_forbidden_phase1_actions_documented() -> None:
 
 def test_acceptance_matrix_documented() -> None:
     audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
-    for n in range(1, 22):
+    for n in range(1, 24):
         assert f"| {n} |" in audit, n
     for label in (
         "governed scope click",
@@ -239,6 +306,8 @@ def test_acceptance_matrix_documented() -> None:
         "numeric verifier",
         "semantic verifier",
         "/ask/stream",
+        "xor violation",
+        "provenance mismatch",
     ):
         assert label.lower() in audit.lower(), label
 

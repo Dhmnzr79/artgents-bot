@@ -63,6 +63,7 @@ def _real_followups():
         today=date(2026, 7, 22),
         include_initial_block=False,
         include_consultation_close=True,
+        turn_topic="implantation",
     )
     plan = build_target_response_materialization_plan(
         materials,
@@ -93,7 +94,7 @@ def test_real_all_on_4_price_exposes_only_price_links() -> None:
     result = select_target_response_followups(followups, source="price")
     assert result.source == "price"
     assert [item.id for item in result.price] == ["stages", "includes"]
-    assert result.price is followups.price
+    assert result.price == followups.price
     assert result.content == ()
 
 

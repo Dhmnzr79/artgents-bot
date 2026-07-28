@@ -123,8 +123,8 @@ DEMO_MD_ROOT = Path("clients/demo/md")
 
 def test_demo_corpus_document_count_and_doctors_inclusion() -> None:
     context = build_target_cached_full_context(DEMO_MD_ROOT)
-    assert context.document_count == 54
-    assert len(context.document_paths) == 54
+    assert context.document_count == 55
+    assert len(context.document_paths) == 55
     doctor_paths = [path for path in context.document_paths if path.startswith("doctors__")]
     assert len(doctor_paths) == 7
     assert "doctors__doctor__kuznetsov.md" in context.document_paths
@@ -163,7 +163,7 @@ def test_pipeline_accepts_prebuilt_context_without_calling_builder() -> None:
     assert "cached_full_context" in s39_params
     assert "cached_full_context" in s40_params
     assert "cached_full_context" in s41_params
-    assert prebuilt.document_count == 54
+    assert prebuilt.document_count == 55
 
 
 def test_import_firewall_excludes_legacy_runtime_and_llm() -> None:

@@ -218,9 +218,8 @@ def test_real_target_catalog_is_strict_complete_s1_wire_data() -> None:
             "active",
             "selection",
             "options",
+            "content_ref",
         }
-        if service_id != "tomography":
-            expected_fields.add("content_ref")
         assert set(record) == expected_fields
         assert models[service_id].model_dump(exclude_none=True) == record
 

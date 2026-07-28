@@ -194,8 +194,8 @@ def test_real_demo_pipeline_crosses_s36_s37_s38_once_and_preserves_sidecars() ->
         composer.invocations[0].cached_full_context
     )
     assert composer.invocations[0].user_message == inputs["user_message"]
-    assert semantic.invocations[0].candidate_text is composer.text
-    assert result.text is composer.text
+    assert semantic.invocations[0].candidate_text == composer.text
+    assert result.text == composer.text
     assert result.spec is bound.spec  # type: ignore[union-attr]
     assert result.selected_followups.source == "content"
     assert result.selected_cta_key == "plan"

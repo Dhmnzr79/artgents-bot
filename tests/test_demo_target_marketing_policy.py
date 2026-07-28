@@ -39,7 +39,8 @@ EXPECTED_SCENARIOS = {
             "kb:implantation__faq__pain.md#korotko",
             "kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut",
         ],
-        "allowed_semantic_contexts": ["service"],
+        "allowed_semantic_contexts": ["service", "default"],
+        "allowed_topics": ["implantation"],
     },
     "cost": {
         "ordered_amplifier_refs": [
@@ -49,7 +50,8 @@ EXPECTED_SCENARIOS = {
             "kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee",
             "kb:clinic__info__payment_terms.md#korotko",
         ],
-        "allowed_semantic_contexts": ["service", "price"],
+        "allowed_semantic_contexts": ["service", "price", "default"],
+        "allowed_topics": ["implantation"],
     },
     "time": {
         "ordered_amplifier_refs": [
@@ -58,7 +60,8 @@ EXPECTED_SCENARIOS = {
             "kb:implantation__faq__tooth_one_day.md#korotko",
             "kb:implantation__info__steps.md#korotko",
         ],
-        "allowed_semantic_contexts": ["service"],
+        "allowed_semantic_contexts": ["service", "default"],
+        "allowed_topics": ["implantation"],
     },
     "doctor_trust": {
         "ordered_amplifier_refs": [
@@ -67,7 +70,8 @@ EXPECTED_SCENARIOS = {
             "kb:doctors__doctor__overview.md#korotko",
             "kb:clinic__info__technology.md#korotko",
         ],
-        "allowed_semantic_contexts": ["service", "doctors"],
+        "allowed_semantic_contexts": ["service", "doctors", "default"],
+        "allowed_topics": ["implantation", "doctors"],
     },
     "result_reliability": {
         "ordered_amplifier_refs": [
@@ -76,14 +80,15 @@ EXPECTED_SCENARIOS = {
             "kb:implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie",
             "kb:clinic__info__warranty.md#korotko",
         ],
-        "allowed_semantic_contexts": ["service"],
+        "allowed_semantic_contexts": ["service", "default"],
+        "allowed_topics": ["implantation"],
     },
 }
 EXPECTED_CURRENT_HASHES = {
     TONE: "b357142967527e0cdd50387efbeaf2d8d3b2a7218a1c5cd8112a316e17f6076f",
 }
 EXPECTED_PREEXISTING_TARGET_DIGEST = (
-    "9049b656346bb101cf9a70633d02c515f86613126aeabff952130ff570f2defb"
+    "1fbf9b045f69aeb9b08394e9416fe5c7f62a285ea2aa8ec3818d9e658ead9126"
 )
 
 

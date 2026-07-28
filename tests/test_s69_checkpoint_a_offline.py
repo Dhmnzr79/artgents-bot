@@ -17,6 +17,7 @@ from core.target_runtime_widget import build_target_runtime_widget_cta
 from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_artifacts_unchanged
 from evals.v5.s66_default_authority_live_contract import assert_frozen_s63_live_artifacts_unchanged
 from orchestration.planner_turn import PlannerTurnOutcome
+from orchestration.route_guards import check_rate_limit
 from session import mem_get, mem_reset
 from tests.test_s61_correction_target_runtime import (
     _fake_backends,
@@ -296,3 +297,18 @@ def test_frozen_s62_s63_s66_artifacts_unchanged() -> None:
     assert_frozen_s62_live_artifacts_unchanged()
     assert_frozen_s63_live_artifacts_unchanged()
     _assert_frozen_s66_artifacts_unchanged()
+
+
+def test_rate_limit_blocks_after_bucket_exhaustion() -> None:
+    ip = f"s69-rate-limit-{uuid.uuid4().hex[:8]}"
+    from orchestration import route_guards
+
+    with route_guards._IP_RATE_LOCK:
+        route_guards._IP_RATE_BUCKETS.clear()
+    try:
+        for _ in range(40):
+            assert check_rate_limit(ip) is True
+        assert check_rate_limit(ip) is False
+    finally:
+        with route_guards._IP_RATE_LOCK:
+            route_guards._IP_RATE_BUCKETS.clear()

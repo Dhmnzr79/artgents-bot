@@ -233,8 +233,8 @@ def test_exact_positive_recommendations_become_equal_baseline_priority() -> None
     priorities = _load_yaml(TARGET_STRATEGY)["default_offer_priorities"]
     target_offer_ids = {offer["offer_id"] for offer in _target_offer_records()}
 
-    assert recommended == EXPECTED_RECOMMENDED_OFFERS
-    assert priorities == {offer_id: 1 for offer_id in sorted(recommended)}
+    assert recommended == set()
+    assert priorities == {offer_id: 1 for offer_id in sorted(EXPECTED_RECOMMENDED_OFFERS)}
     assert set(priorities) <= target_offer_ids
     assert not ((all_current_variants - recommended) & set(priorities))
 

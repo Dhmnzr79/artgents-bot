@@ -65,6 +65,7 @@ def _materials(service_term: str = "All-on-4", **overrides: object):
         "today": TODAY,
         "include_initial_block": False,
         "include_consultation_close": True,
+        "turn_topic": "implantation",
     }
     params.update(overrides)
     return assemble_target_offline_response_materials(

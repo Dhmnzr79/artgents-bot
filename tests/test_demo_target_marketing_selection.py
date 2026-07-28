@@ -60,6 +60,7 @@ def test_all_on_4_cost_price_context_uses_exact_pool_without_service_fallback() 
         today=TODAY,
         include_initial_block=True,
         marketing_scenarios=["cost"],
+        turn_topic="implantation",
     )
 
     assert result.applied_scenarios == ("cost",)
@@ -83,6 +84,7 @@ def test_all_on_4_cost_service_context_fills_exact_service_block() -> None:
         today=TODAY,
         include_initial_block=True,
         marketing_scenarios=["cost"],
+        turn_topic="implantation",
     )
 
     assert result.selected_refs == (
@@ -128,6 +130,7 @@ def test_service_doctor_trust_filters_unlinked_doctors_but_keeps_exact_sources()
         today=TODAY,
         include_initial_block=True,
         marketing_scenarios=["doctor_trust"],
+        turn_topic="implantation",
     )
 
     assert result.amplifier_refs == (
@@ -153,6 +156,7 @@ def test_general_doctors_context_allows_exact_doctor_refs_and_doctor_cta() -> No
         today=TODAY,
         include_initial_block=False,
         marketing_scenarios=["doctor_trust"],
+        turn_topic="doctors",
     )
 
     assert result.selected_refs == result.amplifier_refs == (
@@ -174,6 +178,7 @@ def test_shown_snapshots_and_explicit_date_change_only_exact_candidates() -> Non
         today=TODAY,
         include_initial_block=True,
         marketing_scenarios=["cost"],
+        turn_topic="implantation",
         shown_fact_ids=["installment_12"],
         shown_amplifier_refs=["fact:implant_same_day_discount"],
     )
@@ -208,6 +213,7 @@ def test_real_selection_is_read_only_and_acceptance_has_no_product_wiring() -> N
         today=TODAY,
         include_initial_block=True,
         marketing_scenarios=["pain_fear", "cost"],
+        turn_topic="implantation",
     )
 
     assert {path: _sha256(path) for path in paths} == before

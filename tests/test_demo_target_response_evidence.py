@@ -62,6 +62,7 @@ def _build(**overrides: object):
         "today": TODAY,
         "include_initial_block": False,
         "include_consultation_close": True,
+        "turn_topic": "implantation",
     }
     params.update(overrides)
     result = build_target_response_evidence_package(

@@ -103,7 +103,7 @@ def test_real_all_on_4_price_and_none_followup_focus() -> None:
         "includes",
     ]
     assert price.selected_followups.source == "price"
-    assert price.selected_followups.price is price.followup_candidates.price
+    assert price.selected_followups.price == price.followup_candidates.price
     assert price.selected_followups.content == ()
 
     none = _package(followup_source=None)

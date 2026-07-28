@@ -295,13 +295,13 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
     ]
 
     assert tone_keys == EXPECTED_TONE_CTA_KEYS
-    assert len(md_keys) == 54
+    assert len(md_keys) == 55
     assert Counter(md_keys) == {
         "booking": 6,
         "callback": 2,
         "consult": 13,
         "doctor": 6,
-        "plan": 25,
+        "plan": 26,
         "price": 2,
     }
     assert len(list(TARGET_OFFERS.glob("*.json"))) == 32

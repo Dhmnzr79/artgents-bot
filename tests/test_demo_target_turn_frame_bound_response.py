@@ -243,7 +243,7 @@ class TurnAwareComposerBackend:
 
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.invocations.append(invocation)
-        return self.texts[len(self.invocations) - 1]
+        return composer_test_json(self.texts[len(self.invocations) - 1])
 
 
 def test_prebuilt_full_context_is_identical_across_two_materialize_turns() -> None:

@@ -6213,7 +6213,8 @@ NO ANSWER/ROUTE/PROMPT CHANGE / NO LLM CALL COUNT CHANGE / NO BOUNDARY BYPASS / 
 PREWARM/CACHE / NO INGRESS+PLANNER MERGE / NO UX REDESIGN / NO LIVE / NO LLM / NO E2E / NO FROZEN
 ARTIFACTS / NO TSC-C / NO TSC-D**
 
-**Baseline:** `codex/stage-a` @ `228ee28`
+**Baseline:** `codex/stage-a` @ `228ee28` · **Governance correction @ `254d859`** (worker execution
+context redesigned; see "Worker execution context" below — `app.test_request_context()` rejected).
 
 **Authority:** seam audit
 `docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`.
@@ -6232,26 +6233,37 @@ ARTIFACTS / NO TSC-C / NO TSC-D**
 ## Normative behavior (binding for implementation)
 
 1. `/ask` не меняется — синхронный вызов `_orchestrate_ask_turn` на request-потоке, как сегодня.
-2. `/ask/stream` запускает **per-turn** daemon worker-поток, который выполняет **немодифицированный**
-   `_orchestrate_ask_turn(data)` в собственном, заново построенном request-контексте (Flask
-   `test_request_context()`-паттерн, засеянный `sid`/`client_id`/`request_id`/`data`), с явным
-   `bind_client_id`/`bind_session_client` на этом потоке до касания session state.
-3. Результат (`AskOrchestrationResult`) доставляется через **гарантированный** канал (не через bounded
-   очередь статусов).
-4. `stage_start`/`stage_end`/`stage_skipped` (PERF-0) получают опциональный хук уведомления в тех же
+2. `/ask/stream` запускает **per-turn** daemon worker-поток (при наличии bounded capacity — см. п.11),
+   который выполняет **немодифицированный** `_orchestrate_ask_turn(data)`. До старта worker'а
+   request-поток захватывает **immutable snapshot** (`request_id`, `client_id`, `sid`, parsed `data`,
+   `nav_ref`) — только plain-значения, без Flask proxy, без общего dict. Worker никогда не трогает
+   «живой» `request`.
+3. Worker пушит **собственный независимый** `RequestContext` через `app.request_context(environ)` с
+   вручную собранным минимальным environ (**не** `test_request_context()`, **не**
+   `werkzeug.test`/`EnvironBuilder`) и явно биндит три пары `ContextVar`/thread-local из snapshot:
+   `client_id` `ContextVar`, `session.py`'s `bind_session_client` thread-local, event-sink `ContextVar`.
+   Все три сбрасываются в одном `finally`, который выполняется на любом пути выхода.
+4. Результат (`AskOrchestrationResult`) доставляется через **гарантированный, негубящий** канал
+   (`Future`/single-assignment) — никогда через bounded очередь статусов.
+5. `stage_start`/`stage_end`/`stage_skipped` (PERF-0) получают опциональный хук уведомления в тех же
    местах вызова — пуш в **bounded** `queue.Queue`, best-effort (`put_nowait`, drop-on-full со счётным
-   warning, по образцу `pg_sink.py`).
-5. Текст статуса — из фиксированной таблицы «имя стадии + статус → фраза» (примеры: «Проверяю вопрос»,
+   warning). Очередь явно lossy для статусов и никогда не несёт финальный результат.
+6. Текст статуса — из фиксированной таблицы «имя стадии + статус → фраза» (примеры: «Проверяю вопрос»,
    «Ищу информацию в материалах клиники», «Готовлю ответ»), никогда из `reason`/`q`/свободного текста.
    **`stage_skipped` никогда не порождает статус-событие.**
-6. Без повторяющихся подряд одинаковых статусов (coalesce).
-7. Генератор коротким non-blocking poll вычитывает очередь, отдаёт статусы, проверяет готовность
-   результата; когда готов — ровно один `event: ui` (payload идентичен `/ask`) → ровно один `event: done`.
-8. Disconnect клиента — генератор просто прекращает yield; worker **не отменяется**, доканчивает
-   единственную запись в фоне. Никакого повторного хода, никакой второй записи.
-9. Любое исключение в worker — тот же гарантированный канал, та же `ui`/`done`-последовательность
-   (как сегодня для error-payload).
-10. `time_to_first_server_event` PERF-0-трейса переанкорить на реальный первый `yield` генератора.
+7. Без повторяющихся подряд одинаковых статусов (coalesce).
+8. Генератор коротким non-blocking poll вычитывает очередь, отдаёт статусы, проверяет готовность
+   result-future; когда готов — ровно один `event: ui` (payload идентичен `/ask`) → ровно один
+   `event: done`. Генератор никогда не пишет в worker'ов `request.ctx`, и наоборот — у каждого свой.
+9. Disconnect клиента — генератор просто прекращает yield; worker **не отменяется** (нет безопасного
+   способа прервать blocking LLM-вызов), доканчивает единственную запись в фоне, затем выполняет свой
+   `finally` ровно один раз. Никакого повторного хода, никакой второй записи.
+10. Любое исключение в worker — тот же гарантированный канал, та же `ui`/`done`-последовательность
+    (как сегодня для error-payload), `finally`-очистка всё равно выполняется.
+11. Bounded worker capacity: небольшой config-driven `N` ограничивает число одновременных PERF-1
+    worker'ов; при исчерпании `/ask/stream` откатывается на синхронное вычисление (сегодняшнее
+    поведение) для этого запроса — никогда unbounded создание потоков, никогда бесконечная очередь.
+12. `time_to_first_server_event` PERF-0-трейса переанкорить на реальный первый `yield` генератора.
 
 ## Seam audit summary (Phase 1)
 
@@ -6260,10 +6272,11 @@ ARTIFACTS / NO TSC-C / NO TSC-D**
 | `app.py` `ask_stream()` | синхронный `_orchestrate_ask_turn` **до** создания SSE-генератора — корень задержки |
 | PERF-0 marks | `stage_start/stage_end/stage_skipped` на 6 стадиях уже есть — единственный источник статуса, не дублировать |
 | Client (`api.js`) | уже читает SSE через `fetch()+ReadableStream`, неизвестные `event:` игнорирует молча — новый `event: status` обратно совместим без всяких доп. мер |
-| Flask context | `request.ctx` — thread-local/contextvar; worker-поток не может трогать «живой» `request`, нужен собственный `test_request_context()` |
+| Flask context (**corrected**) | `request.ctx` — thread-local/contextvar; `app.test_request_context()` **отклонён** (testing utility); `copy_current_request_context` **отклонён** (делит один и тот же `request` instance → общий `request.ctx`); выбран `app.request_context(environ)` с вручную собранным минимальным environ — независимый context, без shared dict |
 | `session.py` | `_tls = threading.local()`; `bind_session_client` должен быть вызван **на worker-потоке** явно, иначе тихий fallback на pack `"demo"` |
 | Cancellation | нет примитива отмены blocking LLM-вызова — disconnect останавливает только релей в сокет, не сам ход |
-| Precedent | `pg_sink.py` уже использует bounded `queue.Queue` + background thread в этом проекте — паттерн not foreign |
+| Precedent (**corrected framing**) | `pg_sink.py` — bounded `queue.Queue` + background thread, но fire-and-forget logging БЕЗ request context/session writes — доказывает только «паттерн not foreign», не безопасность именно этой задачи |
+| Precedent (contextvars) | `core/target_composer_action_context.py` — уже в проекте `ContextVar` + `bind_...()`/`reset_...()` в `finally`; генерализуется для `client_id`/event-sink |
 
 Полная таблица A/B/C/D и обоснование выбора:
 `docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`.
@@ -6306,16 +6319,20 @@ ARTIFACTS / NO TSC-C / NO TSC-D**
 
 | File | Action |
 |------|--------|
-| `app.py` | UPDATE — `/ask/stream` worker-thread + queue + generator loop; `/ask` не трогать |
+| `app.py` | UPDATE — `/ask/stream` bounded-capacity worker-thread + queue + generator loop; `/ask` не трогать |
 | `core/turn_timing.py` | UPDATE — опциональный notification hook в `stage_start`/`stage_end`/`stage_skipped`, только additive |
-| `orchestration/pre_resolver_turn.py` | UPDATE только если нужен узкий hook для seeding worker-контекста — без изменения stage-логики |
+| `core/target_sse_worker_context.py` | CREATE — генерализация `ContextVar`-паттерна `core/target_composer_action_context.py` для `client_id` и event-sink; владеет `app.request_context(environ)` push/pop и сборкой минимального environ |
 | `static/widget/api.js` | UPDATE — распознавание нового `event: status` (additive, backward compatible) |
 | `static/widget/widget.js` | UPDATE — рендер текста статуса (additive) |
 | `tests/test_final_early_sse_status_streaming_implementation.py` | CREATE — acceptance matrix |
 
 **KEEP unchanged:** `/ask`; `session.py` (переиспользовать `bind_client_id`/`bind_session_client`, не
-менять их); Composer/Boundary/Verifier policy и call count; routing/threshold; session write call sites
-и их число; widget payload content/CTA/buttons; `core/stream_answer_text.py` (по-прежнему не трогается).
+менять их — вызываются из нового worker-context модуля); `core/target_composer_action_context.py`
+(паттерн переиспользуется/генерализуется, сам файл не меняется); Composer/Boundary/Verifier policy и
+call count; routing/threshold; session write call sites и их число; widget payload content/CTA/buttons;
+`core/stream_answer_text.py` (по-прежнему не трогается).
+**Запрещённый механизм:** `app.test_request_context()` и `flask.copy_current_request_context` — оба
+отклонены в этом аудите.
 
 ## Acceptance matrix (implementation)
 
@@ -6337,6 +6354,11 @@ ARTIFACTS / NO TSC-C / NO TSC-D**
 | 14 | Любой ход | PERF-0 `stages`/marks в trace сохранены и корректны |
 | 15 | Любой ход | число LLM-вызовов идентично `/ask` |
 | 16 | Старый клиент | `ui`/`done` работают, неизвестные event игнорируются |
+| 17 | Worker завершился нормально | `client_id` `ContextVar`, `session.py` thread-local и event-sink `ContextVar` сброшены |
+| 18 | Worker упал с исключением | те же три binding'а всё равно сброшены (`finally` отработал) |
+| 19 | Параллельных запросов больше bounded capacity `N` | `N+1`-й `/ask/stream` откатывается на синхронное вычисление, не unbounded поток и не отказ |
+| 20 | Искусственно переполненная status-очередь | финальные `ui`/`done` всё равно доставлены (гарантированный канал, не теряется при переполнении) |
+| 21 | Генератор и worker осмотрены во время хода | у каждого свой `request.ctx` объект (`is not`), никогда общий dict |
 
 ## Test commands
 
@@ -6357,7 +6379,12 @@ git diff --check
 - статус отправляется для skipped-стадии;
 - меняется число LLM-вызовов, маршрут или ответ для любой fixture;
 - worker-поток не делает собственный `bind_session_client`;
-- disconnect приводит к повторному ходу или второй записи session.
+- disconnect приводит к повторному ходу или второй записи session;
+- используется `app.test_request_context()` или `flask.copy_current_request_context` (оба отклонены);
+- worker и генератор используют один и тот же `request.ctx` объект;
+- `client_id`/session/event-sink binding не сбрасывается в `finally` на каждом пути выхода;
+- нет bounded capacity — worker-потоки создаются неограниченно;
+- финальный результат может быть потерян при переполнении bounded-очереди статусов.
 
 ## STOP (Phase 1 governance)
 

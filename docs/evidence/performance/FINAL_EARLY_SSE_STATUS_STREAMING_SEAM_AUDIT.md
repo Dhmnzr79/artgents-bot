@@ -1,6 +1,6 @@
 # FINAL_EARLY_SSE_STATUS_STREAMING (PERF-1) — seam audit
 
-**Дата:** 2026-07-28
+**Дата:** 2026-07-28 (governance correction @ `254d859`)
 **Baseline:** `codex/stage-a` @ `228ee28`
 **Режим:** governance / docs / tests only · **NO product implementation / NO Composer token streaming /
 NO text_delta / NO answer/route/prompt change / NO LLM-call-count change / NO Boundary bypass / NO
@@ -8,12 +8,23 @@ Verifier change / NO prewarm/cache / NO Ingress+Planner merge / NO UX redesign /
 E2E / NO frozen artifacts / NO TSC-C / NO TSC-D**
 **Owner GO:** Phase 1 governance only; implementation blocked until PRE-CODE ✅ + separate owner GO
 
+## Governance correction (this revision, @ `254d859`)
+
+The initial revision of this audit named `app.test_request_context()` as the worker thread's Flask
+context mechanism. The owner correctly rejected this: `test_request_context()` is a **testing utility**
+(name, semantics, and internal `EnvironBuilder`-fabricated environ all signal "for tests"), not a
+production-safe primitive, and it does not by itself address who owns `request.ctx` concurrently. This
+revision replaces that design with a corrected worker-execution-context design (new section below),
+strengthens disconnect/cleanup/overload normative rules, and corrects the `pg_sink.py` precedent framing
+(fire-and-forget logging is not equivalent proof of safety for session-write-dependent orchestration).
+No other section's conclusions changed: the chosen outer mechanism is still **B**.
+
 ## Preflight
 
 | Check | Result |
 |---|---|
 | Branch `codex/stage-a` | ✅ |
-| `HEAD` == `origin/codex/stage-a` @ `228ee28` | ✅ |
+| `HEAD` == `origin/codex/stage-a` @ `228ee28` (original) / `254d859` (correction baseline) | ✅ |
 | Working tree clean at governance start | ✅ |
 
 ## Goal
@@ -94,11 +105,27 @@ row 16 without any compatibility shim.
    is a plain blocking call (`openai` SDK). There is no way to safely abort it mid-flight from another
    thread without risking a corrupt/partial provider-side call. Any design must treat "client
    disconnected" as **stop relaying to the socket**, never as "cancel the in-flight turn".
-3. **Precedent for background work already exists in this codebase**: `pg_sink.py` runs a singleton
-   background thread draining a bounded `queue.Queue` (`_QUEUE_MAX`, drop-with-warning on overflow) for
-   async Postgres writes. This establishes queue+thread as an accepted pattern here — but it is a
-   **long-lived shared worker** (fire-and-forget producer), structurally different from what PERF-1
-   needs (a **per-turn** worker whose result the request must wait for before closing the stream).
+3. **Precedent for background work already exists in this codebase, but it is not sufficient proof of
+   safety on its own.** `pg_sink.py` runs a singleton background thread draining a bounded `queue.Queue`
+   (`_QUEUE_MAX`, drop-with-warning on overflow) for async Postgres writes. This shows queue+thread is an
+   architecturally familiar shape here — **that is all it shows.** `pg_sink`'s worker never touches
+   `flask.request`, never needs a request context, never does a SQLite session write, and does not care
+   whether the original HTTP request is still alive (fire-and-forget logging of already-serialized
+   dicts). PERF-1's worker is materially different on every one of those axes: it performs a real
+   session write, depends on `request.ctx` resolving correctly for unmodified pipeline code, and its
+   caller (the SSE generator) must wait for its result before closing the stream. `pg_sink.py` is cited
+   here only as evidence that background threads are not a foreign concept in this codebase — it is
+   **not** cited as evidence that PERF-1's specific context-propagation and session-binding problems are
+   already solved. Those are solved by the dedicated design in "Worker execution context" below,
+   independent of `pg_sink.py`.
+4. **A real, already-in-product precedent for cross-thread state without sharing `request.ctx` exists:**
+   `core/target_composer_action_context.py` uses module-level `contextvars.ContextVar` (not
+   `request.ctx`) with a strict `bind_...() -> tokens` / `reset_...(tokens)` pair, called from
+   `core/target_runtime_turn.py` as `tokens = bind_pending_ui_actions_for_composer(...)` /
+   `finally: reset_pending_ui_actions_for_composer(tokens)`. This is the exact discipline (explicit
+   bind, paired `finally` reset, `ContextVar` rather than a shared dict) the corrected worker-context
+   design below generalizes for `client_id`, session binding, and the status event sink — it is a
+   reuse of an existing in-repo pattern, not a new one invented for PERF-1.
 4. **Dev-only deployment** (`app.run(host="0.0.0.0", port=PORT, debug=False)`, no `threaded=` override,
    no Procfile/gunicorn found). Per-request background threads work regardless of the dev server's own
    connection-concurrency mode; LLM calls are I/O-bound and release the GIL while blocked, so a
@@ -156,13 +183,13 @@ any status events → check if future is resolved → when resolved, yield `ui` 
   the notification hook fires from *whatever* stack depth `stage_start`/`stage_end` already lives at,
   independent of how deep that is, and the *main* thread is free to poll-and-yield while the *worker*
   thread is parked in a blocking network call (GIL is released during I/O wait).
-- **Flask context:** worker thread must **not** touch the live `request` proxy at all — it constructs
-  its **own** fresh request context (the same `app.test_request_context()` pattern already used
-  throughout this repo's own test suite for exactly this reason) seeded with only the plain values it
-  needs. This is the documented-safe Flask pattern for background work, not a workaround.
-- **contextvars:** the worker's fresh context is self-contained; nothing crosses the thread boundary
-  except plain data (`sid`, `client_id`, `q`, `data` dict, `request_id`) captured **before** the thread
-  starts.
+- **Flask context:** worker thread must **not** touch the live `request` proxy, and must **not** use
+  `app.test_request_context()` (testing utility, rejected — see "Worker execution context" below for the
+  corrected, production-safe mechanism).
+- **contextvars:** the worker's context is self-contained; nothing crosses the thread boundary except
+  plain data (`sid`, `client_id`, `q`, `data` dict, `request_id`, `nav_ref`) captured **before** the
+  thread starts, plus explicit `contextvars.ContextVar` binds performed **by the worker itself** at
+  start and reset in `finally` — see "Worker execution context" below.
 - **Session/DB:** orchestration still runs exactly once, on the worker thread; `bind_session_client`
   must be called explicitly on that thread (documented requirement, not optional) or session writes
   silently target the wrong SQLite file for non-demo clients — this is the one real, must-not-skip
@@ -207,35 +234,153 @@ inventing a second, cruder classification layer, and without breaking the return
 real risks (context propagation, thread-local session binding, bounded-queue drops, disconnect handling)
 each have one concrete, named, already-idiomatic-to-this-codebase mitigation — not a workaround.
 
+## Worker execution context: production-safe design (governance correction)
+
+Mechanism B's remaining open question is *how the worker thread gets a working `flask.request.ctx`
+without sharing the live one or using test tooling*. Three named options, compared:
+
+### Rejected outright — `app.test_request_context()`
+
+Rejected by the owner and confirmed on inspection: its name, its internal use of
+`werkzeug.test.EnvironBuilder` to fabricate a fake environ, and its purpose (documented Flask testing
+helper) all signal "for tests," not "production background execution." Using it in product code is
+misleading to future readers even where it happens to work. **Not carried forward.**
+
+### Option 1 — `flask.copy_current_request_context`
+
+A real, non-test Flask API for propagating a request context into a callback invoked from another
+thread. On inspection of its mechanics: `RequestContext.copy()` (which it calls internally) constructs a
+new `RequestContext` but passes `request=self.request` — **the same underlying `Request` object
+instance**, and therefore the same `request.ctx` dict object, is shared by reference between the
+original context and the copy. This directly reintroduces the exact hazard the owner flagged in point 6
+("generator and worker must not simultaneously mutate one `request.ctx`") — copying the context does
+**not** give the worker an independent `request.ctx`, it gives it a second handle onto the *same* dict.
+**Rejected as the sole mechanism** for this reason, though the underlying idea (a real, non-test Flask
+API) is correct and informs Option 2.
+
+### Option 2 — a separate, production request context
+
+Flask's actual production entry point for constructing a `RequestContext` is `Flask.request_context(environ)`
+— the exact method `wsgi_app()` itself calls for every real incoming HTTP request; there is nothing
+test-flavored about the method itself. The gap is only that it needs a WSGI-shaped `environ` dict, which
+normally comes from a live socket. **Chosen approach:** the worker constructs a minimal, hand-built
+`environ` dict directly (a plain dict literal with only the small set of keys `werkzeug.wrappers.Request`
+actually requires to construct — `REQUEST_METHOD`, `SERVER_NAME`, `SERVER_PORT`, `SCRIPT_NAME`,
+`PATH_INFO`, `wsgi.input`, `wsgi.errors`, `wsgi.version`, `wsgi.url_scheme`, `wsgi.multithread`,
+`wsgi.multiprocess`, `wsgi.run_once`) — **no `werkzeug.test`/`EnvironBuilder` import, no fabricated
+request semantics beyond what's structurally required to construct a `Request` object.** This gives the
+worker a genuinely **independent** `RequestContext` (a brand-new `request.ctx` dict, never shared with
+the live one), pushed via `app.request_context(environ)` and popped in `finally` — satisfying every
+unmodified pipeline call site that does `from flask import request; request.ctx...` without rewriting
+any of them, and without sharing mutable state with the generator thread (resolves point 6).
+
+### Option 3 — explicit immutable execution context, no Flask request dependency
+
+Carry every cross-cutting value (`client_id`, `sid`, `request_id`, turn-timing event sink) through
+`contextvars.ContextVar` instead of `request.ctx`, generalizing the **already-shipped** in-product
+pattern in `core/target_composer_action_context.py` (`ContextVar` + `bind_...() -> tokens` /
+`reset_...(tokens)` in `finally`, invoked today from `core/target_runtime_turn.py` around Composer
+action binding). This is the cleanest option **for values that matter operationally**, but on its own it
+does not solve `flask.request` resolution — dozens of existing call sites (every PERF-0 stage mark,
+effective-scope publishing, UI-action reads) still do `from flask import request; request.ctx...` and
+would raise `RuntimeError: Working outside of request context` with no `RequestContext` active at all.
+Fully removing that dependency would mean rewriting every one of those call sites to read from
+`ContextVar`s instead of `request.ctx` — a real, large, invasive refactor, explicitly **not** minimal for
+the current architecture and explicitly out of scope (no product code this phase; not "minimal" even in
+Phase 2).
+
+### Chosen combination: Option 2 (Flask-proxy compatibility shell) + Option 3's discipline (operational state)
+
+The worker thread pushes an **independent** `RequestContext` via `app.request_context(environ)` with a
+hand-built minimal environ (Option 2) purely so unmodified pipeline code's `request.ctx` reads/writes
+keep working without touching those call sites. Populating that fresh `request.ctx` and everything that
+actually matters for correctness — `client_id`, `sid` binding, the status-event sink — happens through
+explicit `contextvars.ContextVar` bind/reset pairs **generalizing** `core/target_composer_action_context.py`'s
+existing pattern (new `ContextVar`s for `client_id` and the status sink; `session.py`'s
+`bind_session_client` called explicitly, matching its existing thread-local contract). Both halves are
+bound at worker start and reset in a single `finally` block — never left dangling on any exit path
+(normal return, exception, or disconnect-triggered early generator exit).
+
+This satisfies every point in the governance correction:
+
+- **(1)** No `test_request_context()` anywhere.
+- **(2)** All three named options compared, with concrete reasons, not just named and dismissed.
+- **(3)** Minimal for current architecture: reuses an existing in-product `ContextVar` pattern instead of
+  inventing a new state-passing mechanism; does not rewrite the dozens of existing `request.ctx` call
+  sites.
+- **(4)** Immutable snapshot (`request_id`, `client_id`, `sid`, parsed `data`, `nav_ref`) captured on the
+  **generator's** thread before the worker starts; the worker never reads the live `request` proxy.
+- **(5)** Worker explicitly binds and `finally`-clears: the `client_id` `ContextVar`, `session.py`'s
+  `bind_session_client` thread-local, and the turn-timing/event-sink `ContextVar` — three distinct,
+  named bind/reset pairs, not one bundled blob.
+- **(6)** Generator and worker never share one `request.ctx` object — each has its own, independently
+  constructed dict (this is precisely what rules out Option 1's `copy_current_request_context`).
+
+## Bounded worker capacity (no unlimited thread-per-request)
+
+A bounded pool (e.g. `concurrent.futures.ThreadPoolExecutor(max_workers=N)`, `N` config-driven, small)
+or a counting `threading.Semaphore(N)` gates how many concurrent PERF-1 workers may run. **Overload
+behavior:** when capacity is exhausted, `/ask/stream` degrades to **today's synchronous behavior** for
+that request (compute the full turn on the request-handling thread, exactly as it does now, then emit
+`typing` → `ui` → `done` back-to-back) rather than queueing indefinitely or rejecting the request. This
+guarantees `/ask/stream` never behaves worse than it does today, even under load; it only sometimes loses
+the early-status benefit.
+
+## Guaranteed delivery of the terminal result (queue cannot lose it)
+
+The bounded status queue is explicitly **best-effort and lossy by design** (status is informational and
+coalescable — losing one intermediate "Ищу информацию..." update is harmless). The final result is
+**never** put on that queue. It is delivered through a separate, non-lossy channel — a
+`concurrent.futures.Future` (or equivalent single-assignment primitive) that the generator polls
+alongside its short, non-blocking queue drains, or blocks on with a bounded timeout once no more status
+is expected. A single, unambiguous **terminal sentinel** (the future resolving, not a queue item) is what
+tells the generator loop to stop draining status and emit `ui` + `done` — this cannot be dropped by queue
+overflow because it never enters the queue.
+
 ## Normative behavior (binding for Phase 2 implementation)
 
 1. `/ask` is untouched — it keeps calling `_orchestrate_ask_turn` synchronously, on the request thread,
    exactly as today.
-2. `/ask/stream` starts a **per-turn** daemon worker thread that runs the **unmodified**
-   `_orchestrate_ask_turn(data)` inside its own freshly-constructed request context (seeded with
-   `sid`/`client_id`/`request_id`/`data`), and calls `bind_client_id`/`bind_session_client` on that
-   thread before touching session state.
-3. The worker's `AskOrchestrationResult` is delivered through a guaranteed channel (never the bounded
-   status queue).
-4. PERF-0's `stage_start`/`stage_end`/`stage_skipped` gain an optional notification hook at the same
+2. `/ask/stream` starts a **per-turn** daemon worker thread (subject to the bounded-capacity gate below)
+   that runs the **unmodified** `_orchestrate_ask_turn(data)`. Before starting it, the request-handling
+   thread captures an **immutable snapshot** (`request_id`, `client_id`, `sid`, parsed `data`, `nav_ref`)
+   — plain values only, no Flask proxy, no shared dict. The worker never touches the live `request`.
+3. The worker pushes its **own independent** `RequestContext` via `app.request_context(environ)` with a
+   hand-built minimal environ (no `test_request_context`, no `werkzeug.test`/`EnvironBuilder`) — see
+   "Worker execution context" above — and explicitly binds three `ContextVar`/thread-local pairs from the
+   immutable snapshot: `client_id` `ContextVar`, `session.py`'s `bind_session_client` thread-local, and
+   the status-event-sink `ContextVar`. All three are reset in one `finally` block that runs on every exit
+   path (normal return, exception, or early generator exit on disconnect).
+4. The worker's `AskOrchestrationResult` is delivered through a guaranteed, non-lossy channel (a
+   `Future`/single-assignment result) — **never** the bounded status queue (see "Guaranteed delivery"
+   above).
+5. PERF-0's `stage_start`/`stage_end`/`stage_skipped` gain an optional notification hook at the same
    call sites; the hook pushes onto a **bounded** `queue.Queue` owned by the request, best-effort
-   (`put_nowait`, drop-on-full with a counted warning, mirroring `pg_sink.py`'s existing drop policy).
-5. Status text is derived from stage name + status via one small, fixed mapping table (e.g. `ingress`/
+   (`put_nowait`, drop-on-full with a counted warning). This queue is explicitly lossy for status and
+   explicitly never carries the terminal result.
+6. Status text is derived from stage name + status via one small, fixed mapping table (e.g. `ingress`/
    `planner` running → "Проверяю вопрос"; `boundary`/`composer` running → "Ищу информацию в материалах
    клиники"; `verifier_*` running → "Готовлю ответ") — never from `reason`, `q`, or any free text.
    **Skipped stages never produce a status event** (`stage_skipped` must not enqueue).
-6. No duplicate consecutive status text is sent (coalesce identical adjacent phrases).
-7. The generator polls the queue with a short bounded timeout, yields any pending status, checks
-   whether the worker's result is ready; once ready, yields exactly one `event: ui` (byte-identical
-   payload shape to `/ask`'s JSON body) then exactly one `event: done`, then returns.
-8. On client disconnect (detected before/at a yield), the generator stops yielding and returns; the
-   worker thread is **not** cancelled and completes its single write normally in the background.
-9. On any exception inside the worker (including the existing `TargetResponseVerificationError` /
-   generic pipeline-failure paths already handled by `materialize_target_error_payload`), the worker
-   still produces a normal `AskOrchestrationResult` (error payload) through the **same** guaranteed
-   result channel — the generator's `ui`/`done` sequence is identical to the happy path; only the
-   payload content differs (already true today).
-10. `time_to_first_server_event` in PERF-0's trace must be re-anchored to the actual first `yield` in
+7. No duplicate consecutive status text is sent (coalesce identical adjacent phrases).
+8. The generator polls the queue with a short bounded timeout, yields any pending status, checks
+   whether the worker's result future is resolved; once resolved, yields exactly one `event: ui`
+   (byte-identical payload shape to `/ask`'s JSON body) then exactly one `event: done`, then returns.
+   The generator never writes to the worker's `request.ctx`, and the worker never writes to the
+   generator's — each owns an independent context (resolves owner point 6).
+9. On client disconnect (detected before/at a yield), the generator stops yielding and returns; the
+   worker thread is **not** cancelled — there is no safe way to abort an in-flight blocking LLM call —
+   and completes its single write normally in the background, then runs its `finally` cleanup exactly
+   once. No second turn is started; no retry; no duplicate session write.
+10. On any exception inside the worker (including the existing `TargetResponseVerificationError` /
+    generic pipeline-failure paths already handled by `materialize_target_error_payload`), the worker
+    still produces a normal `AskOrchestrationResult` (error payload) through the **same** guaranteed
+    result channel, and its `finally` cleanup still runs — the generator's `ui`/`done` sequence is
+    identical to the happy path; only the payload content differs (already true today).
+11. Bounded worker capacity: a small, config-driven `N` gates concurrent PERF-1 workers; on exhaustion,
+    `/ask/stream` falls back to computing the turn synchronously (today's behavior) for that request —
+    never unbounded thread creation, never an indefinite queue.
+12. `time_to_first_server_event` in PERF-0's trace must be re-anchored to the actual first `yield` in
     the generator (today it is a same-instant proxy mark next to `request_complete`); `request_complete`
     stays anchored to the real end of the generator.
 
@@ -259,31 +404,41 @@ each have one concrete, named, already-idiomatic-to-this-codebase mitigation —
 | 14 | Any turn | PERF-0's `stages`/marks in the logged `turn_complete` trace still present and correct |
 | 15 | Any turn | LLM call count identical to `/ask` for the same fixture (no extra classification call for status text) |
 | 16 | Old client build (no `event: status` handling) | still receives and renders `ui`/`done` correctly, ignoring unknown event names |
+| 17 | Worker completes normally | `client_id` `ContextVar`, `session.py` thread-local, and event-sink `ContextVar` are all reset (verifiable — not left dangling for the next task on that thread) |
+| 18 | Worker raises before completing | same three bindings are still reset (`finally` ran) |
+| 19 | Concurrent requests beyond bounded worker capacity `N` | the `N+1`th `/ask/stream` request falls back to synchronous computation (today's behavior), not an unbounded new thread and not a rejected request |
+| 20 | Status queue artificially full | terminal `ui`/`done` still delivered (via the guaranteed channel, never dropped by queue overflow) |
+| 21 | Generator and worker inspected mid-flight | each holds a distinct `request.ctx` object (`is not`), never the same dict instance |
 
 ## Implementation allowlist (Phase 2 — blocked until owner GO)
 
 | File | Action |
 |---|---|
-| `app.py` | UPDATE — `/ask/stream` gains the worker-thread + queue + generator loop; `/ask` untouched |
+| `app.py` | UPDATE — `/ask/stream` gains the bounded-capacity worker-thread + queue + generator loop; `/ask` untouched |
 | `core/turn_timing.py` | UPDATE — optional notification hook at `stage_start`/`stage_end`/`stage_skipped` (bounded queue push), additive only |
-| `orchestration/pre_resolver_turn.py` | UPDATE only if the worker-thread request-context seeding needs a narrow hook here (no stage logic change) |
-| `session.py` | **KEEP unchanged** — reuse existing `bind_client_id`/`bind_session_client`, call them explicitly from the worker thread |
+| `core/target_sse_worker_context.py` | CREATE — new module generalizing `core/target_composer_action_context.py`'s `ContextVar` bind/reset pattern for `client_id` and the status-event sink; owns the worker's `app.request_context(environ)` push/pop and the minimal hand-built environ construction |
+| `session.py` | **KEEP unchanged** — reuse existing `bind_client_id`/`bind_session_client`; called explicitly by the new worker-context module, not modified itself |
 | `static/widget/api.js` | UPDATE — recognize new `event: status` (additive, backward compatible; old builds ignore it) |
 | `static/widget/widget.js` | UPDATE — render status phrase text (additive; no change to existing `typing`/`ui`/`done` handling) |
 | `tests/test_final_early_sse_status_streaming_implementation.py` | CREATE — acceptance matrix above |
 
 **KEEP unchanged:** `/ask` route and behavior; Composer/Boundary/Verifier policy, prompts, and call
 count; routing/threshold logic; session write call sites and count; widget payload content/CTA/buttons;
-`core/stream_answer_text.py` (still untouched, unwired — unrelated to status streaming).
+`core/stream_answer_text.py` (still untouched, unwired — unrelated to status streaming);
+`core/target_composer_action_context.py` (pattern reused/generalized, file itself not modified).
+**Forbidden mechanism:** `app.test_request_context()` and `flask.copy_current_request_context` — both
+rejected in this audit (testing utility; shared-`request.ctx` hazard, respectively).
 
 ## PRE-CODE checker
 
 `tests/test_final_early_sse_status_streaming_governance.py` — asserts this seam audit exists and covers
-the required sections (mechanism comparison A/B/C/D, chosen mechanism B, normative behavior, seam
-findings on Flask context / thread-local session binding / cancellation), asserts `TASK.md` has the
-PERF-1 governance section with baseline `228ee28`, asserts `docs/FLAGS_AND_STATUS.md` and
-`docs/STRANGLER_ROADMAP.md` reference the milestone, and asserts the forbidden-in-Phase-1 list is
-documented verbatim.
+the required sections (mechanism comparison A/B/C/D, chosen mechanism B, the corrected worker-execution-
+context comparison — `copy_current_request_context` / production `request_context()` / explicit
+`contextvars` — with `test_request_context()` explicitly rejected, bounded worker capacity, guaranteed
+terminal-result delivery, normative behavior, seam findings on Flask context / thread-local session
+binding / cancellation / the corrected `pg_sink.py` framing), asserts `TASK.md` has the PERF-1 governance
+section with baseline `228ee28`, asserts `docs/FLAGS_AND_STATUS.md` and `docs/STRANGLER_ROADMAP.md`
+reference the milestone, and asserts the forbidden-in-Phase-1 list is documented verbatim.
 
 ## Forbidden in governance commit (Phase 1)
 

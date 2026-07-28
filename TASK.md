@@ -6518,3 +6518,217 @@ tests/test_final_prosthetics_price_nav_reachability_implementation.py -q`
 ## STOP (Phase 2 implementation)
 
 After completion record + push — **STOP** before PERF-2, per owner instruction.
+
+---
+
+# TASK — FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2 (governance)
+
+**Status:** governance only · **NO PRODUCT IMPLEMENTATION / NO BOUNDARY PROMPT/POLICY CHANGE / NO
+COMPOSER/VERIFIER POLICY CHANGE / NO NEW LLM CALL / NO STREAMING TEXT/TEXT_DELTA / NO CACHE/PREWARM / NO
+INGRESS+PLANNER MERGE / NO LIVE / NO LLM / NO E2E / NO FROZEN ARTIFACTS / NO TSC-C / NO TSC-D**
+
+**Baseline:** `codex/stage-a` @ `aa633f2`.
+
+**Authority:** seam audit
+`docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md`.
+
+## Goal
+
+Определить архитектурно, когда Medical Boundary (единственный blocking LLM-вызов перед Composer,
+`core/target_runtime_turn.py:322-342`) гарантированно не нужен, через typed contract и capabilities
+TurnFrame — не через слова пользователя, regex, phrase lists, topic/service hardcode или confidence «на
+глаз». Убрать один LLM-вызов с однозначных немедицинских путей.
+
+**Итог аудита (важно):** эта цель достигается **уже** — но только для одной категории:
+**governed UI scope/stage click**. Pure free-text price lookup и exact FAQ остаются `required` — не
+потому что были забыты, а потому что необходимые для их безопасности typed capabilities (ограниченный
+Composer price-materialization contract; validated content-authority для FAQ) сегодня не существуют.
+Это explicit, документированное решение аудита (см. seam audit §4B/§4C), не недоработка.
+
+## Normative contract (binding for implementation)
+
+```python
+TargetMedicalBoundaryRequirement = Literal[
+    "required",                    # default; Boundary must run
+    "bypass_governed_ui",          # ELIGIBLE — governed UiScopeAction/UiStageAction click
+    "bypass_pure_price",           # documented, NOT eligible — stays required until prerequisite exists
+    "bypass_exact_faq",            # documented, NOT eligible — stays required until prerequisite exists
+    "not_applicable_structured",   # clinic_contact / service_availability — already bypassed elsewhere
+]
+
+def resolve_target_medical_boundary_requirement(
+    *,
+    turn_frame: TurnFrame,
+    structured_capability: StructuredAnswerCapability | None,
+    current_ui_scope_action: UiScopeAction | None,
+    current_ui_stage_action: UiStageAction | None,
+) -> TargetMedicalBoundaryRequirement: ...
+```
+
+Pure function. No I/O, no LLM call, no raw user text read. Called from exactly one place — immediately
+before the existing `turn_timing.stage_start("boundary")` call — reading only data the pipeline has
+**already** deterministically computed by that point (`turn_frame`, `structured_capability` from the
+existing `resolve_structured_answer_capability` call, and the existing governed-UI-action lookups). No new
+inputs, no new classification, no second router — mirrors the existing `structured_capability` skip
+precedent (`stage_skipped("boundary", reason="structured_capability:...")`) exactly, one more `if` branch
+guarding one existing call.
+
+## Eligibility (binding)
+
+**Eligible today — `bypass_governed_ui`:**
+
+1. `UiScopeAction`/`UiStageAction` validated against a session-bound whitelist of refs the **server**
+   rendered earlier (`resolve_ui_scope_ref_click`/`resolve_ui_stage_ref_click`, fail-closed on any
+   mismatch).
+2. TurnFrame built by `core/target_typed_ui_turn_frame.py` — **deterministic code**, not an LLM guess:
+   `intent="price_lookup"`, `aspects=["price"]`, `needs_clarification=False` are hardcoded constants,
+   never inferred, and the builder never reads `q`.
+3. Structurally cannot coexist with free text: `orchestration/pre_resolver_turn.py:248`'s `if not q:`
+   gate means the governed-click branch that produces this TurnFrame **only** runs when the accompanying
+   free text is empty. There is no code path today by which a governed click's turn carries user-authored
+   medical content.
+4. Planner LLM is already skipped for this exact path (`stage_skipped("planner", reason="typed_ui")`,
+   pre-existing) — Boundary-skip is a direct extension of an already-shipped pattern.
+5. Composer's `forbidden_topics=("diagnosis", "personal_eligibility")` (`target_runtime_turn.py:382`)
+   remains unconditional regardless of Boundary's decision.
+6. Deterministic + Semantic Verifier remain unconditional after Composer — untouched.
+
+**Not eligible — stays `required` (documented, not implemented):**
+
+- `bypass_pure_price` — free-text price lookup. Prerequisite missing: Composer today always receives the
+  **full** system policy and **full** `cached_full_context.corpus_text` regardless of price-only intent
+  (`core/target_composer_executor.py:350-394`) — no restricted price-materialization contract exists.
+  Additionally, free-text `intent`/`aspects`/`needs_clarification` are LLM-classified, not deterministic,
+  and `TurnFrame` has no mutual-exclusivity constraint preventing `price_lookup` from coexisting with
+  medical signals elsewhere in the same frame.
+- `bypass_exact_faq` — no dedicated typed "exact validated content authority" capability distinguishes a
+  provably-factual definitional question from one that only looks factual but edges into suitability;
+  both share the same `TurnFrame` shape and the same `needs_clarification` blind spot (see below). Per
+  the milestone brief's own instruction: "если недостаточно — зафиксировать FAQ как required, а не
+  угадывать."
+- `not_applicable_structured` — `clinic_contact`/`service_availability` already bypass Boundary today via
+  `resolve_structured_answer_capability`. PERF-2 does not add a second bypass mechanism on top; this value
+  exists in the type vocabulary for completeness only.
+
+**Critical constraint governing all of the above:** `TurnFrame` has **no field** representing "this
+message may require clinical judgment." The Planner LLM prompt (`core/turn_planner_llm.py:78-84`)
+explicitly instructs the model **not** to set `needs_clarification=true` when the ambiguity is one "a
+doctor would determine" — so `needs_clarification=False` on a free-text frame is the **documented,
+intended** output for clinically-ambiguous messages, not proof of safety. This is why no free-text-driven
+bypass category (pure price, FAQ, or any "the frame looks complete" heuristic) can be treated as eligible
+without a new, separate typed capability — TurnFrame completeness/confidence never substitutes for that.
+
+## Hard exclusions — Boundary stays `required` whenever
+
+- Any free-text turn that is not a governed UI click (covers suitability/«подходит ли мне», diagnosis
+  («диагноз»)/symptoms/complications, contraindications («противопоказания»), personal medical
+  recommendation, post-op problems).
+- `medical_handoff` scenario signals.
+- Ambiguous/invalid `TurnFrame` (`field_meta.status ∈ {"invalid","missing"}` on any axis) — ambiguous
+  frame stays required.
+- `needs_clarification=True` on a free-text frame not already covered by a resolved advisory FAQ path (no
+  such path exists — currently vacuous, everything free-text stays required).
+- `marketing_scenarios` containing `pain_fear`/`result_reliability` used as sole signal (subsumed today by
+  "free-text stays required").
+- Generic topic/content without dedicated typed authority.
+- Conflicting typed signals on the same frame.
+- Any backend/pipeline uncertainty outside the one proven-safe category.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|---|---|
+| Boundary call site | ONE site, `core/target_runtime_turn.py:322-342`, inside `run_target_fullcontext_runtime_turn`; receives only the raw `user_message` string, never `TurnFrame` |
+| Boundary outcomes | `none`/`medical_handoff`/`uncertain`; only `boundary_uncertain_backend_failure` survives normalization as terminal — low-confidence/malformed/ambiguous all silently degrade to confident `none` today (existing design, unchanged by PERF-2) |
+| Existing skip precedent | `resolve_structured_answer_capability` → `clinic_contact`/`service_availability` already skip Boundary+Composer+both Verifiers via `stage_skipped(..., reason=f"structured_capability:{kind}")` — the pattern PERF-2 extends |
+| Governed UI click TurnFrame | 100% deterministic (`core/target_typed_ui_turn_frame.py`), never reads `q`, hardcoded `intent`/`aspects`/`needs_clarification` |
+| Free-text TurnFrame | LLM-classified; `needs_clarification` deliberately never flags doctor-determined ambiguity (prompt-level, `core/turn_planner_llm.py:78-84`) — no safety signal available |
+| `if not q:` gate | `orchestration/pre_resolver_turn.py:248` — governed click resolution only runs when free text is empty; structural, not conventional |
+| Composer input | Always full system policy + full corpus text regardless of price-only intent; `forbidden_topics=("diagnosis","personal_eligibility")` always passed |
+| Verifier | Deterministic (numeric grounding, no LLM) + Semantic (LLM, blocks `unsupported_clinic_claim`/`personal_medical_conclusion`/`material_external_medical_claim`) run **unconditionally** whenever Composer ran — untouched by any Boundary-skip decision |
+| `service_route` | Does not distinguish price/click flows from generic FAQ — only the code branch + `stage_skipped` reason distinguish them |
+
+Full map, outcomes table, eligibility matrix, risk assessment, and 21-row acceptance matrix:
+`docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md`.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|---|---|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_safe_medical_boundary_bypass_governance.py` | CREATE — PRE-CODE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — PERF-1 completion + PERF-2 status pointer |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — PERF-1 moved to Historical, PERF-2 Active milestone pointer |
+
+**Forbidden in governance commit:**
+
+- Product implementation of any kind (no resolver module, no call-site change in
+  `core/target_runtime_turn.py`)
+- Boundary prompt/policy change
+- Composer/Verifier policy change
+- New LLM call
+- Streaming text / `text_delta`
+- Cache/prewarm
+- Ingress + Planner merge
+- LIVE / LLM / E2E eval runs
+- Frozen artifact / hash changes
+- TSC-C / TSC-D
+- Исправление постороннего тестового долга
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|---|---|
+| `contracts/target_medical_boundary_requirement.py` | CREATE — the `TargetMedicalBoundaryRequirement` literal + supporting types |
+| `core/target_medical_boundary_requirement.py` | CREATE — pure `resolve_target_medical_boundary_requirement(...)` |
+| `core/target_runtime_turn.py` | UPDATE — call resolver immediately before `turn_timing.stage_start("boundary")`; on `bypass_governed_ui`, skip via `stage_skipped("boundary", reason="bypass_governed_ui")` and proceed with the existing confident-`none` boundary result shape |
+| `core/turn_timing.py` | **KEEP unchanged** — reuse existing `stage_skipped` |
+| `tests/test_final_safe_medical_boundary_bypass_implementation.py` | CREATE — acceptance matrix (21 rows, seam audit §13) |
+
+**KEEP unchanged:** Boundary/Composer/Verifier prompts and policy; `forbidden_topics` argument; the
+`if not q:` gate; the ref-whitelist check; `core/target_typed_ui_turn_frame.py`'s deterministic
+construction; the `structured_capability` skip mechanism (untouched, not layered on top);
+`bypass_pure_price`/`bypass_exact_faq` remain **unimplemented** — the resolver must return `required` for
+both; session write-back; `/ask`/`/ask/stream` route parity; LLM call count for every non-eligible path.
+
+## Acceptance matrix (implementation — 21 scenarios)
+
+See seam audit §13 for the full table (governed scope/stage click bypass; invalid ref no-bypass; free-text
+price/FAQ/suitability/complication/contraindication/ambiguous-frame all `required`; structured
+contacts/service-availability unaffected; Boundary backend failure on required path unaffected; Numeric +
+Semantic Verifier still enforce after bypass; `/ask` vs `/ask/stream` parity; PERF-0 `boundary=skipped`
+with `reason="bypass_governed_ui"`; PERF-1 shows no Boundary status for skipped stage; LLM count −1 only
+on eligible rows; routes/payload/session write unchanged everywhere else).
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_safe_medical_boundary_bypass_governance.py -q
+python -m pytest tests/test_final_response_latency_observability_governance.py tests/test_final_early_sse_status_streaming_governance.py -q
+
+git diff --check
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно менять Boundary/Composer/Verifier prompt или policy;
+- bypass решается по raw user text, regex, phrase lists, topic/service hardcode, demo-specific IDs
+  (например, литеральный `service_id`/`client_id` конкретной demo-клиники), session scope,
+  confidence без typed sufficiency, или единственному marketing scenario;
+- `bypass_pure_price`/`bypass_exact_faq` возвращается резолвером как что-то кроме `required`;
+- resolver читает что-то, кроме `turn_frame`/`structured_capability`/governed UI action objects;
+- LLM call count меняется на путях, отличных от `bypass_governed_ui`;
+- routes/final payload/session write меняются;
+- Semantic/Numeric Verifier пропускается для eligible path;
+- появляется второй router/selector вместо одного `if`-ветвления на существующем call site;
+- PERF-0/PERF-1 телеметрия для skipped Boundary показывает что-то, кроме `reason="bypass_governed_ui"`.
+
+## STOP (Phase 1 governance)
+
+После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
+отдельного owner GO.

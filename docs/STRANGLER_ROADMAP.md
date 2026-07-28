@@ -830,28 +830,61 @@ Deliverables (Phase 1): seam audit
 
 ---
 
-## Active — FINAL_EARLY_SSE_STATUS_STREAMING / PERF-1 (governance Phase 1)
+## Active — FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2 (governance Phase 1)
 
-**Baseline:** `codex/stage-a` @ `228ee28` · **NO PRODUCT IMPLEMENTATION / NO COMPOSER TOKEN STREAMING / NO LIVE / NO LLM**
+**Baseline:** `codex/stage-a` @ `aa633f2` · **NO PRODUCT IMPLEMENTATION / NO BOUNDARY PROMPT/POLICY
+CHANGE / NO COMPOSER/VERIFIER POLICY CHANGE / NO LIVE / NO LLM**
 
-Second step of the acceleration program, after PERF-0. `/ask/stream` still calls
-`_orchestrate_ask_turn` **synchronously** before the SSE generator is even constructed — no HTTP bytes
-reach the client until the entire turn (Ingress → Planner → Boundary → Composer → Verifier → widget) is
-done. Goal: honest early SSE status events, derived from PERF-0's existing `stage_start`/`stage_end`/
-`stage_skipped` marks (no second timing/classification system), without streaming Composer tokens and
-without changing `/ask`, answers, routes, or LLM call count.
+Third step of the acceleration program, after PERF-0/PERF-1. Medical Boundary is one blocking LLM call
+(`core/target_runtime_turn.py:322-342`) that today runs before Composer on nearly every FullContext turn,
+regardless of topic — only `clinic_contact`/`service_availability` structured answers already skip it.
+Goal: a typed-contract, deterministic bypass (`resolve_target_medical_boundary_requirement(...)`, a pure
+function reading only `TurnFrame`/`structured_capability`/governed UI action objects — never raw text,
+regex, or topic hardcode) for turns where Boundary is provably unnecessary.
 
-Chosen mechanism (of A/B/C/D compared in the seam audit): **B — background worker thread + bounded
-status queue + guaranteed-delivery result**, with the worker constructing its own fresh Flask request
-context and explicitly re-binding `session.py`'s thread-local client-pack binding — the only variant
-that can honestly reflect PERF-0's actual per-stage granularity (including skip semantics for structured
-`clinic_contact`/`service_availability`/`typed_ui`) without breaking existing return-value contracts.
+Audit finding: only **governed UI scope/stage clicks** (`bypass_governed_ui`) are eligible today — the
+TurnFrame they produce is 100% deterministic code (not an LLM guess), structurally cannot carry free text
+(`orchestration/pre_resolver_turn.py:248`'s `if not q:` gate), and is validated against a session-bound,
+server-rendered ref whitelist. Pure free-text price lookup and exact FAQ are explicitly kept `required` —
+not an oversight, but because the typed capabilities that would make them provably safe (a restricted
+Composer price-materialization contract; a validated content-authority registry distinguishing exact
+factual questions from suitability questions) do not exist yet. Deterministic + Semantic Verifier remain
+unconditional after any bypass — the last-line defense is untouched.
 
 Deliverables (Phase 1): seam audit
-(`docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`), `TASK.md`, doc sync,
-PRE-CODE checker `tests/test_final_early_sse_status_streaming_governance.py`.
+(`docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_safe_medical_boundary_bypass_governance.py`.
 
 **STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
+## Historical — FINAL_EARLY_SSE_STATUS_STREAMING / PERF-1 (governance + implementation)
+
+**Baseline:** `codex/stage-a` @ `228ee28` (governance) → `aa633f2` (implementation **COMPLETE**).
+
+Second step of the acceleration program, after PERF-0. `/ask/stream` used to call
+`_orchestrate_ask_turn` **synchronously** before the SSE generator was even constructed — no HTTP bytes
+reached the client until the entire turn (Ingress → Planner → Boundary → Composer → Verifier → widget)
+was done.
+
+Chosen mechanism (of A/B/C/D compared in the seam audit): **B — background worker thread + bounded
+status queue + guaranteed-delivery result**, with the worker constructing its own independent Flask
+request context (`app.request_context(environ)` with a hand-built minimal environ) and explicitly
+re-binding `session.py`'s thread-local client-pack binding — the only variant that could honestly reflect
+PERF-0's actual per-stage granularity (including skip semantics for structured
+`clinic_contact`/`service_availability`/`typed_ui`) without breaking existing return-value contracts.
+
+Implementation: `/ask/stream` now emits `event: status` before orchestration starts, driven by PERF-0's
+real `stage_start`/`stage_end`/`stage_skipped` marks via a `ContextVar`-based sink, with a bounded
+admission `Semaphore` + `ThreadPoolExecutor` and a safe synchronous in-generator fallback under overload.
+`/ask` untouched; no answer/route/LLM-call-count change (21-test acceptance matrix + strict nodeid diff
+against baseline, zero regressions).
+
+Deliverables: seam audit
+(`docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_early_sse_status_streaming_governance.py`, implementation acceptance
+`tests/test_final_early_sse_status_streaming_implementation.py`.
 
 ---
 

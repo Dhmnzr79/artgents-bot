@@ -3,7 +3,10 @@ import re
 import sys
 import time
 import json
+import queue
 import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 from collections import deque
@@ -24,6 +27,7 @@ from core.client_host import resolve_request_client_id
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import load_widget_config, tone_to_txt_dict
 from core.origin_guard import validate_widget_origin
+from core.target_sse_worker_context import worker_execution_context
 from core.widget_cors import (
     apply_widget_cors_headers,
     widget_cors_preflight_response,
@@ -41,6 +45,7 @@ from session import (
     mem_get,
     is_active_lead_flow,
     record_last_bot_payload,
+    sid_from_body,
 )
 from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn
 from orchestration.helpers import get_last_content_ui_payload_compat
@@ -430,6 +435,249 @@ def _sse_typing_line(phase: str) -> str:
     return f"event: typing\ndata: {json.dumps({'phase': phase}, ensure_ascii=False)}\n\n"
 
 
+# --- PERF-1: early SSE status events (docs/evidence/performance/
+# FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md) ---------------------------
+#
+# Bounded worker capacity: an explicit admission Semaphore gates whether a turn
+# runs on a background worker at all — NOT relying on ThreadPoolExecutor's own
+# (effectively unbounded) internal work queue as the admission control. When
+# capacity is exhausted, the SSE generator falls back to computing the turn
+# synchronously, on the request thread, after already having emitted the first
+# status event — /ask/stream never behaves worse than before this milestone.
+_SSE_WORKER_CAPACITY = max(1, int(os.getenv("SSE_WORKER_CAPACITY", "8")))
+_sse_worker_executor = ThreadPoolExecutor(
+    max_workers=_SSE_WORKER_CAPACITY, thread_name_prefix="ask-stream-worker"
+)
+_sse_worker_admission = threading.Semaphore(_SSE_WORKER_CAPACITY)
+_SSE_STATUS_QUEUE_MAXSIZE = 8
+_SSE_STATUS_POLL_INTERVAL_SEC = 0.05
+
+# Status text is derived only from PERF-0's real stage_start call sites (via the
+# notification hook in core/turn_timing.py) — never from reason/q/free text, and
+# skipped stages never enqueue (stage_skipped does not call the hook). No
+# internal LLM/Boundary/Verifier names are exposed to the user.
+_SSE_STAGE_STATUS_PHRASES = {
+    "ingress": "Проверяю вопрос",
+    "planner": "Проверяю вопрос",
+    "boundary": "Ищу информацию в материалах клиники",
+    "composer": "Ищу информацию в материалах клиники",
+    "verifier_deterministic": "Готовлю ответ",
+    "verifier_semantic": "Готовлю ответ",
+}
+_SSE_INITIAL_STATUS_PHRASE = _SSE_STAGE_STATUS_PHRASES["ingress"]
+
+
+def _sse_status_line(message: str) -> str:
+    return f"event: status\ndata: {json.dumps({'message': message}, ensure_ascii=False)}\n\n"
+
+
+def _make_status_emitter(status_queue: "queue.Queue[str]", *, already_sent: str | None):
+    """Non-blocking, deduping, bounded-lossy status emitter for one turn.
+
+    Called from core.turn_timing's stage_start hook (via the ContextVar sink),
+    i.e. from the worker thread. Never blocks the pipeline: a full queue just
+    drops the update (status is informational and coalescable, never the final
+    result — see _run_sse_worker_turn / the guaranteed result channel below).
+    """
+    last = {"phrase": already_sent}
+
+    def _emit(stage_name: str, _event: str) -> None:
+        phrase = _SSE_STAGE_STATUS_PHRASES.get(stage_name)
+        if not phrase or phrase == last["phrase"]:
+            return
+        last["phrase"] = phrase
+        try:
+            status_queue.put_nowait(phrase)
+        except queue.Full:
+            pass
+
+    return _emit
+
+
+def _build_sse_payload(orch_r: AskOrchestrationResult) -> tuple[dict, int]:
+    """Build the final SSE `ui` payload dict (session writes + finalize_ask) for
+    an orchestration result, without any turn_timing marks — the caller (the SSE
+    generator, on its own kept-alive request context) marks first_server_event /
+    request_complete at the actual yield points, not at payload-build time."""
+    if orch_r.kind == "service_reply":
+        payload = orch_r.service_payload
+        sid = orch_r.sid
+        q = orch_r.q
+        doc_id = orch_r.service_doc_id
+        track_user = orch_r.service_track_user
+        route = orch_r.service_route
+        if track_user and q and not _skip_lead_pii_in_session_hist(payload):
+            mem_add_user(sid, q)
+        if route:
+            payload.setdefault("meta", {})["service_route"] = str(route).strip()
+        payload = apply_ui_source_policy(payload, route=route)
+        payload = normalize_policy_payload(payload)
+        answer = (payload.get("answer") or "").strip()
+        turn_meta = None
+        if track_user and (q or "").strip():
+            qs = (q or "").strip()
+            pmeta = payload.get("meta") or {}
+            turn_meta = {
+                "interaction": "user_message",
+                "question_len": len(qs),
+                "preview": observability_turn_preview(qs, route=route, meta=pmeta),
+            }
+        out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
+        if answer:
+            mem_add_bot(sid, answer)
+        http_status = orch_r.http_status if orch_r.http_status != 200 else 200
+        return out, http_status
+    if orch_r.kind == "reset_session":
+        return reset_session_response(orch_r.sid), 200
+    if orch_r.kind == "unknown_client":
+        return (orch_r.client_error or {"error": "unknown_client"}), orch_r.http_status
+    raise RuntimeError(f"bad orchestration kind: {orch_r.kind}")
+
+
+def _run_sse_worker_turn(
+    *,
+    data: dict,
+    client_id: str,
+    request_id: str,
+    sid: str,
+    turn_t0_monotonic: float,
+    status_emit,
+) -> tuple[dict, int]:
+    """Run the unmodified orchestration + payload build inside an independent,
+    per-turn worker request context (core.target_sse_worker_context) — never
+    shares request.ctx with the request-handling/generator thread. Never raises:
+    mirrors ask_stream()'s own top-level error handling so the caller's
+    Future.result() is always safe to read."""
+    try:
+        with worker_execution_context(
+            app,
+            request_id=request_id,
+            sid=sid,
+            client_id=client_id,
+            turn_t0_monotonic=turn_t0_monotonic,
+            status_emit=status_emit,
+        ):
+            orch_r = _orchestrate_ask_turn(data)
+            turn_timing.mark("orchestrate_done")
+            return _build_sse_payload(orch_r)
+    except Exception as e:
+        logger.exception("ask_stream_worker_failed", extra={"sid": sid, "err": str(e)})
+        emit_bot_event(
+            logger,
+            "ask_stream_failed",
+            status="error",
+            details={"error": str(e)[:500]},
+            request_id=request_id,
+            sid=sid,
+            client_id=client_id,
+        )
+        return internal_error_response(), 200
+
+
+def _stream_ask_turn_response(data: dict, client_id: str):
+    """PERF-1: /ask/stream's early-status path — first SSE event before
+    orchestration starts/finishes; bounded background worker with a safe
+    synchronous fallback under admission overload; exactly one orchestration
+    call either way.
+
+    Deliberately does NOT use flask.stream_with_context: that helper keeps the
+    *original* request context alive across generator iteration by re-pushing
+    it, which — observed directly — can leave a stale, unpopped RequestContext
+    behind when a generator is torn down other than by being fully iterated
+    in the exact same call frame that started it (Flask/Werkzeug's own
+    `ctx.pop()` then raises "Popped wrong request context" against a
+    *different* request's context, corrupting Flask's contextvar state for
+    later requests on the same thread). To avoid that failure mode entirely,
+    the generator body below never touches `flask.request` at all: the two
+    SSE-transport marks (`first_server_event`, `request_complete`) are written
+    directly into a bucket dict captured *before* the generator is returned,
+    and both the worker-available and admission-overload paths run through
+    the exact same `_run_sse_worker_turn` — which always pushes its own
+    short-lived, independent request context and pops it in `finally` — the
+    only difference being whether that call happens on a background thread
+    (worker available) or inline on this thread (overload fallback).
+    """
+    request_id = str(request.ctx.get("request_id") or uuid.uuid4())
+    sid = sid_from_body(data)
+    turn_t0 = request.ctx.get("turn_t0_monotonic")
+    if not isinstance(turn_t0, (int, float)):
+        turn_t0 = time.monotonic()
+    bucket = request.ctx.setdefault(
+        "turn_timing", {"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}}
+    )
+    status_queue: "queue.Queue[str]" = queue.Queue(maxsize=_SSE_STATUS_QUEUE_MAXSIZE)
+
+    def _gen():
+        # Requirement: first SSE event before orchestration starts or waits on
+        # anything — this yield happens before any pipeline call whatsoever.
+        yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
+        bucket["marks"]["first_server_event"] = time.monotonic()
+
+        acquired = _sse_worker_admission.acquire(blocking=False)
+        if not acquired:
+            # Safe synchronous fallback, inside the generator, after the first
+            # status — runs the same _run_sse_worker_turn inline (own
+            # independent context, not the live one), on this thread. Never
+            # worse than pre-PERF-1 behavior.
+            out, _http_status = _run_sse_worker_turn(
+                data=data,
+                client_id=client_id,
+                request_id=request_id,
+                sid=sid,
+                turn_t0_monotonic=turn_t0,
+                status_emit=None,
+            )
+            route = str((out.get("meta") or {}).get("service_route") or "")
+            yield _sse_typing_line(_sse_typing_phase(kind="service_reply", route=route))
+            yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+            bucket["marks"]["request_complete"] = time.monotonic()
+            yield "event: done\ndata: {}\n\n"
+            return
+
+        emitter = _make_status_emitter(status_queue, already_sent=_SSE_INITIAL_STATUS_PHRASE)
+
+        def _worker_entry():
+            try:
+                return _run_sse_worker_turn(
+                    data=data,
+                    client_id=client_id,
+                    request_id=request_id,
+                    sid=sid,
+                    turn_t0_monotonic=turn_t0,
+                    status_emit=emitter,
+                )
+            finally:
+                _sse_worker_admission.release()
+
+        try:
+            future = _sse_worker_executor.submit(_worker_entry)
+        except Exception:
+            _sse_worker_admission.release()
+            raise
+
+        while not future.done():
+            try:
+                phrase = status_queue.get(timeout=_SSE_STATUS_POLL_INTERVAL_SEC)
+            except queue.Empty:
+                continue
+            yield _sse_status_line(phrase)
+        while True:
+            try:
+                phrase = status_queue.get_nowait()
+            except queue.Empty:
+                break
+            yield _sse_status_line(phrase)
+
+        out, _http_status = future.result()
+        route = str((out.get("meta") or {}).get("service_route") or "")
+        yield _sse_typing_line(_sse_typing_phase(kind="service_reply", route=route))
+        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+        bucket["marks"]["request_complete"] = time.monotonic()
+        yield "event: done\ndata: {}\n\n"
+
+    return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
+
+
 def _sse_service_reply(
     payload: dict,
     sid: str,
@@ -502,11 +750,14 @@ def _dispatch_orchestration_sse(orch_r: AskOrchestrationResult):
 @app.post("/ask/stream")
 def ask_stream():
     """Стриминговый вариант /ask. Протокол SSE:
-      event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора (первым)
-      event: text_delta  data: {"delta": "..."}   — токены ответа
+      event: status      data: {"message": "..."}   — PERF-1 честный ранний статус (опционален для клиента)
+      event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора (перед ui, как раньше)
+      event: text_delta  data: {"delta": "..."}   — токены ответа (пока не используется)
       event: ui          data: {полный payload}    — UI элементы после генерации
       event: done        data: {}                  — конец стрима
     Direct-ответы (цены, контакты, flow) отдают typing + ui + done без text_delta.
+    /reset и /новая — тот же быстрый детерминированный путь, что и раньше, без early-status
+    (PERF-1 не относится к административным командам).
     """
     q = ""
     request.ctx["turn_t0_monotonic"] = time.monotonic()
@@ -518,12 +769,15 @@ def ask_stream():
         blocked = _widget_origin_forbidden(client_id)
         if blocked:
             return blocked
-        orch_r = _orchestrate_ask_turn(data)
-        from core.turn_timing import mark
 
-        mark("orchestrate_done")
-        q = orch_r.q or ""
-        return _dispatch_orchestration_sse(orch_r)
+        q_raw = str(data.get("q") or "").strip()
+        if q_raw.lower() in ("/reset", "/новая"):
+            orch_r = _orchestrate_ask_turn(data)
+            turn_timing.mark("orchestrate_done")
+            q = orch_r.q or ""
+            return _dispatch_orchestration_sse(orch_r)
+
+        return _stream_ask_turn_response(data, client_id)
     except Exception as e:
         logger.exception("ask_stream_failed", extra={"q": q, "err": str(e)})
         if request.ctx.get("sid") and (q or "").strip():

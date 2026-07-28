@@ -6390,3 +6390,131 @@ git diff --check
 
 После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
 отдельного owner GO.
+
+---
+
+## Completion record (PERF-1 implementation, owner GO)
+
+**Baseline:** `codex/stage-a` @ `8fa1059`. **Implementation commit:** see `git log` (this checkpoint).
+
+### Allowlist adherence
+
+All allowlisted files touched: `core/target_sse_worker_context.py` (new, worker execution context —
+ContextVar-based, `app.request_context(environ)` with a hand-built minimal environ, never
+`test_request_context`/`copy_current_request_context`), `core/turn_timing.py` (`_notify_status_sink`
+hook added to the existing `stage_start` call site — lazy-imports the sink getter, swallows all
+exceptions, no second timing system), `app.py` (bounded admission `Semaphore` + `ThreadPoolExecutor`,
+bounded-lossy `queue.Queue` status channel, `_run_sse_worker_turn`/`_stream_ask_turn_response`,
+`ask_stream()` routed through the new path except `/reset`/`/новая`), `static/widget/api.js` +
+`static/widget/widget.js` (`event: status` parsing + `onStatus`/`setStatusMessage`, additive and
+backward compatible). `tests/test_final_early_sse_status_streaming_implementation.py` created (21
+acceptance-matrix tests). **Deviation (beyond the literal allowlist, required by the approved
+architecture change itself, not unrelated cleanup):** `tests/test_final_response_latency_observability_implementation.py`,
+`tests/test_s65_authority_switch_offline.py`, `tests/test_ac3_scope_price_flow_http_offline.py` —
+each had a pre-existing assertion that checked `/ask/stream`'s `status_code`/side-effects without
+ever reading the streamed body. Under PERF-1's approved design, orchestration now runs lazily, driven
+by the generator actually being iterated (matching real WSGI-server semantics — a real server always
+drains a streaming response to send bytes; only a non-draining test client differs). Each fix adds a
+`resp.data` drain call (or reorders an existing assertion to run after the body is read), always
+matching a body-reading pattern already established elsewhere in the same file. This single-root-cause
+fix in `test_ac3_scope_price_flow_http_offline.py` also resolved 4 further nodeids in two other files
+that import and directly call its test function rather than duplicating it.
+
+### Mid-implementation redesign (found during acceptance testing, not shipped as first-drafted)
+
+The first implementation wrapped the generator in `flask.stream_with_context` so that
+`turn_timing.mark(...)` calls could resolve `flask.request`. This reproduced a genuine Flask/Werkzeug
+bug: `stream_with_context` re-pushes the *original* request's context around the wrapped generator,
+and if that generator is torn down other than by full same-frame iteration (e.g. a disconnect test's
+`.close()`), Werkzeug's `ctx.pop()` finds a *different* request's context active and raises
+`AssertionError: Popped wrong request context` — which was observed to silently corrupt Flask's
+global request contextvar state, breaking two other, unrelated tests afterward
+(`RuntimeError`/`LookupError` on `_cv_request`). Fixed by removing `stream_with_context` entirely: the
+generator never touches `flask.request`; the two SSE-transport marks (`first_server_event`,
+`request_complete`) are written into a plain `bucket` dict captured synchronously before the
+generator is constructed, and both the worker-available and admission-overload paths run through the
+same `_run_sse_worker_turn`, which always pushes and pops its own independent, short-lived request
+context via `core/target_sse_worker_context.py`.
+
+### Actual SSE event sequence (manual smoke test + acceptance suite)
+
+`event: status` (before orchestration starts) → zero or more further `event: status` (deduped, one
+per distinct stage phrase, from real `stage_start` calls) → `event: typing` → `event: ui` → `event:
+done`. Admission-overload fallback: `event: status` (initial only) → `event: typing` → `event: ui` →
+`event: done` (never worse than pre-PERF-1 behavior). Old clients unaffected — `event: status` is
+purely additive; `event: ui`/`done` unchanged in shape and order.
+
+### Worker / context / cleanup scheme
+
+`threading.Semaphore(_SSE_WORKER_CAPACITY)` gates admission explicitly (not relying on
+`ThreadPoolExecutor`'s own unbounded queue). On admission, the turn runs on
+`_sse_worker_executor.submit(...)`; on exhaustion, the same `_run_sse_worker_turn` runs inline on the
+request thread after the first status has already been yielded. Either way, the worker pushes its own
+`app.request_context(environ)` (hand-built minimal WSGI environ, no reuse of the live request's
+environ/cookies/body), binds the `client_id` ContextVar, the status-sink ContextVar, and
+`session.py`'s thread-local client-pack binding (`bind_client_id`, idempotent), and resets/pops all of
+them in one `finally` on every exit path. The status queue is bounded (`maxsize=8`) and lossy
+(`put_nowait` + swallow `queue.Full`) — informational only. The final result is returned via
+`Future.result()` / a direct function return (fallback path) — a separate, non-lossy channel, never
+dropped.
+
+### Overload and disconnect behavior
+
+Overload: synchronous in-generator fallback, described above — orchestration still runs exactly once,
+capacity is not exceeded, the caller sees the same event sequence. Disconnect: the client test-harness
+`.close()`s the response generator after the first two events; no `try`/`except GeneratorExit` is
+needed in `_gen()` because the background worker thread (submitted independently of the generator)
+keeps running to completion regardless of the generator's lifetime — its own `finally` blocks (both
+`_worker_entry`'s semaphore release and `worker_execution_context`'s ContextVar/thread-local/request-
+context cleanup) always run when the worker thread finishes its single turn, with no forced
+cancellation of any in-flight blocking call.
+
+### Regression verification (strict nodeid diff against the exact preflight baseline)
+
+1. Full suite with PERF-1 applied (all fixes included): **101 failed / 3212 passed / 11 skipped**
+   (324.72s).
+2. Full suite on clean `8fa1059` (stashed): **101 failed / 3191 passed / 11 skipped** (the 21-test
+   delta is exactly the new PERF-1 acceptance file, which does not exist at that commit).
+3. Strict nodeid-set comparison of the two 101-item FAILED lists: **identical — zero elements in
+   either direction** (`comm -13`/`comm -23` both empty). Zero new regressions, zero incidental fixes
+   to unrelated pre-existing failures.
+4. Six nodeids briefly regressed mid-implementation (the lazy-orchestration `resp.data`-drain issue,
+   5 nodeids sharing one root cause across 3 files) and one initially-suspicious nodeid
+   (`test_final_service_availability_and_clinic_capability_routing_implementation.py::test_scenario_16_all_on_4_concrete_content_route`,
+   confirmed a pre-existing full-suite-only flake — passes in isolation and as its full 43-test
+   containing file, doesn't touch the HTTP layer at all) — none were dismissed without isolated
+   reproduction, per instruction.
+
+### Focused completion suite
+
+`pytest tests/test_final_early_sse_status_streaming_implementation.py
+tests/test_final_early_sse_status_streaming_governance.py
+tests/test_final_response_latency_observability_implementation.py
+tests/test_final_response_latency_observability_governance.py tests/test_s61_target_fullcontext_runtime.py
+tests/test_target_boundary_enforced_fullcontext_response.py tests/test_target_response_verifier.py
+tests/test_s61_correction_target_runtime.py tests/test_s65_authority_switch_offline.py
+tests/test_s63_correction_offline.py tests/test_s69_checkpoint_a_offline.py
+tests/test_final_verified_primary_content_cta_projection_implementation.py
+tests/test_final_service_availability_and_clinic_capability_routing_implementation.py
+tests/test_ac3_scope_price_flow_http_offline.py
+tests/test_final_explicit_service_price_lookup_boundary_implementation.py
+tests/test_final_prosthetics_price_nav_reachability_implementation.py -q`
+→ **306 passed** (40 PERF-1 + 266 focused set).
+
+### Confirmations
+
+- `git diff --check` clean.
+- No answer/prompt/route/LLM-call-count change: `/ask` (`_service_reply`) untouched; `_build_sse_payload`
+  is the exact pre-existing payload-build logic extracted verbatim, no new/removed LLM calls anywhere
+  in the diff.
+- No Composer token streaming (`text_delta` remains unemitted/unused), no Boundary bypass, no Verifier
+  change, no cache/prewarm, no Ingress+Planner merge, no LIVE/LLM/E2E, no frozen artifact touched, no
+  TSC-C/D work, no unrelated pre-existing test debt fixed.
+- Backward compatible: `event: status` is additive; old clients that don't recognize it simply ignore
+  it, `event: ui`/`event: done` unchanged.
+- No internal stage/LLM/Boundary/Verifier names or PII reach the user — `_SSE_STAGE_STATUS_PHRASES`
+  maps stage names to four fixed, generic Russian phrases only.
+
+## STOP (Phase 2 implementation)
+
+After completion record + push — **STOP** before PERF-2, per owner instruction.

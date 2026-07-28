@@ -670,6 +670,10 @@ export function mountWidget(root, config) {
     // sent over the network — see PERF-0 seam audit client-timing finding.
     perfPendingStartMs: null,
     perfFirstLocalStatusLogged: false,
+    // PERF-1: real-time status text from event: status (optional — old
+    // servers/clients simply never set this, falling back to the existing
+    // typingLabelForPhase() canned text unchanged).
+    statusMessage: null,
   };
 
   /** @type {Record<string, { src: string, title: string }>} */
@@ -1244,8 +1248,18 @@ export function mountWidget(root, config) {
     const bubble = feed.querySelector(".clinic-shell__typing");
     const labelWrap = feed.querySelector(".clinic-shell__typing-label");
     if (!bubble || !labelWrap) return;
-    fillTypingLabel(labelWrap, typingLabelForPhase(state.typingPhase));
+    fillTypingLabel(labelWrap, state.statusMessage || typingLabelForPhase(state.typingPhase));
     bubble.classList.toggle("clinic-shell__typing--shimmer", state.typingPhase === "searching");
+  }
+
+  /** PERF-1: honest early status text (event: status). No-op for old servers —
+   * state.statusMessage simply stays null and the existing canned phase label
+   * (typingLabelForPhase) keeps rendering exactly as before this milestone.
+   * @param {string} message */
+  function setStatusMessage(message) {
+    if (!message || message === state.statusMessage) return;
+    state.statusMessage = message;
+    updateTypingIndicatorText();
   }
 
   /** @param {Record<string, unknown>} body */
@@ -1266,6 +1280,7 @@ export function mountWidget(root, config) {
     state.typingPhase = shouldShowKbSearchTyping(body) ? "searching" : "writing";
     state.perfPendingStartMs = performance.now();
     state.perfFirstLocalStatusLogged = false;
+    state.statusMessage = null;
     renderFeed();
   }
 
@@ -1280,6 +1295,7 @@ export function mountWidget(root, config) {
   function endPendingRequest() {
     state.pending = false;
     state.typingPhase = "searching";
+    state.statusMessage = null;
   }
 
   /**
@@ -1307,14 +1323,24 @@ export function mountWidget(root, config) {
       }
     };
 
+    const logFirstLocalStatusOnce = () => {
+      if (state.perfFirstLocalStatusLogged || typeof state.perfPendingStartMs !== "number") return;
+      state.perfFirstLocalStatusLogged = true;
+      if (typeof console !== "undefined" && console.debug) {
+        console.debug("[perf] time_to_first_local_status_ms", Math.round(performance.now() - state.perfPendingStartMs));
+      }
+    };
+
     return streamAsk(apiBase, body, {
+      onStatus(message) {
+        // PERF-1: the real first local status now — old servers never send
+        // event: status, so this simply never fires and onTyping below is the
+        // fallback measurement point, exactly like before this milestone.
+        logFirstLocalStatusOnce();
+        setStatusMessage(message);
+      },
       onTyping(phase) {
-        if (!state.perfFirstLocalStatusLogged && typeof state.perfPendingStartMs === "number") {
-          state.perfFirstLocalStatusLogged = true;
-          if (typeof console !== "undefined" && console.debug) {
-            console.debug("[perf] time_to_first_local_status_ms", Math.round(performance.now() - state.perfPendingStartMs));
-          }
-        }
+        logFirstLocalStatusOnce();
         setTypingPhase(phase);
       },
       onDelta(delta) {

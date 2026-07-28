@@ -307,6 +307,13 @@ def test_json_and_stream_share_target_authority(monkeypatch: pytest.MonkeyPatch)
             json={"q": "Сколько стоит All-on-4?", "sid": sid, "client_id": "demo"},
         )
         assert resp.status_code == 200
+        # PERF-1: /ask/stream's orchestration now runs lazily, driven by
+        # iterating the streamed response body — exactly like a real WSGI
+        # server sending bytes to a real client (matching every other
+        # /ask/stream test in this file, e.g. test_http_stream_default_target_authority
+        # above, which already reads resp.data for the same reason). Checking
+        # only status_code would never actually iterate the generator.
+        resp.data
     assert calls == ["sid-json", "sid-sse"]
 
 

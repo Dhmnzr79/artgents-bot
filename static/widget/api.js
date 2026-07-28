@@ -36,14 +36,19 @@ export async function postAsk(apiBase, body) {
  * Стриминговый вызов /ask/stream через SSE (fetch + ReadableStream).
  *
  * Протокол:
+ *   event: status      data: {"message": "..."}   — PERF-1 честный ранний статус
+ *                                                    (опционален: старые клиенты его
+ *                                                    просто не обрабатывают, ничего
+ *                                                    не ломается — см. onStatus)
  *   event: typing      data: {"phase":"searching"|"writing"} — фаза индикатора
- *   event: text_delta  data: {"delta": "..."}   — токен ответа
+ *   event: text_delta  data: {"delta": "..."}   — токен ответа (пока не используется)
  *   event: ui          data: {полный payload}    — UI после генерации
  *   event: done        data: {}                  — конец стрима
  *
  * @param {string} apiBase
  * @param {Record<string, unknown>} body
  * @param {{
+ *   onStatus?: (message: string) => void,
  *   onTyping?: (phase: "searching" | "writing") => void,
  *   onDelta?: (delta: string) => void,
  *   onUi?: (data: unknown) => void,
@@ -51,14 +56,14 @@ export async function postAsk(apiBase, body) {
  *   onError?: (msg: string) => void,
  * }} callbacks
  */
-export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone, onError } = {}) {
+export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, onUi, onDone, onError } = {}) {
   const base = (apiBase || "").replace(/\/$/, "");
   const url = `${base}/ask/stream`;
   // PERF-0: local-only client timing per SSE event kind — no PII, no network
   // report (see PERF-0 seam audit "Client (widget) has zero timing
   // instrumentation" finding). Each key is set once, at first receipt.
   const perfT0 = performance.now();
-  const perfMs = { typing: null, text_delta: null, ui: null, done: null };
+  const perfMs = { status: null, typing: null, text_delta: null, ui: null, done: null };
   const markPerfOnce = (key) => {
     if (perfMs[key] === null) perfMs[key] = Math.round(performance.now() - perfT0);
   };
@@ -111,7 +116,11 @@ export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone
         } else if (line.startsWith("data: ")) {
           try {
             const data = JSON.parse(line.slice(6));
-            if (currentEvent === "typing") {
+            if (currentEvent === "status") {
+              markPerfOnce("status");
+              const message = typeof data.message === "string" ? data.message : "";
+              if (message) onStatus?.(message);
+            } else if (currentEvent === "typing") {
               markPerfOnce("typing");
               const phase = data.phase === "writing" ? "writing" : "searching";
               onTyping?.(phase);

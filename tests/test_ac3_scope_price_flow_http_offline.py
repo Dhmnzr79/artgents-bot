@@ -60,6 +60,11 @@ def test_http_ask_and_stream_scope_click_parity(monkeypatch: pytest.MonkeyPatch)
             json={"q": "", "ref": UI_REF, "sid": sid, "client_id": "demo"},
         )
         assert resp.status_code == 200
+        # PERF-1: /ask/stream's orchestration now runs lazily, driven by
+        # iterating the streamed response body — exactly like a real WSGI
+        # server sending bytes to a real client. Reading .data forces that
+        # (harmless no-op for /ask, already fully computed by this point).
+        resp.data
         assert captured.get("ui_scope", {}).get("extent") == "one_tooth"
 
 

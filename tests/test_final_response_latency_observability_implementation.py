@@ -560,9 +560,13 @@ def test_ask_and_ask_stream_produce_identical_payload_and_completed_trace(
             json={"q": q, "sid": sid, "client_id": "demo"},
         )
         assert resp.status_code == 200
-        assert len(captured_turn_complete) == 1
-        traces[endpoint] = captured_turn_complete[0]
 
+        # PERF-1: /ask/stream's orchestration now runs lazily, driven by
+        # iterating the streamed response body (exactly like a real WSGI
+        # server sending bytes to a real client) — so the body must be read
+        # BEFORE asserting anything that depends on the turn having run
+        # (captured_turn_complete). For /ask this ordering makes no
+        # difference (orchestration is still eager there, unchanged).
         if endpoint == "/ask":
             results[endpoint] = resp.get_json()
         else:
@@ -574,6 +578,9 @@ def test_ask_and_ask_stream_produce_identical_payload_and_completed_trace(
                 line for line in text.split("\n") if line.startswith("data: ") and '"answer"' in line
             )
             results[endpoint] = json.loads(ui_line[len("data: "):])
+
+        assert len(captured_turn_complete) == 1
+        traces[endpoint] = captured_turn_complete[0]
 
     ask_payload = results["/ask"]
     stream_payload = results["/ask/stream"]

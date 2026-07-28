@@ -59,6 +59,30 @@ def timed_stage(name: str, *, accumulate: bool = False) -> Iterator[None]:
 def stage_start(name: str) -> None:
     """Open a named pipeline-stage span (Ingress/Planner/Boundary/Composer/Verifier/...)."""
     _bucket()["marks"][f"{name}_start"] = time.monotonic()
+    _notify_status_sink(name)
+
+
+def _notify_status_sink(stage_name: str) -> None:
+    """PERF-1: optional, non-blocking status notification for /ask/stream's worker.
+
+    Reuses this exact call site (no second timing/classification system). No-op
+    unless a sink is registered for the current worker turn (see
+    core/target_sse_worker_context.py). Never raises into the pipeline, never
+    blocks — the sink itself owns any queueing/dedup and is responsible for being
+    non-blocking.
+    """
+    try:
+        from core.target_sse_worker_context import current_status_sink
+
+        sink = current_status_sink()
+    except Exception:
+        return
+    if sink is None:
+        return
+    try:
+        sink(stage_name, "start")
+    except Exception:
+        pass
 
 
 def stage_end(

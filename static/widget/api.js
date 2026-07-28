@@ -6,6 +6,9 @@
 export async function postAsk(apiBase, body) {
   const base = (apiBase || "").replace(/\/$/, "");
   const url = `${base}/ask`;
+  // PERF-0: local-only timing (no PII, no network report) — see PERF-0 seam
+  // audit "Client (widget) has zero timing instrumentation" finding.
+  const perfT0 = performance.now();
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -20,6 +23,11 @@ export async function postAsk(apiBase, body) {
   if (!res.ok) {
     const err = typeof data.error === "string" ? data.error : res.statusText;
     throw new Error(err || "request_failed");
+  }
+  if (typeof console !== "undefined" && console.debug) {
+    console.debug("[perf] ask_client_ms", {
+      first_server_event_ms: Math.round(performance.now() - perfT0),
+    });
   }
   return data;
 }
@@ -46,6 +54,14 @@ export async function postAsk(apiBase, body) {
 export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone, onError } = {}) {
   const base = (apiBase || "").replace(/\/$/, "");
   const url = `${base}/ask/stream`;
+  // PERF-0: local-only client timing per SSE event kind — no PII, no network
+  // report (see PERF-0 seam audit "Client (widget) has zero timing
+  // instrumentation" finding). Each key is set once, at first receipt.
+  const perfT0 = performance.now();
+  const perfMs = { typing: null, text_delta: null, ui: null, done: null };
+  const markPerfOnce = (key) => {
+    if (perfMs[key] === null) perfMs[key] = Math.round(performance.now() - perfT0);
+  };
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -96,13 +112,18 @@ export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone
           try {
             const data = JSON.parse(line.slice(6));
             if (currentEvent === "typing") {
+              markPerfOnce("typing");
               const phase = data.phase === "writing" ? "writing" : "searching";
               onTyping?.(phase);
-            } else if (currentEvent === "text_delta") onDelta?.(String(data.delta ?? ""));
-            else if (currentEvent === "ui") {
+            } else if (currentEvent === "text_delta") {
+              markPerfOnce("text_delta");
+              onDelta?.(String(data.delta ?? ""));
+            } else if (currentEvent === "ui") {
+              markPerfOnce("ui");
               uiReceived = true;
               onUi?.(data);
             } else if (currentEvent === "done") {
+              markPerfOnce("done");
               doneReceived = true;
               onDone?.();
             }
@@ -115,6 +136,9 @@ export async function streamAsk(apiBase, body, { onTyping, onDelta, onUi, onDone
     if (!doneReceived) {
       if (uiReceived) onDone?.();
       else onError?.("Не удалось получить ответ");
+    }
+    if (typeof console !== "undefined" && console.debug) {
+      console.debug("[perf] ask_stream_client_ms", perfMs);
     }
   } catch (e) {
     onError?.(e instanceof Error ? e.message : "Ошибка сети");

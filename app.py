@@ -19,6 +19,7 @@ from flask import (
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
 from config import DEBUG_TOKEN, PORT
+from core import turn_timing
 from core.client_host import resolve_request_client_id
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import load_widget_config, tone_to_txt_dict
@@ -126,6 +127,10 @@ def _service_reply(
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
     if answer:
         mem_add_bot(sid, answer)
+    # PERF-0: /ask returns one JSON body — "first server event" and "request
+    # complete" are the same instant today (no progressive delivery yet).
+    turn_timing.mark("first_server_event")
+    turn_timing.mark("request_complete")
     return safe_jsonify(out)
 
 
@@ -454,6 +459,14 @@ def _sse_service_reply(
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
     if answer:
         mem_add_bot(sid, answer)
+
+    # PERF-0: the full turn (incl. Composer/Verifier) is already computed by
+    # this point — the SSE generator below yields typing/ui/done back-to-back
+    # with no real gap (seam audit Finding 2). These marks honestly reflect
+    # that: they will only diverge once a future milestone streams Composer
+    # tokens progressively instead of one blocking backend.generate() call.
+    turn_timing.mark("first_server_event")
+    turn_timing.mark("request_complete")
 
     phase = _sse_typing_phase(kind="service_reply", route=route)
 

@@ -7,19 +7,27 @@ from contextlib import contextmanager
 from typing import Any, Iterator
 
 
+# PERF-0: stage status vocabulary. "completed" = ran to a normal outcome;
+# "skipped" = never entered (deterministic bypass, use stage_skipped());
+# "blocked" = entered but a deterministic/semantic check rejected the turn;
+# "exception" = entered but the backend/transport raised.
+_STAGE_STATUSES = frozenset({"completed", "skipped", "blocked", "exception"})
+
+
+def _empty_bucket() -> dict[str, Any]:
+    return {"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}}
+
+
 def _bucket() -> dict[str, Any]:
     try:
         from flask import has_request_context, request
 
         if has_request_context():
             ctx = request.ctx
-            return ctx.setdefault(
-                "turn_timing",
-                {"durations_ms": {}, "flags": {}, "marks": {}},
-            )
+            return ctx.setdefault("turn_timing", _empty_bucket())
     except Exception:
         pass
-    return {"durations_ms": {}, "flags": {}, "marks": {}}
+    return _empty_bucket()
 
 
 def mark(name: str) -> None:
@@ -48,6 +56,46 @@ def timed_stage(name: str, *, accumulate: bool = False) -> Iterator[None]:
         record_ms(name, int((time.monotonic() - t0) * 1000), accumulate=accumulate)
 
 
+def stage_start(name: str) -> None:
+    """Open a named pipeline-stage span (Ingress/Planner/Boundary/Composer/Verifier/...)."""
+    _bucket()["marks"][f"{name}_start"] = time.monotonic()
+
+
+def stage_end(
+    name: str,
+    *,
+    status: str,
+    llm_used: bool | None = None,
+    reason: str | None = None,
+) -> None:
+    """Close a span opened with stage_start(); records duration + outcome status."""
+    resolved_status = status if status in _STAGE_STATUSES else "completed"
+    b = _bucket()
+    now = time.monotonic()
+    t_start = b["marks"].get(f"{name}_start")
+    duration_ms: int | None = None
+    if isinstance(t_start, (int, float)):
+        duration_ms = max(0, int((now - float(t_start)) * 1000))
+        b["durations_ms"][f"{name}_ms"] = duration_ms
+    b["marks"][f"{name}_end"] = now
+    entry: dict[str, Any] = {"status": resolved_status, "duration_ms": duration_ms}
+    if llm_used is not None:
+        entry["llm_used"] = bool(llm_used)
+    if reason:
+        entry["reason"] = str(reason)
+    b.setdefault("stages", {})[name] = entry
+
+
+def stage_skipped(name: str, *, reason: str) -> None:
+    """Record a stage that was never entered — explicit label, not absence/0ms (PERF-0 Rule 5)."""
+    b = _bucket()
+    b.setdefault("stages", {})[name] = {
+        "status": "skipped",
+        "duration_ms": None,
+        "reason": str(reason),
+    }
+
+
 def cached_tokens_from_usage(resp: Any) -> int | None:
     u = getattr(resp, "usage", None)
     if u is None:
@@ -70,8 +118,11 @@ def summary_for_turn_complete() -> dict[str, Any]:
     durations = dict(b.get("durations_ms") or {})
     flags = dict(b.get("flags") or {})
     marks = dict(b.get("marks") or {})
+    stages = dict(b.get("stages") or {})
 
     out: dict[str, Any] = {**durations, **{k: v for k, v in flags.items() if v is not None}}
+    if stages:
+        out["stages"] = stages
 
     t0 = None
     try:

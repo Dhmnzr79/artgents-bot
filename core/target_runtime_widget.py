@@ -12,6 +12,7 @@ from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameBoundTerminalResponse,
 )
 from contracts.turn_frame import TurnFrame
+from core import turn_timing
 from core.target_client_ui_nav import TargetNavigationFollowup
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_response_followup_materializer import (
@@ -224,6 +225,7 @@ def materialize_verified_widget_payload(
         "offer": None,
         "meta": meta,
     }
+    turn_timing.mark("widget_payload_ready")
     return TargetRuntimeMaterializedPayload(
         kind="materialized",
         payload=payload,
@@ -260,6 +262,7 @@ def materialize_boundary_uncertain_payload(
             terminal_mode="defer",
         ),
     }
+    turn_timing.mark("widget_payload_ready")
     return TargetRuntimeTerminalPayload(
         kind="terminal",
         payload=payload,
@@ -297,6 +300,7 @@ def materialize_s41_terminal_payload(
             terminal_mode=mode,
         ),
     }
+    turn_timing.mark("widget_payload_ready")
     return TargetRuntimeTerminalPayload(kind="terminal", payload=payload, terminal_mode=mode)
 
 
@@ -341,6 +345,7 @@ def materialize_target_error_payload(
             **meta_extra,
         ),
     }
+    turn_timing.mark("widget_payload_ready")
     return TargetRuntimeErrorPayload(kind="error", payload=payload, error_code=error_code)
 
 

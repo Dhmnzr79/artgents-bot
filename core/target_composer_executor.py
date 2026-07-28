@@ -10,6 +10,7 @@ import json
 
 from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_composer_source_identity import TargetComposerSourceIdentity
+from core import turn_timing
 from core.target_composer_output import parse_composer_backend_output
 from contracts.target_response_spec import TargetResponseSpec
 from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
@@ -411,21 +412,31 @@ def execute_target_composer(
             validated_request = replace(validated_request, action_context=action_context)
     validated_tone = _validate_tone(tone, validated_request)
     validated_full_context = _validate_cached_full_context(cached_full_context)
+    turn_timing.stage_start("composer")
+    # PERF-0: backend.generate() is always a single blocking call today (no
+    # stream=True anywhere in the live backend) — never fabricate a first-token
+    # timestamp from the full response; record it as not measurable instead.
+    turn_timing.set_flag("composer_first_token", "not_available")
     try:
-        generate = getattr(backend, "generate")
+        try:
+            generate = getattr(backend, "generate")
+        except Exception:
+            _error("composer_executor_backend_invalid", "backend_generate")
+        if not callable(generate):
+            _error("composer_executor_backend_invalid", "backend_generate")
+        invocation = _invocation(validated_request, validated_tone, validated_full_context)
+        try:
+            output = generate(invocation)
+        except Exception as exc:
+            _error("composer_executor_backend_failed", type(exc).__name__, exc)
+        try:
+            answer, source_identity, warnings = parse_composer_backend_output(output)
+        except Exception as exc:
+            _error("composer_executor_output_invalid", type(exc).__name__, exc)
     except Exception:
-        _error("composer_executor_backend_invalid", "backend_generate")
-    if not callable(generate):
-        _error("composer_executor_backend_invalid", "backend_generate")
-    invocation = _invocation(validated_request, validated_tone, validated_full_context)
-    try:
-        output = generate(invocation)
-    except Exception as exc:
-        _error("composer_executor_backend_failed", type(exc).__name__, exc)
-    try:
-        answer, source_identity, warnings = parse_composer_backend_output(output)
-    except Exception as exc:
-        _error("composer_executor_output_invalid", type(exc).__name__, exc)
+        turn_timing.stage_end("composer", status="exception")
+        raise
+    turn_timing.stage_end("composer", status="completed")
     return TargetUnverifiedComposedResponse(
         text=answer,
         spec=validated_request.spec,

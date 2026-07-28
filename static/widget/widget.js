@@ -666,6 +666,10 @@ export function mountWidget(root, config) {
     unread: false,
     started: false,
     errorLine: "",
+    // PERF-0: local-only perf timestamp (ms via performance.now()), never
+    // sent over the network — see PERF-0 seam audit client-timing finding.
+    perfPendingStartMs: null,
+    perfFirstLocalStatusLogged: false,
   };
 
   /** @type {Record<string, { src: string, title: string }>} */
@@ -1260,6 +1264,8 @@ export function mountWidget(root, config) {
   function beginPendingRequest(body = {}) {
     state.pending = true;
     state.typingPhase = shouldShowKbSearchTyping(body) ? "searching" : "writing";
+    state.perfPendingStartMs = performance.now();
+    state.perfFirstLocalStatusLogged = false;
     renderFeed();
   }
 
@@ -1303,6 +1309,12 @@ export function mountWidget(root, config) {
 
     return streamAsk(apiBase, body, {
       onTyping(phase) {
+        if (!state.perfFirstLocalStatusLogged && typeof state.perfPendingStartMs === "number") {
+          state.perfFirstLocalStatusLogged = true;
+          if (typeof console !== "undefined" && console.debug) {
+            console.debug("[perf] time_to_first_local_status_ms", Math.round(performance.now() - state.perfPendingStartMs));
+          }
+        }
         setTypingPhase(phase);
       },
       onDelta(delta) {

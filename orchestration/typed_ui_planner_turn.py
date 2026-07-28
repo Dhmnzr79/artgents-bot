@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_stage_action import UiStageAction
+from core import turn_timing
 from core.metadata_first_observability import record_decision_frame_ctx
 from core.runtime_turn_frame import (
     RUNTIME_FRAME_STATUS_OK,
@@ -85,5 +86,6 @@ def try_run_typed_ui_planner_turn(
         safety_net_used=[],
         resolver_bypassed_env=False,
     )
+    turn_timing.stage_skipped("planner", reason="typed_ui")
     topic = str(frame.topic or "").strip().lower() or None
     return PlannerTurnOutcome(intent="price_lookup", scope_topic_candidate=topic)

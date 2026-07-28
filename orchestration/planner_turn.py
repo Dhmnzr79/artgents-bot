@@ -18,6 +18,7 @@ from core.runtime_turn_frame import (
 )
 from core.routing_loader import THRESHOLDS
 from core.turn_planner_llm import plan_turn_attempt
+from core import turn_timing
 from logging_setup import get_logger, log_json
 from core.target_query_cues import commercial_info_query, consultation_info_query
 
@@ -67,7 +68,9 @@ def run_planner_turn(
 ) -> PlannerTurnOutcome:
     """Single planner call → runtime TurnFrame; no resolver fallback."""
     _ = st
+    turn_timing.stage_start("planner")
     attempt = plan_turn_attempt(q, sid, client_id)
+    turn_timing.stage_end("planner", status="completed")
     publish_planner_attempt_frame(attempt=attempt)
     status = get_runtime_turn_frame_status()
     request.ctx["turn_planner_used"] = status in {

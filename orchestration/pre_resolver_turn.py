@@ -11,6 +11,7 @@ from config import (
     INPUT_MAX_CHARS,
 )
 from contracts.ask_orchestration import AskOrchestrationResult
+from core import turn_timing
 from flow_handlers import handle_flows
 from ingress_gate import build_ingress_payload, classify_ingress, ingress_service_route
 from logging_setup import get_logger, log_json
@@ -128,7 +129,14 @@ def run_pre_resolver_turn(
         or bool(st.get("pending_lead_offer"))
     )
     if q and not ingress_skip:
+        turn_timing.stage_start("ingress")
         ingress_res = classify_ingress(q, client_id=client_id, sid=sid, skip=False)
+        turn_timing.stage_end(
+            "ingress",
+            status="completed",
+            llm_used=ingress_res.source in ("llm", "fallback"),
+            reason=ingress_res.source,
+        )
         log_json(
             logger,
             "ingress_gate",
@@ -153,6 +161,20 @@ def run_pre_resolver_turn(
                 service_route=ingress_service_route(ingress_res),
                 decision_frame=decision_frame,
             )
+    else:
+        if not q:
+            ingress_skip_reason = "empty_q"
+        elif ref:
+            ingress_skip_reason = "ref_click"
+        elif is_lead_context(st):
+            ingress_skip_reason = "lead_context"
+        elif st.get("situation_pending"):
+            ingress_skip_reason = "situation_pending"
+        elif st.get("pending_lead_offer"):
+            ingress_skip_reason = "pending_lead_offer"
+        else:
+            ingress_skip_reason = "ingress_skip"
+        turn_timing.stage_skipped("ingress", reason=ingress_skip_reason)
 
     flow_result = handle_flows(
         data=data,

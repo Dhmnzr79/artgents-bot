@@ -11,6 +11,7 @@ from contracts.target_turn_frame_dispatch import (
 from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
 from contracts.ui_stage_action import UiStageAction
+from core import turn_timing
 from core.target_composer_action_context import (
     bind_pending_ui_actions_for_composer,
     reset_pending_ui_actions_for_composer,
@@ -195,6 +196,11 @@ def run_target_fullcontext_runtime_turn(
 
     structured_capability = resolve_structured_answer_capability(turn_frame)
     if structured_capability is not None and structured_capability.kind == "clinic_contact":
+        skip_reason = f"structured_capability:{structured_capability.kind}"
+        turn_timing.stage_skipped("boundary", reason=skip_reason)
+        turn_timing.stage_skipped("composer", reason=skip_reason)
+        turn_timing.stage_skipped("verifier_deterministic", reason=skip_reason)
+        turn_timing.stage_skipped("verifier_semantic", reason=skip_reason)
         try:
             result = materialize_structured_contact_turn_response(
                 client_id=client_id,
@@ -215,6 +221,8 @@ def run_target_fullcontext_runtime_turn(
                 pipeline_result=None,
                 turn_frame=turn_frame,
             )
+        turn_timing.mark("verified_answer_ready")
+        turn_timing.mark("first_meaningful_text")
         presentation_cadence = TargetPresentationCadenceState(
             shown_video_ids=frozenset(session_state.shown_video_ids),
             shown_content_followup_refs=frozenset(session_state.shown_content_followup_refs),
@@ -250,6 +258,11 @@ def run_target_fullcontext_runtime_turn(
         )
 
     if structured_capability is not None and structured_capability.kind == "service_availability":
+        skip_reason = f"structured_capability:{structured_capability.kind}"
+        turn_timing.stage_skipped("boundary", reason=skip_reason)
+        turn_timing.stage_skipped("composer", reason=skip_reason)
+        turn_timing.stage_skipped("verifier_deterministic", reason=skip_reason)
+        turn_timing.stage_skipped("verifier_semantic", reason=skip_reason)
         try:
             result = materialize_structured_service_availability_turn_response(
                 client_id=client_id,
@@ -270,6 +283,8 @@ def run_target_fullcontext_runtime_turn(
                 pipeline_result=None,
                 turn_frame=turn_frame,
             )
+        turn_timing.mark("verified_answer_ready")
+        turn_timing.mark("first_meaningful_text")
         presentation_cadence = TargetPresentationCadenceState(
             shown_video_ids=frozenset(session_state.shown_video_ids),
             shown_content_followup_refs=frozenset(session_state.shown_content_followup_refs),
@@ -304,6 +319,7 @@ def run_target_fullcontext_runtime_turn(
             turn_frame=turn_frame,
         )
 
+    turn_timing.stage_start("boundary")
     try:
         boundary = execute_target_medical_boundary_classification(
             user_message,
@@ -313,6 +329,7 @@ def run_target_fullcontext_runtime_turn(
         )
         boundary = normalize_boundary_for_pipeline(boundary)
     except Exception as exc:
+        turn_timing.stage_end("boundary", status="exception")
         return TargetRuntimeTurnOutcome(
             widget=materialize_target_error_payload(
                 client_id=client_id,
@@ -322,6 +339,7 @@ def run_target_fullcontext_runtime_turn(
             pipeline_result=None,
             turn_frame=turn_frame,
         )
+    turn_timing.stage_end("boundary", status="completed")
 
     catalog_strategy = resolve_target_runtime_strategy_context(
         context.bundle,
@@ -417,6 +435,15 @@ def run_target_fullcontext_runtime_turn(
             )
     finally:
         reset_pending_ui_actions_for_composer(ui_action_tokens)
+
+    if isinstance(result, TargetTurnFrameBoundMaterializeResponse):
+        turn_timing.mark("verified_answer_ready")
+        turn_timing.mark("first_meaningful_text")
+    else:
+        turn_timing.stage_skipped("composer", reason="terminal_before_composer")
+        turn_timing.stage_skipped("verifier_deterministic", reason="terminal_before_composer")
+        turn_timing.stage_skipped("verifier_semantic", reason="terminal_before_composer")
+        turn_timing.mark("first_meaningful_text")
 
     widget = widget_payload_from_runtime_result(
         client_id=client_id,

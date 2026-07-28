@@ -6130,3 +6130,76 @@ git diff --check
 
 После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
 отдельного owner GO.
+
+---
+
+## Completion record (PERF-0 implementation, owner GO)
+
+**Baseline:** `codex/stage-a` @ `3b42cf0`. **Implementation commit:** see `git log` (this checkpoint).
+
+### Allowlist adherence
+
+All 12 allowlisted files touched exactly as scoped; `tests/test_final_response_latency_observability_implementation.py`
+created (acceptance matrix, 14 tests). **Deviation (used less than allowed):** `ingress_gate.py` was
+**not** modified — `IngressRouteResult.source` (`"rule"|"llm"|"catalog_ground_truth"|"doctor_ground_truth"
+|"offered_ground_truth"|"fallback"|"skipped"`) already distinguishes deterministic vs LLM outcomes, so
+Ingress stage timing + `llm_used` derivation lives entirely in `orchestration/pre_resolver_turn.py`
+around the existing `classify_ingress(...)` call site — no need to instrument inside `ingress_gate.py`
+itself. No other allowlist file was skipped.
+
+### What was added (stage vocabulary)
+
+`core/turn_timing.py`: `stage_start` / `stage_end(status, llm_used, reason)` / `stage_skipped(reason)`,
+status ∈ `{completed, skipped, blocked, exception}`; `stages` dict folded into `summary_for_turn_complete()`.
+Stages wired: `ingress`, `planner`, `boundary`, `composer`, `verifier_deterministic`, `verifier_semantic`.
+Point marks: `verified_answer_ready`, `first_meaningful_text`, `widget_payload_ready`, `first_server_event`,
+`request_complete`. Flag: `composer_first_token = "not_available"` (always — Composer never streams today,
+Rule 4). `latency_ms` now derives from the same `summary_for_turn_complete()` snapshot as `total_ms`
+(single source of truth) — kept, not removed, because `admin_dashboard` reads `details->>'latency_ms'`
+directly and is outside this allowlist. `request.ctx["verifier_turn"]` was **not** revived — still dead
+(read in `finalize_turn.py`, never written); out of allowlist to fix.
+
+### Regression verification (strict nodeid diff, not a second full wide run per se)
+
+1. Full suite with PERF-0 applied: **101 failed / 3172 passed / 11 skipped**.
+2. Stashed PERF-0, full suite on clean `3b42cf0`: **100 failed / 3159 passed / 11 skipped**.
+3. Strict nodeid comparison: `FAIL_BOTH` = 100 (all pre-existing, untouched — TSC-C/D territory, correctly
+   not fixed here). `FAIL_BASELINE_PASS_CURRENT` = 0. `PASS_BASELINE_FAIL_CURRENT` = 1:
+   `tests/test_final_test_suite_convergence_governance.py::test_tsc_a_inventory_nodeids_green`.
+4. That one candidate regression was traced, not assumed: reproduced in isolation (pass), reproduced
+   immediately adjacent to the new PERF-0 test file (pass), reproduced as the full governance file alone
+   (pass — only the already-known `test_tsc_b_complete` red), and reproduced via a 138-file first-half
+   slice ending at the same file in real collection order (pass; its 19 failures are all pre-existing,
+   zero new). Four independent reproductions with the PERF-0 diff active all pass. Root cause is the
+   suite's own documented full-run-only flakiness class (`docs/TEST_SUITE_ARCHITECTURE.md` "Shared-state
+   isolation" — wide-suite pollution), not a deterministic PERF-0 regression. Stash was restored (not
+   discarded) before this conclusion was reached.
+5. Per Rule "не исправляй pre-existing failures вне PERF-0" — none of the 100 baseline failures, and this
+   one non-reproducing flake, were touched.
+
+### Focused completion suite (post-restore)
+
+`pytest tests/test_final_response_latency_observability_implementation.py
+tests/test_final_response_latency_observability_governance.py tests/test_s61_target_fullcontext_runtime.py
+tests/test_target_boundary_enforced_fullcontext_response.py tests/test_target_response_verifier.py
+tests/test_s61_correction_target_runtime.py tests/test_s65_authority_switch_offline.py
+tests/test_s63_correction_offline.py tests/test_s69_checkpoint_a_offline.py
+tests/test_final_verified_primary_content_cta_projection_implementation.py
+tests/test_final_service_availability_and_clinic_capability_routing_implementation.py -q`
+→ **209 passed**.
+
+### Confirmations
+
+- `git diff --check` clean.
+- No LLM-call-count, route, payload, or session-write change — verified by the acceptance matrix's
+  `/ask` vs `/ask/stream` parity test (identical `answer`/`meta.service_route`) and by
+  `RecordingComposerBackend`/`RecordingSemanticBackend`/`RecordingBoundaryBackend` invocation counts.
+- No PII in any stage entry (structural: entries are `{status, duration_ms, llm_used, reason}` only,
+  `reason` values are fixed enum-like strings, never user text) — verified by dedicated test.
+- No real streaming, no Boundary bypass, no Verifier policy/prompt change, no provider prewarm, no answer
+  cache, no Ingress+Planner merge, no LIVE/LLM/E2E, no frozen artifact touched, no TSC-C/D work.
+
+## STOP (Phase 2 implementation)
+
+After completion record + push — **STOP** before PERF-1 (real streaming / optimization), per owner
+instruction.

@@ -12,6 +12,7 @@ from typing import Literal, NoReturn, Protocol, TypeAlias
 
 from contracts.target_cached_full_context import TargetCachedFullContext
 from contracts.target_response_spec import TargetResponseSpec
+from core import turn_timing
 from core.target_composer_executor import TargetUnverifiedComposedResponse
 from contracts.target_response_stage import is_scope_aware_price_stage
 from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
@@ -705,72 +706,88 @@ def verify_target_composed_response(
 
     request, response = _validated_inputs(request, response)
     validated_context = _validate_cached_full_context(cached_full_context)
-    structured_whitelist = _structured_commercial_whitelist(request.evidence_blocks)
-    general_whitelist = _general_numeric_whitelist(
-        request.evidence_blocks,
-        validated_context.corpus_text,
-    )
-    for claim in _numeric_claims(response.text):
-        if claim.kind == "money":
-            if claim not in structured_whitelist:
-                _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
-        elif (
-            claim not in structured_whitelist
-            and claim not in general_whitelist
-            and not _claim_in_corpus(claim, validated_context.corpus_text)
-        ):
-            _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
-    for block in request.evidence_blocks:
-        if block.kind != "commercial_fact" or not block.must_preserve_exact:
-            continue
-        if block.fact_ids and block.fact_ids[0] in request.spec.required_fact_ids:
-            if block.text not in response.text:
-                _error("target_verifier_strict_fact_missing", block.fact_ids[0])
-    has_clinic_contact = any(block.kind == "clinic_contact" for block in request.evidence_blocks)
-    if has_clinic_contact:
-        from core.target_contact_authority import (
-            canonical_contact_scalar,
-            contact_field_from_evidence_ref,
-            normalize_contact_scalar,
-        )
 
-        contact_blocks = [
-            block for block in request.evidence_blocks if block.kind == "clinic_contact"
-        ]
-        normalized_answer = normalize_contact_scalar(response.text)
-        for block in contact_blocks:
-            field = contact_field_from_evidence_ref(block.ref)
-            if field is None:
-                _error("target_verifier_clinic_contact_missing", block.ref)
-            canonical = canonical_contact_scalar(
-                field,
-                client_id=client_id or "demo",
-            )
-            if not canonical:
-                _error("target_verifier_clinic_contact_missing", block.ref)
-            if normalize_contact_scalar(canonical) not in normalized_answer:
-                _error("target_verifier_clinic_contact_missing", block.ref)
+    turn_timing.stage_start("verifier_deterministic")
     try:
-        assess = getattr(semantic_backend, "assess")
-    except Exception:
-        _error("target_verifier_backend_invalid", "semantic_assess")
-    if not callable(assess):
-        _error("target_verifier_backend_invalid", "semantic_assess")
-    invocation = _semantic_invocation(request, response, validated_context)
-    try:
-        assessment = assess(invocation)
-    except Exception as exc:
-        _error("target_verifier_backend_failed", type(exc).__name__, exc)
-    validated_assessment = _validated_semantic_assessment(
-        assessment,
-        candidate_text=response.text,
-    )
-    blocking = _blocking_issues(validated_assessment)
-    if blocking:
-        _error(
-            "target_verifier_semantic_rejected",
-            tuple((issue.kind, issue.offending_span) for issue in blocking),
+        structured_whitelist = _structured_commercial_whitelist(request.evidence_blocks)
+        general_whitelist = _general_numeric_whitelist(
+            request.evidence_blocks,
+            validated_context.corpus_text,
         )
+        for claim in _numeric_claims(response.text):
+            if claim.kind == "money":
+                if claim not in structured_whitelist:
+                    _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
+            elif (
+                claim not in structured_whitelist
+                and claim not in general_whitelist
+                and not _claim_in_corpus(claim, validated_context.corpus_text)
+            ):
+                _error("target_verifier_numeric_ungrounded", (claim.kind, claim.value))
+        for block in request.evidence_blocks:
+            if block.kind != "commercial_fact" or not block.must_preserve_exact:
+                continue
+            if block.fact_ids and block.fact_ids[0] in request.spec.required_fact_ids:
+                if block.text not in response.text:
+                    _error("target_verifier_strict_fact_missing", block.fact_ids[0])
+        has_clinic_contact = any(block.kind == "clinic_contact" for block in request.evidence_blocks)
+        if has_clinic_contact:
+            from core.target_contact_authority import (
+                canonical_contact_scalar,
+                contact_field_from_evidence_ref,
+                normalize_contact_scalar,
+            )
+
+            contact_blocks = [
+                block for block in request.evidence_blocks if block.kind == "clinic_contact"
+            ]
+            normalized_answer = normalize_contact_scalar(response.text)
+            for block in contact_blocks:
+                field = contact_field_from_evidence_ref(block.ref)
+                if field is None:
+                    _error("target_verifier_clinic_contact_missing", block.ref)
+                canonical = canonical_contact_scalar(
+                    field,
+                    client_id=client_id or "demo",
+                )
+                if not canonical:
+                    _error("target_verifier_clinic_contact_missing", block.ref)
+                if normalize_contact_scalar(canonical) not in normalized_answer:
+                    _error("target_verifier_clinic_contact_missing", block.ref)
+    except Exception:
+        turn_timing.stage_end("verifier_deterministic", status="blocked")
+        turn_timing.stage_skipped("verifier_semantic", reason="deterministic_block")
+        raise
+    turn_timing.stage_end("verifier_deterministic", status="completed")
+
+    turn_timing.stage_start("verifier_semantic")
+    try:
+        try:
+            assess = getattr(semantic_backend, "assess")
+        except Exception:
+            _error("target_verifier_backend_invalid", "semantic_assess")
+        if not callable(assess):
+            _error("target_verifier_backend_invalid", "semantic_assess")
+        invocation = _semantic_invocation(request, response, validated_context)
+        try:
+            assessment = assess(invocation)
+        except Exception as exc:
+            _error("target_verifier_backend_failed", type(exc).__name__, exc)
+        validated_assessment = _validated_semantic_assessment(
+            assessment,
+            candidate_text=response.text,
+        )
+        blocking = _blocking_issues(validated_assessment)
+        if blocking:
+            _error(
+                "target_verifier_semantic_rejected",
+                tuple((issue.kind, issue.offending_span) for issue in blocking),
+            )
+    except Exception:
+        turn_timing.stage_end("verifier_semantic", status="blocked")
+        raise
+    turn_timing.stage_end("verifier_semantic", status="completed")
+
     validated_primary: str | None = None
     validated_used: tuple[str, ...] = ()
     if md_root is not None:

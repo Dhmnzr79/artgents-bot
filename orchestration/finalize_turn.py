@@ -137,10 +137,19 @@ def finalize_ask(
         },
     )
     if turn_meta and turn_meta.get("interaction") == "user_message":
-        t0 = request.ctx.get("turn_t0_monotonic")
-        lat_ms = None
-        if isinstance(t0, (int, float)):
-            lat_ms = max(0, int((time.monotonic() - float(t0)) * 1000))
+        # PERF-0: latency_ms and total_ms used to be two independent
+        # time.monotonic() reads off the same turn_t0_monotonic (seam audit
+        # Finding 4). latency_ms now derives from the same summary snapshot
+        # that produces total_ms, so the two fields cannot drift apart.
+        # latency_ms is kept (not removed/renamed) because admin_dashboard
+        # queries `details->>'latency_ms'` directly and is outside this
+        # milestone's implementation allowlist.
+        turn_timing_summary = summary_for_turn_complete()
+        lat_ms = turn_timing_summary.get("total_ms")
+        if lat_ms is None:
+            t0 = request.ctx.get("turn_t0_monotonic")
+            if isinstance(t0, (int, float)):
+                lat_ms = max(0, int((time.monotonic() - float(t0)) * 1000))
         emit_bot_event(
             logger,
             "turn_complete",
@@ -171,7 +180,7 @@ def finalize_ask(
                     request.ctx.get("dialog_focus_decision")
                 ),
                 **verifier_trace_flat(request.ctx.get("verifier_turn")),
-                **summary_for_turn_complete(),
+                **turn_timing_summary,
             },
         )
     cta = payload.get("cta")

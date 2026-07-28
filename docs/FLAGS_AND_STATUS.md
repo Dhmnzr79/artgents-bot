@@ -75,6 +75,11 @@ fact in MD; Planner must not route own-scan FAQ to `service_availability`. Seam 
 `docs/evidence/runtime/FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING_SEAM_AUDIT.md`.
 Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
+**FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION:** governance @ `ce256c5` — post-Verifier CTA from
+validated `primary_content_ref` only; generic `allow_cta=False` preserved. Seam audit:
+`docs/evidence/presentation/FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
+
 ### A9 patient scope authority (A9R3 — unconditional post-closeout)
 
 Patient-scope projection (`extent` / `jaw` / `stage`) and per-axis `EffectiveScope` merge are **always on** in product runtime. Temporary kill-switch `A9_PATIENT_SCOPE_AUTHORITY` removed @ FINAL_SCOPE_WIDGET_E2E_CLOSEOUT (`3adc0e7` governance → implementation).

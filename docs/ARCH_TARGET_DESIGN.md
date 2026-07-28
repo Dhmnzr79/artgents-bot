@@ -59,7 +59,21 @@ rules. Seam audits: `FULLCONTEXT_PRESENTATION_PARITY` + `FULLCONTEXT_DIALOGUE_PR
 + `FINAL_GENERIC_FULLCONTEXT_CONTENT_AUTHORITY`
 + `FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING`
 + `FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE`
-+ `FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING`.
++ `FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING`
++ `FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION`.
+
+### Owner decision: verified primary content CTA projection (FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION @ `ce256c5`)
+
+**Defect:** generic FullContext sets `allow_cta=False` and `selected_cta_key=None` upstream; validated
+`primary_content_ref` (e.g. `implantation__faq__pain.md` with `cta_key: consult`) does not surface CTA
+even though presentation already reads the same primary for video/situation/follow-ups.
+
+**Target:** after successful Verifier pass, typed projection from **validated `primary_content_ref` only**
+→ `selected_cta_key` when frontmatter + lead variant config valid. Missing/invalid → warning, no CTA, answer
+kept. Explicit service/price CTA wins. **Do not** set `allow_cta=True` globally for generic mode.
+
+Seam audit: `docs/evidence/presentation/FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION_SEAM_AUDIT.md`.
+Implementation **STOP** until PRE-CODE ✅ + owner GO.
 
 ### Owner decision: tomography existing-scan content routing (FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING @ `a1dc4f2`)
 

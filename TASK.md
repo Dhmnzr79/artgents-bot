@@ -5816,3 +5816,139 @@ python -c "import json; d=json.load(open('docs/evidence/testing/final_test_failu
 
 После TSC-B governance closeout commit + PRE-CODE PASS + push — **остановиться**.
 TSC-C..D implementation запрещена до отдельного owner GO.
+
+---
+
+# TASK — FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO Verifier policy change**
+
+**Baseline:** `codex/stage-a` @ `ce256c5`
+
+**Authority:** seam audit
+`docs/evidence/presentation/FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION_SEAM_AUDIT.md`.
+
+## Goal
+
+Исправить CTA для generic FullContext-ответов, когда услуга заранее не определена, но после
+Composer + Verifier подтверждён конкретный MD-источник (`primary_content_ref`).
+
+**Defect @ `ce256c5`:** «Я боюсь боли» → validated `implantation__faq__pain.md` (`cta_key: consult`,
+`cta_action: lead`) → widget `cta=null`, потому что generic path задаёт `allow_cta=False` и
+`selected_cta_key=None` до Composer.
+
+## Target rule (binding)
+
+Если после Verifier есть validated `primary_content_ref` и **именно этот** MD содержит разрешённую
+CTA metadata → показать CTA **независимо** от того, распознал ли Planner услугу.
+
+**Не** включать `allow_cta=True` глобально для generic FullContext. Projection — typed post-Verifier
+side-effect на verified response.
+
+## Boundaries (binding)
+
+1. CTA только из validated `primary_content_ref`.
+2. Запрещено брать CTA из: произвольных `used_content_refs`; соседнего документа; угаданной услуги/topic;
+   `marketing_scenarios`; текста ответа.
+3. `cta_key` + `cta_action` валидны по `load_lead_cta_variants` / `lead_cta_dict_from_meta`.
+4. Missing/invalid source или CTA metadata → убрать CTA, warning, текст ответа сохранить.
+5. Не `allow_cta=True` глобально для generic.
+6. Уже выбранная service/price CTA имеет приоритет над primary MD CTA.
+7. CTA отдельный payload slot; не choice/secondary/price slots.
+8. Terminal, error, medical handoff, verifier-blocked → без MD CTA.
+9. Starter «Я боюсь боли» (`widget_config.json` / `ui.yaml`) ≡ free-text тот же вопрос.
+10. CTA click → существующий leadflow с правильным variant key.
+11. Parity `/ask` и `/ask/stream`.
+12. Без regex, нового selector, новых routes, service hardcodes.
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|------|---------|
+| Generic policy | `allow_cta=False` by design (`build_generic_fullcontext_content_policy_request`) |
+| Package | `assemble_target_fullcontext_content_bound_package` rejects upstream `selected_cta_key` |
+| Composer | passthrough `selected_cta_key`; blocks when `!allow_cta` — correct pre-projection gate |
+| Verifier | validates `primary_content_ref`; passthrough `selected_cta_key` unchanged |
+| Presentation | `read_doc_presentation_meta` for video/situation; **no CTA projection** |
+| Widget | `build_target_runtime_widget_cta(verified.selected_cta_key)` only |
+| **Gap** | no post-Verifier projection from validated primary frontmatter |
+
+**Minimal projection:** `project_verified_primary_content_cta` after `verify_target_composed_response`;
+reuse `read_doc_presentation_meta` + `lead_cta_dict_from_meta`; do not mutate `spec.allow_cta`.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|------|--------|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/presentation/FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_verified_primary_content_cta_projection_governance.py` | CREATE — PRE-CODE |
+| `docs/ARCH_TARGET_DESIGN.md` | UPDATE — owner decision pointer |
+| `docs/ARCHITECTURE_CONVERGENCE.md` | UPDATE — checkpoint row |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — milestone pointer |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — milestone status |
+
+**Forbidden in governance commit:**
+
+- Product code changes
+- LIVE / LLM / E2E eval runs
+- Verifier policy / prompt changes
+- Frozen artifact edits (S-series, A9R, W1b, widget e2e turns)
+- TSC-C / TSC-D
+- Global `allow_cta=True` for generic mode
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO)
+
+| File | Action |
+|------|--------|
+| `core/target_verified_primary_content_cta_projection.py` | CREATE — pure projection helper |
+| `core/target_verified_response_pipeline.py` | UPDATE — invoke projection after verify |
+| `core/target_policy_bound_verified_response_pipeline.py` | UPDATE — wire if pipeline entry differs |
+| `core/client_config_loader.py` | UPDATE — shared validation only if needed (no behavior drift) |
+| `core/target_presentation_source_identity.py` | UPDATE — reuse only if helper extraction needed |
+| `core/target_runtime_widget.py` | UPDATE — meta/warning only if projection warnings surfaced |
+| `tests/test_final_verified_primary_content_cta_projection_implementation.py` | CREATE — acceptance matrix |
+| `tests/test_s62_correction_offline.py` | UPDATE — CTA regression cases if needed |
+
+**KEEP unchanged:** `target_response_verifier.py` policy/prompts; generic `allow_cta=False` policy;
+presentation slot caps; Numeric/contact/medical gates; frozen pins.
+
+## Acceptance matrix (implementation)
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| 1 | «Я боюсь боли» free text | validated `implantation__faq__pain.md` + CTA `consult` |
+| 2 | Same from starter menu / `widget_config.json` | identical CTA to #1 |
+| 3 | Generic FAQ + valid primary + valid `cta_key`/`cta_action` | CTA shown |
+| 4 | Generic FAQ + valid primary, no CTA frontmatter | no CTA |
+| 5 | Valid answer + missing/invalid primary | answer kept; no CTA; warning |
+| 6 | Invented/secondary `used_content_ref` with CTA in other doc | no CTA |
+| 7 | Explicit service/price CTA already set | primary MD CTA does not replace |
+| 8 | Terminal / error / medical handoff / verifier block | no CTA |
+| 9 | CTA click | existing leadflow with correct variant |
+| 10 | `/ask` vs `/ask/stream` | identical `cta` + `meta.cta_key` |
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_verified_primary_content_cta_projection_governance.py -q
+
+git diff --check
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно менять Verifier policy/prompts или frozen artifacts;
+- для зелёного нужен skip/xfail/ослабление assert;
+- нужно глобально `allow_cta=True` для generic;
+- CTA берётся не из validated primary;
+- появляется regex / new selector / new route / service hardcode.
+
+## STOP (Phase 1 governance)
+
+После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
+отдельного owner GO.

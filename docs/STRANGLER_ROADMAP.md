@@ -830,6 +830,25 @@ Deliverables (Phase 1): seam audit
 
 ---
 
+## Historical — FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION (governance)
+
+**Baseline:** `codex/stage-a` @ `ce256c5`. **Authority:** forbidden in governance commit. **Live/LLM:** forbidden.
+
+Post-Verifier CTA projection for generic FullContext when validated `primary_content_ref` MD has authored
+`cta_key`/`cta_action` — without global `allow_cta=True`, without Verifier policy change, without regex/new routes.
+
+Defect: «Я боюсь боли» → `implantation__faq__pain.md` validated → `cta=null` because generic path sets
+`selected_cta_key=None` upstream.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/presentation/FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION_SEAM_AUDIT.md`),
+`TASK.md`, doc sync, PRE-CODE checker
+`tests/test_final_verified_primary_content_cta_projection_governance.py`.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+
+---
+
 ## Historical — FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE (governance)
 
 **Baseline:** `codex/stage-a` @ `7c716df` (Phase 2 `FULLCONTEXT_PRESENTATION_PARITY` complete).

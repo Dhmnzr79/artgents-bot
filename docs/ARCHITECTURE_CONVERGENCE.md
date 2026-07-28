@@ -31,6 +31,7 @@
 | **FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING** | COMPLETE @ `c4de72c` — service availability vs clinic capability |
 | **FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE** | COMPLETE @ `a1dc4f2` — shared price-only source predicate |
 | **FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING** | governance @ `a1dc4f2` — existing-scan MD + Planner boundary; implementation **STOP** |
+| **FINAL_VERIFIED_PRIMARY_CONTENT_CTA_PROJECTION** | governance @ `ce256c5` — CTA from validated primary MD after Verifier; generic `allow_cta` unchanged; implementation **STOP** |
 | PRICE_SERVICE verification matrix | not fully proven end-to-end |
 
 ## Единый pipeline (target)

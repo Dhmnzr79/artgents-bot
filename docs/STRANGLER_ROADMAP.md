@@ -716,6 +716,23 @@ convergence; cross-turn availability→price matrix (30 scenarios).
 
 ---
 
+## Active — FINAL_TEST_SUITE_CONVERGENCE (governance Phase 1)
+
+**Baseline:** `codex/stage-a` @ `1980ab7` · **NO IMPLEMENTATION / NO LIVE**
+
+Wide suite @ `1980ab7`: **185 failed** / 2993 passed. Exact dual-head audit in `drafts/`.
+Machine inventory 185/185: `docs/evidence/testing/final_test_failure_inventory.json`.
+
+Target: three suites (`current_safe_offline`, `historical_frozen_contracts`, `live_owner_gated`)
+→ aggregate `pytest tests/ -q` green. Checkpoints TSC-A..D in `TASK.md`.
+
+Deliverables: `docs/evidence/testing/FINAL_TEST_SUITE_CONVERGENCE_SEAM_AUDIT.md`,
+`docs/TEST_SUITE_ARCHITECTURE.md`, PRE-CODE `tests/test_final_test_suite_convergence_governance.py`.
+
+**Phase 1 governance only** — STOP after commit until owner GO on TSC-A.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

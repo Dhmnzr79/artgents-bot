@@ -5596,3 +5596,203 @@ python -m pytest tests/ --collect-only -q
 
 После governance commit + PRE-CODE PASS — **остановиться**. Implementation, demo MD/catalog changes,
 LIVE, E2E и Verifier changes запрещены до отдельного owner GO.
+
+---
+
+# TASK — FINAL_TEST_SUITE_CONVERGENCE (governance)
+
+**Status:** governance only · **NO IMPLEMENTATION / NO LIVE / NO LLM / NO product changes**
+
+**Baseline:** `codex/stage-a` @ `1980ab7`
+
+**Evidence:** `drafts/EXACT_WIDE_TWO_HEAD_DELTA_AUDIT.md`, `drafts/wide_two_head_delta_classification.json`
+
+**Seam audit:** `docs/evidence/testing/FINAL_TEST_SUITE_CONVERGENCE_SEAM_AUDIT.md`
+
+## Goal
+
+Перед добавлением двух новых клиник привести тестовую экосистему в понятное состояние:
+
+1. `current_safe_offline` — полностью зелёный.
+2. `historical_frozen_contracts` — зелёный отдельным набором.
+3. `pytest tests/ -q` — 0 failed (документированные live-skips только после TSC-D).
+4. Live-тесты не вызывают сеть без owner GO.
+5. Новый баг не теряется среди 185 объяснённых красных.
+
+## Proven state @ `1980ab7`
+
+| Metric | Value |
+|--------|------:|
+| Wide failures | 185 |
+| `FAIL_BOTH` | 178 |
+| New product regressions (tomography diff) | 0 |
+| Pack-drift guards | 4 (+ compact `FAIL_BOTH`) |
+| Rate-limit pollution | 16 wide / 3 isolated-green |
+| Historical inventory | 87 |
+
+Inventory: `docs/evidence/testing/final_test_failure_inventory.json` (185/185).
+
+## Target test architecture
+
+Three suites — see `docs/TEST_SUITE_ARCHITECTURE.md`:
+
+| Suite | Role |
+|-------|------|
+| **A** `current_safe_offline` | current product path, no network |
+| **B** `historical_frozen_contracts` | frozen artifact/hash contracts |
+| **C** `live_owner_gated` | dry-run/marker only in CI |
+
+## Governance deliverables (Phase 1)
+
+| File | Action |
+|------|--------|
+| `docs/evidence/testing/FINAL_TEST_SUITE_CONVERGENCE_SEAM_AUDIT.md` | CREATE |
+| `docs/evidence/testing/final_test_failure_inventory.json` | CREATE |
+| `docs/TEST_SUITE_ARCHITECTURE.md` | CREATE |
+| `tests/test_final_test_suite_convergence_governance.py` | CREATE — PRE-CODE |
+| `TASK.md` | UPDATE (this section) |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE |
+
+## Inventory action distribution
+
+| Action | Count |
+|--------|------:|
+| `FIX_HISTORICAL_CONTRACT` | 87 |
+| `UPDATE_ASSERTION` | 71 |
+| `FIX_TEST_ISOLATION` | 16 |
+| `KEEP_AS_IS` | 10 |
+| `PRODUCT_BUG_FUTURE` | 1 |
+
+## Implementation checkpoints (blocked until PRE-CODE ✅ + owner GO)
+
+### TSC-A — mutable pack guards + isolation (38)
+
+**Allowlist:**
+
+| File | Action |
+|------|--------|
+| `tests/conftest.py` | CREATE — rate-limit bucket reset fixture |
+| `tests/test_turn_planner_llm.py` | UPDATE — compact 638→661 |
+| `tests/test_target_cached_full_context.py` | UPDATE — corpus 54→55 |
+| `tests/test_demo_target_marketing_migration_audit.py` | UPDATE |
+| `tests/test_demo_target_service_catalog.py` | UPDATE — `content_ref` |
+| `tests/test_demo_target_*.py` | UPDATE — mutable hash cascade only |
+| `tests/test_final_fullcontext_dialogue_runtime_convergence_harness.py` | UPDATE — fixture hook |
+| `tests/test_s61_correction_target_runtime.py` | UPDATE — isolation |
+| `tests/test_s63_correction_offline.py` | UPDATE — isolation |
+| `tests/test_s65_authority_switch_offline.py` | UPDATE — isolation |
+| `tests/test_s69_checkpoint_a_offline.py` | UPDATE — isolation |
+| `tests/test_final_tomography_existing_scan_content_routing_implementation.py` | UPDATE — isolation |
+| `tests/test_final_service_availability_and_clinic_capability_routing_implementation.py` | UPDATE — isolation |
+
+**Delete-list:** none.
+
+**Forbidden:** `E2E_USE_TEST_CLIENT` global bypass; `RATE_LIMIT_MAX_PER_IP` change; frozen hash edits.
+
+**Acceptance:**
+
+```powershell
+python -m pytest tests/test_turn_planner_llm.py tests/test_target_cached_full_context.py tests/test_demo_target_service_catalog.py -q
+python -m pytest tests/test_s65_authority_switch_offline.py tests/test_final_tomography_existing_scan_content_routing_implementation.py -q
+```
+
+**STOP/checker:** TSC-A governance re-run; no TSC-B files.
+
+---
+
+### TSC-B — active current-runtime stale (50)
+
+**Allowlist:** inventory `checkpoint=TSC-B` files — planner contracts, pipeline signatures,
+loader guards, AC3/explicit price, S56, S61 runtime (non-429), `test_md_chunks.py`, etc.
+
+**Delete-list:** none without orphan proof.
+
+**Acceptance:**
+
+```powershell
+python -m pytest tests/test_planner_attempt_contract.py tests/test_c2d_loader_canonical_offline.py tests/test_target_cached_full_context.py -q
+```
+
+**STOP:** if frozen artifact change required.
+
+---
+
+### TSC-C — historical/frozen repair (87)
+
+**Allowlist:**
+
+| File | Action |
+|------|--------|
+| `tests/test_patient_scope_shadow_eval_contract.py` | UPDATE — versioned loader |
+| `tests/test_patient_scope_shadow_eval_v2_contract.py` | UPDATE |
+| `tests/test_preservation_eval_contract.py` | UPDATE |
+| `tests/test_fullcontext_quality_eval_harness.py` | UPDATE |
+| `tests/test_fullcontext_response_eval_harness.py` | UPDATE |
+| `tests/test_fullcontext_verifier_replay_harness.py` | UPDATE |
+| `tests/test_a9r2_scorer_correction_offline.py` | UPDATE |
+| `tests/test_a9r2b_metric_correction_offline.py` | UPDATE |
+| `evals/v5/*` harness shims | CREATE as needed |
+
+**Forbidden:** frozen artifact bytes/hashes; skip/xfail; product runtime change.
+
+**Acceptance:**
+
+```powershell
+python -m pytest tests/test_patient_scope_shadow_eval_contract.py tests/test_preservation_eval_contract.py -q
+```
+
+---
+
+### TSC-D — CI, markers, aggregate closeout
+
+**Allowlist:**
+
+| File | Action |
+|------|--------|
+| `pyproject.toml` or `pytest.ini` | CREATE/UPDATE — markers, testpaths |
+| `.github/workflows/ci.yml` | UPDATE — layered commands |
+| `docs/TEST_SUITE_ARCHITECTURE.md` | UPDATE |
+| `tests/test_final_scope_widget_e2e_live_harness.py` | UPDATE markers only |
+| live harness marker tests | UPDATE markers only |
+
+**Proposed CI commands (document only in Phase 1):**
+
+```powershell
+# Layer A (post-markers)
+python -m pytest tests/ -m current_safe_offline -q
+# Layer B
+python -m pytest tests/ -m historical_frozen_contracts -q
+# Layer C dry-run
+python -m pytest tests/ -m live_owner_gated -q
+# Aggregate
+python -m pytest tests/ -q
+```
+
+**Acceptance:** `pytest tests/ -q` → 0 failed.
+
+## Test commands (Phase 1)
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_test_suite_convergence_governance.py -q
+
+# Inventory sanity (read-only)
+python -c "import json; d=json.load(open('docs/evidence/testing/final_test_failure_inventory.json')); assert d['failure_count']==185"
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне checkpoint allowlist;
+- нужно изменить frozen artifact/hash/matrix;
+- для зелёного нужен skip/xfail/ослабление assert;
+- нужно ослабить product rate limiter;
+- нужно менять product code/data для historical green;
+- появляется catalog-wide `--ignore` на `tests/**`.
+
+## STOP (Phase 1)
+
+После governance commit + PRE-CODE PASS + push — **остановиться**. TSC-A..D implementation
+запрещена до отдельного owner GO.

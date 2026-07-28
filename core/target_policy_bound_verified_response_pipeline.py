@@ -33,6 +33,9 @@ from core.target_spec_offline_response_package import (
     TargetSpecBoundOfflineResponsePackage,
     assemble_target_spec_offline_response_package,
 )
+from core.target_verified_primary_content_cta_projection import (
+    project_verified_primary_content_cta,
+)
 from core.target_verified_response_pipeline import (
     run_target_offline_verified_response_pipeline,
 )
@@ -171,6 +174,11 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         semantic_backend=semantic_backend,
         contact_fields=contact_fields,
         client_id=client_id,
+    )
+    verified = project_verified_primary_content_cta(
+        verified,
+        client_id=client_id,
+        md_root=md_root,
     )
     return verified, extract_target_session_selection(bound_package)
 

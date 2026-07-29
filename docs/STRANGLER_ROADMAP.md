@@ -843,17 +843,21 @@ to be happening. Goal: determine whether it's safe and measurable to deliberatel
 user traffic arrives, without ever risking that a warming call sends a different prefix than the real
 call would.
 
-Audit finding: **prefix identity is provable from code** — a prewarm call built by reusing
+Audit finding: **prefix content identity is provable from code** — a prewarm call built by reusing
 `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim (never a parallel implementation)
-sends byte-identical leading bytes to a real call. Composer and Verifier are **proven separate cache
+sends the identical message/token leading content to a real call (not a claim of HTTP wire-byte
+identity, which this codebase doesn't control). Composer and Verifier are **proven separate cache
 namespaces** (their message arrays diverge starting at the system message, not just as a cautious
-default). What is **not** provable without a live call — the provider's cache TTL, exact hit behavior,
-model-alias stability — is explicitly documented as unknown, not guessed. No explicit provider
-cache-registration API exists (ruled out). Selected: **B (owner-controlled CLI) + C (guarded async
-startup hook, default OFF)** — D (lazy post-first-request warming) was rejected for having the weakest
-real incremental value, since ordinary consecutive turns already appear to implicitly warm each other.
-Two-gate rollout: implementation GO, then a **separate** owner LIVE/LLM permission before first real
-activation — the same pattern already used for A9/S66.
+default). The cache itself is **provider-side state at DashScope/Qwen, not process-local** — a Flask
+restart does not by itself cold it. What is **not** provable without a live call — the provider's cache
+TTL, exact hit behavior, model-alias stability — is explicitly documented as unknown, not guessed. No
+explicit provider cache-registration API exists (ruled out). Selected: **only B (owner-controlled CLI)**
+— automatic startup prewarm (Option C) is explicitly **deferred to a separate future milestone**,
+contingent on the CLI's own measured live results; no `app.py` change, no runtime flag, no background
+hook in this milestone. D (lazy post-first-request warming) was rejected for having the weakest real
+incremental value, since ordinary consecutive turns already appear to implicitly warm each other.
+Two-gate rollout: implementation GO for the CLI, then a **separate** owner LIVE/LLM permission before
+first real `--live` activation — the same pattern already used for A9/S66.
 
 Deliverables (Phase 1): seam audit
 (`docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`), `TASK.md`, doc sync,

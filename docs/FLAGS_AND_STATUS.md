@@ -198,9 +198,10 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    безопасно и измеримо прогревать provider prompt cache для статических Composer/Verifier-префиксов.
    Seam audit доказывает **prefix identity** из кода (Composer и Verifier — доказанно разные namespaces,
    расходятся с первого символа system-сообщения); TTL и реальное cache-hit поведение provider'а остаются
-   неизвестными без live-вызова. Выбран вариант **B+C** (owner-controlled CLI + guarded async startup
-   hook, default OFF), с двумя воротами: owner GO на implementation, и отдельное owner LIVE/LLM
-   разрешение перед первой реальной активацией. Seam audit:
+   неизвестными без live-вызова. Выбран вариант **только B** (owner-controlled CLI перед demo/deploy) —
+   automatic startup prewarm (C) отложен в отдельный future milestone до измеренных результатов CLI, без
+   изменений `app.py`. С двумя воротами: owner GO на implementation CLI, и отдельное owner LIVE/LLM
+   разрешение перед первой `--live` активацией. Seam audit:
    `docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`.
    Implementation **STOP** until PRE-CODE ✅ + owner GO.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.

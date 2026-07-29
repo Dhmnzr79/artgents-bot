@@ -1,13 +1,19 @@
 """PRE-CODE checker for FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3 (Phase 1 only).
 
-Enforces: governance-only phase (no product prewarm modules exist yet, no provider calls
-of any kind), the seam audit proves prefix identity via verbatim reuse of the existing
-Composer/Verifier message builders (not a parallel implementation), the fingerprint design
-covers all required components with self-updating content hashes, Composer/Verifier are
-proven-separate namespaces, fail-open/retry=0/hard-budget/no-import-time-call rules are
-documented, no PII/session/answer-cache, log_llm_usage reuse (no second usage logger), the
-two-gate rollout (implementation GO + separate LIVE/LLM permission) is documented, and the
-exact Phase 2 allowlist is present.
+Covers the governance correction (manual CLI only): Phase 2 scope is narrowed to Option B
+(owner-controlled CLI) alone -- Option C (automatic startup prewarm) is explicitly deferred
+to a separate future milestone, with no app.py change, no runtime flag, and no startup/
+background hook anywhere in this milestone's implementation allowlist. Provider cache
+terminology is corrected (provider-side state at DashScope/Qwen, not process-local; a Flask
+restart does not by itself cold the provider's cache). The fingerprint design includes an
+explicit, directly-verifiable static-prefix hash. Duplicate-run protection is a file-based
+exclusive attempt ledger (correct for a short-lived CLI process), not an in-memory counter.
+Also enforces: no product prewarm/CLI modules exist yet, no provider calls of any kind, the
+seam audit proves prefix identity via verbatim reuse of the existing Composer/Verifier
+message builders, Composer/Verifier are proven-separate namespaces, live budget <= 2 with
+retry=0 and abort-on-mismatch, dry-run makes zero provider calls, no PII/session/
+answer-cache, log_llm_usage reuse (no second usage logger), and the two-gate rollout
+(implementation GO + separate future LIVE/LLM permission) is documented.
 """
 
 from __future__ import annotations
@@ -55,6 +61,14 @@ def _task_section() -> str:
     return TASK_PATH.read_text(encoding="utf-8").split(TASK_HEADER)[-1]
 
 
+def _implementation_allowlist_block(section: str) -> str:
+    """Text of the '## Allowlist (implementation ...)' subsection only."""
+    start = section.index("## Allowlist (implementation")
+    rest = section[start:]
+    next_header = rest.index("\n## ", 1)
+    return rest[:next_header]
+
+
 def test_seam_audit_exists_and_covers_required_sections() -> None:
     assert SEAM_AUDIT_PATH.is_file()
     text = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
@@ -73,19 +87,23 @@ def test_seam_audit_exists_and_covers_required_sections() -> None:
         "fail-open",
         "retry=0",
         "MESSAGE_SERIALIZATION_VERSION",
+        "static_prefix_hash",
+        "ledger",
+        "--live",
         "STOP",
     ):
         assert phrase in text, phrase
     for section in (
+        "## Governance correction",
         "## 1. Producer/consumer map",
         "## 2. Exact current Composer message prefix",
         "## 3. Exact current Semantic Verifier message prefix",
         "## 4. Static/dynamic boundary",
         "## 5. Cache-key / fingerprint design",
         "## 6. Invalidation table",
-        "## 7. What a prewarm call would actually send",
+        "## 7. What the CLI actually sends and records",
         "## 8. What the provider actually caches",
-        "## 9. Deployment / reloader / multi-worker audit",
+        "## 9. Deployment / reloader / multi-worker",
         "## 10. Cost / call budget",
         "## 11. Failure semantics",
         "## 12. Options comparison (A–E)",
@@ -109,14 +127,25 @@ def test_composer_verifier_separate_namespaces_proven() -> None:
     assert "diverge" in text.lower()
 
 
+def test_provider_cache_not_called_process_local() -> None:
+    """Governance correction: cache is provider-side (DashScope/Qwen), not process-local;
+    a Flask restart does not by itself cold the cache."""
+    text = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    normalized = " ".join(text.split()).lower()
+    assert "provider-side" in normalized
+    assert "not process-local" in normalized or "not anything local to this" in normalized
+    assert "does not, by itself" in normalized or "does not by itself" in normalized
+
+
 def test_fingerprint_components_documented() -> None:
     section = _task_section()
     for phrase in (
         "client_id",
         "model",
         "role",
+        "static_prefix_hash",
         "corpus",
-        "sha256",
+        "PROMPT_TEMPLATE_VERSION",
         "MESSAGE_SERIALIZATION_VERSION",
     ):
         assert phrase in section, phrase
@@ -130,16 +159,24 @@ def test_ttl_and_model_alias_explicitly_flagged_unknown() -> None:
     assert "not assumed" in text.lower() or "not invent" in text.lower() or "not guessed" in text.lower()
 
 
-def test_import_time_and_reloader_rules_documented() -> None:
-    section = _task_section()
-    combined = section.lower()
-    for phrase in (
-        "_startup_check",
-        "__main__",
-        "werkzeug_run_main",
-        "gunicorn",
-    ):
+def test_deployment_concerns_deferred_with_option_c() -> None:
+    """Reloader/multi-worker/import-time concerns are documented as out of scope for this
+    CLI-only milestone, deferred alongside Option C -- not solved now, not silently dropped."""
+    text = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    combined = text.lower()
+    assert "not in scope for this milestone" in combined
+    assert "deferred" in combined
+    for phrase in ("_startup_check", "werkzeug_run_main", "gunicorn"):
         assert phrase in combined, phrase
+
+
+def test_option_c_deferred_not_selected() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        assert "DEFERRED" in text, label
+        lowered = text.lower()
+        assert "separate future milestone" in lowered, label
 
 
 def test_fail_open_retry_zero_and_hard_budget_documented() -> None:
@@ -148,6 +185,22 @@ def test_fail_open_retry_zero_and_hard_budget_documented() -> None:
     assert "fail-open" in combined
     assert "retry=0" in combined or "retry = 0" in combined
     assert "budget" in combined
+    assert "максимум 2" in section or "max" in combined
+
+
+def test_live_budget_and_exclusive_ledger_documented() -> None:
+    section = _task_section()
+    combined = section.lower()
+    assert "ledger" in combined
+    assert "exclusive" in combined
+    assert "1 composer" in combined or "1 verifier" in combined
+
+
+def test_dry_run_zero_calls_documented() -> None:
+    section = _task_section()
+    combined = section.lower()
+    assert "dry-run" in combined
+    assert "ноль раз" in section or "zero" in combined
 
 
 def test_no_pii_session_or_answer_cache_documented() -> None:
@@ -215,22 +268,17 @@ def test_acceptance_matrix_documented() -> None:
     for n in range(1, 25):
         assert f"| {n} |" in audit, n
     for label in (
-        "cold request",
-        "warm cache hit",
-        "cache miss after corpus change",
-        "composer/verifier namespaces",
-        "duplicate",
-        "reloader",
-        "multiworker",
-        "fail-open",
-        "retry=0",
-        "hard call budget",
-        "zero real provider calls",
-        "dry-run",
-        "pii",
-        "answer persistence",
-        "cached_tokens",
-        "stale fingerprint",
+        "dry-run mode",
+        "composer warm call",
+        "verifier warm call",
+        "total call budget",
+        "exclusive attempt ledger",
+        "warm response content discarded",
+        "namespaces proven distinct",
+        "message/token prefix identity",
+        "no pii/session",
+        "automatic startup prewarm not exercised",
+        "stale fingerprint never considered warm",
     ):
         assert label.lower() in audit.lower(), label
 
@@ -241,10 +289,21 @@ def test_implementation_allowlist_present() -> None:
         "contracts/target_prompt_cache_fingerprint.py",
         "core/target_prompt_cache_prewarm.py",
         "scripts/prewarm_prompt_cache.py",
-        "app.py",
         "tests/test_final_provider_prompt_cache_prewarm_implementation.py",
     ):
         assert path in section, path
+
+
+def test_no_app_py_or_runtime_flag_in_implementation_allowlist() -> None:
+    """Governance correction: app.py, startup hooks, and runtime flags are explicitly out
+    of this milestone's implementation allowlist -- only Option C's separate future
+    milestone would touch those."""
+    section = _task_section()
+    block = _implementation_allowlist_block(section)
+    assert "| `app.py`" not in block
+    assert "PROMPT_CACHE_PREWARM_ENABLED" not in section
+    assert "Explicitly NOT in this allowlist" in section
+    assert "app.py" in section  # present only in the explicit exclusion/STOP prose, not the table
 
 
 def test_composer_verifier_source_files_kept_unchanged_in_phase1_docs() -> None:

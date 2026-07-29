@@ -10,15 +10,46 @@ even after implementation lands, first real activation against the provider requ
 LIVE/LLM owner permission (see §8) — the same two-gate pattern already used elsewhere in this codebase
 for other live-provider milestones.
 
+## Governance correction (this revision, @ `552c2ce` → correction)
+
+The initial revision of this audit selected **B + C** for Phase 2 (owner-controlled CLI *and* an
+automatic async startup hook wired into `app.py`, gated by a runtime env flag). The owner correctly
+narrowed this: Phase 2 now covers **only Option B** — a manual, owner-controlled CLI. Option C (automatic
+startup prewarm) is **deferred** to a separate future milestone, to be considered only after the CLI's
+own measured results (real `cached_tokens`/duration evidence, not just "the call fired") justify the
+larger engineering surface (`app.py` changes, reloader guard, runtime flag, background thread). This
+revision also:
+
+1. Corrects cache-locality terminology throughout (§8) — the provider's prompt cache lives at
+   DashScope/Qwen, not inside this process; a Flask process restart does not, by itself, necessarily
+   cold the cache (the cache is not process state).
+2. Softens the "byte-identical" claim to what can actually be proven and controlled: **identical
+   message/token prefix** — i.e., the same Python message-list content, built via the same functions, up
+   to the dynamic boundary. This audit does not claim wire-byte HTTP-request identity, since the SDK's
+   own request serialization is not something this codebase controls or inspects.
+3. Redesigns the fingerprint (§5) to include an explicit, directly-verifiable **static-prefix hash** (a
+   hash of the actual assembled static prefix text itself), in addition to the corpus hash and version
+   markers.
+4. Replaces the in-process budget counter (only meaningful for a long-running server process) with a
+   **file-based exclusive attempt ledger** (§7, §10) — correct for a CLI that runs as a fresh, short-lived
+   process each invocation, with no shared memory between runs.
+5. Narrows the Phase 2 implementation allowlist (§13) to remove `app.py` and any startup/runtime-flag
+   component entirely — nothing in Phase 2 touches the running application.
+
+No other section's core finding changed: prefix identity (in the corrected, honest sense above) is still
+provable from code (§2-§7); Composer and Verifier are still proven-separate namespaces (§3); the TTL and
+actual cache-hit behavior are still unknown and not guessed (§8).
+
 ## Governing principle (binding, restated)
 
-**Do not implement prewarm until it is proven that the warming request produces the exact same cache
-key/prefix that a real later Composer or Verifier call would use.** This audit's job in Phase 1 is to
-prove — from code, not from a live experiment — that a prewarm call CAN be built to send byte-identical
-leading bytes to what production Composer/Verifier calls send. It is **not** this phase's job to prove the
-provider actually returns a cache hit for that prefix (that requires a live measurement, which this phase
-forbids) — that empirical proof is deferred to Phase 2's own cold/warm instrumentation, itself gated behind
-a separate LIVE/LLM permission before ever running for real (§8, §9).
+**Do not implement prewarm until it is proven that the warming request produces the same message/token
+prefix that a real later Composer or Verifier call would use.** This audit's job in Phase 1 is to prove —
+from code, not from a live experiment — that a prewarm call CAN be built to send the identical leading
+message content that production Composer/Verifier calls send, by reusing the exact same message-builder
+functions rather than a parallel implementation. It is **not** this phase's job to prove the provider
+actually returns a cache hit for that prefix (that requires a live measurement, which this phase forbids)
+— that empirical proof is deferred to the CLI's own live mode, itself gated behind a separate LIVE/LLM
+permission before ever running for real (§8, §9).
 
 ## 1. Producer/consumer map
 
@@ -48,9 +79,9 @@ Static corpus source (shared by both):
     → TargetCachedFullContext(corpus_text, document_count, document_paths, sha256)  [contracts/target_cached_full_context.py:8-15]
   core/target_runtime_client_context.py: load_target_runtime_client_context(client_id) [154-163]
     → process-level cache: _CONTEXT_CACHE: dict[str, TargetRuntimeClientContext] = {}  [line 37]
-    → built ONCE per client_id per process (lazy, on first use), never rebuilt unless
-      clear_target_runtime_client_context_cache() is called — and that helper is called
-      ONLY from tests/evals (11 files), never from application/route code [target_runtime_client_context.py:166-170]
+    → built ONCE per client_id per process (lazy, on first use). This is a LOCAL, in-process
+      memoization of file-read work — it has nothing to do with the PROVIDER's own prompt cache
+      (§8); do not conflate the two.
 
 Provider client (shared singleton, both stages):
   llm.py:33-37 — chat_client = OpenAI(**_chat_client_kwargs); client = chat_client
@@ -58,7 +89,7 @@ Provider client (shared singleton, both stages):
   llm.py:60-63 — chat_completions_create(*, model, **kwargs) wraps chat_client.chat.completions.create(...)
   Provider: OpenAI-compatible SDK pointed at DashScope/Qwen (config.py:11-18); models are plain
     env-configurable strings (config.py:26-28, `QWEN_PLUS_MODEL = "qwen3.7-plus"`), not aliases
-    documented anywhere in this repo as pinned-vs-rolling (§18 unknown, flagged not invented).
+    documented anywhere in this repo as pinned-vs-rolling (§8 unknown, flagged not invented).
 
 Usage/observability (shared, reused, not re-implemented — see §9):
   logging_setup.py:272-288 — log_llm_usage(logger, resp, *, call_type: str, model: str | None = None,
@@ -93,10 +124,11 @@ Two messages, built by `build_composer_sdk_messages` (`core/target_runtime_llm_m
 under `md_root`, sorted by canonical relative POSIX path, each wrapped
 `---BEGIN DOC:{path}---\n{content}\n---END DOC:{path}---`, joined with `"\n"` — no session state, user
 identity, or date/time interpolated. For `clients/demo/md/` (55 files): **~102,489 characters** of corpus
-text. Combined with the system policy: **~106,000 characters (~26,500 tokens)** of byte-stable static
-prefix per client_id, versus an estimated **1–5 KB** of dynamic per-turn tail — the static prefix
-dominates total prompt size by roughly 20–100×, which is exactly the size profile prefix-caching
-economics are built for, IF the prefix is truly reused byte-for-byte across calls.
+text. Combined with the system policy: **~106,000 characters (~26,500 tokens)** of stable static-prefix
+message content per client_id, versus an estimated **1–5 KB** of dynamic per-turn tail — the static
+prefix dominates total prompt size by roughly 20–100×, which is exactly the size profile prefix-caching
+economics are built for, IF the provider genuinely reuses the cached prefix across calls (unconfirmed
+without a live measurement, §8).
 
 ## 3. Exact current Semantic Verifier message prefix — and why it needs its own namespace
 
@@ -112,19 +144,19 @@ Two messages, built by `build_verifier_sdk_messages` (`core/target_runtime_llm_m
     STATIC leading segment:
       "Assess the candidate answer using the inputs below.\n\n"
       "CACHED_FULL_CONTEXT:\n"
-      + corpus_text                                          ← same corpus_text object, byte-identical
+      + corpus_text                                          ← same corpus_text object/content
     DYNAMIC tail: RESPONSE_SPEC_JSON / PRIMARY_EVIDENCE_JSON / CANDIDATE_TEXT (per-turn).
 ```
 
 **Confirmed empirically, not assumed: Composer and Verifier do NOT share a reusable cache prefix,
-despite sharing byte-identical `corpus_text`.** Both message arrays diverge starting at `message[0]`
+despite sharing identical `corpus_text` content.** Both message arrays diverge starting at `message[0]`
 (different system policy text) and diverge again at the very start of `message[1]` (`"Compose the
 patient-facing answer..."` vs `"Assess the candidate answer..."`, plus Composer's extra
 `"Return strict JSON only: ..."` block that appears *before* `CACHED_FULL_CONTEXT:` and Verifier does not
-have). Provider prefix-caching matches from the *start* of the request; since the very first bytes differ,
-a prewarm of Composer's prefix cannot produce a cache hit for Verifier's later call, or vice versa — **two
-independent namespaces are required, confirming rule 13 as a proven fact for this codebase, not merely a
-cautious default.**
+have). Any provider prefix-matching necessarily matches from the *start* of the request; since the very
+first characters differ, a prewarm of Composer's prefix cannot produce a cache hit for Verifier's later
+call, or vice versa — **two independent namespaces are required, confirmed as a proven fact for this
+codebase, not merely a cautious default.**
 
 ## 4. Static/dynamic boundary (summary table)
 
@@ -132,23 +164,23 @@ cautious default.**
 |---|---|---|---|
 | System policy text | `TARGET_COMPOSER_SYSTEM_POLICY` | `TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY` | Static, but role-specific (no shared text) |
 | User-message preamble | `"Compose the patient-facing answer..."` + `"Return strict JSON only:..."` | `"Assess the candidate answer..."` | Static, role-specific |
-| `CACHED_FULL_CONTEXT:\n` + corpus_text | same corpus object | same corpus object | Static, per-`client_id`, process-lifetime-stable |
+| `CACHED_FULL_CONTEXT:\n` + corpus_text | same corpus content | same corpus content | Static, per-`client_id`, stable until the underlying `.md` files change |
 | Everything after corpus_text | directives/action/evidence/user_message | spec/evidence/candidate_text | Dynamic, per-turn |
 | Model string | `target_fullcontext_composer_model()` | `target_fullcontext_verifier_model()` | Static per process/env, role-specific |
 
 **No PII, session state, or user text of any kind appears anywhere in the static portion** — confirmed by
 construction (`corpus_text` is pure file content; the preambles are fixed literals) — satisfying rule 5
-trivially for the prewarm design, provided the prewarm implementation only ever sends the static portion
-plus a fixed, non-PII placeholder for the dynamic tail's required template fields (§7).
+trivially for the prewarm design, provided the CLI only ever sends the static portion plus a fixed,
+non-PII placeholder for the dynamic tail's required template fields (§7).
 
 ## 5. Cache-key / fingerprint design (local bookkeeping only — not sent to the provider)
 
-**Important distinction:** the fingerprint below is a *local* construct our own code uses to decide "have I
-already warmed this exact prefix recently, should I bother sending it again." It is never transmitted to
-the provider — the provider's own cache matching (whatever it is; unconfirmed, §8) is presumably purely
-byte-content-based on the request it actually receives.
+**Important distinction:** the fingerprint below is a *local* construct the CLI uses to decide "have I
+already warmed this exact prefix, should I attempt it again." It is never transmitted to the provider —
+the provider's own cache matching (whatever it actually is; unconfirmed, §8) is presumably based on the
+bytes of the request it actually receives, independent of any local bookkeeping concept.
 
-No existing single fingerprint covers "everything that determines this static prefix's bytes." What
+No existing single fingerprint covers "everything that determines this static prefix's content." What
 already exists: `TargetCachedFullContext.sha256` (`contracts/target_cached_full_context.py:15`) — SHA-256
 of `corpus_text` only — and `TargetRuntimeClientContext.cache_key` (`core/target_runtime_client_context.py:73-75`,
 `f"{self.client_id}:{self.cached_full_context.sha256}"`) — the closest existing precedent, but it doesn't
@@ -156,63 +188,118 @@ cover the system policy text, the template wording, or the model string. **Nothi
 versions `TARGET_COMPOSER_SYSTEM_POLICY`, `TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY`, or the message
 templates** (confirmed by grep for `POLICY_VERSION`/`policy_version` — no matches).
 
-**Designed fingerprint (Phase 2, not built in this governance phase):**
+**Designed fingerprint (Phase 2, not built in this governance phase) — governance correction: now
+includes an explicit, directly-verifiable static-prefix hash, not just component hashes:**
 
 ```text
+static_prefix_text =                    # the ACTUAL assembled static prefix, built by calling the
+    system_policy_text                  # real build_*_sdk_messages() function and slicing its output
+    + preamble_template_text            # up to (not including) the dynamic tail -- never hand-assembled
+    + corpus_text                       # separately from what production code would build
+
+static_prefix_hash = sha256(static_prefix_text)   # the PRIMARY, directly-verifiable proof: if two
+                                                    # fingerprints share this hash, the actual prefix
+                                                    # content sent is guaranteed identical
+
 TargetPromptCacheFingerprint = sha256(
     client_id
     + "|" + role                          # "composer" | "verifier" — literal, never a third value
     + "|" + model                         # the exact model string passed to chat_completions_create
-    + "|" + corpus_sha256                 # TargetCachedFullContext.sha256 — already exists, reused verbatim
-    + "|" + sha256(system_policy_text)    # hash of the LIVE string constant at prewarm time — self-updating;
-                                           # if the policy text changes for ANY reason, this changes too,
-                                           # without needing a developer to remember to bump a version int
-    + "|" + sha256(preamble_template_text)  # same self-updating principle for the static preamble text
-    + "|" + str(MESSAGE_SERIALIZATION_VERSION)  # a small manually-bumped int (mirrors the existing
-                                           # BOT_EVENTS_SCHEMA_VERSION pattern, logging_setup.py:27) —
-                                           # catches STRUCTURAL changes (field order, message count,
-                                           # role list) that content-hashing the template STRING alone
-                                           # would not catch if the assembly *code* changes without the
-                                           # template *text* changing
+    + "|" + static_prefix_hash            # PRIMARY proof of prefix identity (above)
+    + "|" + corpus_sha256                 # TargetCachedFullContext.sha256 -- kept for readable,
+                                           # independently-checkable invalidation granularity even
+                                           # though it's already subsumed by static_prefix_hash
+    + "|" + str(PROMPT_TEMPLATE_VERSION)        # small manually-bumped int, human-readable version
+                                                  # marker (mirrors BOT_EVENTS_SCHEMA_VERSION,
+                                                  # logging_setup.py:27) -- auditability, even though
+                                                  # static_prefix_hash already catches wording changes
+    + "|" + str(MESSAGE_SERIALIZATION_VERSION)  # separate small manually-bumped int -- catches
+                                           # STRUCTURAL changes (field order, message count, role
+                                           # list) that hashing the assembled TEXT alone would not
+                                           # catch if the assembly *code* changes without the
+                                           # resulting *text* changing
 )
 ```
 
-Hashing the live string content (rather than requiring a manually-maintained policy version) means the
-fingerprint is self-invalidating for the two most likely real-world change vectors (editing the policy
-prose, editing the corpus) without relying on developer discipline to remember a version bump — while the
-explicit `MESSAGE_SERIALIZATION_VERSION` int is the deliberate, rule-18-compliant escape hatch for the one
-class of change that content-hashing cannot catch on its own (restructuring the assembly code itself).
+`static_prefix_hash` is the primary, self-updating proof (if the policy prose, preamble wording, or
+corpus content changes for any reason, this hash changes automatically, with no developer action
+required). The two explicit version ints exist for human auditability and for the one class of change
+content-hashing cannot catch on its own (restructuring the assembly code without changing the resulting
+text) — an explicit escape hatch, not an assumption.
 
-## 6. Invalidation table
+## 6. Invalidation table — cold/miss triggers (corrected terminology)
 
-| Component change | Fingerprint changes? | Mechanism |
+The provider's cache is **provider-side state** (at DashScope/Qwen), not something this process owns or
+controls. A Flask process restart does **not**, by itself, necessarily make the provider's cache cold —
+the provider may still recognize a previously-seen prefix regardless of which local process sends it
+again. Cache miss/cold state can genuinely occur from:
+
+| Trigger | Local fingerprint changes? | Mechanism |
 |---|---|---|
-| `clients/{id}/md/*.md` content edited | Yes | `corpus_sha256` changes |
-| `TARGET_COMPOSER_SYSTEM_POLICY` text edited | Yes (Composer only) | `sha256(system_policy_text)` changes |
-| `TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY` text edited | Yes (Verifier only) | same, role-scoped |
-| `_COMPOSER_USER_TEMPLATE` / `_VERIFIER_USER_TEMPLATE` preamble wording edited | Yes | `sha256(preamble_template_text)` changes |
-| Message-list structure changed (field order, message count, role list) without template text changing | **Only if a developer manually bumps `MESSAGE_SERIALIZATION_VERSION`** | explicit int; documented as a required manual step in the Phase 2 allowlist, not automatic |
-| `TARGET_FULLCONTEXT_COMPOSER_MODEL` / `_VERIFIER_MODEL` env var changed | Yes | `model` string changes |
+| Provider-side cache TTL expiry (duration unknown, §8) | No — fingerprint stays the same | Not detectable locally at all; only a live measurement (`cached_tokens`) reveals this |
+| Provider-side cache cleared/changed by the vendor | No — fingerprint stays the same | Same as above — genuinely invisible to this codebase |
+| `TARGET_FULLCONTEXT_COMPOSER_MODEL` / `_VERIFIER_MODEL` env var changed | Yes | `model` string differs |
+| `TARGET_COMPOSER_SYSTEM_POLICY` / `TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY` text edited | Yes | `static_prefix_hash` differs (and `PROMPT_TEMPLATE_VERSION` should be bumped manually for auditability) |
+| `_COMPOSER_USER_TEMPLATE` / `_VERIFIER_USER_TEMPLATE` preamble wording edited | Yes | `static_prefix_hash` differs |
+| `clients/{id}/md/*.md` content edited | Yes | `static_prefix_hash` AND `corpus_sha256` both differ |
+| Message-list structure changed (field order, message count, role list) without template text changing | **Only if a developer manually bumps `MESSAGE_SERIALIZATION_VERSION`** | explicit int; a required manual step, not automatic |
 | `client_id` changes | Yes | different fingerprint entirely — separate namespace by construction |
 | Composer vs Verifier | Always different | `role` literal differs; §3 proves no shared prefix regardless |
-| Process restart with unchanged files | **No** | fingerprint is deterministic over content, not over process identity — this is intentional, not a gap |
+| Process restart with unchanged files | **No local change** — but whether the PROVIDER still has it warm is unknown (see TTL row above) | fingerprint is deterministic over content, not over process identity — this is intentional, and it does NOT imply the provider is still warm |
 
-## 7. What a prewarm call would actually send
+**Key correction:** a locally-unchanged fingerprint does not prove the provider cache is still warm (TTL
+is unknown) — it only proves the CLI would send the identical prefix content if run again. Warmth itself
+can only be confirmed by an actual live measurement's `cached_tokens` result.
+
+## 7. What the CLI actually sends and records
 
 Reusing `build_composer_sdk_messages`/`build_verifier_sdk_messages` **verbatim, unmodified** (never
-hand-rolling a parallel prefix string) is the only way to *guarantee* byte-identical bytes to what a real
-Composer/Verifier call sends — this is the core of "proving the same cache key/prefix," per the governing
-principle. Since provider prefix-caching (whatever the actual provider mechanism is) matches from the
-*start* of the request, the dynamic tail's exact content does not need to be real: a prewarm call can
-supply a fixed, static, non-PII placeholder for `response_directives_json`/`primary_evidence_json`/
-`governed_action_context_json`/`user_message` (e.g., empty JSON objects and an empty string) built through
-the *same* `TargetComposerInvocation`/`TargetSemanticVerifierInvocation` dataclasses and the *same*
+hand-rolling a parallel prefix string) is the only way to guarantee the CLI's prewarm call carries the
+identical message/token content that a real Composer/Verifier call would send, up to the dynamic
+boundary — this is the core of "proving the same prefix," per the governing principle, stated honestly:
+this is message-content identity, not a claim about HTTP wire-level byte identity (the SDK's own request
+serialization is outside this codebase's control or inspection, per the governance correction).
+
+Since any provider-side prefix matching would necessarily match from the *start* of the request, the
+dynamic tail's exact content does not need to be real: the CLI supplies a fixed, static, non-PII
+placeholder for `response_directives_json`/`primary_evidence_json`/`governed_action_context_json`/
+`user_message` (e.g., empty JSON objects and an empty string) built through the *same*
+`TargetComposerInvocation`/`TargetSemanticVerifierInvocation` dataclasses and the *same*
 `build_*_sdk_messages` functions — never inventing a second message-assembly code path. This automatically
 satisfies rule 5 (no user text/SID/session/PII/phone — the placeholder is a fixed constant, never derived
 from any real request) and rule 6 (only the static approved prefix is meaningfully "warmed"; the
 placeholder tail is not content anyone cares about caching).
 
+**Dry-run mode (default, zero provider calls):** loads the real client pack via the existing
+`load_target_runtime_client_context(client_id)`, builds the real Composer/Verifier messages via the real
+`build_*_sdk_messages` functions, computes the fingerprint (§5), and prints **only**: `client_id`, `role`,
+`model`, `static_prefix_hash`, `corpus_sha256`, prefix length (characters) and an estimated token count,
+and the composite fingerprint. It never prints `corpus_text` itself, any synthetic answer, contact
+information, or any other client-pack content — only hashes and small scalar metadata.
+
+**Live mode (`--live`, explicit, separate owner GO required):** before any attempt-marker write or
+provider call, performs a preflight check comparing the freshly-computed fingerprint against an
+operator-supplied expected model/fingerprint value; aborts immediately on any mismatch (§10, §11). On
+match, writes an **exclusive attempt ledger entry** (a file created with exclusive-create/`O_EXCL`
+semantics, keyed by `(client_id, role, fingerprint)`) *before* calling the provider — a second CLI
+invocation for the same key, whether accidental (operator re-running the script) or concurrent (two
+operators), finds the ledger entry already present and refuses to place a duplicate call. This is the
+correct mechanism for a short-lived CLI process (no shared in-process memory between invocations), unlike
+an in-memory counter, which would only work for a long-running server process.
+
+**Warm response handling (rule 8):** the provider's actual response content (the composed answer text /
+verifier issues JSON) is **discarded** immediately after the usage object is read — never written to
+session, never shown to any user, never persisted anywhere as answer text. Only anonymized
+usage/result metadata is recorded in the ledger: `client_id`, `role`, `model`, fingerprint, timestamp,
+`cached_tokens` (if the provider reports it), and success/failure status. This is not an answer-cache and
+never becomes one.
+
 ## 8. What the provider actually caches, and what remains genuinely unknown
+
+**Corrected terminology:** the cache being discussed is **provider-side state at DashScope/Qwen**, not
+anything local to this Flask process. `_CONTEXT_CACHE` (§1) is a separate, unrelated, purely local
+memoization of file-read work — conflating the two would be a real design error, which this correction
+exists partly to prevent.
 
 `cached_tokens` (`usage.prompt_tokens_details.cached_tokens`, read at `logging_setup.py:238-248`) has
 already been observed in real production usage logs for this exact message shape, per the owner's own
@@ -223,97 +310,83 @@ own docstring (lines 17-18) already anticipated this exact gate: *"This module p
 provider prompt prefix candidate. Provider-side prompt caching is a separate future live integration gate
 and is **not** implemented here."*
 
-**What this audit can prove from code alone (Phase 1, no live calls):** that a prewarm call built via §7
-sends byte-identical leading bytes to a real later call, for a provably-static prefix (§2-§4), scoped to
-correct per-role/per-client namespaces (§3, §5).
+**What this audit can prove from code alone (Phase 1, no live calls):** that a CLI prewarm call built via
+§7 sends message-content-identical leading segments to a real later call, for a provably-static prefix
+(§2-§4), scoped to correct per-role/per-client namespaces (§3, §5).
 
-**What this audit explicitly cannot prove without a live measurement, and does not invent an answer for
-(rule 18):**
+**What this audit explicitly cannot prove without a live measurement, and does not invent an answer for:**
 - The provider's cache TTL — undocumented anywhere in this repo or in any comment/config found. Could be
   seconds, minutes, or longer. Treated as **unknown**, not assumed short or long.
 - Whether the provider's implicit caching applies uniformly to *any* two calls sharing a prefix regardless
-  of time gap between them (as opposed to only very-close-in-time calls, e.g. within one demo session)
-  — unconfirmed.
+  of time gap between them (as opposed to only very-close-in-time calls) — unconfirmed.
 - Whether the exact model string configured (`"qwen3.7-plus"`) is a stable pinned snapshot or could be
-  silently re-aliased by the provider over time — no in-repo documentation either way (a sibling agent's
-  finding, not guessed here).
+  silently re-aliased by the provider over time — no in-repo documentation either way.
+- What specifically causes the provider's cache to invalidate on its side (§6's TTL/vendor-side-clear
+  rows) — genuinely invisible from this codebase; only a live measurement (`cached_tokens`) reveals
+  whether a given call was a hit.
 - Whether a deliberate prewarm call, sent from a context with no subsequent real user activity for some
-  time, would still be warm by the time real traffic arrives — this is precisely what Phase 2's own
-  cold-vs-warm duration/`cached_tokens` comparison is designed to measure empirically, under a **separate,
-  explicit LIVE/LLM owner permission**, matching this codebase's own established pattern (e.g. the A9 and
-  S66 milestones in `docs/STRANGLER_ROADMAP.md` both gate their first live run behind a distinct owner
-  decision even after implementation is otherwise complete).
+  time, would still be warm by the time real traffic arrives — this is precisely what the CLI's own live
+  mode is designed to measure empirically, under a **separate, explicit LIVE/LLM owner permission**,
+  matching this codebase's own established pattern (e.g. the A9 and S66 milestones in
+  `docs/STRANGLER_ROADMAP.md` both gate their first live run behind a distinct owner decision even after
+  implementation is otherwise complete).
 
-## 9. Deployment / reloader / multi-worker audit
+## 9. Deployment / reloader / multi-worker — status: not in scope for this milestone
 
-- **Deployment today is single-process:** `Dockerfile:10` and `start.sh` both run `gunicorn -w 1 -b
-  0.0.0.0:8000 app:app` — `start.sh`'s own comment states this is deliberate ("SQLite session storage is
-  single-writer oriented. Keep one worker to avoid cross-worker session inconsistencies"). No `Procfile`,
-  no `--threads`, no `workers=` overrides found anywhere.
-- **`debug=False` today, no reloader:** `app.py:922`, the only live `app.run(` call, passes `debug=False`.
-  Flask's dev reloader (which would double-fire startup code via a reloader child process) is **not**
-  active in the current deployment.
-- **No `WERKZEUG_RUN_MAIN` guard exists anywhere in this repo** (confirmed by grep) — there is no existing
-  precedent to copy, because the codebase has never needed one. A Phase 2 prewarm step must add its own
-  guard defensively (e.g. `if os.environ.get("WERKZEUG_RUN_MAIN") in (None, "true"):`-style check) in case
-  `debug=True` is ever enabled later, even though it is not required for today's actual deployment shape.
-- **Import-time safety:** `app.py:190-196` calls `_startup_check()` **unconditionally at module scope**
-  (not inside `if __name__ == "__main__":`) — this is the one existing precedent for "runs on every
-  import," and it is explicitly **not** the pattern a prewarm step should follow, since it does file I/O
-  only (`core/startup_check.py:13-56`, no LLM/network call) and would double-fire under any future reloader
-  scenario just like everything else at module scope. No module-level LLM call exists anywhere in this
-  codebase today (confirmed by grep for top-level `chat_completions_create`/classifier calls, and for any
-  `OpenAI(`/client construction outside `llm.py:36`, which only constructs the SDK object — no network
-  call). **A Phase 2 prewarm entry point must be the first thing in this codebase to do real LLM I/O near
-  startup, and must NOT mimic `_startup_check()`'s unconditional-module-scope pattern** — it must run only
-  from inside `if __name__ == "__main__":` (or an equivalent real-server-boot hook), in a background
-  thread, after the app is otherwise ready, gated by an explicit default-OFF env flag.
-- **Tests/CI never trigger real LLM calls today** via any global switch — there is no `OFFLINE_ONLY`/
-  `NO_LLM`/`LIVE=0` gate; instead, tests simply don't import/exercise the code paths that reach
-  `chat_completions_create` (mostly `*_offline.py` naming convention, or per-test monkeypatching). This
-  means a Phase 2 prewarm entry point's safety for tests/CI depends entirely on it **never being reachable
-  from any import path `pytest`/`tests/conftest.py` naturally walks** — not on any existing gate catching it
-  if it were.
-- **`log_llm_usage` reuse:** signature confirmed at `logging_setup.py:272-288`. ~15 distinct `call_type`
-  values already in use across the codebase (`target_fullcontext_runtime_composer`,
-  `target_fullcontext_runtime_verifier`, etc.) — a Phase 2 prewarm call must mint its own new value
-  (e.g. `"target_fullcontext_prewarm_composer"` / `"_verifier"`) rather than reuse any existing one, so
+**Governance correction: this entire concern class is deferred along with Option C.** Since Phase 2 now
+builds only a standalone CLI script (never wired into `app.py`, never started by the application process),
+none of the following affect this milestone's implementation:
+
+- Flask's dev reloader (`debug=True`/`WERKZEUG_RUN_MAIN`) — not applicable; the CLI is invoked directly by
+  an operator, not by Flask's app-boot sequence.
+- Multi-worker gunicorn deployment — not applicable; the CLI runs as its own independent process,
+  regardless of how many `gunicorn` workers the application itself uses.
+- Import-time safety — trivially satisfied; the CLI script is never imported by `app.py`, `tests/conftest.py`,
+  or any other application/test import graph, so it cannot fire as a side effect of `import app` or `pytest`
+  collection.
+
+These findings remain documented here for completeness and to inform a **future, separate Option-C
+milestone** (automatic startup prewarm), which — if ever undertaken — would need to design for: today's
+`gunicorn -w 1` single-worker deployment (`Dockerfile:10`, `start.sh`, deliberately single-writer per its
+own comment about SQLite sessions), the absence of any existing `WERKZEUG_RUN_MAIN` guard precedent in
+this repo, and `app.py:190-196`'s `_startup_check()` as the explicit anti-pattern to avoid copying
+(module-scope, unconditional, would double-fire under any future reloader scenario). None of this is
+built, wired, or exercised in this milestone.
+
+**What does carry over from this section into the current CLI-only scope:**
+- **`log_llm_usage` reuse** (`logging_setup.py:272-288`) — the CLI must mint its own new `call_type` value
+  (e.g. `"target_fullcontext_prewarm_composer"` / `"_verifier"`) distinct from the ~15 existing values, so
   downstream usage dashboards don't misattribute prewarm cost to real turn stages.
-- **`core/turn_timing.py`'s `_bucket()`** (lines 21-30) silently returns a throwaway dict outside an active
-  Flask request context — so `stage_start`/`stage_end` calls from a background prewarm thread would be
-  harmless no-ops, but also pointless (never surfaced anywhere). A Phase 2 prewarm module should log its
-  own timing directly via `log_llm_usage`/`emit_bot_event`, not attempt to reuse PERF-0's request-scoped
-  stage-tracking machinery — satisfying rule 16 (prewarm creates no PERF-1 user-facing status) as a direct
-  consequence of never touching a Flask request context at all.
-- **Existing budget/lock precedent to mirror:** `orchestration/route_guards.py:32-69` (`check_rate_limit`
-  — module-level `threading.Lock` + `dict`/`deque`, env-driven bypass) and
-  `evals/v5/s62_target_runtime_live_provider_audit.py` (`MAX_PROVIDER_CALLS = 20` hard cap wrapping
-  `llm.chat_completions_create`, plus an exclusive marker-file pattern to prevent duplicate concurrent live
-  runs) are both directly reusable *styles* for a Phase 2 prewarm hard budget — a small module-level
-  counter/lock, capped at "at most one attempt per (client_id, role, fingerprint) per process," is the
-  natural fit given today's single-process deployment, with the marker-file style available as a
-  future-proofing option if multi-worker deployment is ever introduced.
-- **`client_id` is a small, fixed, allowlisted set** (`config.py:152-158`, `ALLOWED_CLIENTS`, defaulting to
-  `{"demo"}` — only `clients/demo/` and `clients/_template/` exist on disk today) — confirming a hard
-  per-client budget is trivially boundable, not an open-ended surface.
+- **`core/turn_timing.py`'s `_bucket()`** (lines 21-30) silently returns a throwaway dict outside an
+  active Flask request context — irrelevant to a standalone CLI anyway, which has no Flask request
+  context at all. The CLI logs its own timing directly via `log_llm_usage`, never touching PERF-0's
+  request-scoped stage machinery — satisfying rule 16 (prewarm creates no PERF-1 user-facing status) as a
+  direct, structural consequence.
+- **`client_id` is a small, fixed, allowlisted set** (`config.py:152-158`, `ALLOWED_CLIENTS`, defaulting
+  to `{"demo"}`) — the CLI takes `client_id` as an explicit required argument, validated against this same
+  set.
 
 ## 10. Cost / call budget
 
-Given `ALLOWED_CLIENTS` defaults to one client (`demo`) and there are exactly two roles (Composer,
-Verifier), a full prewarm sweep is at most **2 calls per process start** (one per role, for the one
-configured client) under the "at most one attempt per (client_id, role, fingerprint) per process" budget
-in §9 — small, bounded, and cheap relative to the ~26,500-token static prefix's one-time cost. Re-warming
-the *same* fingerprint repeatedly within a process is never done (§9 budget), since TTL is unknown (§8) and
-resending an already-recently-sent identical prefix has no evidence of providing additional benefit.
+Per CLI invocation, for one `client_id`: **at most one Composer warm call and at most one Verifier warm
+call — total maximum 2 provider calls**, gated by the exclusive attempt ledger (§7) so that re-running the
+CLI for an already-attempted `(client_id, role, fingerprint)` key never places a duplicate call.
+`retry=0` (§11). If the live preflight check (fingerprint/model mismatch) fails, or if the first call's
+result is an unexpected provider/model mismatch, the CLI **aborts immediately** — it does not proceed to
+attempt the second (Verifier, if Composer ran first) call in the same invocation. This is small, bounded,
+operator-visible, and cheap relative to the ~26,500-token static prefix's one-time cost.
 
-## 11. Failure semantics (fail-open, binding)
+## 11. Failure semantics (fail-open for the CLI itself; binding)
 
-A prewarm call failing (timeout, provider error, malformed response, budget exhausted) must never raise
-into the request path, never block `app.run()`/readiness, and never retry (retry=0, matching the existing
+A CLI prewarm attempt failing (timeout, provider error, malformed response, preflight mismatch, ledger
+already present) must never retry (`retry=0`, matching the existing
 `call_count > 1: raise ..._retry_forbidden` single-attempt discipline already used by Composer/Verifier/
-Boundary live backends at `core/target_runtime_llm_backends.py:73-78,121-126,180-185` — the same idiom, not
-a new one). The bot continues serving real traffic without cache exactly as it does today if prewarm never
-ran at all — prewarm is purely additive, never load-bearing for correctness.
+Boundary live backends at `core/target_runtime_llm_backends.py:73-78,121-126,180-185` — the same idiom,
+not a new one) and must **abort the remainder of that invocation** on the first unexpected
+provider/model mismatch rather than attempting further calls. Since the CLI is entirely separate from the
+running application, "fail-open" here means: a failed or aborted CLI run has **zero effect** on the bot's
+ability to serve real traffic — the bot continues exactly as it does today whether or not the CLI was ever
+run, or whether it succeeded or failed. Nothing in the application depends on the CLI having run.
 
 ## 12. Options comparison (A–E)
 
@@ -324,155 +397,129 @@ against its DashScope/Qwen endpoint (§1, confirmed by repo-wide search for `cac
 `ttl` near any LLM call site — zero matches on the actual request/response path). Only implicit,
 content-based caching (if any) is a candidate. Not carried forward — there is nothing to call explicitly.
 
-### B. Owner-controlled prewarm CLI before demo/deploy
+### B. Owner-controlled prewarm CLI before demo/deploy — **SELECTED, sole Phase 2 scope**
 
-- **Guarantees exact reusable prefix:** yes, if built via §7 (reuses production message-builder functions
-  verbatim).
-- **Cost:** identical per-call cost to a real Composer/Verifier call (full static prefix tokens), run at
-  most twice per demo/deploy (Composer + Verifier).
-- **Latency:** irrelevant to the user — runs before traffic, as a standalone script.
+- **Guarantees identical reusable prefix content:** yes, if built via §7 (reuses production
+  message-builder functions verbatim).
+- **Cost:** identical per-call cost to a real Composer/Verifier call (full static prefix tokens), at most
+  2 calls per invocation (§10).
+- **Latency:** irrelevant to the user — runs before traffic, as a standalone script, never inside the
+  request path.
 - **TTL risk:** the CLI-to-first-real-request gap is operator-controlled (run it right before the demo
   starts), which is the *best* case for an unknown, possibly-short TTL (§8).
-- **Duplicate calls under reloader/multiworker:** not applicable — a standalone script process, not part of
-  the running app; no import-time or worker-boot interaction at all.
-- **Failure behavior:** trivially fail-open — a failed warm-up script just means the first real request is
-  cold, exactly like today; the operator sees the failure directly and can decide whether to retry manually
-  (still retry=0 *within* the script itself, per rule 12).
-- **Multi-client scaling:** run once per `client_id` in `ALLOWED_CLIENTS`, operator-driven — scales linearly
-  and explicitly, no automatic fan-out risk.
-- **Observability:** logs via `log_llm_usage` with its own `call_type`, same as any other mechanism.
-- **Complexity/risk:** **lowest** of the automated-benefit options — a new standalone script analogous to
-  the existing `scripts/validate_client_pack.py`, no changes to `app.py`'s startup sequence at all, zero
-  interaction with reloader/multi-worker/import-time concerns by construction.
+- **Duplicate calls under reloader/multiworker:** not applicable at all (§9) — a standalone script
+  process, never part of the running app.
+- **Failure behavior:** trivially fail-open for the application (§11) — a failed warm-up script just means
+  the first real request is cold, exactly like today.
+- **Multi-client scaling:** run once per `client_id` in `ALLOWED_CLIENTS`, operator-driven — scales
+  linearly and explicitly, no automatic fan-out risk.
+- **Observability:** logs via `log_llm_usage` with its own `call_type`.
+- **Complexity/risk:** **lowest** of any automated-benefit option — a new standalone script analogous to
+  the existing `scripts/validate_client_pack.py`, zero changes to `app.py`, zero interaction with
+  reloader/multi-worker/import-time concerns by construction.
 - **Downside:** requires a human to remember to run it; provides no protection for unattended/automatic
-  first-time traffic (e.g. a process restart at 3am with no operator present).
+  first-time traffic. Accepted as the correct trade-off for this milestone — see Option C below.
 
-### C. Async startup prewarm after readiness (not at import)
+### C. Async startup prewarm after readiness — **DEFERRED to a separate future milestone, not in Phase 2**
 
-- **Guarantees exact reusable prefix:** yes, same §7 mechanism.
-- **Cost:** same per-call cost as B, but fires automatically on every process start (today: once per
-  `gunicorn -w 1` boot) rather than requiring a manual trigger.
-- **Latency:** must run in a background thread, strictly after `app.run()`/worker-boot, never blocking
-  readiness or the first real request (rule 3) — the same "fire-and-forget background thread" shape PERF-1
-  already established and shipped for `/ask/stream`'s worker (`app.py`'s `_sse_worker_executor`), a direct,
-  precedented pattern to reuse rather than invent.
-- **TTL risk:** the startup-to-first-traffic gap is *not* operator-controlled — could be seconds (traffic
-  right after boot) or much longer (idle process) — genuinely unknown whether warmth survives, given §8's
-  undocumented TTL. Real risk of wasted prewarm cost if the gap exceeds an unknown TTL.
-- **Duplicate calls under reloader/multiworker:** would require the `WERKZEUG_RUN_MAIN` guard (§9, not yet
-  needed for today's `debug=False` deployment but required defensively per the binding rules) and the
-  per-fingerprint dedup budget (§9/§10); with today's single-worker deployment, the realistic risk is low,
-  but the design must not silently assume single-worker forever.
-- **Failure behavior:** must be explicitly wrapped fail-open (rule 4) — cannot be allowed to delay or crash
-  `app.run()`.
-- **Multi-client scaling:** automatic sweep over `ALLOWED_CLIENTS` × 2 roles at every boot — bounded (§10)
-  but happens unconditionally every restart, including restarts where no demo/traffic is imminent.
-- **Observability:** same `log_llm_usage` reuse.
-- **Complexity/risk:** **medium** — touches `app.py`'s startup sequence (a new guarded call site, not
-  module-scope), needs the reloader guard, the budget, and fail-open wrapping all correctly composed; more
-  moving parts than B, but each part is precedented elsewhere in this codebase (§9).
+Automatic, no manual step, fires on every process start. Real engineering surface (`app.py` changes,
+`WERKZEUG_RUN_MAIN` guard, a new runtime env flag, a background thread, reloader/multi-worker design —
+§9) is materially larger than B's, and its value is currently unproven — the CLI (B) has not yet been run
+even once to confirm real `cached_tokens`/duration benefit. Building C now would mean adding that
+complexity to `app.py` before there is any measured evidence it helps. **Deferred, not rejected:** if the
+CLI's own live measurements (a future, separately-permitted step) show real, repeatable benefit, a
+follow-up milestone can design C properly, informed by that evidence, with its own governance audit. Not
+part of this milestone's implementation allowlist in any form — no `app.py` change, no config flag, no
+background hook.
 
-### D. Lazy background prewarm after first request
+### D. Lazy background prewarm after first request — **not selected**
 
-- **Guarantees exact reusable prefix:** yes, same §7 mechanism, triggered from within an already-correctly
-  guarded Flask request lifecycle (sidesteps import-time/reloader/multi-worker concerns almost entirely,
-  since it never fires outside a real request context).
-- **Real incremental value is the weakest of the four candidates.** The owner's own brief states
-  `cached_tokens` has *already* been observed in production logs **without any deliberate prewarm
-  mechanism** — meaning ordinary consecutive real turns already appear to implicitly warm the cache for
-  each other today, at zero extra engineering cost. Option D only fires *after* a first real request has
-  already occurred — at which point whatever implicit turn-to-turn caching already exists has already had
-  its chance to start warming things up on its own. D would benefit only turns 2+ of a **freshly-cold**
-  process for a client that had zero prior traffic — a narrower and already-partially-covered case than B
-  or C, which both target the higher-value "cold moment right after boot, including the very first
-  request" gap that D structurally cannot help with (D's trigger *is* that first request).
-- **Cost/latency/failure/scaling/observability:** all comparable to C, minus the reloader/import-time risk
-  surface (a real advantage), but at the cost of the value gap above.
-- **Complexity/risk:** low-medium — simplest trigger point of the three automated options, but the
-  narrowest justified benefit.
+Real incremental value is the weakest of the automated candidates. The owner's own brief states
+`cached_tokens` has *already* been observed in production logs **without any deliberate prewarm
+mechanism** — meaning ordinary consecutive real turns already appear to implicitly warm the cache for each
+other today, at zero extra engineering cost. Option D only fires *after* a first real request has already
+occurred — at which point whatever implicit turn-to-turn caching already exists has already had its
+chance to start warming things up on its own. D would benefit only turns 2+ of a freshly-cold process for
+a client with zero prior traffic — a narrower and already-partially-covered case than the "cold moment
+right before a demo" that B directly targets.
 
-### E. Do not implement, if cache semantics cannot be proven
+### E. Do not implement, if cache semantics cannot be proven — **not chosen**
 
 Not chosen outright, because the specific thing the governing principle demands proof of — **prefix
-identity** — is provable from code today (§2-§7), by disciplined reuse of the exact production
+content identity** — is provable from code today (§2-§7), by disciplined reuse of the exact production
 message-builder functions rather than a parallel implementation. What remains unprovable without a live
-call (TTL, actual hit behavior, model-alias stability — §8) is explicitly not claimed as proven anywhere in
-this audit, and Phase 2's own rollout is designed to require a separate LIVE/LLM permission before those
-unknowns are ever tested for real. E would be the right call only if prefix identity itself could not be
-guaranteed — it can be, via reuse discipline, so E is not selected.
+call (TTL, actual hit behavior, model-alias stability — §8) is explicitly not claimed as proven anywhere
+in this audit, and the CLI's live mode requires a separate LIVE/LLM permission before those unknowns are
+ever tested for real. E would be the right call only if prefix identity itself could not be guaranteed —
+it can be, via reuse discipline, so E is not selected.
 
-## Selected: **B + C, implementation permitted in Phase 2, default OFF, two-gate rollout**
+## Selected: **B only — owner-controlled CLI, offline-first, two-gate rollout**
 
-- **B (owner-controlled CLI)** is the lowest-risk, immediately-useful mechanism — build it first, as a
-  standalone script with zero interaction with `app.py`'s startup path, directly analogous to
-  `scripts/validate_client_pack.py`. Solves the highest-value case (warm the cache deliberately right
-  before an important demo) with the least engineering risk.
-- **C (async startup prewarm)** is the automated complement — same underlying prewarm function B calls,
-  wired into `app.py` behind a new, explicit, default-**OFF** env flag (e.g.
-  `PROMPT_CACHE_PREWARM_ENABLED`), a `WERKZEUG_RUN_MAIN` guard, and the fail-open/budget/retry=0 rules from
-  §9-§11. Default-OFF means Phase 2 landing this code changes nothing about current runtime behavior until
-  an operator explicitly opts in — a second, independent gate beyond PRE-CODE/owner-GO-for-implementation.
-- **D is not selected** — real value is too thin given already-observed implicit turn-to-turn caching (see
-  comparison above); not worth its own engineering surface as a *separate* mechanism. (Nothing prevents D's
-  natural effect from continuing to happen on its own, since it isn't a deliberate mechanism at all —
-  ordinary real traffic already does this implicitly, per the owner's own observation.)
-- **A is ruled out** (unsupported), **E is not chosen** (prefix-identity is provable).
-- **Both B and C must reuse the identical `build_composer_sdk_messages`/`build_verifier_sdk_messages` +
-  fingerprint (§5) + budget (§9-§10) machinery** — implemented once, in one Phase 2 module, called by both
-  the CLI entry point and the async startup hook, never duplicated.
-- **First real (LIVE) activation of either B or C against the actual provider requires a separate,
-  explicit owner LIVE/LLM permission**, on top of the Phase 2 implementation GO — matching this codebase's
-  existing two-gate pattern for other live-provider milestones (A9, S66 in `docs/STRANGLER_ROADMAP.md`).
-  Phase 2 implementation itself must remain fully exercisable offline (dry-run mode computing fingerprints
-  and deciding "would I call the provider now" without actually calling it — §"Acceptance matrix" rows
-  15-16).
+- **B (owner-controlled CLI)** is the entire Phase 2 scope. Standalone script, zero interaction with
+  `app.py`, zero runtime flag, zero background worker, zero startup-sequence change.
+- **C (async startup prewarm) is explicitly deferred** to a separate future milestone, contingent on the
+  CLI's own measured live results — not built, wired, or flagged in any form in this milestone.
+- **D is not selected** (weak incremental value given already-observed implicit caching); **A is ruled
+  out** (unsupported); **E is not chosen** (prefix-content identity is provable).
+- **Two-gate rollout (binding):** Phase 2 implementation (the CLI itself, fully exercisable offline via
+  dry-run, default action with no `--live` flag) requires owner GO same as any implementation phase.
+  **First real (`--live`) activation against the actual provider requires a SEPARATE, explicit owner
+  LIVE/LLM permission**, on top of that — matching this codebase's existing pattern for other
+  live-provider milestones (A9, S66 in `docs/STRANGLER_ROADMAP.md`).
 
-## 13. Implementation allowlist (Phase 2 — blocked until owner GO, and LIVE activation blocked further)
+## 13. Implementation allowlist (Phase 2 — blocked until owner GO; LIVE activation blocked further)
 
 | File | Action |
 |---|---|
 | `contracts/target_prompt_cache_fingerprint.py` | CREATE — `TargetPromptCacheFingerprint` frozen dataclass (§5) |
-| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure), budget/dedup gate, the actual `chat_completions_create` prewarm call (reusing `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), fail-open wrapping, `log_llm_usage` call with a new `call_type` |
-| `scripts/prewarm_prompt_cache.py` | CREATE — standalone owner-controlled CLI (Option B), thin wrapper calling `core/target_prompt_cache_prewarm.py` |
-| `app.py` | UPDATE — Option C's guarded async startup hook, inside `if __name__ == "__main__":`, behind `PROMPT_CACHE_PREWARM_ENABLED` (default off) and a `WERKZEUG_RUN_MAIN` guard; **no changes to `/ask`/`/ask/stream` request handling** |
-| `logging_setup.py` | **KEEP unchanged** — reuse existing `log_llm_usage`, no second usage logger (rule 15) |
-| `core/turn_timing.py` | **KEEP unchanged** — prewarm does not use PERF-0's request-scoped stage machinery (§9) |
-| `core/target_composer_executor.py`, `core/target_response_verifier.py`, `core/target_runtime_llm_messages.py` | **KEEP unchanged** — prewarm reuses these modules' existing functions, never forks or edits them (rule 9: no prompt changes for artificial cache hits) |
+| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure, including `static_prefix_hash`), dry-run message assembly (reusing `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), the exclusive attempt-ledger mechanism, the live `chat_completions_create` call path (only exercised when the CLI passes `--live`), fail-open/abort-on-mismatch wrapping, `log_llm_usage` call with a new `call_type` |
+| `scripts/prewarm_prompt_cache.py` | CREATE — the CLI entry point itself: argument parsing (`client_id`, `--live`, expected model/fingerprint for preflight), dry-run vs. live dispatch, calls into `core/target_prompt_cache_prewarm.py` |
 | `tests/test_final_provider_prompt_cache_prewarm_implementation.py` | CREATE — acceptance matrix (§14) |
+
+**Explicitly NOT in this allowlist (governance correction):** `app.py` (no changes of any kind); any
+startup/runtime-flag module; `static/widget/*` (no widget involvement); any orchestration/runtime-turn
+file (no request-path integration); any background-worker/thread-pool component.
+
+**KEEP unchanged:** `logging_setup.py` (`log_llm_usage` reused, not duplicated); `core/turn_timing.py`
+(irrelevant to a standalone CLI); `core/target_composer_executor.py`, `core/target_response_verifier.py`,
+`core/target_runtime_llm_messages.py` (reused verbatim, never forked/edited); `app.py`,
+`core/startup_check.py` (untouched — no automatic prewarm in this milestone); `/ask`/`/ask/stream` route
+parity; LLM call count for every real user turn.
 
 ## 14. Acceptance matrix (Phase 2 implementation — minimum coverage, 24 scenarios)
 
 | # | Scenario | Expected |
 |---|---|---|
-| 1 | First cold request (no prior prewarm) | Behavior identical to today — no dependency on prewarm ever having run |
-| 2 | Warm cache hit (after a successful prewarm, real LIVE-gated test only) | Measurable `cached_tokens` > 0 and/or reduced stage duration vs. cold baseline |
-| 3 | Cache miss after corpus change | Fingerprint differs (`corpus_sha256` changed) — treated as a fresh, un-warmed fingerprint |
-| 4 | Miss after prompt/template change | Fingerprint differs (`sha256(system_policy_text)` or `sha256(preamble_template_text)` changed) |
-| 5 | Miss after model change | Fingerprint differs (`model` string changed) |
-| 6 | Composer/Verifier namespaces separated | Same client_id, same corpus — Composer and Verifier fingerprints are provably different (§3, §5) |
-| 7 | Two `client_id`s separated | Distinct fingerprints, distinct budget counters, no cross-client reuse assumed |
-| 8 | Repeated prewarm of the same fingerprint | No duplicate provider call — budget/dedup gate blocks it (§9-§10) |
-| 9 | Dev reloader simulated (`WERKZEUG_RUN_MAIN` unset then set) | Prewarm fires at most once across the simulated parent+child pair |
-| 10 | Multi-worker simulated (two independent processes) | Each process's own budget counter is independent (documented limitation — no cross-process dedup without a future marker-file mechanism; not silently assumed safe) |
-| 11 | Provider failure (simulated exception from the LLM call) | Fail-open — no exception propagates past the prewarm call site, app continues normally |
-| 12 | Timeout (simulated) | Fail-open, same as row 11 |
-| 13 | `retry=0` | Exactly one attempt per prewarm call, no internal retry loop |
-| 14 | Hard call budget exceeded | Further prewarm attempts for that budget scope are refused, not queued |
-| 15 | Tests/CI run | Zero real provider calls anywhere in the test suite (prewarm entry points never reachable from `pytest`'s import graph) |
-| 16 | Dry-run mode | Fingerprint computed and a "would call provider" decision logged, with zero actual `chat_completions_create` invocations |
-| 17 | No PII/session in prewarm payload | Dynamic-tail fields are fixed non-PII placeholders (§7), never derived from `request`/session/SID/phone |
-| 18 | No answer persistence | Prewarm's provider response is never written to session, never surfaced to any user, never treated as a real answer (rule 7-8) |
-| 19 | User-turn LLM count unchanged | A real `/ask`/`/ask/stream` turn's LLM call count is identical whether or not prewarm ran (rule 17) |
-| 20 | PERF-0 cold vs. warm duration comparison | Composer/Verifier stage `duration_ms` compared between a cold-fingerprint turn and a warm-fingerprint turn (LIVE-gated real measurement, not simulated) |
-| 21 | `cached_tokens` sourced from provider usage | Read via the existing `_cached_tokens_from_usage_obj`/`log_llm_usage` path (`logging_setup.py:238-248,272-288`) — no second usage-parsing implementation |
-| 22 | PERF-1 status sequence unchanged | `/ask/stream`'s `event: status` sequence for a real user turn is unaffected by prewarm having run or not (rule 16 — prewarm never touches `core/turn_timing.py`'s request-scoped sink) |
+| 1 | First cold request (no prior CLI run) | Application behavior identical to today — no dependency on the CLI ever having run |
+| 2 | Dry-run mode | Zero provider calls; loads the real client pack; builds real Composer/Verifier messages via the existing builders; prints only hashes/model/role/prefix length/token estimate/fingerprint |
+| 3 | Dry-run output content | Never prints `corpus_text`, any synthetic answer, contact info, or other client-pack content — hashes and scalar metadata only |
+| 4 | Live mode without `--live` | Never calls the provider — `--live` is required, not a default |
+| 5 | Live mode missing `client_id` | Refused before any provider call — `client_id` is a required argument |
+| 6 | Live mode preflight — expected model/fingerprint mismatch | Aborts before any attempt-marker write or provider call |
+| 7 | Composer warm call | Exactly one, via `build_composer_sdk_messages` verbatim |
+| 8 | Verifier warm call | Exactly one, via `build_verifier_sdk_messages` verbatim |
+| 9 | Total call budget | Never more than 2 provider calls in one CLI invocation (1 Composer + 1 Verifier) |
+| 10 | `retry=0` | Exactly one attempt per provider call, no internal retry loop |
+| 11 | Abort after unexpected provider/model mismatch | The remaining planned call (e.g. Verifier, if Composer's result was unexpected) is not attempted |
+| 12 | Exclusive attempt ledger — repeated CLI run, same fingerprint | Second run finds the ledger entry already present and does not place a duplicate provider call |
+| 13 | Warm response content discarded | Provider's actual answer/issues content is never written to session, never shown to any user, never persisted as answer text |
+| 14 | Ledger persists only anonymized metadata | `client_id`, `role`, `model`, fingerprint, timestamp, `cached_tokens` (if present), success/failure — no corpus/answer content |
+| 15 | Fingerprint includes all required components | `client_id`, `model`, `role`, `static_prefix_hash`, `corpus_sha256`, `PROMPT_TEMPLATE_VERSION`, `MESSAGE_SERIALIZATION_VERSION` |
+| 16 | Composer/Verifier namespaces proven distinct | Same `client_id`, same corpus — Composer and Verifier fingerprints differ (§3, §5) |
+| 17 | Two `client_id`s produce distinct fingerprints/ledger entries | No cross-client reuse assumed |
+| 18 | Message/token prefix identity (offline proof) | The CLI's assembled static prefix equals what a real Composer/Verifier call would build, up to the dynamic boundary — verified by direct comparison in a test, not claimed as HTTP wire-byte identity |
+| 19 | Tests/CI run | Zero real provider calls anywhere — dry-run path and any test invocation of the CLI module never reach `chat_completions_create` |
+| 20 | No PII/session in CLI payload or logs | Dynamic-tail fields are fixed non-PII placeholders (§7), never derived from any real request/session/SID/phone |
+| 21 | `cached_tokens` sourced from provider usage (live-gated) | Read via the existing `_cached_tokens_from_usage_obj`/`log_llm_usage` path (`logging_setup.py:238-248,272-288`) — no second usage-parsing implementation |
+| 22 | Automatic startup prewarm not exercised | No `app.py` change, no config flag, no background hook exists anywhere in this milestone's diff |
 | 23 | Client-pack validation unchanged | `scripts/validate_client_pack.py`'s behavior/output is unaffected by any prewarm code (no shared state, no import coupling) |
-| 24 | Stale fingerprint not considered warm | A fingerprint computed before a tracked component changed is never treated as still-valid after the change — no grace period, no partial match |
+| 24 | Stale fingerprint never considered warm | A fingerprint computed before a tracked component changed is never treated as still-valid after the change — no grace period, no partial match |
 
 ## STOP
 
-After PRE-CODE ✅ — **STOP**. Phase 2 implementation only after a separate owner GO, and even then, first
-real LIVE activation against the provider requires a further separate owner LIVE/LLM permission (§8, §12).
+After PRE-CODE ✅ — **STOP**. Phase 2 implementation (the CLI, offline-first) only after a separate owner
+GO, and even then, first real `--live` activation against the provider requires a further separate owner
+LIVE/LLM permission (§8, §12).
 
 ## Test commands (governance)
 

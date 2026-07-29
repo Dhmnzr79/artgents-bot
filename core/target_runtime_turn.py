@@ -19,11 +19,15 @@ from core.target_composer_action_context import (
 from core.target_boundary_enforced_fullcontext_response import (
     run_target_offline_boundary_enforced_fullcontext_response,
 )
+from contracts.target_medical_boundary import TargetMedicalBoundaryResult
 from core.target_composer_executor import TargetComposerBackend
 from core.target_medical_boundary import (
     TargetMedicalBoundaryBackend,
     execute_target_medical_boundary_classification,
     normalize_boundary_for_pipeline,
+)
+from core.target_medical_boundary_requirement import (
+    resolve_target_medical_boundary_requirement,
 )
 from core.target_response_verifier import (
     TargetResponseVerificationError,
@@ -183,10 +187,12 @@ def run_target_fullcontext_runtime_turn(
 
     sync_session_patient_facts_topic(sid, current_topic=turn_frame.topic)
     session_state = read_target_runtime_session(sid)
+    current_ui_scope_action = _current_ui_scope_action_from_request()
+    current_ui_stage_action = _current_ui_stage_action_from_request()
     projected_turn_scope = project_patient_scope_from_turn_frame(turn_frame)
     effective_scope = resolve_effective_scope(
-        current_ui_action=_current_ui_scope_action_from_request(),
-        current_ui_stage_action=_current_ui_stage_action_from_request(),
+        current_ui_action=current_ui_scope_action,
+        current_ui_stage_action=current_ui_stage_action,
         session_facts=session_state.patient_facts,
         current_topic=turn_frame.topic,
         session_turn_count=session_state.session_turn_count,
@@ -319,27 +325,44 @@ def run_target_fullcontext_runtime_turn(
             turn_frame=turn_frame,
         )
 
-    turn_timing.stage_start("boundary")
-    try:
-        boundary = execute_target_medical_boundary_classification(
-            user_message,
-            backend=boundary_backend,
-            min_confidence_none=0.80,
-            min_confidence_medical_handoff=0.70,
+    boundary_requirement = resolve_target_medical_boundary_requirement(
+        turn_frame=turn_frame,
+        current_ui_scope_action=current_ui_scope_action,
+        current_ui_stage_action=current_ui_stage_action,
+    )
+    if boundary_requirement == "bypass_governed_ui":
+        turn_timing.stage_skipped("boundary", reason="bypass_governed_ui")
+        # PERF-2: identical shape to the confident-none result normalize_boundary_for_pipeline
+        # already produces for degraded/uncertain backend outcomes (core/target_medical_boundary.py)
+        # -- reused here, not a new result shape or a new terminal/envelope branch.
+        boundary = TargetMedicalBoundaryResult(
+            decision="none",
+            confidence=1.0,
+            reason_code="boundary_none_confident",
+            source="backend",
         )
-        boundary = normalize_boundary_for_pipeline(boundary)
-    except Exception as exc:
-        turn_timing.stage_end("boundary", status="exception")
-        return TargetRuntimeTurnOutcome(
-            widget=materialize_target_error_payload(
-                client_id=client_id,
-                sid=sid,
-                error_code=f"target_runtime_boundary_failed:{type(exc).__name__}",
-            ),
-            pipeline_result=None,
-            turn_frame=turn_frame,
-        )
-    turn_timing.stage_end("boundary", status="completed")
+    else:
+        turn_timing.stage_start("boundary")
+        try:
+            boundary = execute_target_medical_boundary_classification(
+                user_message,
+                backend=boundary_backend,
+                min_confidence_none=0.80,
+                min_confidence_medical_handoff=0.70,
+            )
+            boundary = normalize_boundary_for_pipeline(boundary)
+        except Exception as exc:
+            turn_timing.stage_end("boundary", status="exception")
+            return TargetRuntimeTurnOutcome(
+                widget=materialize_target_error_payload(
+                    client_id=client_id,
+                    sid=sid,
+                    error_code=f"target_runtime_boundary_failed:{type(exc).__name__}",
+                ),
+                pipeline_result=None,
+                turn_frame=turn_frame,
+            )
+        turn_timing.stage_end("boundary", status="completed")
 
     catalog_strategy = resolve_target_runtime_strategy_context(
         context.bundle,

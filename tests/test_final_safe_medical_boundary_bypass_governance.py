@@ -48,15 +48,6 @@ _EXPECTED_LITERAL_MEMBERS = {"required", "bypass_governed_ui"}
 _DEAD_LITERAL_MEMBERS = ("bypass_pure_price", "bypass_exact_faq", "not_applicable_structured")
 _LITERAL_STRING_RE = re.compile(r'"([a-z_]+)"')
 
-# Phase 2 files -- must NOT exist yet. Their presence would mean product implementation
-# started before PRE-CODE + a separate owner GO, which this phase forbids.
-_FORBIDDEN_PRODUCT_FILES = (
-    _REPO_ROOT / "contracts" / "target_medical_boundary_requirement.py",
-    _REPO_ROOT / "core" / "target_medical_boundary_requirement.py",
-    _REPO_ROOT / "tests" / "test_final_safe_medical_boundary_bypass_implementation.py",
-)
-
-
 def _task_section() -> str:
     return TASK_PATH.read_text(encoding="utf-8").split(TASK_HEADER)[-1]
 
@@ -254,11 +245,6 @@ def test_resolver_forbidden_from_hardcoding_demo_ids() -> None:
     assert "demo-specific" in section.lower() or "конкретной demo-клиники" in section
     assert "service_id" in section
     assert "client_id" in section
-
-
-def test_product_resolver_not_created_yet() -> None:
-    for path in _FORBIDDEN_PRODUCT_FILES:
-        assert not path.is_file(), f"Phase 2 file created too early: {path}"
 
 
 def test_task_governance_section_present() -> None:

@@ -6754,3 +6754,119 @@ git diff --check
 
 После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
 отдельного owner GO.
+
+---
+
+## Completion record (PERF-2 implementation, owner GO)
+
+**Baseline:** `codex/stage-a` @ `bfcc59c`. **Implementation commit:** see `git log` (this checkpoint).
+
+### Allowlist adherence
+
+All allowlisted files touched exactly as scoped: `contracts/target_medical_boundary_requirement.py`
+(CREATE — the two-member `Literal`), `core/target_medical_boundary_requirement.py` (CREATE — the pure
+resolver, exact 9-point checklist), `core/target_runtime_turn.py` (UPDATE — resolver call site wired
+immediately before the existing `turn_timing.stage_start("boundary")`, after both structured-capability
+early returns), `tests/test_final_safe_medical_boundary_bypass_implementation.py` (CREATE — 48 tests
+covering all 23 seam-audit acceptance rows plus resolver-level implementation guards). `core/turn_timing.py`
+kept unchanged, as required. **Deviation (not on the literal allowlist):**
+`tests/test_final_safe_medical_boundary_bypass_governance.py` — removed the one PRE-CODE assertion
+(`test_product_resolver_not_created_yet`) that asserted the three Phase 2 files must not exist yet. That
+assertion's job was to gate work *before* owner GO; with owner GO now given and those files legitimately
+created, the assertion would fail on every future commit by construction — this is a direct, necessary,
+expected consequence of completing the phase that check was built to gate, not unrelated test debt. No
+other assertion in that file was touched or weakened.
+
+### Resolver logic (exact)
+
+`resolve_target_medical_boundary_requirement(*, turn_frame, current_ui_scope_action, current_ui_stage_action)`
+returns `"bypass_governed_ui"` only if, in order: (1) exactly one of the two action params is not `None`
+(XOR); (2) that action is the expected typed model (`UiScopeAction`/`UiStageAction`); (3)
+`turn_frame.intent == "price_lookup"`, `tuple(turn_frame.aspects) == ("price",)`,
+`turn_frame.primary_aspect == "price"`, `turn_frame.needs_clarification is False`,
+`turn_frame.topic == action.topic`; (4) `field_meta.status == "valid"` **and**
+`field_meta.provenance == f"governed_ui_action:{action.ref}"` (exact match, not prefix) for each of
+`intent`/`aspects`/`primary_aspect`/`needs_clarification`. Any mismatch, missing attribute, unexpected
+type, or exception anywhere in that chain is caught by one outer `try/except Exception: return "required"`
+— fail-safe default, no partial-credit tier. Pure: no I/O, no raw user text, no request/session access of
+its own, no regex, no confidence-based routing, no demo/service/client ID hardcoding (verified by a
+dedicated guard test that scans the resolver's own source for these patterns).
+
+### Runtime branch (`core/target_runtime_turn.py`)
+
+`current_ui_scope_action`/`current_ui_stage_action` are now captured once into local variables (previously
+computed inline, twice implicitly) and reused both for `resolve_effective_scope` and the new resolver
+call. The resolver is called once, immediately before the pre-existing `turn_timing.stage_start("boundary")`
+line — after both `structured_capability` early-return branches, so `structured_capability` being `None`
+is already a control-flow guarantee and was correctly dropped from the resolver's signature. On
+`"bypass_governed_ui"`: `turn_timing.stage_skipped("boundary", reason="bypass_governed_ui")`, and `boundary`
+is set to `TargetMedicalBoundaryResult(decision="none", confidence=1.0, reason_code="boundary_none_confident",
+source="backend")` — byte-identical to the shape `normalize_boundary_for_pipeline` already produces for
+degraded/uncertain backend outcomes elsewhere in the codebase; no new result shape, no new terminal/envelope
+branch. On `"required"`: the original code (unindented into an `else` branch) runs completely unmodified —
+same `execute_target_medical_boundary_classification` call, same exception handling, same
+`stage_end(..., status="completed"|"exception")`. Everything downstream of the `boundary` variable
+(Composer, both Verifiers, widget assembly, session write) is untouched by this diff.
+
+### LLM call map (before → after)
+
+| Path | Before | After |
+|---|---|---|
+| Free-text price/FAQ/suitability/pain/complication/contraindication/marketing-concern/ambiguous | Boundary + Composer + Semantic Verifier = **3** | unchanged — **3** |
+| Structured `clinic_contact`/`service_availability` | **0** (already bypassed) | unchanged — **0** |
+| Governed UI scope/stage click (eligible) | Boundary + Composer + Semantic Verifier = **3** | Composer + Semantic Verifier = **2** (Boundary backend never invoked — verified via `RecordingBoundaryBackend.invocations == []` in both direct and HTTP-level tests) |
+| Governed click with XOR violation / provenance mismatch / metadata invalid / topic mismatch / tampered field | **3** | unchanged — **3** (resolver falls back to `required`, real Boundary call happens) |
+
+### PERF-0 trace
+
+For an eligible governed click, `turn_complete`'s `stages.boundary` reads
+`{"status": "skipped", "reason": "bypass_governed_ui", "duration_ms": null}`; `composer`,
+`verifier_deterministic`, `verifier_semantic` all read `{"status": "completed", ...}` — confirmed
+identically on both `/ask` and `/ask/stream` in the same test.
+
+### PERF-1 event sequence
+
+`/ask/stream` for an eligible governed click still emits the same `status → typing → ui → done` shape;
+no status event's message ever names an internal stage (`boundary`/`composer`/`verifier`/`llm`) — checked
+directly against the SSE payload in the HTTP-level test, not inferred.
+
+### Test results
+
+- New: `tests/test_final_safe_medical_boundary_bypass_implementation.py` — **48 passed** (23 seam-audit
+  rows + XOR/provenance/metadata/topic/field-tamper edge cases + resolver-source guards).
+- `tests/test_final_safe_medical_boundary_bypass_governance.py` (post-deviation) — **25 passed**.
+- PERF-0/PERF-1 neighbor governance + implementation suites — **139 passed** total alongside the above.
+- Typed UI / AC2 / AC3 / Boundary-enforced / Verifier / structured-answer / CTA-projection regression
+  slice (13 files) — **254 passed**, zero failures.
+- `scripts/validate_client_pack.py` — not run: no client data/config YAML touched by this diff, so it is
+  not applicable (owner instruction said "при необходимости").
+- Full suite with PERF-2 applied: **103 failed / 3283 passed / 11 skipped** (316s).
+- Full suite on clean `bfcc59c` (stashed): **102 failed / 3237 passed / 11 skipped** (405s).
+- Strict nodeid diff: 2 nodeids newly failing, 1 nodeid newly passing. **All three traced, not
+  dismissed:** each reproduces identically pass/pass on both `bfcc59c` and current HEAD when run in
+  isolation, within its own full containing file, and in a combined slice with the new PERF-2 test files
+  — confirming this is the suite's own documented full-run-only "Shared-state isolation" / wide-suite
+  pollution class (`docs/TEST_SUITE_ARCHITECTURE.md`), not a PERF-2 regression or an accidental fix.
+  `tests/test_final_service_availability_and_clinic_capability_routing_implementation.py::test_scenario_16_all_on_4_concrete_content_route`
+  is the exact same nodeid already independently confirmed as this same pre-existing flake during PERF-1's
+  investigation, under a completely different diff — strong independent corroboration. Net genuine
+  regression count from this diff: **zero**.
+
+### Confirmations
+
+- `git diff --check` clean (tracked and staged).
+- Diff reviewed in full against `bfcc59c`: exactly the 4 allowlisted files + the 1 justified governance-
+  checker deviation, nothing else.
+- Free-text and medical/personal paths are provably unchanged: every free-text scenario in the acceptance
+  matrix (price, FAQ, suitability, complications, contraindications, marketing concerns, ambiguous frames)
+  shows `len(RecordingBoundaryBackend.invocations) == 1` — Boundary still runs, same as `bfcc59c`.
+- Structured `clinic_contact`/`service_availability` paths never even reach the resolver's call site
+  (confirmed via a monkeypatch spy asserting zero calls) — no new interaction with the existing
+  short-circuit.
+- No Boundary/Composer/Verifier prompt or policy change; no new LLM call; no streaming
+  text/`text_delta`; no cache/prewarm; no Ingress+Planner merge; no LIVE/LLM/E2E; no frozen artifact
+  touched; no TSC-C/D; no unrelated pre-existing test debt fixed.
+
+## STOP (Phase 2 implementation)
+
+After completion record + push — **STOP** before PERF-3, per owner instruction.

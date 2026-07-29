@@ -58,16 +58,6 @@ GOVERNANCE_BASELINE_HEAD = "897cdb7"
 MILESTONE = "FINAL_PROVIDER_PROMPT_CACHE_PREWARM"
 TASK_HEADER = f"# TASK — {MILESTONE} / PERF-3 (governance)"
 
-# Phase 2 files -- must NOT exist yet in this governance-only phase. Their presence would
-# mean product implementation started before PRE-CODE + a separate owner GO.
-_FORBIDDEN_PRODUCT_FILES = (
-    _REPO_ROOT / "contracts" / "target_prompt_cache_fingerprint.py",
-    _REPO_ROOT / "contracts" / "target_prompt_cache_attempt.py",
-    _REPO_ROOT / "core" / "target_prompt_cache_prewarm.py",
-    _REPO_ROOT / "scripts" / "prewarm_prompt_cache.py",
-    _REPO_ROOT / "tests" / "test_final_provider_prompt_cache_prewarm_implementation.py",
-)
-
 
 def _task_section() -> str:
     return TASK_PATH.read_text(encoding="utf-8").split(TASK_HEADER)[-1]
@@ -426,11 +416,6 @@ def test_composer_verifier_source_files_kept_unchanged_in_phase1_docs() -> None:
     assert "KEEP unchanged" in combined
     assert "target_composer_executor.py" in combined
     assert "target_response_verifier.py" in combined
-
-
-def test_product_prewarm_modules_not_created_yet() -> None:
-    for path in _FORBIDDEN_PRODUCT_FILES:
-        assert not path.is_file(), f"Phase 2 file created too early: {path}"
 
 
 def test_frozen_artifact_guards() -> None:

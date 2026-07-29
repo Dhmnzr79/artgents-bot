@@ -7153,3 +7153,98 @@ git diff --check
 только после отдельного owner GO, и даже тогда — первая `--live` активация требует отдельного
 разрешения (см. §"Selected option"). Option C (automatic startup prewarm) остаётся отдельным future
 milestone, не частью этого этапа ни в каком виде.
+
+## Completion record (PERF-3 implementation, owner GO)
+
+**Baseline:** `codex/stage-a` @ `6e27a97`. **Implementation commit:** see `git log` (this checkpoint).
+**LIVE remains blocked** — this phase ships the CLI and offline tests only; the first real `--live`
+activation requires a SEPARATE owner LIVE/LLM GO (two-gate rollout).
+
+### Preflight / abandoned WIP
+
+Owner-directed clean start: two untracked, un-historied Phase-1 WIP contract files of unknown provenance
+(`contracts/target_prompt_cache_attempt.py`, `contracts/target_prompt_cache_fingerprint.py`, forensically
+captured then removed under explicit owner authorization) were deleted before implementation. Both
+contracts were then recreated from scratch under this GO — the recreated `attempt` contract encodes the
+hard invariants the WIP lacked (`budget: Literal[2] = 2`, `retry: Literal[0] = 0`, typed
+`planned_roles`) and keeps model provenance simple (attempt-level `requested_model`/`configured_model`;
+per-call `observed_model` in the shared ledger — no redundant per-role provenance triples).
+
+### Allowlist adherence
+
+All five implementation-allowlist files created exactly as scoped:
+`contracts/target_prompt_cache_fingerprint.py` (cache-identity dataclass, descriptive only),
+`contracts/target_prompt_cache_attempt.py` (attempt lifecycle dataclass, hard `budget=2`/`retry=0`),
+`core/target_prompt_cache_prewarm.py` (pure fingerprint/static-prefix computation via verbatim reuse of
+`build_composer_sdk_messages`/`build_verifier_sdk_messages`; dry-run report; `attempt_id`-keyed `O_EXCL`
+single shared ledger with no force/reclaim/delete; injected-transport attempt machinery; hard-blocked
+live path), `scripts/prewarm_prompt_cache.py` (CLI: dry-run default, `--live` hard-blocked),
+`tests/test_final_provider_prompt_cache_prewarm_implementation.py` (33 tests, 32-row matrix + fakes only).
+`logging_setup.py`, `core/turn_timing.py`, the Composer/Verifier source files, `app.py`, and
+`core/startup_check.py` all kept unchanged. **Deviation (not on the literal allowlist):**
+`tests/test_final_provider_prompt_cache_prewarm_governance.py` — removed the one PRE-CODE assertion
+(`test_product_prewarm_modules_not_created_yet` + its `_FORBIDDEN_PRODUCT_FILES` tuple) that asserted the
+five Phase-2 files must not exist yet. That guard's job was to gate work *before* owner GO; with owner GO
+now given and those files legitimately created, it would fail on every future commit by construction —
+the exact, precedented handling PERF-2 applied to its own governance checker at `897cdb7`. No other
+assertion in that file was touched or weakened (35 passed post-deviation).
+
+### Architecture (as-built)
+
+- **Dry-run (default, zero provider calls, zero artifacts, no `attempt_id`):** loads the real client pack,
+  builds real Composer/Verifier messages, computes each role's fingerprint, prints only anonymized scalars
+  (client_id, role, model, `static_prefix_hash`, `corpus_sha256`, prefix chars, token estimate,
+  fingerprint, budget/retry). Never prints corpus/answer/contacts/SID/PII.
+- **Fingerprint (sec 5):** `static_prefix_hash` = SHA-256 of the actual assembled prefix, sliced from the
+  real builder output at the end of the corpus (never hand-assembled). Composite fingerprint over
+  `client_id | role | model | static_prefix_hash | corpus_sha256 | PROMPT_TEMPLATE_VERSION |
+  MESSAGE_SERIALIZATION_VERSION`. Composer and Verifier are proven-separate identities (different
+  `static_prefix_hash`, shared `corpus_sha256`).
+- **Attempt/ledger:** one run-level marker keyed by `attempt_id` alone via `O_EXCL`, created before the
+  first call; reusing an `attempt_id` is a hard error at creation (before any provider call); one shared
+  ledger records both roles; hard budget 2, `retry=0`; abort after the first provider error or observed-
+  model mismatch (remaining roles never called); a crashed/partial attempt is left non-`completed` and is
+  permanently consumed (no auto-resume, no `--force`/reclaim/delete anywhere). Response content is
+  discarded — only `.model` (observed provenance) and `.usage` (via existing `usage_dict_from_completion`,
+  including `cached_tokens`) are read; usage logged via the existing `log_llm_usage`.
+- **Model-pin (A9R2c defense):** requested (operator) vs configured (env/config accessor, read live) vs
+  observed (provider response) are tracked/checked separately. A stale/mismatched configured model aborts
+  in preflight, before any marker/provider call; an observed mismatch aborts after the first call at most.
+- **Live gate:** `LIVE_ACTIVATION_AUTHORIZED = False`. `--live` runs the model-pin + fingerprint preflight
+  (both abort before marker/call), then returns a dedicated BLOCKED outcome — still before any marker write
+  or provider call. The real transport (`live_provider_call` → `chat_completions_create`) is defined but
+  unreached; flipping the gate + wiring it is the separate LIVE milestone.
+
+### CLI exit codes / examples
+
+`0` dry-run OK · `2` usage error · `3` preflight mismatch (model-pin/fingerprint) · `4` live blocked.
+
+- Dry-run: `python scripts/prewarm_prompt_cache.py --client-id demo` → exit 0, `provider_calls=0 markers=0`.
+- Blocked live: same with `--live --attempt-id <id> --expected-{composer,verifier}-model <m>
+  --expected-{composer,verifier}-fingerprint <hex>` → exit 4, `0 provider calls, 0 markers`.
+
+### Test results
+
+- New `tests/test_final_provider_prompt_cache_prewarm_implementation.py` — **33 passed** (fakes only; zero
+  network/provider calls; ledger machinery exercised in `tmp_path`; CLI dry-run/blocked-live via subprocess).
+- `tests/test_final_provider_prompt_cache_prewarm_governance.py` (post-deviation) — **35 passed**.
+- PERF-0/1/2 neighbor governance suites — **56 passed**.
+- `git diff --check` clean (staged and unstaged).
+
+### Confirmations
+
+- **Zero real provider calls** anywhere in the CLI or tests: dry-run and blocked-live never reach
+  `chat_completions_create`; the attempt machinery uses an injected fake transport in tests.
+- **Runtime unchanged:** no `app.py`/startup/orchestration/widget/user-turn change; a guard test asserts no
+  non-CLI/non-test file imports `core.target_prompt_cache_prewarm`, and that `app.py`/`core/startup_check.py`
+  contain no `prewarm` reference. Per-real-turn LLM call count untouched.
+- No Composer/Verifier prompt/policy change; no answer-cache; no streaming text; no Boundary change; no
+  Ingress+Planner merge; no TSC-C/D; no client data/frozen artifact touched; no second usage logger; no
+  automatic startup prewarm; no unrelated test debt.
+
+## STOP (PERF-3 implementation)
+
+After completion record + push — **STOP** before any PERF-3 `--live` activation, which requires a separate
+explicit owner LIVE/LLM GO.
+
+---

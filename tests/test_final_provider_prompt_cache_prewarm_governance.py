@@ -1,19 +1,30 @@
 """PRE-CODE checker for FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3 (Phase 1 only).
 
-Covers the governance correction (manual CLI only): Phase 2 scope is narrowed to Option B
-(owner-controlled CLI) alone -- Option C (automatic startup prewarm) is explicitly deferred
-to a separate future milestone, with no app.py change, no runtime flag, and no startup/
-background hook anywhere in this milestone's implementation allowlist. Provider cache
-terminology is corrected (provider-side state at DashScope/Qwen, not process-local; a Flask
-restart does not by itself cold the provider's cache). The fingerprint design includes an
-explicit, directly-verifiable static-prefix hash. Duplicate-run protection is a file-based
-exclusive attempt ledger (correct for a short-lived CLI process), not an in-memory counter.
-Also enforces: no product prewarm/CLI modules exist yet, no provider calls of any kind, the
-seam audit proves prefix identity via verbatim reuse of the existing Composer/Verifier
-message builders, Composer/Verifier are proven-separate namespaces, live budget <= 2 with
-retry=0 and abort-on-mismatch, dry-run makes zero provider calls, no PII/session/
-answer-cache, log_llm_usage reuse (no second usage logger), and the two-gate rollout
-(implementation GO + separate future LIVE/LLM permission) is documented.
+Covers the governance correction, second revision (attempt lifecycle): separates cache
+identity -- (client_id, model, role, static_prefix_hash, fingerprint), descriptive/audit
+data only -- from an owner-authorized live attempt, identified by a separate, explicit,
+immutable attempt_id. Exactly one run-level attempt marker exists per CLI invocation, keyed
+by attempt_id alone (never by client_id/role/fingerprint -- that was the flaw the prior
+revision had: a permanent per-fingerprint marker would block every future legitimate
+re-warm after an unknown provider TTL expired, forever). Composer and Verifier calls for
+one attempt land in the same shared ledger. Reusing the same attempt_id is forbidden; a new
+attempt_id for an unchanged fingerprint is fully supported (with a new owner GO). Crashed or
+partial attempts remain permanently consumed -- no --force, no reclaim, no delete mechanism
+exists anywhere.
+
+Also covers the first revision's correction (manual CLI only): Phase 2 scope is narrowed to
+Option B (owner-controlled CLI) alone -- Option C (automatic startup prewarm) is explicitly
+deferred to a separate future milestone, with no app.py change, no runtime flag, and no
+startup/background hook anywhere in this milestone's implementation allowlist. Provider
+cache terminology is corrected (provider-side state at DashScope/Qwen, not process-local).
+
+Also enforces: no product prewarm/CLI/attempt modules exist yet, no provider calls of any
+kind, the seam audit proves prefix identity via verbatim reuse of the existing
+Composer/Verifier message builders, Composer/Verifier are proven-separate namespaces, live
+budget <= 2 with retry=0 and abort-on-mismatch, dry-run makes zero provider calls and creates
+zero artifacts, no PII/session/answer-cache, log_llm_usage reuse (no second usage logger),
+and the two-gate rollout (implementation GO + separate future LIVE/LLM permission) is
+documented.
 """
 
 from __future__ import annotations
@@ -51,6 +62,7 @@ TASK_HEADER = f"# TASK — {MILESTONE} / PERF-3 (governance)"
 # mean product implementation started before PRE-CODE + a separate owner GO.
 _FORBIDDEN_PRODUCT_FILES = (
     _REPO_ROOT / "contracts" / "target_prompt_cache_fingerprint.py",
+    _REPO_ROOT / "contracts" / "target_prompt_cache_attempt.py",
     _REPO_ROOT / "core" / "target_prompt_cache_prewarm.py",
     _REPO_ROOT / "scripts" / "prewarm_prompt_cache.py",
     _REPO_ROOT / "tests" / "test_final_provider_prompt_cache_prewarm_implementation.py",
@@ -265,20 +277,28 @@ def test_forbidden_phase1_actions_documented() -> None:
 
 def test_acceptance_matrix_documented() -> None:
     audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
-    for n in range(1, 25):
+    for n in range(1, 33):
         assert f"| {n} |" in audit, n
     for label in (
         "dry-run mode",
+        "attempt marker creation",
+        "attempt marker required fields",
         "composer warm call",
         "verifier warm call",
+        "one shared ledger per attempt",
         "total call budget",
-        "exclusive attempt ledger",
+        "reusing the same",
+        "new `attempt_id`",
+        "crash/partial attempt",
+        "no `--force`",
         "warm response content discarded",
+        "fingerprint recorded for audit only",
         "namespaces proven distinct",
         "message/token prefix identity",
         "no pii/session",
         "automatic startup prewarm not exercised",
         "stale fingerprint never considered warm",
+        "attempt marker does not imply provider warmth",
     ):
         assert label.lower() in audit.lower(), label
 
@@ -287,11 +307,104 @@ def test_implementation_allowlist_present() -> None:
     section = _task_section()
     for path in (
         "contracts/target_prompt_cache_fingerprint.py",
+        "contracts/target_prompt_cache_attempt.py",
         "core/target_prompt_cache_prewarm.py",
         "scripts/prewarm_prompt_cache.py",
         "tests/test_final_provider_prompt_cache_prewarm_implementation.py",
     ):
         assert path in section, path
+
+
+def test_attempt_marker_keyed_by_attempt_id_not_fingerprint() -> None:
+    """The core fix: marker path/key must be attempt_id alone, never
+    client_id/role/fingerprint -- that was the flaw permanently blocking re-warms."""
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        normalized = " ".join(text.split()).lower()
+        assert "keyed" in normalized and "attempt_id" in normalized, label
+        assert (
+            "not by fingerprint" in normalized
+            or "not by client_id" in normalized
+            or "not client_id/role/fingerprint" in normalized
+            or "не по fingerprint" in normalized
+            or "не по client_id" in normalized
+        ), label
+
+
+def test_fingerprint_stays_cache_identity_inside_marker() -> None:
+    """Fingerprint is descriptive/audit data recorded inside the marker -- never the
+    marker's own lookup key."""
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    lowered = audit.lower()
+    assert "cache identity" in lowered
+    assert "never used as" in lowered or "never a lookup" in lowered or "descriptive" in lowered
+
+
+def test_one_marker_per_run_not_permanent_per_role_fingerprint() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    lowered = audit.lower()
+    assert "one run-level attempt marker" in lowered or "run-level marker" in lowered
+    assert "permanent" in lowered  # names the prior flaw explicitly, not silently
+
+
+def test_new_attempt_id_enables_future_rewarm() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        normalized = " ".join(text.replace("`", "").split()).lower()
+        assert (
+            "new attempt_id" in normalized
+            or "новым attempt_id" in normalized
+            or "новый attempt_id" in normalized
+            or "differently-attempt_id" in normalized
+        ), label
+        assert "new owner go" in normalized or "новым owner go" in normalized or "новый owner go" in normalized, label
+
+
+def test_reuse_of_attempt_id_forbidden() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        lowered = text.lower()
+        assert "reus" in lowered  # reusing / reused / повтор
+        assert "forbidden" in lowered or "запрещен" in text.lower() or "запрещён" in text, label
+
+
+def test_crash_partial_attempt_consumed() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        lowered = text.lower()
+        assert "crash" in lowered, label
+        assert "consumed" in lowered or "consumed" in text.lower(), label
+        assert "auto-resume" in lowered or "resume" in lowered, label
+
+
+def test_no_force_reclaim_delete_override() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    task = _task_section()
+    for label, text in (("seam audit", audit), ("TASK.md", task)):
+        lowered = text.lower()
+        assert "--force" in lowered or "force" in lowered, label
+        assert "reclaim" in lowered, label
+        assert "delete" in lowered, label
+
+
+def test_one_shared_ledger_for_composer_and_verifier() -> None:
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    lowered = audit.lower()
+    assert "one shared ledger" in lowered or "same single marker/ledger file" in lowered or "shared ledger" in lowered
+    assert "not two separate" in lowered or "never two separate" in lowered
+
+
+def test_attempt_marker_never_implies_provider_warmth() -> None:
+    """Explicit clarification required by the correction: the marker proves only the
+    fact/state of that one run -- never that the provider cache is still warm."""
+    audit = SEAM_AUDIT_PATH.read_text(encoding="utf-8")
+    lowered = audit.lower()
+    assert "proves only" in lowered
+    assert "still warm" in lowered
 
 
 def test_no_app_py_or_runtime_flag_in_implementation_allowlist() -> None:

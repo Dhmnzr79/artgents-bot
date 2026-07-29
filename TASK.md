@@ -6893,13 +6893,29 @@ INGRESS+PLANNER MERGE / NO CLIENT DATA/FROZEN ARTIFACTS / NO TSC-C / NO TSC-D**
 `build_composer_sdk_messages`/`build_verifier_sdk_messages` дословно) — но не доказывает и не может
 доказать реальный cache-hit provider'а без live-вызова, что запрещено в Phase 1.
 
-## Governance correction (this revision)
+## Governance correction (first revision)
 
 Первая версия этой секции выбирала **B + C** (ручной CLI и автоматический async startup hook в
 `app.py`). Владелец сузил объём: Phase 2 теперь — **только B** (ручной CLI). C откладывается в отдельный
 future milestone, до измеренных результатов CLI. Также исправлена терминология (provider cache — на
 стороне DashScope/Qwen, не process-local; перезапуск Flask сам по себе не обязательно cold'ит cache) и
 смягчена формулировка про identical prefix (message/token content, не HTTP wire-byte identity).
+
+## Governance correction (second revision — attempt lifecycle)
+
+Первая версия design'а duplicate-run защиты использовала **permanent** O_EXCL marker с ключом
+`(client_id, role, fingerprint)`. Поскольку fingerprint не меняется, когда provider-side cache просто
+истекает по неизвестному TTL, такой design навсегда блокировал бы любой будущий законный повторный
+прогрев неизменившегося fingerprint. Исправление разделяет два понятия:
+
+1. **Cache identity** — `(client_id, model, role, static_prefix_hash, fingerprint)` — описывает, ЧТО
+   прогревается. Это descriptive/audit data, никогда не используется как lookup-ключ, который что-то
+   блокирует или разрешает.
+2. **Owner-authorized live attempt** — отдельный, явный, immutable `attempt_id`, обязательный аргумент
+   CLI только в будущем `--live` режиме (никогда не в dry-run, никогда не auto-generated). Marker —
+   один на весь run, keyed **по `attempt_id`**, не по fingerprint/role. Новый `attempt_id` с
+   неизменившимся fingerprint создаёт новый marker без трения — именно это делает законный re-warm после
+   истечения неизвестного TTL возможным. Запрещено только повторное использование ТОГО ЖЕ `attempt_id`.
 
 ## Normative rules (binding for Phase 2 implementation)
 
@@ -6930,13 +6946,30 @@ future milestone, до измеренных результатов CLI. Такж
     invalidation table. **Важно:** cold/miss также может произойти из-за provider-side TTL expiry или
     provider-side cache clear — эти два триггера **невидимы локально**, fingerprint не меняется, только
     live measurement (`cached_tokens`) может их обнаружить.
-12. Hard budgets: максимум 1 Composer + 1 Verifier warm call = **максимум 2 provider calls** на
-    `client_id`/`model`/`fingerprint` за один запуск CLI; `retry=0` (matches the existing
-    `call_count > 1: raise ..._retry_forbidden` discipline already used by Composer/Verifier/Boundary
-    live backends); abort после первого unexpected provider/model mismatch — оставшийся запланированный
-    call не выполняется. Duplicate-run защита — **exclusive attempt ledger** (файл с O_EXCL-семантикой,
-    ключ `(client_id, role, fingerprint)`), не in-memory счётчик (CLI — короткоживущий процесс без
-    общей памяти между запусками).
+12. Hard budgets: максимум 1 Composer + 1 Verifier warm call = **максимум 2 provider calls** на один
+    attempt (`attempt_id`); `retry=0` (matches the existing `call_count > 1: raise ..._retry_forbidden`
+    discipline already used by Composer/Verifier/Boundary live backends); abort после первого
+    unexpected provider/model mismatch — оставшийся запланированный call не выполняется, `status`
+    становится `"aborted"`/`"failed"`.
+19. **Attempt lifecycle (governance correction, second revision):** `attempt_id` — обязательный, явный
+    аргумент CLI **только** в `--live` режиме (никогда auto-generated, никогда нужен в dry-run). Перед
+    первым provider call CLI создаёт **ровно один run-level attempt marker на весь запуск**, через
+    O_EXCL, **keyed исключительно по `attempt_id`** (не по client_id/role/fingerprint). Composer и
+    Verifier calls отражаются в этом ЖЕ marker/ledger файле (один shared ledger на attempt, не два
+    отдельных per-role файла). Marker хранит: `attempt_id`, `client_id`, `model`, `composer_fingerprint`,
+    `verifier_fingerprint`, `planned_roles`, `budget=2`, `retry=0`, `status`, `started_at`/`completed_at`,
+    `calls_started`/`calls_completed`.
+20. Повторное использование ТОГО ЖЕ `attempt_id` запрещено — второй запуск с уже использованным
+    `attempt_id` падает на этапе создания marker'а, до какого-либо provider call. Новый прогрев того же
+    (неизменившегося) fingerprint после TTL возможен ТОЛЬКО с новым owner GO и новым `attempt_id` —
+    никогда через `--force`, delete или reclaim marker'а (таких механизмов не существует нигде в CLI).
+    Crashed/partial attempt (процесс убит на середине) остаётся в последнем записанном,
+    не-`"completed"` статусе навсегда — считается consumed, никогда не auto-resume'ится без нового
+    owner GO и нового `attempt_id`.
+21. Attempt marker доказывает только факт и финальное состояние ОДНОГО конкретного, owner-authorized
+    запуска. Он **не означает**, что provider cache всё ещё warm — тёплость подтверждается только
+    реальным `cached_tokens` в live measurement (см. п.14), никогда не выводится из самого факта
+    существования marker'а или статуса `"completed"`.
 13. Composer и Verifier — разные cache namespaces. **Доказано эмпирически в seam audit §3**, не просто
     осторожный дефолт: их message arrays diverge starting at `message[0]` (different system policy
     text), so a Composer prewarm can never hit Verifier's cache or vice versa.
@@ -7009,8 +7042,8 @@ by a live measurement; every locally-observable component change invalidates the
 | Observability | `log_llm_usage` (`logging_setup.py:272-288`) already reads `cached_tokens`; ~15 existing `call_type` values, CLI needs its own new one |
 | Already-observed caching | `cached_tokens` already appears in real logs today, with **no deliberate prewarm mechanism** — implicit turn-to-turn caching already happening, which directly informed ruling out Option D |
 
-Full map, exact message prefixes, invalidation table, cost/budget, failure semantics, A-E comparison, and
-24-row acceptance matrix:
+Full map, exact message prefixes, invalidation table, attempt lifecycle, cost/budget, failure semantics,
+A-E comparison, and 32-row acceptance matrix:
 `docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`.
 
 ## Allowlist (governance commit only)
@@ -7039,10 +7072,11 @@ Full map, exact message prefixes, invalidation table, cost/budget, failure seman
 
 | File | Action |
 |---|---|
-| `contracts/target_prompt_cache_fingerprint.py` | CREATE — `TargetPromptCacheFingerprint` frozen dataclass |
-| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure, including `static_prefix_hash`), dry-run message assembly (reuses `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), exclusive attempt-ledger, live call path (only under `--live`), fail-open/abort-on-mismatch, `log_llm_usage` with a new `call_type` |
-| `scripts/prewarm_prompt_cache.py` | CREATE — CLI entry point (argument parsing, `client_id`, `--live`, expected model/fingerprint preflight, dry-run vs live dispatch) |
-| `tests/test_final_provider_prompt_cache_prewarm_implementation.py` | CREATE — acceptance matrix (24 rows, seam audit §14) |
+| `contracts/target_prompt_cache_fingerprint.py` | CREATE — `TargetPromptCacheFingerprint` frozen dataclass — cache identity only, never a lookup/lifecycle key |
+| `contracts/target_prompt_cache_attempt.py` | CREATE — `TargetPromptCacheAttempt` frozen dataclass: `attempt_id`, `client_id`, `model`, `composer_fingerprint`, `verifier_fingerprint`, `planned_roles`, `budget=2`, `retry=0`, `status`, `started_at`/`completed_at`, `calls_started`/`calls_completed` |
+| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure, including `static_prefix_hash`), dry-run message assembly (reuses `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), `attempt_id`-keyed exclusive marker (one shared ledger per attempt, no force/reclaim/delete), live call path (only under `--live`), fail-open/abort-on-mismatch, `log_llm_usage` with a new `call_type` |
+| `scripts/prewarm_prompt_cache.py` | CREATE — CLI entry point (argument parsing, `client_id`, `--live`, required `--attempt-id` in live mode only, expected model/fingerprint preflight, dry-run vs live dispatch) |
+| `tests/test_final_provider_prompt_cache_prewarm_implementation.py` | CREATE — acceptance matrix (32 rows, seam audit §14) |
 
 **Explicitly NOT in this allowlist:** `app.py` (никаких изменений); любой startup/runtime-flag модуль;
 `static/widget/*`; любой orchestration/runtime-turn файл; background-worker/thread-pool компонент.
@@ -7053,16 +7087,20 @@ Full map, exact message prefixes, invalidation table, cost/budget, failure seman
 `core/startup_check.py` (untouched — no automatic prewarm this milestone); `/ask`/`/ask/stream` route
 parity; LLM call count for every real user turn.
 
-## Acceptance matrix (implementation — 24 scenarios)
+## Acceptance matrix (implementation — 32 scenarios)
 
-See seam audit §14 for the full table (cold request unaffected; dry-run 0 calls + output content limits;
-`--live` required + `client_id` required + preflight mismatch abort; exactly 1 Composer + 1 Verifier
-call; total budget ≤2; retry=0; abort on mismatch; exclusive ledger dedup; discarded warm-response
-content; anonymized ledger metadata only; full fingerprint composition; Composer/Verifier namespace
-separation; two-client separation; offline message/token prefix identity proof; zero provider calls in
-tests/CI; no PII/session; `cached_tokens` sourced from existing usage path (live-gated); automatic
-startup prewarm not exercised anywhere; client-pack validation unchanged; stale fingerprint never
-considered warm).
+See seam audit §14 for the full table (cold request unaffected; dry-run 0 calls + 0 artifacts + output
+content limits; `--live` required + `client_id` required + `--attempt-id` required + preflight mismatch
+abort; attempt marker created via O_EXCL keyed by `attempt_id` alone, before first call; marker records
+all required fields; exactly 1 Composer + 1 Verifier call in one shared ledger; total budget ≤2; retry=0;
+abort on mismatch; reusing the same `attempt_id` forbidden; new `attempt_id` for an unchanged fingerprint
+succeeds (the core fix); crash/partial attempt remains consumed forever, no auto-resume; no
+force/reclaim/delete mechanism exists; discarded warm-response content; anonymized marker metadata only;
+fingerprint recorded for audit but never used as the marker's key; Composer/Verifier namespace
+separation; two-client separation; offline message/token prefix identity proof; zero provider calls and
+zero artifacts in tests/CI; no PII/session; `cached_tokens` sourced from existing usage path (live-gated);
+automatic startup prewarm not exercised anywhere; client-pack validation unchanged; stale fingerprint
+never considered warm; attempt marker never implies provider warmth).
 
 ## Test commands
 
@@ -7081,12 +7119,21 @@ git diff --check
 - нужен файл вне implementation allowlist, включая любое изменение `app.py`;
 - нужно менять Composer/Verifier prompt/policy ради cache hit;
 - CLI reachable из `pytest`/import graph приложения;
-- tests/CI делают хотя бы один реальный provider call;
-- dry-run делает хотя бы один реальный provider call;
-- retry ≠ 0, budget > 2 calls, или нет exclusive attempt ledger против duplicate run;
+- tests/CI делают хотя бы один реальный provider call, или создают хотя бы один marker/ledger artifact;
+- dry-run делает хотя бы один реальный provider call, создаёт marker/ledger, или требует `attempt_id`;
+- `--live` запускается без явного `--attempt-id`;
+- attempt marker keyed НЕ по `attempt_id` (например, по client_id/role/fingerprint) — это ровно та
+  ошибка, которую исправляет эта коррекция;
+- тот же `attempt_id` используется повторно без ошибки;
+- существует `--force`, marker delete, или reclaim механизм в любом виде;
+- crashed/partial attempt автоматически resume'ится тем же `attempt_id` без нового owner GO;
+- retry ≠ 0, budget > 2 calls на attempt;
 - CLI не делает abort после первого unexpected provider/model mismatch;
 - fingerprint не включает все обязательные компоненты (п.10) или Composer/Verifier используют общий
   namespace;
+- fingerprint используется как lookup-ключ, который блокирует или разрешает attempt (вместо
+  descriptive-only роли внутри marker'а);
+- Composer и Verifier calls пишутся в разные ledger-файлы вместо одного shared ledger на attempt;
 - CLI читает raw user text, SID, session state, PII;
 - warm response content не discard'ится, сохраняется как answer, или создаёт answer-cache;
 - меняется число LLM-вызовов внутри пользовательского хода;
@@ -7096,6 +7143,7 @@ git diff --check
 - создаётся automatic startup prewarm, runtime flag, или background hook в `app.py` в рамках этого
   этапа;
 - provider cache называется/трактуется как process-local;
+- attempt marker трактуется как доказательство, что provider cache всё ещё warm;
 - LIVE-вызов происходит без отдельного явного owner LIVE/LLM разрешения (сверх owner GO на
   implementation).
 

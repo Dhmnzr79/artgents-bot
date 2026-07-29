@@ -40,6 +40,29 @@ No other section's core finding changed: prefix identity (in the corrected, hone
 provable from code (§2-§7); Composer and Verifier are still proven-separate namespaces (§3); the TTL and
 actual cache-hit behavior are still unknown and not guessed (§8).
 
+## Governance correction (second revision) — separating cache identity from attempt lifecycle
+
+The prior revision's duplicate-run protection had a real design flaw: it used a **permanent** O_EXCL
+marker keyed by `(client_id, role, fingerprint)`. Since the fingerprint does not change when the
+provider's cache simply goes cold (TTL expiry is invisible locally — §6), that design would have
+**permanently blocked every future legitimate re-warm** of an unchanged fingerprint, forever, even
+after the provider's actual cache had long since expired. This revision fixes it by separating two
+concepts that were wrongly conflated into one key:
+
+1. **Cache identity** — `(client_id, model, role, static_prefix_hash, fingerprint)` (§5) — describes
+   *what content* would be warmed. It is descriptive/audit data. **It is never used as a lookup key that
+   blocks or permits an attempt.**
+2. **Owner-authorized live attempt** — a separate, explicit, immutable **`attempt_id`**, supplied by the
+   operator only in the future `--live` mode (never in dry-run). Each CLI invocation that reaches
+   `--live` is exactly one attempt, gets exactly one run-level marker, keyed by `attempt_id` — not by
+   fingerprint, not by role. A fresh attempt_id always gets a fresh marker path; nothing about a
+   previously-warmed fingerprint ever blocks it. What IS forbidden is reusing the **same** `attempt_id`
+   value twice (§7) — that is a bug/replay guard, not a content-based cache-warming throttle.
+
+This means re-warming an unchanged fingerprint after an unknown TTL has expired is fully supported by
+design: it simply requires a new owner GO and a new `attempt_id` — never blocked by the fingerprint
+itself, and never requiring any `--force`/reclaim/delete override (none exists).
+
 ## Governing principle (binding, restated)
 
 **Do not implement prewarm until it is proven that the warming request produces the same message/token
@@ -227,6 +250,14 @@ required). The two explicit version ints exist for human auditability and for th
 content-hashing cannot catch on its own (restructuring the assembly code without changing the resulting
 text) — an explicit escape hatch, not an assumption.
 
+**Governance correction (second revision) — fingerprint is cache identity, not an attempt-lifecycle
+key.** This fingerprint (and its `static_prefix_hash`/`corpus_sha256` components) is recorded *inside* a
+live attempt's marker for audit/description purposes (§7) — it is never used as the marker's file path
+or as any kind of lookup key that permits or blocks a CLI run. That role belongs exclusively to the
+separate, explicit `attempt_id` described in §7. Conflating the two was the exact flaw this correction
+fixes: keying duplicate-run protection off a content fingerprint would permanently block all future
+re-warms of unchanged content, even long after an unknown provider TTL had expired.
+
 ## 6. Invalidation table — cold/miss triggers (corrected terminology)
 
 The provider's cache is **provider-side state** (at DashScope/Qwen), not something this process owns or
@@ -270,29 +301,64 @@ satisfies rule 5 (no user text/SID/session/PII/phone — the placeholder is a fi
 from any real request) and rule 6 (only the static approved prefix is meaningfully "warmed"; the
 placeholder tail is not content anyone cares about caching).
 
-**Dry-run mode (default, zero provider calls):** loads the real client pack via the existing
-`load_target_runtime_client_context(client_id)`, builds the real Composer/Verifier messages via the real
-`build_*_sdk_messages` functions, computes the fingerprint (§5), and prints **only**: `client_id`, `role`,
-`model`, `static_prefix_hash`, `corpus_sha256`, prefix length (characters) and an estimated token count,
-and the composite fingerprint. It never prints `corpus_text` itself, any synthetic answer, contact
-information, or any other client-pack content — only hashes and small scalar metadata.
+**Dry-run mode (default, zero provider calls, zero artifacts):** loads the real client pack via the
+existing `load_target_runtime_client_context(client_id)`, builds the real Composer/Verifier messages via
+the real `build_*_sdk_messages` functions, computes the fingerprint for each role (§5), and prints
+**only**: `client_id`, `role`, `model`, `static_prefix_hash`, `corpus_sha256`, prefix length (characters)
+and an estimated token count, the composite fingerprint per role, and the planned budget (Composer ≤1,
+Verifier ≤1, total ≤2). It never prints `corpus_text` itself, any synthetic answer, contact information,
+or any other client-pack content — only hashes and small scalar metadata. **Dry-run never creates an
+attempt marker, never writes to the ledger, and never requires an `attempt_id` at all** — it is pure
+read/compute/print.
 
-**Live mode (`--live`, explicit, separate owner GO required):** before any attempt-marker write or
-provider call, performs a preflight check comparing the freshly-computed fingerprint against an
-operator-supplied expected model/fingerprint value; aborts immediately on any mismatch (§10, §11). On
-match, writes an **exclusive attempt ledger entry** (a file created with exclusive-create/`O_EXCL`
-semantics, keyed by `(client_id, role, fingerprint)`) *before* calling the provider — a second CLI
-invocation for the same key, whether accidental (operator re-running the script) or concurrent (two
-operators), finds the ledger entry already present and refuses to place a duplicate call. This is the
-correct mechanism for a short-lived CLI process (no shared in-process memory between invocations), unlike
-an in-memory counter, which would only work for a long-running server process.
+**Live mode (`--live`, explicit, separate future owner LIVE/LLM permission required) — attempt
+lifecycle (governance correction, second revision):**
+
+1. **`attempt_id` is a required, explicit CLI argument in `--live` mode only** (never auto-generated by
+   the script, never required or accepted in dry-run) — this ties every live activation to a specific,
+   operator-supplied value that is part of the deliberate owner-authorization act itself, not something
+   the tool invents on the operator's behalf.
+2. Before any marker write or provider call, the CLI performs a **preflight check**: the freshly-computed
+   fingerprints (Composer and Verifier) are compared against operator-supplied expected model/fingerprint
+   values; any mismatch aborts immediately, before anything is written or called.
+3. On a matching preflight, the CLI creates **exactly one run-level attempt marker for the whole
+   invocation**, at a path keyed **by `attempt_id` alone** (e.g.
+   `.prewarm_ledger/attempts/{attempt_id}.json`) — via exclusive-create/`O_EXCL` semantics, **before the
+   first provider call**. This is the file that both proves the attempt happened and prevents that exact
+   `attempt_id` from ever being used again (reuse is a hard error at this exact step, before any provider
+   call). Fingerprint/role/client_id are **not** part of this path — a different `attempt_id` with an
+   unchanged fingerprint creates a brand-new marker without friction, which is precisely what makes a
+   legitimate re-warm after an unknown TTL expiry possible (§6).
+4. The marker records, at creation and updated as the attempt proceeds: `attempt_id`, `client_id`,
+   requested/configured `model`, `composer_fingerprint`, `verifier_fingerprint`, `planned_roles` (e.g.
+   `["composer", "verifier"]`), `budget` (fixed at 2), `retry` (fixed at 0), `status`
+   (`"started"` → `"completed"` | `"aborted"` | `"failed"`), `started_at`/`completed_at` timestamps, and
+   running `calls_started`/`calls_completed` counters.
+5. **Composer and Verifier calls are both recorded in this same single marker/ledger file for the
+   attempt** — one shared ledger per attempt, not two separate per-role files. Each call increments
+   `calls_started` immediately before the provider call and `calls_completed` immediately after a
+   successful response.
+6. On the first unexpected provider/model mismatch or provider error for either role, the CLI **aborts
+   the remainder of the attempt**: `status` is set to `"aborted"`/`"failed"`, `completed_at` is recorded,
+   and the other planned role (if not yet attempted) is never called. `retry=0` throughout — no call is
+   ever repeated within an attempt.
+7. **Once created, an attempt marker is permanently consumed — successful, aborted, failed, or crashed
+   (process killed mid-run, marker left in `"started"` forever) all count as consumed.** There is no
+   `--force` flag, no marker-delete tooling, no reclaim mechanism anywhere in the CLI or its supporting
+   module. A crashed or partial attempt is never auto-resumed or retried by the same `attempt_id` — the
+   operator must obtain a new owner GO and a new `attempt_id` to try again, exactly like any other
+   re-warm.
+8. **The attempt marker proves only the fact and final state of that one specific, owner-authorized run
+   — it does not mean, and must never be read as meaning, that the provider's prompt cache is still
+   warm.** Warmth itself is only ever confirmed by an actual `cached_tokens` value in a live measurement
+   (§8), never inferred from a marker's mere existence or `"completed"` status.
 
 **Warm response handling (rule 8):** the provider's actual response content (the composed answer text /
 verifier issues JSON) is **discarded** immediately after the usage object is read — never written to
 session, never shown to any user, never persisted anywhere as answer text. Only anonymized
-usage/result metadata is recorded in the ledger: `client_id`, `role`, `model`, fingerprint, timestamp,
-`cached_tokens` (if the provider reports it), and success/failure status. This is not an answer-cache and
-never becomes one.
+usage/result metadata is recorded in the marker/ledger (the fields listed in step 4 above, plus
+`cached_tokens` if the provider reports it, per call). This is not an answer-cache and never becomes
+one.
 
 ## 8. What the provider actually caches, and what remains genuinely unknown
 
@@ -368,25 +434,31 @@ built, wired, or exercised in this milestone.
 
 ## 10. Cost / call budget
 
-Per CLI invocation, for one `client_id`: **at most one Composer warm call and at most one Verifier warm
-call — total maximum 2 provider calls**, gated by the exclusive attempt ledger (§7) so that re-running the
-CLI for an already-attempted `(client_id, role, fingerprint)` key never places a duplicate call.
-`retry=0` (§11). If the live preflight check (fingerprint/model mismatch) fails, or if the first call's
-result is an unexpected provider/model mismatch, the CLI **aborts immediately** — it does not proceed to
-attempt the second (Verifier, if Composer ran first) call in the same invocation. This is small, bounded,
-operator-visible, and cheap relative to the ~26,500-token static prefix's one-time cost.
+Per attempt (one `attempt_id`, one CLI `--live` invocation), for one `client_id`: **at most one Composer
+warm call and at most one Verifier warm call — total maximum 2 provider calls**, recorded in that
+attempt's own marker (§7). Budget is scoped to the attempt, not to the fingerprint — a later attempt
+(new `attempt_id`, new owner GO) for the same fingerprint gets its own fresh 2-call budget; nothing
+about a prior attempt's consumed budget carries over or accumulates. `retry=0` (§11). If the live
+preflight check (fingerprint/model mismatch) fails, or if the first call's result is an unexpected
+provider/model mismatch, the CLI **aborts immediately** — it does not proceed to attempt the second
+(Verifier, if Composer ran first) call in the same attempt. This is small, bounded, operator-visible, and
+cheap relative to the ~26,500-token static prefix's one-time cost.
 
 ## 11. Failure semantics (fail-open for the CLI itself; binding)
 
-A CLI prewarm attempt failing (timeout, provider error, malformed response, preflight mismatch, ledger
-already present) must never retry (`retry=0`, matching the existing
+A CLI prewarm attempt failing (timeout, provider error, malformed response, preflight mismatch,
+`attempt_id` already used) must never retry (`retry=0`, matching the existing
 `call_count > 1: raise ..._retry_forbidden` single-attempt discipline already used by Composer/Verifier/
 Boundary live backends at `core/target_runtime_llm_backends.py:73-78,121-126,180-185` — the same idiom,
-not a new one) and must **abort the remainder of that invocation** on the first unexpected
-provider/model mismatch rather than attempting further calls. Since the CLI is entirely separate from the
-running application, "fail-open" here means: a failed or aborted CLI run has **zero effect** on the bot's
-ability to serve real traffic — the bot continues exactly as it does today whether or not the CLI was ever
-run, or whether it succeeded or failed. Nothing in the application depends on the CLI having run.
+not a new one) and must **abort the remainder of that attempt** on the first unexpected provider/model
+mismatch rather than attempting further calls. A crashed process mid-attempt leaves the marker
+permanently in its last-written, non-`"completed"` status — this counts as consumed, exactly like a
+clean abort; there is no difference in outcome between "cleanly aborted" and "crashed," both burn that
+`attempt_id` forever, and neither is auto-resumable. Since the CLI is entirely separate from the running
+application, "fail-open" here means: a failed, aborted, or crashed CLI run has **zero effect** on the
+bot's ability to serve real traffic — the bot continues exactly as it does today whether or not the CLI
+was ever run, or whether it succeeded, failed, or crashed. Nothing in the application depends on the CLI
+having run.
 
 ## 12. Options comparison (A–E)
 
@@ -408,7 +480,8 @@ content-based caching (if any) is a candidate. Not carried forward — there is 
 - **TTL risk:** the CLI-to-first-real-request gap is operator-controlled (run it right before the demo
   starts), which is the *best* case for an unknown, possibly-short TTL (§8).
 - **Duplicate calls under reloader/multiworker:** not applicable at all (§9) — a standalone script
-  process, never part of the running app.
+  process, never part of the running app. Duplicate/replay protection within a single attempt is the
+  `attempt_id`-keyed marker (§7), scoped to that one owner-authorized run, never to the fingerprint.
 - **Failure behavior:** trivially fail-open for the application (§11) — a failed warm-up script just means
   the first real request is cold, exactly like today.
 - **Multi-client scaling:** run once per `client_id` in `ALLOWED_CLIENTS`, operator-driven — scales
@@ -471,9 +544,10 @@ it can be, via reuse discipline, so E is not selected.
 
 | File | Action |
 |---|---|
-| `contracts/target_prompt_cache_fingerprint.py` | CREATE — `TargetPromptCacheFingerprint` frozen dataclass (§5) |
-| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure, including `static_prefix_hash`), dry-run message assembly (reusing `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), the exclusive attempt-ledger mechanism, the live `chat_completions_create` call path (only exercised when the CLI passes `--live`), fail-open/abort-on-mismatch wrapping, `log_llm_usage` call with a new `call_type` |
-| `scripts/prewarm_prompt_cache.py` | CREATE — the CLI entry point itself: argument parsing (`client_id`, `--live`, expected model/fingerprint for preflight), dry-run vs. live dispatch, calls into `core/target_prompt_cache_prewarm.py` |
+| `contracts/target_prompt_cache_fingerprint.py` | CREATE — `TargetPromptCacheFingerprint` frozen dataclass (§5) — cache identity only, never used as a lookup/lifecycle key |
+| `contracts/target_prompt_cache_attempt.py` | CREATE — `TargetPromptCacheAttempt` frozen dataclass: `attempt_id`, `client_id`, `model`, `composer_fingerprint`, `verifier_fingerprint`, `planned_roles`, `budget` (fixed 2), `retry` (fixed 0), `status`, `started_at`, `completed_at`, `calls_started`, `calls_completed` (§7) |
+| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure, including `static_prefix_hash`), dry-run message assembly (reusing `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), the `attempt_id`-keyed exclusive marker mechanism (create-before-first-call, one shared ledger per attempt, no force/reclaim/delete), the live `chat_completions_create` call path (only exercised when the CLI passes `--live`), fail-open/abort-on-mismatch wrapping, `log_llm_usage` call with a new `call_type` |
+| `scripts/prewarm_prompt_cache.py` | CREATE — the CLI entry point itself: argument parsing (`client_id`, `--live`, required `--attempt-id` in live mode only, expected model/fingerprint for preflight), dry-run vs. live dispatch, calls into `core/target_prompt_cache_prewarm.py` |
 | `tests/test_final_provider_prompt_cache_prewarm_implementation.py` | CREATE — acceptance matrix (§14) |
 
 **Explicitly NOT in this allowlist (governance correction):** `app.py` (no changes of any kind); any
@@ -486,34 +560,42 @@ file (no request-path integration); any background-worker/thread-pool component.
 `core/startup_check.py` (untouched — no automatic prewarm in this milestone); `/ask`/`/ask/stream` route
 parity; LLM call count for every real user turn.
 
-## 14. Acceptance matrix (Phase 2 implementation — minimum coverage, 24 scenarios)
+## 14. Acceptance matrix (Phase 2 implementation — minimum coverage, 32 scenarios)
 
 | # | Scenario | Expected |
 |---|---|---|
 | 1 | First cold request (no prior CLI run) | Application behavior identical to today — no dependency on the CLI ever having run |
-| 2 | Dry-run mode | Zero provider calls; loads the real client pack; builds real Composer/Verifier messages via the existing builders; prints only hashes/model/role/prefix length/token estimate/fingerprint |
+| 2 | Dry-run mode | Zero provider calls, zero artifacts (no marker/ledger file, no `attempt_id` required); loads the real client pack; builds real Composer/Verifier messages via the existing builders; prints only hashes/model/role/prefix length/token estimate/fingerprint/planned budget |
 | 3 | Dry-run output content | Never prints `corpus_text`, any synthetic answer, contact info, or other client-pack content — hashes and scalar metadata only |
 | 4 | Live mode without `--live` | Never calls the provider — `--live` is required, not a default |
 | 5 | Live mode missing `client_id` | Refused before any provider call — `client_id` is a required argument |
-| 6 | Live mode preflight — expected model/fingerprint mismatch | Aborts before any attempt-marker write or provider call |
-| 7 | Composer warm call | Exactly one, via `build_composer_sdk_messages` verbatim |
-| 8 | Verifier warm call | Exactly one, via `build_verifier_sdk_messages` verbatim |
-| 9 | Total call budget | Never more than 2 provider calls in one CLI invocation (1 Composer + 1 Verifier) |
-| 10 | `retry=0` | Exactly one attempt per provider call, no internal retry loop |
-| 11 | Abort after unexpected provider/model mismatch | The remaining planned call (e.g. Verifier, if Composer's result was unexpected) is not attempted |
-| 12 | Exclusive attempt ledger — repeated CLI run, same fingerprint | Second run finds the ledger entry already present and does not place a duplicate provider call |
-| 13 | Warm response content discarded | Provider's actual answer/issues content is never written to session, never shown to any user, never persisted as answer text |
-| 14 | Ledger persists only anonymized metadata | `client_id`, `role`, `model`, fingerprint, timestamp, `cached_tokens` (if present), success/failure — no corpus/answer content |
-| 15 | Fingerprint includes all required components | `client_id`, `model`, `role`, `static_prefix_hash`, `corpus_sha256`, `PROMPT_TEMPLATE_VERSION`, `MESSAGE_SERIALIZATION_VERSION` |
-| 16 | Composer/Verifier namespaces proven distinct | Same `client_id`, same corpus — Composer and Verifier fingerprints differ (§3, §5) |
-| 17 | Two `client_id`s produce distinct fingerprints/ledger entries | No cross-client reuse assumed |
-| 18 | Message/token prefix identity (offline proof) | The CLI's assembled static prefix equals what a real Composer/Verifier call would build, up to the dynamic boundary — verified by direct comparison in a test, not claimed as HTTP wire-byte identity |
-| 19 | Tests/CI run | Zero real provider calls anywhere — dry-run path and any test invocation of the CLI module never reach `chat_completions_create` |
-| 20 | No PII/session in CLI payload or logs | Dynamic-tail fields are fixed non-PII placeholders (§7), never derived from any real request/session/SID/phone |
-| 21 | `cached_tokens` sourced from provider usage (live-gated) | Read via the existing `_cached_tokens_from_usage_obj`/`log_llm_usage` path (`logging_setup.py:238-248,272-288`) — no second usage-parsing implementation |
-| 22 | Automatic startup prewarm not exercised | No `app.py` change, no config flag, no background hook exists anywhere in this milestone's diff |
-| 23 | Client-pack validation unchanged | `scripts/validate_client_pack.py`'s behavior/output is unaffected by any prewarm code (no shared state, no import coupling) |
-| 24 | Stale fingerprint never considered warm | A fingerprint computed before a tracked component changed is never treated as still-valid after the change — no grace period, no partial match |
+| 6 | Live mode missing `--attempt-id` | Refused before any marker write or provider call — `attempt_id` is a required argument in `--live` mode only, never auto-generated |
+| 7 | Live mode preflight — expected model/fingerprint mismatch | Aborts before any attempt-marker write or provider call |
+| 8 | Attempt marker creation | Created via exclusive-create/`O_EXCL`, keyed by `attempt_id` alone (not client_id/role/fingerprint), before the first provider call |
+| 9 | Attempt marker required fields | Records `attempt_id`, `client_id`, `model`, `composer_fingerprint`, `verifier_fingerprint`, `planned_roles`, `budget=2`, `retry=0`, `status`, `started_at`/`completed_at`, `calls_started`/`calls_completed` |
+| 10 | Composer warm call | Exactly one, via `build_composer_sdk_messages` verbatim |
+| 11 | Verifier warm call | Exactly one, via `build_verifier_sdk_messages` verbatim |
+| 12 | One shared ledger per attempt | Composer's and Verifier's call records both land in the same attempt marker/ledger file — never two separate per-role files |
+| 13 | Total call budget | Never more than 2 provider calls in one attempt (1 Composer + 1 Verifier) |
+| 14 | `retry=0` | Exactly one attempt per provider call, no internal retry loop |
+| 15 | Abort after unexpected provider/model mismatch | The remaining planned call (e.g. Verifier, if Composer's result was unexpected) is not attempted; `status` becomes `"aborted"`/`"failed"` |
+| 16 | Reusing the same `attempt_id` | Forbidden — a second attempt with an already-used `attempt_id` fails at the marker-creation step, before any provider call |
+| 17 | New `attempt_id` for an unchanged fingerprint (simulated TTL-expiry re-warm) | Succeeds without friction — the unchanged fingerprint never blocks a fresh, differently-`attempt_id`'d attempt; this is the core fix this correction verifies |
+| 18 | Crash/partial attempt (process killed mid-attempt, simulated) | Marker remains in its last-written, non-`"completed"` status forever; that `attempt_id` is permanently consumed; no auto-resume |
+| 19 | No `--force`/reclaim/delete mechanism | Confirmed absent anywhere in the CLI or its supporting module — no code path exists to reopen, delete, or override a consumed marker |
+| 20 | Warm response content discarded | Provider's actual answer/issues content is never written to session, never shown to any user, never persisted as answer text |
+| 21 | Marker/ledger persists only anonymized metadata | The fields in row 9, plus `cached_tokens` (if present) per call — no corpus/answer content |
+| 22 | Fingerprint recorded for audit only | `composer_fingerprint`/`verifier_fingerprint` appear inside the marker as descriptive data; the marker's file path/key is `attempt_id` alone, never the fingerprint |
+| 23 | Composer/Verifier namespaces proven distinct | Same `client_id`, same corpus — Composer and Verifier fingerprints differ (§3, §5) |
+| 24 | Two `client_id`s produce distinct fingerprints | No cross-client reuse assumed |
+| 25 | Message/token prefix identity (offline proof) | The CLI's assembled static prefix equals what a real Composer/Verifier call would build, up to the dynamic boundary — verified by direct comparison in a test, not claimed as HTTP wire-byte identity |
+| 26 | Tests/CI run | Zero real provider calls anywhere, zero marker/ledger artifacts created — dry-run path and any test invocation of the CLI module never reach `chat_completions_create` |
+| 27 | No PII/session in CLI payload, logs, or marker | Dynamic-tail fields are fixed non-PII placeholders (§7), never derived from any real request/session/SID/phone |
+| 28 | `cached_tokens` sourced from provider usage (live-gated) | Read via the existing `_cached_tokens_from_usage_obj`/`log_llm_usage` path (`logging_setup.py:238-248,272-288`) — no second usage-parsing implementation |
+| 29 | Automatic startup prewarm not exercised | No `app.py` change, no config flag, no background hook exists anywhere in this milestone's diff |
+| 30 | Client-pack validation unchanged | `scripts/validate_client_pack.py`'s behavior/output is unaffected by any prewarm code (no shared state, no import coupling) |
+| 31 | Stale fingerprint never considered warm | A fingerprint computed before a tracked component changed is never treated as still-valid after the change — no grace period, no partial match |
+| 32 | Attempt marker does not imply provider warmth | A `"completed"` marker proves only that its specific authorized attempt ran and finished — it is never read anywhere as evidence the provider's cache is still warm; only a live `cached_tokens` measurement proves that |
 
 ## STOP
 

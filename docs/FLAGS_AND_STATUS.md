@@ -187,14 +187,21 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    (admission `Semaphore` + `ThreadPoolExecutor`) with a safe synchronous fallback under overload; `/ask`
    and LLM call count unchanged. Seam audit:
    `docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md`.
-   **FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2** (governance @ `aa633f2`) — третий этап: typed-contract
-   deterministic bypass of Medical Boundary's one blocking LLM call for **governed UI scope/stage clicks
-   only** (`bypass_governed_ui`) — the one category provably safe by construction (session-bound
-   ref-whitelist, deterministic TurnFrame, structurally cannot carry free text). Pure free-text price
-   lookup and exact FAQ audited and explicitly kept `required` — the typed capabilities needed to make
-   them safe (a restricted Composer price-materialization contract; a validated content-authority
-   registry) do not exist yet. Verifier remains unconditional after any bypass. Seam audit:
+   **FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2** implementation **COMPLETE** @ `897cdb7` —
+   typed-contract deterministic bypass of Medical Boundary's one blocking LLM call for **governed UI
+   scope/stage clicks only** (`bypass_governed_ui`) — the one category provably safe by construction
+   (session-bound ref-whitelist, deterministic TurnFrame, structurally cannot carry free text). Pure
+   free-text price lookup and exact FAQ audited and kept `required` — the typed capabilities needed to
+   make them safe do not exist yet. Verifier remains unconditional after any bypass. Seam audit:
    `docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md`.
+   **FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3** (governance @ `897cdb7`) — четвёртый этап: можно ли
+   безопасно и измеримо прогревать provider prompt cache для статических Composer/Verifier-префиксов.
+   Seam audit доказывает **prefix identity** из кода (Composer и Verifier — доказанно разные namespaces,
+   расходятся с первого символа system-сообщения); TTL и реальное cache-hit поведение provider'а остаются
+   неизвестными без live-вызова. Выбран вариант **B+C** (owner-controlled CLI + guarded async startup
+   hook, default OFF), с двумя воротами: owner GO на implementation, и отдельное owner LIVE/LLM
+   разрешение перед первой реальной активацией. Seam audit:
+   `docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`.
    Implementation **STOP** until PRE-CODE ✅ + owner GO.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 6. **FINAL_TEST_SUITE_CONVERGENCE (governance @ `1980ab7`):** 185 wide failures inventoried; TSC-A..D checkpoints defined. See `docs/TEST_SUITE_ARCHITECTURE.md`, `docs/evidence/testing/final_test_failure_inventory.json`. Implementation blocked until owner GO.

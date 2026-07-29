@@ -6870,3 +6870,214 @@ directly against the SSE payload in the HTTP-level test, not inferred.
 ## STOP (Phase 2 implementation)
 
 After completion record + push — **STOP** before PERF-3, per owner instruction.
+
+---
+
+# TASK — FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3 (governance)
+
+**Status:** governance only · **NO PRODUCT IMPLEMENTATION / NO PROVIDER CALLS / NO LIVE / NO LLM / NO
+COMPOSER/VERIFIER PROMPT CHANGE / NO ANSWER-CACHE / NO STREAMING TEXT / NO BOUNDARY CHANGES / NO
+INGRESS+PLANNER MERGE / NO CLIENT DATA/FROZEN ARTIFACTS / NO TSC-C / NO TSC-D**
+
+**Baseline:** `codex/stage-a` @ `897cdb7`.
+
+**Authority:** seam audit
+`docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`.
+
+## Goal
+
+Определить, можно ли безопасно и измеримо прогревать provider prompt cache для статических FullContext-
+префиксов Composer/Verifier до пользовательского запроса. **Главный принцип:** не внедрять prewarm, пока
+не доказано, что прогревающий запрос создаёт тот же cache key/prefix, что и реальный Composer/Verifier
+вызов. Этот аудит доказывает **prefix identity** из кода (переиспользуя существующие
+`build_composer_sdk_messages`/`build_verifier_sdk_messages` дословно) — но не доказывает и не может
+доказать реальный cache-hit provider'а без live-вызова, что запрещено в Phase 1.
+
+## Normative rules (binding for Phase 2 implementation)
+
+1. Никаких prewarm-вызовов при import — `app.py:190-196`'s `_startup_check()` (module-scope,
+   unconditional) is the explicit anti-pattern; prewarm must run only inside
+   `if __name__ == "__main__":` or an equivalent real-server-boot hook.
+2. Tests/CI/dry-run вызывают provider **ноль раз** — prewarm entry points must never be reachable from
+   any import path `pytest`/`tests/conftest.py` naturally walks.
+3. Prewarm не блокирует startup readiness и пользовательский запрос — background thread only, after
+   `app.run()`/worker-boot, never in the request-handling path.
+4. Ошибка prewarm — fail-open: бот продолжает работать без cache, exactly as it does today with no
+   prewarm at all.
+5. Никаких user text, SID, session state, телефона, PII — dynamic-tail template fields use fixed,
+   non-PII placeholders (never derived from any real request).
+6. Прогревается только static approved prefix — system policy + preamble + `CACHED_FULL_CONTEXT`
+   (corpus), never anything past it.
+7. Prewarm не генерирует и не сохраняет пользовательский ответ.
+8. Это не answer-cache и не retrieval-cache — purely a provider-side prompt-prefix warming mechanism.
+9. Не менять Composer/Verifier prompts ради искусственного cache hit без отдельного owner decision —
+   prewarm reuses existing prompt/template code verbatim, never forks it.
+10. Cache identity (fingerprint) должна включать: `client_id`, `model`, `role` (`composer`|`verifier`),
+    corpus fingerprint (`TargetCachedFullContext.sha256`, already exists), prompt/template version
+    (`sha256` of the live system-policy + preamble text — self-updating), message serialization version
+    (explicit manually-bumped int, mirrors `BOT_EVENTS_SCHEMA_VERSION`).
+11. Изменение любого из компонентов в п.10 делает старый warm state неприменимым — see seam audit §6
+    invalidation table.
+12. Hard budgets: максимум одна попытка на `(client_id, role, fingerprint)` за процесс; `retry=0` по
+    умолчанию (matches the existing `call_count > 1: raise ..._retry_forbidden` discipline already used
+    by Composer/Verifier/Boundary live backends); `WERKZEUG_RUN_MAIN` guard against reloader double-fire
+    (defensive — not needed for today's `debug=False` deployment, but required for the design).
+13. Composer и Verifier — разные cache namespaces. **Доказано эмпирически в seam audit §3**, не просто
+    осторожный дефолт: их message arrays diverge starting at `message[0]` (different system policy
+    text), so a Composer prewarm can never hit Verifier's cache or vice versa.
+14. Показатель успеха — реальный рост `cached_tokens`/cache-hit и снижение stage duration (acceptance
+    row 20), а не факт выполнения warm call.
+15. Переиспользовать `log_llm_usage` (`logging_setup.py:272-288`) — не создавать второй usage logger.
+16. Prewarm не создаёт PERF-1 пользовательские статусы — prewarm never touches
+    `core/turn_timing.py`'s request-scoped `_bucket()`/status-sink machinery (outside a Flask request
+    context it's a no-op anyway).
+17. Не менять число LLM-вызовов внутри пользовательского хода — `/ask`/`/ask/stream` request handling is
+    untouched by the Phase 2 allowlist.
+18. Provider cache TTL — **неизвестен, явно зафиксировано, не додумано.** No documentation found
+    anywhere in this repo or its dependencies for DashScope/Qwen cache TTL/guarantees. Model-string
+    aliasing stability (`"qwen3.7-plus"`) is similarly undocumented in-repo. Both are treated as open
+    unknowns requiring a future LIVE measurement, not assumptions.
+
+## Selected option: **B + C** (owner-controlled CLI + guarded async startup hook), two-gate rollout
+
+- **A (explicit provider cache API) — ruled out.** No such API exists in the OpenAI-compatible SDK this
+  codebase uses against DashScope/Qwen (seam audit §1, §12A) — confirmed by repo-wide search, not
+  guessed.
+- **B (owner-controlled CLI before demo/deploy) — selected, primary/first-built.** Lowest risk: a
+  standalone script (like `scripts/validate_client_pack.py`), zero interaction with `app.py`'s startup
+  path, zero reloader/import-time/multi-worker surface. Best case for an unknown TTL (operator controls
+  the warm-to-traffic gap).
+- **C (async startup prewarm after readiness) — selected, automated complement.** Same underlying
+  prewarm function B calls, wired behind a new default-**OFF** env flag
+  (`PROMPT_CACHE_PREWARM_ENABLED`), the `WERKZEUG_RUN_MAIN` guard, and the fail-open/budget/retry=0
+  rules above.
+- **D (lazy background prewarm after first request) — not selected.** Real incremental value is the
+  weakest of the automated options: `cached_tokens` has *already* been observed in production logs
+  **without any deliberate prewarm mechanism** (owner's own brief) — ordinary consecutive real turns
+  already appear to implicitly warm the cache for each other at zero engineering cost. D only fires
+  after a first real request has already happened, at which point that implicit warming has already had
+  its chance — D cannot help the highest-value "cold moment right after boot" case that B and C both
+  target directly.
+- **E (do not implement) — not chosen.** The specific thing the governing principle demands proof of —
+  prefix identity — **is** provable from code today via disciplined reuse of the exact production
+  message-builder functions (seam audit §2-§7). What remains unprovable without a live call (TTL, actual
+  hit behavior, model-alias stability) is not claimed as proven anywhere in this governance work, and
+  Phase 2's rollout requires a separate LIVE/LLM permission before those unknowns are ever tested for
+  real — this is the honest middle ground between "guess it works" and "refuse to build the provably-safe
+  half of it."
+
+**Two-gate rollout (binding):** Phase 2 implementation (building B+C, offline/dry-run capable, default
+OFF) requires owner GO same as any implementation phase. **First real activation against the actual
+provider requires a SEPARATE, explicit owner LIVE/LLM permission**, on top of that — matching this
+codebase's existing pattern for other live-provider milestones (A9, S66 in
+`docs/STRANGLER_ROADMAP.md`).
+
+## Fingerprint / invalidation
+
+See seam audit §5 (exact fingerprint composition — client_id, role, model, corpus_sha256,
+`sha256(system_policy_text)`, `sha256(preamble_template_text)`, `MESSAGE_SERIALIZATION_VERSION` int) and
+§6 (invalidation table — every tracked component change invalidates the fingerprint, except a message
+*structure* change without a text change, which requires the manual version bump as documented).
+
+## Seam audit summary (Phase 1)
+
+| Area | Finding |
+|---|---|
+| Provider | OpenAI SDK against DashScope/Qwen-compatible endpoint; module-level client singleton (`llm.py:33-37`, construction only, no network call); no explicit cache-registration API found |
+| Composer static prefix | `TARGET_COMPOSER_SYSTEM_POLICY` (3,611 chars) + fixed preamble + `CACHED_FULL_CONTEXT:\n` + corpus_text; ~106,000 chars (~26,500 tokens) total for `clients/demo/`; dynamic tail ~1-5 KB |
+| Verifier static prefix | Separate system policy + separate preamble; same corpus_text object, but diverges from `message[0]` — **proven separate namespace from Composer** |
+| Corpus stability | `build_target_cached_full_context` deterministic (sorted paths, no session/date interpolation); process-cached by `client_id` only (`_CONTEXT_CACHE`, `core/target_runtime_client_context.py:37`), never rebuilt without a test-only helper call |
+| Existing fingerprint precedent | `TargetCachedFullContext.sha256` (corpus only) and `TargetRuntimeClientContext.cache_key` (`client_id:corpus_sha256`) exist but don't cover policy text/template/model — no version markers found for either policy string |
+| Deployment | Single-process (`gunicorn -w 1`, `start.sh`'s own comment: SQLite single-writer), `debug=False`, no reloader active today, no `WERKZEUG_RUN_MAIN` precedent anywhere in-repo |
+| Tests/CI | No global LLM-call blocker; relies on `*_offline.py` convention + per-test monkeypatching — a new prewarm entry point must simply never be import-reachable from `pytest` |
+| Observability | `log_llm_usage` (`logging_setup.py:272-288`) already reads `cached_tokens`; ~15 existing `call_type` values, prewarm needs its own new one |
+| Already-observed caching | `cached_tokens` already appears in real logs today, with **no deliberate prewarm mechanism** — implicit turn-to-turn caching already happening, which directly informed ruling out Option D |
+
+Full map, exact message prefixes, invalidation table, deployment audit, cost/budget, failure semantics,
+A-E comparison, and 24-row acceptance matrix:
+`docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`.
+
+## Allowlist (governance commit only)
+
+| File | Action |
+|---|---|
+| `TASK.md` | UPDATE — this checkpoint |
+| `docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md` | CREATE |
+| `tests/test_final_provider_prompt_cache_prewarm_governance.py` | CREATE — PRE-CODE |
+| `docs/FLAGS_AND_STATUS.md` | UPDATE — PERF-2 completion + PERF-3 status pointer |
+| `docs/STRANGLER_ROADMAP.md` | UPDATE — PERF-2 moved to Historical, PERF-3 Active milestone pointer |
+
+**Forbidden in governance commit:**
+
+- Product implementation of any kind (no fingerprint module, no prewarm module, no CLI script, no
+  `app.py` change)
+- LIVE / LLM / provider calls
+- Composer/Verifier prompt change
+- Answer-cache
+- Streaming text
+- Boundary changes
+- Ingress + Planner merge
+- Client data / frozen artifact changes
+- TSC-C / TSC-D
+- Исправление постороннего тестового долга
+
+## Allowlist (implementation — blocked until PRE-CODE ✅ + owner GO; LIVE activation blocked further)
+
+| File | Action |
+|---|---|
+| `contracts/target_prompt_cache_fingerprint.py` | CREATE — `TargetPromptCacheFingerprint` frozen dataclass |
+| `core/target_prompt_cache_prewarm.py` | CREATE — fingerprint computation (pure), budget/dedup gate, prewarm call (reuses `build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim), fail-open, `log_llm_usage` with a new `call_type` |
+| `scripts/prewarm_prompt_cache.py` | CREATE — standalone owner-controlled CLI (Option B) |
+| `app.py` | UPDATE — Option C's guarded async startup hook inside `if __name__ == "__main__":`, behind default-OFF `PROMPT_CACHE_PREWARM_ENABLED` + `WERKZEUG_RUN_MAIN` guard; `/ask`/`/ask/stream` untouched |
+| `tests/test_final_provider_prompt_cache_prewarm_implementation.py` | CREATE — acceptance matrix (24 rows, seam audit §14) |
+
+**KEEP unchanged:** `logging_setup.py` (`log_llm_usage` reused, not duplicated); `core/turn_timing.py`
+(prewarm doesn't use PERF-0's request-scoped stage machinery); `core/target_composer_executor.py`,
+`core/target_response_verifier.py`, `core/target_runtime_llm_messages.py` (reused verbatim, never
+forked/edited); `/ask`/`/ask/stream` route parity; LLM call count for every real user turn.
+
+## Acceptance matrix (implementation — 24 scenarios)
+
+See seam audit §14 for the full table (cold/warm/miss-after-corpus/prompt/model-change; Composer/Verifier
+namespace separation; two-client separation; duplicate-prewarm dedup; reloader/multiworker simulation;
+provider-failure/timeout fail-open; retry=0; hard budget; zero provider calls in tests/CI/dry-run; no
+PII/session; no answer persistence; unchanged user-turn LLM count; PERF-0 cold/warm duration comparison;
+`cached_tokens` sourced from existing usage path; PERF-1 status sequence unchanged; client-pack validation
+unchanged; stale fingerprint never considered warm).
+
+## Test commands
+
+```powershell
+# PRE-CODE (governance)
+python -m pytest tests/test_final_provider_prompt_cache_prewarm_governance.py -q
+python -m pytest tests/test_final_response_latency_observability_governance.py tests/test_final_early_sse_status_streaming_governance.py tests/test_final_safe_medical_boundary_bypass_governance.py -q
+
+git diff --check
+```
+
+## STOP conditions (implementation)
+
+Исполнитель **СТОП** если:
+
+- нужен файл вне implementation allowlist;
+- нужно менять Composer/Verifier prompt/policy ради cache hit;
+- prewarm вызывается при import, или вне `if __name__ == "__main__":`-эквивалентного hook;
+- tests/CI делают хотя бы один реальный provider call;
+- prewarm блокирует startup readiness или пользовательский запрос;
+- ошибка prewarm не fail-open (пробрасывается наверх, блокирует что-либо);
+- retry ≠ 0, или нет hard budget на `(client_id, role, fingerprint)`;
+- fingerprint не включает все обязательные компоненты (§10 normative rules) или Composer/Verifier
+  используют общий namespace;
+- prewarm читает raw user text, SID, session state, PII;
+- prewarm сохраняет ответ как пользовательский, или создаёт answer-cache;
+- меняется число LLM-вызовов внутри пользовательского хода;
+- PERF-1 показывает статус, порождённый prewarm;
+- используется второй usage logger вместо `log_llm_usage`;
+- LIVE-вызов происходит без отдельного явного owner LIVE/LLM разрешения (сверх owner GO на
+  implementation).
+
+## STOP (Phase 1 governance)
+
+После PRE-CODE ✅ + commit/push governance — **остановиться**. Implementation только после
+отдельного owner GO, и даже тогда — первая LIVE-активация требует отдельного разрешения (см. §"Selected
+option").

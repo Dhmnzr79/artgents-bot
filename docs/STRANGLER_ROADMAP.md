@@ -830,32 +830,67 @@ Deliverables (Phase 1): seam audit
 
 ---
 
-## Active — FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2 (governance Phase 1)
+## Active — FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3 (governance Phase 1)
 
-**Baseline:** `codex/stage-a` @ `aa633f2` · **NO PRODUCT IMPLEMENTATION / NO BOUNDARY PROMPT/POLICY
-CHANGE / NO COMPOSER/VERIFIER POLICY CHANGE / NO LIVE / NO LLM**
+**Baseline:** `codex/stage-a` @ `897cdb7` · **NO PRODUCT IMPLEMENTATION / NO PROVIDER CALLS / NO LIVE /
+NO LLM / NO COMPOSER/VERIFIER PROMPT CHANGE**
 
-Third step of the acceleration program, after PERF-0/PERF-1. Medical Boundary is one blocking LLM call
-(`core/target_runtime_turn.py:322-342`) that today runs before Composer on nearly every FullContext turn,
-regardless of topic — only `clinic_contact`/`service_availability` structured answers already skip it.
-Goal: a typed-contract, deterministic bypass (`resolve_target_medical_boundary_requirement(...)`, a pure
-function reading only `TurnFrame`/`structured_capability`/governed UI action objects — never raw text,
-regex, or topic hardcode) for turns where Boundary is provably unnecessary.
+Fourth step of the acceleration program, after PERF-0/1/2. Composer and Semantic Verifier each send a
+large, per-client-static prompt prefix (system policy + full corpus, ~106,000 chars / ~26,500 tokens for
+`clients/demo/`) ahead of a small per-turn dynamic tail. `cached_tokens` has already been observed in real
+usage logs, with no deliberate prewarm mechanism — implicit provider-side prefix caching already appears
+to be happening. Goal: determine whether it's safe and measurable to deliberately warm that cache before
+user traffic arrives, without ever risking that a warming call sends a different prefix than the real
+call would.
 
-Audit finding: only **governed UI scope/stage clicks** (`bypass_governed_ui`) are eligible today — the
-TurnFrame they produce is 100% deterministic code (not an LLM guess), structurally cannot carry free text
-(`orchestration/pre_resolver_turn.py:248`'s `if not q:` gate), and is validated against a session-bound,
-server-rendered ref whitelist. Pure free-text price lookup and exact FAQ are explicitly kept `required` —
-not an oversight, but because the typed capabilities that would make them provably safe (a restricted
-Composer price-materialization contract; a validated content-authority registry distinguishing exact
-factual questions from suitability questions) do not exist yet. Deterministic + Semantic Verifier remain
-unconditional after any bypass — the last-line defense is untouched.
+Audit finding: **prefix identity is provable from code** — a prewarm call built by reusing
+`build_composer_sdk_messages`/`build_verifier_sdk_messages` verbatim (never a parallel implementation)
+sends byte-identical leading bytes to a real call. Composer and Verifier are **proven separate cache
+namespaces** (their message arrays diverge starting at the system message, not just as a cautious
+default). What is **not** provable without a live call — the provider's cache TTL, exact hit behavior,
+model-alias stability — is explicitly documented as unknown, not guessed. No explicit provider
+cache-registration API exists (ruled out). Selected: **B (owner-controlled CLI) + C (guarded async
+startup hook, default OFF)** — D (lazy post-first-request warming) was rejected for having the weakest
+real incremental value, since ordinary consecutive turns already appear to implicitly warm each other.
+Two-gate rollout: implementation GO, then a **separate** owner LIVE/LLM permission before first real
+activation — the same pattern already used for A9/S66.
 
 Deliverables (Phase 1): seam audit
-(`docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md`), `TASK.md`, doc sync,
-PRE-CODE checker `tests/test_final_safe_medical_boundary_bypass_governance.py`.
+(`docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_provider_prompt_cache_prewarm_governance.py`.
 
-**STOP** after PRE-CODE ✅ — separate owner GO before implementation.
+**STOP** after PRE-CODE ✅ — separate owner GO before implementation, and a further separate LIVE/LLM
+permission before first real provider activation.
+
+---
+
+## Historical — FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS / PERF-2 (governance + implementation)
+
+**Baseline:** `codex/stage-a` @ `aa633f2` (governance) → `897cdb7` (implementation **COMPLETE**).
+
+Third step of the acceleration program, after PERF-0/PERF-1. Medical Boundary is one blocking LLM call
+(`core/target_runtime_turn.py:322-342`) that used to run before Composer on nearly every FullContext turn,
+regardless of topic — only `clinic_contact`/`service_availability` structured answers already skipped it.
+
+Audit finding: only **governed UI scope/stage clicks** (`bypass_governed_ui`) were eligible — the
+TurnFrame they produce is 100% deterministic code (not an LLM guess), structurally cannot carry free text
+(`orchestration/pre_resolver_turn.py:248`'s `if not q:` gate), and is validated against a session-bound,
+server-rendered ref whitelist. Pure free-text price lookup and exact FAQ were kept `required` — the typed
+capabilities that would make them provably safe do not exist yet. Deterministic + Semantic Verifier remain
+unconditional after any bypass.
+
+Implementation: `resolve_target_medical_boundary_requirement(...)` — a pure function checking an exact
+9-point checklist (XOR of exactly one governed action, exact TurnFrame field values, exact
+`field_meta.status`/`provenance`, topic match) — wired into `core/target_runtime_turn.py` immediately
+before the existing Boundary call site. On `bypass_governed_ui`, Boundary's backend is never invoked;
+Composer and both Verifiers still run unconditionally. 48-test acceptance matrix + strict nodeid diff
+against baseline (all 3 nodeid differences traced to pre-existing wide-suite pollution, zero genuine
+regressions).
+
+Deliverables: seam audit
+(`docs/evidence/performance/FINAL_SAFE_MEDICAL_BOUNDARY_BYPASS_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_safe_medical_boundary_bypass_governance.py`, implementation acceptance
+`tests/test_final_safe_medical_boundary_bypass_implementation.py`.
 
 ---
 

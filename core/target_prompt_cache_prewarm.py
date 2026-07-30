@@ -18,9 +18,10 @@ What it does (see docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_
   provider transport is injected, so tests drive it with a fake and never touch the network.
 * ``run_live`` -- the CLI-facing live path. It runs the model-pin and fingerprint preflight
   (both abort BEFORE any marker write or provider call) and then hits a hard activation gate:
-  ``LIVE_ACTIVATION_AUTHORIZED`` is ``False`` and flipping it requires a SEPARATE owner LIVE/LLM
-  GO (the second rollout gate). While blocked, ``run_live`` returns before constructing a real
-  provider call or creating any marker -- so the shipping CLI performs zero live provider calls.
+  ``LIVE_AUTHORIZED_ATTEMPT_ID`` must equal the request's ``attempt_id`` exactly, and flipping it
+  requires a SEPARATE owner LIVE/LLM GO (the second rollout gate). While blocked, ``run_live``
+  returns before constructing a real provider call or creating any marker -- so the shipping CLI
+  performs zero live provider calls.
 
 An attempt marker proves only the fact and final state of one owner-authorized run. It never
 means the provider's cache is still warm -- only a live ``cached_tokens`` measurement does.
@@ -94,9 +95,9 @@ _PREWARM_MAX_COMPLETION_TOKENS = 16
 DEFAULT_LEDGER_ROOT = _REPO_ROOT / ".prewarm_ledger"
 
 # HARD GATE. Live activation against the real provider requires a SEPARATE, explicit owner
-# LIVE/LLM GO on top of the implementation GO (two-gate rollout, sec 8/sec 12). Flipping this
-# is out of scope for the implementation phase and must not happen without that separate GO.
-LIVE_ACTIVATION_AUTHORIZED = False
+# LIVE/LLM GO on top of the implementation GO (two-gate rollout, sec 8/sec 12). This authorizes
+# exactly one named attempt_id, never a blanket boolean -- any other attempt_id stays blocked.
+LIVE_AUTHORIZED_ATTEMPT_ID: str | None = "perf3-demo-2026-07-30-01"
 
 _ATTEMPT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -470,7 +471,8 @@ def live_provider_call(role: TargetPromptCacheRole, model: str, messages: list[d
 
     Discards nothing here beyond what the caller ignores: it returns the raw response; the
     caller reads only ``.model``/``.usage`` and never the answer content. Only invoked once
-    ``LIVE_ACTIVATION_AUTHORIZED`` is flipped under a separate owner LIVE/LLM GO."""
+    ``LIVE_AUTHORIZED_ATTEMPT_ID`` is set to this exact attempt_id under a separate owner
+    LIVE/LLM GO."""
 
     from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
 
@@ -515,8 +517,9 @@ class LiveOutcome:
 def run_live(request: LiveRequest, *, ledger_root: Path = DEFAULT_LEDGER_ROOT) -> LiveOutcome:
     """CLI live entry. Order is safety-critical: validate id, then the model-pin and fingerprint
     preflight (both abort BEFORE any marker write or provider call), then the hard activation
-    gate. While ``LIVE_ACTIVATION_AUTHORIZED`` is False this returns ``LIVE_OUTCOME_BLOCKED``
-    before constructing a real provider call or creating a marker."""
+    gate. Unless ``request.attempt_id`` exactly equals ``LIVE_AUTHORIZED_ATTEMPT_ID`` this
+    returns ``LIVE_OUTCOME_BLOCKED`` before constructing a real provider call or creating a
+    marker."""
 
     _validate_attempt_id(request.attempt_id)
     ctx = load_target_runtime_client_context(request.client_id)
@@ -550,9 +553,9 @@ def run_live(request: LiveRequest, *, ledger_root: Path = DEFAULT_LEDGER_ROOT) -
             )
         )
 
-    if not LIVE_ACTIVATION_AUTHORIZED:
-        # Blocked BEFORE any marker write or provider call. Unblocking is a separate owner
-        # LIVE/LLM GO (two-gate rollout) -- not part of the implementation phase.
+    if request.attempt_id != LIVE_AUTHORIZED_ATTEMPT_ID:
+        # Blocked BEFORE any marker write or provider call unless this exact attempt_id was
+        # named by a separate owner LIVE/LLM GO (two-gate rollout). Never a blanket boolean.
         return LiveOutcome(kind=LIVE_OUTCOME_BLOCKED)
 
     # ---- Beyond here requires a separate owner LIVE/LLM GO; unreached in Phase 2. ----

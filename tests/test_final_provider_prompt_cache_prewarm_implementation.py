@@ -3,7 +3,8 @@
 Covers the 32-scenario matrix (seam audit sec 14) with a FAKE injected provider only -- no
 network, no real provider call, no repo artifact. The attempt/ledger machinery is exercised in
 pytest ``tmp_path`` (ephemeral), the dry-run/blocked-live CLI via subprocess. The real live path
-is never invoked (it is hard-blocked behind ``LIVE_ACTIVATION_AUTHORIZED``).
+is never invoked (it is hard-blocked unless ``LIVE_AUTHORIZED_ATTEMPT_ID`` exactly equals the
+request's attempt_id).
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from core.target_composer_executor import (
 from core import target_prompt_cache_prewarm as prewarm
 from core.target_prompt_cache_prewarm import (
     LIVE_OUTCOME_BLOCKED,
+    LIVE_OUTCOME_EXECUTED,
     LIVE_OUTCOME_FINGERPRINT_MISMATCH,
     LIVE_OUTCOME_MODEL_MISMATCH,
     LiveRequest,
@@ -516,8 +518,49 @@ def test_live_fingerprint_mismatch_aborts_before_marker(tmp_path) -> None:
     assert not _attempts_dir(tmp_path).exists()
 
 
-def test_live_activation_is_hard_disabled() -> None:
-    assert prewarm.LIVE_ACTIVATION_AUTHORIZED is False
+def test_live_gate_closed_blocks_every_attempt_id(monkeypatch, tmp_path) -> None:
+    """Gate closed (None) must block regardless of attempt_id -- never a blanket boolean."""
+    monkeypatch.setattr(prewarm, "LIVE_AUTHORIZED_ATTEMPT_ID", None)
+    ctx = load_target_runtime_client_context("demo")
+    fp_c = compute_fingerprint("composer", ctx, _MODEL).fingerprint
+    fp_v = compute_fingerprint("verifier", ctx, _MODEL).fingerprint
+    outcome = run_live(
+        _live_request("any-attempt", composer_model=_MODEL, expected_fp_composer=fp_c, expected_fp_verifier=fp_v),
+        ledger_root=tmp_path,
+    )
+    assert outcome.kind == LIVE_OUTCOME_BLOCKED
+    assert not _attempts_dir(tmp_path).exists()
+
+
+def test_live_blocked_for_non_matching_attempt_id(monkeypatch, tmp_path) -> None:
+    """Exact-attempt gate: authorizing one attempt_id must not authorize any other."""
+    monkeypatch.setattr(prewarm, "LIVE_AUTHORIZED_ATTEMPT_ID", "authorized-attempt")
+    ctx = load_target_runtime_client_context("demo")
+    fp_c = compute_fingerprint("composer", ctx, _MODEL).fingerprint
+    fp_v = compute_fingerprint("verifier", ctx, _MODEL).fingerprint
+    outcome = run_live(
+        _live_request("some-other-attempt", composer_model=_MODEL, expected_fp_composer=fp_c, expected_fp_verifier=fp_v),
+        ledger_root=tmp_path,
+    )
+    assert outcome.kind == LIVE_OUTCOME_BLOCKED
+    assert not _attempts_dir(tmp_path).exists()
+
+
+def test_live_proceeds_only_for_exact_authorized_attempt_id(monkeypatch, tmp_path) -> None:
+    """Exact-attempt gate: the one named attempt_id passes the gate (fake transport, no network)."""
+    log: list[tuple[str, str]] = []
+    monkeypatch.setattr(prewarm, "LIVE_AUTHORIZED_ATTEMPT_ID", "authorized-attempt")
+    monkeypatch.setattr(prewarm, "live_provider_call", _success_provider(log))
+    ctx = load_target_runtime_client_context("demo")
+    fp_c = compute_fingerprint("composer", ctx, _MODEL).fingerprint
+    fp_v = compute_fingerprint("verifier", ctx, _MODEL).fingerprint
+    outcome = run_live(
+        _live_request("authorized-attempt", composer_model=_MODEL, expected_fp_composer=fp_c, expected_fp_verifier=fp_v),
+        ledger_root=tmp_path,
+    )
+    assert outcome.kind == LIVE_OUTCOME_EXECUTED
+    assert _attempts_dir(tmp_path).exists()
+    assert len(log) == 2
 
 
 # --------------------------------------------------------------------------------------------

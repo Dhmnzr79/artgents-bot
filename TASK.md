@@ -7210,10 +7210,11 @@ assertion in that file was touched or weakened (35 passed post-deviation).
 - **Model-pin (A9R2c defense):** requested (operator) vs configured (env/config accessor, read live) vs
   observed (provider response) are tracked/checked separately. A stale/mismatched configured model aborts
   in preflight, before any marker/provider call; an observed mismatch aborts after the first call at most.
-- **Live gate:** `LIVE_ACTIVATION_AUTHORIZED = False`. `--live` runs the model-pin + fingerprint preflight
-  (both abort before marker/call), then returns a dedicated BLOCKED outcome — still before any marker write
+- **Live gate:** `LIVE_AUTHORIZED_ATTEMPT_ID: str | None = None`. `--live` runs the model-pin + fingerprint
+  preflight (both abort before marker/call), then requires `request.attempt_id == LIVE_AUTHORIZED_ATTEMPT_ID`
+  exactly (never a blanket boolean) or returns a dedicated BLOCKED outcome — still before any marker write
   or provider call. The real transport (`live_provider_call` → `chat_completions_create`) is defined but
-  unreached; flipping the gate + wiring it is the separate LIVE milestone.
+  unreached; naming one attempt_id under the gate is a separate owner LIVE/LLM GO.
 
 ### CLI exit codes / examples
 

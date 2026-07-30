@@ -7559,12 +7559,25 @@ overlap does not occur in production until the separate owner activation step ab
   per "не object любой wide red регрессией"; this is the same pre-existing debt PERF-0/1/2 already
   documented, not a PERF-4 regression.
 
-### NO LIVE confirmation
+### NO LIVE confirmation — CORRECTED (see PERF-4 activation completion record below)
 
-Zero LLM/provider/network calls anywhere in this Phase 2 work or its tests. The one genuine live-call
+**This statement was wrong and is superseded.** The original text below is struck through and kept only
+for the audit trail; do not treat it as accurate.
+
+~~Zero LLM/provider/network calls anywhere in this Phase 2 work or its tests. The one genuine live-call
 risk discovered (pre-existing tests inadvertently reaching real `classify_ingress`/`plan_turn_attempt`)
 was found, reproduced, and closed both at the specific call sites and structurally (capacity default 0)
-before this record was written — not shipped as a known gap.
+before this record was written — not shipped as a known gap.~~
+
+**Correction (2026-07-30, PERF-4 activation task, Checkpoint A forensic):** a read-only audit of
+`logs/demo-app.jsonl` found **230 real, live provider calls** (104 Planner `turn_planner_plan` +
+126 Ingress `ingress_classify`, ≈$0.137 estimated cost, 09:58–12:05Z) made during this Phase 2 work's own
+development/debugging session, before the capacity-default-0 fix and the five test corrections were in
+place. This was **not** "zero calls" — it was real live activity, caught and closed after the fact, not
+before. Full forensic detail:
+[`docs/evidence/performance/PERF4_DEVELOPMENT_LIVE_PROVIDER_CALLS_FORENSIC_AUDIT.md`](evidence/performance/PERF4_DEVELOPMENT_LIVE_PROVIDER_CALLS_FORENSIC_AUDIT.md).
+The resulting code (capacity defaults to `0`, five tests fixed, `on_llm_path` hook) is unaffected by this
+correction — only the earlier claim about the development process itself was inaccurate.
 
 ## STOP (PERF-4 Phase 2 implementation)
 

@@ -22,6 +22,8 @@ from core.target_runtime_turn import run_target_fullcontext_runtime_turn
 from contracts.planner_attempt import PlannerAttempt
 from core.runtime_turn_frame import publish_planner_attempt_frame
 from core.turn_frame_from_raw import build_turn_frame_from_raw
+import orchestration.pre_resolver_turn as pre_resolver_module
+from contracts.ingress_route import IngressRouteResult
 from orchestration.context import AskTurnContext
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from orchestration.planner_turn import PlannerTurnOutcome
@@ -92,6 +94,23 @@ def _pre_resolver(data: dict):
         client_txt=lambda cid: {},
         service_payload=lambda **k: {},
         get_last_content_ui_payload=lambda sid: None,
+    )
+
+
+def _fake_classify_ingress_normal(*_a, **_k) -> IngressRouteResult:
+    """PERF-4: real free-text HTTP tests in this file mock run_planner_turn but not
+    Ingress -- classify_ingress must be faked too, or the real, unmocked Ingress LLM
+    call reaches its own LLM path and, being real, also fires PERF-4's speculative
+    Planner fork for real (a genuine background network call upstream of the
+    run_planner_turn mock, which only covers join/publish, not the fork)."""
+    return IngressRouteResult(
+        route="normal",
+        confidence=0.9,
+        reason="fake_offline_normal",
+        policy_key=None,
+        requested_service=None,
+        source="llm",
+        is_urgent=False,
     )
 
 
@@ -393,6 +412,7 @@ def test_http_ask_target_only(monkeypatch: pytest.MonkeyPatch) -> None:
         "run_planner_turn",
         lambda **k: PlannerTurnOutcome("content", None),
     )
+    monkeypatch.setattr(pre_resolver_module, "classify_ingress", _fake_classify_ingress_normal)
     client = app_module.app.test_client()
     resp = client.post(
         "/ask",
@@ -463,6 +483,7 @@ def test_http_ask_two_turns_carries_session_shown_ids(monkeypatch: pytest.Monkey
         "run_planner_turn",
         lambda **k: PlannerTurnOutcome("content", None),
     )
+    monkeypatch.setattr(pre_resolver_module, "classify_ingress", _fake_classify_ingress_normal)
     composer = RecordingComposerBackend(PRICE_TEXT)
     semantic = RecordingSemanticBackend()
     boundary = RecordingBoundaryBackend(BackendPayload("none", 0.95))

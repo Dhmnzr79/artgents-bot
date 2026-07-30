@@ -184,6 +184,12 @@ def test_only_runtime_and_planner_import_planner_attempt():
         "core/turn_planner_llm.py",
         "core/runtime_turn_frame.py",
         "core/turn_frame_shadow.py",
+        # PERF-4 (FINAL_PARALLEL_INGRESS_PLANNER_LATENCY): the compute/publish split
+        # deliberately moved plan_turn_attempt's *invocation* into a dedicated executor
+        # module -- it must return/construct PlannerAttempt (the same technical
+        # envelope, not a parallel type) to hand off to orchestration/planner_turn.py's
+        # unchanged publish step. Documented in TASK.md / the PERF-4 seam audit.
+        "core/planner_compute_executor.py",
     }
     offenders: list[str] = []
     for path in paths:

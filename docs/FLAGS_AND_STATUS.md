@@ -219,7 +219,13 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    contracts) — flags the nested-executor deadlock hazard against PERF-1's `_sse_worker_executor` as the
    most important risk to avoid in Phase 2. Seam audit:
    `docs/evidence/performance/FINAL_PARALLEL_INGRESS_PLANNER_LATENCY_SEAM_AUDIT.md`.
-   Implementation **STOP** until PRE-CODE ✅ + a separate owner GO.
+   **Implementation COMPLETE** (Phase 2, owner GO): Planner's compute forks into a dedicated bounded
+   executor via an additive `on_llm_path` hook on `classify_ingress` (invoked only immediately before its
+   own real LLM call); publish stays unchanged in the main thread. Ships **inert by default**
+   (`PLANNER_SPECULATION_CAPACITY=0`) — real concurrent-call activation is a separate, later owner step,
+   mirroring PERF-3's two-gate pattern; this was chosen after finding several pre-existing tests assumed
+   `run_pre_resolver_turn` alone could never reach Planner. 31 new tests + 520-test regression sweep, zero
+   real-network calls. See TASK.md's PERF-4 Phase 2 completion record.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 6. **FINAL_TEST_SUITE_CONVERGENCE (governance @ `1980ab7`):** 185 wide failures inventoried; TSC-A..D checkpoints defined. See `docs/TEST_SUITE_ARCHITECTURE.md`, `docs/evidence/testing/final_test_failure_inventory.json`. Implementation blocked until owner GO.
 

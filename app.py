@@ -27,6 +27,7 @@ from core.client_host import resolve_request_client_id
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import load_widget_config, tone_to_txt_dict
 from core.origin_guard import validate_widget_origin
+from core.planner_compute_executor import discard_planner_speculation
 from core.target_sse_worker_context import worker_execution_context
 from core.widget_cors import (
     apply_widget_cors_headers,
@@ -326,7 +327,15 @@ def _orchestrate_ask_turn(data: dict):
             client_id=pre.client_id,
             st=pre.st,
             enqueue_resolver_trace=_enqueue_v5_resolver_trace,
+            speculative_handle=pre.planner_speculation,
         )
+    else:
+        # Typed UI clicks bypass free-text Planner entirely (PERF-2 precedent) -- if a
+        # speculative Planner compute was somehow started anyway, it must never be
+        # published. In practice this is always a no-op here: a ref click forces
+        # ingress_skip=True in pre_resolver_turn.py, so the speculative fork never
+        # triggers in the first place for a typed-UI turn.
+        discard_planner_speculation(pre.planner_speculation)
 
     return orchestrate_target_fullcontext_turn(
         q=pre.q,

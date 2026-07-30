@@ -5,7 +5,9 @@ import json
 import pytest
 from flask import Flask
 
+import orchestration.pre_resolver_turn as pre_resolver_module
 from contracts.ask_orchestration import AskOrchestrationResult
+from contracts.ingress_route import IngressRouteResult
 from contracts.target_response_spec import TargetResponseSpec
 from contracts.target_turn_frame_dispatch import (
     TargetTurnFrameBoundTerminalResponse,
@@ -13,6 +15,22 @@ from contracts.target_turn_frame_dispatch import (
 )
 from core.target_runtime_widget import materialize_s41_terminal_payload
 from orchestration.planner_turn import PlannerTurnOutcome
+
+
+def _fake_classify_ingress_normal(*_a, **_k) -> IngressRouteResult:
+    """PERF-4: these HTTP tests mock run_planner_turn but not Ingress -- classify_ingress
+    must be faked too, or the real, unmocked Ingress LLM call also fires PERF-4's
+    speculative Planner fork for real (see test_final_parallel_ingress_planner_latency_*
+    and TASK.md's PERF-4 completion record for the full explanation)."""
+    return IngressRouteResult(
+        route="normal",
+        confidence=0.9,
+        reason="fake_offline_normal",
+        policy_key=None,
+        requested_service=None,
+        source="llm",
+        is_urgent=False,
+    )
 
 
 @pytest.fixture
@@ -64,6 +82,7 @@ def test_ask_and_stream_share_plain_attribution_for_terminal(
         "run_planner_turn",
         lambda **k: PlannerTurnOutcome("content", None),
     )
+    monkeypatch.setattr(pre_resolver_module, "classify_ingress", _fake_classify_ingress_normal)
     client = app_module.app.test_client()
     ask = client.post(
         "/ask",
@@ -133,6 +152,7 @@ def test_materialized_ask_keeps_content_attribution(
         "run_planner_turn",
         lambda **k: PlannerTurnOutcome("content", None),
     )
+    monkeypatch.setattr(pre_resolver_module, "classify_ingress", _fake_classify_ingress_normal)
     client = app_module.app.test_client()
     resp = client.post(
         "/ask",

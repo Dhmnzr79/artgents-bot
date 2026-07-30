@@ -212,8 +212,17 @@ def plan_turn_attempt(
     q: str,
     sid: str | None,
     client_id: str | None,
+    *,
+    history_override: str | None = None,
 ) -> PlannerAttempt:
-    """Run one planner call and build native TurnFrame only (C2b)."""
+    """Run one planner call and build native TurnFrame only (C2b).
+
+    `history_override`, when not None, is used verbatim instead of calling
+    `recent_dialog_history(sid)` internally (PERF-4: the speculative-compute caller
+    reads history itself, in the main thread, where session.py's thread-local
+    client-pack binding is guaranteed correct, and passes it in as part of an
+    immutable snapshot -- the worker thread never touches session.py at all).
+    """
     msg = (q or "").strip()
     if not msg:
         return _not_available_attempt()
@@ -223,7 +232,7 @@ def plan_turn_attempt(
     allowed_ids = frozenset(r["service_id"] for r in rows)
     allowed_groups, allowed_brands = allowed_brand_filters(client_id)
     allowed_topics = _resolve_allowed_topics(client_id, sid=sid)
-    hist = recent_dialog_history(sid) if sid else ""
+    hist = history_override if history_override is not None else (recent_dialog_history(sid) if sid else "")
     brand_hint = ""
     if allowed_groups or allowed_brands:
         brand_hint = (

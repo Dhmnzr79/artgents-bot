@@ -10,6 +10,10 @@ from flask import request
 
 from config import COMPARISON_QUERY_RE
 from core.metadata_first_observability import record_decision_frame_ctx
+from core.planner_compute_executor import (
+    PlannerSpeculationHandle,
+    join_planner_speculation,
+)
 from core.runtime_turn_frame import (
     RUNTIME_FRAME_STATUS_PARTIAL,
     RUNTIME_FRAME_STATUS_OK,
@@ -65,12 +69,36 @@ def run_planner_turn(
     client_id: str,
     st: dict,
     enqueue_resolver_trace: Callable[..., None],
+    speculative_handle: "PlannerSpeculationHandle | None" = None,
 ) -> PlannerTurnOutcome:
-    """Single planner call → runtime TurnFrame; no resolver fallback."""
+    """Single planner call → runtime TurnFrame; no resolver fallback.
+
+    PERF-4 (Variant C): when `speculative_handle` is given, Planner's compute already
+    ran (or is still running) concurrently with Ingress's own LLM call, submitted by
+    `orchestration/pre_resolver_turn.py` via `core/planner_compute_executor.py`. This
+    function only ever *joins* that result and *publishes* it — the join/publish split
+    is exactly the seam the governance audit identified: everything below this point
+    (`publish_planner_attempt_frame`, the `request.ctx` writes, `record_decision_frame_ctx`,
+    `enqueue_resolver_trace`) is unchanged, runs in this same main orchestration thread,
+    exactly once, regardless of whether the attempt came from a speculative join or the
+    synchronous fallback call. `turn_timing.stage_start("planner")` for the speculative
+    path already happened in `pre_resolver_turn.py` at fork time (so the recorded stage
+    duration reflects when the compute actually began, honestly overlapping Ingress's
+    own span) — only `stage_end` happens here for that path."""
     _ = st
-    turn_timing.stage_start("planner")
-    attempt = plan_turn_attempt(q, sid, client_id)
-    turn_timing.stage_end("planner", status="completed")
+    if speculative_handle is not None:
+        attempt = join_planner_speculation(speculative_handle)
+        turn_timing.stage_end("planner", status="completed")
+        log_json(
+            logger,
+            "planner_speculation_published",
+            client_id=client_id,
+            request_id=request.ctx.get("request_id"),
+        )
+    else:
+        turn_timing.stage_start("planner")
+        attempt = plan_turn_attempt(q, sid, client_id)
+        turn_timing.stage_end("planner", status="completed")
     publish_planner_attempt_frame(attempt=attempt)
     status = get_runtime_turn_frame_status()
     request.ctx["turn_planner_used"] = status in {

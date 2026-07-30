@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Callable
 from typing import Any
 
 from config import INGRESS_CLASSIFY_MODEL
@@ -502,9 +503,19 @@ def classify_ingress(
     client_id: str,
     sid: str,
     skip: bool = False,
+    on_llm_path: "Callable[[], None] | None" = None,
 ) -> IngressRouteResult:
     """
     Classify ingress route. skip=True for ref-click / empty q (forced normal).
+
+    `on_llm_path`, if given, is called exactly once, immediately before this function
+    invokes its own real LLM call -- i.e. only after `skip`, the length check, the
+    policy match, and the deterministic-normal check have all already found nothing
+    (PERF-4: the seam a caller can use to start other independent work concurrently
+    with Ingress's LLM call, without duplicating any of the checks above). Never
+    called on a deterministic-rule hit. Default `None` is a pure no-op -- every
+    existing caller, and any test that replaces this function wholesale, is
+    unaffected.
     """
     if skip:
         return _normal_skipped("ingress_skipped_ref_or_empty")
@@ -520,6 +531,9 @@ def classify_ingress(
     det = _ingress_deterministic_normal(msg)
     if det is not None:
         return det
+
+    if on_llm_path is not None:
+        on_llm_path()
 
     try:
         result = _call_ingress_llm(msg, client_id, sid)

@@ -178,6 +178,8 @@ def test_ui_stage_click_skips_planner(
 
 def test_free_text_still_calls_planner(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
+    import orchestration.pre_resolver_turn as pre_resolver_module
+    from contracts.ingress_route import IngressRouteResult
     from orchestration.planner_turn import PlannerTurnOutcome
 
     sid = f"s-free-{uuid.uuid4().hex[:8]}"
@@ -188,6 +190,25 @@ def test_free_text_still_calls_planner(monkeypatch: pytest.MonkeyPatch) -> None:
         planner_calls.append(str(kwargs.get("q")))
         return PlannerTurnOutcome("content", None)
 
+    # PERF-4: classify_ingress must be faked here too (not just run_planner_turn) --
+    # otherwise the real, unmocked Ingress LLM call reaches its own LLM path and, being
+    # real, also triggers PERF-4's speculative Planner fork for real (a genuine
+    # background network call upstream of the run_planner_turn mock below, which only
+    # covers the join/publish step, not the fork). Faking classify_ingress wholesale
+    # means the fork's on_llm_path hook is never invoked either -- by construction.
+    monkeypatch.setattr(
+        pre_resolver_module,
+        "classify_ingress",
+        lambda *a, **k: IngressRouteResult(
+            route="normal",
+            confidence=0.9,
+            reason="fake_offline_normal",
+            policy_key=None,
+            requested_service=None,
+            source="llm",
+            is_urgent=False,
+        ),
+    )
     composer, semantic, boundary = _fake_backends()
     monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", _fake_target_turn_factory(composer, semantic, boundary))
     monkeypatch.setattr(app_module, "run_planner_turn", fake_plan)

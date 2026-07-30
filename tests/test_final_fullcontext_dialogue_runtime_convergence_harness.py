@@ -8,6 +8,8 @@ from typing import Any
 
 from flask import Flask, request
 
+import orchestration.pre_resolver_turn as pre_resolver_module
+from contracts.ingress_route import IngressRouteResult
 from contracts.planner_attempt import PlannerAttempt, turn_frame_has_invalid_or_missing
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundMaterializeResponse
 from core.runtime_turn_frame import publish_planner_attempt_frame
@@ -19,6 +21,22 @@ from core.target_runtime_turn import run_target_fullcontext_runtime_turn
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from orchestration.planner_turn import PlannerTurnOutcome
 from session import mem_reset
+
+
+def _fake_classify_ingress_normal(*_a, **_k) -> IngressRouteResult:
+    """PERF-4: this shared harness mocks run_planner_turn but not Ingress -- classify_ingress
+    must be faked too, or the real, unmocked Ingress LLM call also fires PERF-4's
+    speculative Planner fork for real (a genuine background network call upstream of
+    the run_planner_turn mock, which only covers join/publish, not the fork)."""
+    return IngressRouteResult(
+        route="normal",
+        confidence=0.9,
+        reason="fake_offline_normal",
+        policy_key=None,
+        requested_service=None,
+        source="llm",
+        is_urgent=False,
+    )
 
 
 @dataclass
@@ -174,6 +192,7 @@ def orchestrate_via_app(
         return PlannerTurnOutcome("content", None)
 
     monkeypatch.setattr(app_module, "run_planner_turn", _publish_frame)
+    monkeypatch.setattr(pre_resolver_module, "classify_ingress", _fake_classify_ingress_normal)
     monkeypatch.setattr(
         "orchestration.target_fullcontext_turn._default_target_runtime_backends",
         lambda: (composer, semantic, boundary),

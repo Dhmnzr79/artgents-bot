@@ -12,6 +12,11 @@ from config import (
 )
 from contracts.ask_orchestration import AskOrchestrationResult
 from core import turn_timing
+from core.planner_compute_executor import (
+    PlannerSpeculationHandle,
+    discard_planner_speculation,
+    try_submit_planner_speculation,
+)
 from flow_handlers import handle_flows
 from ingress_gate import build_ingress_payload, classify_ingress, ingress_service_route
 from logging_setup import get_logger, log_json
@@ -35,6 +40,7 @@ from session import (
     mark_nav_ref_used,
     mem_get,
     mem_reset,
+    recent_dialog_history,
     set_anti_spam_redirect_shown,
     sid_from_body,
 )
@@ -128,9 +134,45 @@ def run_pre_resolver_turn(
         or bool(st.get("situation_pending"))
         or bool(st.get("pending_lead_offer"))
     )
+    speculative_handle: PlannerSpeculationHandle | None = None
     if q and not ingress_skip:
+
+        def _fork_planner_speculation() -> None:
+            # PERF-4 (Variant C): classify_ingress calls this exactly once,
+            # immediately before its own real LLM call -- i.e. only after its own
+            # deterministic checks (policy match, deterministic-normal, length) have
+            # already found nothing (seam audit S6, Rule 4). This deliberately never
+            # duplicates those checks out here: a test (or future code) that replaces
+            # classify_ingress wholesale simply never calls this hook either, so
+            # there is no way for this fork to fire out of step with what Ingress is
+            # actually about to do. Session history is read here, in the main
+            # thread (session.py's thread-local client-pack binding is correctly
+            # bound for this thread), and handed over as part of an immutable
+            # snapshot -- the worker thread itself never touches session.py, Flask
+            # `request`, or `request.ctx`.
+            nonlocal speculative_handle
+            speculative_handle = try_submit_planner_speculation(
+                client_id=client_id,
+                sid=sid,
+                q=q,
+                history=recent_dialog_history(sid) if sid else "",
+                request_id=request.ctx.get("request_id"),
+            )
+            if speculative_handle is not None:
+                # Mark the real start of Planner's work now, in this thread, so the
+                # PERF-0 stage duration and PERF-1 status-sink notification reflect
+                # when the compute actually began -- honestly overlapping Ingress's
+                # own span below, not artificially delayed until join time.
+                turn_timing.stage_start("planner")
+
         turn_timing.stage_start("ingress")
-        ingress_res = classify_ingress(q, client_id=client_id, sid=sid, skip=False)
+        ingress_res = classify_ingress(
+            q,
+            client_id=client_id,
+            sid=sid,
+            skip=False,
+            on_llm_path=_fork_planner_speculation,
+        )
         turn_timing.stage_end(
             "ingress",
             status="completed",
@@ -148,6 +190,7 @@ def run_pre_resolver_turn(
             source=ingress_res.source,
         )
         if ingress_res.route != "normal":
+            discard_planner_speculation(speculative_handle)
             return AskOrchestrationResult(
                 kind="service_reply",
                 q=q,
@@ -188,6 +231,7 @@ def run_pre_resolver_turn(
         get_topic_state=get_topic_state,
     )
     if flow_result is not None:
+        discard_planner_speculation(speculative_handle)
         return lead_flow_orchestration_result(
             q=q, sid=sid, client_id=client_id, flow_result=flow_result, decision=decision
         )
@@ -205,6 +249,7 @@ def run_pre_resolver_turn(
                 burst_window_sec=ANTI_SPAM_BURST_WINDOW_SEC,
                 burst_messages=ANTI_SPAM_BURST_MESSAGES,
             )
+            discard_planner_speculation(speculative_handle)
             return AskOrchestrationResult(
                 kind="service_reply",
                 q=q,
@@ -225,6 +270,7 @@ def run_pre_resolver_turn(
                 client_id=client_id,
                 session_turn_count=int(st.get("session_turn_count") or 0),
             )
+            discard_planner_speculation(speculative_handle)
             return AskOrchestrationResult(
                 kind="service_reply",
                 q=q,
@@ -267,6 +313,7 @@ def run_pre_resolver_turn(
                     followups=session_state.followups,
                 )
                 if ui_resolution.kind != "ok" or ui_resolution.action is None:
+                    discard_planner_speculation(speculative_handle)
                     payload = build_target_unknown_ref_clarify_payload(
                         client_id=client_id,
                         sid=sid,
@@ -293,6 +340,7 @@ def run_pre_resolver_turn(
                     followups=session_state.followups,
                 )
                 if ui_resolution.kind != "ok" or ui_resolution.action is None:
+                    discard_planner_speculation(speculative_handle)
                     payload = build_target_unknown_ref_clarify_payload(
                         client_id=client_id,
                         sid=sid,
@@ -324,6 +372,7 @@ def run_pre_resolver_turn(
                     followups=session_state.followups,
                 )
                 if nav is not None and nav.matched_ref is None:
+                    discard_planner_speculation(speculative_handle)
                     payload = build_target_unknown_ref_clarify_payload(
                         client_id=client_id,
                         sid=sid,
@@ -341,6 +390,7 @@ def run_pre_resolver_turn(
                     q = nav.user_message
 
     if not q:
+        discard_planner_speculation(speculative_handle)
         return AskOrchestrationResult(
             kind="service_reply",
             q=q,
@@ -353,4 +403,12 @@ def run_pre_resolver_turn(
             decision_frame=decision_frame,
         )
 
-    return AskTurnContext(q=q, sid=sid, client_id=client_id, ref=ref, data=data, st=st)
+    return AskTurnContext(
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        ref=ref,
+        data=data,
+        st=st,
+        planner_speculation=speculative_handle,
+    )

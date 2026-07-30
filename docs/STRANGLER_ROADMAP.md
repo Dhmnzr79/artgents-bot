@@ -830,10 +830,11 @@ Deliverables (Phase 1): seam audit
 
 ---
 
-## Active — FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4 (governance Phase 1)
+## Active — FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4 (governance + implementation)
 
-**Baseline:** `codex/stage-a` @ `61cd93e` · **NO PRODUCT IMPLEMENTATION / NO MERGING INGRESS+PLANNER /
-NO PROMPT/MODEL/SCHEMA CHANGES / NO LIVE / NO LLM / NO PROVIDER CALLS**
+**Baseline:** `codex/stage-a` @ `61cd93e` (governance Phase 1) → Phase 2 implementation (owner GO)
+**COMPLETE**, shipped **inert by default** (`PLANNER_SPECULATION_CAPACITY=0`) · **NO MERGING
+INGRESS+PLANNER / NO PROMPT/MODEL/SCHEMA CHANGES / NO LIVE / NO LLM / NO PROVIDER CALLS**
 
 Fifth step of the acceleration program, after PERF-0/1/2/3. A real request ("Что такое костная
 пластика?", 18.2s total) showed Ingress (3.4s) and Planner (3.8s) running **sequentially** even though
@@ -866,8 +867,23 @@ Deliverables (Phase 1): seam audit
 (`docs/evidence/performance/FINAL_PARALLEL_INGRESS_PLANNER_LATENCY_SEAM_AUDIT.md`), `TASK.md`, doc sync,
 PRE-CODE checker `tests/test_final_parallel_ingress_planner_latency_governance.py`.
 
-**STOP** after PRE-CODE ✅ — separate owner GO before any product implementation (the parallel
-coordinator does not exist yet).
+**Implementation (Phase 2, owner GO) COMPLETE:** `core/planner_compute_executor.py` (new, dedicated
+bounded executor, never `_sse_worker_executor`); `classify_ingress` gained an additive `on_llm_path` hook
+(invoked only immediately before its own real LLM call — a documented allowlist deviation, since forking
+via an independently re-run copy of Ingress's deterministic checks was found to diverge from test fakes
+and leak a real provider call); `plan_turn_attempt` gained an additive `history_override` param;
+`run_planner_turn`/`AskTurnContext` gained optional fields for the join/publish handle. **Ships inert by
+default** — `PLANNER_SPECULATION_CAPACITY` defaults to `0`, so every existing call site behaves
+byte-for-byte as before PERF-4 until a separate, later, explicit owner step sets it positive (the same
+two-gate spirit as PERF-3's LIVE gate). This default was chosen after finding 5 pre-existing test
+files/helpers assumed `run_pre_resolver_turn` alone could never reach Planner. 31 new tests
+(`tests/test_final_parallel_ingress_planner_latency_implementation.py`) + a 520-test regression sweep +
+the full ~3523-test wide suite (101 failed / 3411 passed, matching the pre-existing TSC baseline, zero
+new failures in this milestone's domain) — all zero real network calls. Full detail, deviations, and the
+call-count/latency evidence: TASK.md's PERF-4 Phase 2 completion record.
+
+**STOP** before the next performance milestone, and before any owner decision to activate
+`PLANNER_SPECULATION_CAPACITY` > 0 in a real environment.
 
 ---
 

@@ -51,11 +51,85 @@ logger = get_logger("bot")
 # reaches Planner" assumption that PERF-4 breaks: several pre-existing tests were found
 # relying on exactly that (see TASK.md's PERF-4 completion record) and a wide test
 # suite this large cannot be exhaustively proven free of more.
-PLANNER_SPECULATION_CAPACITY = max(0, int(os.getenv("PLANNER_SPECULATION_CAPACITY", "0")))
+#
+# This is a per-process, one-time-at-import config value -- never a per-request or
+# per-client executor. It is a plain deployment/operational setting (an env var read
+# once at process startup), not tied to any specific client_id/service; nothing in this
+# module reads client_id to decide capacity.
+PLANNER_SPECULATION_CAPACITY_DEFAULT = 0
+PLANNER_SPECULATION_CAPACITY_MIN = 0
+PLANNER_SPECULATION_CAPACITY_MAX = 4
+
+
+def _resolve_planner_speculation_capacity() -> int:
+    """Parse `PLANNER_SPECULATION_CAPACITY` as a validated integer in the documented
+    safe range `[PLANNER_SPECULATION_CAPACITY_MIN, PLANNER_SPECULATION_CAPACITY_MAX]`.
+
+    Never raises. Any invalid, missing, negative, or above-range value degrades to a
+    safe, logged, well-defined outcome -- never a silent surprise, never an unbounded
+    value:
+    - missing/blank -> the documented default (0, inert)
+    - not an integer -> fail-safe to the default, with a warning event
+    - negative -> fail-safe to the default, with a warning event
+    - above the documented maximum -> clamped down to the maximum, with a warning
+      event (not silently accepted at face value, and not reset all the way to 0 --
+      an operator who set a deliberately-too-high number gets the safe ceiling, not a
+      surprise return to fully inert)
+    """
+    raw = os.getenv("PLANNER_SPECULATION_CAPACITY")
+    if raw is None or not raw.strip():
+        return PLANNER_SPECULATION_CAPACITY_DEFAULT
+    text = raw.strip()
+    try:
+        value = int(text)
+    except ValueError:
+        log_json(
+            logger,
+            "planner_speculation_capacity_invalid_config",
+            raw_value=text,
+            effective_capacity=PLANNER_SPECULATION_CAPACITY_DEFAULT,
+            reason="not_an_integer",
+        )
+        return PLANNER_SPECULATION_CAPACITY_DEFAULT
+    if value < PLANNER_SPECULATION_CAPACITY_MIN:
+        log_json(
+            logger,
+            "planner_speculation_capacity_invalid_config",
+            raw_value=text,
+            effective_capacity=PLANNER_SPECULATION_CAPACITY_DEFAULT,
+            reason="negative",
+        )
+        return PLANNER_SPECULATION_CAPACITY_DEFAULT
+    if value > PLANNER_SPECULATION_CAPACITY_MAX:
+        log_json(
+            logger,
+            "planner_speculation_capacity_clamped",
+            raw_value=text,
+            requested_capacity=value,
+            effective_capacity=PLANNER_SPECULATION_CAPACITY_MAX,
+            safe_max=PLANNER_SPECULATION_CAPACITY_MAX,
+        )
+        return PLANNER_SPECULATION_CAPACITY_MAX
+    return value
+
+
+PLANNER_SPECULATION_CAPACITY = _resolve_planner_speculation_capacity()
 _planner_speculation_executor = ThreadPoolExecutor(
     max_workers=max(1, PLANNER_SPECULATION_CAPACITY), thread_name_prefix="planner-speculative"
 )
 _planner_speculation_admission = threading.Semaphore(PLANNER_SPECULATION_CAPACITY)
+
+# Startup log: effective capacity only, no PII, no client_id, no prompt/session data --
+# an operator reading process logs can see what the running process actually resolved
+# to without needing to inspect environment variables directly.
+log_json(
+    logger,
+    "planner_speculation_capacity_effective",
+    effective_capacity=PLANNER_SPECULATION_CAPACITY,
+    safe_range_min=PLANNER_SPECULATION_CAPACITY_MIN,
+    safe_range_max=PLANNER_SPECULATION_CAPACITY_MAX,
+    inert=PLANNER_SPECULATION_CAPACITY == 0,
+)
 
 # Defense in depth only: plan_turn_attempt already carries its own LLM request timeout
 # (LLM_REQUEST_TIMEOUT_SEC); this bounds the *join*, so a hung compute cannot block the

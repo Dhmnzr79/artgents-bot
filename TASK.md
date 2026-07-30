@@ -7585,3 +7585,144 @@ Product implementation complete, test-covered, and inert by default. **STOP** be
 milestone and before any owner decision to set `PLANNER_SPECULATION_CAPACITY` > 0 in a real environment.
 
 ---
+
+## Completion record (PERF-4 activation: forensic + guard + config, owner GO)
+
+**Baseline:** `codex/stage-a` @ `fbe86bb` → forensic correction `0a299d8` (see above) → this record.
+NO LIVE / NO real provider calls / NO network / no server started / no widget request sent anywhere in
+this activation work.
+
+### Checkpoint A (forensic) — recap
+
+Already committed separately (`0a299d8`): 230 real provider calls during PERF-4's own development
+session, documented in
+[`docs/evidence/performance/PERF4_DEVELOPMENT_LIVE_PROVIDER_CALLS_FORENSIC_AUDIT.md`](evidence/performance/PERF4_DEVELOPMENT_LIVE_PROVIDER_CALLS_FORENSIC_AUDIT.md),
+TASK.md's false "NO LIVE confirmation" corrected in place (struck through, not deleted).
+
+### Checkpoint B — centralized transport guard + config correction
+
+**New, mandatory, centralized pytest guard** (`tests/conftest.py::_block_real_provider_transport`,
+autouse): patches the single shared choke point every provider call funnels through —
+`llm.chat_client.chat.completions.create` — which `llm.chat_completions_create`,
+`ingress_gate._call_ingress_llm`, `core/turn_planner_llm.py`'s `_planner_chat_completions_create`, and
+`core/target_runtime_llm_backends.py`'s Composer/Verifier/Boundary backends all resolve to at call time.
+Blocks unconditionally for every normal test, **even with a real API key configured** — the exact gap the
+230-call incident exposed. Tests that inject their own fake/recording backend (the existing, correct
+pattern throughout this suite) are completely unaffected, since a fake replaces the higher-level function
+before execution ever reaches this choke point. The only recognized bypass is the existing, separate,
+explicit LIVE gate already used by PERF-3
+(`core.target_prompt_cache_prewarm.LIVE_AUTHORIZED_ATTEMPT_ID`, a hardcoded module constant requiring an
+actual code change plus a fresh owner GO) — never a pytest marker, fixture flag, or an available API key.
+Proven by a negative test suite, `tests/test_provider_transport_guard.py` (5 tests): the guard blocks both
+the raw client and the public wrapper, an injected fake remains unaffected, the existing LIVE gate (when
+open) is correctly not intercepted, and the block message names the real bypass (not an API key or
+marker).
+
+**Config correction** (`core/planner_compute_executor.py::_resolve_planner_speculation_capacity`):
+`PLANNER_SPECULATION_CAPACITY` is now a validated integer config, never a bare `int(os.getenv(...))`:
+default `0` (inert, unchanged from before), documented safe range `[0, 4]`, invalid/non-integer/negative
+input fails safe to `0` with a logged warning event (`planner_speculation_capacity_invalid_config`), a
+value above `4` is clamped down to `4` with a logged warning event
+(`planner_speculation_capacity_clamped`) rather than accepted at face value or silently reset to `0`. A
+startup log (`planner_speculation_capacity_effective`) reports only the effective capacity, safe range,
+and whether it's inert — no PII, no client_id-specific data. This is a per-process, one-time-at-import
+deployment setting (an env var read once at startup) — never a per-request or per-client executor, and
+never tied to `client_id=demo` specifically; nothing in the module reads `client_id` to decide capacity.
+`.env.example` documents it as a commented-out, generic deployment override (not an active value, no
+secret involved).
+
+**Demo deployment command** (owner recommended capacity: `2`) — determined from this repo's actual launch
+mechanisms (`start.sh` / `Dockerfile`, both `gunicorn -w 1 -b 0.0.0.0:8000 app:app`; `app.py`'s own
+`if __name__ == "__main__"` block for direct dev invocation), not guessed:
+
+```
+# Real deployment (matches start.sh / Dockerfile):
+PLANNER_SPECULATION_CAPACITY=2 gunicorn -w 1 -b 0.0.0.0:8000 app:app
+
+# Direct local/dev invocation (matches app.py's own __main__ block):
+PLANNER_SPECULATION_CAPACITY=2 python app.py
+```
+
+Neither command has been run — no server started, no widget request sent, per instruction.
+
+### Checkpoint C — test-safety classification
+
+Re-verified the 19-file surface that mocks `run_planner_turn` (a superset including the 5 files/helpers
+from the prior completion record). One correction to the prior record's own count: **4 distinct files
+required a direct point-fix** (not 5 as previously stated — an imprecise count on my part, corrected here
+for accuracy): `tests/test_typed_ui_turn_frame_offline.py`, `tests/test_s61_correction_target_runtime.py`
+(a shared `_pre_resolver`/HTTP helper), `tests/test_w1_attribution_contract_offline.py`,
+`tests/test_final_fullcontext_dialogue_runtime_convergence_harness.py` (a shared harness). The harness
+fix transitively protects a 5th file that reuses it
+(`tests/test_final_fullcontext_dialogue_runtime_convergence_implementation.py`) — which is where "5"
+originally came from, imprecisely phrased as "5 files" rather than "4 fixed + 1 protected transitively."
+
+Classification for all 19 files (verified via the full regression sweep, §below):
+
+| Category | Files | Why |
+|---|---|---|
+| (a) Safe via default capacity=0 + never reaches the fork trigger | 14 files | Either `q=""`+`ref` (`ingress_skip=True`, fork structurally unreachable), or `run_pre_resolver_turn`/`_orchestrate_ask_turn` fully stubbed, or (for the governance file) only a documentation-string check, no execution |
+| (b) Would need an explicit fake Planner backend injected if capacity were ever raised for these specific tests | The 4 point-fixed files | They now fake `classify_ingress` (correctly resolving to `route=normal`), so at positive capacity they *would* reach the real fork trigger; `plan_turn_attempt` itself is not faked in them, so raising capacity for these specific tests would today rely on the centralized guard (§Checkpoint B) to fail safely rather than leak — not on capacity=0 |
+| (c) Required point correction (applied) | Same 4 files | Added `classify_ingress` fakes so they exercise their own intended scenario deterministically, instead of accidentally reaching Ingress's real LLM path |
+
+No global hidden monkeypatch, `skip`/`xfail`, or production-semantics change was used to "fix" any of
+these — each got an explicit, visible fake matching the existing pattern already used throughout the
+suite.
+
+**Pool-sizing correction found and fixed while building the offline acceptance suite:** the existing
+PERF-4 test fixtures (both the original implementation suite and this activation suite) previously
+overrode only the admission `Semaphore`, not the underlying `ThreadPoolExecutor`'s `max_workers` — which
+is fixed at **import time** from the process-level default (capacity `0` → `max_workers=1`). A
+semaphore-only override let more tasks be *admitted* than the pool could actually *run* concurrently,
+silently serializing them — meaning `test_20_concurrent_submissions_stay_within_bounded_capacity` (and
+this activation suite's equivalents) were passing without truly proving multi-task concurrency. Fixed in
+both test files: the capacity-activation helper now replaces both the semaphore and the executor pool,
+with proper `shutdown(wait=True, cancel_futures=True)` teardown to avoid leaking threads across tests.
+
+### Offline acceptance (20/20 + negative-guard suite)
+
+New: `tests/test_final_parallel_ingress_planner_latency_activation_implementation.py` — **21 passed**
+(20-scenario matrix + one capacity=0 sub-case), covering exactly the owner's list: default capacity=0
+sequential path; capacity=2 real overlap; fake 250ms+350ms ≈350ms not 600ms; accepted-normal call count;
+publish-once/main-thread; Ingress-reject discard; deterministic short-circuit; lite→full retry;
+capacity-exhaustion fallback; invalid/negative config → 0; above-max → clamped; `/ask`/`/ask/stream`
+parity; PERF-0 overlap trace at capacity=2; PERF-1 status-phrase compatibility; typed-UI/contacts/
+availability/lead short-circuits at capacity=2; positive-capacity-without-fake-backend blocked safely
+(never leaked); teardown leaves no admission/future pollution; runtime call count unchanged; no
+`request.ctx`/session access from the worker; immutable history snapshot — all at capacity=2 where the
+scenario calls for it, not just capacity=4 as the original suite used.
+
+New: `tests/test_provider_transport_guard.py` — **5 passed** (the guard's own negative-test suite, §above).
+
+### Regression
+
+- New activation/guard/config suites: **26 passed** (21 + 5).
+- PERF-4 original implementation suite (pool-sizing fix applied): **31 passed**.
+- PERF-4 governance + PERF-0/1/2/3 governance/implementation: **245 passed**.
+- Combined direct run: **302 passed**.
+- Broader 27-file regression sweep (ingress/typed-UI/contacts/availability/planner-direct tests):
+  **426 passed**.
+- `python -m pytest tests/ --collect-only`: **3549 tests collected** (+26 vs. the prior completion
+  record), zero collection errors.
+- `git diff --check`: clean.
+- Full wide suite (`python -m pytest tests/`): **101 failed / 3437 passed / 11 skipped** — the exact same
+  101 pre-existing TSC-A/B/C/D failure count as the prior PERF-4 completion record and PERF-0/1/2's own
+  documented baselines (more tests now pass overall, +26, matching the new test count). Confirmed zero
+  failing nodeids reference planner/ingress/pre_resolver/parallel/transport/guard/conftest. Run in full
+  specifically because the centralized guard is a suite-wide change (not a narrow one) and warranted the
+  broader check.
+
+### NO LIVE confirmation (this time, verified accurately — see Checkpoint A above for why the prior claim was wrong)
+
+Zero real provider/network calls in this activation work itself. The 230-call incident this activation
+task responds to is documented, not repeated, not re-verified by re-running anything live — the forensic
+audit was read-only against existing logs, and every fix/test added here is offline, fake-backend-only,
+and now additionally backstopped by the centralized transport guard.
+
+## STOP (PERF-4 activation)
+
+Product-side speculative parallelism remains inert (`PLANNER_SPECULATION_CAPACITY` defaults to `0`); the
+demo deployment command for capacity `2` is documented above but **not run**. **STOP** before starting the
+demo server and before the first real widget measurement — that is the owner's next, separate step.
+
+---

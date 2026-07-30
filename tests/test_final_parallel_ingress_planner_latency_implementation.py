@@ -22,7 +22,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from concurrent.futures import Future
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import pytest
 from flask import Flask, request
@@ -205,12 +205,20 @@ def _fake_planner_by_default(monkeypatch):
     reach the real network even if it forgets to patch explicitly."""
     monkeypatch.setattr(executor_module, "plan_turn_attempt", _fake_planner_compute())
     monkeypatch.setattr(planner_turn_module, "plan_turn_attempt", _fake_planner_compute())
-    # Production default is capacity=0 (inert -- see core/planner_compute_executor.py).
-    # This file explicitly activates a real, working, bounded capacity for its own
-    # scope only, so it can exercise the actual fork/join/executor mechanism.
+    # Production default is capacity=0 (inert -- see core/planner_compute_executor.py),
+    # which also fixes the underlying ThreadPoolExecutor's max_workers=1 at import
+    # time. This file explicitly activates a real, working, bounded capacity for its
+    # own scope only -- both the admission semaphore AND the pool itself (a
+    # semaphore-only override would silently under-provision the pool to 1 worker,
+    # serializing every "concurrent" submission and making any multi-task-concurrency
+    # assertion, e.g. test_20, pass trivially without proving anything).
     monkeypatch.setattr(
         executor_module, "_planner_speculation_admission", threading.Semaphore(PLANNER_SPECULATION_CAPACITY)
     )
+    test_executor = ThreadPoolExecutor(
+        max_workers=PLANNER_SPECULATION_CAPACITY, thread_name_prefix="test-planner-speculative"
+    )
+    monkeypatch.setattr(executor_module, "_planner_speculation_executor", test_executor)
     yield
     # Drain: wait for the admission semaphore to return to full capacity before the
     # next test starts, so a slow fake's still-in-flight background task (started
@@ -221,6 +229,7 @@ def _fake_planner_by_default(monkeypatch):
         and time.monotonic() < deadline
     ):
         time.sleep(0.02)
+    test_executor.shutdown(wait=True, cancel_futures=True)
 
 
 # --------------------------------------------------------------------------------------------

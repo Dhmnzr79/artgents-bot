@@ -203,7 +203,23 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    изменений `app.py`. С двумя воротами: owner GO на implementation CLI, и отдельное owner LIVE/LLM
    разрешение перед первой `--live` активацией. Seam audit:
    `docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`.
-   Implementation **STOP** until PRE-CODE ✅ + owner GO.
+   Implementation shipped (CLI + offline tests, @ `f8db2e0`). Owner LIVE/LLM GO ran exactly one live
+   attempt (`perf3-demo-2026-07-30-01`, @ `64fd54c`/`61cd93e`): 2/2 calls completed, `cached_tokens=0` on
+   both (expected — first-ever warm, nothing previously cached). Gate closed back to blocked after the one
+   attempt; the marker is committed as immutable evidence so replay stays blocked. **A subsequent real
+   request still showed Composer/Verifier `cached_tokens=0`** — the practical cache-hit benefit has **not**
+   been demonstrated; automatic startup prewarm (Option C) remains deferred/not recommended. See
+   `docs/evidence/performance/PERF3_PROMPT_CACHE_PREWARM_LIVE_ATTEMPT_AUDIT.md` and TASK.md's PERF-3
+   completion records.
+   **FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4** (Phase 1 governance @ `61cd93e`) — real request
+   ("Что такое костная пластика?", 18.2s total) showed Ingress 3.4s + Planner 3.8s running sequentially
+   though both only need the original question. Seam audit proves the compute/publish split is clean
+   (`plan_turn_attempt` touches zero `request.ctx`; Ingress's own LLM path does, so Ingress stays
+   untouched) and selects **Variant C** (parallelize only Planner's pure compute, never merge the two
+   contracts) — flags the nested-executor deadlock hazard against PERF-1's `_sse_worker_executor` as the
+   most important risk to avoid in Phase 2. Seam audit:
+   `docs/evidence/performance/FINAL_PARALLEL_INGRESS_PLANNER_LATENCY_SEAM_AUDIT.md`.
+   Implementation **STOP** until PRE-CODE ✅ + a separate owner GO.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 6. **FINAL_TEST_SUITE_CONVERGENCE (governance @ `1980ab7`):** 185 wide failures inventoried; TSC-A..D checkpoints defined. See `docs/TEST_SUITE_ARCHITECTURE.md`, `docs/evidence/testing/final_test_failure_inventory.json`. Implementation blocked until owner GO.
 

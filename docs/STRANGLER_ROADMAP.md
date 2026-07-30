@@ -830,10 +830,51 @@ Deliverables (Phase 1): seam audit
 
 ---
 
-## Active — FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3 (governance Phase 1)
+## Active — FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4 (governance Phase 1)
 
-**Baseline:** `codex/stage-a` @ `897cdb7` · **NO PRODUCT IMPLEMENTATION / NO PROVIDER CALLS / NO LIVE /
-NO LLM / NO COMPOSER/VERIFIER PROMPT CHANGE**
+**Baseline:** `codex/stage-a` @ `61cd93e` · **NO PRODUCT IMPLEMENTATION / NO MERGING INGRESS+PLANNER /
+NO PROMPT/MODEL/SCHEMA CHANGES / NO LIVE / NO LLM / NO PROVIDER CALLS**
+
+Fifth step of the acceleration program, after PERF-0/1/2/3. A real request ("Что такое костная
+пластика?", 18.2s total) showed Ingress (3.4s) and Planner (3.8s) running **sequentially** even though
+both are independent LLM calls over the same original question — the user waits ≈7.2s before Boundary
+even starts. Goal: determine whether Ingress and Planner can safely overlap in wall-clock time without
+merging their contracts, without moving any side-effectful publish logic off the request thread, and
+without sharing `request.ctx` between threads.
+
+Audit finding: the two calls are genuinely independent (separate prompts, separate models, separate
+schemas, neither reads the other's output) but with one asymmetry that decides the design — Ingress's own
+LLM path touches `request.ctx` internally (its lite→full catalog-retry accounting), while Planner's
+compute (`plan_turn_attempt`) touches **zero** Flask state at all. Selected: **Variant C** — split
+Planner into pure compute + publish, parallelize only the compute, leave Ingress exactly as it is today.
+The discard surface for a speculatively-started Planner call is bigger than plain Ingress-reject (lead-
+flow/anti-spam/ref/typed-UI short-circuits all currently happen before Planner runs too). The most
+important hazard identified: `_orchestrate_ask_turn` already runs inside a PERF-1 SSE worker thread for
+`/ask/stream` — the new Planner-compute executor must be a **separate**, independently-bounded pool, never
+PERF-1's `_sse_worker_executor` itself, or SSE workers can deadlock under load. Rule-4 compliance (no
+speculative Planner on a deterministic-rule Ingress hit) requires forking only after Ingress's own
+existing deterministic pre-checks have found nothing — reusing those checks as the gating signal, not a
+second router. Speculative-Planner waste estimated offline from existing local logs (no LIVE call): 1373
+`ingress_gate` events, 99.93% `normal` — dev/test-fixture traffic, not necessarily production-representative.
+
+Also captures, per owner request: **PERF-3's live-attempt outcome** — the one authorized live prewarm
+attempt completed (2/2 calls), but the subsequent real request still showed Composer/Verifier
+`cached_tokens=0`; the practical cache-hit benefit has not been demonstrated, and automatic startup
+prewarm remains deferred/not recommended.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/performance/FINAL_PARALLEL_INGRESS_PLANNER_LATENCY_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_parallel_ingress_planner_latency_governance.py`.
+
+**STOP** after PRE-CODE ✅ — separate owner GO before any product implementation (the parallel
+coordinator does not exist yet).
+
+---
+
+## Historical — FINAL_PROVIDER_PROMPT_CACHE_PREWARM / PERF-3 (governance + implementation + one live attempt)
+
+**Baseline:** `codex/stage-a` @ `897cdb7` (governance) → `f8db2e0` (implementation **COMPLETE**) →
+`64fd54c`/`61cd93e` (one owner-authorized live attempt + closeout **COMPLETE**).
 
 Fourth step of the acceleration program, after PERF-0/1/2. Composer and Semantic Verifier each send a
 large, per-client-static prompt prefix (system policy + full corpus, ~106,000 chars / ~26,500 tokens for
@@ -863,8 +904,14 @@ Deliverables (Phase 1): seam audit
 (`docs/evidence/performance/FINAL_PROVIDER_PROMPT_CACHE_PREWARM_SEAM_AUDIT.md`), `TASK.md`, doc sync,
 PRE-CODE checker `tests/test_final_provider_prompt_cache_prewarm_governance.py`.
 
-**STOP** after PRE-CODE ✅ — separate owner GO before implementation, and a further separate LIVE/LLM
-permission before first real provider activation.
+**Implementation + one live attempt (COMPLETE):** CLI + offline tests shipped @ `f8db2e0`. A separate
+owner LIVE/LLM GO authorized exactly one live attempt (`perf3-demo-2026-07-30-01`): 2/2 calls completed,
+`cached_tokens=0` on both (expected — first warm, nothing previously cached). Gate closed back to blocked
+immediately after; the attempt marker is committed as immutable evidence so replay stays blocked. See
+`docs/evidence/performance/PERF3_PROMPT_CACHE_PREWARM_LIVE_ATTEMPT_AUDIT.md`. **A subsequent real request
+still showed Composer/Verifier `cached_tokens=0`** (captured in PERF-4's seam audit, Checkpoint A) — the
+practical cache-hit benefit has not been demonstrated on real traffic; automatic startup prewarm (Option
+C) remains deferred and is not recommended.
 
 ---
 

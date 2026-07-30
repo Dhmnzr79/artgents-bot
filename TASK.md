@@ -7282,3 +7282,133 @@ change, no TSC-C/D, no frozen artifact touched. The real benefit question (`cach
 subsequent real request) is answered by the next real widget question, run by the owner — not run here.
 
 ---
+
+# TASK — FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4 (governance)
+
+**Status:** Phase 1, governance only · **NO PRODUCT IMPLEMENTATION / NO MERGING INGRESS+PLANNER / NO
+PROMPT/MODEL/SCHEMA CHANGES / NO REMOVING INGRESS / NO COMPOSER/VERIFIER/BOUNDARY CHANGES / NO SCOPED
+FULLCONTEXT IMPLEMENTATION / NO STREAMING TEXT / NO ANSWER-CACHE/PREWARM LOOPS / NO CLIENT DATA/FROZEN
+ARTIFACTS / NO TSC-C / NO TSC-D / NO LIVE / NO LLM / NO PROVIDER CALLS**
+
+**Baseline:** `codex/stage-a` @ `61cd93e`.
+
+**Motivation (owner-observed real request):** "Что такое костная пластика?" — total 18.2s, Ingress
+3.4s, Planner 3.8s, Boundary 1.3s, Composer 7.8s, Verifier 1.8s, Composer/Verifier `cached_tokens=0`.
+Ingress and Planner run sequentially today though both only need the original question — user waits
+≈3.4+3.8=7.2s before Boundary starts. Full detail in
+[`docs/evidence/performance/FINAL_PARALLEL_INGRESS_PLANNER_LATENCY_SEAM_AUDIT.md`](evidence/performance/FINAL_PARALLEL_INGRESS_PLANNER_LATENCY_SEAM_AUDIT.md)
+(seam audit, §0).
+
+## Normative design (summary — seam audit has the full line-by-line evidence)
+
+Ingress and Planner are two independent contracts (separate prompts, separate models
+`INGRESS_CLASSIFY_MODEL`/`TURN_PLANNER_LLM_MODEL`, separate schemas
+`IngressRouteResult`/`PlannerAttempt`) that neither reads the other's output (seam audit §1). The one
+asymmetry that decides the design: Ingress's own LLM path (`_call_ingress_llm`) touches `request.ctx`
+internally (`turn_timing.set_flag`/`timed_stage` for its lite→full retry accounting); Planner's compute
+(`plan_turn_attempt`) touches **zero** Flask/`request.ctx` state — it only reads config/catalog/session-
+history and writes logs (seam audit §1, §3). `run_planner_turn`'s own compute/publish boundary is exactly
+the `plan_turn_attempt` call: everything after it (`publish_planner_attempt_frame`, several `request.ctx`
+writes, `record_decision_frame_ctx`, the durable `enqueue_resolver_trace` shadow-eval write) is
+`request.ctx`-bound publish logic that must run in the main orchestration thread, exactly once, only on
+the path that reaches it today (seam audit §3).
+
+## Dependency / side-effect map
+
+The discard surface for a speculatively-started Planner compute is bigger than "Ingress route ≠ normal"
+— it is every point between the Ingress call and `run_planner_turn`'s actual call site in the **current**
+sequential flow (seam audit §2, full table): Ingress reject: `handle_flows` lead-flow short-circuit;
+anti-spam message-burst redirect; anti-spam no-intent soft redirect; unknown-ref clarify (three
+sub-cases); empty `q`; and `try_run_typed_ui_planner_turn` returning non-`None` (typed UI clicks skip
+free-text Planner entirely). Ref-click turns structurally cannot co-occur with a speculative Planner fork
+under the selected design, since `ref` set ⇒ `ingress_skip=True` ⇒ the fork point (which only fires
+inside the LLM-ingress branch) never triggers.
+
+## Selected variant: C (split Planner into pure compute + publish; parallelize only compute)
+
+| Variant | Verdict |
+|---|---|
+| A — Ingress future, Planner in current thread | Rejected — Ingress's own LLM path needs `request.ctx`; moving it would need the same context-independence work for no extra benefit over moving Planner. |
+| B — Both in a bounded executor | Rejected — same reason as A, doubled. |
+| **C — Split Planner compute/publish, parallelize only compute** | **Selected** — `plan_turn_attempt` already needs zero `request.ctx`; Ingress stays untouched; minimal surface. |
+| D — Stay sequential | Not primary design (split is clean) — kept as the documented overload/failure fallback. |
+
+Fork point: **not** "before every `classify_ingress` call" (would waste a Planner call on every
+deterministic-rule Ingress hit, violating the owner's Rule 4) but immediately after
+`classify_ingress`'s own existing deterministic pre-checks (`match_clinic_policy_key`,
+`_ingress_deterministic_normal`) have already found nothing — reusing those same functions as the gating
+signal, not a second router (seam audit §6, two acceptable shapes sketched, neither chosen yet —
+implementation-time call).
+
+## Trade-offs
+
+- Planner's compute needs none of PERF-1's full independent-`RequestContext` machinery (no Flask state to
+  isolate) but does need explicit `request_id` correlation for its own log lines, since a plain worker
+  thread has no bound `request.ctx` at all otherwise (seam audit §5, §7) — a real but non-blocking
+  observability gap for Phase 2 to close, not a safety hazard.
+- **Nested-executor deadlock hazard (the most important hazard in this audit, seam audit §10):**
+  `_orchestrate_ask_turn` already runs *inside* a PERF-1 SSE worker thread for `/ask/stream`. The new
+  Planner-compute executor **must** be a separate, independently-bounded pool — never
+  `_sse_worker_executor` itself — or all SSE workers can deadlock under load, each blocked submitting a
+  nested task to their own already-exhausted pool.
+- `stage_start("planner")`/`stage_end("planner", ...)` must stay in the main thread, called at fork/join
+  time, not inside the worker — both because `_bucket()` needs `request.ctx` and because
+  `_notify_status_sink`'s `ContextVar` is not inherited by a plain new thread (seam audit §11). This
+  avoids any `ContextVar` propagation work entirely, rather than requiring it.
+- Speculative-Planner waste (Rule 17): counted offline from existing local `logs/demo-app.jsonl` (+
+  rotated) — 1373 `ingress_gate` events, 1372 `normal` (99.93%), 1 `service_not_offered` (0.07%);
+  dev/test-fixture traffic, not necessarily representative of production. Under the selected fork point
+  the residual waste is smaller than this raw reject rate (deterministic rejects are excluded by
+  construction) but not precisely sizeable from this sample alone — Phase 2 should add a dedicated
+  discard-path counter rather than trusting a one-time estimate (seam audit §16).
+- Provider concurrency: one shared module-level `chat_client` (`llm.py`) already tolerates concurrent
+  calls across simultaneous different requests today; two concurrent calls for one turn is the same
+  assumption, not a new one, and the two calls use different models (separate rate-limit buckets) (seam
+  audit §8).
+- Checkpoint A (owner-requested, PERF-3 outcome capture): the live prewarm attempt completed but the
+  subsequent real request still showed Composer/Verifier `cached_tokens=0` — practical prompt-cache
+  benefit not demonstrated; automatic startup prewarm remains deferred/not recommended; PERF-3's CLI and
+  immutable evidence are untouched; no new prewarm loop started (seam audit §15). A related observability
+  gap (PERF-3's offline fake-provider tests write real log rows into the shared `logs/demo-app.jsonl`) is
+  noted, classified as test-log-isolation debt, and deliberately **not** fixed in this Phase 1 (seam audit
+  §15) — only added to a future allowlist if a concrete harm is demonstrated.
+
+## Allowlist (implementation — Phase 2, NOT started in this Phase 1 milestone)
+
+| Path | Change |
+|---|---|
+| `orchestration/pre_resolver_turn.py` | Fork `plan_turn_attempt` compute at the seam above; thread the future through `AskTurnContext` |
+| `orchestration/context.py` (`AskTurnContext`) | Optional field carrying the in-flight future (or `None`) |
+| `orchestration/planner_turn.py` (`run_planner_turn`) | Accept an optional pre-computed future; `future.result(timeout=...)` instead of calling `plan_turn_attempt` when present; publish logic unchanged |
+| New small module (name TBD in Phase 2) | Dedicated, separately-bounded `ThreadPoolExecutor` + non-blocking admission `Semaphore` — never `_sse_worker_executor` |
+| `core/turn_planner_llm.py` logging call sites | Thread an explicit `request_id` (or a small bind/reset `ContextVar`) through for log correlation |
+
+Explicitly NOT in this allowlist: `ingress_gate.py` (no change); `core/target_sse_worker_context.py` /
+`_sse_worker_executor` (no reuse, no modification); Composer/Verifier/Boundary; any prompt/model/schema;
+`app.py` route handlers beyond wiring the new future through unchanged call sites.
+
+## Acceptance matrix
+
+32 scenarios, full table in the seam audit §18 (delayed-stage overlap timing, deterministic-vs-LLM
+Ingress paths, accept/reject/discard combinations, both-fail, timeouts, overload fallback, nested-deadlock
+guard by executor identity, `/ask` vs `/ask/stream` parity, typed-UI/contacts/availability/lead/situation/
+reset unchanged, PERF-0 overlap correctness, PERF-1 status stability, call-count and publish-exactly-once
+invariants, zero-network offline tests).
+
+## Test commands
+
+```
+python -m pytest tests/test_final_parallel_ingress_planner_latency_governance.py -q
+python -m pytest tests/test_final_response_latency_observability_governance.py tests/test_final_response_latency_observability_implementation.py tests/test_final_early_sse_status_streaming_governance.py tests/test_final_early_sse_status_streaming_implementation.py tests/test_final_safe_medical_boundary_bypass_governance.py tests/test_final_safe_medical_boundary_bypass_implementation.py tests/test_final_provider_prompt_cache_prewarm_governance.py tests/test_final_provider_prompt_cache_prewarm_implementation.py -q
+git diff --check
+```
+
+## STOP (PERF-4 Phase 1 governance)
+
+After this seam audit + TASK.md + governance checker + doc syncs + commit/push — **STOP** before any
+Phase 2 product implementation (the parallel coordinator does not exist yet). No merging Ingress+Planner
+at any point; no prompt/model/schema change; no side-effectful `run_planner_turn` moved into a child
+thread wholesale — only pure compute; no `request.ctx` sharing between threads; no publish/session/durable
+side effects before Ingress resolves the turn as normal and no discard trigger has fired.
+
+---

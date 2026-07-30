@@ -7248,4 +7248,37 @@ assertion in that file was touched or weakened (35 passed post-deviation).
 After completion record + push — **STOP** before any PERF-3 `--live` activation, which requires a separate
 explicit owner LIVE/LLM GO.
 
+## Completion record (PERF-3 live attempt, exact-attempt owner LIVE/LLM GO)
+
+**Baseline:** `codex/stage-a` @ `f8db2e0`. **Pre-live authorization commit:** `64fd54c` (replaces
+`LIVE_ACTIVATION_AUTHORIZED` blanket bool with `LIVE_AUTHORIZED_ATTEMPT_ID: str | None`, exact-match
+gate, offline tests).
+
+**Live attempt:** `attempt_id=perf3-demo-2026-07-30-01`, `client_id=demo`, models `qwen3.7-plus`/
+`qwen3.7-plus`, ran exactly once per owner instruction (no retry, no new attempt_id). Result:
+`status=completed`, `calls_started=2`, `calls_completed=2`, `cached_tokens=0` on both calls (expected --
+first-ever warm of this fingerprint, nothing previously cached to hit). Full detail, marker fields, and
+verdict in
+[`docs/evidence/performance/PERF3_PROMPT_CACHE_PREWARM_LIVE_ATTEMPT_AUDIT.md`](evidence/performance/PERF3_PROMPT_CACHE_PREWARM_LIVE_ATTEMPT_AUDIT.md).
+
+**Verdict:** `LIVE_ATTEMPT_COMPLETED_PENDING_REAL_REQUEST_MEASUREMENT` — not declared a success; actual
+prompt-cache benefit is pending a subsequent real Composer/Verifier request's `cached_tokens`/duration.
+
+**Evidence committed:** `.prewarm_ledger/attempts/perf3-demo-2026-07-30-01.json` is committed as immutable
+evidence, so replaying this exact `attempt_id` stays blocked (via `PrewarmAttemptReuseError`, before any
+provider call) on this machine or after a fresh checkout elsewhere.
+
+**Closeout:** `LIVE_AUTHORIZED_ATTEMPT_ID` set back to `None` in the same commit as this record. Two new
+offline tests added: the runtime gate blocks replaying `perf3-demo-2026-07-30-01` once closed, and the
+committed marker independently blocks it at the file level. Three pre-existing tests that asserted the
+repo-root `.prewarm_ledger` directory never exists were updated to assert "no *new* marker created"
+instead, since one committed marker is now expected to exist permanently.
+
+## STOP (PERF-3 live attempt)
+
+After this closeout record + push — **STOP**. No automatic startup prewarm, no user `/ask`, no
+runtime/widget change, no prompt change, no answer-cache, no streaming, no Boundary/Ingress/Planner
+change, no TSC-C/D, no frozen artifact touched. The real benefit question (`cached_tokens`/duration on a
+subsequent real request) is answered by the next real widget question, run by the owner — not run here.
+
 ---

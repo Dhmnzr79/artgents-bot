@@ -97,7 +97,7 @@ DEFAULT_LEDGER_ROOT = _REPO_ROOT / ".prewarm_ledger"
 # HARD GATE. Live activation against the real provider requires a SEPARATE, explicit owner
 # LIVE/LLM GO on top of the implementation GO (two-gate rollout, sec 8/sec 12). This authorizes
 # exactly one named attempt_id, never a blanket boolean -- any other attempt_id stays blocked.
-LIVE_AUTHORIZED_ATTEMPT_ID: str | None = "perf3-demo-2026-07-30-01"
+LIVE_AUTHORIZED_ATTEMPT_ID: str | None = None
 
 _ATTEMPT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 

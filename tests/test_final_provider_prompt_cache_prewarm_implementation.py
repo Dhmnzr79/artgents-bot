@@ -28,6 +28,7 @@ from core.target_composer_executor import (
 )
 from core import target_prompt_cache_prewarm as prewarm
 from core.target_prompt_cache_prewarm import (
+    DEFAULT_LEDGER_ROOT,
     LIVE_OUTCOME_BLOCKED,
     LIVE_OUTCOME_EXECUTED,
     LIVE_OUTCOME_FINGERPRINT_MISMATCH,
@@ -252,13 +253,23 @@ def test_dry_run_report_is_safe_metadata_only() -> None:
     assert "BEGIN DOC" not in blob
 
 
+def _repo_ledger_marker_names() -> set[str]:
+    """Names of markers already committed as evidence (e.g. the one PERF-3 live attempt) --
+    not zero, once a real owner-authorized attempt has landed and been committed."""
+    attempts_dir = _REPO_ROOT / ".prewarm_ledger" / "attempts"
+    if not attempts_dir.exists():
+        return set()
+    return {p.name for p in attempts_dir.iterdir()}
+
+
 def test_dry_run_cli_zero_calls_zero_artifacts(tmp_path) -> None:
+    before = _repo_ledger_marker_names()
     result = _run_cli(["--client-id", "demo"])
     assert result.returncode == 0
     assert "provider_calls=0 markers=0" in result.stdout
     assert "BEGIN DOC" not in result.stdout
     assert "CACHED_FULL_CONTEXT" not in result.stdout
-    assert not (_REPO_ROOT / ".prewarm_ledger").exists()
+    assert _repo_ledger_marker_names() == before  # no NEW marker created
 
 
 # --------------------------------------------------------------------------------------------
@@ -563,6 +574,59 @@ def test_live_proceeds_only_for_exact_authorized_attempt_id(monkeypatch, tmp_pat
     assert len(log) == 2
 
 
+def test_live_replay_of_authorized_attempt_id_blocked_after_closeout(tmp_path) -> None:
+    """After the owner GO closes the gate, replaying the exact attempt_id that was live must
+    stay blocked by the runtime gate alone (no marker involved in this check)."""
+    assert prewarm.LIVE_AUTHORIZED_ATTEMPT_ID is None
+    ctx = load_target_runtime_client_context("demo")
+    fp_c = compute_fingerprint("composer", ctx, _MODEL).fingerprint
+    fp_v = compute_fingerprint("verifier", ctx, _MODEL).fingerprint
+    outcome = run_live(
+        _live_request(
+            "perf3-demo-2026-07-30-01",
+            composer_model=_MODEL,
+            expected_fp_composer=fp_c,
+            expected_fp_verifier=fp_v,
+        ),
+        ledger_root=tmp_path,
+    )
+    assert outcome.kind == LIVE_OUTCOME_BLOCKED
+    assert not _attempts_dir(tmp_path).exists()
+
+
+def test_committed_live_marker_blocks_replay_at_file_level() -> None:
+    """The committed attempt marker for perf3-demo-2026-07-30-01 makes any future attempt with
+    the same attempt_id fail with PrewarmAttemptReuseError before any provider call, on this
+    machine or after a fresh checkout elsewhere -- independent of the runtime gate."""
+    marker_path = DEFAULT_LEDGER_ROOT / "attempts" / "perf3-demo-2026-07-30-01.json"
+    assert marker_path.is_file()
+    ctx = load_target_runtime_client_context("demo")
+    request = PrewarmAttemptRequest(
+        attempt_id="perf3-demo-2026-07-30-01",
+        client_id="demo",
+        roles=(
+            PrewarmRolePlan(
+                role="composer",
+                requested_model=_MODEL,
+                configured_model=_MODEL,
+                fingerprint=compute_fingerprint("composer", ctx, _MODEL),
+            ),
+            PrewarmRolePlan(
+                role="verifier",
+                requested_model=_MODEL,
+                configured_model=_MODEL,
+                fingerprint=compute_fingerprint("verifier", ctx, _MODEL),
+            ),
+        ),
+    )
+
+    def _unreachable(role, model, messages):
+        raise AssertionError("provider must never be called for a replayed attempt_id")
+
+    with pytest.raises(PrewarmAttemptReuseError):
+        execute_prewarm_attempt(request=request, provider_call=_unreachable, ledger_root=DEFAULT_LEDGER_ROOT)
+
+
 # --------------------------------------------------------------------------------------------
 # CLI subprocess (rows 4-6; dry-run + blocked-live)
 # --------------------------------------------------------------------------------------------
@@ -579,6 +643,7 @@ def _run_cli(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def test_cli_blocked_live_exit_code_and_no_artifacts() -> None:
+    before = _repo_ledger_marker_names()
     report = build_dry_run_report("demo")
     fp = {r.role: r.fingerprint for r in report.roles}
     result = _run_cli(
@@ -601,10 +666,11 @@ def test_cli_blocked_live_exit_code_and_no_artifacts() -> None:
     assert result.returncode == 4
     assert "BLOCKED" in result.stderr
     assert "0 provider calls, 0 markers" in result.stderr
-    assert not (_REPO_ROOT / ".prewarm_ledger").exists()
+    assert _repo_ledger_marker_names() == before  # no NEW marker created
 
 
 def test_cli_live_missing_attempt_id_is_usage_error() -> None:
+    before = _repo_ledger_marker_names()
     result = _run_cli(
         [
             "--client-id",
@@ -622,7 +688,7 @@ def test_cli_live_missing_attempt_id_is_usage_error() -> None:
     )
     assert result.returncode == 2
     assert "--attempt-id" in result.stderr
-    assert not (_REPO_ROOT / ".prewarm_ledger").exists()
+    assert _repo_ledger_marker_names() == before  # no NEW marker created
 
 
 def test_cli_unknown_client_rejected() -> None:

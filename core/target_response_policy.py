@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contracts.answer_plan import AspectKind
+from contracts.target_response_length_profile import TargetResponseLengthProfile
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from contracts.target_response_spec import TargetFollowupSource, TargetResponseSpec
 from contracts.target_response_stage import is_scope_aware_price_stage
@@ -107,3 +109,56 @@ def build_target_response_spec(
         allow_consultation_close=request.allow_consultation_close,
         allow_cta=request.allow_cta,
     )
+
+
+def select_target_response_length_profile(
+    spec: TargetResponseSpec,
+    *,
+    aspects: tuple[AspectKind, ...] = (),
+    marketing_scenarios: tuple[str, ...] = (),
+    needs_clarification: bool = False,
+) -> TargetResponseLengthProfile:
+    """Single canonical producer (PERF-5) for the adaptive answer-length profile.
+
+    Reads only already-existing structured signals -- no regex, no phrase list, no
+    new classifier, no second router, no signal derived from the user's raw question
+    length. ``aspects``/``marketing_scenarios``/``needs_clarification`` are optional
+    because ``TargetResponseSpec`` alone (the one contract available at every real
+    call site today) already carries ``response_mode``/``response_stage``/
+    ``required_components``/``required_fact_ids``/``allow_marketing_facts`` -- callers
+    that also have a real TurnFrame-derived aspect/marketing-scenario signal may pass
+    it explicitly; callers that do not still get a safe, correct profile.
+
+    Any ambiguity falls through to ``standard_information`` -- never guessed.
+    """
+
+    if type(spec) is not TargetResponseSpec:
+        raise TargetResponsePolicyBuildError("response_length_profile_spec_invalid", spec)
+
+    if (
+        spec.response_mode == "clarify"
+        or spec.response_stage == "stage_clarify"
+        or needs_clarification
+    ):
+        return "clarification_concise"
+    if spec.response_stage == "broad_family_price":
+        return "broad_price_overview"
+    if spec.response_stage == "scoped_family_price":
+        return "scoped_price"
+    if spec.response_stage == "concrete_service_price":
+        if "comparison" in aspects:
+            return "comparison_or_complex"
+        return "scoped_price"
+    if "comparison" in aspects:
+        return "comparison_or_complex"
+    if marketing_scenarios and spec.required_components == ("content",):
+        return "marketing_concern"
+    if (
+        spec.response_stage is None
+        and spec.required_components == ("content",)
+        and not spec.allow_marketing_facts
+        and not marketing_scenarios
+        and len(spec.required_fact_ids) <= 1
+    ):
+        return "simple_faq"
+    return "standard_information"

@@ -22,9 +22,11 @@ from contracts.price_only_source_sufficiency import (
     offer_identity_rows,
 )
 from contracts.target_composer_action_context import TargetComposerActionContext
+from contracts.target_response_length_profile import TargetResponseLengthProfile
 from core.service_data_context import ServiceDoctorContext
 from core.target_composer_action_context import resolve_target_composer_action_context
 from core.target_response_followup_policy import TargetResponseFollowupSelection
+from core.target_response_policy import select_target_response_length_profile
 from core.target_generic_fullcontext_content import is_generic_fullcontext_content_spec
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_fullcontext_content_package import is_fullcontext_service_optional_spec
@@ -80,6 +82,7 @@ class TargetComposerRequest:
     selected_followups: TargetResponseFollowupSelection
     selected_cta_key: str | None
     action_context: TargetComposerActionContext | None = None
+    response_length_profile: TargetResponseLengthProfile | None = None
 
 
 class TargetComposerRequestError(ValueError):
@@ -546,6 +549,30 @@ def _attach_composer_action_context(request: TargetComposerRequest) -> TargetCom
     return replace(request, action_context=action_context)
 
 
+def _attach_response_length_profile(
+    request: TargetComposerRequest,
+    *,
+    marketing_scenarios: tuple[str, ...],
+) -> TargetComposerRequest:
+    """PERF-5: single canonical producer call, explicit typed field -- no ContextVar/global.
+
+    ``marketing_scenarios`` comes from ``bound_package.package.materials.marketing_selection.
+    applied_scenarios`` (already resolved, already gated/capped upstream) -- a real, live signal
+    available at this exact call site with no new parameter threaded through any caller.
+    ``aspects``/``needs_clarification`` are not available here without threading a TurnFrame
+    through several additional pipeline modules (out of PERF-5 Phase 2's scope); comparison_or_
+    complex therefore does not yet fire on this live call site -- see the PERF-5 completion
+    record for the exact data-flow limitation.
+    """
+    if request.response_length_profile is not None:
+        return request
+    profile = select_target_response_length_profile(
+        request.spec,
+        marketing_scenarios=marketing_scenarios,
+    )
+    return replace(request, response_length_profile=profile)
+
+
 def _prepend_contact_evidence(
     blocks: tuple[TargetComposerEvidenceBlock, ...],
     *,
@@ -585,6 +612,7 @@ def materialize_target_composer_request(
         _error("composer_request_message_invalid", user_message)
 
     scoped = build_target_scoped_response_evidence(bound_package, md_root=md_root)
+    marketing_scenarios = bound_package.package.materials.marketing_selection.applied_scenarios
     if is_fullcontext_service_optional_spec(scoped.spec):
         if not scoped.scope_records:
             blocks: tuple[TargetComposerEvidenceBlock, ...] = ()
@@ -593,14 +621,17 @@ def materialize_target_composer_request(
                 client_id=client_id,
                 contact_fields=contact_fields,
             )
-            return _attach_composer_action_context(
-                TargetComposerRequest(
-                user_message=user_message,
-                spec=scoped.spec,
-                evidence_blocks=blocks,
-                selected_followups=scoped.selected_followups,
-                selected_cta_key=scoped.selected_cta_key,
-                )
+            return _attach_response_length_profile(
+                _attach_composer_action_context(
+                    TargetComposerRequest(
+                    user_message=user_message,
+                    spec=scoped.spec,
+                    evidence_blocks=blocks,
+                    selected_followups=scoped.selected_followups,
+                    selected_cta_key=scoped.selected_cta_key,
+                    )
+                ),
+                marketing_scenarios=marketing_scenarios,
             )
         facts_by_id = {
             fact.id: fact for fact in bound_package.package.materials.commercial_facts
@@ -629,24 +660,30 @@ def materialize_target_composer_request(
             client_id=client_id,
             contact_fields=contact_fields,
         )
-        return _attach_composer_action_context(
-            TargetComposerRequest(
-            user_message=user_message,
-            spec=scoped.spec,
-            evidence_blocks=blocks,
-            selected_followups=scoped.selected_followups,
-            selected_cta_key=scoped.selected_cta_key,
-            )
+        return _attach_response_length_profile(
+            _attach_composer_action_context(
+                TargetComposerRequest(
+                user_message=user_message,
+                spec=scoped.spec,
+                evidence_blocks=blocks,
+                selected_followups=scoped.selected_followups,
+                selected_cta_key=scoped.selected_cta_key,
+                )
+            ),
+            marketing_scenarios=marketing_scenarios,
         )
     if scoped.spec.response_stage in {"stage_clarify", "data_gap"}:
-        return _attach_composer_action_context(
-            TargetComposerRequest(
-            user_message=user_message,
-            spec=scoped.spec,
-            evidence_blocks=(),
-            selected_followups=scoped.selected_followups,
-            selected_cta_key=scoped.selected_cta_key,
-            )
+        return _attach_response_length_profile(
+            _attach_composer_action_context(
+                TargetComposerRequest(
+                user_message=user_message,
+                spec=scoped.spec,
+                evidence_blocks=(),
+                selected_followups=scoped.selected_followups,
+                selected_cta_key=scoped.selected_cta_key,
+                )
+            ),
+            marketing_scenarios=marketing_scenarios,
         )
     if is_scope_aware_price_spec(scoped.spec):
         offers = _scope_price_overview_sources(scoped, bound_package, bundle)
@@ -669,14 +706,17 @@ def materialize_target_composer_request(
         )
         if projected != expected:
             _error("composer_request_output_inconsistent", (projected, expected))
-        return _attach_composer_action_context(
-            TargetComposerRequest(
-            user_message=user_message,
-            spec=scoped.spec,
-            evidence_blocks=blocks,
-            selected_followups=scoped.selected_followups,
-            selected_cta_key=scoped.selected_cta_key,
-            )
+        return _attach_response_length_profile(
+            _attach_composer_action_context(
+                TargetComposerRequest(
+                user_message=user_message,
+                spec=scoped.spec,
+                evidence_blocks=blocks,
+                selected_followups=scoped.selected_followups,
+                selected_cta_key=scoped.selected_cta_key,
+                )
+            ),
+            marketing_scenarios=marketing_scenarios,
         )
     offers, doctors, facts, consultations_by_ref = _exact_sources(
         scoped,
@@ -709,12 +749,15 @@ def materialize_target_composer_request(
         client_id=client_id,
         contact_fields=contact_fields,
     )
-    return _attach_composer_action_context(
-        TargetComposerRequest(
-        user_message=user_message,
-        spec=scoped.spec,
-        evidence_blocks=blocks,
-        selected_followups=scoped.selected_followups,
-        selected_cta_key=scoped.selected_cta_key,
-        )
+    return _attach_response_length_profile(
+        _attach_composer_action_context(
+            TargetComposerRequest(
+            user_message=user_message,
+            spec=scoped.spec,
+            evidence_blocks=blocks,
+            selected_followups=scoped.selected_followups,
+            selected_cta_key=scoped.selected_cta_key,
+            )
+        ),
+        marketing_scenarios=marketing_scenarios,
     )

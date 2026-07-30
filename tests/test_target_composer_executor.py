@@ -162,6 +162,7 @@ def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:
         "source_identity",
         "composer_warnings",
         "verification_status",
+        "response_length_profile",
     ]
     assert list(inspect.signature(execute_target_composer).parameters) == [
         "request",

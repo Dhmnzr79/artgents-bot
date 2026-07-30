@@ -296,6 +296,7 @@ def test_exact_shapes_signature_errors_and_frozen_slots(md_root: Path) -> None:
         "selected_followups",
         "selected_cta_key",
         "action_context",
+        "response_length_profile",
     ]
     assert list(inspect.signature(materialize_target_composer_request).parameters) == [
         "bound_package",

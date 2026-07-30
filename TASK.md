@@ -7872,3 +7872,159 @@ truncation anywhere, ever; no retry-for-length on the normal path; no Verifier p
 to presentation/button/channel state; no price-rule change; correctness always wins over budget.
 
 ---
+
+## Completion record (PERF-5 Phase 2 implementation, owner GO)
+
+**Baseline:** `codex/stage-a` @ `6e88ced`. Implements Variant A+E exactly as selected in Phase 1: a soft
+answer-length budget carried as an additive Composer directive, plus a structured outline instruction —
+never hard truncation, never retry-for-length, never a Verifier change.
+
+### Owner decision applied verbatim
+
+`simple_faq` requires the conjunction of **all** of: no price stage/aspect, no comparison, no
+`marketing_scenarios`, no clarification, ≤1 required fact, single content-only component. Any one of
+these present, or any signal absent/ambiguous, falls through to `standard_information` — implemented as
+the producer's last, unconditional `else` branch (never guessed, never a second heuristic).
+
+### Exact data flow (typed, explicit, no ContextVar/global)
+
+- **Typed contract:** `contracts/target_response_length_profile.py` (new) — `TargetResponseLengthProfile`
+  (7-value `Literal`) + `RESPONSE_LENGTH_SOFT_BUDGETS` (the governance-approved soft ranges) +
+  `response_length_soft_max`/`response_length_soft_range` helpers.
+- **Single canonical producer:** `select_target_response_length_profile(spec, *, aspects=(),
+  marketing_scenarios=(), needs_clarification=False)` in `core/target_response_policy.py`, alongside the
+  existing stage-overlay functions. Priority order matches the seam audit's §17 table exactly: clarify/
+  stage_clarify/needs_clarification → broad_family_price → scoped_family_price → concrete_service_price
+  (+comparison split) → comparison (any other stage) → marketing_scenarios-on-content-only →
+  simple_faq-conjunction → `standard_information` fallback.
+- **Attach point:** `core/target_composer_request.py` — new `_attach_response_length_profile()` helper,
+  wired into **all five** return sites of `materialize_target_composer_request()` (the seam audit
+  undercounted this as four; a full re-read found five). `TargetComposerRequest` gained one additive,
+  defaulted field: `response_length_profile: TargetResponseLengthProfile | None = None`.
+- **Composer injection:** `core/target_composer_executor.py::_invocation()` adds `response_length_profile`
+  and `response_length_soft_max` as additive keys in `response_directives_json` — the exact same injection
+  point the existing `broad_family_price_directive_overlay`/`stage_clarify_directive_overlay` already use.
+  A new numbered Rule 12 was appended to `TARGET_COMPOSER_SYSTEM_POLICY` (never renumbering the existing
+  11 rules): soft target, not a hard limit; outline shape (direct answer → 2-4 facts → conditions →
+  next step); never omit/shorten/paraphrase a required fact, price, number, unit, `no_public_price`
+  approved text, or `must_preserve_exact` evidence to fit it. `TargetUnverifiedComposedResponse` gained the
+  same additive field, populated from the validated request, for explicit typed carry-forward.
+- **Observability:** `_log_response_length_observability()` (new, private, in `target_composer_executor.py`)
+  emits `response_length_profile_evaluated` via the existing `logging_setup.emit_bot_event` right after
+  `stage_end("composer", ...)`, wrapped in its own `try/except: pass` so a logging failure can never affect
+  the answer or misclassify the Composer stage outcome. Fields: `response_length_profile`,
+  `response_length_soft_max`, `answer_chars`, `over_soft_budget`, `required_content_override` (true only
+  when over budget **and** the request carried at least one `must_preserve_exact` evidence block — an
+  honest correlation signal, not a literal re-run of the Verifier's own check). `completion_tokens` is
+  deliberately **not** duplicated into this new event — it is already logged per Composer call by the
+  existing `llm_usage` event (`call_type=target_fullcontext_runtime_composer`) and correlates via
+  `request_id`; `composer_ms` is already produced by PERF-0's existing `stage_start`/`stage_end("composer",
+  ...)` marks. No answer/question text or contact values appear in the new event's `details`.
+
+### Real live-wiring status per profile (traced through `core/target_runtime_turn.py` end-to-end)
+
+Tracing the actual live call chain (`run_target_fullcontext_runtime_turn` →
+`run_target_offline_boundary_enforced_fullcontext_response` → `run_target_offline_turn_frame_bound_response`
+→ `run_target_offline_policy_bound_verified_response_pipeline_with_selection` →
+`materialize_target_composer_request`) found that `TurnFrame` **is** live-hydrated and populated on every
+real turn (`load_runtime_turn_frame`/`hydrate_target_runtime_turn_frame_from_session` in
+`target_runtime_turn.py`) — correcting the Phase 1 seam audit's more pessimistic reading of its own
+docstring ("A1 shadow-only"). However, `turn_frame.aspects` and `turn_frame.needs_clarification` are
+**not** threaded past `dispatch_target_turn_frame_response`/`build_target_response_spec` into anything
+`materialize_target_composer_request()` receives — `TargetResponsePolicyRequest`/`TargetResponseSpec` carry
+no aspect field. Threading `aspects` that far would require adding a new parameter to three additional
+functions (`run_target_offline_turn_frame_bound_response`, `run_target_offline_policy_bound_verified_
+response_pipeline_with_selection`, `_assemble_bound_package`) — beyond the owner's pre-authorized deviation
+scope ("`target_composer_request.py` or one neighboring request contract"). `marketing_scenarios`, by
+contrast, **is** already fully live at the exact attach point: `bound_package.package.materials.
+marketing_selection.applied_scenarios` (the real, already-gated/capped `TargetMarketingSelection` — not a
+raw pre-selection list) is read directly inside `materialize_target_composer_request()` with **zero** new
+parameters anywhere upstream.
+
+Result: **6 of 7 profiles are live end-to-end today** (`clarification_concise`, `broad_price_overview`,
+`scoped_price` from both scoped-family and concrete-service stages, `marketing_concern`, `simple_faq`,
+`standard_information`) — all reachable purely from `TargetResponseSpec` fields plus the already-wired
+`marketing_selection`. `comparison_or_complex` is fully implemented and fully unit-tested (producer-level,
+scenario #6) but **does not yet fire on the one real call site** because `aspects` defaults to `()` there
+— a known, deliberately scoped-out limitation, not a hidden gap. A future, separate milestone could thread
+`turn_frame.aspects` the additional three hops if comparison-length steering in production is wanted.
+
+### Allowlist deviations (flagged and justified)
+
+1. **Five return sites, not four** (seam audit §20 said "wrap all return points" without an exact count) —
+   a full re-read of `materialize_target_composer_request()` found five, all now wrapped identically.
+2. **Two narrow-surface shape-guard tests updated**
+   (`tests/test_target_composer_request.py::test_exact_shapes_signature_errors_and_frozen_slots`,
+   `tests/test_target_composer_executor.py::test_contract_shapes_signature_policy_and_exact_error_codes`)
+   — both pin the exact `fields()` list of `TargetComposerRequest`/`TargetUnverifiedComposedResponse`.
+   Updated to include the new additive `response_length_profile` field, the same class of narrow-allowlist
+   update PERF-4 made to `tests/test_planner_attempt_contract.py`. No other assertion in either test
+   changed.
+3. **`aspects`/`needs_clarification` not live-wired** (see above) — an explicit, documented scope boundary,
+   not an oversight.
+
+### Fail-open semantics (verified by test, not just asserted)
+
+Over-budget: never blocks (`test_14`), never retries (`test_15`/`backend.invocations` length stays 1
+across all 7 profiles in `test_16`), never changes call count or route (`test_17` — `spec.model_dump()`
+identical before/after profile selection). Missing profile (request built without going through
+`materialize_target_composer_request`): the executor degrades to omitting the length directive entirely —
+byte-for-byte the pre-PERF-5 `response_directives_json` shape (`test_19`, `test_27b`) — never guesses a
+profile itself (a guess would be an uncoordinated second producer, forbidden by the governance design).
+Required content always wins: a `must_preserve_exact` fact/`no_public_price` `approved_text` is returned
+verbatim even when the answer is far over its soft budget (`test_11`, `test_13`, `test_24`).
+
+### Structured-capability bypass paths unchanged
+
+`core/target_runtime_turn.py`'s `clinic_contact` and `service_availability` branches both call
+`turn_timing.stage_skipped("composer", ...)` and return before ever reaching
+`materialize_target_composer_request`/`execute_target_composer` — verified by source-text slicing in
+`test_21`/`test_22`, not just by inspection.
+
+### Tests and results
+
+- New: `tests/test_final_adaptive_response_length_budgets_implementation.py` — **32 passed** (30-scenario
+  matrix + 2 sub-cases: `test_27b` degrade-safely case, `test_30b` guard-liveness sanity check), fakes/
+  recording backend only, zero real network/provider calls.
+- New governance checker (unchanged from Phase 1, still green): **22 passed**.
+- Combined new PERF-5 suite (implementation + governance): **54 passed**.
+- Neighbor PERF-0/1/2/3/4 governance + implementation + transport-guard suites: **291 passed**.
+- Wide regression sweep across every Composer/spec/Verifier/presentation/followup/CTA/pipeline-adjacent
+  test file (`-k` filter over 20+ modules): **330 passed**, exactly **1 pre-existing failure**
+  (`tests/test_target_policy_bound_verified_response_pipeline.py::
+  test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity`) — reproduced identically on
+  the clean pre-PERF-5 baseline (`git stash` verified), unrelated to this milestone's changed files, not
+  fixed here per "не исправляй pre-existing failures вне текущего milestone."
+- `git diff --check`: clean.
+- `python -m pytest tests/ --collect-only`: **3603 tests collected** (+32 vs. the PERF-4 baseline), zero
+  collection errors.
+- Full wide suite: **not re-run** — the owner's instruction was "только если TASK.md требует," and the
+  330-test focused sweep above already covers every file that imports or is imported by the three touched
+  modules; no signal suggested a wider run was needed.
+
+### NO LIVE / NO PROVIDER / NO NETWORK / NO SERVER / NO WIDGET confirmation
+
+Zero real provider/network calls anywhere in this Phase 2 work or its tests — the centralized
+`tests/conftest.py` transport guard was verified still active and blocking (`test_30b`, a new sanity check
+added specifically for this milestone). No server was started, no widget request was sent.
+
+### Honest limitation: real acceleration not measured
+
+**This milestone changes what Composer is told, not what actually happens on a real call.** No live
+request was made (forbidden by this task's own brief), so: (a) whether the soft-budget/outline directive
+actually shortens real Composer answers, (b) whether shorter answers actually reduce `composer_ms`/
+`completion_tokens` on real traffic, and (c) whether any of this improves conversion, are all **unmeasured
+claims, not demonstrated ones**. The offline baseline in the Phase 1 seam audit (§0: real Composer calls
+averaging 234 completion tokens, 6.6s duration) remains the only real-traffic number on file; a
+profile-segmented before/after comparison requires the new `response_length_profile_evaluated` event to
+accumulate real data after a separate, later owner activation step — exactly the same two-gate discipline
+PERF-3/PERF-4 already used for their own live-measurement phases.
+
+## STOP (PERF-5 Phase 2 implementation)
+
+Product implementation complete and test-covered. 6 of 7 profiles are live end-to-end; `comparison_or_
+complex` is implemented and unit-tested but not yet fed a live `aspects` signal (documented limitation,
+not a defect). **STOP** before PERF-6 (Scoped FullContext) and before any real widget/live measurement of
+this milestone's effect on answer length or latency — that is a separate, later owner step.
+
+---

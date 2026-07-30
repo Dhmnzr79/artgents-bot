@@ -226,6 +226,19 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    mirroring PERF-3's two-gate pattern; this was chosen after finding several pre-existing tests assumed
    `run_pre_resolver_turn` alone could never reach Planner. 31 new tests + 520-test regression sweep, zero
    real-network calls. See TASK.md's PERF-4 Phase 2 completion record.
+   **FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS / PERF-5** (Phase 1 governance @ `2fe7437`) — шестой
+   этап: можно ли ускорить генерацию Composer и улучшить конверсию через адаптивную soft-длину
+   ответа, без hard truncation, без retry-по-длине и без изменения Verifier policy. Seam audit
+   подтверждает, что Verifier сегодня полностью «length-blind» (ноль length-related проверок),
+   а единственный существующий прецедент структурного управления — стейдж-условный оверлей
+   `broad_family_price_compact`/`max_price_anchors`. Выбран вариант **A + E** (soft-budget
+   директива в Composer + структурный outline: прямой ответ → 2–4 факта → условия → next-step),
+   явно **не** C (обрезание готового текста — рвёт `must_preserve_exact`/numeric grounding) и
+   **не** D (retry на обычном пути). Определён typed contract `TargetResponseLengthProfile`
+   (7 профилей) и единственный producer `select_target_response_length_profile` в
+   `core/target_response_policy.py`; корректность всегда важнее бюджета — обязательный факт
+   никогда не режется ради лимита. Seam audit:
+   `docs/evidence/performance/FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS_SEAM_AUDIT.md`.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 6. **FINAL_TEST_SUITE_CONVERGENCE (governance @ `1980ab7`):** 185 wide failures inventoried; TSC-A..D checkpoints defined. See `docs/TEST_SUITE_ARCHITECTURE.md`, `docs/evidence/testing/final_test_failure_inventory.json`. Implementation blocked until owner GO.
 

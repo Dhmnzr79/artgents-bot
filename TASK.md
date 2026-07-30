@@ -7726,3 +7726,149 @@ demo deployment command for capacity `2` is documented above but **not run**. **
 demo server and before the first real widget measurement — that is the owner's next, separate step.
 
 ---
+
+# TASK — FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS / PERF-5 (governance)
+
+**Status:** Phase 1, governance only · **NO PRODUCT CHANGE / NO LIVE / NO PROVIDER CALLS / NO NETWORK /
+NO HARD TRUNCATION / NO RETRY-FOR-LENGTH / NO VERIFIER POLICY CHANGE / NO PRICE-RULE CHANGE / NO SCOPED
+FULLCONTEXT / NO TOKEN STREAMING / NO MODEL CHANGE / NO INGRESS+PLANNER CHANGES / NO BOUNDARY BYPASS / NO
+ANSWER-CACHE/PREWARM / NO CLIENT-PACK/FROZEN ARTIFACTS / NO TSC-C / NO TSC-D / NO UNRELATED CLEANUP**
+
+**Baseline:** `codex/stage-a` @ `2fe7437`.
+
+**Motivation:** sixth step of the acceleration program, after PERF-0/1/2/3/4. The prior four steps
+targeted latency of the understanding/observability/boundary/parallelism layers; this step targets the
+Composer's own answer *shape*. Today's Composer has exactly one general, unbounded brevity instruction
+("answer concisely," `core/target_composer_executor.py` Rule 3) and exactly one stage-conditional
+structural directive (`broad_family_price_compact`/`max_price_anchors`, an anchor-count cap, not a text
+budget). Offline aggregation over existing local logs (no LIVE call made) shows real FullContext Composer
+calls (`call_type="target_fullcontext_runtime_composer"`, n=21) average 234 completion tokens (max 367),
+well under the fixed `max_completion_tokens=1024` ceiling, and real nonzero Composer stage duration
+(`composer_ms`, n=11) averages 6.6s — consistent with PERF-4's own motivating example ("Composer 7.8s").
+Full detail, including the honest caveat that most logged `answer_chars` records never reached the
+FullContext Composer at all (so are not a clean per-profile baseline), in
+[`docs/evidence/performance/FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS_SEAM_AUDIT.md`](evidence/performance/FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS_SEAM_AUDIT.md)
+(seam audit, §0).
+
+## Normative design (summary — seam audit has the full line-by-line evidence)
+
+The Verifier is confirmed length-blind today — a targeted grep of `core/target_response_verifier.py` for
+`len(`/`char`/`token`/`max_tokens`/`truncat` returns zero length-policy hits (seam audit §11). The only
+existing precedent for stage-conditional response-shape control is the additive-overlay pattern in
+`core/target_response_policy.py` (`broad_family_price_directive_overlay`, `stage_clarify_directive_
+overlay`, `data_gap_protocol_unconfirmed_directive_overlay`), each merged into `response_directives_json`
+at `core/target_composer_executor.py::_invocation()` (seam audit §4). This is the exact shape a length
+budget should reuse — an additive directive, never a hard cutoff. The single most important existing
+constraint the whole design must respect: the Verifier's own strict-fact check already requires
+`must_preserve_exact` evidence text (offers, doctors, strict-mode commercial facts) to appear as a
+**verbatim substring** of the final answer (`target_verifier_strict_fact_missing`), and its numeric-
+grounding check extracts every number from the **full** answer text (seam audit §8-9). Any adaptive
+shortening must yield to these existing checks, never fight them — correctness always wins over budget.
+
+## Dependency / side-effect map
+
+The signals a length-profile selector may read are exactly the ones already produced upstream and
+already validated by existing contracts: `TargetResponseSpec.response_mode`/`response_stage`/
+`required_components`/`allow_marketing_facts`/`allow_consultation_close`/`allowed_topics`
+(`contracts/target_response_spec.py`), `TurnFrame.aspects`/`primary_aspect`/`marketing_scenarios`/
+`needs_clarification` (`contracts/turn_frame.py`), and `TargetMarketingSelection.applied_scenarios`
+(`core/target_marketing_selector.py`). None of these needs new computation — the selector is a pure,
+read-only fan-in over contracts that already exist and are already populated before Composer runs (seam
+audit §2-3, §6-7).
+
+## Selected variant: A + E (soft budget directive + structured outline shape)
+
+| Variant | Verdict |
+|---|---|
+| **A — Soft budget as a Composer instruction, chosen by existing governed signals** | **Selected** — mirrors the one existing stage-overlay precedent exactly; Composer may exceed it when correctness requires. |
+| B — Hard provider `max_tokens` as the precise size dial | Rejected as sole mechanism — truncates at the token boundary, not the fact boundary; can cut a required fact or the JSON shape mid-token. Kept only as the existing, generous, fixed ceiling it already is. |
+| C — Truncate the finished answer text after generation | Rejected outright — cannot know which characters are load-bearing; would break the existing strict-fact/numeric-grounding checks or silently drop facts they don't happen to catch. |
+| D — Regenerate on overflow | Rejected for the normal path — doubles Composer latency/cost on every over-budget turn, directly opposed to this milestone's own goal; forbidden by the owner's brief. |
+| **E — Structured outline (direct answer → 2-4 facts → conditions → next step, CTA separate)** | **Selected** — a shape instruction, not a size instruction; composes with A instead of fighting it. |
+
+## Typed contract, canonical producer, target profiles
+
+**`TargetResponseLengthProfile`** (planned, Phase 2 — not created in this Phase 1 milestone): a 7-value
+`Literal` (`clarification_concise`, `simple_faq`, `standard_information`, `marketing_concern`,
+`broad_price_overview`, `scoped_price`, `comparison_or_complex`), declared next to the existing sibling
+`contracts/target_response_stage.py`. Soft-budget ranges (chars, over `answer` text alone — no buttons, no
+CTA key, no `source_identity`): `clarification_concise` ≤250; `simple_faq` 250-450; `standard_information`
+400-700; `marketing_concern` 350-650; `broad_price_overview` 450-750; `scoped_price` 350-650;
+`comparison_or_complex` 700-1000.
+
+**Single canonical producer:** one new pure function, `select_target_response_length_profile(...)`, in
+`core/target_response_policy.py` alongside the existing stage-overlay functions — reads only already-
+existing structured fields (no regex, no phrase list, no new classifier, no second router, no signal
+derived from the user's question length). Its result is injected into `response_directives_json` as an
+additive key at the same call site the existing overlays already use — **not** a new field on the frozen
+`TargetResponseSpec` (seam audit §16).
+
+**Profile-selection map** (9-row priority table, full detail in seam audit §17): `clarification_concise`
+from `response_mode=="clarify"`/`response_stage=="stage_clarify"`/`needs_clarification`;
+`broad_price_overview`/`scoped_price` directly from `response_stage`; `comparison_or_complex` from
+`"comparison" in aspects`; `marketing_concern` from non-empty `applied_scenarios` on a content-only spec;
+`simple_faq`/`standard_information` split on topic breadth, with the exact boundary honestly flagged as an
+open Phase 2 decision (not silently resolved) — the only unresolved point in the whole map.
+
+## Invariants (never-touch list, full cross-reference in seam audit §18)
+
+Prices/numbers/currency/units; `approved_text`/`no_public_price`; `required_fact_ids`/`must_preserve_exact`
+evidence text; canonical contacts; material price conditions and inclusions/exclusions when asked;
+protocol differences in a comparison; governed marketing wording; `source_identity`/CTA
+key/UI channel state. **When a required fact cannot fit inside the soft budget, correctness wins — the
+budget is exceeded, not the fact dropped, no retry, no fallback, no route change.**
+
+## Fail semantics
+
+Over-soft-budget: never blocks, never triggers fallback, never retries, never changes route — logged only
+(`over_soft_budget`). Missing/invalid profile input: safe default `standard_information`, logged, never
+raises. **This is explicitly not a new Verifier policy** — the existing Verifier (seam audit §11) stays
+untouched.
+
+## Observability (planned, Phase 2 — no q/answer/sid/contact values, no PII)
+
+New: `response_length_profile`, `response_length_soft_max`, `over_soft_budget`, `required_content_override`.
+Reused, not duplicated: `answer_chars` (`app.py`, `orchestration/finalize_turn.py`),
+`completion_tokens` (already logged per LLM call, `logging_setup.py::log_llm_usage`), `composer_ms`
+(already produced by PERF-0's `stage_start`/`stage_end("composer", ...)` marks). Fixture/prewarm usage
+rows must never be mixed into a future real-runtime aggregate for these fields (seam audit §0, §19).
+
+## Allowlist (implementation — Phase 2, NOT started in this Phase 1 milestone)
+
+| Path | Change |
+|---|---|
+| New: `contracts/target_response_length_profile.py` | `TargetResponseLengthProfile` literal + soft-budget mapping |
+| `core/target_response_policy.py` | New pure function `select_target_response_length_profile(...)` — the single canonical producer |
+| `core/target_composer_executor.py` (`_invocation()`) | Inject the profile/soft-max into `response_directives_json`; add one new system-policy rule for the direct-answer→facts→conditions→next-step outline shape |
+| `app.py` / `orchestration/finalize_turn.py` | Add the new observability fields as siblings to existing `answer_chars` logging |
+
+Explicitly NOT in this allowlist: `core/target_response_verifier.py` (no Verifier policy change);
+`core/target_presentation_decision.py` (no coupling to button/channel/cadence state); any price/offer
+resolution module; Boundary; Ingress/Planner; any prompt/model/schema beyond the one additive Composer
+rule above; token streaming; Scoped FullContext; answer-cache/prewarm.
+
+## Acceptance matrix
+
+30 scenarios, full table in the seam audit §21 (all 7 profiles; both structured-capability bypass paths —
+contacts, service availability — explicitly unaffected; typed-UI/governed-action-context parity; `no_
+public_price`/required-fact/multi-offer over-budget cases where correctness wins; CTA/source-identity/
+presentation-channel non-coupling; missing-profile fallback; `/ask` vs. `/ask/stream` parity; zero
+real-network offline tests throughout).
+
+## Test commands
+
+```
+python -m pytest tests/test_final_adaptive_response_length_budgets_governance.py -q
+python -m pytest tests/test_final_response_latency_observability_governance.py tests/test_final_response_latency_observability_implementation.py tests/test_final_early_sse_status_streaming_governance.py tests/test_final_early_sse_status_streaming_implementation.py tests/test_final_safe_medical_boundary_bypass_governance.py tests/test_final_safe_medical_boundary_bypass_implementation.py tests/test_final_provider_prompt_cache_prewarm_governance.py tests/test_final_provider_prompt_cache_prewarm_implementation.py tests/test_final_parallel_ingress_planner_latency_governance.py tests/test_final_parallel_ingress_planner_latency_implementation.py tests/test_final_parallel_ingress_planner_latency_activation_implementation.py tests/test_provider_transport_guard.py -q
+git diff --check
+python -m pytest tests/ --collect-only -q
+```
+
+## STOP (PERF-5 Phase 1 governance)
+
+After this seam audit + TASK.md + governance checker + doc syncs + commit/push — **STOP** before any
+Phase 2 product implementation (the length-profile contract and producer do not exist yet). No hard
+truncation anywhere, ever; no retry-for-length on the normal path; no Verifier policy change; no coupling
+to presentation/button/channel state; no price-rule change; correctness always wins over budget.
+
+---

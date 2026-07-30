@@ -830,7 +830,41 @@ Deliverables (Phase 1): seam audit
 
 ---
 
-## Active — FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4 (governance + implementation)
+## Active — FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS / PERF-5 (governance)
+
+**Baseline:** `codex/stage-a` @ `2fe7437` (Phase 1 governance) · **NO PRODUCT CHANGE / NO LIVE / NO
+PROVIDER CALLS / NO HARD TRUNCATION / NO RETRY-FOR-LENGTH / NO VERIFIER POLICY CHANGE**
+
+Sixth step of the acceleration program, after PERF-0/1/2/3/4. The prior steps targeted latency of the
+understanding/observability/boundary/parallelism layers; this step targets the Composer's own answer
+*shape* — can a soft, stage-aware length budget speed generation and improve conversion without ever
+truncating a price, condition, or required fact.
+
+Audit finding: the Verifier is confirmed length-blind today (a targeted grep of
+`core/target_response_verifier.py` for length/char/token/truncation terms returns zero hits); the only
+existing precedent for stage-conditional response-shape control is the additive-overlay pattern already
+used for `broad_family_price_compact`/`max_price_anchors`. Selected: **Variant A + E** — a soft-budget
+directive injected the same way that existing overlay already is, combined with a structured outline
+shape (direct answer → 2-4 key facts → material conditions → next step, CTA separate) — never Variant C
+(post-hoc truncation, which would break the existing `must_preserve_exact`/numeric-grounding Verifier
+checks) and never Variant D (retry-for-length, which doubles Composer cost/latency on the normal path).
+Defines one typed contract (`TargetResponseLengthProfile`, 7 profiles) and one canonical producer
+(`select_target_response_length_profile`, planned for `core/target_response_policy.py`), a profile-
+selection map built only from existing structured signals (no regex, no new classifier, no second
+router), and a full never-touch invariant list (prices, `must_preserve_exact` evidence, `no_public_price`
+approved text, canonical contacts, CTA/source-identity/presentation-channel state) — correctness always
+wins over budget, with zero retry/fallback/route-change on overage.
+
+Deliverables (Phase 1): seam audit
+(`docs/evidence/performance/FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS_SEAM_AUDIT.md`), `TASK.md`, doc sync,
+PRE-CODE checker `tests/test_final_adaptive_response_length_budgets_governance.py`.
+
+**STOP** before any Phase 2 product implementation — the length-profile contract and producer do not
+exist yet.
+
+---
+
+## Historical — FINAL_PARALLEL_INGRESS_PLANNER_LATENCY / PERF-4 (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `61cd93e` (governance Phase 1) → Phase 2 implementation (owner GO)
 **COMPLETE**, shipped **inert by default** (`PLANNER_SPECULATION_CAPACITY=0`) · **NO MERGING

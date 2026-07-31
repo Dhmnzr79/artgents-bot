@@ -8346,3 +8346,170 @@ a previously-empty class, never auto-merging/deleting). See audit report § 9 fo
 **NO CLIENT/PRODUCT CHANGE. NO LIVE.** STOP before any cleanup or Phase 2 implementation.
 
 ---
+
+# TASK — FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6 (governance, Phase 1)
+
+**Status:** Phase 1, design/governance only · **NO PRODUCT IMPLEMENTATION / NO CLIENT-PACK CHANGE /
+NO LIVE / NO PROVIDER / NO NETWORK / NO CONTEXT_GROUPS.JSON / NO REAL COMPOSER SWITCH /
+NO VERIFIER CHANGE / NO SECOND LLM CALL / NO ITERATIVE COMPOSER FALLBACK /
+NO RAG/VECTOR/EMBEDDING SEARCH / NO RAW-TEXT REGEX ROUTING / NO HARDCODED SERVICE/TOPIC GRAPH /
+NO CACHE IMPLEMENTATION / NO TOKEN STREAMING / NO PROMPT/MODEL CHANGE /
+NO PRICE/MARKETING/PRESENTATION CHANGE / NO TSC-C / NO TSC-D / NO UNRELATED CLEANUP**
+
+**Baseline:** `codex/stage-a` @ `c0dfde6` (`FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT` complete).
+
+**Motivation:** the prior audit proved client-pack-internal duplication is negligible (~402 tokens)
+and that the real cost is architectural — Composer (~29,142 tokens) and Verifier (~28,679 tokens)
+each independently receive the full 107,980-char / ~26,995-token cached FullContext corpus, every
+turn, regardless of question scope. This milestone designs (not implements) a multi-level
+`service_exact → topic → context_group → full` Scoped FullContext resolver and a **shadow-only**
+first integration: the real Composer/Verifier keep receiving the full corpus unconditionally; a
+local, side-effect-free candidate package is computed in parallel and compared, after the real
+verified response exists, against what was actually needed — logged only, never gating. Full
+detail:
+[`docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`](evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md).
+
+## Context-group data model (decision)
+
+**Selected: Option A** — an explicit authored `target_response/context_groups.json`
+(`{schema_version, groups: [{group_id, topics: [...]}]}` shape), validated per-client the same way
+every other `target_response/*` file is. Option B (membership field inside `service_catalog.json`)
+rejected as sole mechanism (a service may belong to >1 group; a group may have non-service
+members). Option C (automatic neighboring by shared topic/refs) rejected as primary mechanism — zero
+authored cross-topic links exist in the demo pack today, so "automatic" would produce nothing or
+require an unapproved similarity heuristic. Option D (hardcoded Python graph) rejected per brief.
+**`context_groups.json` is not created in this Phase 1** — decision recorded for a future,
+separately-owned milestone (seam audit § 3).
+
+## Resolver contract
+
+`TargetContextScopeDecision` (frozen, `extra="forbid"`): `level` (`service_exact|topic|
+context_group|full`), `reason`, `service_id`, `topic`, `context_group_id`, `included_content_refs`,
+`included_offer_ids`, `included_fact_ids`, `included_doctor_ids`, `included_policy_sections`,
+`estimated_chars`, `estimated_tokens`, `package_fingerprint`, `completeness_status`
+(`complete|insufficient_widened|full_required`), `widening_reason`. No raw question/answer/SID/
+contact values — every field is an enum, count, hash, or reference ID. One canonical resolver
+function; never a second producer (mirrors the PERF-5 `select_target_response_length_profile`
+single-producer precedent). Full field-by-field design: seam audit § 4.
+
+## Source closure rules
+
+`service_exact` reads its closure **directly from the already-materialized
+`TargetComposerRequest.evidence_blocks`** (`core/target_composer_request.py`) — no new
+closure-computation logic, since S22–S36 already produce exactly this for the exact-service path.
+`topic` closure = every MD doc whose frontmatter `topic:` is in `spec.allowed_topics` (the
+already-validated `TargetResponseSpec` field, itself derived from the existing, deterministic,
+frontmatter-driven `load_client_topic_taxonomy`) plus their services/offers/facts/doctors.
+`context_group` closure is defined by § 3's future data model but is **structurally unreachable on
+the demo pack today** (no authored group file exists) — the shadow will honestly log zero
+activations until that changes. `full` = the existing, unmodified 55-doc corpus. Full rules: seam
+audit § 5.
+
+**`field_meta.confidence` is explicitly NOT used as a threshold anywhere** — traced to source
+(`core/turn_frame_from_raw.py`): only `topic` ever gets a real (uncalibrated, self-reported)
+planner number; every other axis is a hardcoded `0.0`/`1.0` constant. Only the categorical `status`
+enum and structural presence checks are used. Seam audit § 2.
+
+## Widening algorithm
+
+Deterministic, local, single pass, evaluated **before** the one real Composer call (never a repeat
+call per level): checks required facts/components/content refs/contact authority/consultation
+applicability/marketing selection/comparison-aspect source/governed-UI-action source against the
+current level's closure; on any failure, moves to the next level in
+`service_exact → topic → context_group → full` order. `full` is a safe fallback, not an error.
+Full checklist: seam audit § 6.
+
+## Shadow producer/consumer map
+
+Producer: a new, additive, side-effect-free function invoked **after** the real
+`TargetComposerRequest` is materialized (mirrors PERF-4's `on_llm_path` additive-hook pattern —
+never replaces an existing argument). Consumer: an observability sink only (§ Shadow observability
+below) — never the real `cached_full_context` argument passed to Composer or Verifier, both of
+which remain full/unconditional. Post-verification comparison uses the **post-validation**
+`TargetComposerSourceIdentity` (after the Verifier's existing silent-drop-invented-refs step,
+`core/target_presentation_source_identity.py::validate_used_content_refs`) — never the Composer's
+raw, unvalidated JSON claim, so an invented ref can never inflate `shadow_hit` (a real miss is
+logged as `shadow_miss`, never silently converted to a hit). The Verifier's own
+grounding/fact checks are confirmed independent of `used_content_refs` (they read `evidence_blocks`
++ candidate text directly) — corpus scoping only ever affects what the Composer had to write from,
+never Verifier correctness. Full map: seam audit § 1 (10-row table) and §§ 7–8.
+
+## Shadow observability fields (anonymized; no document/question/answer/SID/contact content)
+
+`scope_level`, `scope_reason`, `context_group_id`, `included_doc_count`, `included_offer_count`,
+`included_fact_count`, `included_doctor_count`, `estimated_tokens`, `full_context_estimated_tokens`,
+`estimated_reduction_tokens`, `completeness_status`, `widening_steps`, `shadow_hit`,
+`shadow_would_widen`, `missing_source_classes`, `resolver_ms` (via the existing
+`core/turn_timing.py::timed_stage` helper, reusing the exact pattern `resolver.py`'s legacy
+`resolver_ms` mark already uses, under a distinct name `scoped_context_shadow_ms` so it never
+collides), `package_fingerprint`. Seam audit § 9.
+
+## Package fingerprint (identity design only — nothing cached in Phase 1)
+
+`sha256(client_id | client_pack_content_hash | schema_version | level |
+service_id_or_topic_or_group_id | sorted(included_*_ids) | context_schema_version)`.
+`client_pack_content_hash` reuses the existing `TargetCachedFullContext.sha256` component — the
+same pattern `core/target_prompt_cache_prewarm.py` already uses for its own fingerprint. Seam
+audit § 10.
+
+## Estimated package sizes (real demo-pack data, computed from committed inventory — seam audit § 11)
+
+`service_exact` (one content doc): ~1,788 chars / ~447 tokens (~98% smaller than full).
+`service_exact` (with 1–2 marketing amplifiers + doctor): ~4,000–8,000 chars / ~1,000–2,000 tokens
+(~92–96% smaller). `topic=implantation` (28/55 docs, the dominant topic): 54,137 chars / 13,534
+tokens (~50% smaller). `topic=prosthetics/clinic/doctors/treatment` and the four 1-doc topics:
+87–98% smaller. `full`: 107,980 chars / 26,995 tokens (baseline, unchanged).
+
+## Honest gaps (not fixed in this milestone)
+
+1. No authored service↔service or service↔comparison cross-refs — confirmed zero references from
+   `service_catalog.json`/`marketing.yaml` to any `comparison__*.md`.
+2. `context_group` has no usable signal today (no authored file, no safe proxy).
+3. `field_meta.confidence` is not calibration-worthy (see above).
+4. Session staleness is implicit (age-guard only) — this design reuses the existing gate rather
+   than re-implementing a second staleness policy.
+5. Cross-topic multi-aspect questions have no structural resolution beyond `full` — correct, safe
+   behavior, not a defect.
+
+Seam audit § 12.
+
+## Exact Phase 2 implementation allowlist (none of this exists yet)
+
+- `contracts/target_context_scope_decision.py` — **does not exist**.
+- `core/target_context_scope_resolver.py` — **does not exist**.
+- `core/target_context_scope_shadow.py` — **does not exist**.
+- An additive post-materialization hook point (mirrors PERF-4's `on_llm_path`) — **does not exist**.
+- `clients/demo/target_response/context_groups.json` — a **separate**, even-later milestone, not
+  part of the resolver allowlist above.
+- Explicitly **NOT** in this allowlist: any change to `core/target_composer_request.py`'s or
+  `core/target_response_verifier.py`'s real invocation arguments; any caching implementation; any
+  embeddings/vector/RAG code.
+
+## Acceptance matrix
+
+50 scenarios (exact service/topic/context_group/full selection, widening, shadow hit/miss,
+fail-closed cases, zero-LLM-call and output-parity assertions) — full table in seam audit § 13.
+
+## Test commands
+
+```powershell
+python -m pytest tests/test_final_multi_level_scoped_context_shadow_governance.py -q
+python -m pytest tests/test_final_client_pack_content_dedup_and_token_audit_governance.py -q
+python scripts/validate_client_pack.py --client-id demo
+python scripts/validate_client_pack.py --path clients/_template --scaffold
+python -m pytest tests/test_target_cached_full_context.py tests/test_target_composer_request.py tests/test_target_composer_executor.py tests/test_target_response_verifier.py -q
+git diff --check
+python -m pytest tests/ --collect-only -q
+```
+
+## STOP conditions
+
+**STOP before any Phase 2 implementation.** None of §§ "Resolver contract" through "Exact Phase 2
+implementation allowlist" above are created by this commit. Required before Phase 2 starts:
+owner GO on this design; a separate governance TASK for the shadow resolver implementation; a
+separate, later governance TASK for `context_groups.json`, authored and validated per client before any
+`context_group` tier can ever activate. **No real switch of Composer/Verifier onto a scoped corpus
+is authorized by this document** — that would be a third, still-later milestone, contingent on
+shadow measurement (once implemented and run) actually proving high `shadow_hit` rates.
+
+---

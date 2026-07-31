@@ -251,6 +251,14 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    architecture fact, not a client-pack defect. See
    `docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md`. **NO CLIENT/PRODUCT
    CHANGE.** Phase 2 cleanup/tooling not started; STOP until owner GO.
+8. **FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6 (governance @ `c0dfde6`, design only):**
+   multi-level `service_exact → topic → context_group → full` Scoped FullContext resolver design +
+   shadow-only (measurement, never gating) integration plan. `context_groups.json` data model
+   selected (Option A, explicit authored file) but **not created**. `field_meta.confidence` traced
+   and found not calibration-worthy — level rules use only categorical `status`, never a numeric
+   threshold. Real Composer/Verifier keep receiving the full corpus unconditionally; nothing is
+   implemented. See `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`.
+   **NO PRODUCT/CLIENT-PACK CHANGE.** STOP until owner GO on Phase 2.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

@@ -756,6 +756,29 @@ Deliverables: `docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOK
 
 ---
 
+## Active — FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6 (governance Phase 1, design only)
+
+**Baseline:** `codex/stage-a` @ `c0dfde6` · **NO PRODUCT IMPLEMENTATION / NO CLIENT-PACK CHANGE / NO LIVE**
+
+Designs (does not implement) a multi-level `service_exact → topic → context_group → full` Scoped
+FullContext resolver and a shadow-only first integration: real Composer/Verifier keep receiving the
+full 107,980-char corpus unconditionally; a local candidate package would be computed in parallel
+and compared, after the real verified response, against what was actually needed — log-only, never
+gating, never a second LLM call. `context_groups.json` data model selected (explicit authored file)
+but not created — the demo pack has zero authored cross-service/comparison refs today, so
+`context_group` is honestly reported as structurally unreachable until that file exists.
+`field_meta.confidence` traced and found not calibration-worthy (only `topic` gets a real,
+uncalibrated planner number; every other axis is a hardcoded constant) — level rules use only
+categorical `status`. Estimated demo-pack package sizes: `service_exact` ~92–98% smaller than full,
+`topic` 50–98% smaller depending on topic size.
+
+Deliverables: `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`,
+`TASK.md`, PRE-CODE `tests/test_final_multi_level_scoped_context_shadow_governance.py`.
+
+**Phase 1 design only** — STOP before any Phase 2 shadow implementation.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

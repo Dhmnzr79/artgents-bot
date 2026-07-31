@@ -78,6 +78,13 @@ python scripts/validate_client_pack.py --client-id {new_id}
 
 - `target_response/pricebook/family_prices.json`
 - `video_catalog.yaml`
+- `target_response/context_groups.json` (future, not yet implemented — see
+  `FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW` / PERF-6 governance,
+  `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md` § 3). Proposed
+  shape: `{"schema_version": 1, "groups": [{"group_id": "...", "topics": ["...", "..."]}]}` — an
+  explicit authored cross-topic grouping (e.g. "tooth restoration" spanning `implantation` +
+  `prosthetics` + `diagnostics`), used only by a future Scoped FullContext `context_group` tier.
+  **Does not exist yet; no client currently has this file.**
 
 ## ID consistency
 

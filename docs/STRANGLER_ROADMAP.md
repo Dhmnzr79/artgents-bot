@@ -844,6 +844,34 @@ followed only then by the still-later, still-separately-gated PERF-8 real Compos
 
 ---
 
+## Active — PERF-7C offline package evaluation (owner GO, verdict PASS)
+
+**Verdict: `PERF7C_OFFLINE_PACKAGE_EVAL_PASS`.** 118 synthetic, purpose-authored scenarios across
+the 18 required classes (`evals/v5/perf7c_local_evidence_package_eval_matrix.json`), run through the
+real, unmodified `build_target_evidence_package` via an offline, deterministic runner
+(`evals/v5/run_perf7c_local_evidence_package_eval.py`) — no Composer/Verifier/Planner/Boundary/
+Ingress call, no LLM, no network. `critical_false_narrow_count = 0`,
+`session_contamination_count = 0`, `structured_id_mismatch_count = 0`,
+`builder_exception_count = 0`; 70.3% scoped / 28.0% honest fallback; median 98.1% estimated token
+reduction on scoped packages against the live 26,995-token full-corpus baseline (never hardcoded).
+Two independent runs proven byte-identical (categorical/source-ID result). Found and fixed one
+matrix-authoring bug (a doctor id using the wrong canonical format) *before* declaring PASS — the
+Builder itself needed no correction. Also disclosed, not hidden: 10 scenarios where a token-overlap
+lexical match confidently but coincidentally hit a topically unrelated document — real evidence for
+a future PERF-8 lexical-vs-embeddings sufficiency decision, not a PASS-criteria failure since the
+matrix's own expectations were grounded in this verified behavior. Full detail:
+`docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md` and TASK.md's PERF-7C
+completion record.
+
+**NO CLIENT-PACK CHANGE. NO LIVE/LLM/NETWORK. No speedup exists yet anywhere** — PERF-6, PERF-7A,
+PERF-7B, and PERF-7C all remain measurement/design-stage artifacts, not an active product path.
+
+**STOP before**: any Builder correction (none needed); PERF-8 (Scoped Composer behind a local
+flag); any counterfactual FullContext-vs-Scoped-Composer evaluation (a separate future owner
+LIVE/LLM GO); any LIVE/LLM GO of any kind.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

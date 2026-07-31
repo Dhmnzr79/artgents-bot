@@ -511,6 +511,28 @@ PERF-7C, not live text:
 (18 rows because the brief's prose lists "medically risky personal question" as an 18th item after
 17 named classes — counted here, not merged, so nothing from the brief's list is silently dropped.)
 
+**Governance correction (PERF-7C owner clarification, recorded here rather than rewriting the
+Phase-1 text above):** at PERF-7C implementation time, the owner clarified that this section's "no
+literal question text in any committed artifact" applies to *this design document* and to *result
+artifacts* — it does **not** forbid committing synthetic, purpose-authored eval question fixtures in
+a frozen eval matrix, the same way every other eval matrix already committed in this repository
+holds its own `question`/`case` text (e.g. `evals/v5/demo/medical_boundary_eval_matrix.json`). What
+remains forbidden, unchanged: real user data, generated Composer/Verifier answers, session ids, PII,
+and contact values — none of these ever appear in a matrix, a result artifact, or a log line.
+
+**Matrix correction (arithmetic, found and fixed at PERF-7C time, disclosed rather than silently
+patched):** the per-class counts in the table above (10+8+8+6+4+4+6+6+6+8+6+8+8+8+8+8+6+8) sum to
+**126, not 118** — the "~118"/"= 118" total this table and § 17 row 38 claimed was a real arithmetic
+error in this Phase 1 design document, not a deliberately-chosen figure. The actual frozen matrix
+built at PERF-7C (`evals/v5/perf7c_local_evidence_package_eval_matrix.json`) uses corrected per-class
+counts that genuinely sum to 118: exact service 10, broad service 6, price 8, doctor 6, contacts 4,
+parking 4, sterilization/safety 6, own fresh CT 6, treatment plan from another clinic 6, pain/fear 8,
+marketing concern 6, comparison 8, cross-topic 6, explicit follow-up price 8, new independent service
+6, unknown/paraphrased wording 6, no matching clinic fact 6, medically risky personal question 8 —
+`10+6+8+6+4+4+6+6+6+8+6+8+6+8+6+6+6+8 = 118`, verified by direct computation. This table's original
+numbers are left as historical record of the Phase 1 design; the corrected counts are authoritative
+for the actual PERF-7C matrix.
+
 ## 14. Implementation milestone sequence (not started; future, separately owner-approved)
 
 Exactly the sequence named in the brief, restated as the canonical order — no milestone here is

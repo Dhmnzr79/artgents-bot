@@ -1,0 +1,5919 @@
+{
+  "schema_version": 1,
+  "suite_id": "perf7c_local_evidence_package_eval_matrix",
+  "client_id": "demo",
+  "execution_mode": "offline_builder_only",
+  "authority": "canonical_demo_pack",
+  "no_llm_no_network": true,
+  "governance_note": "Synthetic, purpose-authored eval question fixtures only -- never real user data, never a generated Composer/Verifier answer (no Composer/Verifier call exists anywhere in this milestone), never a session id/PII/contact value. See TASK.md's PERF-7C governance correction and the seam audit's matching note.",
+  "scenario_count": 118,
+  "class_target_counts": {
+    "exact_service": 10,
+    "broad_service": 6,
+    "price": 8,
+    "doctor": 6,
+    "contacts": 4,
+    "parking": 4,
+    "sterilization_safety": 6,
+    "own_fresh_ct": 6,
+    "treatment_plan_other_clinic": 6,
+    "pain_fear": 8,
+    "marketing_concern": 6,
+    "comparison": 8,
+    "cross_topic": 6,
+    "explicit_followup_price": 8,
+    "new_independent_service": 6,
+    "unknown_wording": 6,
+    "no_matching_fact": 6,
+    "medically_risky_personal": 8
+  },
+  "scenarios": [
+    {
+      "scenario_id": "s001_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про имплантация classic",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__classic.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[classic].content_ref == implantation__service__classic.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s002_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про all-on-4",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_4.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[all_on_4].content_ref == implantation__service__all_on_4.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s003_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про профессиональное отбеливание",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "professional_whitening",
+          "allowed_topics": [
+            "whitening"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:whitening__service__teeth_whitening.md",
+            "topics": [
+              "whitening"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "whitening__service__teeth_whitening.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[professional_whitening].content_ref == whitening__service__teeth_whitening.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s004_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про компьютерная томография",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:diagnostics__service__tomography.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "diagnostics__service__tomography.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[tomography].content_ref == diagnostics__service__tomography.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s005_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про лечение пародонтита",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "periodontitis",
+          "allowed_topics": [
+            "periodontology"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:periodontology__service__periodontitis.md",
+            "topics": [
+              "periodontology"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "periodontology__service__periodontitis.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[periodontitis].content_ref == periodontology__service__periodontitis.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s006_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про элайнеры",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "aligners",
+          "allowed_topics": [
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:orthodontics__service__aligners.md",
+            "topics": [
+              "orthodontics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "orthodontics__service__aligners.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[aligners].content_ref == orthodontics__service__aligners.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s007_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про удаление зуба",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tooth_extraction",
+          "allowed_topics": [
+            "extraction"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:extraction__service__tooth_extraction.md",
+            "topics": [
+              "extraction"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "extraction__service__tooth_extraction.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[tooth_extraction].content_ref == extraction__service__tooth_extraction.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s008_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про виниры",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "veneers",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:prosthetics__service__veneers.md",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "prosthetics__service__veneers.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[veneers].content_ref == prosthetics__service__veneers.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s009_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про лечение кариеса",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "caries",
+          "allowed_topics": [
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:treatment__service__caries.md",
+            "topics": [
+              "treatment"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "treatment__service__caries.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[caries].content_ref == treatment__service__caries.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s010_exact_service",
+      "scenario_class": "exact_service",
+      "synthetic_query": "Расскажите подробнее про костная пластика",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "bone_graft",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__bone_graft.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__bone_graft.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "service_catalog.json[bone_graft].content_ref == implantation__service__bone_graft.md; exact content evidence already satisfies required_components=(content,) -> complete by construction."
+    },
+    {
+      "scenario_id": "s011_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Расскажите про варианты протезирования зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Broad multi-document browsing question with no exact service_id; verified read-only against the real lexical index before freezing -- multiple distinct documents tie at the top score, so the Builder conservatively falls back rather than guessing one."
+    },
+    {
+      "scenario_id": "s012_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Какие у вас методы лечения пародонтита и дёсен",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "periodontology"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Broad multi-document browsing question with no exact service_id; verified read-only against the real lexical index before freezing -- multiple distinct documents tie at the top score, so the Builder conservatively falls back rather than guessing one."
+    },
+    {
+      "scenario_id": "s013_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Расскажите про виды протезирования зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Broad multi-document browsing question with no exact service_id; verified read-only against the real lexical index before freezing -- multiple distinct documents tie at the top score, so the Builder conservatively falls back rather than guessing one."
+    },
+    {
+      "scenario_id": "s014_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Расскажите про отбеливание зубов вообще",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "whitening"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Broad multi-document browsing question with no exact service_id; verified read-only against the real lexical index before freezing -- multiple distinct documents tie at the top score, so the Builder conservatively falls back rather than guessing one."
+    },
+    {
+      "scenario_id": "s015_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Какие у вас методы лечения зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Broad multi-document browsing question with no exact service_id; verified read-only against the real lexical index before freezing -- multiple distinct documents tie at the top score, so the Builder conservatively falls back rather than guessing one."
+    },
+    {
+      "scenario_id": "s016_broad_service",
+      "scenario_class": "broad_service",
+      "synthetic_query": "Какие есть методы выравнивания зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Broad multi-document browsing question with no exact service_id; verified read-only against the real lexical index before freezing -- multiple distinct documents tie at the top score, so the Builder conservatively falls back rather than guessing one."
+    },
+    {
+      "scenario_id": "s017_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит classic?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:classic.one_tooth.implantium",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:classic.one_tooth.impro",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:classic.one_tooth.nobel",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "classic.one_tooth.implantium",
+          "classic.one_tooth.impro",
+          "classic.one_tooth.nobel"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=classic: ['classic.one_tooth.implantium', 'classic.one_tooth.impro', 'classic.one_tooth.nobel']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s018_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит all_on_4?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_4.jaw.implantium",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_4.jaw.impro",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_4.jaw.nobel",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "all_on_4.jaw.implantium",
+          "all_on_4.jaw.impro",
+          "all_on_4.jaw.nobel"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=all_on_4: ['all_on_4.jaw.implantium', 'all_on_4.jaw.impro', 'all_on_4.jaw.nobel']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s019_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит tomography?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:tomography.default",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "tomography.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=tomography: ['tomography.default']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s020_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит bone_graft?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "bone_graft",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:bone_graft.default",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "bone_graft.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=bone_graft: ['bone_graft.default']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s021_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит veneers?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "veneers",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:veneers.default",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "veneers.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=veneers: ['veneers.default']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s022_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит zirconia_crowns?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "zirconia_crowns",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:zirconia_crowns.default",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "zirconia_crowns.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=zirconia_crowns: ['zirconia_crowns.default']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s023_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит professional_whitening?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "professional_whitening",
+          "allowed_topics": [
+            "whitening"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:professional_whitening.default",
+            "topics": [
+              "whitening"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "professional_whitening.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=professional_whitening: ['professional_whitening.default']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s024_price",
+      "scenario_class": "price",
+      "synthetic_query": "Сколько стоит aligners?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "aligners",
+          "allowed_topics": [
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:aligners.default",
+            "topics": [
+              "orthodontics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "aligners.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/services/*.json active offers for service_id=aligners: ['aligners.default']; exact offer ids -> complete, price-only never requires content per FINAL_PRICE_ONLY_SOURCE_SUFFICIENCY_CONVERGENCE."
+    },
+    {
+      "scenario_id": "s025_doctor",
+      "scenario_class": "doctor",
+      "synthetic_query": "Какой врач ведёт classic?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "doctors"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "doctors"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "doctor",
+            "ref": "doctor:doctors__doctor__kuznetsov",
+            "topics": [
+              "doctors"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [
+          "doctors__doctor__kuznetsov"
+        ],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "doctor_catalog.json[doctors__doctor__kuznetsov].service_ids includes 'classic'; exact doctor id -> complete."
+    },
+    {
+      "scenario_id": "s026_doctor",
+      "scenario_class": "doctor",
+      "synthetic_query": "Какой врач ведёт all_on_4?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "doctors"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "doctors"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "doctor",
+            "ref": "doctor:doctors__doctor__volkov",
+            "topics": [
+              "doctors"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [
+          "doctors__doctor__volkov"
+        ],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "doctor_catalog.json[doctors__doctor__volkov].service_ids includes 'all_on_4'; exact doctor id -> complete."
+    },
+    {
+      "scenario_id": "s027_doctor",
+      "scenario_class": "doctor",
+      "synthetic_query": "Какой врач ведёт sinus_lift?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "sinus_lift",
+          "allowed_topics": [
+            "doctors"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "doctors"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "doctor",
+            "ref": "doctor:doctors__doctor__orlov",
+            "topics": [
+              "doctors"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [
+          "doctors__doctor__orlov"
+        ],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "doctor_catalog.json[doctors__doctor__orlov].service_ids includes 'sinus_lift'; exact doctor id -> complete."
+    },
+    {
+      "scenario_id": "s028_doctor",
+      "scenario_class": "doctor",
+      "synthetic_query": "Какой врач ведёт periodontitis?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "periodontitis",
+          "allowed_topics": [
+            "doctors"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "doctors"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "doctor",
+            "ref": "doctor:doctors__doctor__grigoriev",
+            "topics": [
+              "doctors"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [
+          "doctors__doctor__grigoriev"
+        ],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "doctor_catalog.json[doctors__doctor__grigoriev].service_ids includes 'periodontitis'; exact doctor id -> complete."
+    },
+    {
+      "scenario_id": "s029_doctor",
+      "scenario_class": "doctor",
+      "synthetic_query": "Какой врач ведёт aligners?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "aligners",
+          "allowed_topics": [
+            "doctors"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "doctors"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "doctor",
+            "ref": "doctor:doctors__doctor__morozova",
+            "topics": [
+              "doctors"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [
+          "doctors__doctor__morozova"
+        ],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "doctor_catalog.json[doctors__doctor__morozova].service_ids includes 'aligners'; exact doctor id -> complete."
+    },
+    {
+      "scenario_id": "s030_doctor",
+      "scenario_class": "doctor",
+      "synthetic_query": "Какой врач ведёт veneers?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "veneers",
+          "allowed_topics": [
+            "doctors"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "doctors"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "doctor",
+            "ref": "doctor:doctors__doctor__fedorova",
+            "topics": [
+              "doctors"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [
+          "doctors__doctor__fedorova"
+        ],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "doctor_catalog.json[doctors__doctor__fedorova].service_ids includes 'veneers'; exact doctor id -> complete."
+    },
+    {
+      "scenario_id": "s031_contacts",
+      "scenario_class": "contacts",
+      "synthetic_query": "Подскажите phone клиники",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:phone",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "phone"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.phone_display is authored; clinic_contact:phone evidence -> exact policy_sections=('phone',), field name only, never the value."
+    },
+    {
+      "scenario_id": "s032_contacts",
+      "scenario_class": "contacts",
+      "synthetic_query": "Подскажите whatsapp клиники",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:whatsapp",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "whatsapp"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.whatsapp_display is authored; clinic_contact:whatsapp evidence -> exact policy_sections=('whatsapp',), field name only, never the value."
+    },
+    {
+      "scenario_id": "s033_contacts",
+      "scenario_class": "contacts",
+      "synthetic_query": "Подскажите address клиники",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:address",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "address"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.address_display is authored; clinic_contact:address evidence -> exact policy_sections=('address',), field name only, never the value."
+    },
+    {
+      "scenario_id": "s034_contacts",
+      "scenario_class": "contacts",
+      "synthetic_query": "Подскажите hours клиники",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:hours",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "hours"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.hours_display is authored; clinic_contact:hours evidence -> exact policy_sections=('hours',), field name only, never the value."
+    },
+    {
+      "scenario_id": "s035_parking",
+      "scenario_class": "parking",
+      "synthetic_query": "Есть ли у вас парковка?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:parking",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "parking"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.parking_display is authored; parking goes through the structured policy_sections field, never an MD lexical hit."
+    },
+    {
+      "scenario_id": "s036_parking",
+      "scenario_class": "parking",
+      "synthetic_query": "Есть ли у вас парковка?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:parking",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:phone",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "parking",
+          "phone"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.parking_display is authored; parking goes through the structured policy_sections field, never an MD lexical hit."
+    },
+    {
+      "scenario_id": "s037_parking",
+      "scenario_class": "parking",
+      "synthetic_query": "Есть ли у вас парковка?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:parking",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:address",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "address",
+          "parking"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.parking_display is authored; parking goes through the structured policy_sections field, never an MD lexical hit."
+    },
+    {
+      "scenario_id": "s038_parking",
+      "scenario_class": "parking",
+      "synthetic_query": "Есть ли у вас парковка?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:clinic__info__contacts.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:parking",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "clinic_contact",
+            "ref": "clinic_contact:hours",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "clinic__info__contacts.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [
+          "hours",
+          "parking"
+        ],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "clinic_policies.yaml contact.parking_display is authored; parking goes through the structured policy_sections field, never an MD lexical hit."
+    },
+    {
+      "scenario_id": "s039_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "централизованное стерилизационное отделение и обработка инструментов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__faq__safety.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 12 on implantation__faq__safety.md, no other document ties."
+    },
+    {
+      "scenario_id": "s040_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "дезинфекция инструментов химическая термическая",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__faq__safety.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: only implantation__faq__safety.md scores (score 8), single unambiguous hit."
+    },
+    {
+      "scenario_id": "s041_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "как обеззараживают инструменты перед приёмом",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: three distinct documents (tomography, safety, contraindications) tie at score 4."
+    },
+    {
+      "scenario_id": "s042_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "какая у вас стерилизация",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: multiple distinct documents tie at score 2."
+    },
+    {
+      "scenario_id": "s043_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "стерилизация",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_zero_hits"
+        ]
+      },
+      "rationale": "Required morphology check #1 (стерилизация/стерилизационное): the bare nominative query never exact- or prefix-matches стерилизационное (grammatical divergence before the shared root ends) -- verified zero hits."
+    },
+    {
+      "scenario_id": "s044_sterilization_safety",
+      "scenario_class": "sterilization_safety",
+      "synthetic_query": "обеззараживание",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_zero_hits"
+        ]
+      },
+      "rationale": "Required morphology check #4 (обеззараживание/стерилизация): this exact word form is not present anywhere in the corpus -- verified zero hits."
+    },
+    {
+      "scenario_id": "s045_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "У меня уже есть КТ, можно её использовать?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:diagnostics__service__tomography.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "diagnostics__service__tomography.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Own-scan FAQ routes to diagnostics__service__tomography.md content_ref per FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING; exact content evidence -> complete."
+    },
+    {
+      "scenario_id": "s046_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "Своя томография подойдёт для вас?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:diagnostics__service__tomography.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "diagnostics__service__tomography.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Own-scan FAQ routes to diagnostics__service__tomography.md content_ref per FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING; exact content evidence -> complete."
+    },
+    {
+      "scenario_id": "s047_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "Принесу свой снимок КТ, этого достаточно?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:diagnostics__service__tomography.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "diagnostics__service__tomography.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Own-scan FAQ routes to diagnostics__service__tomography.md content_ref per FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING; exact content evidence -> complete."
+    },
+    {
+      "scenario_id": "s048_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "у меня уже есть свежая компьютерная томография можно ли использовать",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "diagnostics__service__tomography.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 8 on diagnostics__service__tomography.md."
+    },
+    {
+      "scenario_id": "s049_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "снимок кт сделан месяц назад подойдёт ли он",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "diagnostics__service__tomography.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 15 on diagnostics__service__tomography.md."
+    },
+    {
+      "scenario_id": "s050_own_fresh_ct",
+      "scenario_class": "own_fresh_ct",
+      "synthetic_query": "нужно ли делать новую томографию если недавно делал",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: five distinct documents tie at score 6, including but not limited to tomography.md."
+    },
+    {
+      "scenario_id": "s051_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "мне в другой клинике предложили план лечения хочу проверить у вас",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic",
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "clinic__info__technology.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 7 on clinic__info__technology.md (coincidental token overlap, not semantically about external plans -- disclosed in the audit's honest-miss inventory)."
+    },
+    {
+      "scenario_id": "s052_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "был в другой клинике составили план лечения можно ли к вам на консультацию",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic",
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: clinic__info__payment_terms.md and clinic__info__technology.md tie at score 9."
+    },
+    {
+      "scenario_id": "s053_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "хочу второе мнение по плану лечения от другого врача",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic",
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "orthodontics__service__aligners.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 8 on orthodontics__service__aligners.md (coincidental overlap, disclosed)."
+    },
+    {
+      "scenario_id": "s054_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "сделали снимки в другой клинике стоит ли перепроверить план",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic",
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "clinic__info__technology.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 7 on clinic__info__technology.md."
+    },
+    {
+      "scenario_id": "s055_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "принесу документы из другой клиники посмотрите план лечения",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic",
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "clinic__info__technology.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 5 on clinic__info__technology.md."
+    },
+    {
+      "scenario_id": "s056_treatment_plan_other_clinic",
+      "scenario_class": "treatment_plan_other_clinic",
+      "synthetic_query": "консультация по чужому плану лечения возможна ли у вас",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "clinic",
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "orthodontics__service__aligners.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 8 on orthodontics__service__aligners.md."
+    },
+    {
+      "scenario_id": "s057_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Мне страшно, будет ли больно при classic?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "external_kb",
+            "ref": "kb:implantation__faq__pain.md#korotko",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__classic.md",
+          "implantation__faq__pain.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Marketing pain/fear amplifier is an exact external_kb evidence block (anchored section of implantation__faq__pain.md), already present alongside service content -> complete, not a fallback."
+    },
+    {
+      "scenario_id": "s058_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Мне страшно, будет ли больно при all_on_4?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_4.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "external_kb",
+            "ref": "kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_4.md",
+          "implantation__faq__pain.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Marketing pain/fear amplifier is an exact external_kb evidence block (anchored section of implantation__faq__pain.md), already present alongside service content -> complete, not a fallback."
+    },
+    {
+      "scenario_id": "s059_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Мне страшно, будет ли больно при one_stage?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "one_stage",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__one_stage.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "external_kb",
+            "ref": "kb:implantation__faq__pain.md#chto-chuvstvuetsya-posle-ustanovki",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__one_stage.md",
+          "implantation__faq__pain.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Marketing pain/fear amplifier is an exact external_kb evidence block (anchored section of implantation__faq__pain.md), already present alongside service content -> complete, not a fallback."
+    },
+    {
+      "scenario_id": "s060_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Мне страшно, будет ли больно при all_on_6?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_6",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_6.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "external_kb",
+            "ref": "kb:implantation__faq__pain.md#sedatsiya-i-narkoz",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_6.md",
+          "implantation__faq__pain.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Marketing pain/fear amplifier is an exact external_kb evidence block (anchored section of implantation__faq__pain.md), already present alongside service content -> complete, not a fallback."
+    },
+    {
+      "scenario_id": "s061_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Боюсь долгого лечения, что вы предлагаете для bone_graft?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "bone_graft",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "free_implant_consult"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__bone_graft.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:free_implant_consult",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "free_implant_consult"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__bone_graft.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "free_implant_consult"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook offers for bone_graft reference fact_refs including 'free_implant_consult'; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s062_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Боюсь долгого лечения, что вы предлагаете для all_on_6?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_6",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "implant_warranty"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_6.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:implant_warranty",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "implant_warranty"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_6.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "implant_warranty"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook offers for all_on_6 reference fact_refs including 'implant_warranty'; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s063_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Боюсь долгого лечения, что вы предлагаете для classic?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "installment_12"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:installment_12",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "installment_12"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__classic.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "installment_12"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook offers for classic reference fact_refs including 'installment_12'; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s064_pain_fear",
+      "scenario_class": "pain_fear",
+      "synthetic_query": "Боюсь долгого лечения, что вы предлагаете для one_stage?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "one_stage",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "implant_same_day_discount"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__one_stage.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:implant_same_day_discount",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "implant_same_day_discount"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__one_stage.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "implant_same_day_discount"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook offers for one_stage reference fact_refs including 'implant_same_day_discount'; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s065_marketing_concern",
+      "scenario_class": "marketing_concern",
+      "synthetic_query": "Есть ли у вас акции или скидки на classic?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "implant_warranty"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:implant_warranty",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "implant_warranty"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__classic.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "implant_warranty"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/facts.json[implant_warranty] is a real marketing-selected commercial fact for classic; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s066_marketing_concern",
+      "scenario_class": "marketing_concern",
+      "synthetic_query": "Есть ли у вас акции или скидки на all_on_4?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "tax_deduction"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_4.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:tax_deduction",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "tax_deduction"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "tax_deduction"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/facts.json[tax_deduction] is a real marketing-selected commercial fact for all_on_4; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s067_marketing_concern",
+      "scenario_class": "marketing_concern",
+      "synthetic_query": "Есть ли у вас акции или скидки на bone_graft?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "bone_graft",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "free_implant_consult"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__bone_graft.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:free_implant_consult",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "free_implant_consult"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__bone_graft.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "free_implant_consult"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/facts.json[free_implant_consult] is a real marketing-selected commercial fact for bone_graft; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s068_marketing_concern",
+      "scenario_class": "marketing_concern",
+      "synthetic_query": "Есть ли у вас акции или скидки на professional_whitening?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "professional_whitening",
+          "allowed_topics": [
+            "whitening"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "professional_whitening_discount"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:whitening__service__teeth_whitening.md",
+            "topics": [
+              "whitening"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:professional_whitening_discount",
+            "topics": [
+              "whitening"
+            ],
+            "fact_ids": [
+              "professional_whitening_discount"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "whitening__service__teeth_whitening.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "professional_whitening_discount"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/facts.json[professional_whitening_discount] is a real marketing-selected commercial fact for professional_whitening; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s069_marketing_concern",
+      "scenario_class": "marketing_concern",
+      "synthetic_query": "Есть ли у вас акции или скидки на all_on_6?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_6",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "installment_12"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_6.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:installment_12",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "installment_12"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_6.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "installment_12"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/facts.json[installment_12] is a real marketing-selected commercial fact for all_on_6; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s070_marketing_concern",
+      "scenario_class": "marketing_concern",
+      "synthetic_query": "Есть ли у вас акции или скидки на one_stage?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "one_stage",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "implant_same_day_discount"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__one_stage.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "commercial_fact",
+            "ref": "fact:implant_same_day_discount",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": [
+              "implant_same_day_discount"
+            ]
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "implantation__service__one_stage.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [
+          "implant_same_day_discount"
+        ],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "pricebook/facts.json[implant_same_day_discount] is a real marketing-selected commercial fact for one_stage; exact fact evidence -> complete."
+    },
+    {
+      "scenario_id": "s071_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "в чем разница между all-on-4 и all-on-6",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_4.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "comparison__all_on_4_vs_all_on_6.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 14 on comparison__all_on_4_vs_all_on_6.md (doc_type=comparison)."
+    },
+    {
+      "scenario_id": "s072_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "имплант или мост что лучше поставить",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [
+          "implantation__service__classic.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "comparison__implant_vs_bridge.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 10 on comparison__implant_vs_bridge.md (doc_type=comparison)."
+    },
+    {
+      "scenario_id": "s073_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "костная пластика или all-on-4 сравнение вариантов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "bone_graft",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__bone_graft.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [
+          "implantation__service__bone_graft.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "comparison__bone_graft_vs_all_on_4.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 10 on comparison__bone_graft_vs_all_on_4.md (doc_type=comparison)."
+    },
+    {
+      "scenario_id": "s074_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "классическая двухэтапная имплантация против одноэтапной методики сравнение подходов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [
+          "implantation__service__classic.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "comparison__classic_vs_one_stage.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 6 on comparison__classic_vs_one_stage.md (doc_type=comparison)."
+    },
+    {
+      "scenario_id": "s075_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "all-on-4 или all-on-6 что лучше выбрать",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_4.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: three distinct documents tie at score 12 (only one is doc_type=comparison)."
+    },
+    {
+      "scenario_id": "s076_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "классическая имплантация или одноэтапная в чем отличие",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: five distinct documents tie at score 6, none is comparison__classic_vs_one_stage.md."
+    },
+    {
+      "scenario_id": "s077_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "бюгельный протез или мостовидный протез сравнение",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "clasp_dentures",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:prosthetics__service__clasp_dentures.md",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: comparison__bugel_prosthesis_vs_fixed_bridge.md ties with prosthetics__service__clasp_dentures.md at score 6."
+    },
+    {
+      "scenario_id": "s078_comparison",
+      "scenario_class": "comparison",
+      "synthetic_query": "плюсы и минусы бюгельного протеза по сравнению с мостовидным протезом",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_6",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_6.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": true
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_no_comparison_document_found"
+        ]
+      },
+      "rationale": "Verified: unique top score 8 is implantation__service__all_on_6.md (doc_type=service, not comparison) -- confident single match but not comparison-typed, so the comparison deficit cannot be closed -> fallback."
+    },
+    {
+      "scenario_id": "s079_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "сравните имплантацию виниры и отбеливание что выбрать для передних зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics",
+            "whitening",
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: three distinct documents tie at score 8."
+    },
+    {
+      "scenario_id": "s080_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "что дешевле поставить импланты или брекеты в вашей клинике",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics",
+            "whitening",
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: comparison__bone_graft_vs_all_on_4.md and implantation__service__sinus_lift.md tie at score 8."
+    },
+    {
+      "scenario_id": "s081_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "какая связь между лечением дёсен и имплантацией зубов у вас",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics",
+            "whitening",
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: five distinct documents tie at score 6."
+    },
+    {
+      "scenario_id": "s082_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "можно ли совместить отбеливание и лечение кариеса за один визит",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics",
+            "whitening",
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: six distinct documents tie at score 8."
+    },
+    {
+      "scenario_id": "s083_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "нужна консультация ортодонта и стоматолога одновременно по разным вопросам",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics",
+            "whitening",
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "orthodontics__service__aligners.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 8 on orthodontics__service__aligners.md (coincidental single-doc resolution of a nominally cross-topic question -- disclosed as a real algorithmic limitation, not hidden)."
+    },
+    {
+      "scenario_id": "s084_cross_topic",
+      "scenario_class": "cross_topic",
+      "synthetic_query": "какая разница между терапией и хирургией зубов у вас в клинике",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics",
+            "whitening",
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "prosthetics__service__zirconia_crowns.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 10 on prosthetics__service__zirconia_crowns.md (coincidental, disclosed)."
+    },
+    {
+      "scenario_id": "s085_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:classic.one_tooth.implantium",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:classic.one_tooth.impro",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:classic.one_tooth.nobel",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "implantation__service__classic.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "classic.one_tooth.implantium",
+          "classic.one_tooth.impro",
+          "classic.one_tooth.nobel"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "implantation__service__classic.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on classic; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s086_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_4.jaw.implantium",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_4.jaw.impro",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_4.jaw.nobel",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "all_on_4.jaw.implantium",
+          "all_on_4.jaw.impro",
+          "all_on_4.jaw.nobel"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "implantation__service__all_on_4.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on all_on_4; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s087_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_6",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_6.jaw.implantium",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_6.jaw.impro",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:all_on_6.jaw.nobel",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "implantation__service__all_on_6.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "all_on_6.jaw.implantium",
+          "all_on_6.jaw.impro",
+          "all_on_6.jaw.nobel"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "implantation__service__all_on_6.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on all_on_6; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s088_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "one_stage",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:one_stage.one_tooth.implantium",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:one_stage.one_tooth.impro",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          },
+          {
+            "kind": "offer",
+            "ref": "offer:one_stage.one_tooth.nobel",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "implantation__service__one_stage.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "one_stage.one_tooth.implantium",
+          "one_stage.one_tooth.impro",
+          "one_stage.one_tooth.nobel"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "implantation__service__one_stage.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on one_stage; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s089_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:tomography.default",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "diagnostics__service__tomography.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "tomography.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "diagnostics__service__tomography.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on tomography; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s090_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "veneers",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:veneers.default",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "prosthetics__service__veneers.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "veneers.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "prosthetics__service__veneers.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on veneers; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s091_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "zirconia_crowns",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:zirconia_crowns.default",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "prosthetics__service__zirconia_crowns.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "zirconia_crowns.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "prosthetics__service__zirconia_crowns.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on zirconia_crowns; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s092_explicit_followup_price",
+      "scenario_class": "explicit_followup_price",
+      "synthetic_query": "А сколько это стоит?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "professional_whitening",
+          "allowed_topics": [
+            "whitening"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "price"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "offer",
+            "ref": "offer:professional_whitening.default",
+            "topics": [
+              "whitening"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": true,
+        "session_derived_refs": [
+          "whitening__service__teeth_whitening.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [
+          "professional_whitening.default"
+        ],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [
+          "whitening__service__teeth_whitening.md"
+        ],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Follow-up 'how much' after prior turn's confirmed focus on professional_whitening; explicit_followup=True carries the prior content ref as session_derived_refs while price is answered from exact offer evidence -- both sources coexist without contamination."
+    },
+    {
+      "scenario_id": "s093_new_independent_service",
+      "scenario_class": "new_independent_service",
+      "synthetic_query": "На самом деле у меня другой вопрос: расскажите про tooth_extraction",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tooth_extraction",
+          "allowed_topics": [
+            "extraction"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:extraction__service__tooth_extraction.md",
+            "topics": [
+              "extraction"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "extraction__service__tooth_extraction.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "A genuinely new, independent question after some unrelated prior focus; explicit_followup=False and no session_derived_refs are passed by the caller -- proves no stale service/extent/jaw/price/doctor is silently carried into a standalone new question."
+    },
+    {
+      "scenario_id": "s094_new_independent_service",
+      "scenario_class": "new_independent_service",
+      "synthetic_query": "На самом деле у меня другой вопрос: расскажите про periodontitis",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "periodontitis",
+          "allowed_topics": [
+            "periodontology"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:periodontology__service__periodontitis.md",
+            "topics": [
+              "periodontology"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "periodontology__service__periodontitis.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "A genuinely new, independent question after some unrelated prior focus; explicit_followup=False and no session_derived_refs are passed by the caller -- proves no stale service/extent/jaw/price/doctor is silently carried into a standalone new question."
+    },
+    {
+      "scenario_id": "s095_new_independent_service",
+      "scenario_class": "new_independent_service",
+      "synthetic_query": "На самом деле у меня другой вопрос: расскажите про aligners",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "aligners",
+          "allowed_topics": [
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:orthodontics__service__aligners.md",
+            "topics": [
+              "orthodontics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "orthodontics__service__aligners.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "A genuinely new, independent question after some unrelated prior focus; explicit_followup=False and no session_derived_refs are passed by the caller -- proves no stale service/extent/jaw/price/doctor is silently carried into a standalone new question."
+    },
+    {
+      "scenario_id": "s096_new_independent_service",
+      "scenario_class": "new_independent_service",
+      "synthetic_query": "На самом деле у меня другой вопрос: расскажите про caries",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "caries",
+          "allowed_topics": [
+            "treatment"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:treatment__service__caries.md",
+            "topics": [
+              "treatment"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "complete"
+        ],
+        "required_md_refs": [
+          "treatment__service__caries.md"
+        ],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "A genuinely new, independent question after some unrelated prior focus; explicit_followup=False and no session_derived_refs are passed by the caller -- proves no stale service/extent/jaw/price/doctor is silently carried into a standalone new question."
+    },
+    {
+      "scenario_id": "s097_new_independent_service",
+      "scenario_class": "new_independent_service",
+      "synthetic_query": "Расскажите про veneers",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "veneers",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:prosthetics__service__veneers.md",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [
+          "implantation__service__classic.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": "evidence_package_session_refs_without_explicit_followup",
+        "acceptable_completeness_status": [],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Caller-contract violation probe: session_derived_refs passed non-empty while explicit_followup=False (simulating a hypothetical upstream bug) must raise, never silently accept stale session refs into a new independent question."
+    },
+    {
+      "scenario_id": "s098_new_independent_service",
+      "scenario_class": "new_independent_service",
+      "synthetic_query": "Расскажите про bone_graft",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "bone_graft",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__bone_graft.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [
+          "implantation__service__classic.md"
+        ],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": "evidence_package_session_refs_without_explicit_followup",
+        "acceptable_completeness_status": [],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": null
+      },
+      "rationale": "Caller-contract violation probe: session_derived_refs passed non-empty while explicit_followup=False (simulating a hypothetical upstream bug) must raise, never silently accept stale session refs into a new independent question."
+    },
+    {
+      "scenario_id": "s099_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "подскажите насчёт альтернативных методик восстановления улыбки без привычных терминов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__service__all_on_4.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 5 on implantation__service__all_on_4.md -- a genuinely paraphrased query still produced a confident (coincidental) single-document match; disclosed as a real token-overlap limitation, not hidden."
+    },
+    {
+      "scenario_id": "s100_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "интересует нестандартный подход к зубам без операции вообще",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "comparison__implant_vs_bridge.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 6 on comparison__implant_vs_bridge.md (coincidental, disclosed)."
+    },
+    {
+      "scenario_id": "s101_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "хочу узнать про новый способ который вы возможно ещё не рекламируете",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__service__temporary_teeth.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 6 on implantation__service__temporary_teeth.md (coincidental, disclosed)."
+    },
+    {
+      "scenario_id": "s102_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "что можете предложить если ничего из обычного не подходит мне",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: seven distinct documents tie at score 6 -- honest fallback."
+    },
+    {
+      "scenario_id": "s103_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "ищу необычное решение проблемы с зубами нестандартное совсем",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: five distinct documents tie at score 4 -- honest fallback."
+    },
+    {
+      "scenario_id": "s104_unknown_wording",
+      "scenario_class": "unknown_wording",
+      "synthetic_query": "расскажите про восстановление отсутствующих элементов альтернативным способом",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation",
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match",
+          "lexical_zero_hits"
+        ]
+      },
+      "rationale": "Verified: multiple distinct documents tie at a low top score -- honest fallback (fully paraphrased, no shared distinctive tokens)."
+    },
+    {
+      "scenario_id": "s105_no_matching_fact",
+      "scenario_class": "no_matching_fact",
+      "synthetic_query": "Есть ли особая акция fake_fact_discount_9001 на classic?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "classic",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "fake_fact_discount_9001"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__classic.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "structured_evidence_incomplete_requires_fullcontext"
+        ]
+      },
+      "rationale": "'fake_fact_discount_9001' does not exist anywhere in pricebook/facts.json for the demo pack -- structurally cannot ever be closed by lexical retrieval -> immediate, honest fullcontext_fallback, never an invented fact."
+    },
+    {
+      "scenario_id": "s106_no_matching_fact",
+      "scenario_class": "no_matching_fact",
+      "synthetic_query": "Есть ли особая акция fake_promo_never_authored на all_on_4?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "all_on_4",
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "fake_promo_never_authored"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:implantation__service__all_on_4.md",
+            "topics": [
+              "implantation"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "structured_evidence_incomplete_requires_fullcontext"
+        ]
+      },
+      "rationale": "'fake_promo_never_authored' does not exist anywhere in pricebook/facts.json for the demo pack -- structurally cannot ever be closed by lexical retrieval -> immediate, honest fullcontext_fallback, never an invented fact."
+    },
+    {
+      "scenario_id": "s107_no_matching_fact",
+      "scenario_class": "no_matching_fact",
+      "synthetic_query": "Есть ли особая акция nonexistent_veneer_bonus на veneers?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "veneers",
+          "allowed_topics": [
+            "prosthetics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "nonexistent_veneer_bonus"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:prosthetics__service__veneers.md",
+            "topics": [
+              "prosthetics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "structured_evidence_incomplete_requires_fullcontext"
+        ]
+      },
+      "rationale": "'nonexistent_veneer_bonus' does not exist anywhere in pricebook/facts.json for the demo pack -- structurally cannot ever be closed by lexical retrieval -> immediate, honest fullcontext_fallback, never an invented fact."
+    },
+    {
+      "scenario_id": "s108_no_matching_fact",
+      "scenario_class": "no_matching_fact",
+      "synthetic_query": "Есть ли особая акция fake_whitening_deal_xyz на professional_whitening?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "professional_whitening",
+          "allowed_topics": [
+            "whitening"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "fake_whitening_deal_xyz"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:whitening__service__teeth_whitening.md",
+            "topics": [
+              "whitening"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "structured_evidence_incomplete_requires_fullcontext"
+        ]
+      },
+      "rationale": "'fake_whitening_deal_xyz' does not exist anywhere in pricebook/facts.json for the demo pack -- structurally cannot ever be closed by lexical retrieval -> immediate, honest fullcontext_fallback, never an invented fact."
+    },
+    {
+      "scenario_id": "s109_no_matching_fact",
+      "scenario_class": "no_matching_fact",
+      "synthetic_query": "Есть ли особая акция fake_aligner_fact_123 на aligners?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "aligners",
+          "allowed_topics": [
+            "orthodontics"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "fake_aligner_fact_123"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:orthodontics__service__aligners.md",
+            "topics": [
+              "orthodontics"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "structured_evidence_incomplete_requires_fullcontext"
+        ]
+      },
+      "rationale": "'fake_aligner_fact_123' does not exist anywhere in pricebook/facts.json for the demo pack -- structurally cannot ever be closed by lexical retrieval -> immediate, honest fullcontext_fallback, never an invented fact."
+    },
+    {
+      "scenario_id": "s110_no_matching_fact",
+      "scenario_class": "no_matching_fact",
+      "synthetic_query": "Есть ли особая акция fake_tomography_fact_abc на tomography?",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": "tomography",
+          "allowed_topics": [
+            "clinic"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [
+            "fake_tomography_fact_abc"
+          ],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [
+          {
+            "kind": "content",
+            "ref": "content:diagnostics__service__tomography.md",
+            "topics": [
+              "clinic"
+            ],
+            "fact_ids": []
+          }
+        ],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "structured_evidence_incomplete_requires_fullcontext"
+        ]
+      },
+      "rationale": "'fake_tomography_fact_abc' does not exist anywhere in pricebook/facts.json for the demo pack -- structurally cannot ever be closed by lexical retrieval -> immediate, honest fullcontext_fallback, never an invented fact."
+    },
+    {
+      "scenario_id": "s111_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "есть противопоказания при неконтролируемом диабете",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__info__contraindications.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 6 on implantation__info__contraindications.md -- a genuinely correct, on-topic match. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s112_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "диабет второго типа можно ли делать имплантацию зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__info__contraindications.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Verified: unique top score 8 on implantation__info__contraindications.md. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s113_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "есть противопоказания при неконтролируемом диабете",
+      "builder_input": {
+        "spec": {
+          "response_mode": "medical_handoff",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [
+            "diagnosis"
+          ],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__info__contraindications.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Same verified query under response_mode=medical_handoff -- the Builder does not special-case response_mode at all, only required_components/required_fact_ids/service_id, so the outcome is identical. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s114_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "диабет второго типа можно ли делать имплантацию зубов",
+      "builder_input": {
+        "spec": {
+          "response_mode": "medical_handoff",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [
+            "diagnosis"
+          ],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "insufficient_widened"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": [
+          "implantation__info__contraindications.md"
+        ],
+        "fallback_reason_options": null
+      },
+      "rationale": "Same verified query under response_mode=medical_handoff -- identical outcome, proving Builder mode-independence. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s115_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "можно ли ставить импланты при диабете",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: four distinct documents tie at score 6, none is contraindications.md -- honest fallback, not an invented differential. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s116_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "импланты и беременность можно ли делать",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: three distinct documents tie at score 8. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s117_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "принимаю антикоагулянты можно ли имплантацию",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: implantation__faq__duration.md and implantation__info__contraindications.md tie at score 6. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    },
+    {
+      "scenario_id": "s118_medically_risky_personal",
+      "scenario_class": "medically_risky_personal",
+      "synthetic_query": "у меня сахарный диабет подходит ли имплантация в моем случае",
+      "builder_input": {
+        "spec": {
+          "response_mode": "answer",
+          "service_id": null,
+          "allowed_topics": [
+            "implantation"
+          ],
+          "forbidden_topics": [],
+          "required_fact_ids": [],
+          "required_components": [
+            "content"
+          ]
+        },
+        "evidence_blocks": [],
+        "explicit_followup": false,
+        "session_derived_refs": [],
+        "comparison_required": false
+      },
+      "expected": {
+        "expect_exception": null,
+        "acceptable_completeness_status": [
+          "fullcontext_fallback"
+        ],
+        "required_md_refs": [],
+        "expected_offer_ids": [],
+        "expected_fact_ids": [],
+        "expected_doctor_ids": [],
+        "expected_policy_sections": [],
+        "expected_session_refs": [],
+        "lexical_target_options": null,
+        "fallback_reason_options": [
+          "lexical_ambiguous_top_match"
+        ]
+      },
+      "rationale": "Verified: two distinct documents tie at score 8. Personal medical eligibility remains Boundary/Verifier's job, unchanged by PERF-7C -- this scenario only tests whether the Builder's package selection is honest, never whether the (non-existent-here) Composer output is medically appropriate."
+    }
+  ]
+}

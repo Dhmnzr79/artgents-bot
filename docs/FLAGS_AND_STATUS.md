@@ -303,6 +303,17 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    PERF-6's own unchanged shadow hook — **no speedup exists yet from PERF-6, PERF-7A, or PERF-7B**.
    See TASK.md's PERF-7A/PERF-7B completion records. **NO CLIENT-PACK CHANGE. NO LIVE.** STOP
    before PERF-7C (offline package evaluation).
+   **PERF-7C offline package evaluation: PASS** (`PERF7C_OFFLINE_PACKAGE_EVAL_PASS`, owner GO):
+   118 synthetic scenarios across 18 classes run through the real, unmodified
+   `build_target_evidence_package` — zero critical false-narrow, zero session contamination, zero
+   structured-ID mismatch, zero Builder exceptions; 70.3% scoped / 28.0% fallback; median 98.1%
+   estimated token reduction on scoped packages. Found and fixed one matrix-authoring bug (wrong
+   doctor id format) before declaring PASS — no Builder code change was needed. See TASK.md's
+   PERF-7C completion record and
+   `docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md`. **NO CLIENT-PACK
+   CHANGE. NO LIVE/LLM/NETWORK. No speedup exists yet anywhere.** STOP before PERF-8 (Scoped
+   Composer behind a local flag) and before any counterfactual FullContext-vs-Scoped-Composer
+   evaluation.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

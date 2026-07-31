@@ -756,26 +756,33 @@ Deliverables: `docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOK
 
 ---
 
-## Active — FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6 (governance Phase 1, design only)
+## Active — FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6 (Phase 2 shadow implementation COMPLETE)
 
-**Baseline:** `codex/stage-a` @ `c0dfde6` · **NO PRODUCT IMPLEMENTATION / NO CLIENT-PACK CHANGE / NO LIVE**
+**Baseline:** `codex/stage-a` @ `c0dfde6` (governance) → Phase 2 implementation, owner GO.
+**NO CLIENT-PACK CHANGE / NO LIVE / NO REAL COMPOSER-VERIFIER SWITCH**
 
-Designs (does not implement) a multi-level `service_exact → topic → context_group → full` Scoped
-FullContext resolver and a shadow-only first integration: real Composer/Verifier keep receiving the
-full 107,980-char corpus unconditionally; a local candidate package would be computed in parallel
-and compared, after the real verified response, against what was actually needed — log-only, never
-gating, never a second LLM call. `context_groups.json` data model selected (explicit authored file)
-but not created — the demo pack has zero authored cross-service/comparison refs today, so
-`context_group` is honestly reported as structurally unreachable until that file exists.
-`field_meta.confidence` traced and found not calibration-worthy (only `topic` gets a real,
-uncalibrated planner number; every other axis is a hardcoded constant) — level rules use only
-categorical `status`. Estimated demo-pack package sizes: `service_exact` ~92–98% smaller than full,
-`topic` 50–98% smaller depending on topic size.
+A multi-level `service_exact → topic → context_group → full` Scoped FullContext resolver
+(`core/target_context_scope_resolver.py`) plus a shadow-only comparison
+(`core/target_context_scope_shadow.py`) are now wired, additively, into
+`core/target_policy_bound_verified_response_pipeline.py` — real Composer/Verifier keep receiving
+the full 107,980-char corpus unconditionally on every turn (proven by test: unchanged call counts,
+invocation content, and output); a local candidate is resolved once and compared, after the real
+verified response, against the post-validation source identity — log-only, never gating, zero
+additional LLM calls. `context_groups.json` still does not exist anywhere (structurally
+unreachable on the real demo pack; proven only via a synthetic in-memory fixture). Real demo-pack
+decisions: `service_exact` 94.9–98.4% smaller than the full corpus, `topic` 46.4–97.7% smaller
+depending on topic size.
 
-Deliverables: `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`,
-`TASK.md`, PRE-CODE `tests/test_final_multi_level_scoped_context_shadow_governance.py`.
+Deliverables: `contracts/target_context_scope_decision.py`,
+`core/target_context_scope_resolver.py`, `core/target_context_scope_shadow.py`, the additive hook
+in `core/target_policy_bound_verified_response_pipeline.py` (documented deviation from the
+Phase 1 sketch — the originally-targeted file has a protected straight-line contract), four new
+test files (88 tests), `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`,
+TASK.md's PERF-6 Phase 2 completion record.
 
-**Phase 1 design only** — STOP before any Phase 2 shadow implementation.
+**No speedup exists yet** — this is measurement only. STOP before authored `context_groups.json`
+and before any real Composer/Verifier switch onto a scoped corpus (both separate, later, owner-
+gated milestones).
 
 ---
 

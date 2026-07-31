@@ -251,14 +251,22 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    architecture fact, not a client-pack defect. See
    `docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md`. **NO CLIENT/PRODUCT
    CHANGE.** Phase 2 cleanup/tooling not started; STOP until owner GO.
-8. **FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6 (governance @ `c0dfde6`, design only):**
-   multi-level `service_exact → topic → context_group → full` Scoped FullContext resolver design +
-   shadow-only (measurement, never gating) integration plan. `context_groups.json` data model
-   selected (Option A, explicit authored file) but **not created**. `field_meta.confidence` traced
-   and found not calibration-worthy — level rules use only categorical `status`, never a numeric
-   threshold. Real Composer/Verifier keep receiving the full corpus unconditionally; nothing is
-   implemented. See `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`.
-   **NO PRODUCT/CLIENT-PACK CHANGE.** STOP until owner GO on Phase 2.
+8. **FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW / PERF-6:** governance (design) @ `c0dfde6` →
+   **Phase 2 shadow implementation COMPLETE**, owner GO. `contracts/target_context_scope_decision.py`
+   + `core/target_context_scope_resolver.py` (`service_exact → topic → context_group → full`,
+   fail-closed to `full` on any exception) + `core/target_context_scope_shadow.py`
+   (post-verification comparison against the post-validation source identity, log-only). Hook wired
+   into `core/target_policy_bound_verified_response_pipeline.py` (moved one level up from the
+   Phase-1 sketch — the originally-targeted file is protected by an S39 "exact straight-line" AST
+   test; documented deviation in TASK.md). Real demo decisions: `service_exact` 94.9–98.4% smaller
+   than the 26,995-token full corpus, `topic` 46.4–97.7% smaller depending on topic size,
+   synthetic `context_group` fixture proven at 86.2% smaller (structurally unreachable on the real
+   demo pack — no `context_groups.json`). Real Composer/Verifier **still receive the full corpus
+   unconditionally on every turn — no speedup yet**, proven by test (call counts, invocation
+   content, output all unchanged; `clients/demo/**` untouched, SHA-256 verified). See
+   `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md` and TASK.md's
+   PERF-6 Phase 2 completion record. **NO CLIENT-PACK CHANGE. NO LIVE.** STOP before authored
+   `context_groups.json` and before any real Composer/Verifier switch.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

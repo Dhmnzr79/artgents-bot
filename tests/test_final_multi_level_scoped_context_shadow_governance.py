@@ -275,11 +275,21 @@ def test_forbidden_actions_documented() -> None:
 # --------------------------------------------------------------------------------------------
 
 
-def test_no_phase2_product_files_exist_yet() -> None:
+def test_phase2_resolver_shadow_contract_files_now_exist_context_groups_still_does_not() -> None:
+    """Updated after owner GO on Phase 2 implementation (see TASK.md's PERF-6 Phase 2 completion
+    record). This Phase 1 design commit's own text above is left as written -- a historical
+    statement of what was true at that commit -- but this *live* filesystem check must track
+    current reality: the three approved resolver/shadow/contract files now exist, while
+    `context_groups.json` remains a separate, still-unauthorized, later milestone (§3 of the seam
+    audit) and must still not exist anywhere."""
+
     for relative in (
         "contracts/target_context_scope_decision.py",
         "core/target_context_scope_resolver.py",
         "core/target_context_scope_shadow.py",
+    ):
+        assert (_REPO_ROOT / relative).is_file(), relative
+    for relative in (
         "clients/demo/target_response/context_groups.json",
         "clients/_template/target_response/context_groups.json",
     ):

@@ -8513,3 +8513,168 @@ is authorized by this document** — that would be a third, still-later mileston
 shadow measurement (once implemented and run) actually proving high `shadow_hit` rates.
 
 ---
+
+## Completion record (PERF-6 Phase 2 implementation, owner GO)
+
+**Status:** implementation COMPLETE. **Real Composer/Verifier still receive the full cached
+FullContext corpus, unconditionally, on every turn — no speedup exists yet.** This milestone adds
+measurement only; a real switch remains a separate, later, still-unauthorized milestone gated on
+what this shadow data shows over time.
+
+### Allowlist delivered
+
+- `contracts/target_context_scope_decision.py` — `TargetContextScopeDecision` exactly as
+  specified in the Phase 1 design (§4): `level`, `reason`, `service_id`, `topic`,
+  `context_group_id`, `included_content_refs/offer_ids/fact_ids/doctor_ids/policy_sections`,
+  `estimated_chars`, `estimated_tokens`, `package_fingerprint`, `completeness_status`,
+  `widening_reason`. Frozen, `extra="forbid"`, strict; cross-field invariants enforce level↔identity
+  consistency (`service_exact` requires `service_id`, `full` forbids any narrower identity,
+  `complete` forbids a `widening_reason` and vice versa, `estimated_tokens == estimated_chars // 4`).
+  No document text, question, answer, SID, or contact value anywhere in the contract.
+- `core/target_context_scope_resolver.py` — `resolve_target_context_scope`, the single canonical
+  resolver. `service_exact` reads `TargetComposerRequest.evidence_blocks` directly (no new closure
+  logic). `topic` reads MD frontmatter `topic:` via the client's taxonomy
+  (`core/topic_taxonomy.py`) plus services/offers/facts/doctors whose own content falls in that
+  topic — including doctors whose own profile MD topic matches directly (fixes a real gap found
+  during implementation: doctor profile docs aren't tied to any `service.content_ref`, so a
+  service-only match missed doctors for e.g. the `doctors` topic; corrected before shipping).
+  `context_group` is fully generic and driven by an optional, in-memory
+  `TargetContextGroupCatalog`/`TargetContextGroup` — always `None` on the real call site (no
+  `context_groups.json` exists). Any exception anywhere in resolution is caught and converted to a
+  safe `full` decision.
+- `core/target_context_scope_shadow.py` — `compare_target_context_scope_shadow` (post-verification,
+  using the **post-validation** `TargetVerifiedComposedResponse.primary_content_ref`/
+  `used_content_refs`, never Composer's raw claim), `emit_target_context_scope_shadow_event`,
+  `emit_target_context_scope_shadow_blocked_event` (Verifier-blocked path), both best-effort/never-
+  raising. `SHADOW_TIMING_MARK = "scoped_context_shadow_ms"`, distinct from `resolver.py`'s legacy
+  `resolver_ms` mark, recorded via the existing `core/turn_timing.py::record_ms` (safe outside a
+  request context too).
+
+### Hook point and local-decision lifecycle (documented deviation)
+
+**Deviation from the Phase 1 sketch, discovered and resolved during implementation:** the seam
+audit assumed the hook would sit inside `core/target_verified_response_pipeline.py`
+(`run_target_offline_verified_response_pipeline`). That function is protected by an existing S39
+AST contract test (`tests/test_target_verified_response_pipeline.py::
+test_public_signature_and_function_is_exact_straight_line`) asserting **zero control flow**
+(no `If`/`Try`/`Raise`/`For`/`While`) — adding the shadow try/except there would have broken a
+pre-existing, unrelated architectural invariant. Per the owner's explicit permission ("если
+additive hook требует изменить непосредственный policy-bound pipeline файл, это минимальное
+отклонение разрешено"), the hook was moved one level up to
+**`core/target_policy_bound_verified_response_pipeline.py::
+run_target_offline_policy_bound_verified_response_pipeline_with_selection`** — the actual
+"policy-bound pipeline" file the brief named, which carries no such straight-line contract (only
+its sibling `run_target_offline_policy_bound_verified_response_pipeline` is protected, and that
+function is untouched).
+
+Lifecycle, exactly as specified:
+
+1. After `bound_package` is assembled (before the real `run_target_offline_verified_response_
+   pipeline` call), `_resolve_shadow_decision_safely` re-materializes a `TargetComposerRequest`
+   purely to read its `evidence_blocks` (pure/offline, no provider call — the real request used for
+   the actual Composer/Verifier call is materialized again, identically, inside the unmodified
+   pipeline function; this is a deliberate, safe redundancy, not a shared object) and calls
+   `resolve_target_context_scope` exactly once. The result is held **only in the local variable
+   `shadow`** — never a `ContextVar`, global, or session value (statically verified,
+   `tests/test_final_multi_level_scoped_context_shadow_implementation.py::
+   test_52_no_contextvar_global_or_session_state_introduced`).
+2. The real `run_target_offline_verified_response_pipeline(...)` call is **byte-for-byte
+   unchanged** — same positional/keyword arguments, same order, wrapped in a `try/except` added at
+   this (unprotected) call site only.
+3. On success: `compare_target_context_scope_shadow` + `emit_target_context_scope_shadow_event`,
+   both wrapped in their own best-effort `try/except` so a shadow failure can never surface.
+4. On the real Verifier raising (`TargetResponseVerificationError` or any exception):
+   `emit_target_context_scope_shadow_blocked_event` runs (best-effort), then the **exact same
+   exception is re-raised via a bare `raise`** — never touched, renamed, or replaced.
+5. `verified = project_verified_primary_content_cta(...)` and the return value are unchanged.
+
+### Selection / widening matrix (real demo-pack decisions, real numbers)
+
+Full corpus baseline: **107,980 chars / 26,995 tokens**.
+
+| Case | Level | Tokens | Reduction | Status |
+|---|---|---:|---:|---|
+| `service_exact`: `classic` (content) | service_exact | 484 | 26,511 (98.2%) | complete |
+| `service_exact`: `all_on_4` (content+price+doctors) | service_exact | 1,372 | 25,623 (94.9%) | complete |
+| `service_exact`: `bone_graft` | service_exact | 752 | 26,243 (97.2%) | complete |
+| `service_exact`: `tomography` (topic `clinic`) | service_exact | 428 | 26,567 (98.4%) | complete |
+| `topic`: `implantation` (28/55 docs, dominant topic) | topic | 14,470 | 12,525 (46.4%) | complete |
+| `topic`: `prosthetics` | topic | 3,891 | 23,104 (85.6%) | complete |
+| `topic`: `whitening` | topic | 617 | 26,378 (97.7%) | complete |
+| `topic`: `clinic` | topic | 2,037 | 24,958 (92.5%) | complete |
+| `topic`: `doctors` | topic | 1,684 | 25,311 (93.8%) | complete |
+| synthetic `context_group` `clinic_trust` (`clinic`+`doctors`, doctors required, real `clinic`-topic-alone gap) | context_group | 3,721 | 23,274 (86.2%) | insufficient_widened |
+| no service/topic signal | full | 26,995 | 0 (0%) | full_required |
+
+`context_group` is confirmed **structurally unreachable on the real demo pack** (`context_groups`
+param is always `None` at the real call site) — the row above is the synthetic-fixture proof
+required by the brief, not a real-turn observation.
+
+### Shadow-hit/miss semantics (implemented exactly as specified)
+
+`shadow_hit` requires: every validated `used_content_ref` (post-`validate_used_content_refs`,
+never Composer's raw claim) inside `included_content_refs`; `primary_content_ref` inside
+`included_content_refs`; `required_fact_ids ⊆ included_fact_ids`; `price`/`doctors` required
+components backed by non-empty `included_offer_ids`/`included_doctor_ids`. `full` is always a
+trivial hit (superset by construction). `shadow_would_widen` (`completeness_status != "complete"`)
+is a **separate** field from the post-hoc `shadow_miss` — one predicts before the real answer
+exists, the other measures after. An invented/nonexistent ref in Composer's raw JSON can never
+inflate a hit — the comparison only ever reads the post-validation identity, and the real Verifier
+already silently drops invented refs before that identity is populated
+(`tests/test_target_context_scope_shadow.py::test_28_invented_ref_never_expands_candidate`).
+
+### Call-count / output parity (proven, not assumed)
+
+`tests/test_final_multi_level_scoped_context_shadow_implementation.py`, real demo pack, fake
+Composer/Verifier backends: exactly 1 Composer call, exactly 1 Verifier call, both invocations
+still carry the **full, unscoped** `cached_full_context` (§ shadow does not touch them), output
+text/spec/`selected_cta_key`/`selected_followups`/`primary_content_ref` all match the pre-PERF-6
+baseline exactly, a Verifier semantic rejection raises the exact same
+`target_verifier_semantic_rejected` `TargetResponseVerificationError` with the same call counts (no
+retry, no widened re-call), and a full pipeline run leaves every file under `clients/demo/**`
+byte-identical (SHA-256 checked).
+
+### Test results
+
+- `tests/test_final_multi_level_scoped_context_shadow_governance.py` — 20/20 (one test updated to
+  reflect Phase 2 completion: `test_phase2_resolver_shadow_contract_files_now_exist_context_groups_
+  still_does_not`, replacing the Phase-1-only "does not exist yet" check; `context_groups.json`
+  non-existence assertion unchanged).
+- `tests/test_target_context_scope_decision.py` — 14/14.
+- `tests/test_target_context_scope_resolver.py` — 34/34.
+- `tests/test_target_context_scope_shadow.py` — 10/10.
+- `tests/test_final_multi_level_scoped_context_shadow_implementation.py` — 10/10.
+- `tests/test_final_client_pack_content_dedup_and_token_audit_governance.py` — 23/23.
+- PERF-0..5 governance neighbours (6 files) — 136/136.
+- FullContext/cache/source-identity/composer/verifier (5 files) — 93/93.
+- Policy-bound + verified-response pipeline + real-demo pipeline (3 files) — 21/22; the one failure
+  (`test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity`) is **pre-existing**,
+  confirmed identical against the true baseline file (calls the real, un-monkeypatched
+  `project_verified_primary_content_cta` with a bare `object()` sentinel — breaks with or without
+  this milestone's changes) — unrelated to PERF-6.
+- Presentation/CTA/buttons/widget-followup — 150/151 (1 pre-existing skip).
+- Generic-FullContext/price/facts/doctors/consultation sweep — 925/940; the 15 failures are all
+  **pre-existing**, confirmed present in `docs/evidence/testing/final_test_failure_inventory.json`
+  (the frozen TSC baseline @ `1980ab7`) — not fixed, per the brief's explicit "не исправляй
+  TSC-C/D".
+- `scripts/validate_client_pack.py` — OK for `demo` and `_template`.
+- `git diff --check` — clean.
+- `pytest tests/ --collect-only` — 3,746 tests collected, zero collection errors.
+- Centralized pytest provider guard — unchanged, active throughout (no test in this milestone
+  touches it or makes a real provider call).
+
+### Forbidden actions — confirmed not taken
+
+No `clients/demo/**` change (SHA-256 verified). No `context_groups.json` created anywhere. No real
+switch of Composer/Verifier onto a scoped corpus — both invocations still carry the full corpus,
+proven by test. No Verifier context change. No second LLM call anywhere in the shadow path
+(`materialize_target_composer_request` and `resolve_target_context_scope` are both pure/offline).
+No iterative Composer widening. No RAG/vector/embeddings. No raw-text/regex routing. No hardcoded
+service/topic graph (`context_group` is fully data-driven). No caching implementation (`§10`'s
+fingerprint is identity-design only, nothing is cached). No token streaming, prompt/model/policy
+change. No LIVE/provider/network/server/widget touched.
+
+**STOP before authored `context_groups.json` and before any switch of Composer/Verifier onto a
+scoped corpus** — both remain separate, later, owner-gated milestones.
+
+---

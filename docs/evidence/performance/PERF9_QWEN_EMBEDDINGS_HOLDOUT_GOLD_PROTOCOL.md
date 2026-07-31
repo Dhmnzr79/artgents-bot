@@ -2,10 +2,14 @@
 
 ## Status
 
-`HOLDOUT_GOLD_FROZEN_PENDING_COMMIT`. This checkpoint creates and validates the
-questions and human-authored gold only. No lexical, BM25, embedding, hybrid,
-reranking, LLM, provider, network, or runtime execution is allowed against these
-60 questions before the freeze commit exists.
+`HOLDOUT_GOLD_FROZEN_PROVIDER_ACCESS_BLOCKED`. The questions and human-authored
+gold were frozen at `27c8340` before evaluator implementation or retrieval. Two
+development-only provider attempts stopped at their first call with HTTP 403;
+the compatible API returned safe code `access_denied`. The holdout remains
+unopened by any retrieval candidate and no embeddings exist yet.
+
+Before the freeze commit, no lexical, BM25, embedding, hybrid, reranking, LLM,
+provider, network, or runtime execution was performed against these questions.
 
 ## Model policy
 
@@ -42,9 +46,11 @@ OpenAI, Cohere, Voyage, Gemini, and Jina are not candidates.
 
 ## Next gate
 
-Provider/network calls remain zero at this checkpoint. Calling Alibaba
-DashScope/Qwen, downloading any model, or generating embeddings requires a
-separate explicit owner LIVE/network GO after this gold freeze is committed.
-That later run must pin the model name, dimension, endpoint region, input hashes,
-output hashes, token usage, duration, and cost without storing contacts, SID,
-questions, answers, or other PII in provider-call audit logs.
+The owner issued a development-only LIVE/network GO after the freeze. Two calls
+were attempted under separate consumed attempt IDs and both returned HTTP 403
+before embeddings were generated. No retrieval or provider execution against
+the 60 holdout queries has occurred. A later run requires corrected Alibaba
+workspace/model permission plus a new explicit LIVE GO and attempt ID. It must
+pin model name, dimension, endpoint region, input hashes, output hashes, token
+usage, duration, and cost without storing contacts, SID, questions, answers, or
+other PII in provider-call audit logs.

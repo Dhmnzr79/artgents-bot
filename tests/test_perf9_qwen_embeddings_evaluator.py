@@ -114,6 +114,10 @@ def test_live_requires_exact_committed_attempt_before_marker(tmp_path: Path, mon
     assert not (tmp_path / "ledger").exists()
 
 
+def test_live_gate_is_closed_after_provider_denial() -> None:
+    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID is None
+
+
 def test_attempt_id_is_consumed_with_exclusive_creation(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(perf9, "LEDGER_ROOT", tmp_path)
     perf9._create_attempt_marker("one", "dev", "hash")

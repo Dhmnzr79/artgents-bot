@@ -1305,6 +1305,15 @@ Frozen matrix/harness v2 подготовлены и независимо про
 schema design создан отдельный governance TASK `dbf2c46`; runtime и client data заранее
 не меняются.
 
+## PERF-9 — Qwen embeddings blind holdout
+
+- [x] 60-question blind holdout and independent gold frozen before evaluator/retrieval (`27c8340`).
+- [x] Qwen-only gated evaluator implemented; runtime remains unchanged.
+- [x] Two development attempts audited and consumed: 2 attempted calls, 0 embedding responses.
+- [ ] Grant Alibaba `text-embedding-v4` model access to the current Singapore workspace/API key.
+- [ ] New explicit LIVE GO: development calibration, commit candidate thresholds, then one blind
+  holdout run. Scoped Composer remains blocked until that result passes independently.
+
 ## Как поддерживать чекбоксы
 
 1. Новый checkbox сначала добавляется в governance `TASK.md`.

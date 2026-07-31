@@ -9727,3 +9727,33 @@ owner GO; provider/network use, if chosen, requires an additional explicit LIVE 
 **STOP before embeddings evaluation and before any runtime retrieval implementation.**
 
 ---
+
+## Completion record — PERF-9 Qwen embeddings holdout foundation and blocked provider attempts
+
+**Owner model policy:** all model inference must be Chinese. Retrieval embeddings are restricted to
+Alibaba Qwen `text-embedding-v4`; OpenAI compatibility is transport syntax only. No Western
+embedding model is authorised.
+
+- Holdout/query gold freeze: `27c8340` — 60 synthetic questions, separate query/gold files, frozen
+  before evaluator implementation or retrieval execution.
+- Pre-live evaluator: `66167b4`; native-denial correction/evidence: `6a1cd62`.
+- Attempt `perf9-qwen-dev-2026-08-01-01`: native DashScope HTTP 403 on call 1; stopped, consumed.
+- Attempt `perf9-qwen-dev-compat-2026-08-01-02`: compatible DashScope `access_denied` on call 1;
+  stopped, consumed.
+- Aggregate: 2 provider calls attempted, 0 embedding responses, 0 observed provider input tokens,
+  0 holdout retrieval runs. The holdout remains blind.
+- LIVE gate returned to `None`; runtime/client pack/Composer/Verifier are unchanged and no speedup
+  exists from this work yet.
+
+**Blocking external action:** grant standard model `text-embedding-v4` to the current Singapore
+workspace/API key, or provide a default-workspace key with API-key permission `All`. Then issue a
+new explicit LIVE GO and new attempt ID. Development calibration must complete and its candidate
+thresholds must be committed before the holdout query file is opened by the retriever.
+
+Evidence:
+`docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_PROVIDER_ATTEMPT_AUDIT.md` and
+`docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_HOLDOUT_GOLD_PROTOCOL.md`.
+
+**STOP — provider access blocked; no third attempt and no alternate model.**
+
+---

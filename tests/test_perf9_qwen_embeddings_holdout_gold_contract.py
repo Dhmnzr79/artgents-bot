@@ -138,7 +138,7 @@ def test_model_policy_is_qwen_only_and_openai_compatibility_is_transport_only() 
 def test_protocol_freezes_gold_before_any_retrieval_or_provider_run() -> None:
     text = PROTOCOL_PATH.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
-    assert "No lexical, BM25, embedding, hybrid" in text
+    assert "Before the freeze commit, no lexical, BM25, embedding, hybrid" in normalized
     assert "must be committed before the evaluator imports or reads the query file" in normalized
-    assert "Provider/network calls remain zero" in text
-    assert "separate explicit owner LIVE/network GO" in text
+    assert "No retrieval or provider execution against the 60 holdout queries has occurred" in normalized
+    assert "requires corrected Alibaba workspace/model permission" in normalized

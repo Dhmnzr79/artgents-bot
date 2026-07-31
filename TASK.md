@@ -8875,3 +8875,201 @@ that is PERF-8, contingent on PERF-7C's own offline measurement actually proving
 quality.
 
 ---
+
+## Completion record (PERF-7A implementation, owner GO)
+
+**Status:** implementation COMPLETE. **Not wired to any runtime path.** No `app.py`, Composer,
+Verifier, pipeline, or `TurnFrame` code imports this module — confirmed by a live `git grep`-based
+test, not assumed. PERF-7B (`EvidencePackageBuilder`) and PERF-7C (offline package eval) remain
+separate, still-unauthorized, later milestones.
+
+### Delivered (exact allowlist)
+
+- `core/target_lexical_paragraph_index.py` — the one new module.
+- `tests/test_final_local_lexical_paragraph_index_implementation.py` — 52 new tests.
+- `tests/test_final_local_evidence_package_builder_foundation_governance.py` — one test function
+  replaced (`test_no_future_implementation_artifacts_exist` →
+  `test_perf7a_complete_perf7b_perf7c_not_started`), asserting live filesystem state: PERF-7A
+  artifacts now exist, PERF-7B/PERF-7C artifacts still do not, `context_groups.json` still does not
+  exist anywhere — mirrors the exact precedent PERF-6's own governance checker set for itself. No
+  other test in that file weakened.
+- This TASK.md completion record.
+- `docs/FLAGS_AND_STATUS.md`/`docs/STRANGLER_ROADMAP.md` — not changed in this commit: nothing in
+  either file made a claim this implementation contradicts (both already correctly describe PERF-7
+  as "nothing implemented yet" only in the *governance* framing, which this record now supersedes
+  narrowly for PERF-7A; a fuller status-line update is deferred to avoid rewriting the Phase 1
+  governance entry's own history mid-sentence — flagged here rather than silently skipped).
+
+### Public API (exact)
+
+```python
+# core/target_lexical_paragraph_index.py
+class TargetLexicalParagraph:      # frozen dataclass: paragraph_id, document_path,
+                                     # document_identity, heading, topic, document_type,
+                                     # normalized_searchable_text, content_hash, text
+class TargetLexicalParagraphIndex: # frozen dataclass: paragraphs, document_count,
+                                     # paragraph_count, fingerprint
+class TargetLexicalSearchHit:      # frozen dataclass: paragraph, score, exact_token_matches,
+                                     # prefix_token_matches
+class TargetLexicalParagraphIndexError(ValueError):  # typed fail-closed error, .code/.value
+
+def build_target_lexical_paragraph_index(md_root: Path) -> TargetLexicalParagraphIndex: ...
+def search_target_lexical_paragraph_index(
+    index: TargetLexicalParagraphIndex, query: str, *, limit: int = 10,
+) -> tuple[TargetLexicalSearchHit, ...]: ...
+```
+
+One canonical builder, one canonical search function — no parallel per-service/topic/group index,
+matching the PERF-5/PERF-6 single-producer precedent.
+
+### Automatic add/change/delete rules (implemented and tested)
+
+- Recursive `md_root.rglob("*.md")`, canonical relative-POSIX-path sort order — no manual document
+  list anywhere.
+- A new `*.md` under `md_root` is included automatically on the *next* `build_target_lexical_
+  paragraph_index(md_root)` call — no filesystem watcher, no hot reload, exactly as scoped ("для
+  PERF-7A достаточно пересборки при... явной загрузке").
+- `fingerprint = sha256("|".join(sorted(f"{relative_path}:{sha256(raw_file_text)}" for every
+  discovered doc)))` — changes on add (new entry), change (that doc's hash entry changes), and
+  delete (its entry disappears). Proven by three dedicated `tmp_path` tests, never by assertion on
+  `clients/demo/**`.
+- **No persistent cache added.** Per the brief's own explicit permission to skip a cache helper
+  when it "complicates the stage without real benefit": no real caller exists yet for either
+  function (module is unwired), so a `get_or_build_...` helper and any global cache would be
+  complexity added for the word "cache" alone. Recorded, not silently dropped: a future PERF-7B
+  loader is expected to hold one already-built `TargetLexicalParagraphIndex` in its own
+  instance/session state and design its own rebuild-on-fingerprint-change policy once a real
+  caller and its concurrency shape actually exist to design against.
+
+### MD parsing (implemented and tested)
+
+Frontmatter parsed via `frontmatter.loads()` (the already-used `python-frontmatter` dependency,
+same as `core/topic_taxonomy.py`/`core/target_context_scope_resolver.py` — no new dependency).
+`doc_id`/`doc_type`/`topic` extracted when present, `None` when absent (never an error — tested).
+H2/H3 headings are section boundaries; H1/H4+ are not (tested); a heading marker inside an open
+fenced code block is never treated as a boundary (tested, fence-tracking checked before
+heading/list/blank classification). Paragraph vs. list-run vs. fence blocks split on blank lines /
+list-item-marker transitions / fence open-close, never on a fixed character length, never with
+sliding-window/overlap chunking. The 40-char minimum-unit rule (same constant the client-pack dedup
+audit's own near-duplicate detector already uses) is one deterministic algorithm, tested three ways:
+forward-merge into the next block, backward-merge for a still-short trailing block, and whole-section
+keep for a lone short block — no block's content is ever silently dropped.
+
+**Reuse decision (per the required critical review):** `core/target_composer_request.py`'s
+frontmatter/heading/fence regexes were read and evaluated before writing this module. Not imported:
+every relevant name there is module-private (`_FRONTMATTER`/`_EXPLICIT_HEADING`/`_HEADING`/`_FENCE`/
+`_section`), `_section` only extracts one named anchor section rather than walking a whole document,
+and its error semantics are tied to the Composer-request exact-ref-format contract, not to a
+tolerant, best-effort corpus-wide indexer. Importing those private names would have coupled this new,
+unwired, foundational module to an unrelated module's internal contract for no real benefit — the
+H2/H3-boundary and fence-tracking *rules* are reused conceptually (restated as this module's own
+small, self-contained regexes), the code is not. No import cycle exists either direction (tested:
+`core/target_composer_request.py`'s own source does not reference this module at all).
+
+### Paragraph ID / provenance
+
+`paragraph_id = f"{relative_posix_document_path}#p{ordinal:03d}"` — deterministic, unique within an
+index (tested), contains no absolute filesystem path (tested: `str(tmp_path)` never appears in any
+generated ID) and no raw paragraph text, and always resolves unambiguously back to its
+`document_path` (tested). `content_hash` is the sha256 of the paragraph's own raw (pre-normalization)
+text.
+
+### Lexical search (Option A, implemented and tested)
+
+Pure in-memory Python: NFKC normalize → ё/Ё → е/Е → casefold → `[a-zа-я0-9]+` tokenize (Cyrillic +
+Latin + digits), identical function used for both indexing and query time. Exact token match scores
+2, prefix match (paragraph token starting with a query token of ≥4 chars, to avoid over-matching)
+scores 1; `TargetLexicalSearchHit` exposes `score`/`exact_token_matches`/`prefix_token_matches`
+explicitly (never one opaque number) so a test can prove *why* one hit outranks another. Deterministic
+tie-break on equal score: ascending `paragraph_id` (never an unordered `set`/dict iteration — the
+exact PERF-6 debt item 5 mistake this milestone's own seam audit flagged is deliberately not
+repeated here). `limit`/query are validated (empty/whitespace query, non-string query, non-positive
+or non-int `limit` all raise `TargetLexicalParagraphIndexError` — never a silent empty result, never
+network/LLM); a well-formed query that simply tokenizes to nothing (e.g. pure punctuation) returns
+`()`, which is not an error. No aliases/synonym dictionary, no hand-built regex phrase lists, no
+manufactured semantic confidence — confirmed by a source-level test (module text contains no
+`alias`/`synonym`/`словар` token at all).
+
+### Demo corpus — real numbers (read-only; `clients/demo/**` untouched)
+
+- `document_count = 55`, `paragraph_count = 348`.
+- `fingerprint = 1adb0683331a475788f0cc971d604ef9c93ca25dfd612b6bd8a92fa787be3e15`.
+- Offline build timing (this machine, cold call, no warmup): **~30 ms** for the full 55-document
+  corpus. A single `search_target_lexical_paragraph_index` call against the built 348-paragraph
+  index: **~2 ms**. Both timings are illustrative (single local run, no benchmarking harness), not a
+  performance SLA.
+
+### Honest Russian-language lexical miss inventory
+
+Covered (tested, synthetic fixtures): exact match; case-insensitivity; ё/е normalization in both
+query directions; punctuation stripping; mixed Cyrillic/Latin queries; prefix/common-root recovery
+when the query is a genuine prefix of the indexed word (e.g. `стерилизаци` → `стерилизационное`).
+
+Not covered, confirmed honest misses (never patched around):
+
+1. **Short query tokens (<4 chars) never prefix-match** — by design, to avoid over-matching (e.g.
+   `зуб` does not match `зубов`). A future Builder must accept this as a real recall gap, not a bug.
+2. **Fully paraphrased questions sharing zero lexical tokens with the source** never match — exactly
+   the case a future `EvidencePackageBuilder` must resolve via FullContext fallback (seam audit §11),
+   never via this index alone.
+3. **A full inflected query word that diverges from the indexed word before the shared root ends**
+   does not match, even when a human would consider them obviously related — found on the *real*
+   demo corpus, not invented: querying `стерилизация` (nominative) returns zero hits against
+   `implantation__faq__safety.md`'s `стерилизационное` (a different derived adjective, not a simple
+   suffix extension of the query — they diverge at position 11, "стерилизаци**я**" vs
+   "стерилизаци**онное**"), while the shorter root query `стерилизаци` (prefix of both) does match.
+   This is the single most concrete evidence this milestone produced that stock prefix-only matching
+   is not a substitute for real morphological analysis — recorded exactly as instructed, not
+   smoothed over, and explicitly named as a candidate reason a future embeddings milestone might
+   eventually be justified (not decided or scheduled here).
+
+None of the above are treated as this module's defects — a miss is the expected, designed-for
+signal a future Builder uses to prefer FullContext fallback over a possibly-incomplete narrow
+package (seam audit §11), never a silent wrong answer.
+
+### Test results
+
+- `tests/test_final_local_lexical_paragraph_index_implementation.py` — **52 passed**.
+- `tests/test_final_local_evidence_package_builder_foundation_governance.py` — **26 passed**
+  (updated for PERF-7A COMPLETE / PERF-7B NOT STARTED / PERF-7C NOT STARTED).
+- `tests/test_final_multi_level_scoped_context_shadow_implementation.py`,
+  `tests/test_target_composer_request.py`, `tests/test_target_cached_full_context.py` — **112
+  passed** (PERF-6/S36/S44 neighbors, all pre-existing, all unaffected by this unwired addition).
+- `scripts/validate_client_pack.py --client-id demo` — OK.
+- `scripts/validate_client_pack.py --path clients/_template --scaffold` — OK.
+- `pytest tests/ --collect-only` — 3,824 tests collected (was 3,772 at the PERF-7 Phase 1 baseline;
+  +52, all from the new implementation test file; zero collection errors).
+- `git diff --check` — clean.
+- `clients/**` byte-identical since `1d5bda6` (confirmed by scoped `git diff --name-only`, zero
+  changed paths).
+- No `config.py`/`app.py`/Composer/Verifier/pipeline/`contracts/turn_frame.py` file touched
+  (confirmed by scoped `git diff --name-only` against the same forbidden-path set).
+- No new third-party dependency: the module's only non-stdlib import is `frontmatter`, already used
+  elsewhere in this repository (confirmed by an AST-based test).
+- Zero LLM/provider/network calls anywhere in this milestone's code or tests (the module has no
+  logging import either, confirmed by an AST-based test — queries and raw hit text are structurally
+  impossible to log from inside this module).
+
+### Deviations from the allowlist
+
+None. Exactly the four allowed files were touched: `core/target_lexical_paragraph_index.py`
+(create), `tests/test_final_local_lexical_paragraph_index_implementation.py` (create),
+`tests/test_final_local_evidence_package_builder_foundation_governance.py` (update, one function),
+`TASK.md` (this record). `docs/FLAGS_AND_STATUS.md`/`docs/STRANGLER_ROADMAP.md` were evaluated and
+deliberately left unchanged (see "Delivered" above) rather than touched speculatively.
+
+### Confirmations
+
+- **NO RUNTIME WIRING** — confirmed by a live `git grep`-based test restricted to real Python
+  `import`/`from ... import` statements (not prose mentions): the only files importing this module
+  are itself and its own test file.
+- **NO CLIENT-PACK CHANGE** — `clients/**` byte-identical since `1d5bda6`, confirmed by scoped
+  `git diff`.
+- **NO LIVE / NO LLM / NO NETWORK** — the module makes zero network/provider calls; all 52
+  implementation tests run against `tmp_path` synthetic fixtures or the local, already-committed
+  `clients/demo/md` tree, entirely offline.
+
+**STOP before PERF-7B (`EvidencePackageBuilder`).** This owner GO authorized PERF-7A implementation
+and commit/push only.
+
+---

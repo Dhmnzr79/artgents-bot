@@ -267,6 +267,29 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    `docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md` and TASK.md's
    PERF-6 Phase 2 completion record. **NO CLIENT-PACK CHANGE. NO LIVE.** STOP before authored
    `context_groups.json` and before any real Composer/Verifier switch.
+9. **FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION / PERF-7 (governance + seam audit @ `2d0769c`,
+   read-only):** owner directs a simpler target shape than PERF-6's ladder — one
+   `EvidencePackageBuilder` over independent sources (existing `evidence_blocks`, exact content
+   refs, structured offers/facts/doctors/contacts, session projection, lexical MD retrieval,
+   FullContext fallback), not a deeper `service_exact/topic/context_group/full` ladder;
+   `context_groups.json` still not created. Critically re-audited PERF-6's own shipped debt: 5 of 7
+   named items **PROVEN** real gaps (false-positive `shadow_hit` on missing source identity;
+   "any offer/doctor present" instead of exact required source at `topic`/`context_group` tiers;
+   token estimate counts only MD, never offer/fact/doctor/policy JSON; non-deterministic
+   `context_group` selection via unordered `set` iteration; unconditional per-turn shadow overhead
+   with no flag gate), 1 structural-not-a-bug (source coverage ≠ answer equivalence), 1 accepted
+   disclosed gap (`context_group` unreachable on demo). Local `sqlite3` FTS5/`bm25()` capability
+   proven available and functional by direct offline probe (no product code, no network); selected
+   **Option A — simple in-memory Python token-overlap lexical scan** over FTS5 as the simplest
+   sufficient option for 55–150 short MD, with FTS5 documented as a ready fallback only if future
+   measurement proves it necessary. Designed (not built): generated paragraph index reusing
+   already-authored `doc_id`/`doc_type`/`topic` frontmatter, typed `TargetEvidencePackage` contract,
+   exact-ID completeness rules, FullContext-before-single-call fallback, explicit-follow-up-only
+   session projection, and a two-mode offline evaluation plan (package eval; separately-gated
+   counterfactual Composer eval, no raw question/answer persistence ever). See
+   `docs/evidence/performance/FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION_SEAM_AUDIT.md`.
+   **NO PRODUCT CODE. NO CLIENT-PACK CHANGE. NO LIVE.** STOP before PERF-7A (lexical index
+   implementation).
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

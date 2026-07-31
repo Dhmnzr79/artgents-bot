@@ -8678,3 +8678,200 @@ change. No LIVE/provider/network/server/widget touched.
 scoped corpus** — both remain separate, later, owner-gated milestones.
 
 ---
+
+# TASK — FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION / PERF-7 (governance + seam audit, Phase 1)
+
+**Status:** Phase 1, governance + seam audit only · **NO PRODUCT IMPLEMENTATION / NO CLIENT-PACK
+CHANGE / NO LIVE / NO PROVIDER / NO NETWORK / NO FTS TABLE / NO SQLITE INDEX / NO EMBEDDINGS /
+NO VECTOR DATABASE / NO EVIDENCEPACKAGEBUILDER PRODUCT MODULE / NO RUNTIME FLAG / NO MIGRATION /
+NO CONTEXT_GROUPS.JSON**
+
+**Baseline:** `codex/stage-a` @ `2d0769c` (`FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW` / PERF-6
+Phase 2 shadow implementation complete).
+
+**Motivation:** PERF-6 proved a shadow-only `service_exact → topic → context_group → full` resolver
+but is explicitly **not** the target architecture — the owner directs a simpler shape: existing
+typed `TurnFrame` → deterministic policy → one `EvidencePackageBuilder` → one Composer → validators
+→ conditional medical verifier → presentation/leadflow, with lexical retrieval as one auxiliary
+input among several independent sources, never the sole router. This milestone is read-only
+governance: it critically re-audits PERF-6's own shipped debt, proves local FTS5/lexical capability
+with real probes (no product code), and designs (does not build) a lexical paragraph index, a typed
+Evidence Package contract, completeness/fallback/session rules, and an offline evaluation plan. Full
+detail:
+[`docs/evidence/performance/FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION_SEAM_AUDIT.md`](evidence/performance/FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION_SEAM_AUDIT.md).
+
+## Architecture map and PERF-6 debt verdicts
+
+Extended producer→consumer map (seam audit §1) confirms `TargetComposerRequest.evidence_blocks`,
+`doc_id`/`doc_type`/`topic`/`subtopic` MD frontmatter (already authored on every current demo file —
+no new required field), and the existing fence-aware `_section` extractor
+(`core/target_composer_request.py`) are all reusable, unchanged, read-only inputs for a future
+Builder. Seven PERF-6 debt items were each critically graded PROVEN / NOT PROVEN / ALREADY FIXED /
+ACCEPTABLE TEMPORARY DEBT against the real shipped code (seam audit §2): (1) false-positive
+`shadow_hit` on missing source identity — **PROVEN**; (2) "any offer/doctor present" instead of
+exact required source — **PROVEN** at `topic`/`context_group` tiers, harmless-by-construction at
+`service_exact`; (3) incomplete token estimate counting only MD, never offer/fact/doctor/policy JSON
+— **PROVEN**; (4) `context_group` unreachable on demo — **ACCEPTABLE TEMPORARY DEBT** (already
+honestly disclosed); (5) non-deterministic `context_group` selection via unordered `set` iteration —
+**PROVEN**, a real bug in already-shipped code, unreachable today only because of item 4; (6) source
+coverage does not prove answer equivalence — **PROVEN**, structural, not a bug; (7) unconditional
+per-turn shadow overhead with no flag gate — **PROVEN**. None of these are fixed in this Phase 1
+commit — items 2 and 5 are flagged as required fixes for a future PERF-7A/B implementation, not
+optional cleanup.
+
+## Integration seam
+
+Today's real path materializes `TargetComposerRequest` **twice** per turn (real, inside the
+S39-protected `run_target_offline_verified_response_pipeline`, shared already by both Composer and
+Verifier; plus PERF-6's one documented redundant shadow copy) — not three times. A frozen AST test
+(`tests/test_target_verified_response_pipeline.py::
+test_public_signature_and_function_is_exact_straight_line`) pins that protected function's exact
+13-parameter signature and exact 5-call sequence, so it cannot accept a pre-built request without a
+**second**, separately owner-approved deviation of the same kind PERF-6 already needed once. The
+recommended seam (not built here): share PERF-6's one existing redundant copy across the future
+Builder, PERF-6's own shadow resolver, and any future counterfactual-eval harness — keeping the real
+per-turn count at exactly 2, never 3, without touching the protected function. Full analysis: seam
+audit §3.
+
+## Lexical index selection
+
+**Selected: Option A — in-memory Python token-overlap scan with prefix matching.** Simplest option
+proven sufficient for a 55–150-short-document corpus; zero new query-language injection surface;
+zero new build/artifact step. Option B (SQLite FTS5 in-memory) is a documented, ready fallback if
+PERF-7A's own future measurement finds real recall gaps — **proven locally available** on this
+machine (sqlite3 3.49.1, `fts5`, `bm25()`, `unicode61 remove_diacritics 2`, `trigram` tokenizer all
+functional, verified by direct offline probe, no product code, no network). Option C (persisted
+per-client FTS5 file) rejected as premature — no proven need at this corpus size. Russian-morphology
+probe confirms **no stemming** in stock FTS5 (`'имплант' -> []` against `импланты`/`имплантация`
+present); prefix wildcards (`импланта*`) recover same-root forms. Malformed `MATCH` query probe
+confirms raw user text cannot be forwarded to FTS5 unsanitized (`sqlite3.OperationalError` on
+unescaped quotes/unbalanced parens/dangling operators) — a cost Option A avoids entirely by having
+no query language at all. Full probe output and rationale: seam audit §§4–7.
+
+## Paragraph index design
+
+Generated (not authored) from the existing `clients/{id}/md/**` tree — no new required MD field.
+Splits on H2/H3 headings (reusing the existing `_section`/`_EXPLICIT_HEADING`/`_FENCE` precedent
+conceptually) then blank-line paragraphs/list blocks; fence-aware; minimum unit 40 chars (reuses the
+dedup audit's own near-duplicate minimum-block-length constant, no new size constant invented);
+no maximum beyond natural boundaries; no sliding-window/overlap chunking. Minimum fields:
+`paragraph_id`, `document_path`, `document_identity` (frontmatter `doc_id`), `heading`, `topic`,
+`document_type` (frontmatter `doc_type`, already authored on every current file),
+`normalized_searchable_text`, `content_hash`. Full design: seam audit §8.
+
+## Typed Evidence Package contract
+
+One proposed, not-yet-created contract, `TargetEvidencePackage`
+(`contracts/target_evidence_package.py`), mirroring `TargetContextScopeDecision`'s proven shape
+(frozen, `extra="forbid"`, strict): `selected_md_refs`, `selected_paragraph_refs`,
+`exact_evidence_block_refs`, `structured_record_ids` (nested offer/fact/doctor/policy ids),
+`session_derived_refs`, `retrieval_derived_refs`, `provenance` (nested per-ref source-kind + reason),
+`completeness_status`, `fallback_reason`, `estimated_chars`, `estimated_tokens`,
+`package_fingerprint`. No raw question/answer/SID/contact values anywhere — every field is an enum,
+count, hash, or reference ID. One canonical, not-yet-created producer
+(`build_target_evidence_package` in `core/target_evidence_package_builder.py`), mirroring the
+PERF-5/PERF-6 single-producer precedent. No separate parallel contract per service/topic/group.
+Full field table: seam audit §9.
+
+## Completeness rules
+
+Closes PERF-6 debt item 2 by design: every check is against **specific required IDs** (exact offer
+ids/doctor ids actually present in `evidence_blocks`, `required_fact_ids ⊆` included facts, specific
+contact fields, exact consultation content ref), never "any offer/doctor of this class present."
+Comparison/related content (closing PERF-6's own honest gap — no authored service↔comparison
+cross-ref exists) is resolved via the lexical index as a retrieval-assisted signal, or an honest
+FullContext fallback, never an invented cross-ref. Global microfacts are a retrieval-found addition,
+never the primary completeness gate. Full rule list: seam audit §10.
+
+## FullContext fallback rules
+
+Chosen **before** the single Composer call, never as a second retry — identical constraint to
+PERF-6's own "no repeated Composer call at any step." Triggers: PERF-6's own existing `full`
+triggers plus any § "Completeness rules" deficit the lexical index cannot resolve with sufficient
+confidence (no numeric threshold invented in this Phase 1 document). Never surfaced as a user-visible
+error — fail-closed, mirroring `resolve_target_context_scope`'s own exception handling.
+`fullcontext_fallback` is a valid `completeness_status`, not an error state. Full rules: seam audit
+§11.
+
+## Session projection rules
+
+Reuses the existing age-guarded, hydration-gated `TurnFrame.service_id`/topic machinery
+(`core/target_runtime_turn_frame_hydration.py`/`core/dialog_focus.py`) without a second staleness
+policy. `session_derived_refs` populates only when the already-arbitrated `TargetResponseSpec`
+carries session-hydrated identity, i.e. only when the existing contextual-follow-up detection has
+already fired — a standalone new question never receives session-derived evidence. Full rules: seam
+audit §12.
+
+## Offline evaluation design
+
+Two modes, neither implemented: **Mode 1 — offline package evaluation** (no LLM; frozen
+`TurnFrame`/spec fixtures; asserts source IDs/completeness/fallback/size, zero provider calls).
+**Mode 2 — counterfactual Composer evaluation** (FullContext vs. scoped answers, separate future
+owner LIVE/LLM GO; answers compared in memory only; raw questions/answers never persisted — only
+scenario ID, source IDs, categorical verdicts, answer-text hashes, token counts, call counts, timing,
+error codes). 18 required scenario classes (per brief, including "medically risky personal
+question" as an 18th item), target allocation ~118 scenarios total (within the 100–150 range), no
+literal question/answer text in this document or any committed artifact. Full design and per-class
+counts: seam audit §13.
+
+## Implementation milestone sequence (none started)
+
+PERF-7A (lexical index) → PERF-7B (`EvidencePackageBuilder`) → PERF-7C (offline package eval) →
+PERF-8 (Scoped Composer behind a local flag, real switch — **not authorized by this document**) →
+PERF-9 (evidence-only Verifier) → PERF-10 (real Composer token streaming) → final local widget E2E →
+cleanup of the old PERF-6 ladder/contracts (only after PERF-8/9 prove the new path). Full sequence:
+seam audit §14.
+
+## Risks
+
+Repeat of PERF-6's own unconditional-shadow-overhead debt (item 7) if PERF-7B is naive; lexical
+false negatives on genuine unknown wording (mitigated structurally by fallback-before-single-call);
+comparison-content gap only partially closed pending PERF-7A's measured recall; `doc_type`/`topic`
+frontmatter coverage is a demo-pack-only observation, must degrade gracefully for a future client
+pack that doesn't author it; PERF-6 debt items 2 and 5 must be fixed before/alongside PERF-7A/B, not
+left to drift. Full list: seam audit §15.
+
+## Exact future allowlist (none created by this Phase 1 commit)
+
+- `core/target_lexical_paragraph_index.py` — **does not exist**.
+- `contracts/target_evidence_package.py` — **does not exist**.
+- `core/target_evidence_package_builder.py` — **does not exist**.
+- Any generated paragraph-index artifact/cache file — **does not exist**.
+- `clients/demo/target_response/context_groups.json` / `clients/_template/target_response/
+  context_groups.json` — **still does not exist**.
+- Any runtime flag (e.g. `EVIDENCE_PACKAGE_BUILDER_ON`) — **does not exist**.
+- Any FTS5/SQLite virtual table, embeddings model, or vector database dependency — **none added**.
+- Explicitly **NOT** in this allowlist without a further, separate owner GO: any change to
+  `core/target_composer_request.py`'s or `core/target_response_verifier.py`'s real invocation
+  arguments; any change to the S39-protected pipeline signature; any real Composer/Verifier switch
+  (PERF-8); any embeddings/vector/RAG code.
+
+## Acceptance matrix
+
+40 scenarios verifying this Phase 1 document's own structural claims against the already-shipped
+code (never against unbuilt PERF-7A/B/C code) — full table in seam audit §17.
+
+## Test commands
+
+```powershell
+python -m pytest -p no:cacheprovider tests/test_final_local_evidence_package_builder_foundation_governance.py -q
+python -m pytest -p no:cacheprovider tests/test_final_multi_level_scoped_context_shadow_governance.py tests/test_final_multi_level_scoped_context_shadow_implementation.py tests/test_final_client_pack_content_dedup_and_token_audit_governance.py tests/test_target_composer_request.py tests/test_target_cached_full_context.py -q
+python scripts/validate_client_pack.py --client-id demo
+python scripts/validate_client_pack.py --path clients/_template --scaffold
+python -m pytest tests/ --collect-only -q
+git diff --check
+git status --short
+```
+
+## STOP conditions
+
+**STOP before any PERF-7A implementation.** None of the modules named in "Exact future allowlist"
+above are created by this commit. Required before PERF-7A starts: owner GO on this design (lexical
+option, paragraph-index shape, Evidence Package contract shape, completeness/fallback/session
+rules); a separate governance TASK for PERF-7A itself; separate, later governance TASKs for PERF-7B
+and PERF-7C, each gated on the prior milestone's own measured results, not assumed. **No real switch
+of Composer/Verifier onto a Builder-produced package is authorized by this document at all** —
+that is PERF-8, contingent on PERF-7C's own offline measurement actually proving sufficient package
+quality.
+
+---

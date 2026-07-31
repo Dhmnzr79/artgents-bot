@@ -786,6 +786,37 @@ gated milestones).
 
 ---
 
+## Active — FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION / PERF-7 (governance + seam audit, Phase 1)
+
+**Baseline:** `codex/stage-a` @ `2d0769c` (PERF-6 Phase 2 complete) · **NO PRODUCT IMPLEMENTATION /
+NO CLIENT-PACK CHANGE / NO LIVE / NO FTS TABLE / NO SQLITE INDEX / NO EMBEDDINGS /
+NO VECTOR DATABASE / NO EVIDENCEPACKAGEBUILDER PRODUCT MODULE / NO RUNTIME FLAG /
+NO CONTEXT_GROUPS.JSON**
+
+Owner directs a simpler target shape than PERF-6's `service_exact → topic → context_group → full`
+ladder: existing typed `TurnFrame` → deterministic policy → one `EvidencePackageBuilder` → one
+Composer → validators → conditional medical verifier → presentation/leadflow, with lexical MD
+retrieval as one auxiliary input among several independent sources, never the sole router. This
+read-only Phase 1 milestone critically re-audits PERF-6's own shipped debt (5 of 7 named items
+confirmed **PROVEN** real gaps with exact code citations, 1 structural, 1 accepted disclosed gap),
+proves local `sqlite3` FTS5/`bm25()` capability with real offline probes, selects the simplest
+sufficient lexical approach (in-memory Python token-overlap scan, Option A, over FTS5 as a
+documented fallback), and designs — without building — a generated paragraph index, a typed
+`TargetEvidencePackage` contract, exact-ID completeness rules, a FullContext-before-single-call
+fallback rule, an explicit-follow-up-only session projection rule, and a two-mode offline
+evaluation plan (no raw question/answer text ever persisted).
+
+Deliverables: `docs/evidence/performance/FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION_SEAM_AUDIT.md`,
+TASK.md's PERF-7 governance section,
+`tests/test_final_local_evidence_package_builder_foundation_governance.py`, minimal sync of
+`docs/FLAGS_AND_STATUS.md`/this file.
+
+**Nothing implemented.** STOP before PERF-7A (lexical paragraph-index implementation) — a separate,
+later, owner-approved milestone, followed by PERF-7B (`EvidencePackageBuilder`), PERF-7C (offline
+eval), and only then the still-later, still-separately-gated PERF-8 real Composer/Verifier switch.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

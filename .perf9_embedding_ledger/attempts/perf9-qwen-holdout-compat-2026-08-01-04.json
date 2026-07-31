@@ -1,0 +1,12 @@
+{
+  "attempt_id": "perf9-qwen-holdout-compat-2026-08-01-04",
+  "dimension": 1024,
+  "input_manifest_hash": "381f1775a0ef3523fae66c26ae0dc137c633a47de925accf11372bf3f00a527f",
+  "model": "text-embedding-v4",
+  "output_type": "dense",
+  "phase": "holdout",
+  "provider_calls": 41,
+  "provider_input_tokens": 31007,
+  "schema_version": 1,
+  "status": "completed"
+}

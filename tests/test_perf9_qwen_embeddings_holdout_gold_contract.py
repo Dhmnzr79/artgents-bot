@@ -140,5 +140,6 @@ def test_protocol_freezes_gold_before_any_retrieval_or_provider_run() -> None:
     normalized = " ".join(text.split())
     assert "Before the freeze commit, no lexical, BM25, embedding, hybrid" in normalized
     assert "must be committed before the evaluator imports or reads the query file" in normalized
-    assert "No retrieval or provider execution against the 60 holdout queries has occurred" in normalized
-    assert "requires corrected Alibaba workspace/model permission" in normalized
+    assert "gold were frozen at `27c8340` before evaluator implementation or retrieval" in normalized
+    assert "Development thresholds were frozen at `9273630`; only then was the holdout run once" in normalized
+    assert "The holdout must not be rerun or used for tuning" in normalized

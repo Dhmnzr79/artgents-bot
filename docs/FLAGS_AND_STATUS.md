@@ -332,15 +332,14 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
     `docs/evidence/performance/FINAL_RETRIEVAL_RELEVANCE_DECISION_AUDIT.md`. STOP before a separately
     approved embeddings/hybrid holdout evaluation and before Scoped Composer wiring.
 
-11. **PERF-9 QWEN EMBEDDINGS HOLDOUT — PROVIDER ACCESS BLOCKED:** a new 60-question blind holdout
-    and independent gold were frozen at `27c8340` before evaluator implementation. The gated
-    evaluator is Qwen-only (`text-embedding-v4`, 1024 dimensions); no Western embedding model is
-    permitted. Two development attempts each stopped on their first request: native API HTTP 403,
-    then the configured compatible API `access_denied`. Total attempted calls: 2; completed
-    embedding responses: 0; holdout retrieval executions: 0. LIVE gate is closed. Grant
-    `text-embedding-v4` to the current Singapore workspace/API key (or use a default-workspace key
-    with model scope `All`) before a new explicit attempt. See
-    `docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_PROVIDER_ATTEMPT_AUDIT.md`.
+11. **PERF-9 QWEN EMBEDDINGS HOLDOUT — FAIL, NO RUNTIME CANDIDATE:** the 60-question blind holdout
+    and independent gold were frozen at `27c8340`; development thresholds were committed at
+    `9273630` before the one holdout run. Qwen dense returned 4 critical false-narrow decisions
+    (Recall@1 81.3%, fallback 51.7%); Qwen dense + local lexical RRF returned 2 (Recall@1 72.9%,
+    fallback 75.0%). Binding safety bar is zero, so neither may be wired to Scoped Composer.
+    Runtime/client pack are unchanged, LIVE gate is closed, and no speedup exists. All inference
+    remained Alibaba Qwen `text-embedding-v4`; no Western model was used. See
+    `docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_HOLDOUT_DECISION.md`.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

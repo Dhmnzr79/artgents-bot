@@ -115,8 +115,8 @@ def test_live_requires_exact_committed_attempt_before_marker(tmp_path: Path, mon
     assert not (tmp_path / "ledger").exists()
 
 
-def test_live_gate_is_open_only_for_owner_authorized_holdout_attempt_4() -> None:
-    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID == "perf9-qwen-holdout-compat-2026-08-01-04"
+def test_live_gate_is_closed_after_blind_holdout_attempt() -> None:
+    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID is None
 
 
 def test_completed_development_result_and_candidate_config_are_consistent() -> None:
@@ -132,6 +132,35 @@ def test_completed_development_result_and_candidate_config_are_consistent() -> N
     assert result["candidates"]["dense"]["recall_at_1"] > 0.9
     assert result["candidates"]["dense"]["recall_at_3"] == 1.0
     assert result["candidates"]["qwen_dense_lexical_hybrid"]["recall_at_1"] < result["candidates"]["dense"]["recall_at_1"]
+
+
+def test_blind_holdout_result_is_pinned_and_rejects_both_runtime_candidates() -> None:
+    result = json.loads(perf9.HOLDOUT_RESULT_PATH.read_text(encoding="utf-8"))
+    marker = json.loads(
+        (perf9.LEDGER_ROOT / "perf9-qwen-holdout-compat-2026-08-01-04.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert result["phase"] == "holdout"
+    assert result["model"] == perf9.MODEL
+    assert result["provider_calls"] == 41
+    assert result["provider_input_tokens"] == 31007
+    assert result["contains_query_or_answer_text"] is False
+    assert result["gold_sha256"] == perf9._sha256(perf9.HOLDOUT_GOLD_PATH)
+    assert result["query_index_sha256"] == perf9._sha256(perf9.HOLDOUT_QUERY_PATH)
+    assert result["candidate_config_sha256"] == "1681b6858fef569aac21daac84fa1e0378286f235eaba7754aaa1a0b91667d46"
+    dense = result["candidates"]["dense"]
+    hybrid = result["candidates"]["qwen_dense_lexical_hybrid"]
+    assert dense["critical_false_narrow_count"] == 4
+    assert dense["recall_at_1"] == 0.8125
+    assert hybrid["critical_false_narrow_count"] == 2
+    assert hybrid["recall_at_1"] == 0.7291666666666666
+    assert dense["critical_false_narrow_count"] > 0
+    assert hybrid["critical_false_narrow_count"] > 0
+    assert marker["attempt_id"] == "perf9-qwen-holdout-compat-2026-08-01-04"
+    assert marker["status"] == "completed"
+    assert marker["provider_calls"] == result["provider_calls"]
+    assert marker["provider_input_tokens"] == result["provider_input_tokens"]
 
 
 def test_attempt_id_is_consumed_with_exclusive_creation(tmp_path: Path, monkeypatch) -> None:

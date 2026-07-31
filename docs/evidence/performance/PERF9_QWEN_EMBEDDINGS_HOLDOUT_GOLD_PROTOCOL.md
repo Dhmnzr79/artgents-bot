@@ -2,11 +2,11 @@
 
 ## Status
 
-`HOLDOUT_GOLD_FROZEN_PROVIDER_ACCESS_BLOCKED`. The questions and human-authored
-gold were frozen at `27c8340` before evaluator implementation or retrieval. Two
-development-only provider attempts stopped at their first call with HTTP 403;
-the compatible API returned safe code `access_denied`. The holdout remains
-unopened by any retrieval candidate and no embeddings exist yet.
+`HOLDOUT_COMPLETE_FAIL_NO_RUNTIME_CANDIDATE`. The questions and human-authored
+gold were frozen at `27c8340` before evaluator implementation or retrieval.
+Development thresholds were frozen at `9273630`; only then was the holdout run
+once. Dense produced four critical false narrows and hybrid produced two, so
+neither candidate is authorised for runtime.
 
 Before the freeze commit, no lexical, BM25, embedding, hybrid, reranking, LLM,
 provider, network, or runtime execution was performed against these questions.
@@ -46,11 +46,8 @@ OpenAI, Cohere, Voyage, Gemini, and Jina are not candidates.
 
 ## Next gate
 
-The owner issued a development-only LIVE/network GO after the freeze. Two calls
-were attempted under separate consumed attempt IDs and both returned HTTP 403
-before embeddings were generated. No retrieval or provider execution against
-the 60 holdout queries has occurred. A later run requires corrected Alibaba
-workspace/model permission plus a new explicit LIVE GO and attempt ID. It must
-pin model name, dimension, endpoint region, input hashes, output hashes, token
-usage, duration, and cost without storing contacts, SID, questions, answers, or
-other PII in provider-call audit logs.
+The owner issued LIVE/network GO after the freeze. Two denied attempts, one
+completed development attempt, and one completed holdout attempt are captured
+under separate consumed IDs. The holdout must not be rerun or used for tuning.
+Any later retrieval experiment requires a new development set, second untouched
+holdout, explicit LIVE GO, and new attempt IDs.

@@ -1309,10 +1309,12 @@ schema design создан отдельный governance TASK `dbf2c46`; runtime
 
 - [x] 60-question blind holdout and independent gold frozen before evaluator/retrieval (`27c8340`).
 - [x] Qwen-only gated evaluator implemented; runtime remains unchanged.
-- [x] Two development attempts audited and consumed: 2 attempted calls, 0 embedding responses.
-- [ ] Grant Alibaba `text-embedding-v4` model access to the current Singapore workspace/API key.
-- [ ] New explicit LIVE GO: development calibration, commit candidate thresholds, then one blind
-  holdout run. Scoped Composer remains blocked until that result passes independently.
+- [x] Two denied attempts audited and consumed; Alibaba model access then granted.
+- [x] Development calibration completed; thresholds frozen at `9273630` before holdout retrieval.
+- [x] One blind holdout run completed: dense 4 critical false narrows; hybrid 2.
+- [x] Verdict: `QWEN_EMBEDDINGS_HOLDOUT_FAIL_NO_RUNTIME_CANDIDATE`; Scoped Composer remains blocked.
+- [ ] Optional new milestone only: Qwen reranker + explicit broad/unsupported guards on a new
+  development set and a second untouched holdout. Do not retune against PERF-9 holdout.
 
 ## Как поддерживать чекбоксы
 

@@ -9757,3 +9757,33 @@ Evidence:
 **STOP — provider access blocked; no third attempt and no alternate model.**
 
 ---
+
+## Closeout — PERF-9 Qwen embeddings blind holdout
+
+Alibaba access was granted after the blocked-attempt record. Attempt 3 completed development
+calibration (40 calls, 30,503 input tokens); its thresholds/config were frozen and pushed at
+`9273630`. Attempt 4 then ran the untouched 60-question holdout once (41 calls, 31,007 input
+tokens), without changing thresholds or hybrid weight.
+
+| Frozen candidate | Critical false narrow | Recall@1 | Recall@3 | Fallback rate |
+|---|---:|---:|---:|---:|
+| Qwen `text-embedding-v4` dense | **4** | 81.3% | 91.7% | 51.7% |
+| Qwen dense + local lexical RRF | **2** | 72.9% | 87.5% | 75.0% |
+
+**Verdict:** `QWEN_EMBEDDINGS_HOLDOUT_FAIL_NO_RUNTIME_CANDIDATE`. The safety requirement is zero
+critical false narrowing. Neither candidate is authorised for Scoped Composer, and the PERF-9
+holdout must not be rerun or used to tune thresholds. LIVE gate is `None`.
+
+No runtime/client-pack/Composer/Verifier/session/widget change; no answer or latency test; no
+speedup claim. All model inference was Alibaba Qwen; no Western model was called.
+
+Optional next milestone requires a new owner scope: Chinese Qwen reranker (`qwen3-rerank`) over
+conservative top-K plus explicit broad/unsupported applicability guards, a new development set,
+and a second untouched holdout.
+
+Evidence: `docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_HOLDOUT_DECISION.md` and
+`docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_PROVIDER_ATTEMPT_AUDIT.md`.
+
+**STOP — no Scoped Composer runtime wiring.**
+
+---

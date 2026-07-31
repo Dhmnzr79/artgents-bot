@@ -30,19 +30,20 @@ if str(ROOT) not in sys.path:
 
 from config import CHAT_BASE_URL
 from core.target_lexical_paragraph_index import build_target_lexical_paragraph_index
+from core.target_lexical_paragraph_index import (
+    TargetLexicalParagraphIndex,
+    search_target_lexical_paragraph_index,
+)
 
 
 MODEL = "text-embedding-v4"
 DIMENSION = 1024
-OUTPUT_TYPE = "dense&sparse"
-QUERY_INSTRUCT = (
-    "Given a Russian-language patient question about a dental clinic, retrieve the relevant "
-    "clinic knowledge-base passage."
-)
+OUTPUT_TYPE = "dense"
 HYBRID_DENSE_WEIGHT = 0.75
+RRF_K = 60
 MAX_BATCH_SIZE = 10
 TIMEOUT_SECONDS = 60.0
-LIVE_AUTHORIZED_ATTEMPT_ID: str | None = "perf9-qwen-dev-2026-08-01-01"
+LIVE_AUTHORIZED_ATTEMPT_ID: str | None = "perf9-qwen-dev-compat-2026-08-01-02"
 
 MD_ROOT = ROOT / "clients" / "demo" / "md"
 DEV_GOLD_PATH = Path(__file__).with_name("perf8_retrieval_relevance_gold_v2.json")
@@ -65,7 +66,6 @@ class Perf9EvaluationError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class EmbeddingVector:
     dense: tuple[float, ...]
-    sparse: tuple[tuple[int, float], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,7 +97,7 @@ def _stable_payload_hash(payload: object) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _native_endpoint(compatible_base_url: str | None) -> str:
+def _compatible_endpoint(compatible_base_url: str | None) -> str:
     value = (compatible_base_url or "").strip().rstrip("/")
     lowered = value.lower()
     if not value or not ("aliyuncs.com" in lowered or "dashscope" in lowered):
@@ -105,7 +105,7 @@ def _native_endpoint(compatible_base_url: str | None) -> str:
     suffix = "/compatible-mode/v1"
     if not lowered.endswith(suffix):
         raise Perf9EvaluationError("qwen_compatible_base_url_invalid", value)
-    return value[: -len(suffix)] + "/api/v1/services/embeddings/text-embedding/text-embedding"
+    return value + "/embeddings"
 
 
 def _api_key() -> str:
@@ -116,8 +116,10 @@ def _api_key() -> str:
     return value
 
 
-def _build_corpus_inputs() -> tuple[CorpusInput, ...]:
-    index = build_target_lexical_paragraph_index(MD_ROOT)
+def _build_corpus_inputs(
+    index: TargetLexicalParagraphIndex | None = None,
+) -> tuple[CorpusInput, ...]:
+    index = index or build_target_lexical_paragraph_index(MD_ROOT)
     rows: list[CorpusInput] = []
     for paragraph in index.paragraphs:
         parts = [paragraph.document_path]
@@ -139,20 +141,14 @@ def _post_qwen_batch(texts: Sequence[str], text_type: str) -> tuple[tuple[Embedd
         raise Perf9EvaluationError("qwen_text_type_invalid", text_type)
     if not texts or len(texts) > MAX_BATCH_SIZE:
         raise Perf9EvaluationError("qwen_batch_size_invalid", len(texts))
-    parameters: dict[str, Any] = {
-        "dimension": DIMENSION,
-        "output_type": OUTPUT_TYPE,
-        "text_type": text_type,
-    }
-    if text_type == "query":
-        parameters["instruct"] = QUERY_INSTRUCT
     payload = {
         "model": MODEL,
-        "input": {"texts": list(texts)},
-        "parameters": parameters,
+        "input": list(texts),
+        "dimensions": DIMENSION,
+        "encoding_format": "float",
     }
     request = urllib.request.Request(
-        _native_endpoint(CHAT_BASE_URL),
+        _compatible_endpoint(CHAT_BASE_URL),
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {_api_key()}",
@@ -163,31 +159,27 @@ def _post_qwen_batch(texts: Sequence[str], text_type: str) -> tuple[tuple[Embedd
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
             body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            error_body = json.loads(exc.read().decode("utf-8"))
+            safe_code = error_body.get("error", {}).get("code") or f"http_{exc.code}"
+        except Exception:
+            safe_code = f"http_{exc.code}"
+        raise Perf9EvaluationError("qwen_provider_error", safe_code) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise Perf9EvaluationError("qwen_transport_failed", type(exc).__name__) from exc
-    if int(body.get("status_code") or 0) != 200:
-        raise Perf9EvaluationError("qwen_provider_error", body.get("code") or "unknown")
-    raw_vectors = body.get("output", {}).get("embeddings")
+    if body.get("model") != MODEL:
+        raise Perf9EvaluationError("qwen_observed_model_mismatch", body.get("model"))
+    raw_vectors = body.get("data")
     if not isinstance(raw_vectors, list) or len(raw_vectors) != len(texts):
         raise Perf9EvaluationError("qwen_vector_count_mismatch", len(raw_vectors or ()))
-    ordered = sorted(raw_vectors, key=lambda row: int(row.get("text_index", -1)))
+    ordered = sorted(raw_vectors, key=lambda row: int(row.get("index", -1)))
     vectors: list[EmbeddingVector] = []
     for row in ordered:
         dense = tuple(float(value) for value in row.get("embedding") or ())
         if len(dense) != DIMENSION or not all(math.isfinite(value) for value in dense):
             raise Perf9EvaluationError("qwen_dense_vector_invalid", len(dense))
-        sparse = tuple(
-            sorted(
-                (
-                    (int(item["index"]), float(item["value"]))
-                    for item in (row.get("sparse_embedding") or ())
-                ),
-                key=lambda item: item[0],
-            )
-        )
-        if not sparse or not all(math.isfinite(value) for _, value in sparse):
-            raise Perf9EvaluationError("qwen_sparse_vector_invalid")
-        vectors.append(EmbeddingVector(dense=dense, sparse=sparse))
+        vectors.append(EmbeddingVector(dense=dense))
     return tuple(vectors), int(body.get("usage", {}).get("total_tokens") or 0)
 
 
@@ -208,21 +200,10 @@ def _embed_all(
     return tuple(vectors), total_tokens, calls
 
 
-def _sparse_cosine(left: tuple[tuple[int, float], ...], right: tuple[tuple[int, float], ...]) -> float:
-    left_map = dict(left)
-    right_map = dict(right)
-    dot = sum(value * right_map.get(index, 0.0) for index, value in left_map.items())
-    left_norm = math.sqrt(sum(value * value for value in left_map.values()))
-    right_norm = math.sqrt(sum(value * value for value in right_map.values()))
-    return dot / (left_norm * right_norm) if left_norm and right_norm else 0.0
-
-
 def _rank_documents(
     corpus: Sequence[CorpusInput],
     corpus_vectors: Sequence[EmbeddingVector],
     query_vector: EmbeddingVector,
-    *,
-    dense_weight: float,
 ) -> tuple[RankedDocument, ...]:
     matrix = np.asarray([vector.dense for vector in corpus_vectors], dtype=np.float32)
     query = np.asarray(query_vector.dense, dtype=np.float32)
@@ -231,13 +212,49 @@ def _rank_documents(
     dense_scores = (matrix @ query) / np.maximum(matrix_norms * query_norm, 1e-12)
     best: dict[str, float] = {}
     for index, row in enumerate(corpus):
-        sparse_score = _sparse_cosine(corpus_vectors[index].sparse, query_vector.sparse)
-        score = dense_weight * float(dense_scores[index]) + (1.0 - dense_weight) * sparse_score
+        score = float(dense_scores[index])
         if row.document_ref not in best or score > best[row.document_ref]:
             best[row.document_ref] = score
     return tuple(
         RankedDocument(document_ref=document_ref, score=score)
         for document_ref, score in sorted(best.items(), key=lambda item: (-item[1], item[0]))
+    )
+
+
+def _lexical_document_ranking(
+    index: TargetLexicalParagraphIndex, query: str
+) -> tuple[str, ...]:
+    hits = search_target_lexical_paragraph_index(
+        index, query, limit=max(1, index.paragraph_count)
+    )
+    refs: list[str] = []
+    for hit in hits:
+        ref = hit.paragraph.document_path
+        if ref not in refs:
+            refs.append(ref)
+    return tuple(refs)
+
+
+def _rank_fusion(
+    dense_ranking: Sequence[RankedDocument], lexical_ranking: Sequence[str]
+) -> tuple[RankedDocument, ...]:
+    dense_rank = {row.document_ref: rank for rank, row in enumerate(dense_ranking, start=1)}
+    lexical_rank = {ref: rank for rank, ref in enumerate(lexical_ranking, start=1)}
+    refs = set(dense_rank) | set(lexical_rank)
+    scores = {
+        ref: HYBRID_DENSE_WEIGHT / (RRF_K + dense_rank[ref])
+        + (1.0 - HYBRID_DENSE_WEIGHT) / (RRF_K + lexical_rank[ref])
+        if ref in dense_rank and ref in lexical_rank
+        else (
+            HYBRID_DENSE_WEIGHT / (RRF_K + dense_rank[ref])
+            if ref in dense_rank
+            else (1.0 - HYBRID_DENSE_WEIGHT) / (RRF_K + lexical_rank[ref])
+        )
+        for ref in refs
+    }
+    return tuple(
+        RankedDocument(document_ref=ref, score=score)
+        for ref, score in sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     )
 
 
@@ -330,12 +347,9 @@ def _rank_all(
     corpus_vectors: Sequence[EmbeddingVector],
     query_ids: Sequence[str],
     query_vectors: Sequence[EmbeddingVector],
-    dense_weight: float,
 ) -> dict[str, tuple[RankedDocument, ...]]:
     return {
-        scenario_id: _rank_documents(
-            corpus, corpus_vectors, query_vector, dense_weight=dense_weight
-        )
+        scenario_id: _rank_documents(corpus, corpus_vectors, query_vector)
         for scenario_id, query_vector in zip(query_ids, query_vectors, strict=True)
     }
 
@@ -394,17 +408,22 @@ def _run_phase(phase: str, transport: Transport) -> dict[str, Any]:
     gold_rows = gold["scenarios"]
     query_ids = [row["scenario_id"] for row in gold_rows]
     query_texts = [query_by_id[scenario_id]["synthetic_query"] for scenario_id in query_ids]
-    corpus = _build_corpus_inputs()
+    lexical_index = build_target_lexical_paragraph_index(MD_ROOT)
+    corpus = _build_corpus_inputs(lexical_index)
 
     started = time.perf_counter()
     corpus_vectors, corpus_tokens, corpus_calls = _embed_all(
         [row.text for row in corpus], "document", transport
     )
     query_vectors, query_tokens, query_calls = _embed_all(query_texts, "query", transport)
-    dense_rankings = _rank_all(corpus, corpus_vectors, query_ids, query_vectors, 1.0)
-    hybrid_rankings = _rank_all(
-        corpus, corpus_vectors, query_ids, query_vectors, HYBRID_DENSE_WEIGHT
-    )
+    dense_rankings = _rank_all(corpus, corpus_vectors, query_ids, query_vectors)
+    hybrid_rankings = {
+        scenario_id: _rank_fusion(
+            dense_rankings[scenario_id],
+            _lexical_document_ranking(lexical_index, query_text),
+        )
+        for scenario_id, query_text in zip(query_ids, query_texts, strict=True)
+    }
 
     if phase == "dev":
         dense_config = _calibrate(dense_rankings, gold_rows)
@@ -412,7 +431,7 @@ def _run_phase(phase: str, transport: Transport) -> dict[str, Any]:
     else:
         config = _json(CANDIDATE_CONFIG_PATH)
         dense_config = config["candidates"]["dense"]
-        hybrid_config = config["candidates"]["qwen_native_hybrid"]
+        hybrid_config = config["candidates"]["qwen_dense_lexical_hybrid"]
 
     result = {
         "schema_version": 1,
@@ -420,8 +439,9 @@ def _run_phase(phase: str, transport: Transport) -> dict[str, Any]:
         "model": MODEL,
         "dimension": DIMENSION,
         "output_type": OUTPUT_TYPE,
-        "query_instruct_sha256": hashlib.sha256(QUERY_INSTRUCT.encode("utf-8")).hexdigest(),
+        "query_document_role_distinction": "not_available_through_openai_compatible_api",
         "hybrid_dense_weight": HYBRID_DENSE_WEIGHT,
+        "hybrid_method": "weighted_reciprocal_rank_fusion_qwen_dense_plus_local_lexical",
         "gold_sha256": _sha256(gold_path),
         "query_index_sha256": _sha256(query_path),
         "corpus_input_manifest_sha256": _stable_payload_hash(
@@ -439,7 +459,7 @@ def _run_phase(phase: str, transport: Transport) -> dict[str, Any]:
                 float(dense_config["min_score"]),
                 float(dense_config["min_margin"]),
             ),
-            "qwen_native_hybrid": _metrics(
+            "qwen_dense_lexical_hybrid": _metrics(
                 hybrid_rankings,
                 gold_rows,
                 float(hybrid_config["min_score"]),
@@ -448,7 +468,7 @@ def _run_phase(phase: str, transport: Transport) -> dict[str, Any]:
         },
         "top3": {
             "dense": _safe_rankings(dense_rankings),
-            "qwen_native_hybrid": _safe_rankings(hybrid_rankings),
+            "qwen_dense_lexical_hybrid": _safe_rankings(hybrid_rankings),
         },
         "contains_query_or_answer_text": False,
     }
@@ -465,7 +485,7 @@ def _run_phase(phase: str, transport: Transport) -> dict[str, Any]:
             "hybrid_dense_weight": HYBRID_DENSE_WEIGHT,
             "candidates": {
                 "dense": {key: dense_config[key] for key in ("min_score", "min_margin")},
-                "qwen_native_hybrid": {
+                "qwen_dense_lexical_hybrid": {
                     key: hybrid_config[key] for key in ("min_score", "min_margin")
                 },
             },

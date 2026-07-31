@@ -1,0 +1,12 @@
+{
+  "attempt_id": "perf9-qwen-dev-2026-08-01-01",
+  "dimension": 1024,
+  "input_manifest_hash": "89e3fe4c3d9db9833ec2af3c096fddaf48baff6a1f5b2eecebcc4fc1d7949dbf",
+  "model": "text-embedding-v4",
+  "output_type": "dense&sparse",
+  "phase": "dev",
+  "provider_calls": 1,
+  "provider_input_tokens": 0,
+  "schema_version": 1,
+  "status": "failed_consumed"
+}

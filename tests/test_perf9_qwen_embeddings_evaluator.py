@@ -16,28 +16,26 @@ sys.modules[SPEC.name] = perf9
 SPEC.loader.exec_module(perf9)
 
 
-def _vector(dense: tuple[float, ...], sparse: tuple[tuple[int, float], ...] = ((1, 1.0),)):
+def _vector(dense: tuple[float, ...]):
     padded = dense + (0.0,) * (perf9.DIMENSION - len(dense))
-    return perf9.EmbeddingVector(dense=padded, sparse=sparse)
+    return perf9.EmbeddingVector(dense=padded)
 
 
 def test_qwen_model_contract_is_chinese_only() -> None:
     source = MODULE_PATH.read_text(encoding="utf-8")
     assert perf9.MODEL == "text-embedding-v4"
     assert perf9.DIMENSION == 1024
-    assert perf9.OUTPUT_TYPE == "dense&sparse"
+    assert perf9.OUTPUT_TYPE == "dense"
     assert "OPENAI_API_KEY" in source
     assert "no OPENAI_API_KEY fallback" in source
     assert "text-embedding-3" not in source
 
 
-def test_native_endpoint_is_derived_only_from_dashscope_aliyun() -> None:
+def test_compatible_endpoint_is_derived_only_from_dashscope_aliyun() -> None:
     source = "https://workspace.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
-    assert perf9._native_endpoint(source).endswith(
-        "/api/v1/services/embeddings/text-embedding/text-embedding"
-    )
+    assert perf9._compatible_endpoint(source).endswith("/compatible-mode/v1/embeddings")
     with pytest.raises(perf9.Perf9EvaluationError) as error:
-        perf9._native_endpoint("https://api.openai.com/v1")
+        perf9._compatible_endpoint("https://api.openai.com/v1")
     assert error.value.code == "qwen_base_url_required"
 
 
@@ -48,25 +46,18 @@ def test_document_ranking_aggregates_best_paragraph_per_document() -> None:
         perf9.CorpusInput("p3", "b.md", "b"),
     )
     vectors = (_vector((1.0, 0.0)), _vector((0.8, 0.2)), _vector((0.0, 1.0)))
-    ranking = perf9._rank_documents(corpus, vectors, _vector((1.0, 0.0)), dense_weight=1.0)
+    ranking = perf9._rank_documents(corpus, vectors, _vector((1.0, 0.0)))
     assert [row.document_ref for row in ranking] == ["a.md", "b.md"]
     assert ranking[0].score == pytest.approx(1.0)
 
 
-def test_qwen_native_sparse_signal_can_change_hybrid_rank() -> None:
-    corpus = (
-        perf9.CorpusInput("p1", "dense.md", "dense"),
-        perf9.CorpusInput("p2", "sparse.md", "sparse"),
+def test_local_lexical_signal_can_change_qwen_dense_hybrid_rank() -> None:
+    dense = (
+        perf9.RankedDocument("dense.md", 0.9),
+        perf9.RankedDocument("lexical.md", 0.8),
     )
-    vectors = (
-        _vector((1.0, 0.0), ((2, 1.0),)),
-        _vector((0.8, 0.2), ((1, 1.0),)),
-    )
-    query = _vector((1.0, 0.0), ((1, 1.0),))
-    dense = perf9._rank_documents(corpus, vectors, query, dense_weight=1.0)
-    hybrid = perf9._rank_documents(corpus, vectors, query, dense_weight=0.5)
-    assert dense[0].document_ref == "dense.md"
-    assert hybrid[0].document_ref == "sparse.md"
+    hybrid = perf9._rank_fusion(dense, ("lexical.md",))
+    assert hybrid[0].document_ref == "lexical.md"
 
 
 def test_calibration_optimizes_safety_before_usefulness() -> None:

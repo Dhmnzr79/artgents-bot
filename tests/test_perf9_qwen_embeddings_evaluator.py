@@ -115,8 +115,8 @@ def test_live_requires_exact_committed_attempt_before_marker(tmp_path: Path, mon
     assert not (tmp_path / "ledger").exists()
 
 
-def test_live_gate_is_closed_after_completed_development_attempt() -> None:
-    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID is None
+def test_live_gate_is_open_only_for_owner_authorized_holdout_attempt_4() -> None:
+    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID == "perf9-qwen-holdout-compat-2026-08-01-04"
 
 
 def test_completed_development_result_and_candidate_config_are_consistent() -> None:

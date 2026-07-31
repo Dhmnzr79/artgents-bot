@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -114,8 +115,23 @@ def test_live_requires_exact_committed_attempt_before_marker(tmp_path: Path, mon
     assert not (tmp_path / "ledger").exists()
 
 
-def test_live_gate_is_open_only_for_owner_authorized_attempt_3() -> None:
-    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID == "perf9-qwen-dev-compat-2026-08-01-03"
+def test_live_gate_is_closed_after_completed_development_attempt() -> None:
+    assert perf9.LIVE_AUTHORIZED_ATTEMPT_ID is None
+
+
+def test_completed_development_result_and_candidate_config_are_consistent() -> None:
+    result = json.loads(perf9.DEV_RESULT_PATH.read_text(encoding="utf-8"))
+    config = json.loads(perf9.CANDIDATE_CONFIG_PATH.read_text(encoding="utf-8"))
+    assert result["phase"] == "dev"
+    assert result["model"] == perf9.MODEL
+    assert result["provider_calls"] == 40
+    assert result["provider_input_tokens"] == 30503
+    assert result["contains_query_or_answer_text"] is False
+    assert result["candidate_config"] == config
+    assert result["candidates"]["dense"]["critical_false_narrow_count"] == 0
+    assert result["candidates"]["dense"]["recall_at_1"] > 0.9
+    assert result["candidates"]["dense"]["recall_at_3"] == 1.0
+    assert result["candidates"]["qwen_dense_lexical_hybrid"]["recall_at_1"] < result["candidates"]["dense"]["recall_at_1"]
 
 
 def test_attempt_id_is_consumed_with_exclusive_creation(tmp_path: Path, monkeypatch) -> None:

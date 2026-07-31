@@ -48,3 +48,25 @@ This proves that the current API key/workspace is not authorised to call the sta
 to `None` after the attempt. The next attempt is forbidden until the owner grants the model to this
 workspace/API key (or supplies a default-workspace key with model scope `All`) and issues a new
 explicit LIVE GO with a new attempt ID.
+
+## Attempt 3 — development calibration completed
+
+- Attempt ID: `perf9-qwen-dev-compat-2026-08-01-03`
+- Phase: development calibration only; holdout files were not read
+- Model: Alibaba Qwen `text-embedding-v4` (observed exactly)
+- Dimension/output: `1024`, dense
+- Calls attempted/completed: **40/40**, retry 0
+- Provider input tokens: **30,503**
+- End-to-end evaluation duration: **96,049 ms**
+- Ledger state: `completed`; attempt ID consumed
+
+Development metrics after safety-first threshold calibration:
+
+| Candidate | Critical false narrow | Recall@1 | Recall@3 | Fallback rate |
+|---|---:|---:|---:|---:|
+| Qwen dense | 0 | 90.6% | 100% | 59.2% |
+| Qwen dense + local lexical RRF | 0 | 71.9% | 90.6% | 69.4% |
+
+These are development-set metrics, not an independent quality claim. The resulting candidate
+configuration and development result must be committed before any retrieval process reads the
+holdout query file. The LIVE gate was returned to `None` after completion.

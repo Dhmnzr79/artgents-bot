@@ -1,0 +1,19 @@
+{
+  "candidates": {
+    "dense": {
+      "min_margin": 0.06788,
+      "min_score": 0.0
+    },
+    "qwen_dense_lexical_hybrid": {
+      "min_margin": 0.0,
+      "min_score": 0.016393
+    }
+  },
+  "dimension": 1024,
+  "hybrid_dense_weight": 0.75,
+  "model": "text-embedding-v4",
+  "output_type": "dense",
+  "schema_version": 1,
+  "source_gold_sha256": "e2a59ec5cb82229ca590291321011932635269d6ef545ea9543e418ee54ee681",
+  "source_phase": "dev"
+}

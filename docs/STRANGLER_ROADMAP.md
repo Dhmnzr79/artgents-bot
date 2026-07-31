@@ -817,6 +817,33 @@ eval), and only then the still-later, still-separately-gated PERF-8 real Compose
 
 ---
 
+## Active — PERF-7A + PERF-7B implementation (unwired, owner GO each)
+
+**PERF-7A COMPLETE:** `core/target_lexical_paragraph_index.py` — pure in-memory, offline paragraph
+index over client MD (deterministic recursive discovery, H2/H3 + fence-aware section splitting, a
+40-char minimum-unit merge rule) plus `search_target_lexical_paragraph_index` (NFKC/casefold/ё-е
+normalized token-overlap + prefix matching, deterministic tie-break, typed validation). 52 tests.
+
+**PERF-7B COMPLETE:** `contracts/target_evidence_package.py` (`TargetEvidencePackage`, strict/
+frozen) + `core/target_evidence_package_builder.py` (`build_target_evidence_package`) — the one
+canonical producer combining exact `evidence_blocks` extraction, conservative lexical-retrieval
+widening (accept only ≥1 exact token match, reject ambiguous ties, no invented confidence score),
+explicit-only session projection, and FullContext fallback. Does not extend or reuse PERF-6's
+`service_exact/topic/context_group/full` ladder; does not read/know about `context_group` at all.
+51 tests.
+
+**Both remain fully unwired** — no `app.py`/Composer/Verifier/pipeline/`TurnFrame`/`session.py`
+code imports either module (proven by `git grep`-restricted-to-import-statement tests in each
+module's own test suite). `clients/**` byte-identical throughout. Real Composer/Verifier still
+receive the full FullContext corpus unconditionally via PERF-6's own unchanged shadow hook —
+**no speedup exists yet from PERF-6, PERF-7A, or PERF-7B.** See TASK.md's PERF-7A/PERF-7B
+completion records.
+
+**STOP before PERF-7C** (offline package evaluation) — a separate, later, owner-approved milestone,
+followed only then by the still-later, still-separately-gated PERF-8 real Composer/Verifier switch.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

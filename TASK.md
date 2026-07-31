@@ -9073,3 +9073,297 @@ deliberately left unchanged (see "Delivered" above) rather than touched speculat
 and commit/push only.
 
 ---
+
+## Completion record (PERF-7B implementation, owner GO)
+
+**Status:** implementation COMPLETE. **Not wired to any runtime path.** No `app.py`, Composer,
+Verifier, pipeline, `TurnFrame`, `session.py`, or widget code imports this module (confirmed by a
+live `git grep`-restricted-to-import-statements test, mirroring PERF-7A's own proof). PERF-7C
+(offline package evaluation) remains a separate, still-unauthorized, later milestone. **Real
+Composer/Verifier still receive the full cached FullContext corpus unconditionally, via PERF-6's
+own already-shipped shadow hook in `core/target_policy_bound_verified_response_pipeline.py` — no
+speedup exists yet from PERF-6, PERF-7A, or PERF-7B.**
+
+### Delivered (exact allowlist)
+
+- `contracts/target_evidence_package.py` — the one new contract module.
+- `core/target_evidence_package_builder.py` — the one new builder module.
+- `tests/test_final_local_evidence_package_builder_implementation.py` — 51 new tests.
+- `tests/test_final_local_evidence_package_builder_foundation_governance.py` — one test function
+  renamed/extended (`test_perf7a_complete_perf7b_perf7c_not_started` →
+  `test_perf7a_perf7b_complete_perf7c_not_started`), asserting live filesystem state: PERF-7A and
+  PERF-7B artifacts now exist, PERF-7C artifacts still do not, `context_groups.json` still does not
+  exist anywhere. No other test in that file weakened.
+- This TASK.md completion record.
+- `docs/FLAGS_AND_STATUS.md`/`docs/STRANGLER_ROADMAP.md` — minimal status sync (see below).
+
+### Public contract (exact)
+
+```python
+# contracts/target_evidence_package.py
+class TargetEvidenceStructuredRecordIds(BaseModel):  # frozen, extra="forbid", strict
+    offer_ids: tuple[str, ...] = ()
+    fact_ids: tuple[str, ...] = ()
+    doctor_ids: tuple[str, ...] = ()
+    policy_sections: tuple[str, ...] = ()
+
+class TargetEvidenceProvenance(BaseModel):  # frozen, extra="forbid", strict
+    ref: str            # namespace-tagged for structured records (offer:/fact:/doctor:/policy:)
+    source: Literal["evidence_block", "exact_content_ref", "structured_record",
+                     "session_projection", "lexical_retrieval", "fullcontext_fallback"]
+    reason: str          # canonical token, e.g. "structured_record_id"
+
+class TargetEvidencePackage(BaseModel):  # frozen, extra="forbid", strict
+    selected_md_refs: tuple[str, ...] = ()
+    selected_paragraph_refs: tuple[str, ...] = ()
+    exact_evidence_block_refs: tuple[str, ...] = ()
+    structured_record_ids: TargetEvidenceStructuredRecordIds
+    session_derived_refs: tuple[str, ...] = ()
+    retrieval_derived_refs: tuple[str, ...] = ()
+    provenance: tuple[TargetEvidenceProvenance, ...] = ()
+    completeness_status: Literal["complete", "insufficient_widened", "fullcontext_fallback"]
+    fallback_reason: str | None = None
+    serialized_context_chars: int
+    estimated_tokens: int
+    package_fingerprint: str
+```
+
+**Documented contract clarification (not a silent deviation):** the seam audit's Phase 1 sketch
+(§9) named this field `estimated_chars`; it is implemented here as `serialized_context_chars` — the
+exact same value, renamed to honestly say what it measures (deterministic serialization of the
+*selected* evidence actually assembled by this package), never a claim about a real future HTTP
+prompt size (no Scoped Composer exists yet to measure that against). Cross-field invariants enforce
+`estimated_tokens == serialized_context_chars // 4`, `complete` forbids `fallback_reason` and vice
+versa, and a `fullcontext_fallback` package forbids non-empty `session_derived_refs`/
+`retrieval_derived_refs` (both become moot once the whole corpus is already included). No field on
+this contract can hold a raw question, answer, session id, or contact value — every field is a
+count, an enum, a hash-shaped string, or a tuple of short reference IDs (proven by a dedicated test
+asserting the field-name set contains none of `question`/`answer`/`raw_text`/`sid`/`contact_value`).
+
+### Public Builder API (exact)
+
+```python
+# core/target_evidence_package_builder.py
+def build_target_evidence_package(
+    request: TargetComposerRequest,
+    lexical_index: TargetLexicalParagraphIndex,
+    cached_full_context: TargetCachedFullContext,
+    *,
+    md_root: Path,
+    explicit_followup: bool = False,
+    session_derived_refs: tuple[str, ...] = (),
+    comparison_required: bool = False,
+) -> TargetEvidencePackage: ...
+
+class TargetEvidencePackageBuilderError(ValueError): ...  # typed fail-closed caller-contract error
+```
+
+One canonical producer — no separate builder for service/topic/group (proven by a source-level test
+asserting the module never references `context_group`, `service_exact`, or PERF-6's resolver/shadow
+modules at all). Reads `request.user_message` only to build the lexical search query — it is never
+placed on the returned package, in a cache, or in a log line (this module performs zero logging
+calls anywhere, proven by an AST-level test). Never reads session state, a `ContextVar`, a Flask
+request, or any global itself — `session_derived_refs` must always be supplied explicitly by the
+caller. `bundle`/`doctor_catalog` are deliberately **not** parameters: every structured ID this
+Builder reports is read directly from the already-materialized `TargetComposerRequest.
+evidence_blocks`, mirroring the exact precedent `core/target_context_scope_resolver.py` already
+established for PERF-6's own `service_exact` tier — no new content authority, no new MD parser (the
+frontmatter/heading/fence parsing all lives, unchanged, in PERF-7A's own
+`core/target_lexical_paragraph_index.py`, reused only through its existing public
+`search_target_lexical_paragraph_index` function).
+
+### Exact evidence extraction rules
+
+`request.evidence_blocks` is walked once; each block's `kind` maps deterministically to exactly one
+target: `content`/`external_kb` → bare MD filename (`content:{file}`, `content:{file}#{anchor}`, and
+`kb:{file}#{anchor}` all correctly strip to `{file}` — the anchored-`content:` case is handled
+defensively even though the real pipeline never produces it today); `offer` → exact `offer_id`;
+`commercial_fact` → exact `fact_id`; `doctor`/`external_doctor` → exact `doctor_id`;
+`clinic_contact` → exact policy field name (never the contact *value*); `consultation` → its own
+content ref, folded into `selected_md_refs` alongside ordinary content refs. Stable, first-occurrence
+dedup and canonical (insertion) ordering are applied to every extracted tuple. Two tests
+(`test_17`/`test_18`) prove extraction never fabricates an offer/doctor id that was not actually
+present in `evidence_blocks` — there is no `required_offer_id`/`required_doctor_id` field on
+`TargetResponseSpec` to check "the right one" against, so the honest, implementable exactness
+guarantee this milestone provides is: *only* real, materialized ids are ever reported, never an
+invented or coincidentally-similar one.
+
+### Conservative completeness rule
+
+A deficit is checked, never assumed, against four categories: `spec.required_fact_ids ⊆`
+extracted fact ids ("fact"); `"price" in spec.required_components` requires a non-empty extracted
+offer-id set ("offer"); `"doctors" in spec.required_components` requires a non-empty extracted
+doctor-id set ("doctor"); `"content" in spec.required_components` requires a non-empty extracted
+content-ref set ("content"); and, only when the caller passes `comparison_required=True`, whether
+any already-included content document's `document_type` (read from the lexical index's own
+per-document frontmatter metadata, never invented) equals `"comparison"`. **"fact"/"offer"/"doctor"
+deficits can never be closed by lexical retrieval** — they are structural, so any one of them
+present forces an immediate `fullcontext_fallback` (reason
+`structured_evidence_incomplete_requires_fullcontext`) without even running a lexical search, since
+lexical text search cannot produce a structured offer/fact/doctor record. Only "content" and
+"comparison" deficits are lexical-eligible.
+
+### Lexical acceptance/fallback rule (explainable, no invented confidence score)
+
+When at least one lexical-eligible deficit remains, `search_target_lexical_paragraph_index` is
+called once with `request.user_message` (limit 8). Hits are filtered to those with
+`exact_token_matches >= 1` — a categorical fact ("was there any real token match"), not a tunable
+similarity number. Zero eligible hits → `fullcontext_fallback` (`lexical_zero_hits` if the search
+returned nothing at all, `lexical_only_weak_prefix_matches` if it returned only prefix-only hits).
+Otherwise the single highest-scoring **document** among eligible hits is taken; if two or more
+documents tie at the top score → `fullcontext_fallback` (`lexical_ambiguous_top_match`) — never a
+guess among ties. A `"content"` deficit is closed by that document (and its matched paragraph id,
+for provenance); a `"comparison"` deficit additionally requires that document's own
+`document_type == "comparison"` — if the confident top hit is not comparison-typed, fallback
+(`lexical_no_comparison_document_found`), never a forced "close enough" accept. A package widened
+this way is `completeness_status="insufficient_widened"`, never `"complete"` — the two are kept
+distinct exactly as the seam audit's own `TargetContextScopeDecision` precedent already
+distinguishes narrowest-exact from confirmed-but-broader. **When exact evidence alone already
+satisfies every deficit, lexical search is never even called** (proven by `test_20`) — retrieval is
+strictly auxiliary, never a router, exactly as directed.
+
+### Session projection rule
+
+`explicit_followup=False` with any non-empty `session_derived_refs` raises
+`TargetEvidencePackageBuilderError` (code `evidence_package_session_refs_without_explicit_followup`)
+— a pure caller-contract violation, distinct from a runtime ambiguity, so it is raised rather than
+silently absorbed. When `explicit_followup=True`, each ref is checked against the lexical index's
+own known `document_path` set; an unresolvable ref triggers `fullcontext_fallback`
+(`unknown_session_ref`) for the **whole** package, never a silent per-ref drop, per the brief's own
+"structural inconsistency conservatively falls back" instruction. Session refs never by themselves
+count toward closing a "content"/"comparison" completeness deficit (only exact evidence and
+confident lexical retrieval do) — a deliberate, documented conservatism: session continuity is not
+proof that *this turn's* specific structural requirement is met.
+
+### Structural consistency guard (before any other logic runs)
+
+`build_target_evidence_package` first compares `{p.document_path for p in lexical_index.
+paragraphs}` against `set(cached_full_context.document_paths)`. Any mismatch (the two were built
+from different `md_root`s, or one is stale relative to the other) forces an immediate
+`fullcontext_fallback` (`lexical_index_full_context_document_set_mismatch`) before any exact/lexical
+logic runs at all — exactly the "consistency between lexical index / cached FullContext / md_root"
+check the brief required.
+
+### Fingerprint components (namespace-tagged, hash/ID-only payload)
+
+`sha256("|".join([schema_version, completeness_status, fallback_reason or "",
+sorted("md:{ref}:{doc_hash}" for each selected MD), sorted("{block.ref}:{text_hash_16}" for each
+evidence block), sorted("offer:{id}"/"fact:{id}"/"doctor:{id}"/"policy:{field}" for each structured
+record), sorted("session:{ref}"), sorted("retrieval:{ref}")]))`. Namespace tags
+(`offer:`/`fact:`/`doctor:`/`policy:`/`session:`/`retrieval:`/`md:`) guarantee a bare id shared
+across two different record classes (e.g. an offer and a doctor both literally named `"x"`) can
+never collide in the payload or in `TargetEvidenceProvenance.ref` — proven directly by `test_34`.
+Changes on: selected-MD content hash, evidence-block ref, evidence-block text hash, any structured
+ID set, session refs, retrieval refs, completeness/fallback state, and `EVIDENCE_PACKAGE_SCHEMA_
+VERSION` (proven by `test_31`/`test_32`/`test_33`). During `fullcontext_fallback`, the MD component
+collapses to one entry (`md:fullcontext:{cached_full_context.sha256}`) instead of 55+ individual
+file reads — reuses the corpus's own already-computed hash rather than re-reading every file, and
+is still fully sensitive to any real corpus change (that sha256 changes whenever any MD file does).
+
+### What "size" means here (stated exactly, as required)
+
+`serialized_context_chars` = **(a)** the deterministic `---BEGIN DOC:{ref}---\n{text}\n---END
+DOC:{ref}---`-wrapped whole-document text (the same stable wrapper shape `core/target_cached_full_
+context.py` documents publicly) for every distinct filename in `selected_md_refs`, read fresh from
+disk once per file, **plus (b)** `len(block.text)` for every `evidence_blocks` entry whose `kind` is
+**not** `content`/`external_kb`/`consultation` (those three are document-backed and already fully
+counted in (a) — excluding them avoids double-counting). This is **not** a claim about a real future
+HTTP prompt size: no Scoped Composer invocation exists yet to measure that against — it is exactly,
+and only, the deterministic serialized size of *this specific package's own selected evidence*,
+proven arithmetically exact against a hand-computed expected value in `test_35`.
+`estimated_tokens = serialized_context_chars // 4` (the same floor-division estimate convention
+used throughout this repo).
+
+### Demo package examples (real, read-only; `clients/demo/**` untouched)
+
+| Scenario | `completeness_status` | `selected_md_refs` count | `serialized_context_chars` | `estimated_tokens` | build time |
+|---|---|---:|---:|---:|---:|
+| Exact service content (`classic`) | `complete` | 1 | 2,036 | 509 | ~0.8 ms |
+| Exact service content+price (`all_on_4`) | `complete` | 1 | 4,193 | 1,048 | ~0.7 ms |
+| Generic content-only, no service, unmatched wording | `fullcontext_fallback` (`lexical_ambiguous_top_match`) | 55 | 107,980 | 26,995 | ~6 ms |
+
+The third row is a genuine, unforced outcome, not a cherry-picked pass: the query legitimately ties
+across several documents once tokenized (short/common Russian words), and the Builder correctly
+refuses to guess — exactly the conservative behavior this milestone required, not a shortcut taken
+to make a demo look better than the algorithm actually performs. **Honest note on PERF-6's own debt
+item 3** (§2 of the PERF-6 completion record above): unlike PERF-6's `_closure_size`, this sizing
+includes non-document-backed evidence-block text explicitly (component (b) above) — the same debt
+item this milestone's own governance seam audit flagged is not repeated here.
+
+### PERF-6 status (unchanged by this milestone, restated per the brief's explicit instruction)
+
+- PERF-7B is the intended future replacement for PERF-6's `service_exact/topic/context_group/full`
+  ladder, per the owner's direction restated in this milestone's brief — **not yet authorized to
+  replace it**; that is PERF-8, still separately owner-gated.
+- PERF-6's own runtime hook (`core/target_policy_bound_verified_response_pipeline.py::
+  run_target_offline_policy_bound_verified_response_pipeline_with_selection`'s unconditional,
+  ungated shadow resolve) remains **live, unmodified, temporary debt** — this milestone does not
+  touch it, does not remove it, and does not reduce its per-turn overhead.
+- This Builder does not read, import, or know about `context_group` in any form (proven by
+  `test_46`).
+- Nothing in the real runtime calls `build_target_evidence_package` — it is invoked only by its own
+  test suite (proven by `test_41`'s live `git grep` restricted to real import statements).
+- The real Composer/Verifier invocation still carries the full, unscoped `cached_full_context`
+  corpus every turn, exactly as PERF-6 left it.
+- **No speedup exists yet anywhere in this repository from PERF-6, PERF-7A, or PERF-7B** — all
+  three are measurement/design-stage artifacts, not an active product path.
+
+### Test results
+
+- `tests/test_final_local_evidence_package_builder_implementation.py` — **51 passed**.
+- `tests/test_final_local_evidence_package_builder_foundation_governance.py` — **26 passed**
+  (updated for PERF-7A COMPLETE / PERF-7B COMPLETE / PERF-7C NOT STARTED).
+- `tests/test_final_local_lexical_paragraph_index_implementation.py` — **52 passed** (unaffected,
+  re-run as part of this gate to prove PERF-7A behavior is unchanged).
+- `tests/test_final_multi_level_scoped_context_shadow_implementation.py`,
+  `tests/test_target_composer_request.py`, `tests/test_target_cached_full_context.py`,
+  `tests/test_target_response_verifier.py` — **all passed**, pre-existing PERF-6/S36/S38/S44
+  neighbors, unaffected by this unwired addition.
+- `scripts/validate_client_pack.py --client-id demo` — OK.
+- `scripts/validate_client_pack.py --path clients/_template --scaffold` — OK.
+- `pytest tests/ --collect-only` — zero collection errors; new total is the PERF-7A baseline (3,824)
+  plus this milestone's 51 new tests.
+- `git diff --check` — clean.
+- `clients/**` byte-identical since `802dfa1` (confirmed by scoped `git diff --name-only`, zero
+  changed paths).
+- No `config.py`/`app.py`/`session.py`/Composer/Verifier/pipeline/`contracts/turn_frame.py`/PERF-6
+  resolver-or-shadow file touched (confirmed by scoped `git diff --name-only` against the same
+  forbidden-path set used by PERF-7A's own gate, extended with the PERF-6 resolver/shadow modules
+  and `session.py`).
+- No new third-party dependency: the contract module imports only `pydantic`/stdlib; the builder
+  module imports only this repository's own `contracts`/`core` modules plus stdlib (confirmed by
+  AST-based tests on both files).
+- Zero LLM/provider/network calls anywhere in this milestone's code or tests — the builder module
+  has no logging import either (queries and raw hit/evidence text are structurally impossible to
+  log from inside it, confirmed by an AST-based test). The number of real LLM calls the existing
+  bot makes is unchanged, since nothing in the real runtime path was touched.
+
+### Deviations from the allowlist
+
+One documented contract clarification, not a silent deviation: `estimated_chars` (seam audit §9
+naming) is implemented as `serialized_context_chars` (see "Public contract" above) — the value and
+its meaning are unchanged, only the name, chosen to honestly describe what is actually measured.
+No other deviation. Exactly the allowed files were touched: `contracts/target_evidence_package.py`
+(create), `core/target_evidence_package_builder.py` (create),
+`tests/test_final_local_evidence_package_builder_implementation.py` (create),
+`tests/test_final_local_evidence_package_builder_foundation_governance.py` (update, one function),
+`TASK.md` (this record), plus the minimal `docs/FLAGS_AND_STATUS.md`/`docs/STRANGLER_ROADMAP.md`
+status sync below.
+
+### Confirmations
+
+- **NO RUNTIME WIRING** — confirmed by a live `git grep`-based test restricted to real Python
+  `import`/`from ... import` statements: the only files importing this Builder are itself and its
+  own test file.
+- **NO CLIENT-PACK CHANGE** — `clients/**` byte-identical since `802dfa1`, confirmed by scoped
+  `git diff`.
+- **NO LIVE / NO LLM / NO NETWORK** — the module makes zero network/provider calls; all 51
+  implementation tests run against `tmp_path` synthetic fixtures or the local, already-committed
+  `clients/demo` tree, entirely offline. The real bot's LLM call count is unchanged.
+- **No speedup exists yet** — stated honestly, not implied otherwise: this is measurement/design-
+  stage tooling, not an active product path.
+
+**STOP before PERF-7C (offline package evaluation).** This owner GO authorized PERF-7B
+implementation and commit/push only.
+
+---

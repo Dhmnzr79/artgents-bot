@@ -290,6 +290,19 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    `docs/evidence/performance/FINAL_LOCAL_EVIDENCE_PACKAGE_BUILDER_FOUNDATION_SEAM_AUDIT.md`.
    **NO PRODUCT CODE. NO CLIENT-PACK CHANGE. NO LIVE.** STOP before PERF-7A (lexical index
    implementation).
+   **PERF-7A implementation COMPLETE** (`core/target_lexical_paragraph_index.py`, owner GO): pure
+   in-memory paragraph index + token-overlap/prefix lexical search over client MD, unwired.
+   **PERF-7B implementation COMPLETE** (`contracts/target_evidence_package.py` +
+   `core/target_evidence_package_builder.py`, owner GO): one canonical, unwired
+   `build_target_evidence_package` combining exact `evidence_blocks`, conservative lexical
+   widening (exact-token-match bar, ambiguous-tie fallback, no invented confidence score),
+   explicit-only session projection, and FullContext fallback into one typed
+   `TargetEvidencePackage`. Neither module is imported by any runtime path (`app.py`, Composer,
+   Verifier, pipeline, `TurnFrame`, `session.py`) — proven by `git grep`-restricted-to-imports
+   tests. Real Composer/Verifier still receive the full FullContext corpus unconditionally via
+   PERF-6's own unchanged shadow hook — **no speedup exists yet from PERF-6, PERF-7A, or PERF-7B**.
+   See TASK.md's PERF-7A/PERF-7B completion records. **NO CLIENT-PACK CHANGE. NO LIVE.** STOP
+   before PERF-7C (offline package evaluation).
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

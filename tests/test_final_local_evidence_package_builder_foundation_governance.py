@@ -392,14 +392,16 @@ def test_forbidden_actions_documented() -> None:
 # --------------------------------------------------------------------------------------------
 
 
-def test_perf7a_complete_perf7b_perf7c_not_started() -> None:
-    """PERF-7A (lexical paragraph index implementation) shipped under a separate, later owner GO
-    after this Phase 1 governance commit -- this live filesystem check tracks *current* reality,
-    exactly like PERF-6's own governance checker updated its "does not exist yet" assertion after
-    PERF-6 Phase 2 shipped (see that file's ``test_phase2_resolver_shadow_contract_files_now_exist_
-    context_groups_still_does_not``). PERF-7B (``EvidencePackageBuilder``) and PERF-7C (offline
-    package eval) remain separate, still-unauthorized, later milestones -- their artifacts must
-    still not exist."""
+def test_perf7a_perf7b_complete_perf7c_not_started() -> None:
+    """PERF-7A (lexical paragraph index) and PERF-7B (``EvidencePackageBuilder``) shipped under
+    separate, later owner GOs after this Phase 1 governance commit -- this live filesystem check
+    tracks *current* reality, exactly like PERF-6's own governance checker updated its "does not
+    exist yet" assertion after PERF-6 Phase 2 shipped (see that file's
+    ``test_phase2_resolver_shadow_contract_files_now_exist_context_groups_still_does_not``).
+    PERF-7C (offline package eval) remains a separate, still-unauthorized, later milestone -- its
+    artifacts must still not exist. Neither PERF-7A nor PERF-7B is wired to any runtime path or
+    extends/reuses PERF-6's ``service_exact/topic/context_group/full`` ladder -- ``context_groups.
+    json`` still does not exist anywhere."""
 
     # PERF-7A COMPLETE.
     assert (_REPO_ROOT / "core" / "target_lexical_paragraph_index.py").is_file()
@@ -407,12 +409,16 @@ def test_perf7a_complete_perf7b_perf7c_not_started() -> None:
         _REPO_ROOT / "tests" / "test_final_local_lexical_paragraph_index_implementation.py"
     ).is_file()
 
-    # PERF-7B NOT STARTED.
-    assert not (_REPO_ROOT / "contracts" / "target_evidence_package.py").exists()
-    assert not (_REPO_ROOT / "core" / "target_evidence_package_builder.py").exists()
+    # PERF-7B COMPLETE.
+    assert (_REPO_ROOT / "contracts" / "target_evidence_package.py").is_file()
+    assert (_REPO_ROOT / "core" / "target_evidence_package_builder.py").is_file()
+    assert (
+        _REPO_ROOT / "tests" / "test_final_local_evidence_package_builder_implementation.py"
+    ).is_file()
 
     # PERF-7C NOT STARTED -- no offline package-eval harness/fixtures exist yet.
     assert not (_REPO_ROOT / "evals" / "v5" / "demo" / "evidence_package_eval_matrix.json").exists()
+    assert not (_REPO_ROOT / "scripts" / "run_evidence_package_eval.py").exists()
 
     # Still not created by any PERF-7 milestone so far.
     for relative in (

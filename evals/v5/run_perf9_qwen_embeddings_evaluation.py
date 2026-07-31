@@ -43,7 +43,7 @@ HYBRID_DENSE_WEIGHT = 0.75
 RRF_K = 60
 MAX_BATCH_SIZE = 10
 TIMEOUT_SECONDS = 60.0
-LIVE_AUTHORIZED_ATTEMPT_ID: str | None = None
+LIVE_AUTHORIZED_ATTEMPT_ID: str | None = "perf9-qwen-dev-compat-2026-08-01-03"
 
 MD_ROOT = ROOT / "clients" / "demo" / "md"
 DEV_GOLD_PATH = Path(__file__).with_name("perf8_retrieval_relevance_gold_v2.json")

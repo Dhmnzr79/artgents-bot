@@ -9538,3 +9538,126 @@ LIVE/LLM GO); any LIVE/LLM GO of any kind. This owner GO authorized PERF-7C offl
 evaluation and commit/push at PASS only.
 
 ---
+
+## Completion record (PERF-7C eval correction — supersedes the PASS verdict above, owner GO)
+
+**The `PERF7C_OFFLINE_PACKAGE_EVAL_PASS` verdict recorded in the completion record immediately above
+this one is WITHDRAWN. It was wrong.** New verdict: **`PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND`**,
+`critical_false_narrow_count = 10` (previously misreported as `0`). This record is not a rewrite of
+the one above — that record's factual description of what was delivered (files, test counts, the
+doctor-ID matrix fix) remains accurate — only its PASS conclusion was wrong, and this record
+corrects that conclusion honestly rather than editing it away. Full detail:
+[`docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md`](evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md)
+(rewritten in place with a correction notice at the top — the original PASS-framed content is
+superseded there, not preserved as a separate historical document, since it described a factually
+wrong verdict rather than a design decision that later changed).
+
+### What was wrong
+
+For 10 scenarios (`s051`, `s053`–`s056` in `treatment_plan_other_clinic`; `s083`–`s084` in
+`cross_topic`; `s099`–`s101` in `unknown_wording`), the original matrix set the "expected" lexical
+target document to whatever `search_target_lexical_paragraph_index` actually returned for that exact
+query — discovered by running the search before freezing the matrix, then accepted because the score
+was a unique, confident top match. A unique confident score only proves there was no ranking tie; it
+proves nothing about whether the returned document is a relevant answer. In all 10 cases it was not
+(e.g. a question about reviewing an external clinic's treatment plan resolved to
+`clinic__info__technology.md`, a page about 3D/AI diagnostic technology). This is circular
+evaluation: grading the algorithm against its own output. Compounding it, the eval runner's
+`_classify` function routed any widened-but-off-target result into a soft, non-critical
+`unexpected_scoped_target` bucket instead of `critical_false_narrow`, so even a corrected matrix
+would not, by itself, have failed the binding PASS criteria without also fixing the scoring logic.
+
+### What was fixed (eval-only — per the owner's explicit instruction, no product file touched)
+
+- `evals/v5/perf7c_local_evidence_package_eval_matrix.json` — expectations for the 10 scenarios
+  re-derived from question meaning and canonical demo-pack authority, decided independently of
+  search output. Query wording was **not** changed anywhere. For the 5
+  `treatment_plan_other_clinic` scenarios, the one genuinely relevant document
+  (`clinic__info__consultation.md` — authored alias "план лечения", body literally offers to draw up
+  a treatment plan at consultation) was identified and set as the allowed target; verified,
+  read-only, that this document does appear in the real search results for all five queries but
+  always ranks below the coincidentally-matching wrong document (score comparison in the audit
+  doc's own table) — this observation did not change the expectation, only explains why the
+  now-correct expectation still legitimately produces `critical_false_narrow` against the
+  unmodified, real search behavior. For the 2 `cross_topic` and 3 `unknown_wording` scenarios, no
+  document was judged genuinely relevant at all (both classes exist specifically to test honest
+  fallback on multi-topic/deliberately-novel questions) — their allowed target set is empty, so any
+  confident widened result is automatically wrong by design.
+- `evals/v5/run_perf7c_local_evidence_package_eval.py` — `_classify` no longer has a soft
+  "unexpected_scoped_target" escape path: any widened package whose target falls outside the
+  independently-derived allowed set is now unconditionally `critical_false_narrow`
+  (verdict `critical_false_narrow_irrelevant_lexical_target`), regardless of completeness_status,
+  regardless of a unique top score, regardless of matching a prior (now-corrected) expectation. Also
+  adds the `PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND` verdict string, used when every critical failure
+  in a run is specifically this defect class (distinct from the generic
+  `PERF7C_CRITICAL_FALSE_NARROW_FOUND`, which remains available for any future run where a critical
+  failure has a different root cause).
+- `docs/evidence/performance/perf7c_local_evidence_package_eval_result.json` — regenerated from the
+  corrected matrix/runner; still holds no raw query, generated answer, session id, PII, or contact
+  value (re-verified by the contract test suite).
+- `docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md` — corrected in place with a
+  prominent correction notice, the full 10-scenario query→wrong-target→why-irrelevant table, the
+  consultation.md score-comparison evidence, and the updated (failing) binding-PASS table.
+- `tests/test_final_local_evidence_package_eval_contract.py` — updated to assert the corrected
+  verdict and metrics; no criterion was loosened (the file's canonical-ID cross-check, determinism
+  proof, sanitization checks, and integration subset are unchanged).
+- `tests/test_final_local_lexical_paragraph_index_implementation.py` — separately, its
+  `test_module_not_imported_anywhere_outside_this_test_and_itself` test (renamed
+  `test_module_not_imported_by_any_real_runtime_path`) was updated for the legitimate architectural
+  fact that PERF-7B's `core/target_evidence_package_builder.py` (and PERF-7C's own runner/contract
+  test) import `core/target_lexical_paragraph_index.py`'s public search API — this dependency was
+  always intended and is not itself a defect; the test now asserts the invariant that actually
+  matters (no *real runtime* module imports it), not "zero non-runtime consumers ever," which was
+  always going to go stale as PERF-7 progressed. This test had gone stale silently at the `75ce5f9`
+  commit itself (it only kept passing during PERF-7B's own PRE-COMMIT gate because the newly-created
+  builder file was untracked by git at the moment that gate ran) — a latent issue, now fixed.
+- `contracts/target_evidence_package.py`, `core/target_evidence_package_builder.py`,
+  `core/target_lexical_paragraph_index.py` — **not touched**, per explicit instruction. The defect
+  was in the evaluation, not in either product module.
+
+### Corrected metrics
+
+```
+total_scenarios: 118
+scoped_complete_count: 61   scoped_widened_count: 22   scoped_count: 83 (70.3%, descriptive only)
+fullcontext_fallback_count: 33 (28.0%)
+critical_false_narrow_count: 10   (all: critical_false_narrow_irrelevant_lexical_target)
+safe_over_fallback_count: 0
+session_contamination_count: 0
+structured_id_mismatch_count: 0
+builder_exception_count: 0
+lexical_hit_count: 22 (12 genuinely correct + 10 now-identified defects)   lexical_ambiguous_count: 24   lexical_miss_count: 3
+```
+
+Two independent post-correction eval runs produce byte-identical categorical/source-ID results
+(only `timing_ms` differs). `git diff` scoped to `clients/` remains empty throughout.
+
+### Test results
+
+- `tests/test_final_local_evidence_package_eval_contract.py` — updated, passing.
+- `tests/test_final_local_lexical_paragraph_index_implementation.py` — **52 passed** (including the
+  corrected isolation test).
+- `tests/test_final_local_evidence_package_builder_implementation.py`,
+  `tests/test_final_local_evidence_package_builder_foundation_governance.py` — unaffected, re-run,
+  passing.
+- Neighbor suites (PERF-6 implementation, composer-request, cached-full-context, verifier) —
+  unaffected, re-run, passing.
+- `scripts/validate_client_pack.py` — OK for `demo` and `_template`.
+- `git diff --check` — clean. `clients/**` byte-identical since `596a4b3`.
+
+### Confirmations
+
+- **NO PRODUCT CHANGE** — `contracts/target_evidence_package.py`,
+  `core/target_evidence_package_builder.py`, `core/target_lexical_paragraph_index.py` all
+  byte-identical since `596a4b3`.
+- **NO RUNTIME WIRING** — unchanged, still true.
+- **NO CLIENT-PACK CHANGE** — `clients/**` byte-identical since `596a4b3`.
+- **NO LIVE / NO LLM / NO NETWORK** — unchanged, still true.
+
+**STOP before**: any Builder or lexical-index correction (a real limitation was found — plain
+token-overlap ranking can rank an irrelevant document above a relevant lower-scoring one — but
+deciding how to address it is a separate, future, owner-approved milestone, not decided here);
+PERF-8; any counterfactual FullContext-vs-Scoped-Composer evaluation; any embeddings work; any
+LIVE/LLM GO of any kind. This owner GO authorized only the eval correction and commit/push.
+
+---

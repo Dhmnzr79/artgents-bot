@@ -844,27 +844,33 @@ followed only then by the still-later, still-separately-gated PERF-8 real Compos
 
 ---
 
-## Active — PERF-7C offline package evaluation (owner GO, verdict PASS)
+## Active — PERF-7C offline package evaluation (owner GO; CORRECTED, verdict DEFECT FOUND)
 
-**Verdict: `PERF7C_OFFLINE_PACKAGE_EVAL_PASS`.** 118 synthetic, purpose-authored scenarios across
-the 18 required classes (`evals/v5/perf7c_local_evidence_package_eval_matrix.json`), run through the
-real, unmodified `build_target_evidence_package` via an offline, deterministic runner
-(`evals/v5/run_perf7c_local_evidence_package_eval.py`) — no Composer/Verifier/Planner/Boundary/
-Ingress call, no LLM, no network. `critical_false_narrow_count = 0`,
-`session_contamination_count = 0`, `structured_id_mismatch_count = 0`,
-`builder_exception_count = 0`; 70.3% scoped / 28.0% honest fallback; median 98.1% estimated token
-reduction on scoped packages against the live 26,995-token full-corpus baseline (never hardcoded).
-Two independent runs proven byte-identical (categorical/source-ID result). Found and fixed one
-matrix-authoring bug (a doctor id using the wrong canonical format) *before* declaring PASS — the
-Builder itself needed no correction. Also disclosed, not hidden: 10 scenarios where a token-overlap
-lexical match confidently but coincidentally hit a topically unrelated document — real evidence for
-a future PERF-8 lexical-vs-embeddings sufficiency decision, not a PASS-criteria failure since the
-matrix's own expectations were grounded in this verified behavior. Full detail:
-`docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md` and TASK.md's PERF-7C
-completion record.
+**Verdict: `PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND`.** The original `PERF7C_OFFLINE_PACKAGE_EVAL_PASS`
+verdict is **withdrawn** — independent review found a circular-evaluation defect: 10 of 118
+scenarios (`treatment_plan_other_clinic` ×5, `cross_topic` ×2, `unknown_wording` ×3) had their
+"expected" lexical target set to whatever `search_target_lexical_paragraph_index` actually returned
+for that query, rather than to what the question's meaning and canonical demo-pack authority
+independently require — so a topically irrelevant confident match (e.g. a question about reviewing
+an external clinic's treatment plan resolving to a page about 3D/AI diagnostic technology) was
+graded as a pass. Corrected, using `evals/v5/perf7c_local_evidence_package_eval_matrix.json`
+(`evals/v5/run_perf7c_local_evidence_package_eval.py`, offline/deterministic, unchanged isolation
+from Composer/Verifier/Planner/Boundary/Ingress/LLM/network): `critical_false_narrow_count = 10`
+(all `critical_false_narrow_irrelevant_lexical_target`), `session_contamination_count = 0`,
+`structured_id_mismatch_count = 0`, `builder_exception_count = 0`. Two independent post-correction
+runs proven byte-identical. **Neither `core/target_evidence_package_builder.py` nor
+`core/target_lexical_paragraph_index.py` was touched** — the defect was in the evaluation's own
+expectations and scoring logic (a soft, non-critical bucket that had been hiding exactly this class
+of defect), not in either product module. Full detail:
+`docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md` (rewritten in place with a
+correction notice) and TASK.md's PERF-7C eval-correction completion record.
 
-**NO CLIENT-PACK CHANGE. NO LIVE/LLM/NETWORK. No speedup exists yet anywhere** — PERF-6, PERF-7A,
-PERF-7B, and PERF-7C all remain measurement/design-stage artifacts, not an active product path.
+**NO PRODUCT CHANGE. NO CLIENT-PACK CHANGE. NO LIVE/LLM/NETWORK. No speedup exists yet anywhere** —
+PERF-6, PERF-7A, PERF-7B, and PERF-7C all remain measurement/design-stage artifacts, not an active
+product path. **STOP before any Builder/lexical-index correction, PERF-8, or any counterfactual
+FullContext-vs-Scoped-Composer evaluation** — a real limitation of plain token-overlap ranking was
+found (it can confidently rank an irrelevant document above a relevant lower-scoring one), but how
+to address it is a separate, future, owner-approved milestone, not decided here.
 
 **STOP before**: any Builder correction (none needed); PERF-8 (Scoped Composer behind a local
 flag); any counterfactual FullContext-vs-Scoped-Composer evaluation (a separate future owner

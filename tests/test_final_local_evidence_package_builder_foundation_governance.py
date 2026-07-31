@@ -393,17 +393,23 @@ def test_forbidden_actions_documented() -> None:
 # --------------------------------------------------------------------------------------------
 
 
-def test_perf7a_perf7b_perf7c_complete() -> None:
-    """PERF-7A (lexical paragraph index), PERF-7B (``EvidencePackageBuilder``), and PERF-7C
-    (offline package eval, verdict ``PERF7C_OFFLINE_PACKAGE_EVAL_PASS``) all shipped under
-    separate, later owner GOs after this Phase 1 governance commit -- this live filesystem check
-    tracks *current* reality, exactly like PERF-6's own governance checker updated its "does not
-    exist yet" assertion after PERF-6 Phase 2 shipped (see that file's
-    ``test_phase2_resolver_shadow_contract_files_now_exist_context_groups_still_does_not``). None
-    of the three is wired to any runtime path or extends/reuses PERF-6's
+def test_perf7a_perf7b_complete_perf7c_evaluated_with_defect_found() -> None:
+    """PERF-7A (lexical paragraph index) and PERF-7B (``EvidencePackageBuilder``) are genuinely
+    COMPLETE and unaffected by the PERF-7C eval correction below. PERF-7C's evaluation
+    *infrastructure* (matrix/runner/tests/audit) is complete and working -- but its evaluation
+    *outcome* is honestly not a pass: an original ``PERF7C_OFFLINE_PACKAGE_EVAL_PASS`` verdict was
+    found, via independent review, to rest on a circular-evaluation defect (10 scenarios whose
+    "expected" lexical target was set to whatever the search function actually returned, rather
+    than to what the question's meaning and canonical demo-pack authority independently require --
+    see docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md). That verdict was
+    withdrawn and corrected to ``PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND``,
+    ``critical_false_narrow_count = 10``. This live filesystem check asserts the corrected,
+    honest state -- it must never again assert a PASS verdict unless a future, separately
+    owner-approved correction milestone actually closes these 10 defects. Neither PERF-7A, PERF-7B,
+    nor PERF-7C is wired to any runtime path or extends/reuses PERF-6's
     ``service_exact/topic/context_group/full`` ladder -- ``context_groups.json`` still does not
     exist anywhere. PERF-8 (a real Scoped Composer switch) remains a separate, still-unauthorized,
-    later milestone."""
+    later milestone, now additionally gated on this defect being resolved."""
 
     # PERF-7A COMPLETE.
     assert (_REPO_ROOT / "core" / "target_lexical_paragraph_index.py").is_file()
@@ -418,7 +424,7 @@ def test_perf7a_perf7b_perf7c_complete() -> None:
         _REPO_ROOT / "tests" / "test_final_local_evidence_package_builder_implementation.py"
     ).is_file()
 
-    # PERF-7C COMPLETE (offline package eval, PASS).
+    # PERF-7C evaluation infrastructure exists and ran -- outcome is a defect, not a pass.
     assert (_REPO_ROOT / "evals" / "v5" / "perf7c_local_evidence_package_eval_matrix.json").is_file()
     assert (_REPO_ROOT / "evals" / "v5" / "run_perf7c_local_evidence_package_eval.py").is_file()
     assert (
@@ -434,8 +440,9 @@ def test_perf7a_perf7b_perf7c_complete() -> None:
     )
     assert result_path.is_file()
     result = json.loads(result_path.read_text(encoding="utf-8"))
-    assert result["verdict"] == "PERF7C_OFFLINE_PACKAGE_EVAL_PASS"
-    assert result["metrics"]["critical_false_narrow_count"] == 0
+    assert result["verdict"] == "PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND"
+    assert result["metrics"]["critical_false_narrow_count"] == 10
+    assert result["binding_pass"] is False
 
     # context_groups.json still does not exist anywhere -- no PERF-7 milestone created it.
     for relative in (

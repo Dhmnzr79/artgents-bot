@@ -798,7 +798,16 @@ def test_40_no_llm_network_or_provider_dependency() -> None:
 # --------------------------------------------------------------------------------------------
 
 
-def test_41_builder_not_imported_anywhere_outside_its_own_files() -> None:
+def test_41_builder_not_imported_by_any_real_runtime_path() -> None:
+    """PERF-7C correction: originally asserted zero non-self consumers; PERF-7C's own offline eval
+    runner and contract test legitimately import ``build_target_evidence_package`` (that is the
+    entire point of PERF-7C), and neither is wired to any real runtime path (proven by their own
+    equivalent isolation tests). The invariant that actually matters -- and the one checked here --
+    is that no *real runtime* module imports the Builder, not that it has zero non-runtime
+    consumers, which was always going to grow as PERF-7 progressed. Mirrors the identical, same-day
+    correction applied to
+    tests/test_final_local_lexical_paragraph_index_implementation.py::test_module_not_imported_by_any_real_runtime_path."""
+
     proc = subprocess.run(
         ["git", "grep", "-nE", r"^\s*(from|import)\s+.*target_evidence_package_builder", "--", "*.py"],
         cwd=str(_REPO_ROOT),
@@ -812,7 +821,21 @@ def test_41_builder_not_imported_anywhere_outside_its_own_files() -> None:
     allowed_files = {
         "core/target_evidence_package_builder.py",
         "tests/test_final_local_evidence_package_builder_implementation.py",
+        "evals/v5/run_perf7c_local_evidence_package_eval.py",
+        "tests/test_final_local_evidence_package_eval_contract.py",
     }
+    real_runtime_files = {
+        "app.py",
+        "session.py",
+        "core/target_composer_executor.py",
+        "core/target_response_verifier.py",
+        "core/target_verified_response_pipeline.py",
+        "core/target_policy_bound_verified_response_pipeline.py",
+        "core/target_composer_request.py",
+        "contracts/turn_frame.py",
+    }
+    runtime_hits = [line for line in hits if any(line.startswith(f"{path}:") for path in real_runtime_files)]
+    assert runtime_hits == [], runtime_hits
     unexpected = [line for line in hits if not any(line.startswith(f"{path}:") for path in allowed_files)]
     assert unexpected == [], unexpected
 

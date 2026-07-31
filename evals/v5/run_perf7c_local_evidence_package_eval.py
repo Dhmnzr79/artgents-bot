@@ -177,6 +177,16 @@ def _classify(scenario: dict[str, Any], outcome: dict[str, Any]) -> dict[str, An
             if not structural_ok:
                 findings["critical_false_narrow"] = True
         elif actual_status == "insufficient_widened":
+            # PERF-7C correction: relevance is decided independently from question meaning and
+            # canonical authority (the matrix's own `lexical_target_options`, frozen before this
+            # run) -- never from what the search function actually returned. A widened package
+            # whose extra MD ref(s) fall outside that independently-decided allowed set is a
+            # critical false-narrow, full stop -- regardless of a unique top score, regardless of
+            # completeness_status="insufficient_widened", and regardless of whether the target
+            # happened to match a *previous* (circular, now-corrected) expectation. An empty
+            # `lexical_target_options` list means no document in the corpus was judged genuinely
+            # relevant to this exact frozen query -- any widened result is therefore automatically
+            # irrelevant.
             lexical_options = expected.get("lexical_target_options")
             target_ok = True
             if lexical_options is not None:
@@ -184,8 +194,9 @@ def _classify(scenario: dict[str, Any], outcome: dict[str, Any]) -> dict[str, An
                 target_ok = bool(actual_targets & set(lexical_options))
             if structural_ok and target_ok:
                 findings["verdict"] = "match_expected_widened"
-            elif structural_ok and not target_ok:
-                findings["verdict"] = "unexpected_scoped_target"
+            elif not target_ok:
+                findings["verdict"] = "critical_false_narrow_irrelevant_lexical_target"
+                findings["critical_false_narrow"] = True
                 findings["unexpected_scoped_target"] = True
             else:
                 findings["verdict"] = "widened_structural_mismatch"
@@ -332,6 +343,22 @@ def run_eval(client_id: str, matrix_path: Path) -> dict[str, Any]:
         and exceptions_count == 0
     )
 
+    lexical_relevance_defects = [
+        f for f in critical_false_narrow if f["verdict"] == "critical_false_narrow_irrelevant_lexical_target"
+    ]
+    if binding_pass:
+        top_verdict = "PERF7C_OFFLINE_PACKAGE_EVAL_PASS"
+    elif critical_false_narrow and len(lexical_relevance_defects) == len(critical_false_narrow) and (
+        len(session_contamination) == 0 and len(id_mismatches) == 0 and exceptions_count == 0
+    ):
+        # Every critical failure is specifically an irrelevant-lexical-target defect (not a
+        # structural Builder defect, not session contamination, not a missing exact ID, not an
+        # unhandled exception) -- a distinct, more specific verdict than the generic
+        # "critical false-narrow found", per the PERF-7C correction owner GO.
+        top_verdict = "PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND"
+    else:
+        top_verdict = "PERF7C_CRITICAL_FALSE_NARROW_FOUND"
+
     result = {
         "schema_version": 1,
         "suite_id": matrix["suite_id"],
@@ -362,6 +389,7 @@ def run_eval(client_id: str, matrix_path: Path) -> dict[str, Any]:
             "full_context_estimated_tokens": full_context_tokens,
         },
         "critical_false_narrow_scenario_ids": [f["scenario_id"] for f in critical_false_narrow],
+        "lexical_relevance_defect_scenario_ids": [f["scenario_id"] for f in lexical_relevance_defects],
         "safe_over_fallback_scenario_ids": [f["scenario_id"] for f in safe_over_fallback],
         "session_contamination_scenario_ids": [f["scenario_id"] for f in session_contamination],
         "structured_id_mismatch_scenario_ids": [f["scenario_id"] for f in id_mismatches],
@@ -381,7 +409,7 @@ def run_eval(client_id: str, matrix_path: Path) -> dict[str, Any]:
             for f in per_scenario
         ],
         "binding_pass": binding_pass,
-        "verdict": "PERF7C_OFFLINE_PACKAGE_EVAL_PASS" if binding_pass else "PERF7C_CRITICAL_FALSE_NARROW_FOUND",
+        "verdict": top_verdict,
     }
     return result
 

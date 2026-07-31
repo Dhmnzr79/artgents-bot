@@ -2512,7 +2512,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -2521,11 +2522,11 @@
         "expected_policy_sections": [],
         "expected_session_refs": [],
         "lexical_target_options": [
-          "clinic__info__technology.md"
+          "clinic__info__consultation.md"
         ],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 7 on clinic__info__technology.md (coincidental token overlap, not semantically about external plans -- disclosed in the audit's honest-miss inventory)."
+      "rationale": "Canonical authority: clinic__info__consultation.md is the only genuinely relevant document (authored alias 'план лечения'); the real top match (clinic__info__technology.md, score 7) is coincidental token overlap, not a relevant answer -- PERF-7C correction, previously miscounted as a pass."
     },
     {
       "scenario_id": "s052_treatment_plan_other_clinic",
@@ -2566,7 +2567,7 @@
           "lexical_ambiguous_top_match"
         ]
       },
-      "rationale": "Verified: clinic__info__payment_terms.md and clinic__info__technology.md tie at score 9."
+      "rationale": "Verified: clinic__info__payment_terms.md and clinic__info__technology.md tie at score 9 -- honest fallback, unchanged by this correction."
     },
     {
       "scenario_id": "s053_treatment_plan_other_clinic",
@@ -2594,7 +2595,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -2603,11 +2605,11 @@
         "expected_policy_sections": [],
         "expected_session_refs": [],
         "lexical_target_options": [
-          "orthodontics__service__aligners.md"
+          "clinic__info__consultation.md"
         ],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 8 on orthodontics__service__aligners.md (coincidental overlap, disclosed)."
+      "rationale": "Canonical authority: clinic__info__consultation.md only; the real top match (orthodontics__service__aligners.md, score 8) is coincidental, not relevant -- PERF-7C correction."
     },
     {
       "scenario_id": "s054_treatment_plan_other_clinic",
@@ -2635,7 +2637,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -2644,11 +2647,12 @@
         "expected_policy_sections": [],
         "expected_session_refs": [],
         "lexical_target_options": [
-          "clinic__info__technology.md"
+          "clinic__info__consultation.md",
+          "diagnostics__service__tomography.md"
         ],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 7 on clinic__info__technology.md."
+      "rationale": "Canonical authority: this query blends 'plan review' (consultation.md) and 'own scans' (tomography.md, per FINAL_TOMOGRAPHY_EXISTING_SCAN_CONTENT_ROUTING); the real top match (clinic__info__technology.md, score 7) is neither -- PERF-7C correction."
     },
     {
       "scenario_id": "s055_treatment_plan_other_clinic",
@@ -2676,7 +2680,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -2685,11 +2690,11 @@
         "expected_policy_sections": [],
         "expected_session_refs": [],
         "lexical_target_options": [
-          "clinic__info__technology.md"
+          "clinic__info__consultation.md"
         ],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 5 on clinic__info__technology.md."
+      "rationale": "Canonical authority: clinic__info__consultation.md only; the real top match (clinic__info__technology.md, score 5) is coincidental -- PERF-7C correction."
     },
     {
       "scenario_id": "s056_treatment_plan_other_clinic",
@@ -2717,7 +2722,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -2726,11 +2732,11 @@
         "expected_policy_sections": [],
         "expected_session_refs": [],
         "lexical_target_options": [
-          "orthodontics__service__aligners.md"
+          "clinic__info__consultation.md"
         ],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 8 on orthodontics__service__aligners.md."
+      "rationale": "Canonical authority: the query literally asks about 'консультация', which is exactly clinic__info__consultation.md's own subject; the real top match (orthodontics__service__aligners.md, score 8) is unrelated -- PERF-7C correction."
     },
     {
       "scenario_id": "s057_pain_fear",
@@ -4194,7 +4200,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -4202,12 +4209,10 @@
         "expected_doctor_ids": [],
         "expected_policy_sections": [],
         "expected_session_refs": [],
-        "lexical_target_options": [
-          "orthodontics__service__aligners.md"
-        ],
+        "lexical_target_options": [],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 8 on orthodontics__service__aligners.md (coincidental single-doc resolution of a nominally cross-topic question -- disclosed as a real algorithmic limitation, not hidden)."
+      "rationale": "PERF-7C correction: by definition this question spans two different specialties/topics at once -- no single document in the corpus is a genuinely correct answer, so no MD ref is allowed and only fullcontext_fallback is acceptable. The real top match (orthodontics__service__aligners.md, score 8) only covers one of the two specialties and is coincidental token overlap, not a relevant answer -- previously miscounted as a pass."
     },
     {
       "scenario_id": "s084_cross_topic",
@@ -4237,7 +4242,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -4245,12 +4251,10 @@
         "expected_doctor_ids": [],
         "expected_policy_sections": [],
         "expected_session_refs": [],
-        "lexical_target_options": [
-          "prosthetics__service__zirconia_crowns.md"
-        ],
+        "lexical_target_options": [],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 10 on prosthetics__service__zirconia_crowns.md (coincidental, disclosed)."
+      "rationale": "PERF-7C correction: 'therapy vs surgery' is not one of the 5 authored comparison__*.md pairs and no other document addresses this broad distinction -- no MD ref is allowed. The real top match (prosthetics__service__zirconia_crowns.md, score 10) is unrelated coincidental overlap -- previously miscounted as a pass."
     },
     {
       "scenario_id": "s085_explicit_followup_price",
@@ -5064,7 +5068,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -5072,12 +5077,10 @@
         "expected_doctor_ids": [],
         "expected_policy_sections": [],
         "expected_session_refs": [],
-        "lexical_target_options": [
-          "implantation__service__all_on_4.md"
-        ],
+        "lexical_target_options": [],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 5 on implantation__service__all_on_4.md -- a genuinely paraphrased query still produced a confident (coincidental) single-document match; disclosed as a real token-overlap limitation, not hidden."
+      "rationale": "PERF-7C correction: deliberately vague paraphrase by design (this class exists to test honest-miss behavior) -- no single document is a genuinely correct answer, so no MD ref is allowed. The real top match (implantation__service__all_on_4.md, score 5) is coincidental token overlap, not a relevant answer -- previously miscounted as a pass."
     },
     {
       "scenario_id": "s100_unknown_wording",
@@ -5105,7 +5108,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -5113,12 +5117,10 @@
         "expected_doctor_ids": [],
         "expected_policy_sections": [],
         "expected_session_refs": [],
-        "lexical_target_options": [
-          "comparison__implant_vs_bridge.md"
-        ],
+        "lexical_target_options": [],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 6 on comparison__implant_vs_bridge.md (coincidental, disclosed)."
+      "rationale": "PERF-7C correction: deliberately vague -- no MD ref is allowed. The real top match (comparison__implant_vs_bridge.md, score 6) is coincidental -- previously miscounted as a pass."
     },
     {
       "scenario_id": "s101_unknown_wording",
@@ -5146,7 +5148,8 @@
       "expected": {
         "expect_exception": null,
         "acceptable_completeness_status": [
-          "insufficient_widened"
+          "insufficient_widened",
+          "fullcontext_fallback"
         ],
         "required_md_refs": [],
         "expected_offer_ids": [],
@@ -5154,12 +5157,10 @@
         "expected_doctor_ids": [],
         "expected_policy_sections": [],
         "expected_session_refs": [],
-        "lexical_target_options": [
-          "implantation__service__temporary_teeth.md"
-        ],
+        "lexical_target_options": [],
         "fallback_reason_options": null
       },
-      "rationale": "Verified: unique top score 6 on implantation__service__temporary_teeth.md (coincidental, disclosed)."
+      "rationale": "PERF-7C correction: deliberately vague -- no MD ref is allowed. The real top match (implantation__service__temporary_teeth.md, score 6) is coincidental -- previously miscounted as a pass."
     },
     {
       "scenario_id": "s102_unknown_wording",

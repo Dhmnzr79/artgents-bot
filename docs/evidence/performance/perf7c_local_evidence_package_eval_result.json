@@ -26,7 +26,8 @@
   "verdict_counts": {
     "match_expected_complete": 61,
     "match_expected_fallback": 33,
-    "match_expected_widened": 22,
+    "match_expected_widened": 12,
+    "critical_false_narrow_irrelevant_lexical_target": 10,
     "match_expected_exception": 2
   },
   "metrics": {
@@ -37,7 +38,7 @@
     "fullcontext_fallback_count": 33,
     "scoped_rate": 0.7034,
     "fallback_rate": 0.2797,
-    "critical_false_narrow_count": 0,
+    "critical_false_narrow_count": 10,
     "safe_over_fallback_count": 0,
     "session_contamination_count": 0,
     "structured_id_mismatch_count": 0,
@@ -47,15 +48,49 @@
     "lexical_miss_count": 3,
     "package_tokens_p50": 616,
     "package_tokens_p95": 26995,
-    "builder_ms_p50": 0.853,
-    "builder_ms_p95": 6.721,
+    "builder_ms_p50": 1.018,
+    "builder_ms_p95": 7.334,
     "full_context_estimated_tokens": 26995
   },
-  "critical_false_narrow_scenario_ids": [],
+  "critical_false_narrow_scenario_ids": [
+    "s051_treatment_plan_other_clinic",
+    "s053_treatment_plan_other_clinic",
+    "s054_treatment_plan_other_clinic",
+    "s055_treatment_plan_other_clinic",
+    "s056_treatment_plan_other_clinic",
+    "s083_cross_topic",
+    "s084_cross_topic",
+    "s099_unknown_wording",
+    "s100_unknown_wording",
+    "s101_unknown_wording"
+  ],
+  "lexical_relevance_defect_scenario_ids": [
+    "s051_treatment_plan_other_clinic",
+    "s053_treatment_plan_other_clinic",
+    "s054_treatment_plan_other_clinic",
+    "s055_treatment_plan_other_clinic",
+    "s056_treatment_plan_other_clinic",
+    "s083_cross_topic",
+    "s084_cross_topic",
+    "s099_unknown_wording",
+    "s100_unknown_wording",
+    "s101_unknown_wording"
+  ],
   "safe_over_fallback_scenario_ids": [],
   "session_contamination_scenario_ids": [],
   "structured_id_mismatch_scenario_ids": [],
-  "unexpected_scoped_target_scenario_ids": [],
+  "unexpected_scoped_target_scenario_ids": [
+    "s051_treatment_plan_other_clinic",
+    "s053_treatment_plan_other_clinic",
+    "s054_treatment_plan_other_clinic",
+    "s055_treatment_plan_other_clinic",
+    "s056_treatment_plan_other_clinic",
+    "s083_cross_topic",
+    "s084_cross_topic",
+    "s099_unknown_wording",
+    "s100_unknown_wording",
+    "s101_unknown_wording"
+  ],
   "scenarios": [
     {
       "scenario_id": "s001_exact_service",
@@ -65,7 +100,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 509,
       "actual_package_fingerprint": "1fdafcc1b75950ed2cd40911c2d19001a3bf8fca1d05d5bc6997644a5836aeb2",
-      "timing_ms": 0.888,
+      "timing_ms": 1.002,
       "builder_exception": null
     },
     {
@@ -76,7 +111,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 596,
       "actual_package_fingerprint": "f416612817954ec9026e29988c0f7e88e27658f372b392a3662e78c98b0e05c8",
-      "timing_ms": 0.757,
+      "timing_ms": 0.772,
       "builder_exception": null
     },
     {
@@ -87,7 +122,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 643,
       "actual_package_fingerprint": "9b504285b1c2a7c7365bb0fe4ee24fde21552673153f3840cd798b3bf4fd145c",
-      "timing_ms": 0.735,
+      "timing_ms": 1.386,
       "builder_exception": null
     },
     {
@@ -98,7 +133,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 453,
       "actual_package_fingerprint": "e3231aaa51276239ee81d3e5fa8c6daa0a70d0144d4bbddd708d8d5df1854aaf",
-      "timing_ms": 0.73,
+      "timing_ms": 1.125,
       "builder_exception": null
     },
     {
@@ -109,7 +144,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 632,
       "actual_package_fingerprint": "b68522e844e03c8f60e56f8b12043cea888cad010da71e3a36be2154a138283a",
-      "timing_ms": 0.701,
+      "timing_ms": 0.774,
       "builder_exception": null
     },
     {
@@ -120,7 +155,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 455,
       "actual_package_fingerprint": "c51f9ca3250885a5c7239e68cf2fd477f5311c198ebc52e53ce2e204ae0a2830",
-      "timing_ms": 0.846,
+      "timing_ms": 0.691,
       "builder_exception": null
     },
     {
@@ -131,7 +166,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 886,
       "actual_package_fingerprint": "1ef7b47c0503e7c91d6c4d5b813c5bce8b34e29234623c5f5dddea67864c58cb",
-      "timing_ms": 0.777,
+      "timing_ms": 0.721,
       "builder_exception": null
     },
     {
@@ -142,7 +177,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 555,
       "actual_package_fingerprint": "b78cbe790ccdb37c5f1e8c31383cc5fc3d4f551d23700fa99e1c8d34a8b14199",
-      "timing_ms": 0.707,
+      "timing_ms": 0.965,
       "builder_exception": null
     },
     {
@@ -153,7 +188,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 305,
       "actual_package_fingerprint": "637620cf166825955777438d7384baddd42185ace91c37b24cf42f68c3ed879f",
-      "timing_ms": 0.73,
+      "timing_ms": 0.756,
       "builder_exception": null
     },
     {
@@ -164,7 +199,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 778,
       "actual_package_fingerprint": "ecce3742d9af98d62bfc467108a532f243b1e75a502a73b29d20360fe43a8933",
-      "timing_ms": 0.979,
+      "timing_ms": 1.06,
       "builder_exception": null
     },
     {
@@ -175,7 +210,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.678,
+      "timing_ms": 4.505,
       "builder_exception": null
     },
     {
@@ -186,7 +221,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.014,
+      "timing_ms": 5.955,
       "builder_exception": null
     },
     {
@@ -197,7 +232,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.172,
+      "timing_ms": 4.471,
       "builder_exception": null
     },
     {
@@ -208,7 +243,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.544,
+      "timing_ms": 4.42,
       "builder_exception": null
     },
     {
@@ -219,7 +254,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.294,
+      "timing_ms": 4.916,
       "builder_exception": null
     },
     {
@@ -230,7 +265,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.735,
+      "timing_ms": 4.985,
       "builder_exception": null
     },
     {
@@ -241,7 +276,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 41,
       "actual_package_fingerprint": "7556c00e9c6e84b5457c3f3748ea1376c69665cc68823b30109413d41f8fea8c",
-      "timing_ms": 0.392,
+      "timing_ms": 0.452,
       "builder_exception": null
     },
     {
@@ -252,7 +287,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 41,
       "actual_package_fingerprint": "5194e367c576ad9bcada5f9b409fd3378eca8d663d0a0b5943df4c0398b78c7c",
-      "timing_ms": 0.313,
+      "timing_ms": 0.334,
       "builder_exception": null
     },
     {
@@ -263,7 +298,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 13,
       "actual_package_fingerprint": "69416608ab2f0c1d627a4e6bc2ede0582e25da3d00cc8676ee8f327201f15d56",
-      "timing_ms": 0.359,
+      "timing_ms": 0.299,
       "builder_exception": null
     },
     {
@@ -274,7 +309,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 13,
       "actual_package_fingerprint": "4452c28f31817b127639ade44d1d3d426ded7de14b3c902c7a2123bbf387f097",
-      "timing_ms": 0.3,
+      "timing_ms": 0.346,
       "builder_exception": null
     },
     {
@@ -285,7 +320,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 13,
       "actual_package_fingerprint": "49fe7964059f254c7d9ef3b93ea8b673e0e0c4e24019974a36bd2125763f3f05",
-      "timing_ms": 0.306,
+      "timing_ms": 0.384,
       "builder_exception": null
     },
     {
@@ -296,7 +331,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 13,
       "actual_package_fingerprint": "ff92a148d1f8f87b0db733e3afd0bc5fdc9b519cd4e8297f7d7751e34960c344",
-      "timing_ms": 0.296,
+      "timing_ms": 0.33,
       "builder_exception": null
     },
     {
@@ -307,7 +342,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 13,
       "actual_package_fingerprint": "f1ddec950f578cd644137a68f0be64439214a1b66235284da3628a9a61e29786",
-      "timing_ms": 0.353,
+      "timing_ms": 0.319,
       "builder_exception": null
     },
     {
@@ -318,7 +353,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 13,
       "actual_package_fingerprint": "7e57809702f712c76df6a44a061a7c7aba658aedcb715a9712274309f9bce4b6",
-      "timing_ms": 0.293,
+      "timing_ms": 0.34,
       "builder_exception": null
     },
     {
@@ -329,7 +364,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 14,
       "actual_package_fingerprint": "53dbf93a1981e286cd85ddfe84b47180d1e95823607d8296b7ae9f799b3bd899",
-      "timing_ms": 0.306,
+      "timing_ms": 0.488,
       "builder_exception": null
     },
     {
@@ -340,7 +375,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 14,
       "actual_package_fingerprint": "022975290c94258d529fde722acfefc90cfbddfb44162dd78b01a7295c986321",
-      "timing_ms": 0.326,
+      "timing_ms": 0.613,
       "builder_exception": null
     },
     {
@@ -351,7 +386,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 14,
       "actual_package_fingerprint": "8950db1db2c294d82bd1d4f0a92918c4a79ed04b9e162d2d36bd785da7633aef",
-      "timing_ms": 0.475,
+      "timing_ms": 0.868,
       "builder_exception": null
     },
     {
@@ -362,7 +397,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 14,
       "actual_package_fingerprint": "cdba857484dee9b6076753347f9c6398da66ed8c44cfd9d9dd40301debce7b13",
-      "timing_ms": 0.317,
+      "timing_ms": 0.34,
       "builder_exception": null
     },
     {
@@ -373,7 +408,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 14,
       "actual_package_fingerprint": "621f88ab23c23e66599d2ec55a239cca7576f4a28e27383418c5e7eaebdcb7b4",
-      "timing_ms": 0.336,
+      "timing_ms": 0.75,
       "builder_exception": null
     },
     {
@@ -384,7 +419,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 14,
       "actual_package_fingerprint": "7c063fd26bdccdd3ef440a309fde3e0affc747223f4f549c335a0cf6343e6ec4",
-      "timing_ms": 0.535,
+      "timing_ms": 1.119,
       "builder_exception": null
     },
     {
@@ -395,7 +430,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 156,
       "actual_package_fingerprint": "df940817e0e0adcd443ba84835653dae712d02dcd1acd107fcd4b71b8541abd4",
-      "timing_ms": 2.017,
+      "timing_ms": 0.861,
       "builder_exception": null
     },
     {
@@ -406,7 +441,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 156,
       "actual_package_fingerprint": "590edaf7c32c0ffecac6a891c7b913de0d8fc9ca8c88078bbe4aeabc2fda9c27",
-      "timing_ms": 0.837,
+      "timing_ms": 0.866,
       "builder_exception": null
     },
     {
@@ -417,7 +452,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 156,
       "actual_package_fingerprint": "d99a1921ee3a23e3ec7b2d565b0e531c990357381193b157eb4f050fbbbf8fa6",
-      "timing_ms": 0.706,
+      "timing_ms": 0.859,
       "builder_exception": null
     },
     {
@@ -428,7 +463,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 156,
       "actual_package_fingerprint": "dd9aaf1cc8f07ed57fb6796d9d001a344368e2ec18e8b15ae51df3c3821eb63f",
-      "timing_ms": 0.676,
+      "timing_ms": 0.77,
       "builder_exception": null
     },
     {
@@ -439,7 +474,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 156,
       "actual_package_fingerprint": "f263317e7451d0eb132257900faa75f8bb74bc1ce784963119186856d705d0fa",
-      "timing_ms": 0.661,
+      "timing_ms": 0.799,
       "builder_exception": null
     },
     {
@@ -450,7 +485,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 172,
       "actual_package_fingerprint": "835c2b2d9f04722627b204efa542e30a45f1cfb5f2cc6c1b2cc43e0ba735a495",
-      "timing_ms": 0.663,
+      "timing_ms": 0.719,
       "builder_exception": null
     },
     {
@@ -461,7 +496,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 172,
       "actual_package_fingerprint": "8c416ff271c5b07bfad9af6291019976983043c134a3d07d84ceae1627726a0d",
-      "timing_ms": 0.658,
+      "timing_ms": 0.908,
       "builder_exception": null
     },
     {
@@ -472,7 +507,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 172,
       "actual_package_fingerprint": "d351888a21168540c108d0097c333f10afd8305dac3ee7b494d882ae21802506",
-      "timing_ms": 0.649,
+      "timing_ms": 0.755,
       "builder_exception": null
     },
     {
@@ -483,7 +518,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 326,
       "actual_package_fingerprint": "2aabd943437d4b80f554206d7bbc8a4ab2983e5b50eb8ecb049cd097fd2e954d",
-      "timing_ms": 5.032,
+      "timing_ms": 5.285,
       "builder_exception": null
     },
     {
@@ -494,7 +529,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 326,
       "actual_package_fingerprint": "2aabd943437d4b80f554206d7bbc8a4ab2983e5b50eb8ecb049cd097fd2e954d",
-      "timing_ms": 4.688,
+      "timing_ms": 4.619,
       "builder_exception": null
     },
     {
@@ -505,7 +540,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.222,
+      "timing_ms": 4.128,
       "builder_exception": null
     },
     {
@@ -516,7 +551,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 2.878,
+      "timing_ms": 3.138,
       "builder_exception": null
     },
     {
@@ -527,7 +562,7 @@
       "actual_fallback_reason": "lexical_zero_hits",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "a27eb8fb8baff6ef264cc6a8481d84cb9f5bb76690d9ad938b521177e59c8ae4",
-      "timing_ms": 2.124,
+      "timing_ms": 2.216,
       "builder_exception": null
     },
     {
@@ -538,7 +573,7 @@
       "actual_fallback_reason": "lexical_zero_hits",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "a27eb8fb8baff6ef264cc6a8481d84cb9f5bb76690d9ad938b521177e59c8ae4",
-      "timing_ms": 2.076,
+      "timing_ms": 2.154,
       "builder_exception": null
     },
     {
@@ -549,7 +584,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 453,
       "actual_package_fingerprint": "e3231aaa51276239ee81d3e5fa8c6daa0a70d0144d4bbddd708d8d5df1854aaf",
-      "timing_ms": 0.795,
+      "timing_ms": 0.811,
       "builder_exception": null
     },
     {
@@ -560,7 +595,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 453,
       "actual_package_fingerprint": "e3231aaa51276239ee81d3e5fa8c6daa0a70d0144d4bbddd708d8d5df1854aaf",
-      "timing_ms": 0.72,
+      "timing_ms": 0.668,
       "builder_exception": null
     },
     {
@@ -571,7 +606,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 453,
       "actual_package_fingerprint": "e3231aaa51276239ee81d3e5fa8c6daa0a70d0144d4bbddd708d8d5df1854aaf",
-      "timing_ms": 0.651,
+      "timing_ms": 0.652,
       "builder_exception": null
     },
     {
@@ -582,7 +617,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 453,
       "actual_package_fingerprint": "24d6eecce1e1aa70bd42e1dbb2ffacb509be08f969831cc60573091e44277373",
-      "timing_ms": 7.392,
+      "timing_ms": 6.425,
       "builder_exception": null
     },
     {
@@ -593,7 +628,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 453,
       "actual_package_fingerprint": "378bac8b0b754915847a117a36679c1575c8f46593a0cfdba6b3ba623667b943",
-      "timing_ms": 5.567,
+      "timing_ms": 5.781,
       "builder_exception": null
     },
     {
@@ -604,18 +639,18 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 6.023,
+      "timing_ms": 5.919,
       "builder_exception": null
     },
     {
       "scenario_id": "s051_treatment_plan_other_clinic",
       "scenario_class": "treatment_plan_other_clinic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 515,
       "actual_package_fingerprint": "efefd48b685d7b47830d73f730ea727c3f38dc03eb2b4f2bc792d30b16546a3a",
-      "timing_ms": 6.971,
+      "timing_ms": 6.87,
       "builder_exception": null
     },
     {
@@ -626,51 +661,51 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 6.211,
+      "timing_ms": 6.04,
       "builder_exception": null
     },
     {
       "scenario_id": "s053_treatment_plan_other_clinic",
       "scenario_class": "treatment_plan_other_clinic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 455,
       "actual_package_fingerprint": "34a0a2ae7cff365a2010d3372ca65c3aa8e697517a740d720159e31afa605eb1",
-      "timing_ms": 6.854,
+      "timing_ms": 6.909,
       "builder_exception": null
     },
     {
       "scenario_id": "s054_treatment_plan_other_clinic",
       "scenario_class": "treatment_plan_other_clinic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 515,
       "actual_package_fingerprint": "efefd48b685d7b47830d73f730ea727c3f38dc03eb2b4f2bc792d30b16546a3a",
-      "timing_ms": 6.511,
+      "timing_ms": 7.334,
       "builder_exception": null
     },
     {
       "scenario_id": "s055_treatment_plan_other_clinic",
       "scenario_class": "treatment_plan_other_clinic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 515,
       "actual_package_fingerprint": "efefd48b685d7b47830d73f730ea727c3f38dc03eb2b4f2bc792d30b16546a3a",
-      "timing_ms": 7.5,
+      "timing_ms": 6.791,
       "builder_exception": null
     },
     {
       "scenario_id": "s056_treatment_plan_other_clinic",
       "scenario_class": "treatment_plan_other_clinic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 455,
       "actual_package_fingerprint": "34a0a2ae7cff365a2010d3372ca65c3aa8e697517a740d720159e31afa605eb1",
-      "timing_ms": 5.636,
+      "timing_ms": 6.715,
       "builder_exception": null
     },
     {
@@ -681,7 +716,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 1236,
       "actual_package_fingerprint": "7428f02c9ccee2beffd20f5ffd1d155002baacedfb1024162b813fd1b25f65c0",
-      "timing_ms": 1.099,
+      "timing_ms": 1.332,
       "builder_exception": null
     },
     {
@@ -692,7 +727,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 1323,
       "actual_package_fingerprint": "66270be41978fb3d7fb1cb05312aea56147f32727c61b3ba743ca201224c219c",
-      "timing_ms": 1.116,
+      "timing_ms": 1.219,
       "builder_exception": null
     },
     {
@@ -703,7 +738,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 1262,
       "actual_package_fingerprint": "ea89d5e12f895f403ff0502e365d7a87920e0a6e597cd1c1e8cc5d49c9e10367",
-      "timing_ms": 1.085,
+      "timing_ms": 1.237,
       "builder_exception": null
     },
     {
@@ -714,7 +749,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 1286,
       "actual_package_fingerprint": "1e570a219d80a39b73ff51872ca7029ccf3fa6c246ed40a8b7f599e8fd64eff3",
-      "timing_ms": 1.099,
+      "timing_ms": 1.219,
       "builder_exception": null
     },
     {
@@ -725,7 +760,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 794,
       "actual_package_fingerprint": "07d347122b232b57fd636b623c74fd7893c270d86d1267d8697b89d33548f2f6",
-      "timing_ms": 0.701,
+      "timing_ms": 0.789,
       "builder_exception": null
     },
     {
@@ -736,7 +771,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 575,
       "actual_package_fingerprint": "1b1277ec9653d79c09c3827ddbdbef4898a8ca547111564d6c02e722f89bff60",
-      "timing_ms": 0.699,
+      "timing_ms": 0.723,
       "builder_exception": null
     },
     {
@@ -747,7 +782,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 525,
       "actual_package_fingerprint": "97018401568b393618747f89fabba5a18d92bce717de6dd7dcda367ae6d6afc3",
-      "timing_ms": 0.686,
+      "timing_ms": 0.752,
       "builder_exception": null
     },
     {
@@ -758,7 +793,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 551,
       "actual_package_fingerprint": "000d025d813d8ff229300be412c182173220680d946c5e7ca2b8784a4baef33d",
-      "timing_ms": 0.698,
+      "timing_ms": 0.745,
       "builder_exception": null
     },
     {
@@ -769,7 +804,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 525,
       "actual_package_fingerprint": "067cbdd6ac062a11a636fca38716ec0c017c90ae7a51f6166e9c8dc5ee9bb616",
-      "timing_ms": 0.674,
+      "timing_ms": 0.77,
       "builder_exception": null
     },
     {
@@ -780,7 +815,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 612,
       "actual_package_fingerprint": "96670e92dda8f2eac41d6af8a324df4238ced58f07cfed5e26bd659731861436",
-      "timing_ms": 0.682,
+      "timing_ms": 0.756,
       "builder_exception": null
     },
     {
@@ -791,7 +826,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 794,
       "actual_package_fingerprint": "07d347122b232b57fd636b623c74fd7893c270d86d1267d8697b89d33548f2f6",
-      "timing_ms": 0.963,
+      "timing_ms": 0.964,
       "builder_exception": null
     },
     {
@@ -802,7 +837,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 660,
       "actual_package_fingerprint": "b8102f8b9e6611f804242fc6a79ea476a3f1ad316ded3eaf636e385644c2d7c2",
-      "timing_ms": 1.122,
+      "timing_ms": 1.046,
       "builder_exception": null
     },
     {
@@ -813,7 +848,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 575,
       "actual_package_fingerprint": "d7eae6f4de2276513032812c121ea60daa914a9ca68ab70aded8ce4a29aa9957",
-      "timing_ms": 0.868,
+      "timing_ms": 1.018,
       "builder_exception": null
     },
     {
@@ -824,7 +859,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 551,
       "actual_package_fingerprint": "000d025d813d8ff229300be412c182173220680d946c5e7ca2b8784a4baef33d",
-      "timing_ms": 0.726,
+      "timing_ms": 0.975,
       "builder_exception": null
     },
     {
@@ -835,7 +870,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 1386,
       "actual_package_fingerprint": "a61e698b26b8627970ad00903e9b3c7708757eb949f20990836f469f5fda18ba",
-      "timing_ms": 4.046,
+      "timing_ms": 5.658,
       "builder_exception": null
     },
     {
@@ -846,7 +881,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 1276,
       "actual_package_fingerprint": "623d4b24711946df30208e3be31c0f6f31fe495b00fe839ade694b659554b0d6",
-      "timing_ms": 4.863,
+      "timing_ms": 6.149,
       "builder_exception": null
     },
     {
@@ -857,7 +892,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 1456,
       "actual_package_fingerprint": "84e7dc20a0da3653282da8ebd92aa46bfd354a233513abd1e6f9e320e0c209d6",
-      "timing_ms": 5.694,
+      "timing_ms": 7.349,
       "builder_exception": null
     },
     {
@@ -868,7 +903,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 1147,
       "actual_package_fingerprint": "140fd5a163374970520efb9339427c6f0d184f14a3702b835bbe463f0065f38d",
-      "timing_ms": 7.276,
+      "timing_ms": 10.424,
       "builder_exception": null
     },
     {
@@ -879,7 +914,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "39c910bc8734c113678a0d75db3a01f1f49bbfc855fc405b98796de04b3a5b11",
-      "timing_ms": 2.996,
+      "timing_ms": 5.724,
       "builder_exception": null
     },
     {
@@ -890,7 +925,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "d4e9f0b94cad19ea4f3e21254b451ac818c5c63f8eb2e5d241252f24b1c1482e",
-      "timing_ms": 4.292,
+      "timing_ms": 4.677,
       "builder_exception": null
     },
     {
@@ -901,7 +936,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "8ff94fd54180c7afd42b2b42daefee6dd00c324d1a2407d91b573b97c52738c0",
-      "timing_ms": 5.519,
+      "timing_ms": 4.442,
       "builder_exception": null
     },
     {
@@ -912,7 +947,7 @@
       "actual_fallback_reason": "lexical_no_comparison_document_found",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "cb606f29904f16c2ed2c059fd6f255aec489c130860bd58c83789781f461e92c",
-      "timing_ms": 5.919,
+      "timing_ms": 7.53,
       "builder_exception": null
     },
     {
@@ -923,7 +958,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.971,
+      "timing_ms": 6.759,
       "builder_exception": null
     },
     {
@@ -934,7 +969,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.376,
+      "timing_ms": 5.837,
       "builder_exception": null
     },
     {
@@ -945,7 +980,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.794,
+      "timing_ms": 6.69,
       "builder_exception": null
     },
     {
@@ -956,29 +991,29 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.902,
+      "timing_ms": 6.187,
       "builder_exception": null
     },
     {
       "scenario_id": "s083_cross_topic",
       "scenario_class": "cross_topic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 455,
       "actual_package_fingerprint": "34a0a2ae7cff365a2010d3372ca65c3aa8e697517a740d720159e31afa605eb1",
-      "timing_ms": 6.562,
+      "timing_ms": 6.88,
       "builder_exception": null
     },
     {
       "scenario_id": "s084_cross_topic",
       "scenario_class": "cross_topic",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 582,
       "actual_package_fingerprint": "4f119c8910ec7b7541401e13fcd3a533628feef33e2358bbfe5856e760fd1137",
-      "timing_ms": 6.355,
+      "timing_ms": 6.686,
       "builder_exception": null
     },
     {
@@ -989,7 +1024,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 550,
       "actual_package_fingerprint": "98762e1248e636a65985f47d5db161a1a62b86cf28feb77cdb1098f367ce951e",
-      "timing_ms": 0.686,
+      "timing_ms": 0.699,
       "builder_exception": null
     },
     {
@@ -1000,7 +1035,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 637,
       "actual_package_fingerprint": "386b2b4545cac47d5eb60b95fb534d989787b3664f4ef3ca534b5a78fc6c90e3",
-      "timing_ms": 0.674,
+      "timing_ms": 0.721,
       "builder_exception": null
     },
     {
@@ -1011,7 +1046,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 600,
       "actual_package_fingerprint": "62b987d38b72a211fac853f32e70f9fe5e16dd45ec83d14bb27beb25e0903f95",
-      "timing_ms": 0.704,
+      "timing_ms": 0.715,
       "builder_exception": null
     },
     {
@@ -1022,7 +1057,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 576,
       "actual_package_fingerprint": "4309f27742f6be08ae353b4c52f54133f870d5613ed5b704aa3d7c878c844739",
-      "timing_ms": 0.721,
+      "timing_ms": 0.712,
       "builder_exception": null
     },
     {
@@ -1033,7 +1068,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 467,
       "actual_package_fingerprint": "69280c0fd78fce82f01d82911aa13a4b9b24aa68a462a1e403b20fb51d4f841f",
-      "timing_ms": 0.853,
+      "timing_ms": 0.653,
       "builder_exception": null
     },
     {
@@ -1044,7 +1079,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 569,
       "actual_package_fingerprint": "829c61c512dc42a0c60617267cd5ad1ab5f4e43ed6d9cf9cd4bb882d026fac1c",
-      "timing_ms": 0.834,
+      "timing_ms": 0.695,
       "builder_exception": null
     },
     {
@@ -1055,7 +1090,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 596,
       "actual_package_fingerprint": "47e730520ac70af41a1e675221562c56740c9a3f4f186d006c2c79d440b1cc0e",
-      "timing_ms": 0.701,
+      "timing_ms": 0.702,
       "builder_exception": null
     },
     {
@@ -1066,7 +1101,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 657,
       "actual_package_fingerprint": "aa94a3ef52eddb2972beafc33b36c0bd116436b9c1cdd0718cae57e3c7c47372",
-      "timing_ms": 0.699,
+      "timing_ms": 0.687,
       "builder_exception": null
     },
     {
@@ -1077,7 +1112,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 886,
       "actual_package_fingerprint": "1ef7b47c0503e7c91d6c4d5b813c5bce8b34e29234623c5f5dddea67864c58cb",
-      "timing_ms": 0.71,
+      "timing_ms": 0.757,
       "builder_exception": null
     },
     {
@@ -1088,7 +1123,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 632,
       "actual_package_fingerprint": "b68522e844e03c8f60e56f8b12043cea888cad010da71e3a36be2154a138283a",
-      "timing_ms": 0.656,
+      "timing_ms": 0.727,
       "builder_exception": null
     },
     {
@@ -1099,7 +1134,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 455,
       "actual_package_fingerprint": "c51f9ca3250885a5c7239e68cf2fd477f5311c198ebc52e53ce2e204ae0a2830",
-      "timing_ms": 0.687,
+      "timing_ms": 0.892,
       "builder_exception": null
     },
     {
@@ -1110,7 +1145,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": 305,
       "actual_package_fingerprint": "637620cf166825955777438d7384baddd42185ace91c37b24cf42f68c3ed879f",
-      "timing_ms": 0.644,
+      "timing_ms": 1.446,
       "builder_exception": null
     },
     {
@@ -1121,7 +1156,7 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": null,
       "actual_package_fingerprint": null,
-      "timing_ms": 0.049,
+      "timing_ms": 0.089,
       "builder_exception": null
     },
     {
@@ -1132,40 +1167,40 @@
       "actual_fallback_reason": null,
       "actual_estimated_tokens": null,
       "actual_package_fingerprint": null,
-      "timing_ms": 0.038,
+      "timing_ms": 0.061,
       "builder_exception": null
     },
     {
       "scenario_id": "s099_unknown_wording",
       "scenario_class": "unknown_wording",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 596,
       "actual_package_fingerprint": "b2a58e9619b2ec038eba5152eb7b7526dde7076ed0320dfb66f6b4285c67d8f3",
-      "timing_ms": 6.721,
+      "timing_ms": 7.813,
       "builder_exception": null
     },
     {
       "scenario_id": "s100_unknown_wording",
       "scenario_class": "unknown_wording",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 767,
       "actual_package_fingerprint": "5de53f9e91683a8443c6a2d61ae5dc210f624cc6ae9f5c602c0558a351970006",
-      "timing_ms": 6.174,
+      "timing_ms": 5.962,
       "builder_exception": null
     },
     {
       "scenario_id": "s101_unknown_wording",
       "scenario_class": "unknown_wording",
-      "verdict": "match_expected_widened",
+      "verdict": "critical_false_narrow_irrelevant_lexical_target",
       "actual_completeness_status": "insufficient_widened",
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 616,
       "actual_package_fingerprint": "cf7d182a1184d17f08b8db16998340ed9c9e00c3005a40b7af827b119799ec76",
-      "timing_ms": 6.225,
+      "timing_ms": 7.684,
       "builder_exception": null
     },
     {
@@ -1176,7 +1211,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.991,
+      "timing_ms": 5.801,
       "builder_exception": null
     },
     {
@@ -1187,7 +1222,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.832,
+      "timing_ms": 6.254,
       "builder_exception": null
     },
     {
@@ -1198,7 +1233,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.92,
+      "timing_ms": 5.948,
       "builder_exception": null
     },
     {
@@ -1209,7 +1244,7 @@
       "actual_fallback_reason": "structured_evidence_incomplete_requires_fullcontext",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "52231ae593984140bc665713cc5408fc83afc533bf457bff63a7c7c0973f1151",
-      "timing_ms": 0.156,
+      "timing_ms": 0.196,
       "builder_exception": null
     },
     {
@@ -1220,7 +1255,7 @@
       "actual_fallback_reason": "structured_evidence_incomplete_requires_fullcontext",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "3c96ac9f8cf86c9293a314ae4e0932a4e1e71bb12810692d47be40ef2f0cd6f0",
-      "timing_ms": 0.148,
+      "timing_ms": 0.227,
       "builder_exception": null
     },
     {
@@ -1231,7 +1266,7 @@
       "actual_fallback_reason": "structured_evidence_incomplete_requires_fullcontext",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "57753dd1d555074b0f9f0342283b3fa5cfe5bd5220c6123e98fc36cda377de55",
-      "timing_ms": 0.143,
+      "timing_ms": 0.241,
       "builder_exception": null
     },
     {
@@ -1242,7 +1277,7 @@
       "actual_fallback_reason": "structured_evidence_incomplete_requires_fullcontext",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "cd4e045c9a2b4b2a5916cf7f6fa24b839cf03830b26c57b962c78b7c2102fe73",
-      "timing_ms": 0.15,
+      "timing_ms": 0.146,
       "builder_exception": null
     },
     {
@@ -1253,7 +1288,7 @@
       "actual_fallback_reason": "structured_evidence_incomplete_requires_fullcontext",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "8e36dfc8517695b795bcb8a34ecdc77f328429eab56f2a05a3194248c5bcaf28",
-      "timing_ms": 0.145,
+      "timing_ms": 0.148,
       "builder_exception": null
     },
     {
@@ -1264,7 +1299,7 @@
       "actual_fallback_reason": "structured_evidence_incomplete_requires_fullcontext",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "9a07c413efee5c97371786fc2c7e71aadcafbfd7a7fbb3eb42958c429a20992a",
-      "timing_ms": 0.142,
+      "timing_ms": 0.189,
       "builder_exception": null
     },
     {
@@ -1275,7 +1310,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 665,
       "actual_package_fingerprint": "2c3de2982c995e7acc771cb3adea447c5b9c3e100faf5c663854f0bbbc05d69a",
-      "timing_ms": 4.446,
+      "timing_ms": 5.116,
       "builder_exception": null
     },
     {
@@ -1286,7 +1321,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 665,
       "actual_package_fingerprint": "03104da8789781ef90e6f3156eddff82b8688c8c941768af879bd4d5a4b74fd3",
-      "timing_ms": 6.842,
+      "timing_ms": 7.447,
       "builder_exception": null
     },
     {
@@ -1297,7 +1332,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 665,
       "actual_package_fingerprint": "2c3de2982c995e7acc771cb3adea447c5b9c3e100faf5c663854f0bbbc05d69a",
-      "timing_ms": 4.37,
+      "timing_ms": 4.709,
       "builder_exception": null
     },
     {
@@ -1308,7 +1343,7 @@
       "actual_fallback_reason": "exact_evidence_incomplete_widened_via_lexical_retrieval",
       "actual_estimated_tokens": 665,
       "actual_package_fingerprint": "03104da8789781ef90e6f3156eddff82b8688c8c941768af879bd4d5a4b74fd3",
-      "timing_ms": 5.907,
+      "timing_ms": 6.454,
       "builder_exception": null
     },
     {
@@ -1319,7 +1354,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 4.329,
+      "timing_ms": 4.404,
       "builder_exception": null
     },
     {
@@ -1330,7 +1365,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 3.893,
+      "timing_ms": 4.368,
       "builder_exception": null
     },
     {
@@ -1341,7 +1376,7 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 3.744,
+      "timing_ms": 4.122,
       "builder_exception": null
     },
     {
@@ -1352,10 +1387,10 @@
       "actual_fallback_reason": "lexical_ambiguous_top_match",
       "actual_estimated_tokens": 26995,
       "actual_package_fingerprint": "2a35ac3b2c0c8840e0422882134ddcbdd16e56c5dbceffa00e8d093ab4e68f83",
-      "timing_ms": 5.59,
+      "timing_ms": 6.343,
       "builder_exception": null
     }
   ],
-  "binding_pass": true,
-  "verdict": "PERF7C_OFFLINE_PACKAGE_EVAL_PASS"
+  "binding_pass": false,
+  "verdict": "PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND"
 }

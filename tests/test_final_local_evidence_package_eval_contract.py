@@ -238,14 +238,103 @@ def test_result_artifact_never_contains_raw_query_or_contact_values() -> None:
             assert value not in raw, value
 
 
-def test_result_verdict_is_binding_pass() -> None:
+_KNOWN_LEXICAL_RELEVANCE_DEFECT_SCENARIO_IDS = {
+    "s051_treatment_plan_other_clinic",
+    "s053_treatment_plan_other_clinic",
+    "s054_treatment_plan_other_clinic",
+    "s055_treatment_plan_other_clinic",
+    "s056_treatment_plan_other_clinic",
+    "s083_cross_topic",
+    "s084_cross_topic",
+    "s099_unknown_wording",
+    "s100_unknown_wording",
+    "s101_unknown_wording",
+}
+
+
+def test_result_verdict_is_lexical_relevance_defect_found() -> None:
+    """PERF-7C correction: the original PASS verdict was wrong (circular evaluation -- see
+    docs/evidence/performance/PERF7C_LOCAL_EVIDENCE_PACKAGE_EVAL_AUDIT.md). This asserts the
+    corrected, honest verdict -- not a weakened criterion. The three other binding-PASS counters
+    (session contamination, structured-ID mismatch, Builder exceptions) remain proven at zero,
+    proving the correction is scoped exactly to the lexical-relevance defect, nothing broader."""
+
     result = _result()
-    assert result["metrics"]["critical_false_narrow_count"] == 0
+    assert result["metrics"]["critical_false_narrow_count"] == 10
     assert result["metrics"]["session_contamination_count"] == 0
     assert result["metrics"]["structured_id_mismatch_count"] == 0
     assert result["metrics"]["builder_exception_count"] == 0
-    assert result["binding_pass"] is True
-    assert result["verdict"] == "PERF7C_OFFLINE_PACKAGE_EVAL_PASS"
+    assert result["binding_pass"] is False
+    assert result["verdict"] == "PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND"
+    assert set(result["critical_false_narrow_scenario_ids"]) == _KNOWN_LEXICAL_RELEVANCE_DEFECT_SCENARIO_IDS
+    assert set(result["lexical_relevance_defect_scenario_ids"]) == _KNOWN_LEXICAL_RELEVANCE_DEFECT_SCENARIO_IDS
+
+
+def test_all_10_flagged_scenarios_verdict_is_irrelevant_lexical_target() -> None:
+    result = _result()
+    by_id = {s["scenario_id"]: s for s in result["scenarios"]}
+    for scenario_id in _KNOWN_LEXICAL_RELEVANCE_DEFECT_SCENARIO_IDS:
+        assert by_id[scenario_id]["verdict"] == "critical_false_narrow_irrelevant_lexical_target", scenario_id
+        assert by_id[scenario_id]["actual_completeness_status"] == "insufficient_widened", scenario_id
+
+
+def test_relevance_gated_scenarios_never_silently_accept_an_unlisted_target() -> None:
+    """General rule, not just the 10 known cases: for every scenario whose expected
+    ``lexical_target_options`` is a list (possibly empty), an actual ``insufficient_widened``
+    outcome must either land in the allowed set (verdict ``match_expected_widened``) or be flagged
+    ``critical_false_narrow_irrelevant_lexical_target`` -- never the old soft
+    ``unexpected_scoped_target``-only bucket with no critical flag."""
+
+    matrix = {s["scenario_id"]: s for s in _matrix()["scenarios"]}
+    result = _result()
+    for scenario_result in result["scenarios"]:
+        scenario = matrix[scenario_result["scenario_id"]]
+        if scenario["expected"]["lexical_target_options"] is None:
+            continue
+        if scenario_result["actual_completeness_status"] != "insufficient_widened":
+            continue
+        assert scenario_result["verdict"] in {
+            "match_expected_widened",
+            "critical_false_narrow_irrelevant_lexical_target",
+        }, (scenario["scenario_id"], scenario_result["verdict"])
+
+
+def test_empty_allowed_target_scenarios_can_never_match_as_widened() -> None:
+    """Scenarios whose independently-derived relevant-document set is empty (cross_topic/
+    unknown_wording defect scenarios) can never legitimately produce ``match_expected_widened`` --
+    by construction, no document was judged relevant, so any widened result is automatically the
+    critical defect verdict."""
+
+    matrix = {s["scenario_id"]: s for s in _matrix()["scenarios"]}
+    result = _result()
+    by_id = {s["scenario_id"]: s for s in result["scenarios"]}
+    for scenario in matrix.values():
+        if scenario["expected"]["lexical_target_options"] == []:
+            actual = by_id[scenario["scenario_id"]]
+            assert actual["verdict"] != "match_expected_widened", scenario["scenario_id"]
+
+
+def test_treatment_plan_relevant_authority_is_clinic_consultation_doc() -> None:
+    """Grounds the corrected expectation in canonical authority, not in search output: the
+    consultation MD is the one genuinely relevant document for "plan from another clinic"
+    questions, per its own authored frontmatter alias."""
+
+    import frontmatter
+
+    consultation_path = _REPO_ROOT / "clients" / "demo" / "md" / "clinic__info__consultation.md"
+    with open(consultation_path, encoding="utf-8-sig") as handle:
+        post = frontmatter.load(handle)
+    aliases = post.metadata.get("aliases") or []
+    assert any("план лечения" in alias for alias in aliases), aliases
+
+    matrix = {s["scenario_id"]: s for s in _matrix()["scenarios"]}
+    for scenario_id in (
+        "s051_treatment_plan_other_clinic",
+        "s053_treatment_plan_other_clinic",
+        "s055_treatment_plan_other_clinic",
+        "s056_treatment_plan_other_clinic",
+    ):
+        assert matrix[scenario_id]["expected"]["lexical_target_options"] == ["clinic__info__consultation.md"]
 
 
 def test_result_matches_matrix_scenario_count() -> None:
@@ -293,11 +382,18 @@ def test_all_fallback_expected_scenarios_actually_fell_back_or_matched_two_way_e
 # --------------------------------------------------------------------------------------------
 
 
-def test_audit_document_exists_and_states_verdict() -> None:
+def test_audit_document_exists_and_states_corrected_verdict() -> None:
     assert AUDIT_PATH.is_file()
     text = AUDIT_PATH.read_text(encoding="utf-8")
-    assert "PERF7C_OFFLINE_PACKAGE_EVAL_PASS" in text
+    assert "PERF7C_LEXICAL_RELEVANCE_DEFECT_FOUND" in text
     assert "critical false-narrow" in text.lower() or "critical_false_narrow" in text.lower()
+    # The withdrawn PASS claim must be documented as withdrawn, not silently deleted.
+    assert "PERF7C_OFFLINE_PACKAGE_EVAL_PASS" in text
+    lowered = text.lower()
+    assert "withdrawn" in lowered or "superseded" in lowered or "wrong" in lowered
+    for scenario_id in _KNOWN_LEXICAL_RELEVANCE_DEFECT_SCENARIO_IDS:
+        short_id = scenario_id.split("_", 1)[0]  # e.g. "s051"
+        assert short_id in text, short_id
 
 
 def test_audit_document_no_client_pack_change_disclosed() -> None:

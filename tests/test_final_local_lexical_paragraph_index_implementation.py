@@ -646,10 +646,21 @@ def test_no_logging_or_print_calls_in_module() -> None:
     assert "get_logger" not in source
 
 
-def test_module_not_imported_anywhere_outside_this_test_and_itself() -> None:
+def test_module_not_imported_by_any_real_runtime_path() -> None:
     """Only real Python ``import``/``from ... import`` statements count as a runtime import --
     prose mentions in TASK.md/the seam audit/the governance checker's existence assertions are
-    expected and must not fail this check."""
+    expected and must not fail this check.
+
+    PERF-7B correction: this originally asserted that *no* module besides this file's own pair
+    imported ``target_lexical_paragraph_index`` at all. That went stale the moment PERF-7B shipped
+    -- ``core/target_evidence_package_builder.py`` legitimately imports it through its public
+    ``search_target_lexical_paragraph_index`` API (that dependency is the entire point of PERF-7B),
+    and PERF-7C's own offline eval runner/contract test legitimately import it too. None of those
+    three are wired to any real runtime path either (proven by their own equivalent isolation
+    tests) -- so the invariant that actually matters, and the one this test now checks, is that no
+    *real runtime* module (``app.py``, the Composer/Verifier/pipeline chain, session handling,
+    ``TurnFrame`` handling) imports this module -- not that the module has exactly zero non-runtime
+    consumers, which was always going to grow as PERF-7 progressed."""
 
     proc = subprocess.run(
         ["git", "grep", "-nE", r"^\s*(from|import)\s+.*target_lexical_paragraph_index", "--", "*.py"],
@@ -664,8 +675,35 @@ def test_module_not_imported_anywhere_outside_this_test_and_itself() -> None:
     allowed_files = {
         "core/target_lexical_paragraph_index.py",
         "tests/test_final_local_lexical_paragraph_index_implementation.py",
+        # PERF-7B: the Builder legitimately consumes the public search API -- still unwired to
+        # runtime itself (see tests/test_final_local_evidence_package_builder_implementation.py's
+        # own "not imported by any runtime path" proof).
+        "core/target_evidence_package_builder.py",
+        "tests/test_final_local_evidence_package_builder_implementation.py",
+        # PERF-7C: the offline eval runner and its contract test build the index directly.
+        "evals/v5/run_perf7c_local_evidence_package_eval.py",
+        "tests/test_final_local_evidence_package_eval_contract.py",
     }
-    unexpected = [line for line in hits if not any(line.startswith(f"{path}:") for path in allowed_files)]
+    real_runtime_files = {
+        "app.py",
+        "session.py",
+        "core/target_composer_executor.py",
+        "core/target_response_verifier.py",
+        "core/target_verified_response_pipeline.py",
+        "core/target_policy_bound_verified_response_pipeline.py",
+        "core/target_composer_request.py",
+        "contracts/turn_frame.py",
+    }
+    unexpected = [
+        line
+        for line in hits
+        if not any(line.startswith(f"{path}:") for path in allowed_files)
+    ]
+    runtime_hits = [line for line in hits if any(line.startswith(f"{path}:") for path in real_runtime_files)]
+    assert runtime_hits == [], runtime_hits
+    # Any import from a file outside both the allowed and known-runtime sets is a new consumer
+    # this test has not been told about yet -- surfaced explicitly rather than silently ignored,
+    # so a future milestone's own governance work updates this list deliberately.
     assert unexpected == [], unexpected
 
 

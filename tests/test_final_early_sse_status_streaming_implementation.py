@@ -21,6 +21,7 @@ from core.runtime_turn_frame import publish_planner_attempt_frame
 from core.target_runtime_turn import run_target_fullcontext_runtime_turn
 from core.target_sse_worker_context import (
     _status_sink_var,
+    current_text_sink,
     current_status_sink,
     current_worker_client_id,
     worker_execution_context,
@@ -657,6 +658,7 @@ def test_worker_bindings_reset_on_normal_completion() -> None:
     mem_reset(sid)
     assert current_worker_client_id() is None
     assert current_status_sink() is None
+    assert current_text_sink() is None
     with app.test_request_context():
         request.ctx = {}
         with worker_execution_context(
@@ -793,3 +795,34 @@ def test_generator_and_worker_have_distinct_request_ctx() -> None:
         assert request.ctx is not None
     assert inner_ctx_id is not None
     assert inner_ctx_id != outer_ctx_id
+
+
+def test_non_lossy_text_delta_relay_arrives_before_final_ui(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "_sse_worker_admission", threading.Semaphore(1))
+
+    def _fake_worker(*, sid: str, text_emit=None, **_kwargs):
+        assert text_emit is not None
+        text_emit("First ")
+        time.sleep(0.08)
+        text_emit("answer")
+        return {
+            "answer": "First answer",
+            "meta": {"sid": sid, "service_route": "target_fullcontext_materialized"},
+        }, 200
+
+    monkeypatch.setattr(app_module, "_run_sse_worker_turn", _fake_worker)
+    client = app_module.app.test_client()
+    response = client.post(
+        "/ask/stream",
+        json={"q": "Safe FAQ", "sid": "stream-relay", "client_id": "demo"},
+    )
+    events = _read_sse_events(response)
+    kinds = [name for _, name, _ in events]
+    deltas = [data["delta"] for _, name, data in events if name == "text_delta"]
+
+    assert deltas == ["First ", "answer"]
+    assert kinds.index("text_delta") < kinds.index("ui") < kinds.index("done")

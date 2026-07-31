@@ -26,6 +26,9 @@ from core.target_composer_request import (
 )
 from core.target_response_followup_materializer import TargetContentFollowup
 from core.target_response_followup_policy import TargetResponseFollowupSelection
+from core.target_composer_json_stream import TargetComposerJsonStream
+from core.target_sse_worker_context import bind_text_sink, reset_text_sink
+from core.target_versioned_answer_cache import build_versioned_answer_cache_key
 
 
 class RecordingBackend:
@@ -50,6 +53,31 @@ class FailingBackend:
     def generate(self, invocation: TargetComposerInvocation, /) -> object:
         self.calls += 1
         raise RuntimeError("provider detail must not become fallback text")
+
+
+class StreamingBackend:
+    def __init__(self) -> None:
+        self.stream_calls = 0
+        self.blocking_calls = 0
+
+    def generate(self, invocation: TargetComposerInvocation, /) -> object:
+        self.blocking_calls += 1
+        return composer_test_json("Blocking answer")
+
+    def generate_stream(self, invocation: TargetComposerInvocation, on_delta, /) -> object:
+        self.stream_calls += 1
+        on_delta("Streamed ")
+        on_delta("answer")
+        return composer_test_json("Streamed answer")
+
+
+class NumericStreamingBackend(StreamingBackend):
+    def generate_stream(self, invocation: TargetComposerInvocation, on_delta, /) -> object:
+        self.stream_calls += 1
+        on_delta("Safe lead. ")
+        on_delta("Price 3000 rubles")
+        on_delta(" must stay held")
+        return composer_test_json("Safe lead. Price 3000 rubles must stay held")
 
 
 def _cached_context(
@@ -139,6 +167,108 @@ def _error(callable_) -> TargetComposerExecutorError:
     with pytest.raises(TargetComposerExecutorError) as caught:
         callable_()
     return caught.value
+
+
+def test_incremental_json_parser_emits_only_decoded_answer_text() -> None:
+    parser = TargetComposerJsonStream()
+    assert parser.ingest('{"ans') == ""
+    assert parser.ingest('wer":"Line 1\\n') == "Line 1\n"
+    assert parser.ingest('Line \\u0032","source_identity":') == "Line 2"
+    assert parser.raw_json.startswith('{"answer"')
+    emoji = TargetComposerJsonStream()
+    assert emoji.ingest('{"answer":"\\uD83D') == ""
+    assert emoji.ingest('\\uDE00"}') == "😀"
+
+
+def test_safe_content_only_request_uses_true_stream_backend_when_sink_is_bound() -> None:
+    content = _request().evidence_blocks[0]
+    request = _request(
+        spec=_spec(
+            required_fact_ids=(),
+            allow_marketing_facts=False,
+            allow_consultation_close=False,
+            allow_cta=False,
+        ),
+        evidence_blocks=(content,),
+        selected_cta_key=None,
+        response_length_profile="simple_faq",
+    )
+    backend = StreamingBackend()
+    deltas: list[str] = []
+    token = bind_text_sink(deltas.append)
+    try:
+        result = execute_target_composer(
+            request,
+            backend,
+            tone=_tone(),
+            cached_full_context=_cached_context(),
+        )
+    finally:
+        reset_text_sink(token)
+
+    assert result.text == "Streamed answer"
+    assert deltas == ["Streamed ", "answer"]
+    assert (backend.stream_calls, backend.blocking_calls) == (1, 0)
+
+
+def test_verified_answer_cache_key_changes_with_pack_or_qwen_model() -> None:
+    request = _request()
+    composer = type("Backend", (), {"model": "qwen3.7-plus"})()
+    verifier = type("Backend", (), {"model": "qwen3.7-plus"})()
+    first = build_versioned_answer_cache_key(
+        request,
+        _cached_context(),
+        client_id="demo",
+        composer_backend=composer,
+        semantic_backend=verifier,
+    )
+    changed_pack = build_versioned_answer_cache_key(
+        request,
+        _cached_context("Changed canonical corpus."),
+        client_id="demo",
+        composer_backend=composer,
+        semantic_backend=verifier,
+    )
+    composer.model = "qwen3.8-plus"
+    changed_model = build_versioned_answer_cache_key(
+        request,
+        _cached_context(),
+        client_id="demo",
+        composer_backend=composer,
+        semantic_backend=verifier,
+    )
+
+    assert len({first, changed_pack, changed_model}) == 3
+
+
+def test_unverified_numeric_tail_is_held_until_final_verified_ui() -> None:
+    content = _request().evidence_blocks[0]
+    request = _request(
+        spec=_spec(
+            required_fact_ids=(),
+            allow_marketing_facts=False,
+            allow_consultation_close=False,
+            allow_cta=False,
+        ),
+        evidence_blocks=(content,),
+        selected_cta_key=None,
+        response_length_profile="simple_faq",
+    )
+    backend = NumericStreamingBackend()
+    deltas: list[str] = []
+    token = bind_text_sink(deltas.append)
+    try:
+        result = execute_target_composer(
+            request,
+            backend,
+            tone=_tone(),
+            cached_full_context=_cached_context(),
+        )
+    finally:
+        reset_text_sink(token)
+
+    assert result.text == "Safe lead. Price 3000 rubles must stay held"
+    assert deltas == ["Safe lead. ", "Price "]
 
 
 def test_contract_shapes_signature_policy_and_exact_error_codes() -> None:

@@ -174,7 +174,7 @@ def test_real_demo_pipeline_crosses_s33_s34_s39_once_and_preserves_sidecars() ->
     assert composer.invocations[0].primary_evidence_json == (
         semantic.invocations[0].primary_evidence_json
     )
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
     assert composer.invocations[0].primary_evidence_json
     assert composer.invocations[0].user_message == inputs["user_message"]
     assert semantic.invocations[0].candidate_text == result.text

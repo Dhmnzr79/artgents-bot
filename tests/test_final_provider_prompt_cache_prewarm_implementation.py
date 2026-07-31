@@ -175,7 +175,7 @@ def test_offline_static_prefix_matches_real_builder_up_to_boundary() -> None:
     boundary -- independent of the dynamic tail (message-content identity, not wire-byte)."""
 
     ctx = load_target_runtime_client_context("demo")
-    corpus = ctx.cached_full_context.corpus_text
+    corpus = ctx.cached_full_context.model_corpus_text
 
     real_call = build_composer_sdk_messages(
         TargetComposerInvocation(

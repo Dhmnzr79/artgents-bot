@@ -39,6 +39,7 @@ from core.target_response_verifier import (
     TargetSemanticVerifierInvocation,
 )
 from core.turn_frame_from_raw import build_turn_frame_from_raw
+from core.target_versioned_answer_cache import clear_versioned_answer_cache
 
 
 DEMO_ROOT = Path("clients/demo")
@@ -68,6 +69,22 @@ class RecordingComposerBackend:
         return composer_test_json(self.text)
 
 
+class CachedRecordingComposerBackend(RecordingComposerBackend):
+    supports_versioned_answer_cache = True
+    model = "qwen3.7-plus"
+
+
+class DeterministicProductComposerBackend:
+    supports_deterministic_commercial_answer = True
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def generate(self, invocation: TargetComposerInvocation, /) -> object:
+        self.calls += 1
+        raise AssertionError("deterministic commercial route reached Composer")
+
+
 class RecordingSemanticBackend:
     def __init__(self) -> None:
         self.invocations: list[TargetSemanticVerifierInvocation] = []
@@ -75,6 +92,40 @@ class RecordingSemanticBackend:
     def assess(self, invocation: TargetSemanticVerifierInvocation, /) -> object:
         self.invocations.append(invocation)
         return TargetSemanticAssessment()
+
+
+def test_exact_starter_prompt_reuses_only_an_already_verified_versioned_answer() -> None:
+    clear_versioned_answer_cache()
+    composer = CachedRecordingComposerBackend(MEDICAL_TEXT)
+    semantic = RecordingSemanticBackend()
+    semantic.model = "qwen3.7-plus"
+    inputs = _pipeline_inputs()
+    inputs["user_message"] = "Расскажите про all-on-4"
+    frame = _frame(
+        aspects=["overview"],
+        primary_aspect="overview",
+    )
+
+    first = run_target_offline_turn_frame_bound_response(
+        frame,
+        _envelope(),
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+    second = run_target_offline_turn_frame_bound_response(
+        frame,
+        _envelope(),
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+
+    assert isinstance(first, TargetTurnFrameBoundMaterializeResponse)
+    assert isinstance(second, TargetTurnFrameBoundMaterializeResponse)
+    assert first.verified.text == second.verified.text
+    assert len(composer.invocations) == 1
+    assert len(semantic.invocations) == 1
 
 
 def _envelope(**overrides: object) -> TargetTurnFramePolicyEnvelope:
@@ -108,7 +159,7 @@ def _frame(**overrides: object):
     return build_turn_frame_from_raw(
         payload,
         allowed_topics=frozenset({"implantation", "doctors"}),
-        allowed_service_ids=frozenset({"all_on_4"}),
+        allowed_service_ids=frozenset({"all_on_4", "bone_graft"}),
     )
 
 
@@ -177,7 +228,7 @@ def test_real_materialize_path_crosses_dispatch_and_s40_once() -> None:
     assert result.dispatch.policy_request.response_mode == "answer"
     assert result.dispatch.policy_request.requested_components == ("content", "price")
     assert len(composer.invocations) == 1
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
     assert len(semantic.invocations) == 1
     assert result.verified.verification_status == "verified"
     assert {path: _sha256(path) for path in paths} == before
@@ -217,6 +268,78 @@ def test_real_doctors_only_materialize_requests_doctors_component() -> None:
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
     assert result.dispatch.policy_request.requested_components == ("doctors",)
     assert len(composer.invocations) == 1
+
+
+def test_product_doctors_only_route_is_deterministic_and_skips_both_llms() -> None:
+    composer = DeterministicProductComposerBackend()
+    semantic = RecordingSemanticBackend()
+    result = run_target_offline_turn_frame_bound_response(
+        _frame(
+            topic="doctors",
+            topic_confidence=0.95,
+            aspects=["overview"],
+            primary_aspect="overview",
+        ),
+        _envelope(),
+        **_pipeline_inputs(),  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.dispatch.policy_request.requested_components == ("doctors",)
+    assert composer.calls == 0
+    assert semantic.invocations == []
+    assert "- " in result.verified.text
+
+
+def test_product_price_only_route_is_deterministic_and_skips_both_llms() -> None:
+    composer = DeterministicProductComposerBackend()
+    semantic = RecordingSemanticBackend()
+    result = run_target_offline_turn_frame_bound_response(
+        _frame(
+            aspects=["price"],
+            primary_aspect="price",
+        ),
+        _envelope(),
+        **_pipeline_inputs(),  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.dispatch.policy_request.requested_components == ("price",)
+    assert composer.calls == 0
+    assert semantic.invocations == []
+    assert any(char.isdigit() for char in result.verified.text)
+
+
+def test_product_no_public_price_preserves_the_approved_text_exactly() -> None:
+    composer = DeterministicProductComposerBackend()
+    semantic = RecordingSemanticBackend()
+    inputs = _pipeline_inputs()
+    bundle = inputs["bundle"]
+    approved_text = next(
+        offer.price.approved_text
+        for offer in bundle.offers  # type: ignore[union-attr]
+        if offer.service_id == "bone_graft"
+    )
+    result = run_target_offline_turn_frame_bound_response(
+        _frame(
+            service_id="bone_graft",
+            aspects=["price"],
+            primary_aspect="price",
+        ),
+        _envelope(),
+        **inputs,  # type: ignore[arg-type]
+        composer_backend=composer,
+        semantic_backend=semantic,
+    )
+
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert result.verified.text == approved_text
+    assert composer.calls == 0
+    assert semantic.invocations == []
 
 
 def test_materializable_medical_handoff_crosses_s40_once() -> None:
@@ -272,8 +395,8 @@ def test_prebuilt_full_context_is_identical_across_two_materialize_turns() -> No
     assert isinstance(first, TargetTurnFrameBoundMaterializeResponse)
     assert isinstance(second, TargetTurnFrameBoundMaterializeResponse)
     assert len(composer.invocations) == 2
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
-    assert composer.invocations[1].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
+    assert composer.invocations[1].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
     assert (
         composer.invocations[0].cached_full_context
         == composer.invocations[1].cached_full_context

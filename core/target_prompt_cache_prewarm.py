@@ -125,11 +125,16 @@ class PrewarmAttemptReuseError(PrewarmError):
 # --------------------------------------------------------------------------------------------
 
 
+def _model_corpus(ctx: TargetRuntimeClientContext) -> str:
+    cached = ctx.cached_full_context
+    return getattr(cached, "model_corpus_text", cached.corpus_text)
+
+
 def _role_messages(role: TargetPromptCacheRole, ctx: TargetRuntimeClientContext) -> list[dict[str, str]]:
     """Full SDK messages for a role, built by the production builder verbatim with fixed
     non-PII placeholders for the dynamic tail. Never a parallel assembly path."""
 
-    corpus = ctx.cached_full_context.corpus_text
+    corpus = _model_corpus(ctx)
     if role == "composer":
         invocation = TargetComposerInvocation(
             system_policy=TARGET_COMPOSER_SYSTEM_POLICY,
@@ -157,7 +162,7 @@ def _static_prefix_serialization(role: TargetPromptCacheRole, ctx: TargetRuntime
     call would send up to the dynamic tail."""
 
     messages = _role_messages(role, ctx)
-    corpus = ctx.cached_full_context.corpus_text
+    corpus = _model_corpus(ctx)
     system_content = messages[0]["content"]
     user_content = messages[1]["content"]
     boundary = user_content.index(corpus) + len(corpus)
@@ -184,7 +189,10 @@ def compute_fingerprint(
     lookup or lifecycle key."""
 
     static_prefix_hash = _sha256_hex(_static_prefix_serialization(role, ctx))
-    corpus_sha256 = ctx.cached_full_context.sha256
+    corpus_sha256 = (
+        getattr(ctx.cached_full_context, "prompt_sha256", None)
+        or ctx.cached_full_context.sha256
+    )
     composite = _sha256_hex(
         "|".join(
             (

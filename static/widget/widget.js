@@ -1383,8 +1383,11 @@ export function mountWidget(root, config) {
           if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
           const turn = botTurnFromPayload(uiData);
           if (turn) {
-            // Текст ответа: единственный источник правды — то, что уже показали в стриме.
-            if (streamedText) turn.text = streamedText;
+            // The verified final payload remains the source of truth. A blocked
+            // or corrected route must replace speculative streamed prose.
+            if (streamedText && streamedText === String(turn.text || "").trim()) {
+              turn.text = streamedText;
+            }
             state.messages.push(turn);
           }
           state.lastPayload = uiData;

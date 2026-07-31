@@ -2,8 +2,8 @@
 
 Generalizes the existing `core/target_composer_action_context.py` pattern
 (`ContextVar` + `bind_...() -> tokens` / `reset_...(tokens)` in `finally`) for the
-values a PERF-1 worker thread needs: `client_id`, and the status-event sink used by
-`core/turn_timing.py`'s `stage_start` hook.
+values a worker thread needs: `client_id`, the status-event sink used by
+`core/turn_timing.py`'s `stage_start` hook, and the non-lossy Composer text sink.
 
 Governance (docs/evidence/performance/FINAL_EARLY_SSE_STATUS_STREAMING_SEAM_AUDIT.md,
 "Worker execution context: production-safe design"):
@@ -24,18 +24,22 @@ import os
 import time
 import uuid
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from typing import Callable, Iterator
 
 from session import bind_client_id
 
 StatusEmitter = Callable[[str, str], None]
+TextEmitter = Callable[[str], None]
 
 _client_id_var: ContextVar[str | None] = ContextVar(
     "perf1_worker_client_id", default=None
 )
 _status_sink_var: ContextVar[StatusEmitter | None] = ContextVar(
     "perf1_worker_status_sink", default=None
+)
+_text_sink_var: ContextVar[TextEmitter | None] = ContextVar(
+    "composer_text_stream_sink", default=None
 )
 
 
@@ -46,6 +50,19 @@ def current_worker_client_id() -> str | None:
 def current_status_sink() -> StatusEmitter | None:
     """Read by core/turn_timing.py's stage_start hook. None outside a worker context."""
     return _status_sink_var.get()
+
+
+def current_text_sink() -> TextEmitter | None:
+    """Return the current SSE answer-delta sink, or ``None`` on blocking paths."""
+    return _text_sink_var.get()
+
+
+def bind_text_sink(emitter: TextEmitter | None) -> Token:
+    return _text_sink_var.set(emitter)
+
+
+def reset_text_sink(token: Token) -> None:
+    _text_sink_var.reset(token)
 
 
 def _minimal_environ(*, path: str) -> dict[str, object]:
@@ -78,6 +95,7 @@ def worker_execution_context(
     client_id: str,
     turn_t0_monotonic: float,
     status_emit: StatusEmitter | None,
+    text_emit: TextEmitter | None = None,
     path: str = "/ask/stream",
 ) -> Iterator[None]:
     """Independent request context + explicit bindings for one PERF-1 worker turn.
@@ -96,6 +114,7 @@ def worker_execution_context(
     req_ctx.push()
     client_token = _client_id_var.set(client_id)
     sink_token = _status_sink_var.set(status_emit)
+    text_sink_token = bind_text_sink(text_emit)
     try:
         flask_request.ctx = {
             "request_id": request_id,
@@ -115,6 +134,7 @@ def worker_execution_context(
         bind_client_id(sid, client_id)
         yield
     finally:
+        reset_text_sink(text_sink_token)
         _status_sink_var.reset(sink_token)
         _client_id_var.reset(client_token)
         req_ctx.pop()

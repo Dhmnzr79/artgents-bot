@@ -22,8 +22,9 @@ class TargetPromptCacheFingerprint:
     ``static_prefix_hash`` is the primary, directly-verifiable proof of prefix identity: it is
     the SHA-256 of the actual static prefix assembled by reusing the production message
     builders verbatim (sec 5). ``corpus_sha256`` mirrors ``TargetCachedFullContext.sha256`` for
-    readable invalidation granularity. The two version ints catch the one class of change a
-    text hash cannot (restructuring the assembly code without changing the resulting text).
+    readable invalidation granularity (the model-facing prompt corpus when available). The two
+    version ints catch the one class of change a text hash cannot (restructuring the assembly code
+    without changing the resulting text).
     """
 
     client_id: str

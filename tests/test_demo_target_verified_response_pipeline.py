@@ -185,7 +185,7 @@ def test_real_demo_pipeline_crosses_s36_s37_s38_once_and_preserves_sidecars() ->
     assert composer.invocations[0].primary_evidence_json == (
         semantic.invocations[0].primary_evidence_json
     )
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
     assert composer.invocations[0].primary_evidence_json
     assert composer.invocations[0].response_directives_json not in (
         composer.invocations[0].cached_full_context

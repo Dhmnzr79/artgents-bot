@@ -7,6 +7,7 @@ import os
 
 from config import QWEN_PLUS_MODEL
 from core.target_composer_executor import TargetComposerInvocation
+from core.target_composer_json_stream import TargetComposerJsonStream
 from core.target_medical_boundary import (
     TARGET_MEDICAL_BOUNDARY_SYSTEM_POLICY,
     TargetMedicalBoundaryInvocation,
@@ -24,7 +25,7 @@ from core.target_runtime_llm_messages import (
     parse_verifier_assessment_payload,
 )
 from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create, log_llm_error, log_llm_usage
-from logging_setup import get_logger
+from logging_setup import get_logger, log_llm_stream_usage
 
 logger = get_logger("target_runtime")
 
@@ -65,6 +66,9 @@ def target_fullcontext_boundary_model() -> str:
 class TargetRuntimeLiveComposerBackend:
     """One-shot live composer backend for target runtime (lazy network on generate)."""
 
+    supports_deterministic_commercial_answer = True
+    supports_versioned_answer_cache = True
+
     def __init__(self, *, model: str | None = None) -> None:
         self.model = model or target_fullcontext_composer_model()
         self.call_count = 0
@@ -95,6 +99,63 @@ class TargetRuntimeLiveComposerBackend:
             if not raw_text:
                 raise ValueError("composer_empty_output")
             return raw_text
+        except TargetRuntimeBackendTransportError:
+            raise
+        except Exception as exc:
+            log_llm_error(
+                logger,
+                call_type="target_fullcontext_runtime_composer",
+                model=self.model,
+                err=str(exc)[:300],
+            )
+            raise TargetRuntimeBackendTransportError(
+                "target_runtime_composer_provider_failed",
+                type(exc).__name__,
+            ) from exc
+
+    def generate_stream(self, invocation: TargetComposerInvocation, on_delta, /) -> object:
+        """Stream only the decoded ``answer`` field; retain strict JSON for parsing."""
+
+        self.call_count += 1
+        if self.call_count > 1:
+            raise TargetRuntimeBackendTransportError(
+                "target_runtime_composer_retry_forbidden",
+                self.call_count,
+            )
+        parser = TargetComposerJsonStream()
+        usage = None
+        try:
+            stream = chat_completions_create(
+                model=self.model,
+                temperature=0,
+                max_completion_tokens=1024,
+                response_format={"type": "json_object"},
+                timeout=LLM_REQUEST_TIMEOUT_SEC,
+                messages=build_composer_sdk_messages(invocation),
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for chunk in stream:
+                if getattr(chunk, "usage", None) is not None:
+                    usage = chunk.usage
+                choices = getattr(chunk, "choices", None) or ()
+                if not choices:
+                    continue
+                raw_delta = getattr(getattr(choices[0], "delta", None), "content", None)
+                if not raw_delta:
+                    continue
+                answer_delta = parser.ingest(str(raw_delta))
+                if answer_delta:
+                    on_delta(answer_delta)
+            log_llm_stream_usage(
+                logger,
+                usage,
+                call_type="target_fullcontext_runtime_composer",
+                model=self.model,
+            )
+            if not parser.raw_json.strip():
+                raise ValueError("composer_empty_output")
+            return parser.raw_json
         except TargetRuntimeBackendTransportError:
             raise
         except Exception as exc:

@@ -168,7 +168,7 @@ def test_32_33_45_call_counts_unchanged_with_shadow_active() -> None:
 # --------------------------------------------------------------------------------------------
 
 
-def test_53_54_55_real_invocations_carry_full_unscoped_corpus() -> None:
+def test_53_54_55_composer_carries_compact_corpus_and_verifier_exact_documents() -> None:
     inputs = _real_inputs()
     composer = RecordingComposerBackend()
     semantic = RecordingSemanticBackend()
@@ -179,8 +179,12 @@ def test_53_54_55_real_invocations_carry_full_unscoped_corpus() -> None:
         semantic_backend=semantic,
     )
 
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
-    assert semantic.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
+    verifier_context = semantic.invocations[0].cached_full_context
+    assert "---BEGIN DOC:implantation__service__all_on_4.md---" in verifier_context
+    assert "---END DOC:implantation__service__all_on_4.md---" in verifier_context
+    assert "---BEGIN DOC:clinic__info__advantages.md---" not in verifier_context
+    assert len(verifier_context) < len(DEMO_FULL_CONTEXT.model_corpus_text)
     assert composer.invocations[0].primary_evidence_json == semantic.invocations[0].primary_evidence_json
 
 

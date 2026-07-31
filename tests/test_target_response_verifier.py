@@ -382,6 +382,41 @@ def test_price_only_all_on_4_name_is_semantic_but_standalone_four_blocks() -> No
     )
 
 
+def test_exact_service_semantic_verifier_receives_only_validated_owned_documents() -> None:
+    content = _default_blocks()[0]
+    request = replace(
+        _request(
+            spec=_spec(
+                required_fact_ids=(),
+                required_components=("content",),
+                allow_marketing_facts=False,
+                allow_consultation_close=False,
+                allow_cta=False,
+            ),
+            blocks=(content,),
+        ),
+        selected_cta_key=None,
+    )
+    corpus = (
+        "---BEGIN DOC:service_one.md---\nOwned answer.\n---END DOC:service_one.md---\n"
+        "---BEGIN DOC:unrelated.md---\nUnrelated secret.\n---END DOC:unrelated.md---"
+    )
+    backend = RecordingBackend()
+
+    accepted = verify_target_composed_response(
+        request,
+        _response(request, "Owned answer."),
+        cached_full_context=_cached_context(corpus),
+        semantic_backend=backend,
+        used_content_refs=("service_one.md",),
+        exact_service_authority=True,
+    )
+
+    assert accepted.verification_status == "verified"
+    assert "Owned answer." in backend.invocations[0].cached_full_context
+    assert "Unrelated secret." not in backend.invocations[0].cached_full_context
+
+
 @pytest.mark.parametrize(
     ("price", "candidate"),
     [

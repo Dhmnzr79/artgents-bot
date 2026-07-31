@@ -594,7 +594,7 @@ def _blocking_issues(assessment: TargetSemanticAssessment) -> tuple[TargetSemant
 def _semantic_invocation(
     request: TargetComposerRequest,
     response: TargetUnverifiedComposedResponse,
-    cached_full_context: TargetCachedFullContext,
+    verifier_context: str,
 ) -> TargetSemanticVerifierInvocation:
     spec = request.spec
     spec_payload = {
@@ -618,11 +618,72 @@ def _semantic_invocation(
     ]
     return TargetSemanticVerifierInvocation(
         system_policy=TARGET_SEMANTIC_VERIFIER_SYSTEM_POLICY,
-        cached_full_context=cached_full_context.corpus_text,
+        cached_full_context=verifier_context,
         response_spec_json=_compact_json(spec_payload),
         primary_evidence_json=_compact_json(evidence_payload),
         candidate_text=response.text,
     )
+
+
+def _document_block_from_context(context_text: str, content_ref: str) -> str | None:
+    begin = f"---BEGIN DOC:{content_ref}---\n"
+    end = f"\n---END DOC:{content_ref}---"
+    start = context_text.find(begin)
+    if start < 0:
+        return None
+    finish = context_text.find(end, start + len(begin))
+    if finish < 0:
+        return None
+    return context_text[start : finish + len(end)]
+
+
+def _structured_evidence_is_complete(request: TargetComposerRequest) -> bool:
+    kinds = {block.kind for block in request.evidence_blocks}
+    for component in request.spec.required_components:
+        if component == "price" and "offer" not in kinds:
+            return False
+        if component == "doctors" and not kinds.intersection({"doctor", "external_doctor"}):
+            return False
+        if component == "content":
+            return False
+    required_facts = set(request.spec.required_fact_ids)
+    observed_facts = {
+        fact_id for block in request.evidence_blocks for fact_id in block.fact_ids
+    }
+    return required_facts.issubset(observed_facts)
+
+
+def _verifier_context(
+    request: TargetComposerRequest,
+    cached_full_context: TargetCachedFullContext,
+    *,
+    used_content_refs: tuple[str, ...],
+    exact_service_authority: bool,
+) -> tuple[str, str]:
+    """Return conservative model context and an anonymous observability mode.
+
+    FullContext remains the fallback for every generic/incomplete request. A
+    lightweight context is allowed only when package-owned MD refs or exact
+    structured evidence deterministically cover the response specification.
+    """
+
+    full = cached_full_context.model_corpus_text
+    try:
+        if exact_service_authority and used_content_refs:
+            blocks = tuple(
+                _document_block_from_context(full, ref) for ref in used_content_refs
+            )
+            if all(blocks):
+                return "\n".join(block for block in blocks if block), "exact_documents"
+        if _structured_evidence_is_complete(request):
+            return (
+                "No additional MD context is required. "
+                "The exact PRIMARY_EVIDENCE records are authoritative.",
+                "exact_structured_evidence",
+            )
+    except Exception:  # noqa: BLE001 - optimization must never weaken verification
+        pass
+    return full, "fullcontext_fallback"
 
 
 def _validate_cached_full_context(value: object) -> TargetCachedFullContext:
@@ -760,6 +821,15 @@ def verify_target_composed_response(
         raise
     turn_timing.stage_end("verifier_deterministic", status="completed")
 
+    verifier_context, verifier_context_mode = _verifier_context(
+        request,
+        validated_context,
+        used_content_refs=used_content_refs,
+        exact_service_authority=exact_service_authority,
+    )
+    turn_timing.set_flag("verifier_context_mode", verifier_context_mode)
+    turn_timing.set_flag("verifier_context_chars", len(verifier_context))
+
     turn_timing.stage_start("verifier_semantic")
     try:
         try:
@@ -768,7 +838,7 @@ def verify_target_composed_response(
             _error("target_verifier_backend_invalid", "semantic_assess")
         if not callable(assess):
             _error("target_verifier_backend_invalid", "semantic_assess")
-        invocation = _semantic_invocation(request, response, validated_context)
+        invocation = _semantic_invocation(request, response, verifier_context)
         try:
             assessment = assess(invocation)
         except Exception as exc:

@@ -135,7 +135,7 @@ def test_real_demo_all_on_4_reaches_one_backend_without_ui_or_client_writes() ->
 
     assert len(backend.invocations) == 1
     invocation = backend.invocations[0]
-    assert invocation.cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert invocation.cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
     evidence = json.loads(invocation.primary_evidence_json)
     assert [item["kind"] for item in evidence] == [
         "content",

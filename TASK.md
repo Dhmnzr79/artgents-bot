@@ -9787,3 +9787,41 @@ Evidence: `docs/evidence/performance/PERF9_QWEN_EMBEDDINGS_HOLDOUT_DECISION.md` 
 **STOP — no Scoped Composer runtime wiring.**
 
 ---
+
+## Completion record — FINAL_FULLCONTEXT_RUNTIME_SPEED_OPTIMIZATIONS / PERF-10
+
+**Baseline:** `d447526`. Final FullContext remains product authority. Five orthogonal speed
+mechanisms were added without embeddings, reranking, FTS5, or a second answer pipeline.
+
+1. **True Composer streaming:** default Qwen Composer uses SDK `stream=True` only for conservative
+   content-only turns with owned MD evidence and no required/strict marketing facts. Server decodes
+   only the JSON `answer` field and relays it through a non-lossy per-turn SSE queue. Digits,
+   currency/contact markers, and the remaining tail are held for the verified final `ui` payload.
+2. **Compact FullContext:** immutable raw corpus/SHA stays unchanged. Model prompts receive every MD
+   answer body plus only `doc_id/doc_type/topic/subtopic/aspect` metadata. Demo prompt corpus:
+   107,980 -> 90,164 chars (**16.5% reduction**) with no answer-body deletion.
+3. **Light Verifier context:** exact service-owned turns receive validated used MD documents; exact
+   structured price/doctor evidence needs no MD corpus. Generic/incomplete/error cases fall back to
+   compact FullContext before one semantic call. Numeric grounding still checks full raw corpus.
+4. **Deterministic price/doctors:** default runtime opts into a local formatter only for exact
+   `price`-only or `doctors`-only specs after canonical evidence materialization. It selects no
+   records and copies exact amounts, approved no-public-price text, names, positions, and experience.
+   Alternate/test backends retain the Composer -> Verifier contour.
+5. **Versioned governed-answer cache:** only already-verified default-runtime answers for validated
+   navigation refs or exact starter prompts are cached in-process. Key hashes client, raw/prompt pack
+   identities, both policies, Qwen models, message, typed spec/evidence/action, and length profile.
+   Current UI sidecars are projected on hit, preserving cadence/no-repeat. Any content/prompt/model/
+   evidence change misses; restart clears the bounded 128-entry cache; no SID/PII is logged to disk.
+
+**Observability:** `composer_context_chars`, `verifier_context_mode`, `verifier_context_chars`,
+`verified_answer_cache_hit`, real `composer_first_token`, and explicit skipped-stage reasons.
+Provider prewarm fingerprints the same compact model-facing prefix; its LIVE gate remains closed.
+
+**Safety unchanged:** Medical Boundary, Numeric grounding, Semantic policy, source identity, CTA,
+session cadence, and terminal routes remain authoritative. No retry or second Composer call was added.
+
+**Offline completion:** focused FullContext/Composer/Verifier/SSE/prewarm/demo suite **231 passed**;
+price/doctors/widget regression **87 passed, 1 skipped**; `git diff --check` clean. No LIVE/provider
+call and no real latency claim. Real widget timing is a separate measurement step.
+
+---

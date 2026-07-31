@@ -641,5 +641,5 @@ def test_prebuilt_full_context_shared_without_rebuild_in_s46(
         semantic_backend=semantic,
     )
     assert calls == []
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
-    assert semantic.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
+    assert semantic.invocations[0].cached_full_context in DEMO_FULL_CONTEXT.model_corpus_text

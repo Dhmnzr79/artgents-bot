@@ -332,8 +332,8 @@ def test_general_service_less_content_materializes_with_single_composer_and_veri
     assert result.dispatch.policy_request.requested_components == ("content",)
     assert len(composer.invocations) == 1
     assert len(semantic.invocations) == 1
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
-    assert semantic.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
+    assert semantic.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
     directives = json.loads(composer.invocations[0].response_directives_json)
     spec_payload = json.loads(semantic.invocations[0].response_spec_json)
     assert directives["allow_cta"] is False
@@ -702,8 +702,8 @@ def test_prebuilt_full_context_is_shared_without_rebuild(monkeypatch: pytest.Mon
         semantic_backend=semantic,
     )
     assert calls == []
-    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
-    assert semantic.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.corpus_text
+    assert composer.invocations[0].cached_full_context == DEMO_FULL_CONTEXT.model_corpus_text
+    assert semantic.invocations[0].cached_full_context in DEMO_FULL_CONTEXT.model_corpus_text
 
 
 def test_uncertain_boundary_stays_terminal_defer() -> None:

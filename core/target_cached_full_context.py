@@ -21,8 +21,11 @@ prompt caching is a separate future live integration gate and is **not** impleme
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import NoReturn
+
+import frontmatter
 
 from contracts.target_cached_full_context import TargetCachedFullContext
 
@@ -76,6 +79,37 @@ def _document_block(relative_path: str, content: str) -> str:
     )
 
 
+_MODEL_ROUTING_FRONTMATTER_KEYS = frozenset(
+    {"doc_id", "doc_type", "topic", "subtopic", "aspect"}
+)
+
+
+def _prompt_document_block(relative_path: str, content: str) -> str:
+    """Serialize the whole answer body plus only lean model-routing metadata."""
+
+    try:
+        post = frontmatter.loads(content)
+    except Exception as exc:  # noqa: BLE001 - malformed source must fail closed
+        _fail("full_context_frontmatter_invalid", relative_path, exc)
+    metadata = {
+        str(key): value
+        for key, value in post.metadata.items()
+        if str(key) in _MODEL_ROUTING_FRONTMATTER_KEYS
+    }
+    meta_json = json.dumps(
+        metadata,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+        default=str,
+    )
+    body = post.content.rstrip("\n")
+    if not body.strip():
+        _fail("full_context_document_body_empty", relative_path)
+    prefix = f"META_JSON:{meta_json}\n" if metadata else ""
+    return _document_block(relative_path, f"{prefix}{body}")
+
+
 def build_target_cached_full_context(md_root: Path) -> TargetCachedFullContext:
     """Build one immutable cached FullContext corpus from explicit client MD root."""
 
@@ -85,6 +119,7 @@ def build_target_cached_full_context(md_root: Path) -> TargetCachedFullContext:
         _fail("full_context_corpus_empty", root)
 
     blocks: list[str] = []
+    prompt_blocks: list[str] = []
     paths: list[str] = []
     for path, relative_path in discovered:
         relative_posix = relative_path.as_posix()
@@ -92,13 +127,18 @@ def build_target_cached_full_context(md_root: Path) -> TargetCachedFullContext:
         if not text.strip():
             _fail("full_context_document_empty", relative_posix)
         blocks.append(_document_block(relative_posix, text.rstrip("\n")))
+        prompt_blocks.append(_prompt_document_block(relative_posix, text))
         paths.append(relative_posix)
 
     corpus_text = "\n".join(blocks)
     digest = hashlib.sha256(corpus_text.encode("utf-8")).hexdigest()
+    prompt_corpus_text = "\n".join(prompt_blocks)
+    prompt_digest = hashlib.sha256(prompt_corpus_text.encode("utf-8")).hexdigest()
     return TargetCachedFullContext(
         corpus_text=corpus_text,
         document_count=len(paths),
         document_paths=tuple(paths),
         sha256=digest,
+        prompt_corpus_text=prompt_corpus_text,
+        prompt_sha256=prompt_digest,
     )

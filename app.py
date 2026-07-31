@@ -480,6 +480,10 @@ def _sse_status_line(message: str) -> str:
     return f"event: status\ndata: {json.dumps({'message': message}, ensure_ascii=False)}\n\n"
 
 
+def _sse_text_delta_line(delta: str) -> str:
+    return f"event: text_delta\ndata: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+
+
 def _make_status_emitter(status_queue: "queue.Queue[str]", *, already_sent: str | None):
     """Non-blocking, deduping, bounded-lossy status emitter for one turn.
 
@@ -551,6 +555,7 @@ def _run_sse_worker_turn(
     sid: str,
     turn_t0_monotonic: float,
     status_emit,
+    text_emit=None,
 ) -> tuple[dict, int]:
     """Run the unmodified orchestration + payload build inside an independent,
     per-turn worker request context (core.target_sse_worker_context) — never
@@ -565,6 +570,7 @@ def _run_sse_worker_turn(
             client_id=client_id,
             turn_t0_monotonic=turn_t0_monotonic,
             status_emit=status_emit,
+            text_emit=text_emit,
         ):
             orch_r = _orchestrate_ask_turn(data)
             turn_timing.mark("orchestrate_done")
@@ -615,6 +621,18 @@ def _stream_ask_turn_response(data: dict, client_id: str):
         "turn_timing", {"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}}
     )
     status_queue: "queue.Queue[str]" = queue.Queue(maxsize=_SSE_STATUS_QUEUE_MAXSIZE)
+    # Composer output is capped and correctness-critical: unlike coalescable status
+    # events, answer deltas use a non-lossy per-turn queue.
+    text_queue: "queue.SimpleQueue[str]" = queue.SimpleQueue()
+
+    def _drain_text_queue():
+        while True:
+            try:
+                delta = text_queue.get_nowait()
+            except queue.Empty:
+                break
+            if delta:
+                yield _sse_text_delta_line(delta)
 
     def _gen():
         # Requirement: first SSE event before orchestration starts or waits on
@@ -635,7 +653,9 @@ def _stream_ask_turn_response(data: dict, client_id: str):
                 sid=sid,
                 turn_t0_monotonic=turn_t0,
                 status_emit=None,
+                text_emit=text_queue.put,
             )
+            yield from _drain_text_queue()
             route = str((out.get("meta") or {}).get("service_route") or "")
             yield _sse_typing_line(_sse_typing_phase(kind="service_reply", route=route))
             yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
@@ -654,6 +674,7 @@ def _stream_ask_turn_response(data: dict, client_id: str):
                     sid=sid,
                     turn_t0_monotonic=turn_t0,
                     status_emit=emitter,
+                    text_emit=text_queue.put,
                 )
             finally:
                 _sse_worker_admission.release()
@@ -665,11 +686,18 @@ def _stream_ask_turn_response(data: dict, client_id: str):
             raise
 
         while not future.done():
+            yielded_text = False
+            for line in _drain_text_queue():
+                yielded_text = True
+                yield line
+            if yielded_text:
+                continue
             try:
                 phrase = status_queue.get(timeout=_SSE_STATUS_POLL_INTERVAL_SEC)
             except queue.Empty:
                 continue
             yield _sse_status_line(phrase)
+        yield from _drain_text_queue()
         while True:
             try:
                 phrase = status_queue.get_nowait()

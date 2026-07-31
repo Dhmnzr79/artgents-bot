@@ -263,19 +263,20 @@ def test_cached_full_context_matches_live_pack_reconstruction() -> None:
 
 
 def test_composer_and_verifier_static_prefix_matches_live_pack() -> None:
-    """Recomputes the real production Composer/Verifier static prefixes (zero provider calls,
-    reused verbatim from core/target_prompt_cache_prewarm.py) and cross-checks against the
-    committed hashes -- proves both the client pack AND these specific production message
-    builders were not changed since the audit was produced."""
+    """The historical audit pins the old raw-corpus prefixes, while current production and
+    prewarm must share the newer compact model-facing corpus.  The raw pack identity is pinned by
+    the preceding test; this check prevents prewarm/runtime prefix drift after PERF-10."""
 
     inv = _inventory()
+    live = build_target_cached_full_context(MD_ROOT)
     dry_run = build_dry_run_report("demo")
     for role_key, role_name in (("composer_static_prefix", "composer"), ("verifier_static_prefix", "verifier")):
         recorded = inv["layers"][role_key]
         live_role = next(r for r in dry_run.roles if r.role == role_name)
-        assert live_role.static_prefix_hash == recorded["sha256"]
-        assert live_role.static_prefix_chars == recorded["chars"]
-        assert live_role.estimated_tokens == recorded["token_estimate"]
+        assert live_role.corpus_sha256 == live.prompt_sha256
+        assert live_role.static_prefix_hash != recorded["sha256"]
+        assert live_role.static_prefix_chars < recorded["chars"]
+        assert live_role.estimated_tokens < recorded["token_estimate"]
 
 
 def test_live_pack_counts_match_recorded_counts() -> None:

@@ -68,13 +68,40 @@ def test_build_includes_every_md_once_with_stable_order_and_boundaries(tmp_path:
         "z_last/service_z.md",
     )
     assert first.sha256 == hashlib.sha256(first.corpus_text.encode("utf-8")).hexdigest()
+    assert first.prompt_sha256 == hashlib.sha256(
+        first.model_corpus_text.encode("utf-8")
+    ).hexdigest()
     for path in first.document_paths:
         assert f"---BEGIN DOC:{path}---" in first.corpus_text
         assert f"---END DOC:{path}---" in first.corpus_text
     assert first.corpus_text.count("---BEGIN DOC:") == 3
     assert first.corpus_text.count("---END DOC:") == 3
     assert "Doctor profile text." in first.corpus_text
+    assert "Doctor profile text." in first.model_corpus_text
     assert "ё" in first.corpus_text
+
+
+def test_model_corpus_omits_python_owned_ui_metadata_but_keeps_body(tmp_path: Path) -> None:
+    _write_md(
+        tmp_path,
+        "service.md",
+        "---\n"
+        "doc_id: service\n"
+        "doc_type: service\n"
+        "topic: implantation\n"
+        "cta_key: consult\n"
+        "suggest_h3: [details]\n"
+        "---\n\n"
+        "# Service\n\nCanonical answer body.\n",
+    )
+
+    cached = build_target_cached_full_context(tmp_path)
+
+    assert "cta_key" in cached.corpus_text
+    assert "suggest_h3" in cached.corpus_text
+    assert "cta_key" not in cached.model_corpus_text
+    assert "suggest_h3" not in cached.model_corpus_text
+    assert "Canonical answer body." in cached.model_corpus_text
 
 
 def test_build_rejects_non_path_md_root() -> None:
@@ -149,6 +176,10 @@ def test_demo_corpus_document_count_and_doctors_inclusion() -> None:
         assert f"---BEGIN DOC:{sample}---" in context.corpus_text
     assert "doctors__" in context.corpus_text
     assert context.sha256 == hashlib.sha256(context.corpus_text.encode("utf-8")).hexdigest()
+    assert len(context.model_corpus_text) < len(context.corpus_text)
+    assert context.prompt_sha256 == hashlib.sha256(
+        context.model_corpus_text.encode("utf-8")
+    ).hexdigest()
 
 
 def test_pipeline_accepts_prebuilt_context_without_calling_builder() -> None:

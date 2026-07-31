@@ -8,9 +8,9 @@ log event. Chosen over touching ``core/target_verified_response_pipeline.py`` it
 module's ``run_target_offline_verified_response_pipeline`` is protected by an AST "exact
 straight-line, no control flow" contract test (S39) that this deviation must not violate; this
 file's ``_with_selection`` entry point carries no such contract. The decision is a local variable
-only -- never a ``ContextVar``, global, or session value -- and the real call to
-``run_target_offline_verified_response_pipeline`` below is byte-for-byte unchanged (same
-arguments, same order). See
+only -- never a ``ContextVar``, global, or session value. When no newer deterministic/cache fast
+path applies, the real call to ``run_target_offline_verified_response_pipeline`` retains the same
+arguments and order. See
 ``docs/evidence/performance/FINAL_MULTI_LEVEL_SCOPED_CONTEXT_SHADOW_SEAM_AUDIT.md`` and
 ``TASK.md``'s PERF-6 Phase 2 completion record for the full rationale.
 """
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -71,6 +72,15 @@ from core.target_verified_primary_content_cta_projection import (
 )
 from core.target_verified_response_pipeline import (
     run_target_offline_verified_response_pipeline,
+)
+from core.target_deterministic_commercial_answer import (
+    materialize_deterministic_commercial_answer,
+)
+from core.target_versioned_answer_cache import (
+    build_versioned_answer_cache_key,
+    get_versioned_answer,
+    governed_ui_answer_cache_eligible,
+    put_versioned_answer,
 )
 from logging_setup import get_logger
 
@@ -260,24 +270,83 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         client_id=client_id,
     )
 
-    # PERF-6 Phase 2 shadow: resolved once, held only in this local variable. The real call below
-    # is byte-for-byte unchanged -- this decision is never read by it.
-    shadow = _resolve_shadow_decision_safely(
-        bound_package,
-        bundle,
-        doctor_catalog,
-        consultation_values,
-        user_message=user_message,
-        md_root=md_root,
-        cached_full_context=cached_full_context,
-        contact_fields=contact_fields,
-        client_id=client_id,
-        response_length_profile=response_length_profile,
+    deterministic_verified = None
+    prepared_request = None
+    deterministic_components = getattr(
+        getattr(bound_package, "spec", None), "required_components", ()
     )
-    full_context_estimated_tokens = len(cached_full_context.corpus_text) // 4
+    if (
+        getattr(composer_backend, "supports_deterministic_commercial_answer", False) is True
+        and deterministic_components in {("price",), ("doctors",)}
+    ):
+        prepared_request = materialize_target_composer_request(
+            bound_package,
+            bundle,
+            doctor_catalog,
+            consultation_values,
+            user_message=user_message,
+            md_root=md_root,
+            contact_fields=contact_fields,
+            client_id=client_id,
+            response_length_profile=response_length_profile,
+        )
+        deterministic_verified = materialize_deterministic_commercial_answer(
+            prepared_request,
+            bound_package,
+            bundle,
+        )
 
-    try:
-        verified = run_target_offline_verified_response_pipeline(
+    answer_cache_key = None
+    cached_verified = None
+    if (
+        deterministic_verified is None
+        and getattr(composer_backend, "supports_versioned_answer_cache", False) is True
+        and governed_ui_answer_cache_eligible(
+            user_message=user_message,
+            client_id=client_id,
+        )
+    ):
+        prepared_request = prepared_request or materialize_target_composer_request(
+            bound_package,
+            bundle,
+            doctor_catalog,
+            consultation_values,
+            user_message=user_message,
+            md_root=md_root,
+            contact_fields=contact_fields,
+            client_id=client_id,
+            response_length_profile=response_length_profile,
+        )
+        answer_cache_key = build_versioned_answer_cache_key(
+            prepared_request,
+            cached_full_context,
+            client_id=client_id,
+            composer_backend=composer_backend,
+            semantic_backend=semantic_backend,
+        )
+        cached_verified = get_versioned_answer(answer_cache_key)
+        if cached_verified is not None:
+            cached_verified = replace(
+                cached_verified,
+                spec=prepared_request.spec,
+                selected_followups=prepared_request.selected_followups,
+                selected_cta_key=prepared_request.selected_cta_key,
+                navigation_followups=bound_package.package.navigation_followups,
+            )
+        turn_timing.set_flag("verified_answer_cache_hit", cached_verified is not None)
+        if cached_verified is not None:
+            turn_timing.stage_skipped("composer", reason="verified_answer_cache_hit")
+            turn_timing.stage_skipped(
+                "verifier_deterministic", reason="verified_answer_cache_hit"
+            )
+            turn_timing.stage_skipped(
+                "verifier_semantic", reason="verified_answer_cache_hit"
+            )
+
+    # PERF-6 Phase 2 shadow remains local and is skipped on newer local/cache fast paths.
+    shadow = None
+    if deterministic_verified is None and cached_verified is None:
+        shadow = _resolve_shadow_decision_safely(
             bound_package,
             bundle,
             doctor_catalog,
@@ -285,13 +354,30 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
             user_message=user_message,
             md_root=md_root,
             cached_full_context=cached_full_context,
-            tone=tone,
-            composer_backend=composer_backend,
-            semantic_backend=semantic_backend,
             contact_fields=contact_fields,
             client_id=client_id,
             response_length_profile=response_length_profile,
         )
+    full_context_estimated_tokens = len(cached_full_context.corpus_text) // 4
+
+    try:
+        verified = deterministic_verified or cached_verified
+        if verified is None:
+            verified = run_target_offline_verified_response_pipeline(
+                bound_package,
+                bundle,
+                doctor_catalog,
+                consultation_values,
+                user_message=user_message,
+                md_root=md_root,
+                cached_full_context=cached_full_context,
+                tone=tone,
+                composer_backend=composer_backend,
+                semantic_backend=semantic_backend,
+                contact_fields=contact_fields,
+                client_id=client_id,
+                response_length_profile=response_length_profile,
+            )
     except Exception:
         # Verifier blocked or raised: the real exception is never touched or replaced. Best-effort
         # shadow bookkeeping only, then the exact same exception is re-raised unchanged.
@@ -328,6 +414,9 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
                 logger.warning("scoped_context_shadow_compare_failed", exc_info=True)
             except Exception:  # noqa: BLE001
                 pass
+
+    if answer_cache_key is not None and cached_verified is None:
+        put_versioned_answer(answer_cache_key, verified)
 
     verified = project_verified_primary_content_cta(
         verified,

@@ -1,5 +1,10 @@
 # Флаги и статус проекта (фикс-реестр)
 
+> **PERF-10 current:** Final FullContext remains sole authority. Implemented: conservative true
+> Composer SSE streaming, 16.5% compact model corpus, scoped Verifier context with FullContext
+> fallback, deterministic exact price/doctor formatters, and a bounded versioned in-process cache
+> for governed UI answers. No retrieval runtime was enabled.
+
 **Что это.** Единый сканируемый список: что за флаг, что делает, включён ли по умолчанию, и почему. Исторический подробный нарратив перенесён в [`archive/FULLCONTEXT_ROADMAP.md`](archive/FULLCONTEXT_ROADMAP.md); здесь — текущая короткая правда одним взглядом.
 
 **Контекст (важно для трактовки флагов).** Это **локальная разработка**: нет прода, нет реальных клиентов, бот на localhost, один разработчик (Denis). Флаг здесь — НЕ ремень безопасности для клиентов (их нет), а: (1) переключатель для сравнения старого/нового поведения без правки кода; (2) стабильность тест-эталонов (менять дефолты = сдвигать «правильное» по всей eval-сьюте); (3) способ отложить **продуктовое решение** там, где поведение спорное.

@@ -321,6 +321,16 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    CLIENT-PACK CHANGE. NO LIVE/LLM/NETWORK. No speedup exists yet anywhere.** STOP before any
    Builder/lexical-index correction, before PERF-8, and before any counterfactual
    FullContext-vs-Scoped-Composer evaluation.
+10. **FINAL_RETRIEVAL_RELEVANCE_DECISION / PERF-8 Phase 1 —
+    `EMBEDDINGS_EVALUATION_JUSTIFIED`:** 49 retrieval-dependent scenarios compared the current
+    token-overlap baseline, an IDF-weighted conservative prototype, and local FTS5/BM25. Current
+    lexical produced 11 critical false-narrow results. Conservative prototypes produced zero on
+    the same development matrix only with 85–88% fallback and thresholds tuned on that matrix;
+    therefore neither is authorized for runtime. Local embeddings were `NOT_EVALUATED` because no
+    repository-configured offline model artifact exists. **No runtime candidate, no product/client
+    change, no speedup.** See TASK.md and
+    `docs/evidence/performance/FINAL_RETRIEVAL_RELEVANCE_DECISION_AUDIT.md`. STOP before a separately
+    approved embeddings/hybrid holdout evaluation and before Scoped Composer wiring.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

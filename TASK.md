@@ -9661,3 +9661,69 @@ PERF-8; any counterfactual FullContext-vs-Scoped-Composer evaluation; any embedd
 LIVE/LLM GO of any kind. This owner GO authorized only the eval correction and commit/push.
 
 ---
+
+## Completion record — FINAL_RETRIEVAL_RELEVANCE_DECISION / PERF-8 Phase 1
+
+**Baseline:** `0f3935c` · **Verdict: `EMBEDDINGS_EVALUATION_JUSTIFIED`** · **runtime candidate:
+none**.
+
+PERF-8 was resumed from five untracked files left by an interrupted Claude session. Those files
+were treated as untrusted WIP rather than accepted as a completed result. Their original temporal
+authoring order cannot be proven cryptographically. Before the final comparison run, the gold and
+query index were independently reviewed, corrected, and hashed; the runner verifies both hashes
+remain unchanged during execution and records this provenance limitation in its result.
+
+### Independent-review corrections
+
+- `s011` and `s013` now require FullContext fallback: their broad prosthetics answer spans several
+  per-type documents, while all compared retrievers emit at most one document.
+- `s015` allows only `treatment__service__teeth_treatment.md`, the actual general overview; a caries
+  or pulpitis page alone would falsely narrow the broad question.
+- `s081` allows only `implantation__info__contraindications.md`, which directly states the
+  gum-treatment/implantation relationship.
+- `s051`, `s053`–`s056` require fallback. `clinic__info__consultation.md` supports composing a new
+  plan at this clinic, not auditing or giving a second opinion on an external clinic's plan.
+- Candidate A now mirrors the current Builder's ten-hit lexical acceptance shape rather than an
+  approximate five-hit variant.
+- `estimated_avg_tokens` now divides selected-document characters by four.
+- paragraph-index, weighted-table and FTS5 build times are now actually measured and explicitly
+  non-binding.
+
+### Compared mechanisms (49 retrieval-dependent scenarios)
+
+| Candidate | Critical false narrow | Correct | Safe over-fallback | Fallback rate | Recall@1 |
+|---|---:|---:|---:|---:|---:|
+| A — current token overlap | **11** | 19 | 19 | 53.1% | 37.5% |
+| B — IDF weighted + conservative gate | 0 | 23 | 26 | **87.8%** | 18.8% |
+| C — FTS5/BM25 + conservative gate | 0 | 24 | 25 | **85.7%** | 21.9% |
+| D — local embeddings | `NOT_EVALUATED` | — | — | — | — |
+
+B and C thresholds were selected after aggregate inspection of this same development matrix. Their
+zero observed critical errors are therefore descriptive, not independent holdout evidence. Their
+85–88% fallback rates also make them insufficient evidence for a useful runtime switch. Candidate
+A reproduces all ten known PERF-7C relevance defects plus one additional critical false narrowing.
+Candidate B additionally receives synthetic `allowed_topics` from the PERF-7C matrix rather than
+topics produced by a measured Planner run, so its descriptive result may be optimistic.
+
+### Deliverables
+
+- `evals/v5/perf8_retrieval_relevance_gold_v2.json`
+- `evals/v5/perf8_retrieval_relevance_query_index.json`
+- `evals/v5/perf8_retrieval_relevance_prototypes.py`
+- `evals/v5/run_perf8_retrieval_relevance_comparison.py`
+- `evals/v5/perf8_retrieval_relevance_comparison_result.json`
+- `docs/evidence/performance/FINAL_RETRIEVAL_RELEVANCE_DECISION_AUDIT.md`
+- `tests/test_final_retrieval_relevance_decision_contract.py`
+
+### Boundaries and next gate
+
+NO PRODUCT CHANGE / NO RUNTIME WIRING / NO CLIENT-PACK CHANGE / NO LIVE / NO LLM / NO NETWORK / NO
+SPEEDUP CLAIM. Scoped Composer remains blocked.
+
+Next justified milestone: an offline embeddings/hybrid comparison against a **newly committed
+holdout gold frozen before retrieval execution**. Model/dependency selection requires a separate
+owner GO; provider/network use, if chosen, requires an additional explicit LIVE authorization.
+
+**STOP before embeddings evaluation and before any runtime retrieval implementation.**
+
+---

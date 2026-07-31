@@ -1,0 +1,909 @@
+{
+  "schema_version": 2,
+  "decision": {
+    "verdict": "EMBEDDINGS_EVALUATION_JUSTIFIED",
+    "runtime_candidate": null,
+    "reason": "The current lexical baseline produces critical false narrowing. Conservative weighted lexical and FTS5/BM25 avoid it on this development matrix only by falling back on most scenarios, and their gates were tuned on this same matrix. No candidate has independent holdout evidence sufficient for runtime wiring."
+  },
+  "methodology": {
+    "evaluation_scope": "exploratory_development_set",
+    "gold_sha256_before": "e2a59ec5cb82229ca590291321011932635269d6ef545ea9543e418ee54ee681",
+    "gold_sha256_after": "e2a59ec5cb82229ca590291321011932635269d6ef545ea9543e418ee54ee681",
+    "gold_unchanged_during_run": true,
+    "query_index_sha256_before": "027dc9ce5692d36ddd634a2df4829947c0afe0a918b94c4371ef9585541767ef",
+    "query_index_sha256_after": "027dc9ce5692d36ddd634a2df4829947c0afe0a918b94c4371ef9585541767ef",
+    "query_index_unchanged_during_run": true,
+    "inherited_wip_provenance_limitation": "Gold and executor files were inherited as untracked WIP, so original temporal authoring order cannot be proven cryptographically. They were independently reviewed and hashed before this final comparison run.",
+    "candidate_b_c_threshold_status": "tuned on this same development matrix; metrics are descriptive, not generalization evidence",
+    "topic_hint_limitation": "candidate B receives synthetic allowed_topics copied from the PERF-7C matrix, not topics produced by a measured Planner run; this can make B optimistic"
+  },
+  "one_time_build_ms": {
+    "paragraph_index": 30.859100006637163,
+    "weighted_lexical_tables": 10.481400007847697,
+    "fts5": 9.725500000058673,
+    "note": "one observed local run; non-binding and expected to vary"
+  },
+  "candidates": {
+    "A": {
+      "scenario_count": 49,
+      "fallback_required_false_count": 32,
+      "critical_false_narrow_count": 11,
+      "match_correct_count": 19,
+      "safe_over_fallback_count": 19,
+      "fallback_count": 26,
+      "fallback_rate": 0.5306122448979592,
+      "recall_at_1": 0.375,
+      "recall_at_3": 0.5625,
+      "unrelated_top_candidate_count": 32,
+      "estimated_avg_tokens": 545.7391304347826,
+      "avg_time_ms": 5.181451021320643,
+      "avg_time_ms_note": "per-scenario decision time only; one-time corpus/index build cost (paragraph index build, IDF table build, FTS5 table build) is measured once and amortized outside this average, not included per-call"
+    },
+    "B": {
+      "scenario_count": 49,
+      "fallback_required_false_count": 32,
+      "critical_false_narrow_count": 0,
+      "match_correct_count": 23,
+      "safe_over_fallback_count": 26,
+      "fallback_count": 43,
+      "fallback_rate": 0.8775510204081632,
+      "recall_at_1": 0.1875,
+      "recall_at_3": 0.84375,
+      "unrelated_top_candidate_count": 29,
+      "estimated_avg_tokens": 456.6666666666667,
+      "avg_time_ms": 0.12046326550522021,
+      "avg_time_ms_note": "per-scenario decision time only; one-time corpus/index build cost (paragraph index build, IDF table build, FTS5 table build) is measured once and amortized outside this average, not included per-call"
+    },
+    "C": {
+      "scenario_count": 49,
+      "fallback_required_false_count": 32,
+      "critical_false_narrow_count": 0,
+      "match_correct_count": 24,
+      "safe_over_fallback_count": 25,
+      "fallback_count": 42,
+      "fallback_rate": 0.8571428571428571,
+      "recall_at_1": 0.21875,
+      "recall_at_3": 0.65625,
+      "unrelated_top_candidate_count": 33,
+      "estimated_avg_tokens": 503.2857142857143,
+      "avg_time_ms": 0.38068163136200867,
+      "avg_time_ms_note": "per-scenario decision time only; one-time corpus/index build cost (paragraph index build, IDF table build, FTS5 table build) is measured once and amortized outside this average, not included per-call"
+    },
+    "D": "NOT_EVALUATED"
+  },
+  "per_scenario": [
+    {
+      "scenario_id": "s011_broad_service",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s012_broad_service",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s013_broad_service",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s014_broad_service",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s015_broad_service",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s016_broad_service",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s039_sterilization_safety",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__faq__safety.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "implantation__faq__safety.md",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "implantation__faq__safety.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s040_sterilization_safety",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__faq__safety.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "implantation__faq__safety.md",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "implantation__faq__safety.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s041_sterilization_safety",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s042_sterilization_safety",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s043_sterilization_safety",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s044_sterilization_safety",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s048_own_fresh_ct",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "diagnostics__service__tomography.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "diagnostics__service__tomography.md",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "diagnostics__service__tomography.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s049_own_fresh_ct",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "diagnostics__service__tomography.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "diagnostics__service__tomography.md",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "diagnostics__service__tomography.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s050_own_fresh_ct",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s051_treatment_plan_other_clinic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "clinic__info__technology.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s052_treatment_plan_other_clinic",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s053_treatment_plan_other_clinic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "orthodontics__service__aligners.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s054_treatment_plan_other_clinic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "clinic__info__technology.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s055_treatment_plan_other_clinic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "clinic__info__technology.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s056_treatment_plan_other_clinic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "orthodontics__service__aligners.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s071_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "comparison__all_on_4_vs_all_on_6.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s072_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "comparison__implant_vs_bridge.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s073_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "comparison__bone_graft_vs_all_on_4.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s074_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "comparison__classic_vs_one_stage.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s075_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s076_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s077_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s078_comparison",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__service__all_on_6.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "comparison__bugel_prosthesis_vs_fixed_bridge.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s079_cross_topic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s080_cross_topic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s081_cross_topic",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s082_cross_topic",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s083_cross_topic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "orthodontics__service__aligners.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s084_cross_topic",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "prosthetics__service__zirconia_crowns.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s099_unknown_wording",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "implantation__service__all_on_4.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s100_unknown_wording",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "comparison__implant_vs_bridge.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s101_unknown_wording",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "implantation__service__temporary_teeth.md",
+        "verdict": "critical_false_narrow_irrelevant_retrieval"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s102_unknown_wording",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s103_unknown_wording",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s104_unknown_wording",
+      "gold_fallback_required": true,
+      "A": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s111_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s112_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s113_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "C": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s114_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "implantation__info__contraindications.md",
+        "verdict": "match_correct"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s115_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s116_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s117_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    },
+    {
+      "scenario_id": "s118_medically_risky_personal",
+      "gold_fallback_required": false,
+      "A": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "B": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "C": {
+        "decision": "fallback",
+        "verdict": "safe_over_fallback"
+      },
+      "D": null
+    }
+  ]
+}

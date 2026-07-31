@@ -878,6 +878,26 @@ LIVE/LLM GO); any LIVE/LLM GO of any kind.
 
 ---
 
+## PERF-8 Phase 1 complete — retrieval relevance decision
+
+**Verdict: `EMBEDDINGS_EVALUATION_JUSTIFIED`; runtime candidate: none.** PERF-8 compared 49 frozen
+retrieval-dependent questions against current token overlap, a conservative IDF-weighted prototype,
+and local FTS5/BM25. Token overlap produced 11 critical false-narrow selections. The conservative
+prototypes suppressed observed critical errors only by falling back 85–88% of the time, and their
+gates were tuned on this same development matrix, so they are not independent safety evidence.
+Local embeddings were not evaluated because no repository-configured offline model artifact exists.
+
+The milestone was resumed from interrupted untracked WIP. Its gold/query files were independently
+reviewed and hashed before the final run, but their original temporal authoring order is disclosed
+as unprovable. No runtime or product file imports the research prototypes.
+
+**NO PRODUCT/RUNTIME/CLIENT-PACK CHANGE. NO LIVE/LLM/NETWORK. NO SPEEDUP. Scoped Composer remains
+blocked.** Next gate is a separately approved embeddings/hybrid comparison using a newly committed
+holdout gold frozen before retrieval execution; only a later successful result may authorize a
+runtime retriever.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

@@ -96,6 +96,7 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         "effective_scope",
         "client_id",
         "contact_fields",
+        "response_length_profile",
     ]
     assert inspect.signature(
         run_target_offline_policy_bound_verified_response_pipeline
@@ -204,6 +205,7 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "semantic_backend": values["semantic_backend"],
         "contact_fields": None,
         "client_id": "demo",
+        "response_length_profile": None,
     }
 
 

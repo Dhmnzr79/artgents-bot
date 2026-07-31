@@ -307,6 +307,7 @@ def test_exact_shapes_signature_errors_and_frozen_slots(md_root: Path) -> None:
         "md_root",
         "contact_fields",
         "client_id",
+        "response_length_profile",
     ]
     with pytest.raises(FrozenInstanceError):
         result.user_message = "changed"  # type: ignore[misc]

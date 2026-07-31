@@ -31,7 +31,10 @@ from core.target_presentation_turn_projection import (
     resolve_bound_marketing_flags,
     resolve_target_semantic_context,
 )
-from core.target_response_policy import build_target_response_spec
+from core.target_response_policy import (
+    build_target_response_spec,
+    select_target_response_length_profile,
+)
 from core.target_response_verifier import TargetSemanticVerifierBackend
 from core.target_turn_frame_dispatch import dispatch_target_turn_frame_response
 
@@ -90,6 +93,19 @@ def run_target_offline_turn_frame_bound_response(
         )
     )
     contact_fields = contact_fields_from_turn_frame(turn_frame)
+    # PERF-5 (corrected): the one production seam -- final bound_spec, the real
+    # TurnFrame's aspects/needs_clarification, and the resolved (post-marketing-flag)
+    # applied scenarios are all simultaneously available here. select_target_response_
+    # length_profile is called exactly once; the resulting typed profile is threaded
+    # down as a plain parameter -- never a ContextVar/global, never recomputed by any
+    # downstream consumer.
+    response_length_profile = select_target_response_length_profile(
+        bound_spec,
+        aspects=tuple(turn_frame.aspects),
+        aspects_valid=turn_frame.field_meta.aspects.status == "valid",
+        marketing_scenarios=tuple(resolved_scenarios),
+        needs_clarification=turn_frame.needs_clarification,
+    )
     verified, session_selection = run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         dispatch.policy_request,
         bundle,
@@ -117,6 +133,7 @@ def run_target_offline_turn_frame_bound_response(
         effective_scope=effective_scope,
         client_id=client_id,
         contact_fields=contact_fields,
+        response_length_profile=response_length_profile,
     )
     return TargetTurnFrameBoundMaterializeResponse(
         kind="materialize",

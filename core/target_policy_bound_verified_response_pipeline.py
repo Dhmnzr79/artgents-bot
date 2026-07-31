@@ -12,6 +12,7 @@ from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.effective_scope import EffectiveScope
 from contracts.target_cached_full_context import TargetCachedFullContext
+from contracts.target_response_length_profile import TargetResponseLengthProfile
 from contracts.target_response_policy import TargetResponsePolicyRequest
 from core.target_composer_executor import (
     TargetComposerBackend,
@@ -133,11 +134,15 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
     contact_fields: tuple[str, ...] | None = None,
+    response_length_profile: TargetResponseLengthProfile | None = None,
 ) -> tuple[TargetVerifiedComposedResponse, TargetMaterializedSessionSelection]:
     """Build spec-bound package and return one exact verified target response.
 
     Composer governed UI action context is resolved from the runtime turn binding
-    established in ``target_runtime_turn``.
+    established in ``target_runtime_turn``. ``response_length_profile`` (PERF-5,
+    corrected) is the already-decided typed profile from the one production seam
+    (``core/target_turn_frame_bound_response.py``) -- passed straight through, never
+    recomputed here.
     """
     bound_package = _assemble_bound_package(
         policy_request,
@@ -174,6 +179,7 @@ def run_target_offline_policy_bound_verified_response_pipeline_with_selection(
         semantic_backend=semantic_backend,
         contact_fields=contact_fields,
         client_id=client_id,
+        response_length_profile=response_length_profile,
     )
     verified = project_verified_primary_content_cta(
         verified,
@@ -211,6 +217,7 @@ def run_target_offline_policy_bound_verified_response_pipeline(
     effective_scope: EffectiveScope | None = None,
     client_id: str = "demo",
     contact_fields: tuple[str, ...] | None = None,
+    response_length_profile: TargetResponseLengthProfile | None = None,
 ) -> TargetVerifiedComposedResponse:
     """Build spec-bound package and return one exact verified target response."""
 
@@ -241,5 +248,6 @@ def run_target_offline_policy_bound_verified_response_pipeline(
         effective_scope=effective_scope,
         client_id=client_id,
         contact_fields=contact_fields,
+        response_length_profile=response_length_profile,
     )
     return verified

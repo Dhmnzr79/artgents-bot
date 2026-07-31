@@ -63,6 +63,7 @@ def test_public_signature_and_function_is_exact_straight_line() -> None:
         "semantic_backend",
         "contact_fields",
         "client_id",
+        "response_length_profile",
     ]
     assert inspect.signature(
         run_target_offline_verified_response_pipeline
@@ -128,6 +129,7 @@ def test_pipeline_passes_exact_objects_in_order_and_returns_verifier_identity(
         "md_root": values["md_root"],
         "contact_fields": None,
         "client_id": "demo",
+        "response_length_profile": None,
     }
     assert calls[1][1] == (request, values["composer_backend"])
     assert calls[1][2] == {

@@ -115,19 +115,32 @@ def select_target_response_length_profile(
     spec: TargetResponseSpec,
     *,
     aspects: tuple[AspectKind, ...] = (),
+    aspects_valid: bool = True,
     marketing_scenarios: tuple[str, ...] = (),
     needs_clarification: bool = False,
 ) -> TargetResponseLengthProfile:
-    """Single canonical producer (PERF-5) for the adaptive answer-length profile.
+    """Single canonical producer (PERF-5, corrected) for the adaptive answer-length
+    profile.
 
     Reads only already-existing structured signals -- no regex, no phrase list, no
     new classifier, no second router, no signal derived from the user's raw question
-    length. ``aspects``/``marketing_scenarios``/``needs_clarification`` are optional
-    because ``TargetResponseSpec`` alone (the one contract available at every real
-    call site today) already carries ``response_mode``/``response_stage``/
-    ``required_components``/``required_fact_ids``/``allow_marketing_facts`` -- callers
-    that also have a real TurnFrame-derived aspect/marketing-scenario signal may pass
-    it explicitly; callers that do not still get a safe, correct profile.
+    length. ``aspects``/``aspects_valid``/``marketing_scenarios``/
+    ``needs_clarification`` are optional because ``TargetResponseSpec`` alone (the one
+    contract available at every real call site today) already carries
+    ``response_mode``/``response_stage``/``required_components``/
+    ``required_fact_ids``/``allow_marketing_facts`` -- callers that also have a real
+    TurnFrame-derived aspect/marketing-scenario signal (the production seam,
+    ``core/target_turn_frame_bound_response.py``) pass it explicitly; callers that do
+    not still get a safe, correct profile.
+
+    ``aspects_valid`` mirrors ``turn_frame.field_meta.aspects.status == "valid"`` --
+    when the aspect signal itself is missing/defaulted/invalid, both the comparison
+    and the simple_faq branches are gated off (an untrusted or absent aspect list must
+    never be read as "no comparison" or "exactly one confirmed aspect"). ``simple_faq``
+    additionally requires exactly one aspect (``len(aspects) == 1``), matching the
+    owner's exact "one informational aspect, proven" requirement -- multiple aspects,
+    zero aspects, or an invalid aspect signal all fall through to
+    ``standard_information``, never guessed.
 
     Any ambiguity falls through to ``standard_information`` -- never guessed.
     """
@@ -146,10 +159,10 @@ def select_target_response_length_profile(
     if spec.response_stage == "scoped_family_price":
         return "scoped_price"
     if spec.response_stage == "concrete_service_price":
-        if "comparison" in aspects:
+        if aspects_valid and "comparison" in aspects:
             return "comparison_or_complex"
         return "scoped_price"
-    if "comparison" in aspects:
+    if aspects_valid and "comparison" in aspects:
         return "comparison_or_complex"
     if marketing_scenarios and spec.required_components == ("content",):
         return "marketing_concern"
@@ -159,6 +172,8 @@ def select_target_response_length_profile(
         and not spec.allow_marketing_facts
         and not marketing_scenarios
         and len(spec.required_fact_ids) <= 1
+        and aspects_valid
+        and len(aspects) == 1
     ):
         return "simple_faq"
     return "standard_information"

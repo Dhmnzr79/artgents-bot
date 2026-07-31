@@ -8027,4 +8027,201 @@ complex` is implemented and unit-tested but not yet fed a live `aspects` signal 
 not a defect). **STOP** before PERF-6 (Scoped FullContext) and before any real widget/live measurement of
 this milestone's effect on answer length or latency — that is a separate, later owner step.
 
+**Status at this point: `PARTIAL_COMPLETE`** — superseded below by the correction record. The
+Phase 2 completion record's own "6 of 7 profiles are live end-to-end" claim was optimistic:
+`comparison_or_complex` was not wired at all (not merely "not fed a live signal" — the producer was never
+called with real TurnFrame data anywhere on the live call path), a comparison/multi-aspect content turn
+could silently be read as `simple_faq`, and `required_content_override` did not cover all protected
+required content. See "Completion record (PERF-5 correction, owner GO)" below.
+
+---
+
+## Completion record (PERF-5 correction: complete live profile wiring, owner GO)
+
+**Baseline:** `codex/stage-a` @ `6d9777c` (Phase 2 implementation). **Status: `CORRECTION_COMPLETE`.**
+NO LIVE / NO PROVIDER / NO NETWORK / NO SERVER / NO WIDGET in this correction's own work.
+
+### Why Phase 2 needed correction
+
+Phase 2 computed the length profile *inside* `materialize_target_composer_request`, reading only
+`bound_package.package.materials.marketing_selection.applied_scenarios` — real and live, but `aspects`/
+`needs_clarification` were never threaded from the real TurnFrame to that point (they aren't available
+there at all). Consequences: `comparison_or_complex` never fired on any real call path; a comparison or
+multi-aspect content turn, having no `aspects` signal at the profile-selection point, could be read as
+`simple_faq` by omission (the old check was merely "comparison not present" — true by default of an
+always-empty tuple, not by evidence); and `required_content_override` counted only `must_preserve_exact`
+evidence blocks, missing a `required_fact_id` backed by a *non-strict* fact (e.g., the demo bundle's
+`free_implant_consult`, `render_mode="natural"`) that carries no `must_preserve_exact` block at all.
+
+### Exact producer→consumer chain (traced by reading the real call chain, not assumed)
+
+```
+core/target_runtime_turn.py::run_target_fullcontext_runtime_turn
+  -- turn_frame is real and live-hydrated here (load_runtime_turn_frame +
+     hydrate_target_runtime_turn_frame_from_session) -- correcting the Phase 1 seam
+     audit's more pessimistic "A1 shadow-only" reading of TurnFrame's own docstring.
+  -> core/target_boundary_enforced_fullcontext_response.py::run_target_offline_boundary_enforced_fullcontext_response
+     -> core/target_turn_frame_bound_response.py::run_target_offline_turn_frame_bound_response   <-- PRODUCER CALLED EXACTLY ONCE HERE
+          dispatch = dispatch_target_turn_frame_response(turn_frame, envelope, ...)
+          bound_spec = build_target_response_spec(dispatch.policy_request)          # final pre-price-resolution spec
+          resolved_scenarios = resolve_bound_marketing_flags(...)                    # real applied marketing_scenarios
+          response_length_profile = select_target_response_length_profile(
+              bound_spec,
+              aspects=tuple(turn_frame.aspects),
+              aspects_valid=turn_frame.field_meta.aspects.status == "valid",
+              marketing_scenarios=tuple(resolved_scenarios),
+              needs_clarification=turn_frame.needs_clarification,
+          )
+        -> core/target_policy_bound_verified_response_pipeline.py::run_target_offline_policy_bound_verified_response_pipeline_with_selection(..., response_length_profile=response_length_profile)   # pass-through only, no branching (straight-line guard preserved)
+             -> core/target_verified_response_pipeline.py::run_target_offline_verified_response_pipeline(..., response_length_profile=response_length_profile)   # pass-through only
+                  -> core/target_composer_request.py::materialize_target_composer_request(..., response_length_profile=response_length_profile)
+                       normalized = _normalized_response_length_profile(response_length_profile)   # NORMALIZE ONLY, never re-select
+                       # attached directly as a TargetComposerRequest field at all 5 return sites
+```
+
+`select_target_response_length_profile` is imported and called from exactly one module
+(`core/target_response_policy.py`'s definition, `core/target_turn_frame_bound_response.py`'s one call
+site) — confirmed by `tests/test_final_adaptive_response_length_budgets_correction_implementation.py::
+test_14_profile_selected_by_exactly_one_producer_call` (a monkeypatch spy) and `test_16_executor_never_
+calls_the_producer` (AST import-statement check, not a substring match, since both touched modules'
+docstrings legitimately *name* the producer in prose).
+
+### Corrected producer signature
+
+```python
+def select_target_response_length_profile(
+    spec: TargetResponseSpec,
+    *,
+    aspects: tuple[AspectKind, ...] = (),
+    aspects_valid: bool = True,
+    marketing_scenarios: tuple[str, ...] = (),
+    needs_clarification: bool = False,
+) -> TargetResponseLengthProfile:
+```
+
+`aspects_valid` mirrors `turn_frame.field_meta.aspects.status == "valid"` and gates **both** the
+comparison and the simple_faq branches — an untrusted or empty aspect signal must never be read as "no
+comparison" or "one confirmed aspect." `simple_faq` additionally requires `len(aspects) == 1` (exactly one
+proven aspect) on top of every Phase-2 condition (no price stage, no marketing, no clarify, ≤1 required
+fact, content-only) — matching the owner's exact conjunction. Any missing/multiple/invalid aspect signal
+now falls through to `standard_information`, never guessed.
+
+### Compatibility/fallback boundary (single canonical normalization, not a second selector)
+
+`core/target_composer_request.py::_normalized_response_length_profile(value)` — the **only** place a
+missing/invalid profile is handled, and it never calls the producer:
+
+- Valid profile → passed through unchanged.
+- `None` (legacy/unit caller that bypassed the production seam) → `standard_information`, silently — an
+  ordinary, expected shape, not a fault.
+- Any other non-`None`, invalid value → `standard_information`, with a logged `response_length_profile_
+  invalid` warning event (`status="warning"`, `details={"invalid_value_type": ...}` — no raw value, no
+  PII) — never a fallback route, never a retry, never a blocked answer.
+
+### Corrected `required_content_override` semantics
+
+`over_soft_budget AND (bool(spec.required_fact_ids) OR any(block.must_preserve_exact for block in
+evidence_blocks))` — a **structured indicator of presence**, not a causal claim. `bool(spec.required_
+fact_ids)` closes the exact gap found: a required fact backed by a non-strict (`render_mode="natural"`)
+commercial fact block carries `must_preserve_exact=False` by design (`core/target_composer_request.py`'s
+`_block()`), so the old must-preserve-exact-only check would have missed it. Proven with a real, non-strict
+demo-bundle fact (`free_implant_consult`) in `test_19` (also proves the "no protected content" `False`
+case), and with `must_preserve_exact` evidence for a doctor block (`test_20`) and an offer/price block
+(`test_21`) separately.
+
+### Discovered and documented (not fixed) limitation: known-extent scope-price turns
+
+Tracing `derive_response_stage` (`core/target_response_stage.py`, called from `core/target_scope_aware_
+price_package.py::assemble_scope_aware_price_package`, itself called from `_assemble_bound_package`
+**after** this milestone's chosen profile-selection seam) found that `_initial_scope_price_stage` only
+returns `"broad_family_price"` when `effective_scope is None or effective_scope.extent == "unknown"`; when
+a prior governed UI scope click has already resolved `effective_scope.extent` (e.g. `"one_tooth"`),
+`dispatch.policy_request.response_stage` is `None` at the chosen seam, and the *true* final stage
+(`scoped_family_price`/`concrete_service_price`/`data_gap`) is only produced later, inside price-resolution
+internals this correction's own Forbidden list explicitly excludes ("price resolution changes"). Proven
+directly with a constructed `EffectiveScope(extent="one_tooth", source="ui_action")`
+(`test_10_known_extent_scope_price_safely_defaults_pending_price_resolution`): the profile safely defaults
+to `standard_information` (never a narrower budget than warranted, never dropped content) rather than the
+more precise `scoped_price` the refined stage might justify. `scoped_price`'s own mapping (from an already-
+resolved `response_stage`) is unchanged and still correct at the producer-unit level — only this specific,
+governed-UI-click-only sub-path is affected, and fixing it would require touching `derive_response_stage`/
+`assemble_scope_aware_price_package` internals, explicitly out of scope for this correction. Flagged for a
+future, separate, narrowly-scoped follow-up if the owner wants full precision here.
+
+### Allowlist deviations (flagged and justified, pre-authorized by the owner's own instruction to thread
+### through "several intermediate pipeline contracts" if documented)
+
+1. **Four intermediate files threaded**, not just `target_composer_request.py`: `core/target_turn_frame_
+   bound_response.py` (producer call site), `core/target_policy_bound_verified_response_pipeline.py` (both
+   the `_with_selection` variant and its plain wrapper — the wrapper's own "straight-line, no branching"
+   narrow-surface guard test was preserved by adding only a pass-through keyword, no new control flow),
+   `core/target_verified_response_pipeline.py` (pass-through only, same straight-line guard preserved).
+2. **Five narrow-surface signature/shape guard tests updated** (additive-only, no other assertion
+   changed): `tests/test_target_composer_request.py` (`TargetComposerRequest` fields list — already had
+   `response_length_profile` from Phase 2 — and `materialize_target_composer_request`'s parameter list),
+   `tests/test_target_verified_response_pipeline.py` (signature list + one exact-kwargs-passed dict),
+   `tests/test_target_policy_bound_verified_response_pipeline.py` (signature list + one exact-kwargs-passed
+   dict at the pre-existing, already-reported-in-Phase-2 sentinel-object bug's assertion, which still fails
+   for the same pre-existing, unrelated reason — fixed for internal consistency, not because it newly
+   passes).
+3. **`select_target_response_length_profile`'s import/call site moved** from `core/target_composer_
+   request.py` (Phase 2) to `core/target_turn_frame_bound_response.py` (this correction) — the request
+   materializer now only normalizes an already-decided value, never selects one; `TargetComposerRequest`
+   (Phase 2's `response_length_profile` field) and `TargetUnverifiedComposedResponse` are unchanged.
+
+### Production-seam test matrix (30 scenarios + 2 sub-cases, real TurnFrame + real demo bundle, never a
+### hand-passed `aspects` tuple into the selector)
+
+`tests/test_final_adaptive_response_length_budgets_correction_implementation.py` — drives
+`run_target_offline_turn_frame_bound_response` directly with `build_turn_frame_from_raw` (the same
+constructor `core/target_runtime_turn.py` uses) and the real `clients/demo` `ResponseSchemaBundle`/doctor
+catalog/consultation values. Highlights: `simple_faq`/`comparison_or_complex`/`marketing_concern`/
+`broad_price_overview` all confirmed live via the real seam (not asserted by hand); multi-aspect, empty-
+aspects, and a genuinely unknown aspect value (which fails closed inside TurnFrame dispatch itself,
+`TargetTurnFrameDispatchError: dispatch_field_invalid`, before Composer is ever reached — a *stronger* form
+of "never guess simple_faq" than a soft fallback) all confirmed excluded from `simple_faq`; a service-bound
+multi-required-fact turn (using two real, correctly-scoped demo-bundle facts, `installment_12` +
+`free_implant_consult`) confirmed `standard_information`; a service-bound multi-component turn
+(`content`+`price`) confirmed `standard_information`; `needs_clarification=True` confirmed to reach
+Composer with `clarification_concise` when no structured price/service parameter forces a terminal dispatch
+first, and confirmed terminal (never reaching Composer at all) when one does.
+
+### Regression
+
+- New correction suite: **32 passed** (30-scenario matrix + 2 sub-cases).
+- All three PERF-5 suites together (governance + Phase-2 implementation + correction): **86 passed**.
+- Phase-2 implementation suite's own simple_faq tests updated for the corrected contract (now require
+  `aspects=("overview",), aspects_valid=True` — 3 tests adjusted, all still pass, 32/32).
+- Neighbor PERF-0/1/2/3/4 governance + implementation + transport-guard suites: **291 passed**.
+- Wide regression sweep across every Composer/spec/Verifier/presentation/followup/CTA/pipeline/dispatch/
+  generic-FullContext-adjacent test file: **422 passed**, exactly the same **1 pre-existing failure**
+  (`test_target_policy_bound_verified_response_pipeline.py::test_pipeline_passes_exact_objects_in_order_
+  and_returns_verifier_identity`, reproduced identically on the pre-PERF-5 baseline, unrelated to this
+  milestone) already documented in the Phase 2 completion record — not fixed here, not a new regression.
+- `git diff --check`: clean.
+- `python -m pytest tests/ --collect-only`: **3635 tests collected** (+32 vs. the Phase 2 baseline), zero
+  collection errors.
+
+### NO LIVE / NO PROVIDER / NO NETWORK confirmation
+
+Zero real provider/network calls anywhere in this correction's work or its tests — reconfirmed by a new
+sanity test (`test_30b_real_provider_transport_still_blocked`) exercising the centralized
+`tests/conftest.py` transport guard from within this correction's own test file. No server started, no
+widget request sent.
+
+### Honest limitation, restated
+
+`composer_ms`/real answer-length reduction on production traffic remains **unmeasured** — this correction
+fixes *which* profile is selected and *how completely* it is wired, not whether shorter Composer answers
+actually happen or help conversion. That evidence can only come from the `response_length_profile_
+evaluated` observability event accumulating on real traffic after a separate, later owner activation step.
+
+## STOP (PERF-5 correction)
+
+Live wiring is now complete for 6 of 7 profiles through the real production seam, with the 7th
+(`scoped_price` under a *specific*, governed-UI-click-driven, known-extent scope-price sub-path) honestly
+documented as deferred pending price-resolution-internal changes explicitly out of this correction's scope
+— not a hidden gap. **STOP** before any real widget/live measurement and before PERF-6 (Scoped
+FullContext).
+
 ---

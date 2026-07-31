@@ -416,13 +416,20 @@ def _log_response_length_observability(
     """PERF-5 observability only -- never blocking, never able to affect the answer.
 
     Anonymized fields only: profile, soft-max, char count, over-budget flag, and a
-    correctness-override signal (over budget while carrying must_preserve_exact
-    evidence). No answer/question text, no sid/contact values are placed in
-    ``details``. completion_tokens is intentionally not duplicated here -- it is
-    already logged per Composer call by the existing llm_usage event
-    (call_type=target_fullcontext_runtime_composer) and can be correlated via
-    request_id; composer_ms is already produced by the stage_start/stage_end
-    marks immediately around this call (PERF-0).
+    ``required_content_override`` structured indicator (PERF-5 correction: means
+    ``over_soft_budget AND protected required content is present`` -- it does **not**
+    assert that the protected content *caused* the overage, only that it was present
+    on an over-budget turn). Protected content is: ``spec.required_fact_ids`` being
+    non-empty, or any evidence block with ``must_preserve_exact=True`` -- which, by
+    construction (``core/target_composer_request.py``'s ``_PRESERVATION``/``_block()``
+    per-kind assignment), already covers strict commercial facts, offers (including
+    ``no_public_price`` price evidence), doctors, and validated clinic-contact evidence
+    whenever the Composer path uses them. No answer/question text, no sid/contact
+    values are placed in ``details``. completion_tokens is intentionally not
+    duplicated here -- it is already logged per Composer call by the existing
+    llm_usage event (call_type=target_fullcontext_runtime_composer) and can be
+    correlated via request_id; composer_ms is already produced by the
+    stage_start/stage_end marks immediately around this call (PERF-0).
     """
     profile = request.response_length_profile
     if profile is None:
@@ -431,9 +438,10 @@ def _log_response_length_observability(
         soft_max = response_length_soft_max(profile)
         answer_chars = len(answer_text)
         over_soft_budget = answer_chars > soft_max
-        required_content_override = over_soft_budget and any(
+        protected_content_present = bool(request.spec.required_fact_ids) or any(
             block.must_preserve_exact for block in request.evidence_blocks
         )
+        required_content_override = over_soft_budget and protected_content_present
         emit_bot_event(
             logger,
             "response_length_profile_evaluated",

@@ -9,6 +9,7 @@ from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.service_consultation import ServiceConsultationValue
 from contracts.target_cached_full_context import TargetCachedFullContext
+from contracts.target_response_length_profile import TargetResponseLengthProfile
 from core.target_composer_executor import (
     TargetComposerBackend,
     TargetComposerTone,
@@ -42,6 +43,7 @@ def run_target_offline_verified_response_pipeline(
     semantic_backend: TargetSemanticVerifierBackend,
     contact_fields: tuple[str, ...] | None = None,
     client_id: str = "demo",
+    response_length_profile: TargetResponseLengthProfile | None = None,
 ) -> TargetVerifiedComposedResponse:
     """Materialize, compose and verify one exact target response without wiring it."""
 
@@ -54,6 +56,7 @@ def run_target_offline_verified_response_pipeline(
         md_root=md_root,
         contact_fields=contact_fields,
         client_id=client_id,
+        response_length_profile=response_length_profile,
     )
     unverified = execute_target_composer(
         request,

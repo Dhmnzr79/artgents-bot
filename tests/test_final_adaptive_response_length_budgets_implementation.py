@@ -205,7 +205,9 @@ def test_1_all_seven_profiles_reachable() -> None:
     )
     assert (
         select_target_response_length_profile(
-            _content_spec(allow_marketing_facts=False, required_fact_ids=())
+            _content_spec(allow_marketing_facts=False, required_fact_ids=()),
+            aspects=("overview",),
+            aspects_valid=True,
         )
         == "simple_faq"
     )
@@ -228,34 +230,65 @@ def test_1_all_seven_profiles_reachable() -> None:
 
 def test_2_simple_faq_matches_owner_decision_exactly() -> None:
     """simple_faq only for: no price stage/aspect, no comparison, no marketing_scenarios,
-    no clarification, <=1 required fact, single (content-only) component."""
+    no clarification, <=1 required fact, single (content-only) component, AND a genuinely
+    proven single valid aspect (the PERF-5 correction's own explicit requirement)."""
     base = _content_spec(allow_marketing_facts=False, required_fact_ids=())
-    assert select_target_response_length_profile(base) == "simple_faq"
+    assert (
+        select_target_response_length_profile(base, aspects=("overview",), aspects_valid=True)
+        == "simple_faq"
+    )
 
     # any one owner-listed axis present -> must NOT be simple_faq
-    assert select_target_response_length_profile(base, aspects=("comparison",)) != "simple_faq"
-    assert select_target_response_length_profile(base, marketing_scenarios=("time",)) != "simple_faq"
+    assert (
+        select_target_response_length_profile(
+            base, aspects=("comparison",), aspects_valid=True
+        )
+        != "simple_faq"
+    )
+    assert (
+        select_target_response_length_profile(
+            base, aspects=("overview",), aspects_valid=True, marketing_scenarios=("time",)
+        )
+        != "simple_faq"
+    )
     assert select_target_response_length_profile(_clarify_spec()) != "simple_faq"
     assert (
         select_target_response_length_profile(
-            _content_spec(allow_marketing_facts=False, required_fact_ids=("f1", "f2"))
+            _content_spec(allow_marketing_facts=False, required_fact_ids=("f1", "f2")),
+            aspects=("overview",),
+            aspects_valid=True,
         )
         != "simple_faq"
     )
     assert (
         select_target_response_length_profile(
-            _content_spec(required_components=("content", "doctors"), allow_marketing_facts=False)
+            _content_spec(required_components=("content", "doctors"), allow_marketing_facts=False),
+            aspects=("overview",),
+            aspects_valid=True,
         )
         != "simple_faq"
     )
     assert (
         select_target_response_length_profile(
-            _content_spec(allow_marketing_facts=True, required_fact_ids=())
+            _content_spec(allow_marketing_facts=True, required_fact_ids=()),
+            aspects=("overview",),
+            aspects_valid=True,
         )
         != "simple_faq"
     )
     assert (
         select_target_response_length_profile(_price_stage_spec("concrete_service_price"))
+        != "simple_faq"
+    )
+    # the correction's own new gate: no aspect, multiple aspects, or an invalid aspect
+    # signal must never be read as "simple_faq" even when every other axis is clean
+    assert select_target_response_length_profile(base) != "simple_faq"
+    assert (
+        select_target_response_length_profile(base, aspects=("overview", "pain"), aspects_valid=True)
+        != "simple_faq"
+    )
+    assert (
+        select_target_response_length_profile(base, aspects=("overview",), aspects_valid=False)
         != "simple_faq"
     )
 
@@ -490,7 +523,10 @@ def test_23_generic_micro_fact_gets_simple_faq() -> None:
         allow_marketing_facts=False,
         allow_consultation_close=False,
     )
-    assert select_target_response_length_profile(spec) == "simple_faq"
+    assert (
+        select_target_response_length_profile(spec, aspects=("overview",), aspects_valid=True)
+        == "simple_faq"
+    )
 
 
 def test_24_consultation_value_does_not_bleed_via_length_profile() -> None:

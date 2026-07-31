@@ -1,0 +1,425 @@
+{
+  "audit": "FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT",
+  "client_id": "demo",
+  "tokenizer": "chars_div_4_estimate_NOT_exact",
+  "layers": {
+    "md_body": {
+      "chars": 67560,
+      "token_estimate": 16890,
+      "doc_count": 55
+    },
+    "md_frontmatter": {
+      "chars": 24071,
+      "token_estimate": 6018,
+      "doc_count": 55
+    },
+    "service_catalog": {
+      "chars": 13161,
+      "token_estimate": 3290,
+      "service_count": 22
+    },
+    "offers": {
+      "chars": 23545,
+      "token_estimate": 5886,
+      "offer_count": 32
+    },
+    "facts": {
+      "chars": 3277,
+      "token_estimate": 819,
+      "fact_count": 6
+    },
+    "doctors": {
+      "chars": 2388,
+      "token_estimate": 597,
+      "doctor_count": 6
+    },
+    "clinic_policies": {
+      "chars": 3227,
+      "token_estimate": 807
+    },
+    "marketing": {
+      "chars": 2135,
+      "token_estimate": 534
+    },
+    "consultation_content": {
+      "chars": 380,
+      "token_estimate": 95,
+      "note": "subset_of md_frontmatter (S18 stores consultation_value in MD frontmatter) - NOT additive to grand total"
+    },
+    "presentation_metadata": {
+      "chars": 5829,
+      "token_estimate": 1457,
+      "note": "suggest_h3+situation_allowed+video_key+cta_key+cta_action+empathy_enabled are subset_of md_frontmatter; video_catalog.yaml chars are additive",
+      "video_catalog_yaml_chars": 228
+    },
+    "cached_full_context": {
+      "chars": 107980,
+      "token_estimate": 26995,
+      "sha256": "758a64ebbc75f033c68165ed1c70a96e82267938a97ee204b314ed28a0c82f2e",
+      "document_count": 55,
+      "note": "chars == sum(per-doc trimmed content) + BEGIN/END markers + join newlines (verified below); equals md_body+md_frontmatter+heading/markup overhead by construction (whole file, not split)"
+    },
+    "composer_static_prefix": {
+      "chars": 116571,
+      "token_estimate": 29142,
+      "sha256": "8706732e54b511ed29eaaa41b54ae552b9c32ed2a17605f50a7115035408a079",
+      "model": "qwen3.7-plus",
+      "note": "system_policy + static user content through end of cached_full_context (production build_composer_sdk_messages, sliced at corpus boundary)"
+    },
+    "verifier_static_prefix": {
+      "chars": 114719,
+      "token_estimate": 28679,
+      "sha256": "76787840d9ccfc3f2e36ae3db20a4ae7450479380a15bb89a8a01bca24789fd8",
+      "model": "qwen3.7-plus",
+      "note": "system_policy + static user content through end of cached_full_context (production build_verifier_sdk_messages, sliced at corpus boundary)"
+    },
+    "clinic_strategy_extra": {
+      "chars": 1947,
+      "token_estimate": 487,
+      "note": "not one of the 13 spec-itemized layers; included for completeness (target_response/clinic_strategy.yaml)"
+    },
+    "brand_catalog_extra": {
+      "chars": 488,
+      "token_estimate": 122,
+      "note": "not one of the 13 spec-itemized layers; included for completeness (target_response/brand_catalog.json)"
+    }
+  },
+  "arithmetic_checks": {
+    "cached_full_context_chars_verified_by_reconstruction": true,
+    "composer_minus_verifier_static_prefix_delta_chars": 1852,
+    "composer_and_verifier_both_include_full_cached_full_context_once_each": true,
+    "raw_client_pack_sum_chars_excl_subsets": 142027
+  },
+  "per_doc_md_summary": [
+    {
+      "doc_path": "clients/demo/md/clinic__info__advantages.md",
+      "frontmatter_chars": 254,
+      "body_chars": 575,
+      "doc_id": "clinic__info__advantages"
+    },
+    {
+      "doc_path": "clients/demo/md/clinic__info__consultation.md",
+      "frontmatter_chars": 370,
+      "body_chars": 629,
+      "doc_id": "clinic__info__consultation"
+    },
+    {
+      "doc_path": "clients/demo/md/clinic__info__contacts.md",
+      "frontmatter_chars": 276,
+      "body_chars": 192,
+      "doc_id": "clinic__info__contacts"
+    },
+    {
+      "doc_path": "clients/demo/md/clinic__info__payment_terms.md",
+      "frontmatter_chars": 303,
+      "body_chars": 499,
+      "doc_id": "clinic__info__payment_terms"
+    },
+    {
+      "doc_path": "clients/demo/md/clinic__info__technology.md",
+      "frontmatter_chars": 421,
+      "body_chars": 1402,
+      "doc_id": "clinic__info__technology"
+    },
+    {
+      "doc_path": "clients/demo/md/clinic__info__warranty.md",
+      "frontmatter_chars": 276,
+      "body_chars": 941,
+      "doc_id": "clinic__info__warranty"
+    },
+    {
+      "doc_path": "clients/demo/md/comparison__all_on_4_vs_all_on_6.md",
+      "frontmatter_chars": 555,
+      "body_chars": 2262,
+      "doc_id": "comparison__all_on_4_vs_all_on_6"
+    },
+    {
+      "doc_path": "clients/demo/md/comparison__bone_graft_vs_all_on_4.md",
+      "frontmatter_chars": 482,
+      "body_chars": 1861,
+      "doc_id": "comparison__bone_graft_vs_all_on_4"
+    },
+    {
+      "doc_path": "clients/demo/md/comparison__bugel_prosthesis_vs_fixed_bridge.md",
+      "frontmatter_chars": 545,
+      "body_chars": 2220,
+      "doc_id": "comparison__bugel_prosthesis_vs_fixed_bridge"
+    },
+    {
+      "doc_path": "clients/demo/md/comparison__classic_vs_one_stage.md",
+      "frontmatter_chars": 535,
+      "body_chars": 1658,
+      "doc_id": "comparison__classic_vs_one_stage"
+    },
+    {
+      "doc_path": "clients/demo/md/comparison__implant_vs_bridge.md",
+      "frontmatter_chars": 470,
+      "body_chars": 2135,
+      "doc_id": "comparison__implant_vs_bridge"
+    },
+    {
+      "doc_path": "clients/demo/md/diagnostics__service__tomography.md",
+      "frontmatter_chars": 424,
+      "body_chars": 1014,
+      "doc_id": "diagnostics__service__tomography"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__fedorova.md",
+      "frontmatter_chars": 483,
+      "body_chars": 580,
+      "doc_id": "doctors__doctor__fedorova"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__grigoriev.md",
+      "frontmatter_chars": 378,
+      "body_chars": 496,
+      "doc_id": "doctors__doctor__grigoriev"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__kuznetsov.md",
+      "frontmatter_chars": 529,
+      "body_chars": 496,
+      "doc_id": "doctors__doctor__kuznetsov"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__morozova.md",
+      "frontmatter_chars": 356,
+      "body_chars": 452,
+      "doc_id": "doctors__doctor__morozova"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__orlov.md",
+      "frontmatter_chars": 473,
+      "body_chars": 490,
+      "doc_id": "doctors__doctor__orlov"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__overview.md",
+      "frontmatter_chars": 329,
+      "body_chars": 414,
+      "doc_id": "doctors__doctor__overview"
+    },
+    {
+      "doc_path": "clients/demo/md/doctors__doctor__volkov.md",
+      "frontmatter_chars": 566,
+      "body_chars": 618,
+      "doc_id": "doctors__doctor__volkov"
+    },
+    {
+      "doc_path": "clients/demo/md/extraction__service__tooth_extraction.md",
+      "frontmatter_chars": 550,
+      "body_chars": 2212,
+      "doc_id": "extraction__service__tooth_extraction"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__cost.md",
+      "frontmatter_chars": 430,
+      "body_chars": 694,
+      "doc_id": "implantation__faq__cost"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__duration.md",
+      "frontmatter_chars": 575,
+      "body_chars": 1356,
+      "doc_id": "implantation__faq__duration"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__osseointegration.md",
+      "frontmatter_chars": 491,
+      "body_chars": 1255,
+      "doc_id": "implantation__faq__osseointegration"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__pain.md",
+      "frontmatter_chars": 461,
+      "body_chars": 2011,
+      "doc_id": "implantation__faq__pain"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__safety.md",
+      "frontmatter_chars": 437,
+      "body_chars": 771,
+      "doc_id": "implantation__faq__safety"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__tooth_loss.md",
+      "frontmatter_chars": 294,
+      "body_chars": 622,
+      "doc_id": "implantation__faq__tooth_loss"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__tooth_one_day.md",
+      "frontmatter_chars": 447,
+      "body_chars": 469,
+      "doc_id": "implantation__faq__tooth_one_day"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__faq__what_included.md",
+      "frontmatter_chars": 425,
+      "body_chars": 1456,
+      "doc_id": "implantation__faq__what_included"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__info__aftercare.md",
+      "frontmatter_chars": 455,
+      "body_chars": 1098,
+      "doc_id": "implantation__info__aftercare"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__info__contraindications.md",
+      "frontmatter_chars": 445,
+      "body_chars": 1877,
+      "doc_id": "implantation__info__contraindications"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__info__curator.md",
+      "frontmatter_chars": 297,
+      "body_chars": 523,
+      "doc_id": "implantation__info__curator"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__info__implant_systems.md",
+      "frontmatter_chars": 398,
+      "body_chars": 990,
+      "doc_id": "implantation__info__implant_systems"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__info__methods_overview.md",
+      "frontmatter_chars": 390,
+      "body_chars": 1514,
+      "doc_id": "implantation__info__methods_overview"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__info__steps.md",
+      "frontmatter_chars": 623,
+      "body_chars": 1106,
+      "doc_id": "implantation__info__steps"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__all_on_4.md",
+      "frontmatter_chars": 500,
+      "body_chars": 1570,
+      "doc_id": "implantation__service__all_on_4"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__all_on_6.md",
+      "frontmatter_chars": 331,
+      "body_chars": 1568,
+      "doc_id": "implantation__service__all_on_6"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__benefits.md",
+      "frontmatter_chars": 272,
+      "body_chars": 534,
+      "doc_id": "implantation__service__benefits"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__bone_graft.md",
+      "frontmatter_chars": 494,
+      "body_chars": 2187,
+      "doc_id": "implantation__service__bone_graft"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__classic.md",
+      "frontmatter_chars": 498,
+      "body_chars": 1230,
+      "doc_id": "implantation__service__classic"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__one_stage.md",
+      "frontmatter_chars": 456,
+      "body_chars": 1367,
+      "doc_id": "implantation__service__one_stage"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__pterygoid_implants.md",
+      "frontmatter_chars": 475,
+      "body_chars": 1491,
+      "doc_id": "implantation__service__pterygoid_implants"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__sinus_lift.md",
+      "frontmatter_chars": 389,
+      "body_chars": 1912,
+      "doc_id": "implantation__service__sinus_lift"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__temporary_teeth.md",
+      "frontmatter_chars": 611,
+      "body_chars": 1432,
+      "doc_id": "implantation__service__temporary_teeth"
+    },
+    {
+      "doc_path": "clients/demo/md/implantation__service__zygomatic_implants.md",
+      "frontmatter_chars": 591,
+      "body_chars": 1531,
+      "doc_id": "implantation__service__zygomatic_implants"
+    },
+    {
+      "doc_path": "clients/demo/md/orthodontics__service__aligners.md",
+      "frontmatter_chars": 335,
+      "body_chars": 1213,
+      "doc_id": "orthodontics__service__aligners"
+    },
+    {
+      "doc_path": "clients/demo/md/periodontology__service__periodontitis.md",
+      "frontmatter_chars": 485,
+      "body_chars": 1669,
+      "doc_id": "periodontology__service__periodontitis"
+    },
+    {
+      "doc_path": "clients/demo/md/prosthetics__service__clasp_dentures.md",
+      "frontmatter_chars": 397,
+      "body_chars": 1559,
+      "doc_id": "prosthetics__service__clasp_dentures"
+    },
+    {
+      "doc_path": "clients/demo/md/prosthetics__service__implant_supported_prosthetics.md",
+      "frontmatter_chars": 487,
+      "body_chars": 1678,
+      "doc_id": "prosthetics__service__implant_supported_prosthetics"
+    },
+    {
+      "doc_path": "clients/demo/md/prosthetics__service__removable_dentures.md",
+      "frontmatter_chars": 608,
+      "body_chars": 2358,
+      "doc_id": "prosthetics__service__removable_dentures"
+    },
+    {
+      "doc_path": "clients/demo/md/prosthetics__service__veneers.md",
+      "frontmatter_chars": 304,
+      "body_chars": 1590,
+      "doc_id": "prosthetics__service__veneers"
+    },
+    {
+      "doc_path": "clients/demo/md/prosthetics__service__zirconia_crowns.md",
+      "frontmatter_chars": 413,
+      "body_chars": 1527,
+      "doc_id": "prosthetics__service__zirconia_crowns"
+    },
+    {
+      "doc_path": "clients/demo/md/treatment__service__caries.md",
+      "frontmatter_chars": 411,
+      "body_chars": 710,
+      "doc_id": "treatment__service__caries"
+    },
+    {
+      "doc_path": "clients/demo/md/treatment__service__pulpitis.md",
+      "frontmatter_chars": 397,
+      "body_chars": 1223,
+      "doc_id": "treatment__service__pulpitis"
+    },
+    {
+      "doc_path": "clients/demo/md/treatment__service__teeth_treatment.md",
+      "frontmatter_chars": 345,
+      "body_chars": 773,
+      "doc_id": "treatment__service__teeth_treatment"
+    },
+    {
+      "doc_path": "clients/demo/md/whitening__service__teeth_whitening.md",
+      "frontmatter_chars": 529,
+      "body_chars": 1550,
+      "doc_id": "whitening__service__teeth_whitening"
+    }
+  ]
+}

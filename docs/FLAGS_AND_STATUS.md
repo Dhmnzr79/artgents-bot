@@ -241,6 +241,16 @@ $env:E2E_USE_TEST_CLIENT="1"; $env:PYTHONIOENCODING="utf-8"
    `docs/evidence/performance/FINAL_ADAPTIVE_RESPONSE_LENGTH_BUDGETS_SEAM_AUDIT.md`.
 5. Гигиена: красные playbook-тесты не в CI, мёртвый `core/claim_gate.py`, ветка `feature/controlled-composer`.
 6. **FINAL_TEST_SUITE_CONVERGENCE (governance @ `1980ab7`):** 185 wide failures inventoried; TSC-A..D checkpoints defined. See `docs/TEST_SUITE_ARCHITECTURE.md`, `docs/evidence/testing/final_test_failure_inventory.json`. Implementation blocked until owner GO.
+7. **FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT (governance @ `9073a22`, read-only):** demo
+   client pack token/char inventory (13 layers) + duplicate/conflict candidate scan (exact/near/
+   structured methods, no embeddings/LLM). Found: 5 `EXACT_DUPLICATE` + 2 `INTENTIONAL_DUPLICATE` +
+   10 `NEAR_DUPLICATE` offer-package-text candidates (~1,609 chars / ~402 tokens safe potential
+   savings), zero structured duplicates/conflicts across authority (contacts/doctors/marketing-facts
+   scans all clean). Confirms cached FullContext (107,980 chars) is transmitted in full by both
+   Composer and Verifier static prefixes independently (116,571 / 114,719 chars) — a known
+   architecture fact, not a client-pack defect. See
+   `docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md`. **NO CLIENT/PRODUCT
+   CHANGE.** Phase 2 cleanup/tooling not started; STOP until owner GO.
 
 ⚠️ **Мёртвый конфиг (найдено 2026-07-10):** блок `limits:` в `clients/demo/marketing.yaml` (`max_text_ingredients`, `max_cta`, `promo_cooldown_turns`, `proof_cooldown_turns`) грузится, но **нигде не применяется**. Работают только `blocked_aspects_for_promo` и `service_marketing`. Разбор — в Этапе 7.
 

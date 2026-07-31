@@ -733,6 +733,29 @@ Deliverables: `docs/evidence/testing/FINAL_TEST_SUITE_CONVERGENCE_SEAM_AUDIT.md`
 
 ---
 
+## Active — FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT (governance Phase 1, read-only)
+
+**Baseline:** `codex/stage-a` @ `9073a22` · **NO CLIENT-PACK CHANGE / NO PRODUCT CHANGE / NO LIVE**
+
+Read-only audit of `clients/demo/**` content volume and duplication before any future Scoped
+FullContext / compact-Verifier decision (PERF-6 candidate). Deterministic local methods only
+(normalized-hash exact match, word-5-gram Jaccard near-match, structured cross-authority scans) —
+no embeddings, no LLM. Found 5 `EXACT_DUPLICATE` + 2 `INTENTIONAL_DUPLICATE` + 10 `NEAR_DUPLICATE`
+candidates (all offer `package` text, ~1,609 chars / ~402 tokens safe potential savings) and zero
+structured duplicates/conflicts across the `docs/CLIENT_PACK_AUTHORING.md` authority boundaries.
+Confirms Composer (116,571 chars) and Verifier (114,719 chars) static prefixes each independently
+carry the full 107,980-char cached FullContext corpus once — a known architecture fact restated
+with exact current numbers, not a new finding requiring action.
+
+Deliverables: `docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md`,
+`docs/evidence/client_pack/demo_content_token_inventory.json`,
+`docs/evidence/client_pack/demo_content_duplicate_candidates.json`, `TASK.md`, PRE-CODE
+`tests/test_final_client_pack_content_dedup_and_token_audit_governance.py`.
+
+**Phase 1 audit only** — STOP before any cleanup, tooling, or Scoped FullContext/Verifier work.
+
+---
+
 ## Historical — FINAL_SERVICE_AVAILABILITY_AND_CLINIC_CAPABILITY_ROUTING (governance + implementation)
 
 **Baseline:** `codex/stage-a` @ `d8dbe93` (governance) → `c4de72c` (implementation COMPLETE).

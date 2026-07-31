@@ -8225,3 +8225,124 @@ documented as deferred pending price-resolution-internal changes explicitly out 
 FullContext).
 
 ---
+
+# TASK — FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT (governance, Phase 1)
+
+**Status:** Phase 1, audit/governance only · **NO CLIENT-PACK CHANGE / NO PRODUCT CHANGE / NO LIVE /
+NO PROVIDER CALLS / NO NETWORK / NO EMBEDDINGS/LLM DUPLICATE DETECTION / NO AUTOMATIC MERGE / NO
+DELETIONS/RENAMES/MIGRATIONS / NO SCOPED FULLCONTEXT / NO VERIFIER CHANGE / NO CONTEXT GROUPS / NO
+PROMPT/MODEL CHANGE / NO PRICE/MARKETING/DOCTOR POLICY CHANGE / NO CLIENT/FROZEN ARTIFACTS / NO
+TSC-C / NO TSC-D / NO UNRELATED CLEANUP**
+
+**Baseline:** `codex/stage-a` @ `9073a22`.
+
+**Motivation:** before any future Scoped FullContext / compact-Verifier work (flagged but not
+started by PERF-3/PERF-4/PERF-5), establish an honest, read-only picture of where the demo client
+pack's token/char volume actually comes from, whether the pack itself carries duplicated or
+conflicting content, and whether the documented `docs/CLIENT_PACK_AUTHORING.md` authority rules
+hold in practice. Full detail:
+[`docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md`](evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md).
+
+## Scope
+
+Read-only audit of `clients/demo/**` content: `md/**`, `target_response/service_catalog.json`,
+`target_response/pricebook/**` (offers + `facts.json`), `target_response/brand_catalog.json`,
+`target_response/marketing.yaml`, `target_response/clinic_strategy.yaml`, `doctor_catalog.json`,
+`clinic_policies.yaml`, `video_catalog.yaml`. Plus sizing (not modifying) the assembled cached
+FullContext corpus and the Composer/Verifier static prefixes, via the real production offline
+builders (`core/target_cached_full_context.py`, `core/target_prompt_cache_prewarm.py`'s
+`build_dry_run_report` — zero provider calls, reused verbatim, never a parallel assembly path).
+
+## Definitions
+
+- **Content block** — the unit of analysis: one MD frontmatter block, one MD heading, one MD
+  paragraph/list run (grouped under its nearest heading), one `suggest_h3`/presentation-metadata/
+  alias/inline-alias-comment/`consultation_value` field, one `facts.json` `text_fact`, one offer
+  `package.label`+`includes`, one offer `price.amount`+`currency` scalar, one `clinic_policies.yaml`
+  contact field/policy answer/template, one doctor `name, position, стаж N лет` composite.
+- **Exact duplicate** — identical `normalized_hash` (NFKC normalize, casefold, strip leading
+  `#`/list markers and `*_\`>` emphasis, collapse whitespace; numbers/currency/negation preserved),
+  minimum block length 12 chars.
+- **Near duplicate** — word 5-gram shingle Jaccard similarity ≥ 0.6 on casefolded
+  `[a-zа-яё0-9]+` tokens, minimum block length 40 chars; a manual-review signal only, never a merge
+  basis.
+- **Structured duplicate** — a canonical scalar (offer price, contact field, doctor fact,
+  `facts.json` text) found again outside its declared authority file.
+- **Possible conflict** — the same service/entity's canonical scalar (currently: offer price)
+  contradicted by a different number found in that entity's own MD body.
+- **Token estimate** — `chars // 4`, explicitly labelled `chars_div_4_estimate_NOT_exact`; not
+  compared against real logged `prompt_tokens` (out of scope for a content-only audit).
+
+## Authority matrix (proposed; observed to hold with zero violations in § 6 of the audit report)
+
+| Data | Sole authority |
+|---|---|
+| Service identity, aliases, routing, refs | `target_response/service_catalog.json` |
+| Response text, follow-ups, presentation metadata | `md/*.md` |
+| Prices, billing units, inclusions, `no_public_price` | `target_response/pricebook/services/*.json` |
+| Doctor data | `doctor_catalog.json` |
+| Contacts, hours, general policy | `clinic_policies.yaml` |
+| Reusable approved commercial/clinic facts | `target_response/pricebook/facts.json` |
+| Applicability/selection (refs to facts, not text) | `target_response/marketing.yaml` |
+| Consultation value | exact service MD frontmatter |
+
+**Gap found:** the matrix does not state whether offer `package` prose may repeat verbatim across
+sibling brand-SKU offers of the same service (it currently does, for 5 of the ~10 multi-brand
+services — audit report § 2/§ 6). Documentation-only gap, not a data-placement violation; not fixed
+in this Phase 1.
+
+## Duplicate classes (7, per task brief)
+
+`EXACT_DUPLICATE` · `NEAR_DUPLICATE` · `STRUCTURED_DUPLICATE` · `POSSIBLE_CONFLICT` ·
+`INTENTIONAL_DUPLICATE` · `UI_METADATA_REPEAT` · `REQUIRES_OWNER_REVIEW` — each candidate in
+[`demo_content_duplicate_candidates.json`](evidence/client_pack/demo_content_duplicate_candidates.json)
+carries exactly one of these plus one recommendation (`KEEP`/`MERGE`/`REFERENCE_CANONICAL`/
+`MOVE_TO_AUTHORITY`/`MARK_INTENTIONAL`/`INVESTIGATE_CONFLICT`). Observed on the current demo pack:
+5 `EXACT_DUPLICATE` (offer package text, brand-SKU siblings), 2 `INTENTIONAL_DUPLICATE` (doctor
+card section labels), 10 `NEAR_DUPLICATE` (all `offer_package`), 0 `STRUCTURED_DUPLICATE`, 0
+`POSSIBLE_CONFLICT`, 0 `UI_METADATA_REPEAT`, 0 `REQUIRES_OWNER_REVIEW` beyond the near-dup set.
+
+## Proposed Phase 2 script contract (not implemented)
+
+A future, separately owner-approved milestone could add `scripts/audit_client_pack_dedup.py
+--client-id demo --check` (read-only, versioned methods, CI-failing only on a **new** candidate in
+a previously-empty class, never auto-merging/deleting). See audit report § 9 for the full contract.
+**Does not exist yet.**
+
+## Cleanup acceptance matrix (future Phase 2 owner decision — not started)
+
+| Candidate class | Safe to auto-apply? | Why |
+|---|---|---|
+| `EXACT_DUPLICATE` (offer package text) | No | Requires a schema decision (shared field + validator change), not a text-only edit |
+| `INTENTIONAL_DUPLICATE` | Never | By definition intentional (doctor-card template structure) |
+| `NEAR_DUPLICATE` | Never automatically | Similarity ≠ identity; risk of merging distinct facts |
+| `STRUCTURED_DUPLICATE` / `POSSIBLE_CONFLICT` / `REQUIRES_OWNER_REVIEW` | Never automatically | Requires human judgement on canonical source |
+
+## Exact implementation allowlist (future Phase 2 — none of this exists yet)
+
+- `scripts/audit_client_pack_dedup.py` (proposed above) — **does not exist**.
+- Any `pricebook/services/*.json` schema change (e.g. shared `package_ref`) — **does not exist**.
+- Any `docs/CLIENT_PACK_AUTHORING.md` update documenting the authority-matrix gap — **not made**.
+
+## STOP conditions
+
+**STOP** before any of the following — none are authorized by this Phase 1 commit:
+
+- creating the Phase 2 script above;
+- merging/hoisting any of the 5 `EXACT_DUPLICATE` offer-package texts found in § 2 of the audit
+  report;
+- documenting the authority-matrix gap as a rule change in `docs/CLIENT_PACK_AUTHORING.md`;
+- any Scoped FullContext or compact-Verifier work (the audit's § 5 FullContext duplication map is
+  read-only sizing, explicitly not a proposal to implement either).
+
+## Deliverables (this commit)
+
+- [`docs/evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md`](evidence/client_pack/FINAL_CLIENT_PACK_CONTENT_DEDUP_AND_TOKEN_AUDIT.md) — full report.
+- [`docs/evidence/client_pack/demo_content_token_inventory.json`](evidence/client_pack/demo_content_token_inventory.json) — 13+2 layer sizes, arithmetic checks, per-doc MD summary.
+- [`docs/evidence/client_pack/demo_content_duplicate_candidates.json`](evidence/client_pack/demo_content_duplicate_candidates.json) — 17 candidates, methodology, classification.
+- `docs/FLAGS_AND_STATUS.md`, `docs/STRANGLER_ROADMAP.md` — minimal sync (this milestone referenced).
+- `tests/test_final_client_pack_content_dedup_and_token_audit_governance.py` — PRE-CODE checker.
+
+**NO CLIENT/PRODUCT CHANGE. NO LIVE.** STOP before any cleanup or Phase 2 implementation.
+
+---

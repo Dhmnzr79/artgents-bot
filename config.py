@@ -24,8 +24,11 @@ QWEN_ENABLE_THINKING = os.getenv("QWEN_ENABLE_THINKING", "0").lower() in (
 
 
 # --- Models (Qwen pilot defaults; override via .env to revert to OpenAI) ---
-QWEN_PLUS_MODEL = "qwen3.7-plus"
-QWEN_FLASH_MODEL = "qwen3.6-flash"
+# Local speed experiment: use one Qwen Flash model across the complete bot
+# contour (Planner, Ingress, Boundary, Composer, Verifier and auxiliary
+# classifiers).  Keep environment-variable overrides intact for rollback.
+QWEN_PLUS_MODEL = "qwen3.7-flash"
+QWEN_FLASH_MODEL = "qwen3.7-flash"
 
 CHAT_MODEL = os.getenv("MODEL_CHAT", QWEN_PLUS_MODEL)
 

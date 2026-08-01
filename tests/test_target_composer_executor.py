@@ -180,12 +180,12 @@ def test_incremental_json_parser_emits_only_decoded_answer_text() -> None:
     assert emoji.ingest('\\uDE00"}') == "😀"
 
 
-def test_safe_content_only_request_uses_true_stream_backend_when_sink_is_bound() -> None:
+def test_safe_content_only_request_streams_when_marketing_is_only_permitted() -> None:
     content = _request().evidence_blocks[0]
     request = _request(
         spec=_spec(
             required_fact_ids=(),
-            allow_marketing_facts=False,
+            allow_marketing_facts=True,
             allow_consultation_close=False,
             allow_cta=False,
         ),
@@ -209,6 +209,35 @@ def test_safe_content_only_request_uses_true_stream_backend_when_sink_is_bound()
     assert result.text == "Streamed answer"
     assert deltas == ["Streamed ", "answer"]
     assert (backend.stream_calls, backend.blocking_calls) == (1, 0)
+
+
+def test_selected_strict_fact_still_disables_unverified_text_streaming() -> None:
+    request = _request(
+        spec=_spec(
+            required_fact_ids=(),
+            allow_marketing_facts=True,
+            allow_consultation_close=False,
+            allow_cta=False,
+        ),
+        selected_cta_key=None,
+        response_length_profile="simple_faq",
+    )
+    backend = StreamingBackend()
+    deltas: list[str] = []
+    token = bind_text_sink(deltas.append)
+    try:
+        result = execute_target_composer(
+            request,
+            backend,
+            tone=_tone(),
+            cached_full_context=_cached_context(),
+        )
+    finally:
+        reset_text_sink(token)
+
+    assert result.text == "Blocking answer"
+    assert deltas == []
+    assert (backend.stream_calls, backend.blocking_calls) == (0, 1)
 
 
 def test_verified_answer_cache_key_changes_with_pack_or_qwen_model() -> None:

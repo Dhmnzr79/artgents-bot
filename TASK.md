@@ -9824,4 +9824,22 @@ session cadence, and terminal routes remain authoritative. No retry or second Co
 price/doctors/widget regression **87 passed, 1 skipped**; `git diff --check` clean. No LIVE/provider
 call and no real latency claim. Real widget timing is a separate measurement step.
 
+### Post-completion correction — streaming eligibility uses selected evidence
+
+The Composer streaming gate must distinguish permission from materialization:
+
+- `spec.allow_marketing_facts=True` is only permission and does **not** disable streaming;
+- a selected evidence block with `must_preserve_exact=True`, or any non-empty
+  `required_fact_ids`, still disables unverified text streaming;
+- content evidence must still be present and the existing response-mode/component/length-profile
+  restrictions remain unchanged;
+- the digit/currency/contact hold boundary and the final verified `ui` payload remain authoritative.
+
+This is covered at the executor boundary and through the real demo TurnFrame/bundle path. The
+positive product case uses a legitimate session state where prior strict marketing facts are in the
+no-repeat ledger; the negative case proves that newly selected installment/discount facts keep the
+answer held. No route, fact selection, Verifier policy, answer, or LLM-call count changes.
+
+Focused correction result: **40 passed**. No client-pack/LIVE/provider change.
+
 ---

@@ -468,14 +468,18 @@ def _log_response_length_observability(
 
 
 def _text_stream_eligible(request: TargetComposerRequest) -> bool:
-    """Conservative unverified-text boundary for true Composer streaming."""
+    """Allow safe lead text unless selected evidence itself is strict.
+
+    ``allow_marketing_facts`` is only a permission on the response spec.  It
+    does not mean that a marketing fact was selected for this request, so it
+    must not disable streaming by itself.
+    """
 
     blocks = request.evidence_blocks
     return (
         request.spec.response_mode == "answer"
         and request.spec.required_components == ("content",)
         and not request.spec.required_fact_ids
-        and not request.spec.allow_marketing_facts
         and request.response_length_profile in {"simple_faq", "standard_information"}
         and any(block.kind == "content" for block in blocks)
         and not any(block.must_preserve_exact for block in blocks)

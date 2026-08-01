@@ -32,6 +32,7 @@ from core.target_composer_executor import (
     TargetComposerInvocation,
     TargetComposerTone,
 )
+from core.target_sse_worker_context import bind_text_sink, reset_text_sink
 from core.target_turn_frame_bound_response import run_target_offline_turn_frame_bound_response
 from core.target_turn_frame_dispatch import TargetTurnFrameDispatchError
 from core.target_response_verifier import (
@@ -72,6 +73,24 @@ class RecordingComposerBackend:
 class CachedRecordingComposerBackend(RecordingComposerBackend):
     supports_versioned_answer_cache = True
     model = "qwen3.7-plus"
+
+
+class StreamingDemoComposerBackend(RecordingComposerBackend):
+    def __init__(self, text: str = MEDICAL_TEXT) -> None:
+        super().__init__(text)
+        self.stream_calls = 0
+        self.blocking_calls = 0
+
+    def generate(self, invocation: TargetComposerInvocation, /) -> object:
+        self.blocking_calls += 1
+        return super().generate(invocation)
+
+    def generate_stream(self, invocation: TargetComposerInvocation, on_delta, /) -> object:
+        self.stream_calls += 1
+        self.invocations.append(invocation)
+        on_delta("Safe demo lead. ")
+        on_delta("More answer text.")
+        return composer_test_json(self.text)
 
 
 class DeterministicProductComposerBackend:
@@ -203,6 +222,56 @@ def _pipeline_inputs() -> dict[str, object]:
             instruction="Отвечай доброжелательно и без давления.",
         ),
     }
+
+
+def test_real_demo_content_turn_streams_despite_marketing_permission() -> None:
+    composer = StreamingDemoComposerBackend()
+    semantic = RecordingSemanticBackend()
+    inputs = _pipeline_inputs()
+    inputs["shown_fact_ids"] = (
+        "free_implant_consult",
+        "installment_12",
+        "implant_same_day_discount",
+    )
+    deltas: list[str] = []
+    token = bind_text_sink(deltas.append)
+    try:
+        result = run_target_offline_turn_frame_bound_response(
+            _frame(aspects=["overview"], primary_aspect="overview"),
+            _envelope(allow_marketing_facts=True),
+            **inputs,  # type: ignore[arg-type]
+            composer_backend=composer,
+            semantic_backend=semantic,
+        )
+    finally:
+        reset_text_sink(token)
+
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert deltas == ["Safe demo lead. ", "More answer text."]
+    assert (composer.stream_calls, composer.blocking_calls) == (1, 0)
+    assert len(semantic.invocations) == 1
+
+
+def test_real_demo_selected_strict_marketing_facts_keep_text_held() -> None:
+    composer = StreamingDemoComposerBackend()
+    semantic = RecordingSemanticBackend()
+    deltas: list[str] = []
+    token = bind_text_sink(deltas.append)
+    try:
+        result = run_target_offline_turn_frame_bound_response(
+            _frame(aspects=["overview"], primary_aspect="overview"),
+            _envelope(allow_marketing_facts=True),
+            **_pipeline_inputs(),  # type: ignore[arg-type]
+            composer_backend=composer,
+            semantic_backend=semantic,
+        )
+    finally:
+        reset_text_sink(token)
+
+    assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert deltas == []
+    assert (composer.stream_calls, composer.blocking_calls) == (0, 1)
+    assert len(semantic.invocations) == 1
 
 
 def _sha256(path: Path) -> str:

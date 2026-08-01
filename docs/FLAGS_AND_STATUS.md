@@ -1,7 +1,8 @@
 # Флаги и статус проекта (фикс-реестр)
 
 > **PERF-10 current:** Final FullContext remains sole authority. Implemented: conservative true
-> Composer SSE streaming, 16.5% compact model corpus, scoped Verifier context with FullContext
+> Composer SSE streaming (gated by actually selected strict evidence, not the marketing-permission
+> flag), 16.5% compact model corpus, scoped Verifier context with FullContext
 > fallback, deterministic exact price/doctor formatters, and a bounded versioned in-process cache
 > for governed UI answers. No retrieval runtime was enabled.
 

@@ -15,7 +15,7 @@ from core.target_client_data import (
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.topic_taxonomy import load_client_topic_taxonomy
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
-from llm import LLM_REQUEST_TIMEOUT_SEC, chat_client, chat_completions_create
+from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
 from session import format_dialog_context_for_understanding, recent_dialog_history
 
 logger = get_logger(__name__)
@@ -115,11 +115,9 @@ def _planner_completion_controls() -> dict[str, Any]:
 
 
 def _planner_chat_completions_create(**kwargs: Any):
-    """Keep Qwen controls model-aware when the planner model is overridden."""
-    model = str(kwargs.get("model") or "").lower()
-    if "qwen" in model:
-        return chat_completions_create(**kwargs)
-    return chat_client.chat.completions.create(**kwargs)
+    """Route all planner transport through the central budget-aware wrapper."""
+    kwargs.setdefault("provider_call_source", "planner")
+    return chat_completions_create(**kwargs)
 
 
 

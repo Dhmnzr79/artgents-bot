@@ -29,6 +29,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 
 from contracts.planner_attempt import PlannerAttempt
+from config import SALES_ONE_PLUS_ON
 from core.turn_planner_llm import plan_turn_attempt
 from logging_setup import get_logger, log_json
 
@@ -212,6 +213,9 @@ def try_submit_planner_speculation(
     a submit failure -- the caller must then run `plan_turn_attempt` synchronously itself
     (the existing, unchanged sequential path -- Variant D fallback), never a user-visible
     error and never an unbounded wait."""
+
+    if SALES_ONE_PLUS_ON:
+        return None
 
     if not _planner_speculation_admission.acquire(blocking=False):
         log_json(

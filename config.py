@@ -73,6 +73,15 @@ ASPECT_PLANNER_LLM_MODEL = (
     (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
+# --- Sales-fast one-call widget path (Stage 8; default OFF — old FullContext chain preserved) ---
+SALES_ONE_PLUS_ON = os.getenv("SALES_ONE_PLUS_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+# Pinned provider snapshot for the sales-fast path (not an alias).
+SALES_ONE_PLUS_FLASH_MODEL = "qwen3.7-flash-2026-07-15"
+
 # --- Lead booking date defer (no slot confirmation without schedule; default on, env "0" = kill-switch) ---
 BOOKING_DATE_DEFER_ON = os.getenv("BOOKING_DATE_DEFER_ON", "1").lower() in (
     "1",

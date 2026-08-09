@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import time
 
 from openai import OpenAI
 
@@ -59,8 +60,30 @@ def _qwen_disable_thinking(*, model: str, kwargs: dict) -> dict:
 
 def chat_completions_create(*, model: str, **kwargs):
     """Chat completion via chat_client with Qwen-compatible extras."""
+    from core.provider_call_budget import (
+        record_provider_call_outcome,
+        reserve_provider_call,
+    )
+
     kwargs = _qwen_disable_thinking(model=model, kwargs=dict(kwargs))
-    return chat_client.chat.completions.create(model=model, **kwargs)
+    source = kwargs.pop("provider_call_source", None)
+    started = time.monotonic()
+    call_index = reserve_provider_call(model=model, source=source)
+    try:
+        response = chat_client.chat.completions.create(model=model, **kwargs)
+    except Exception:
+        record_provider_call_outcome(
+            call_index=call_index,
+            outcome="error",
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        raise
+    record_provider_call_outcome(
+        call_index=call_index,
+        outcome="ok",
+        duration_ms=int((time.monotonic() - started) * 1000),
+    )
+    return response
 LLM_REQUEST_TIMEOUT_SEC = float(os.getenv("LLM_REQUEST_TIMEOUT_SEC", "20"))
 LLM_FALLBACK_ANSWER = os.getenv(
     "LLM_FALLBACK_ANSWER",

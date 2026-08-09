@@ -88,6 +88,7 @@ class TargetRuntimeLiveComposerBackend:
                 response_format={"type": "json_object"},
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
                 messages=build_composer_sdk_messages(invocation),
+                provider_call_source="composer",
             )
             log_llm_usage(
                 logger,
@@ -134,6 +135,7 @@ class TargetRuntimeLiveComposerBackend:
                 messages=build_composer_sdk_messages(invocation),
                 stream=True,
                 stream_options={"include_usage": True},
+                provider_call_source="composer",
             )
             for chunk in stream:
                 if getattr(chunk, "usage", None) is not None:
@@ -193,6 +195,7 @@ class TargetRuntimeLiveSemanticBackend:
                 response_format={"type": "json_object"},
                 timeout=LLM_REQUEST_TIMEOUT_SEC,
                 messages=build_verifier_sdk_messages(invocation),
+                provider_call_source="verifier",
             )
             log_llm_usage(
                 logger,
@@ -255,6 +258,7 @@ class TargetRuntimeLiveMedicalBoundaryBackend:
                     system_policy=TARGET_MEDICAL_BOUNDARY_SYSTEM_POLICY,
                     user_message=invocation.user_message,
                 ),
+                provider_call_source="medical_boundary",
             )
             log_llm_usage(
                 logger,

@@ -1,0 +1,177 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
+from contracts.sales_one_plus import SalesOnePlusStrictFact
+from contracts.target_cached_full_context import TargetCachedFullContext
+from core.target_cached_full_context import build_target_cached_full_context
+from core.sales_one_plus_turn import run_sales_one_plus_candidate
+import core.sales_one_plus_live_backend as live_module
+from core.sales_one_plus_live_backend import SalesOnePlusLiveBackend
+
+
+def _resolution() -> ExactSalesResolution:
+    authority = ExactSalesFieldAuthority(authority="unknown", provenance="test")
+    return ExactSalesResolution(None, None, None, None, None, authority, authority, authority, authority, authority)
+
+
+class _Backend:
+    def __init__(self, output: object) -> None:
+        self.output = output
+        self.calls = 0
+        self.invocation = None
+
+    def generate(self, invocation, /):
+        self.calls += 1
+        self.invocation = invocation
+        if isinstance(self.output, Exception):
+            raise self.output
+        return self.output
+
+
+def _context() -> TargetCachedFullContext:
+    return TargetCachedFullContext(
+        corpus_text="WRONG CORPUS",
+        prompt_corpus_text="MD number 73.5 and microfact parking.",
+        document_count=1,
+        document_paths=("x.md",),
+        sha256="x",
+    )
+
+
+def _run(**kwargs):
+    return run_sales_one_plus_candidate(static_admin_handoff_text="Позвоните администратору.", **kwargs)
+
+
+def test_local_gate_bypasses_backend_for_admin_and_spam() -> None:
+    backend = _Backend("@ANSWER\nwrong")
+    assert _run(user_message="Сильно болит зуб", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend).decision == "admin"
+    spam = _run(
+        user_message="!!!!!",
+        cached_full_context=_context(),
+        exact_sales_resolution=_resolution(),
+        backend=backend,
+    )
+    assert spam.decision == "spam" and spam.handoff_text is None
+    assert backend.calls == 0
+
+
+def test_pass_uses_model_corpus_strict_facts_and_exact_resolution_once() -> None:
+    fact = SalesOnePlusStrictFact(id="f", kind="offer", text="Цена 100 000 ₽.")
+    backend = _Backend("@ANSWER\nЕсть парковка, цена по прайсу.")
+    result = _run(
+        user_message="Есть парковка и сколько стоит?",
+        cached_full_context=_context(),
+        exact_sales_resolution=_resolution(),
+        current_strict_facts=(fact,),
+        sales_context={"cta": "lead", "numbers": [73.5]},
+        backend=backend,
+    )
+    assert (result.decision, result.patient_text, backend.calls) == ("answer", "Есть парковка, цена по прайсу.", 1)
+    assert "MD number 73.5" in backend.invocation.user_prompt
+    assert "WRONG CORPUS" not in backend.invocation.user_prompt
+    assert "Цена 100 000 ₽." in backend.invocation.user_prompt
+    assert "EXACT_SALES_RESOLUTION" in backend.invocation.user_prompt
+
+
+def test_scoped_service_axes_and_all_authored_strict_evidence_are_lossless() -> None:
+    authority = ExactSalesFieldAuthority(
+        authority="governed_ui",
+        provenance="target:ui_scope/implantation/few_teeth",
+    )
+    resolution = ExactSalesResolution(
+        service_id="implant_alpha",
+        aspect="price",
+        extent="few_teeth",
+        jaw="both",
+        stage="extraction_context",
+        service_id_authority=authority,
+        aspect_authority=authority,
+        extent_authority=authority,
+        jaw_authority=authority,
+        stage_authority=authority,
+    )
+    facts = (
+        SalesOnePlusStrictFact(
+            id="offer:clinic-authored-few-teeth",
+            kind="offer",
+            text="Несколько зубов: от 321 000 ₽; единица — согласованный объём.",
+        ),
+        SalesOnePlusStrictFact(
+            id="package:implant-alpha",
+            kind="package",
+            text="В цену входят КТ и два контрольных осмотра.",
+        ),
+    )
+    backend = _Backend("@ANSWER\nЦена указана в согласованном оффере.")
+    result = _run(
+        user_message="Цена для нескольких зубов?",
+        cached_full_context=_context(),
+        exact_sales_resolution=resolution,
+        current_strict_facts=facts,
+        backend=backend,
+    )
+
+    assert result.decision == "answer" and backend.calls == 1
+    for expected in (
+        "implant_alpha",
+        "few_teeth",
+        "both",
+        "extraction_context",
+        "321 000 ₽",
+        "КТ и два контрольных осмотра",
+    ):
+        assert expected in backend.invocation.user_prompt
+
+
+def test_model_admin_ignores_prose_and_failures_are_technical_admin() -> None:
+    admin = _Backend("@ADMIN\nThis must never escape")
+    malformed = _Backend("not protocol")
+    failed = _Backend(RuntimeError("network"))
+    for backend, reason in ((admin, "model_admin"), (malformed, "sales_one_plus_marker_invalid"), (failed, "backend_failed")):
+        result = _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend)
+        assert result.decision == "admin" and result.patient_text is None and result.handoff_text == "Позвоните администратору." and result.reason == reason and backend.calls == 1
+
+
+def test_live_adapter_is_one_shot_and_does_not_force_json(monkeypatch) -> None:
+    calls = []
+
+    class _Response:
+        choices = [type("Choice", (), {"message": type("Message", (), {"content": "@ANSWER\nДа"})()})()]
+
+    monkeypatch.setattr(live_module, "chat_completions_create", lambda **kwargs: calls.append(kwargs) or _Response())
+    backend = SalesOnePlusLiveBackend(model="candidate-model")
+    result = _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend)
+
+    assert result.decision == "answer" and len(calls) == 1
+    assert calls[0]["model"] == "candidate-model" and "response_format" not in calls[0]
+    assert _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend).decision == "admin"
+    assert len(calls) == 1
+
+
+def test_live_adapter_defaults_to_separate_plus_model(monkeypatch) -> None:
+    monkeypatch.delenv("SALES_ONE_PLUS_MODEL", raising=False)
+    assert live_module.sales_one_plus_model() == "qwen3.7-plus"
+
+
+def test_live_demo_model_corpus_and_every_numeric_line_reach_invocation() -> None:
+    cached = build_target_cached_full_context(Path("clients/demo/md"))
+    backend = _Backend("@ANSWER\nОтвет из корпуса.")
+    result = _run(
+        user_message="Расскажите об услугах клиники",
+        cached_full_context=cached,
+        exact_sales_resolution=_resolution(),
+        backend=backend,
+    )
+
+    assert result.decision == "answer"
+    assert backend.invocation.model_corpus_text == cached.model_corpus_text
+    numeric_lines = {
+        line.strip()
+        for line in cached.model_corpus_text.splitlines()
+        if re.search(r"\d", line)
+    }
+    assert len(numeric_lines) >= 100
+    assert all(line in backend.invocation.user_prompt for line in numeric_lines)

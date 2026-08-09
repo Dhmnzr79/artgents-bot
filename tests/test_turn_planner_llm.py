@@ -322,21 +322,17 @@ def test_planner_completion_controls_are_bounded_and_disable_qwen_thinking(monke
     assert _planner_completion_controls() == {"max_completion_tokens": 700}
 
 
-def test_non_qwen_planner_outgoing_kwargs_bypass_qwen_wrapper(monkeypatch):
+def test_planner_routes_through_central_transport_wrapper(monkeypatch):
     captured: dict = {}
 
-    def _direct_create(**kwargs):
+    def _wrapped_create(**kwargs):
         captured.update(kwargs)
         return object()
 
-    monkeypatch.setattr(
-        "core.turn_planner_llm.chat_completions_create",
-        lambda **_kwargs: pytest.fail("non-Qwen planner must not use Qwen wrapper"),
-    )
-    monkeypatch.setattr("core.turn_planner_llm.chat_client.chat.completions.create", _direct_create)
+    monkeypatch.setattr("core.turn_planner_llm.chat_completions_create", _wrapped_create)
     _planner_chat_completions_create(model="gpt-test", temperature=0, max_completion_tokens=700)
     assert captured["model"] == "gpt-test"
-    assert "extra_body" not in captured
+    assert captured["provider_call_source"] == "planner"
 
 
 def test_planner_call_uses_qwen_controls_once_without_retry(monkeypatch):

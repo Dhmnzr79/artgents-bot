@@ -441,6 +441,7 @@ def _call_ingress_llm(question: str, client_id: str, sid: str) -> IngressRouteRe
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
+                provider_call_source="ingress",
             )
         log_llm_usage(
             logger,

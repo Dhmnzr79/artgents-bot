@@ -21,9 +21,10 @@ from flask import (
 )
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
-from config import DEBUG_TOKEN, PORT
+from config import DEBUG_TOKEN, PORT, SALES_ONE_PLUS_ON
 from core import turn_timing
 from core.client_host import resolve_request_client_id
+from core.provider_call_budget import http_provider_budget_scope
 from contracts.ask_orchestration import AskOrchestrationResult
 from core.client_config_loader import load_widget_config, tone_to_txt_dict
 from core.origin_guard import validate_widget_origin
@@ -54,6 +55,7 @@ from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from orchestration.planner_turn import run_planner_turn
+from orchestration.sales_one_plus_ask_turn import orchestrate_sales_one_plus_ask_turn
 from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
@@ -303,6 +305,33 @@ def dashboard_events_api():
 
 
 def _orchestrate_ask_turn(data: dict):
+    request_id = str(data.get("request_id") or uuid.uuid4())
+    try:
+        from flask import request as flask_request
+
+        request_id = str(flask_request.ctx.get("request_id") or request_id)
+    except RuntimeError:
+        pass
+    with http_provider_budget_scope(
+        request_id=request_id,
+        sales_one_plus_on=bool(SALES_ONE_PLUS_ON),
+    ):
+        return _orchestrate_ask_turn_inner(data)
+
+
+def _orchestrate_ask_turn_inner(data: dict):
+    if SALES_ONE_PLUS_ON:
+        return orchestrate_sales_one_plus_ask_turn(
+            data,
+            resolve_client_id=resolve_request_client_id,
+            bind_chat_ctx=_bind_chat_ctx,
+            resolve_ip=_resolve_request_ip,
+            client_txt=_client_txt,
+            service_payload=build_service_payload,
+            get_last_content_ui_payload=get_last_content_ui_payload_compat,
+            enqueue_resolver_trace=_enqueue_v5_resolver_trace,
+        )
+
     pre = run_pre_resolver_turn(
         data,
         resolve_client_id=resolve_request_client_id,

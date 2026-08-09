@@ -9,6 +9,7 @@ from config import (
     ANTI_SPAM_BURST_MESSAGES,
     ANTI_SPAM_BURST_WINDOW_SEC,
     INPUT_MAX_CHARS,
+    SALES_ONE_PLUS_ON,
 )
 from contracts.ask_orchestration import AskOrchestrationResult
 from core import turn_timing
@@ -138,6 +139,8 @@ def run_pre_resolver_turn(
     if q and not ingress_skip:
 
         def _fork_planner_speculation() -> None:
+            if SALES_ONE_PLUS_ON:
+                return
             # PERF-4 (Variant C): classify_ingress calls this exactly once,
             # immediately before its own real LLM call -- i.e. only after its own
             # deterministic checks (policy match, deterministic-normal, length) have

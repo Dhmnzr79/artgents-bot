@@ -18,6 +18,7 @@ from core import turn_timing
 from core.exact_sales_resolver import ExactSalesResolverInputs, resolve_exact_sales_inputs
 from core.local_problem_gate import decide_local_problem_gate
 from core.provider_call_budget import current_provider_call_budget
+from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.sales_fast_observability import collect_sales_fast_timings_ms, record_sales_fast_observability
 from core.sales_fast_presentation import (
     materialize_sales_fast_admin_payload,
@@ -39,7 +40,7 @@ from core.sales_one_plus_turn import (
     run_sales_one_plus_candidate,
     run_sales_one_plus_candidate_stream,
 )
-from core.target_client_data import match_service_from_target_catalog
+from core.target_client_data import match_service_from_bundle
 from core.target_effective_scope import resolve_effective_scope
 from core.target_presentation_decision import TargetPresentationCadenceState
 from core.target_runtime_client_context import (
@@ -169,8 +170,8 @@ def sales_fast_widget_outcome_from_local_gate(
     return _local_gate_terminal_outcome(gate, client_id=client_id, sid=sid)
 
 
-def _exact_service_term(user_message: str, client_id: str) -> str | None:
-    match = match_service_from_target_catalog(user_message, client_id=client_id)
+def _exact_service_term(user_message: str, context: TargetRuntimeClientContext) -> str | None:
+    match = match_service_from_bundle(user_message, context.bundle)
     term = str(
         match.get("matched_phrase")
         or match.get("matched_service_term")
@@ -202,7 +203,7 @@ def _resolve_sales_context(
             session_turn_count=session_state.session_turn_count,
             current_ui_scope_action=current_ui_scope_action,
             current_ui_stage_action=current_ui_stage_action,
-            exact_service_term=_exact_service_term(user_message, context.client_id),
+            exact_service_term=_exact_service_term(user_message, context),
             exact_aspect=exact_aspect,
             projected_turn_scope=projected_turn_scope,
             session_facts=session_state.patient_facts,
@@ -347,6 +348,7 @@ def run_sales_fast_widget_turn(
         bundle=context.bundle,
     )
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
+    active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     turn_timing.stage_start("sales_fast_model")
     if on_delta is None:
         result = run_sales_one_plus_candidate(
@@ -358,6 +360,8 @@ def run_sales_fast_widget_turn(
             static_admin_handoff_text=static_handoff,
             backend=backend,  # type: ignore[arg-type]
             local_gate_result=local_gate,
+            pack_identity=context.pack_identity,
+            active_service_catalog=active_service_catalog,
         )
     else:
         result = run_sales_one_plus_candidate_stream(
@@ -370,8 +374,11 @@ def run_sales_fast_widget_turn(
             backend=backend,  # type: ignore[arg-type]
             on_delta=on_delta,
             local_gate_result=local_gate,
+            pack_identity=context.pack_identity,
+            active_service_catalog=active_service_catalog,
         )
     backend_invocations = int(getattr(backend, "call_count", 0) or 0)
+    cache_obs = getattr(backend, "last_observability", None)
     budget = current_provider_call_budget()
     if budget is not None:
         provider_calls = int(budget.call_count)
@@ -405,6 +412,7 @@ def run_sales_fast_widget_turn(
         failure_kind=outcome.failure_kind,
         timings=collect_sales_fast_timings_ms(),
         backend_invocations=backend_invocations,
+        cache_observability=cache_obs,
     )
     return outcome
 

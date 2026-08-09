@@ -86,6 +86,30 @@ def _validate_external_refs(
     validate_response_schema_external_refs(bundle, external_index)
 
 
+def _data_cache_key(client_id: str, pack_hash: str | None = None) -> str:
+    if pack_hash:
+        return f"{client_id}:{pack_hash}"
+    return client_id
+
+
+def evict_target_client_data_cache_for_client(
+    client_id: str | None,
+    *,
+    keep_pack_hash: str | None = None,
+) -> None:
+    """Drop stale pack-scoped target bundles; keep current identity when provided."""
+
+    resolved = resolve_pack_client_id(client_id)
+    keep_key = _data_cache_key(resolved, keep_pack_hash) if keep_pack_hash else None
+    with _CACHE_LOCK:
+        for key in list(_DATA_CACHE.keys()):
+            if key != resolved and not key.startswith(f"{resolved}:"):
+                continue
+            if keep_key is not None and key == keep_key:
+                continue
+            del _DATA_CACHE[key]
+
+
 def _build_target_client_data(client_id: str) -> TargetClientData:
     pack_root = client_pack_root(client_id)
     target_root = pack_root / "target_response"
@@ -104,16 +128,21 @@ def _build_target_client_data(client_id: str) -> TargetClientData:
     )
 
 
-def load_target_client_data(client_id: str | None) -> TargetClientData:
+def load_target_client_data(
+    client_id: str | None,
+    *,
+    pack_hash: str | None = None,
+) -> TargetClientData:
     """Load and cache validated canonical target bundle for one client pack."""
 
     resolved = resolve_pack_client_id(client_id)
+    key = _data_cache_key(resolved, pack_hash)
     with _CACHE_LOCK:
-        cached = _DATA_CACHE.get(resolved)
+        cached = _DATA_CACHE.get(key)
         if cached is not None:
             return cached
         data = _build_target_client_data(resolved)
-        _DATA_CACHE[resolved] = data
+        _DATA_CACHE[key] = data
         return data
 
 
@@ -122,8 +151,12 @@ def clear_target_client_data_cache() -> None:
         _DATA_CACHE.clear()
 
 
-def service_catalog_dict(client_id: str | None) -> dict[str, dict[str, Any]]:
-    return _service_catalog_dict(load_target_client_data(client_id).bundle)
+def service_catalog_dict(
+    client_id: str | None,
+    *,
+    pack_hash: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    return _service_catalog_dict(load_target_client_data(client_id, pack_hash=pack_hash).bundle)
 
 
 def catalog_service_label(client_id: str | None, service_id: str | None) -> str | None:
@@ -197,15 +230,34 @@ def allowed_brand_filters(client_id: str | None) -> tuple[frozenset[str], frozen
     return frozenset(groups), frozenset(brands)
 
 
-def match_service_from_target_catalog(
+def match_service_from_bundle(
     q: str,
+    bundle: ResponseSchemaBundle,
     *,
-    client_id: str | None,
     exclude_service_ids: frozenset[str] | None = None,
     service_topic: str | None = None,
     topic_confidence: float = 0.0,
 ) -> dict[str, Any]:
-    catalog = service_catalog_dict(client_id)
+    return resolve_catalog_match(
+        q,
+        _service_catalog_dict(bundle),
+        exclude_service_ids=exclude_service_ids,
+        service_topic=service_topic,
+        topic_confidence=topic_confidence,
+        strong_match_min=float(PRICE_SERVICE_MATCH_STRONG),
+    )
+
+
+def match_service_from_target_catalog(
+    q: str,
+    *,
+    client_id: str | None,
+    pack_hash: str | None = None,
+    exclude_service_ids: frozenset[str] | None = None,
+    service_topic: str | None = None,
+    topic_confidence: float = 0.0,
+) -> dict[str, Any]:
+    catalog = service_catalog_dict(client_id, pack_hash=pack_hash)
     return resolve_catalog_match(
         q,
         catalog,

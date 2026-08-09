@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.one_call_cache_observability import OneCallCacheObservability
 from core.provider_call_budget import current_provider_call_budget
 from core import turn_timing
 
@@ -39,6 +40,7 @@ def record_sales_fast_observability(
     failure_kind: str | None = None,
     timings: dict[str, int] | None = None,
     backend_invocations: int | None = None,
+    cache_observability: OneCallCacheObservability | None = None,
 ) -> None:
     budget = current_provider_call_budget()
     if budget is not None:
@@ -56,4 +58,6 @@ def record_sales_fast_observability(
         payload["backend_invocations"] = int(backend_invocations)
     if timings:
         payload["timings_ms"] = dict(timings)
+    if cache_observability is not None:
+        payload.update(cache_observability.as_dict())
     turn_timing.set_flag("sales_fast_observability", payload)

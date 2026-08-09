@@ -79,3 +79,15 @@ def test_frozen_admin_matrix_cases_follow_normative_answer_admin_table() -> None
         if row.get("execution_layer") == "local" and row.get("expected_decision") == "admin"
     }
     assert local_admin_ids == {"a01", "a02", "a03"}
+
+
+def test_stage3a_production_stack_has_no_plus_model_fallback() -> None:
+    paths = (
+        Path("core/sales_one_plus_live_backend.py"),
+        Path("orchestration/sales_fast_widget_turn.py"),
+        Path("core/sales_fast_widget_runtime.py"),
+    )
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        assert "qwen3.7-plus" not in text
+        assert "SALES_ONE_PLUS_FLASH_MODEL" in text

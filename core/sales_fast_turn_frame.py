@@ -10,7 +10,7 @@ from contracts.patient_scope_projection import ProjectedPatientScope, ProjectedS
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.turn_frame import FieldMeta, PatientScopeFrame, PatientScopeFrameMeta, TurnFrame, TurnFrameMeta
 from core.answer_planner import detect_aspects_regex
-from core.target_client_data import match_service_from_target_catalog
+from core.target_client_data import match_service_from_bundle
 
 _CLINIC_INFO_RE = re.compile(
     r"парков|адрес|как добраться|где наход|режим работ|график|контакт|телефон",
@@ -69,7 +69,7 @@ def _topic_for_resolution(
 ) -> str:
     if _CLINIC_INFO_RE.search(user_message):
         return "clinic"
-    match = match_service_from_target_catalog(user_message, client_id=client_id)
+    match = match_service_from_bundle(user_message, bundle)
     catalog_topic = str(match.get("catalog_topic") or match.get("matched_topic") or "").strip().lower()
     if catalog_topic:
         return catalog_topic

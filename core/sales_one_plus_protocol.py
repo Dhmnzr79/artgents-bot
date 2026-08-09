@@ -183,15 +183,14 @@ def _stable_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def build_sales_one_plus_user_prompt(
+def build_sales_one_plus_dynamic_suffix(
     *,
-    model_corpus_text: str,
     exact_sales_resolution: ExactSalesResolution,
     current_strict_facts: tuple[SalesOnePlusStrictFact, ...],
     sales_context: Mapping[str, object],
     user_message: str,
 ) -> str:
-    """Lossless deterministic data sections; no instruction interpolation."""
+    """Dynamic suffix only — no corpus, no session id, no stable prefix."""
 
     strict_facts = [asdict(fact) for fact in current_strict_facts]
     return "\n\n".join(
@@ -201,7 +200,30 @@ def build_sales_one_plus_user_prompt(
             + _stable_json(asdict(exact_sales_resolution))
             + "\n</EXACT_SALES_RESOLUTION>",
             "<SALES_CONTEXT>\n" + _stable_json(dict(sales_context)) + "\n</SALES_CONTEXT>",
-            "<APPROVED_MD_CORPUS>\n" + model_corpus_text + "\n</APPROVED_MD_CORPUS>",
             "<USER_MESSAGE_DATA>\n" + _stable_json(user_message) + "\n</USER_MESSAGE_DATA>",
+        )
+    )
+
+
+def build_sales_one_plus_user_prompt(
+    *,
+    model_corpus_text: str,
+    exact_sales_resolution: ExactSalesResolution,
+    current_strict_facts: tuple[SalesOnePlusStrictFact, ...],
+    sales_context: Mapping[str, object],
+    user_message: str,
+) -> str:
+    """Legacy combined prompt — corpus before dynamic tail (non-prefix-cache layout)."""
+
+    suffix = build_sales_one_plus_dynamic_suffix(
+        exact_sales_resolution=exact_sales_resolution,
+        current_strict_facts=current_strict_facts,
+        sales_context=sales_context,
+        user_message=user_message,
+    )
+    return "\n\n".join(
+        (
+            "<APPROVED_MD_CORPUS>\n" + model_corpus_text + "\n</APPROVED_MD_CORPUS>",
+            suffix,
         )
     )

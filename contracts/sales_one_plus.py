@@ -9,6 +9,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from contracts.exact_sales_resolution import ExactSalesResolution
+from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 
 SalesOnePlusDecision = Literal["answer", "admin", "spam"]
 SalesOnePlusSource = Literal["local_gate", "model", "backend", "protocol"]
@@ -39,6 +40,9 @@ class SalesOnePlusInvocation:
     exact_sales_resolution: ExactSalesResolution
     current_strict_facts: tuple[SalesOnePlusStrictFact, ...]
     sales_context: Mapping[str, object]
+    pack_identity: ClientPackIdentityKey
+    local_prefix_cache_hit: bool = False
+    prefix_build_ms: int | None = None
 
     def __post_init__(self) -> None:
         if not self.system_prompt.strip() or not self.user_prompt.strip():

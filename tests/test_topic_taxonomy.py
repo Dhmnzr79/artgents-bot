@@ -20,7 +20,10 @@ _LOADER_MODULE = Path("core/topic_taxonomy.py")
 # - target_runtime_client_context: FullContext bootstrap allowed_topics (S61)
 _RUNTIME_TOPIC_TAXONOMY_IMPORT_ALLOWLIST: dict[str, frozenset[str]] = {
     "core/turn_planner_llm.py": frozenset({"load_client_topic_taxonomy"}),
-    "core/target_runtime_client_context.py": frozenset({"load_client_topic_taxonomy"}),
+    "core/target_context_scope_resolver.py": frozenset({"load_client_topic_taxonomy"}),
+    "core/target_runtime_client_context.py": frozenset(
+        {"load_client_topic_taxonomy", "evict_topic_taxonomy_cache_for_client"}
+    ),
 }
 
 

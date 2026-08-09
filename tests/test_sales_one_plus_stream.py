@@ -11,7 +11,7 @@ from core.sales_one_plus_live_backend import SalesOnePlusLiveBackend
 from core.sales_one_plus_protocol import SalesOnePlusProtocolError
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
 from core.sales_one_plus_turn import run_sales_one_plus_candidate_stream
-from tests.test_sales_one_plus_turn import _context, _resolution
+from tests.test_sales_one_plus_turn import _context, _resolution, _PACK_IDENTITY, _EMPTY_CATALOG
 
 
 def _run_stream(*, backend, on_delta: Callable[[str], None]):
@@ -22,6 +22,8 @@ def _run_stream(*, backend, on_delta: Callable[[str], None]):
         static_admin_handoff_text="Позвоните администратору.",
         backend=backend,
         on_delta=on_delta,
+        pack_identity=_PACK_IDENTITY,
+        active_service_catalog=_EMPTY_CATALOG,
     )
 
 
@@ -157,6 +159,8 @@ def test_candidate_local_admin_and_spam_make_zero_calls_and_zero_deltas() -> Non
             static_admin_handoff_text="Позвоните администратору.",
             backend=backend,
             on_delta=emitted.append,
+            pack_identity=_PACK_IDENTITY,
+            active_service_catalog=_EMPTY_CATALOG,
         )
         assert result.decision == expected and emitted == []
     assert backend.calls == 0

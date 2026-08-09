@@ -7,6 +7,7 @@ from typing import Protocol
 
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
+from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 from contracts.sales_one_plus import (
     SalesOnePlusInvocation,
     SalesOnePlusResult,
@@ -15,11 +16,13 @@ from contracts.sales_one_plus import (
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core import turn_timing
 from core.local_problem_gate import decide_local_problem_gate
+from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_client_pack_identity import build_client_pack_identity
+from core.one_call_prefix_cache import get_or_build_stable_prefix
 from core.sales_one_plus_protocol import (
-    SALES_ONE_PLUS_SYSTEM_POLICY,
-    SalesOnePlusProtocolError,
-    build_sales_one_plus_user_prompt,
+    build_sales_one_plus_dynamic_suffix,
     parse_sales_one_plus_output,
+    SalesOnePlusProtocolError,
 )
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
 
@@ -62,24 +65,34 @@ def _make_invocation(
     exact_sales_resolution: ExactSalesResolution,
     current_strict_facts: Sequence[SalesOnePlusStrictFact],
     sales_context: Mapping[str, object] | None,
+    pack_identity: ClientPackIdentityKey,
+    active_service_catalog: ActiveServiceCatalogSnapshot,
 ) -> SalesOnePlusInvocation:
     corpus = cached_full_context.model_corpus_text
     strict_facts = tuple(current_strict_facts)
     context = dict(sales_context or {})
+    prefix_bundle, local_hit = get_or_build_stable_prefix(
+        identity=pack_identity,
+        cached_full_context=cached_full_context,
+        active_service_catalog=active_service_catalog,
+    )
+    dynamic_suffix = build_sales_one_plus_dynamic_suffix(
+        exact_sales_resolution=exact_sales_resolution,
+        current_strict_facts=strict_facts,
+        sales_context=context,
+        user_message=user_message,
+    )
     return SalesOnePlusInvocation(
-        system_prompt=SALES_ONE_PLUS_SYSTEM_POLICY,
-        user_prompt=build_sales_one_plus_user_prompt(
-            model_corpus_text=corpus,
-            exact_sales_resolution=exact_sales_resolution,
-            current_strict_facts=strict_facts,
-            sales_context=context,
-            user_message=user_message,
-        ),
+        system_prompt=prefix_bundle.stable_prefix,
+        user_prompt=dynamic_suffix,
         model_corpus_text=corpus,
         user_message=user_message,
         exact_sales_resolution=exact_sales_resolution,
         current_strict_facts=strict_facts,
         sales_context=context,
+        pack_identity=pack_identity,
+        local_prefix_cache_hit=local_hit,
+        prefix_build_ms=prefix_bundle.build_ms if not local_hit else 0,
     )
 
 
@@ -142,6 +155,8 @@ def run_sales_one_plus_candidate(
     static_admin_handoff_text: str,
     backend: SalesOnePlusBackend,
     local_gate_result: LocalProblemGateResult | None = None,
+    pack_identity: ClientPackIdentityKey,
+    active_service_catalog: ActiveServiceCatalogSnapshot,
 ) -> SalesOnePlusResult:
     """Make exactly one blocking backend call after a local pass."""
 
@@ -160,6 +175,8 @@ def run_sales_one_plus_candidate(
         exact_sales_resolution=exact_sales_resolution,
         current_strict_facts=current_strict_facts,
         sales_context=sales_context,
+        pack_identity=pack_identity,
+        active_service_catalog=active_service_catalog,
     )
     try:
         raw = backend.generate(invocation)
@@ -202,6 +219,8 @@ def run_sales_one_plus_candidate_stream(
     backend: SalesOnePlusStreamingBackend,
     on_delta: PatientDeltaCallback,
     local_gate_result: LocalProblemGateResult | None = None,
+    pack_identity: ClientPackIdentityKey,
+    active_service_catalog: ActiveServiceCatalogSnapshot,
 ) -> SalesOnePlusResult:
     """Stream answer body after its marker using one backend call and no retry."""
 
@@ -227,6 +246,8 @@ def run_sales_one_plus_candidate_stream(
         exact_sales_resolution=exact_sales_resolution,
         current_strict_facts=current_strict_facts,
         sales_context=sales_context,
+        pack_identity=pack_identity,
+        active_service_catalog=active_service_catalog,
     )
     try:
         backend.generate_stream(invocation, parser.ingest)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -20,6 +21,7 @@ from core.provider_call_budget import (
     reserve_provider_call,
 )
 from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
+from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 from contracts.sales_one_plus import SalesOnePlusInvocation
 from core import turn_timing
 from core.sales_fast_observability import record_sales_fast_observability
@@ -358,6 +360,12 @@ def _minimal_invocation() -> SalesOnePlusInvocation:
         exact_sales_resolution=resolution,
         current_strict_facts=(),
         sales_context={},
+        pack_identity=ClientPackIdentityKey(
+            client_id="stage1",
+            client_pack_hash=hashlib.sha256(b"stage1-test").hexdigest(),
+            prompt_contract_version=1,
+            model_snapshot="qwen3.7-flash-2026-07-15",
+        ),
     )
 
 

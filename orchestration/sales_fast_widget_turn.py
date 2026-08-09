@@ -48,6 +48,12 @@ class _LazySalesFastBackend:
         backend.generate_stream(invocation, on_raw_delta)
         self.call_count = int(getattr(backend, "call_count", 0) or 0)
 
+    @property
+    def last_observability(self):
+        if self._backend is None:
+            return None
+        return getattr(self._backend, "last_observability", None)
+
 
 def orchestrate_sales_fast_widget_turn(
     *,

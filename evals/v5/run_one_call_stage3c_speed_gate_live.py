@@ -13,6 +13,7 @@ from evals.v5.one_call_stage3c_speed_gate_live_runner import (
     SpeedGateLiveGovernanceError,
     run_live_attempt,
     run_preflight_blocked,
+    validate_expected_live_head,
 )
 
 
@@ -24,6 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--attempt-id",
         required=True,
         help="Explicit attempt id; must match LIVE_AUTHORIZED_ATTEMPT_ID when gate open",
+    )
+    parser.add_argument(
+        "--expected-head",
+        default=None,
+        help="Owner-authorized exact LIVE code HEAD (40-char lowercase hex); required when gate open",
     )
     parser.add_argument(
         "--attempt-wall-timeout-seconds",
@@ -69,9 +75,15 @@ def main(argv: list[str] | None = None) -> int:
         print(summary)
         return 3
 
+    if args.expected_head is None:
+        print("expected_head_required", file=sys.stderr)
+        return 2
+
     try:
+        expected_live_head = validate_expected_live_head(args.expected_head)
         result = run_live_attempt(
             attempt_id,
+            expected_live_head=expected_live_head,
             worker_startup_timeout_seconds=args.worker_startup_timeout_seconds,
             turn_timeout_seconds=args.turn_timeout_seconds,
             attempt_wall_timeout_seconds=(

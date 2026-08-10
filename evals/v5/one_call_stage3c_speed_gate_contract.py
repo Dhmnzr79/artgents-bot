@@ -17,8 +17,11 @@ PROPOSED_LIVE_ATTEMPT_ID = "one_call_stage3c_speed_gate_v1_2026-08-10-01"
 ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
 MAX_RETRIES = 0
 
-# Governance: HEAD at Stage 3C offline gate acceptance (LIVE runner pins this).
-FROZEN_BASELINE_COMMIT = "4fe14658ebe8a454be6c4cb017c3670c7ea2f4c0"
+# Governance: accepted Stage 3C OFFLINE foundation (ancestry pin, not exact LIVE HEAD).
+STAGE3C_OFFLINE_BASELINE_COMMIT = "4fe14658ebe8a454be6c4cb017c3670c7ea2f4c0"
+
+# Relative path allowed to carry temporary LIVE gate authorization edits.
+STAGE3C_GATE_CONTRACT_REL_PATH = "evals/v5/one_call_stage3c_speed_gate_contract.py"
 
 ArmLabel = Literal["OLD", "NEW"]
 SpeedGateVerdict = Literal["pass", "fail", "inconclusive"]
@@ -29,7 +32,7 @@ CaseKind = Literal["latency", "admin"]
 SPEED_GATE_TTFT_P50_MIN_RELATIVE_IMPROVEMENT = 0.30
 SPEED_GATE_TTFT_P50_MIN_ABSOLUTE_MS = 2000
 SPEED_GATE_ENDPOINT = (
-    "https://ws-yk9n49fhzg4hebx9.ap-southeast-1.maas.aliyuncs.com/v1"
+    "https://ws-yk9n49fhzg4hebx9.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
 )
 
 # Provider call ceilings per HTTP turn (proved offline in call_plan module).
@@ -88,7 +91,9 @@ def build_attempt_marker_payload(
     *,
     attempt_id: str,
     frozen_matrix_sha256: str,
-    baseline_commit: str,
+    stage3c_offline_baseline_commit: str,
+    expected_live_head: str,
+    observed_live_head: str,
 ) -> dict[str, Any]:
     return {
         "measurement_id": MEASUREMENT_ID,
@@ -97,7 +102,9 @@ def build_attempt_marker_payload(
         "live_authorized_attempt_id": LIVE_AUTHORIZED_ATTEMPT_ID,
         "proposed_attempt_id": PROPOSED_LIVE_ATTEMPT_ID,
         "frozen_matrix_sha256": frozen_matrix_sha256,
-        "baseline_commit": baseline_commit,
+        "stage3c_offline_baseline_commit": stage3c_offline_baseline_commit,
+        "expected_live_head": expected_live_head,
+        "observed_live_head": observed_live_head,
         "latency_case_ids": list(FROZEN_LATENCY_CASE_IDS),
         "admin_case_ids": list(FROZEN_ADMIN_CASE_IDS),
         "max_retries_configured": MAX_RETRIES,

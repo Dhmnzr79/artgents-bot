@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import multiprocessing
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 import config
 import llm as llm_module
@@ -19,7 +21,6 @@ from evals.v5.one_call_stage3c_speed_gate_call_plan import (
 )
 from evals.v5.one_call_stage3c_speed_gate_contract import (
     CLIENT_ID,
-    FROZEN_BASELINE_COMMIT,
     LIVE_AUTHORIZED_ATTEMPT_ID,
     MAX_PROVIDER_CALLS_LIVE,
     MAX_RETRIES,
@@ -29,6 +30,8 @@ from evals.v5.one_call_stage3c_speed_gate_contract import (
     NEW_MAX_PROVIDER_CALLS_PER_FREE_TEXT,
     PROPOSED_LIVE_ATTEMPT_ID,
     SPEED_GATE_ENDPOINT,
+    STAGE3C_GATE_CONTRACT_REL_PATH,
+    STAGE3C_OFFLINE_BASELINE_COMMIT,
     ArmLabel,
     build_attempt_marker_payload,
 )
@@ -82,6 +85,8 @@ _PLACEHOLDER_KEY_MARKERS = (
     "changeme",
 )
 
+_FULL_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
 
 @dataclass(frozen=True, slots=True)
 class SpawnMeasurementOutcome:
@@ -106,6 +111,97 @@ def _git_head_commit() -> str:
         cwd=_REPO_ROOT,
         text=True,
     ).strip()
+
+
+def _git_is_ancestor(ancestor: str, descendant: str) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=_REPO_ROOT,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _git_tracked_dirty_paths() -> list[str]:
+    output = subprocess.check_output(
+        ["git", "diff", "--name-only", "HEAD"],
+        cwd=_REPO_ROOT,
+        text=True,
+    )
+    return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
+
+
+def _git_diff_against_head(rel_path: str) -> str:
+    return subprocess.check_output(
+        ["git", "diff", "HEAD", "--", rel_path],
+        cwd=_REPO_ROOT,
+        text=True,
+    )
+
+
+def normalize_speed_gate_endpoint(url: str) -> str:
+    raw = str(url or "").strip()
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        raise SpeedGateLiveGovernanceError("endpoint_mismatch", f"endpoint={raw}")
+    if parsed.query or parsed.fragment:
+        raise SpeedGateLiveGovernanceError(
+            "endpoint_mismatch",
+            f"endpoint_has_query_or_fragment={raw}",
+        )
+    if parsed.username or parsed.password:
+        raise SpeedGateLiveGovernanceError(
+            "endpoint_mismatch",
+            f"endpoint_has_credentials={raw}",
+        )
+    path = parsed.path or ""
+    return f"{parsed.scheme}://{parsed.netloc}{path}"
+
+
+def validate_expected_live_head(expected_live_head: str) -> str:
+    value = str(expected_live_head or "").strip()
+    if not value:
+        raise SpeedGateLiveGovernanceError(
+            "expected_live_head_missing",
+            "stage3c_expected_live_head_missing",
+        )
+    if not _FULL_COMMIT_SHA_RE.match(value):
+        raise SpeedGateLiveGovernanceError(
+            "expected_live_head_invalid",
+            f"expected_live_head={expected_live_head}",
+        )
+    return value
+
+
+def _gate_authorization_diff_only(diff: str) -> bool:
+    if not diff.strip():
+        return True
+    for line in diff.splitlines():
+        if line.startswith(("+++", "---", "@@", "diff ", "index ")):
+            continue
+        if line.startswith("-") or line.startswith("+"):
+            if "LIVE_AUTHORIZED_ATTEMPT_ID" not in line:
+                return False
+    return True
+
+
+def assert_tracked_code_clean() -> None:
+    dirty_paths = _git_tracked_dirty_paths()
+    if not dirty_paths:
+        return
+    gate_path = STAGE3C_GATE_CONTRACT_REL_PATH
+    non_gate_dirty = [path for path in dirty_paths if path != gate_path]
+    if non_gate_dirty:
+        raise SpeedGateLiveGovernanceError(
+            "tracked_code_dirty",
+            f"dirty_paths={non_gate_dirty}",
+        )
+    diff = _git_diff_against_head(gate_path)
+    if not _gate_authorization_diff_only(diff):
+        raise SpeedGateLiveGovernanceError(
+            "tracked_code_dirty",
+            "gate_contract_diff_not_authorization_only",
+        )
 
 
 def _is_fatal_attempt_error(error_code: str | None) -> bool:
@@ -136,10 +232,11 @@ def assert_live_preflight(
     attempt_id: str,
     *,
     paths: dict[str, Path],
-    baseline_commit: str | None = None,
-) -> None:
+    expected_live_head: str,
+) -> tuple[str, str]:
     assert_live_governance(attempt_id)
     assert_frozen_matrix_unchanged()
+    validated_expected = validate_expected_live_head(expected_live_head)
     if os.environ.get("GITHUB_ACTIONS") == "true":
         raise SpeedGateLiveGovernanceError("ci_forbidden", "stage3c_ci_forbidden")
     if llm_module.chat_client.max_retries != MAX_RETRIES:
@@ -147,11 +244,12 @@ def assert_live_preflight(
             "max_retries_nonzero",
             f"max_retries={llm_module.chat_client.max_retries}",
         )
-    endpoint = str(config.CHAT_BASE_URL or "").strip()
-    if endpoint != SPEED_GATE_ENDPOINT:
+    configured_endpoint = normalize_speed_gate_endpoint(str(config.CHAT_BASE_URL or ""))
+    pinned_endpoint = normalize_speed_gate_endpoint(SPEED_GATE_ENDPOINT)
+    if configured_endpoint != pinned_endpoint:
         raise SpeedGateLiveGovernanceError(
             "endpoint_mismatch",
-            f"endpoint={endpoint}",
+            f"endpoint={configured_endpoint} expected={pinned_endpoint}",
         )
     api_key = str(config.CHAT_API_KEY or "").strip()
     if not api_key:
@@ -159,20 +257,30 @@ def assert_live_preflight(
     lowered_key = api_key.lower()
     if any(marker in lowered_key for marker in _PLACEHOLDER_KEY_MARKERS):
         raise SpeedGateLiveGovernanceError("api_key_placeholder", "stage3c_api_key_placeholder")
+    assert_tracked_code_clean()
+    observed_live_head = _git_head_commit()
+    if not _git_is_ancestor(STAGE3C_OFFLINE_BASELINE_COMMIT, observed_live_head):
+        raise SpeedGateLiveGovernanceError(
+            "offline_baseline_not_ancestor",
+            (
+                f"offline_baseline={STAGE3C_OFFLINE_BASELINE_COMMIT} "
+                f"head={observed_live_head}"
+            ),
+        )
+    if observed_live_head != validated_expected:
+        raise SpeedGateLiveGovernanceError(
+            "expected_live_head_mismatch",
+            f"head={observed_live_head} expected={validated_expected}",
+        )
     if paths["attempt_json"].exists():
         raise AttemptMarkerExistsError("ATTEMPT_MARKER_EXISTS")
-    head = baseline_commit or _git_head_commit()
-    if head != FROZEN_BASELINE_COMMIT:
-        raise SpeedGateLiveGovernanceError(
-            "baseline_commit_mismatch",
-            f"head={head} expected={FROZEN_BASELINE_COMMIT}",
-        )
+    return observed_live_head, validated_expected
 
 
 def run_dry_run_attempt(
     *,
     attempt_id: str = "stage3c_offline_dry_run",
-    baseline_commit: str,
+    observed_live_head: str,
 ) -> dict[str, Any]:
     """Fake-transport dry-run via offline harness; no LIVE gate required."""
 
@@ -186,7 +294,9 @@ def run_dry_run_attempt(
         build_attempt_marker_payload(
             attempt_id=attempt_id,
             frozen_matrix_sha256=matrix_sha,
-            baseline_commit=baseline_commit,
+            stage3c_offline_baseline_commit=STAGE3C_OFFLINE_BASELINE_COMMIT,
+            expected_live_head=observed_live_head,
+            observed_live_head=observed_live_head,
         ),
     )
     append_ledger_event(
@@ -897,9 +1007,9 @@ def _handle_ipc_event(
 def run_live_attempt(
     attempt_id: str,
     *,
+    expected_live_head: str,
     artifact_root: dict[str, Path] | None = None,
     artifacts_root: Path | None = None,
-    baseline_commit: str | None = None,
     worker_startup_timeout_seconds: float = 60.0,
     turn_timeout_seconds: float = 120.0,
     attempt_wall_timeout_seconds: float = 600.0,
@@ -917,8 +1027,11 @@ def run_live_attempt(
         attempt_id,
         artifacts_root=artifacts_root,
     )
-    head = baseline_commit or _git_head_commit()
-    assert_live_preflight(attempt_id, paths=paths, baseline_commit=head)
+    observed_live_head, validated_expected = assert_live_preflight(
+        attempt_id,
+        paths=paths,
+        expected_live_head=expected_live_head,
+    )
 
     matrix_sha = frozen_matrix_sha256()
     create_attempt_marker_exclusive(
@@ -926,7 +1039,9 @@ def run_live_attempt(
         build_attempt_marker_payload(
             attempt_id=attempt_id,
             frozen_matrix_sha256=matrix_sha,
-            baseline_commit=head,
+            stage3c_offline_baseline_commit=STAGE3C_OFFLINE_BASELINE_COMMIT,
+            expected_live_head=validated_expected,
+            observed_live_head=observed_live_head,
         ),
     )
 
@@ -938,7 +1053,9 @@ def run_live_attempt(
         "mode": "live_fake_transport" if use_fake_transport else "live",
         "model_snapshot": MODEL_SNAPSHOT,
         "frozen_matrix_sha256": matrix_sha,
-        "baseline_commit": head,
+        "stage3c_offline_baseline_commit": STAGE3C_OFFLINE_BASELINE_COMMIT,
+        "expected_live_head": validated_expected,
+        "observed_live_head": observed_live_head,
         "status": "in_progress",
         "spawned_child_count": 1,
         "completed_turns": 0,
@@ -1046,7 +1163,9 @@ def _assemble_result_payload(
         "model_snapshot": state.get("model_snapshot"),
         "frozen_matrix_sha256": state.get("frozen_matrix_sha256"),
         "stable_fullcontext_prefix_sha256": state.get("stable_prefix_sha256"),
-        "baseline_commit": state.get("baseline_commit"),
+        "stage3c_offline_baseline_commit": state.get("stage3c_offline_baseline_commit"),
+        "expected_live_head": state.get("expected_live_head"),
+        "observed_live_head": state.get("observed_live_head"),
         "status": status,
         "spawned_child_count": state.get("spawned_child_count", 0),
         "completed_turns": state.get("completed_turns", 0),

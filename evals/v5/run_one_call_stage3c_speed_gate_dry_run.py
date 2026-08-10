@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         return 3
 
     if args.with_artifacts:
-        payload = run_dry_run_attempt(attempt_id=args.attempt_id, baseline_commit=_git_head())
+        payload = run_dry_run_attempt(attempt_id=args.attempt_id, observed_live_head=_git_head())
     else:
         from pytest import MonkeyPatch
 

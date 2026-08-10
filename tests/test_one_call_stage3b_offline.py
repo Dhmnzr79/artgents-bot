@@ -314,6 +314,7 @@ def test_blocking_success_fake_process(monkeypatch: pytest.MonkeyPatch, tmp_path
         use_fake_transport=True,
         wall_timeout_seconds=30,
     )
+    assert result["status"] == "completed"
     assert result["legacy_blocking_supported"]
     assert result["consumed_call_count"] == MAX_CALLS
     assert result["completed_call_count"] == MAX_CALLS
@@ -411,7 +412,7 @@ def test_response_format_unsupported_error_ledger(
         raise_error=ResponseFormatUnsupportedError("unsupported"),
     )
     paths = artifact_paths_for_attempt(PROPOSED_LIVE_ATTEMPT_ID, artifacts_root=tmp_path)
-    run_live_attempt(
+    result = run_live_attempt(
         PROPOSED_LIVE_ATTEMPT_ID,
         artifact_root=paths,
         use_fake_transport=True,
@@ -419,6 +420,8 @@ def test_response_format_unsupported_error_ledger(
     )
     events = _ledger_events(paths.calls_jsonl)
     assert events[1]["event"] == "ERROR"
+    assert result["status"] == "completed"
+    assert result["consumed_call_count"] == MAX_CALLS
 
 
 def test_provider_exception_error_ledger(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -441,7 +444,55 @@ def test_provider_exception_error_ledger(monkeypatch: pytest.MonkeyPatch, tmp_pa
     assert first["ledger_event"] == "ERROR"
     events = _ledger_events(paths.calls_jsonl)
     assert events[1]["event"] == "ERROR"
+    assert result["status"] == "completed"
     assert result["completed_call_count"] == MAX_CALLS - 1
+
+
+class AuthenticationError(Exception):
+    """Test double for OpenAI SDK authentication failure."""
+
+
+def test_authentication_error_aborts_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    attempt_id = "auth_abort_test_attempt"
+    _patch_live_gate(monkeypatch, attempt_id)
+    _patch_endpoint(monkeypatch)
+    active_before = len(multiprocessing.active_children())
+    fake = list(sample_offline_fake_responses())
+    fake[0] = FakeProviderResponse(
+        model=MODEL_SNAPSHOT,
+        content="",
+        raise_error=AuthenticationError("auth failed"),
+    )
+    paths = artifact_paths_for_attempt(attempt_id, artifacts_root=tmp_path)
+    result = run_live_attempt(
+        attempt_id,
+        artifact_root=paths,
+        use_fake_transport=True,
+        fake_responses=fake,
+    )
+    assert result["status"] == "error"
+    assert result["failure_kind"] == "provider_authentication_failed"
+    assert result["consumed_call_count"] == 1
+    assert result["completed_call_count"] == 0
+    assert len(result["case_results"]) == 1
+    events = _ledger_events(paths.calls_jsonl)
+    assert len(events) == 2
+    assert events[0]["event"] == "START"
+    assert events[1]["event"] == "ERROR"
+    assert events[1]["error_code"] == "AuthenticationError"
+    assert paths.raw_json.exists()
+    assert paths.result_json.exists()
+    blob = paths.raw_json.read_text(encoding="utf-8") + paths.result_json.read_text(encoding="utf-8")
+    assert "sk-" not in blob.lower()
+    contract_text = (
+        Path(__file__).resolve().parents[1]
+        / "evals/v5/one_call_flash_capability_contract.py"
+    ).read_text(encoding="utf-8")
+    assert "LIVE_AUTHORIZED_ATTEMPT_ID: str | None = None" in contract_text
+    assert len(multiprocessing.active_children()) == active_before
 
 
 def test_model_mismatch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

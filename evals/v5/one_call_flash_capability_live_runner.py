@@ -59,6 +59,38 @@ class CapabilityChildTimeoutError(RuntimeError):
 
 _INFRASTRUCTURE_IPC_STATUSES = frozenset({"timeout", "error"})
 
+_FATAL_ATTEMPT_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        "AuthenticationError",
+        "PermissionDeniedError",
+        "PermissionDenied",
+        "InvalidAPIKeyError",
+    }
+)
+
+
+def _is_fatal_attempt_error(error_code: str | None) -> bool:
+    if not error_code:
+        return False
+    if error_code in _FATAL_ATTEMPT_ERROR_CODES:
+        return True
+    lowered = error_code.lower()
+    return (
+        "authentication" in lowered
+        or "permissiondenied" in lowered
+        or "invalidapikey" in lowered
+        or lowered == "accessdenied"
+    )
+
+
+def _fatal_failure_kind(error_code: str) -> str:
+    lowered = error_code.lower()
+    if "authentication" in lowered or error_code == "InvalidAPIKeyError":
+        return "provider_authentication_failed"
+    if "permission" in lowered or "accessdenied" in lowered:
+        return "provider_permission_denied"
+    return "provider_access_denied"
+
 
 def assert_live_governance(attempt_id: str) -> None:
     if LIVE_AUTHORIZED_ATTEMPT_ID is None:
@@ -333,6 +365,7 @@ def run_live_attempt(
     child_cleanup_verified_all = True
     wall_timeout_occurred = False
     aborted = False
+    failure_kind: str | None = None
     fake_payload = (
         [asdict(response) for response in fake_responses]
         if fake_responses is not None
@@ -454,6 +487,9 @@ def run_live_attempt(
                 )
                 completed_call_count += 1
             case_records.append(record)
+            if _is_fatal_attempt_error(transport_result.error_code):
+                aborted = True
+                failure_kind = _fatal_failure_kind(str(transport_result.error_code))
         else:
             error = ipc_payload.get("error", {})
             record = _error_record(
@@ -474,7 +510,13 @@ def run_live_attempt(
         raw_payload["consumed_call_count"] = consumed_call_count
         raw_payload["completed_call_count"] = completed_call_count
         raw_payload["case_results"] = [r.to_artifact_dict() for r in case_records]
-        raw_payload["status"] = "aborted" if aborted else "in_progress"
+        if failure_kind:
+            raw_payload["status"] = "error"
+            raw_payload["failure_kind"] = failure_kind
+        elif aborted:
+            raw_payload["status"] = "aborted"
+        else:
+            raw_payload["status"] = "in_progress"
         write_json_atomic(paths.raw_json, raw_payload)
 
         if aborted:
@@ -490,7 +532,11 @@ def run_live_attempt(
         conclusions["json_mode_blocking_supported"]
         and conclusions["json_mode_streaming_supported"]
     )
-    final_status = "aborted" if aborted else "completed"
+    final_status = (
+        "error"
+        if failure_kind
+        else ("aborted" if aborted else "completed")
+    )
     result_payload = {
         "measurement_id": MEASUREMENT_ID,
         "attempt_id": attempt_id,
@@ -507,6 +553,8 @@ def run_live_attempt(
         "live_gate": LIVE_AUTHORIZED_ATTEMPT_ID,
         "status": final_status,
     }
+    if failure_kind:
+        result_payload["failure_kind"] = failure_kind
     write_json_atomic(paths.result_json, result_payload)
     raw_payload["status"] = final_status
     write_json_atomic(paths.raw_json, raw_payload)

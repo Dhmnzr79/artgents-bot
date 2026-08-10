@@ -41,16 +41,49 @@ def test_real_transport_is_blocked_by_default() -> None:
         )
 
 
-def test_real_transport_blocked_via_public_chat_completions_create() -> None:
-    """Same guard, reached via the public `llm.chat_completions_create` wrapper that
-    ingress_gate.py / core/turn_planner_llm.py / core/target_runtime_llm_backends.py
-    all funnel through -- proving the choke point actually covers real call sites, not
-    just the raw client object in isolation."""
+def test_real_transport_blocked_via_public_chat_completions_create(monkeypatch) -> None:
+    """Endpoint gate passes; guarded transport still blocks before network."""
+    import config as config_module
+
+    monkeypatch.setattr(
+        config_module,
+        "CHAT_BASE_URL",
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    )
+    monkeypatch.setattr(config_module, "CHAT_API_KEY", "sk-test")
     with pytest.raises(RuntimeError, match=_BLOCKED_MARKER):
         llm_module.chat_completions_create(
             model="qwen3.7-plus",
             messages=[{"role": "user", "content": "test"}],
         )
+
+
+def test_public_chat_completions_create_blocks_missing_endpoint_before_transport(
+    monkeypatch,
+) -> None:
+    import config as config_module
+
+    attempts = 0
+
+    def _never_called(**_kwargs: object) -> None:
+        nonlocal attempts
+        attempts += 1
+
+    monkeypatch.setattr(config_module, "CHAT_BASE_URL", "")
+    monkeypatch.setattr(config_module, "CHAT_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        llm_module.chat_client.chat.completions,
+        "create",
+        _never_called,
+    )
+    from core.alibaba_openai_transport_policy import AlibabaEndpointConfigurationError
+
+    with pytest.raises(AlibabaEndpointConfigurationError, match="chat_base_url_missing"):
+        llm_module.chat_completions_create(
+            model="qwen3.7-plus",
+            messages=[{"role": "user", "content": "test"}],
+        )
+    assert attempts == 0
 
 
 def test_injected_fake_backend_is_unaffected_by_the_guard(monkeypatch) -> None:

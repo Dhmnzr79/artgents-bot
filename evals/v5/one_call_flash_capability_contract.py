@@ -14,12 +14,10 @@ MODEL_SNAPSHOT = SALES_ONE_PLUS_FLASH_MODEL
 LIVE_AUTHORIZED_ATTEMPT_ID: str | None = None
 PROPOSED_LIVE_ATTEMPT_ID = "one_call_flash_capability_v1_2026-08-09"
 MAX_CALLS = 6
+ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
 
-# Stage 3B gap: wall-timeout and Windows process isolation for LIVE transport.
-STAGE_3B_LIVE_GAPS = (
-    "wall_timeout_enforcement",
-    "windows_process_isolation",
-)
+# Stage 3B offline preflight closes wall-timeout and Windows process isolation gaps.
+STAGE_3B_LIVE_GAPS: tuple[str, ...] = ()
 
 ResponseFormatStrategy = Literal["json_mode", "legacy_line_protocol"]
 CapabilityOutcome = Literal[
@@ -33,7 +31,10 @@ CapabilityOutcome = Literal[
     "skipped",
 ]
 
-JSON_MODE_PROBE_USER = "Return a JSON control envelope for this capability probe."
+JSON_MODE_PROBE_USER = (
+    "Deprecated alias — use evals.v5.one_call_flash_capability_probes."
+    "JSON_MODE_CAPABILITY_PROBE_USER"
+)
 
 
 @dataclass(frozen=True, slots=True)

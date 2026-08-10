@@ -1,7 +1,7 @@
 """Offline ONE_CALL Flash capability harness — frozen plan, fake transport only (Stage 3A).
 
-Stage 3B gap (not claimed LIVE-ready): wall-timeout enforcement and Windows process
-isolation for real provider transport — see STAGE_3B_LIVE_GAPS in contract.
+Stage 3B adds eval-only LIVE preflight (process isolation, artifacts) in
+``one_call_flash_capability_live_runner.py``; this harness remains fake/offline.
 """
 
 from __future__ import annotations
@@ -20,13 +20,18 @@ from evals.v5.one_call_flash_capability_contract import (
     CapabilityCaseSpec,
     CapabilityOutcome,
     FROZEN_CAPABILITY_CASES,
-    JSON_MODE_PROBE_USER,
     LIVE_AUTHORIZED_ATTEMPT_ID,
     MAX_CALLS,
     MODEL_SNAPSHOT,
     PROPOSED_LIVE_ATTEMPT_ID,
     STAGE_3B_LIVE_GAPS,
     build_attempt_marker_payload,
+)
+from evals.v5.one_call_flash_capability_probes import (
+    build_cache_cold_dynamic_suffix,
+    build_cache_repeat_dynamic_suffix,
+    JSON_MODE_CAPABILITY_PROBE_USER,
+    LEGACY_CAPABILITY_PROBE_USER,
 )
 
 
@@ -43,8 +48,8 @@ class ResponseFormatUnsupportedError(RuntimeError):
 
 
 STABLE_PREFIX_BYTES = "STABLE_PREFIX_BYTE_IDENTICAL_FOR_CACHE_PROBES"
-CACHE_COLD_DYNAMIC_SUFFIX = "DYNAMIC_SUFFIX_CACHE_COLD_ONLY"
-CACHE_REPEAT_DYNAMIC_SUFFIX = "DYNAMIC_SUFFIX_CACHE_REPEAT_ONLY"
+CACHE_COLD_DYNAMIC_SUFFIX = build_cache_cold_dynamic_suffix()
+CACHE_REPEAT_DYNAMIC_SUFFIX = build_cache_repeat_dynamic_suffix()
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,11 +191,11 @@ def _cache_probe_messages(dynamic_suffix: str) -> list[dict[str, str]]:
 
 
 def _json_mode_messages() -> list[dict[str, str]]:
-    return [{"role": "user", "content": JSON_MODE_PROBE_USER}]
+    return [{"role": "user", "content": JSON_MODE_CAPABILITY_PROBE_USER}]
 
 
 def _legacy_messages() -> list[dict[str, str]]:
-    return [{"role": "user", "content": "Capability legacy line-protocol probe."}]
+    return [{"role": "user", "content": LEGACY_CAPABILITY_PROBE_USER}]
 
 
 def _messages_for_case(case: CapabilityCaseSpec) -> list[dict[str, str]]:

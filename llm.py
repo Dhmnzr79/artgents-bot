@@ -6,10 +6,13 @@ import time
 
 from openai import OpenAI
 
+from core.alibaba_openai_transport_policy import (
+    build_openai_compatible_client_kwargs,
+    validate_alibaba_chat_transport_config,
+)
 from config import (
     BOOKING_INTENT_LLM_MODEL,
     BOOKING_INTENT_LLM_ON,
-    CHAT_API_KEY,
     CHAT_BASE_URL,
     QWEN_ENABLE_THINKING,
     chat_provider_is_qwen,
@@ -31,9 +34,7 @@ from config import (
 )
 from logging_setup import get_logger, log_json, log_llm_error, log_llm_usage
 
-_chat_client_kwargs: dict = {"api_key": CHAT_API_KEY}
-if CHAT_BASE_URL:
-    _chat_client_kwargs["base_url"] = CHAT_BASE_URL
+_chat_client_kwargs = build_openai_compatible_client_kwargs(validate_endpoint=False)
 chat_client = OpenAI(**_chat_client_kwargs)
 client = chat_client
 
@@ -65,6 +66,7 @@ def chat_completions_create(*, model: str, **kwargs):
         reserve_provider_call,
     )
 
+    validate_alibaba_chat_transport_config()
     kwargs = _qwen_disable_thinking(model=model, kwargs=dict(kwargs))
     source = kwargs.pop("provider_call_source", None)
     started = time.monotonic()

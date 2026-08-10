@@ -29,6 +29,7 @@ from evals.v5.one_call_stage3c_speed_gate_live_runner import (
     assert_live_governance,
 )
 from evals.v5.one_call_stage3c_speed_gate_matrix import (
+    FROZEN_MATRIX_SHA256,
     FROZEN_SPEED_GATE_CASES,
     frozen_matrix_sha256,
     assert_frozen_matrix_unchanged,
@@ -53,8 +54,7 @@ def test_proposed_live_attempt_id_frozen() -> None:
 def test_frozen_matrix_sha_stable() -> None:
     assert_frozen_matrix_unchanged()
     sha = frozen_matrix_sha256()
-    assert len(sha) == 64
-    assert sha == frozen_matrix_sha256()
+    assert sha == FROZEN_MATRIX_SHA256
 
 
 def test_matrix_has_nine_cases() -> None:
@@ -154,6 +154,7 @@ def test_offline_gate_closed() -> None:
 def test_production_does_not_import_dry_run_runner() -> None:
     text = Path(app_module.__file__).read_text(encoding="utf-8")
     assert "run_one_call_stage3c_speed_gate_dry_run" not in text
+    assert "run_one_call_stage3c_speed_gate_live" not in text
 
 
 def test_old_live_artifact_untouched() -> None:

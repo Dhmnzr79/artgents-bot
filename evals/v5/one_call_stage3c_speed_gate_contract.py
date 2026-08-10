@@ -17,6 +17,9 @@ PROPOSED_LIVE_ATTEMPT_ID = "one_call_stage3c_speed_gate_v1_2026-08-10-01"
 ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
 MAX_RETRIES = 0
 
+# Governance: HEAD at Stage 3C offline gate acceptance (LIVE runner pins this).
+FROZEN_BASELINE_COMMIT = "4fe14658ebe8a454be6c4cb017c3670c7ea2f4c0"
+
 ArmLabel = Literal["OLD", "NEW"]
 SpeedGateVerdict = Literal["pass", "fail", "inconclusive"]
 LatencyCategory = Literal["cold", "warm"]
@@ -72,6 +75,13 @@ FROZEN_ADMIN_CASE_IDS: tuple[str, ...] = (
 )
 
 FROZEN_ALL_CASE_IDS: tuple[str, ...] = FROZEN_LATENCY_CASE_IDS + FROZEN_ADMIN_CASE_IDS
+
+# Global provider-call ceiling for one LIVE measurement (frozen call plan).
+MAX_PROVIDER_CALLS_LIVE = (
+    len(FROZEN_LATENCY_CASE_IDS) * OLD_MAX_PROVIDER_CALLS_PER_TURN
+    + len(FROZEN_LATENCY_CASE_IDS) * NEW_MAX_PROVIDER_CALLS_PER_FREE_TEXT
+    + len(FROZEN_ADMIN_CASE_IDS) * NEW_MAX_PROVIDER_CALLS_ADMIN
+)
 
 
 def build_attempt_marker_payload(

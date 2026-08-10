@@ -4,63 +4,46 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 
 from evals.v5.one_call_stage3c_speed_gate_contract import (
     FROZEN_ALL_CASE_IDS,
     SpeedGateCaseSpec,
     SpeedGateQualitySpec,
 )
-from tests.one_call_stage2_fixture import case_by_id, load_stage2_cases
+from evals.v5.one_call_stage3c_speed_gate_matrix_fixture import snapshot_by_id
+
+# Pinned at matrix acceptance; governance tests fail if document changes.
+FROZEN_MATRIX_SHA256 = "8ab01bcb28505ddf301f164576e363830afde0c8e3685d67fb3246a1f1d9b939"
 
 
-from tests.one_call_stage2_fixture import case_by_id, load_stage2_cases
-
-_STAGE2_FIXTURE = (
-    Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "one_call_stage2_cases.json"
-)
-
-
-def _stage2_raw(case_id: str) -> dict[str, object]:
-    payload = json.loads(_STAGE2_FIXTURE.read_text(encoding="utf-8"))
-    for row in payload.get("cases") or []:
-        if str(row.get("case_id")) == case_id:
-            return dict(row)
-    raise KeyError(case_id)
-
-
-def _quality_from_stage2(case_id: str, *, max_provider_calls: int) -> SpeedGateQualitySpec:
-    row = case_by_id(case_id)
-    raw = _stage2_raw(case_id)
+def _quality_from_snapshot(stage2_ref: str, *, max_provider_calls: int) -> SpeedGateQualitySpec:
+    row = snapshot_by_id(stage2_ref)
     return SpeedGateQualitySpec(
         expected_route=row.expected_decision,
         required_all=row.required_all,
         required_any=row.required_any,
         forbidden_terms=row.forbidden_terms,
-        forbidden_price_tokens=tuple(str(x) for x in raw.get("forbidden_price_tokens") or ()),
+        forbidden_price_tokens=row.forbidden_price_tokens,
         max_provider_calls=max_provider_calls,
         execution_layer=row.execution_layer,
     )
 
 
 def _build_frozen_cases() -> tuple[SpeedGateCaseSpec, ...]:
-    m01 = case_by_id("m01")
-    p03 = case_by_id("p03")
-    p04 = case_by_id("p04")
-    f01 = case_by_id("f01")
+    m01 = snapshot_by_id("m01")
+    p03 = snapshot_by_id("p03")
+    p04 = snapshot_by_id("p04")
+    f01 = snapshot_by_id("f01")
     cases: list[SpeedGateCaseSpec] = [
         SpeedGateCaseSpec(
             case_id="s01_microfact",
             user_message=m01.user_message,
             kind="latency",
-            quality=_quality_from_stage2("m01", max_provider_calls=1),
+            quality=_quality_from_snapshot("m01", max_provider_calls=1),
             stage2_ref="m01",
-            source_refs=tuple(
-                str(ref)
-                for ref in (
-                    "clients/demo/clinic_policies.yaml",
-                    "clients/demo/md/clinic__info__contacts.md",
-                )
+            source_refs=(
+                "clients/demo/clinic_policies.yaml",
+                "clients/demo/md/clinic__info__contacts.md",
             ),
         ),
         SpeedGateCaseSpec(
@@ -81,27 +64,21 @@ def _build_frozen_cases() -> tuple[SpeedGateCaseSpec, ...]:
             case_id="s03_exact_price",
             user_message=p03.user_message,
             kind="latency",
-            quality=_quality_from_stage2("p03", max_provider_calls=1),
+            quality=_quality_from_snapshot("p03", max_provider_calls=1),
             stage2_ref="p03",
-            source_refs=tuple(
-                str(ref)
-                for ref in (
-                    "clients/demo/target_response/pricebook/services/classic.one_tooth.implantium.json",
-                    "clients/demo/target_response/pricebook/facts.json",
-                )
+            source_refs=(
+                "clients/demo/target_response/pricebook/services/classic.one_tooth.implantium.json",
+                "clients/demo/target_response/pricebook/facts.json",
             ),
         ),
         SpeedGateCaseSpec(
             case_id="s04_both_jaws",
             user_message=p04.user_message,
             kind="latency",
-            quality=_quality_from_stage2("p04", max_provider_calls=1),
+            quality=_quality_from_snapshot("p04", max_provider_calls=1),
             stage2_ref="p04",
-            source_refs=tuple(
-                str(ref)
-                for ref in (
-                    "clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json",
-                )
+            source_refs=(
+                "clients/demo/target_response/pricebook/services/all_on_4.jaw.implantium.json",
             ),
         ),
         SpeedGateCaseSpec(
@@ -123,25 +100,22 @@ def _build_frozen_cases() -> tuple[SpeedGateCaseSpec, ...]:
             case_id="s06_pain_fear",
             user_message=f01.user_message,
             kind="latency",
-            quality=_quality_from_stage2("f01", max_provider_calls=1),
+            quality=_quality_from_snapshot("f01", max_provider_calls=1),
             stage2_ref="f01",
-            source_refs=tuple(
-                str(ref)
-                for ref in (
-                    "clients/demo/md/implantation__faq__pain.md",
-                    "clients/demo/target_response/pricebook/facts.json",
-                )
+            source_refs=(
+                "clients/demo/md/implantation__faq__pain.md",
+                "clients/demo/target_response/pricebook/facts.json",
             ),
         ),
     ]
     for admin_id in ("a01", "a02", "a03"):
-        row = case_by_id(admin_id)
+        row = snapshot_by_id(admin_id)
         cases.append(
             SpeedGateCaseSpec(
                 case_id=admin_id,
                 user_message=row.user_message,
                 kind="admin",
-                quality=_quality_from_stage2(admin_id, max_provider_calls=0),
+                quality=_quality_from_snapshot(admin_id, max_provider_calls=0),
                 stage2_ref=admin_id,
             )
         )
@@ -198,8 +172,21 @@ def assert_frozen_matrix_unchanged() -> None:
     expected_ids = set(FROZEN_ALL_CASE_IDS)
     actual_ids = {case.case_id for case in FROZEN_SPEED_GATE_CASES}
     if actual_ids != expected_ids:
-        raise RuntimeError(f"matrix case id mismatch expected={sorted(expected_ids)} actual={sorted(actual_ids)}")
-    stage2_ids = {row.case_id for row in load_stage2_cases()}
+        raise RuntimeError(
+            f"matrix case id mismatch expected={sorted(expected_ids)} actual={sorted(actual_ids)}"
+        )
+    actual_sha = frozen_matrix_sha256()
+    if actual_sha != FROZEN_MATRIX_SHA256:
+        raise RuntimeError(
+            f"matrix sha mismatch expected={FROZEN_MATRIX_SHA256} actual={actual_sha}"
+        )
+    fixture_refs = set(_fixture_snapshot_ids())
     for case in FROZEN_SPEED_GATE_CASES:
-        if case.stage2_ref and case.stage2_ref not in stage2_ids:
-            raise RuntimeError(f"missing stage2 ref {case.stage2_ref} for {case.case_id}")
+        if case.stage2_ref and case.stage2_ref not in fixture_refs:
+            raise RuntimeError(f"missing fixture ref {case.stage2_ref} for {case.case_id}")
+
+
+def _fixture_snapshot_ids() -> tuple[str, ...]:
+    from evals.v5.one_call_stage3c_speed_gate_matrix_fixture import FROZEN_STAGE2_SNAPSHOTS
+
+    return tuple(FROZEN_STAGE2_SNAPSHOTS.keys())

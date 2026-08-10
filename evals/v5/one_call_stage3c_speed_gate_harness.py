@@ -104,6 +104,11 @@ def _synthetic_timings_from_calls(
     *,
     arm: ArmLabel,
 ) -> tuple[int | None, int]:
+    """Offline dry-run only: supplement patient TTFT/total when Flask test client wall-clock is too coarse.
+
+    LIVE runner and fake-transport LIVE path never call this — patient TTFT there comes only
+    from SSE timing. Synthetic values are for offline harness math checks, not speed verdicts.
+    """
     if not calls:
         return None, 0
     total_ms = sum(int(call.duration_ms) for call in calls)
@@ -194,6 +199,11 @@ def run_offline_dry_run(
     attempt_id: str = "stage3c_offline_dry_run",
     write_artifacts: bool = True,
 ) -> dict[str, Any]:
+    """Offline fake-transport harness via monkeypatch in parent process.
+
+    Uses synthetic timing supplement (_synthetic_timings_from_calls) for offline math only.
+    speed_gate verdict from this path is not a LIVE speed measurement.
+    """
     assert_offline_gate_closed()
     assert_frozen_matrix_unchanged()
 
@@ -428,3 +438,71 @@ def run_offline_dry_run(
         ctx.__exit__(None, None, None)
 
     return result
+
+
+def canned_answer_for_case(case_id: str) -> str:
+    return _canned_answer(case_id)
+
+
+def configure_arm_flags(arm: ArmLabel) -> None:
+    import app as app_module
+
+    flag_on = arm == "NEW"
+    config.SALES_ONE_PLUS_ON = flag_on
+    app_module.SALES_ONE_PLUS_ON = flag_on
+
+
+def build_frozen_turn_plan() -> list[dict[str, object]]:
+    turns: list[dict[str, object]] = []
+    latency_cases = [case for case in FROZEN_SPEED_GATE_CASES if case.kind == "latency"]
+    arm_cold_seen: dict[ArmLabel, bool] = {"OLD": False, "NEW": False}
+    for case_index, case in enumerate(latency_cases):
+        arm_order = _deterministic_arm_order(case_index)
+        for arm in arm_order:
+            latency_category: LatencyCategory = "cold" if not arm_cold_seen[arm] else "warm"
+            arm_cold_seen[arm] = True
+            turns.append(
+                {
+                    "case_id": case.case_id,
+                    "arm": arm,
+                    "kind": case.kind,
+                    "user_message": case.user_message,
+                    "latency_category": latency_category,
+                    "arm_order_index": case_index,
+                    "sid": _sid_for(arm, case.case_id),
+                }
+            )
+    for case in FROZEN_SPEED_GATE_CASES:
+        if case.kind != "admin":
+            continue
+        turns.append(
+            {
+                "case_id": case.case_id,
+                "arm": "NEW",
+                "kind": case.kind,
+                "user_message": case.user_message,
+                "latency_category": "warm",
+                "arm_order_index": None,
+                "sid": _sid_for("NEW", case.case_id),
+            }
+        )
+    return turns
+
+
+def evaluate_turn_quality(
+    case_id: str,
+    *,
+    arm: ArmLabel,
+    http_result: dict[str, object],
+    provider_call_count: int,
+) -> dict[str, Any]:
+    return _evaluate_quality(
+        case_id,
+        arm=arm,
+        http_result=http_result,
+        provider_call_count=provider_call_count,
+    )
+
+
+def stable_prefix_sha256() -> str:
+    return _stable_prefix_sha256()

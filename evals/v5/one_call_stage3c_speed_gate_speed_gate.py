@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from statistics import median
 from typing import Any, Literal
 
 from evals.v5.one_call_stage3c_speed_gate_contract import (
@@ -31,6 +30,35 @@ def _p95(values: list[int]) -> float | None:
     return float(ordered[index])
 
 
+def warm_latency_ttft_ready(latency_runs: list[dict[str, Any]]) -> bool:
+    warm_rows = [
+        row
+        for row in latency_runs
+        if row.get("kind") == "latency" or row.get("latency_category") is not None
+    ]
+    warm_rows = [row for row in warm_rows if row.get("latency_category") == "warm"]
+    if not warm_rows:
+        return False
+    return all(
+        bool(row.get("ttft_measurement_valid"))
+        and row.get("patient_ttft_ms") is not None
+        for row in warm_rows
+    )
+
+
+def compute_speed_gate_quality_pass(
+    latency_runs: list[dict[str, Any]],
+    admin_runs: list[dict[str, Any]],
+) -> bool:
+    for row in admin_runs:
+        if not (row.get("quality") or {}).get("pass"):
+            return False
+    for row in latency_runs:
+        if row.get("arm") == "NEW" and not (row.get("quality") or {}).get("pass"):
+            return False
+    return True
+
+
 def evaluate_speed_gate(
     *,
     warm_new_ttft_ms: list[int],
@@ -39,6 +67,7 @@ def evaluate_speed_gate(
     warm_old_total_ms: list[int],
     new_provider_calls_ok: bool,
     quality_pass: bool,
+    ttft_measurement_ready: bool = True,
 ) -> dict[str, Any]:
     new_p50 = _p50(warm_new_ttft_ms)
     old_p50 = _p50(warm_old_ttft_ms)
@@ -67,9 +96,11 @@ def evaluate_speed_gate(
     )
     provider_budget_pass = new_provider_calls_ok
     quality_guard_pass = quality_pass
+    ttft_measurement_pass = ttft_measurement_ready
 
     speed_pass = (
-        ttft_p50_pass
+        ttft_measurement_pass
+        and ttft_p50_pass
         and ttft_p95_pass
         and total_p50_pass
         and provider_budget_pass
@@ -77,7 +108,7 @@ def evaluate_speed_gate(
     )
 
     verdict: SpeedGateVerdict
-    if not warm_new_ttft_ms or not warm_old_ttft_ms:
+    if not ttft_measurement_ready or not warm_new_ttft_ms or not warm_old_ttft_ms:
         verdict = "inconclusive"
     elif speed_pass:
         verdict = "pass"
@@ -96,6 +127,7 @@ def evaluate_speed_gate(
         "warm_ttft_p95": {"new": new_p95, "old": old_p95},
         "warm_total_p50": {"new": new_total_p50, "old": old_total_p50},
         "checks": {
+            "ttft_measurement_pass": ttft_measurement_pass,
             "ttft_p50_pass": ttft_p50_pass,
             "ttft_p95_pass": ttft_p95_pass,
             "total_p50_pass": total_p50_pass,

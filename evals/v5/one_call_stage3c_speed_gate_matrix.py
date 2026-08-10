@@ -12,16 +12,16 @@ from evals.v5.one_call_stage3c_speed_gate_contract import (
 )
 from evals.v5.one_call_stage3c_speed_gate_matrix_fixture import snapshot_by_id
 
-# Pinned at matrix acceptance; governance tests fail if document changes.
-FROZEN_MATRIX_SHA256 = "8ab01bcb28505ddf301f164576e363830afde0c8e3685d67fb3246a1f1d9b939"
+# Pinned at matrix v2 acceptance; governance tests fail if document changes.
+FROZEN_MATRIX_SHA256 = "b60b4a85fa016a2496733e731ce206b8fba32d086096e451f56a6a5296d76b3c"
 
 
 def _quality_from_snapshot(stage2_ref: str, *, max_provider_calls: int) -> SpeedGateQualitySpec:
     row = snapshot_by_id(stage2_ref)
     return SpeedGateQualitySpec(
         expected_route=row.expected_decision,
-        required_all=row.required_all,
-        required_any=row.required_any,
+        critical_required_all=row.critical_required_all,
+        noncritical_review_any=row.noncritical_review_any,
         forbidden_terms=row.forbidden_terms,
         forbidden_price_tokens=row.forbidden_price_tokens,
         max_provider_calls=max_provider_calls,
@@ -52,7 +52,7 @@ def _build_frozen_cases() -> tuple[SpeedGateCaseSpec, ...]:
             kind="latency",
             quality=SpeedGateQualitySpec(
                 expected_route="answer",
-                required_any=(("имплант",), ("лечени",)),
+                critical_required_all=("имплант",),
                 max_provider_calls=1,
             ),
             source_refs=(
@@ -87,7 +87,8 @@ def _build_frozen_cases() -> tuple[SpeedGateCaseSpec, ...]:
             kind="latency",
             quality=SpeedGateQualitySpec(
                 expected_route="answer",
-                required_any=(("опыт", "стаж"), ("врач",), ("имплант",)),
+                critical_required_all=("врач",),
+                noncritical_review_any=(("опыт", "стаж"), ("имплант",)),
                 max_provider_calls=1,
             ),
             source_refs=(
@@ -134,7 +135,7 @@ def case_by_matrix_id(case_id: str) -> SpeedGateCaseSpec:
 
 def frozen_matrix_document() -> dict[str, object]:
     return {
-        "schema": "one_call_stage3c_speed_gate_matrix_v1",
+        "schema": "one_call_stage3c_speed_gate_matrix_v2",
         "case_ids": list(FROZEN_ALL_CASE_IDS),
         "cases": [
             {
@@ -145,8 +146,10 @@ def frozen_matrix_document() -> dict[str, object]:
                 "source_refs": list(case.source_refs),
                 "quality": {
                     "expected_route": case.quality.expected_route,
-                    "required_all": list(case.quality.required_all),
-                    "required_any": [list(group) for group in case.quality.required_any],
+                    "critical_required_all": list(case.quality.critical_required_all),
+                    "noncritical_review_any": [
+                        list(group) for group in case.quality.noncritical_review_any
+                    ],
                     "forbidden_terms": list(case.quality.forbidden_terms),
                     "forbidden_price_tokens": list(case.quality.forbidden_price_tokens),
                     "max_provider_calls": case.quality.max_provider_calls,

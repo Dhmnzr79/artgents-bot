@@ -14,6 +14,7 @@ CLIENT_ID = "demo"
 # LIVE gate — default closed; dry-run and offline tests keep None.
 LIVE_AUTHORIZED_ATTEMPT_ID: str | None = None
 PROPOSED_LIVE_ATTEMPT_ID = "one_call_stage3c_speed_gate_v1_2026-08-10-01"
+PROPOSED_LIVE_ATTEMPT_ID_V2 = "one_call_stage3c_speed_gate_v2_2026-08-11-01"
 ATTEMPT_MARKER_EXISTS_CODE = "ATTEMPT_MARKER_EXISTS"
 MAX_RETRIES = 0
 
@@ -44,8 +45,8 @@ NEW_MAX_PROVIDER_CALLS_ADMIN = 0
 @dataclass(frozen=True, slots=True)
 class SpeedGateQualitySpec:
     expected_route: str
-    required_all: tuple[str, ...] = ()
-    required_any: tuple[tuple[str, ...], ...] = ()
+    critical_required_all: tuple[str, ...] = ()
+    noncritical_review_any: tuple[tuple[str, ...], ...] = ()
     forbidden_terms: tuple[str, ...] = ()
     forbidden_price_tokens: tuple[str, ...] = ()
     max_provider_calls: int = 1

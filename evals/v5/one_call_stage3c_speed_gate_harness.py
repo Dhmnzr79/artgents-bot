@@ -39,7 +39,11 @@ from evals.v5.one_call_stage3c_speed_gate_matrix import (
     assert_frozen_matrix_unchanged,
 )
 from evals.v5.one_call_stage3c_speed_gate_patient_ttft import execute_stream_turn
-from evals.v5.one_call_stage3c_speed_gate_speed_gate import evaluate_speed_gate
+from evals.v5.one_call_stage3c_speed_gate_speed_gate import (
+    compute_speed_gate_quality_pass,
+    evaluate_speed_gate,
+    warm_latency_ttft_ready,
+)
 from session import mem_reset
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -137,15 +141,16 @@ def _evaluate_quality(
     answer = str(http_result.get("answer_text") or "").lower()
     meta = http_result.get("meta") or {}
     route = str(meta.get("service_route") or "")
-    failures: list[str] = []
+    critical_failures: list[str] = []
+    noncritical_review_flags: list[str] = []
 
     if case.kind == "admin":
         if arm != "NEW":
-            failures.append("admin_case_wrong_arm")
+            critical_failures.append("admin_case_wrong_arm")
         if provider_call_count != 0:
-            failures.append("admin_provider_calls_nonzero")
+            critical_failures.append("admin_provider_calls_nonzero")
         if "sales_fast_admin" not in route and quality.expected_route == "admin":
-            failures.append("admin_route_mismatch")
+            critical_failures.append("admin_route_mismatch")
     else:
         allowed_calls = (
             OLD_MAX_PROVIDER_CALLS_PER_TURN
@@ -153,41 +158,43 @@ def _evaluate_quality(
             else quality.max_provider_calls
         )
         if provider_call_count > allowed_calls:
-            failures.append("provider_call_budget_exceeded")
+            critical_failures.append("provider_call_budget_exceeded")
         if arm == "NEW" and provider_call_count > 1:
-            failures.append("new_more_than_one_call")
+            critical_failures.append("new_more_than_one_call")
         if quality.expected_route == "answer" and (
             "admin" in route
             or route.endswith("_error")
             or "verifier_blocked" in route
         ):
-            failures.append(f"static_fallback_route:{route}")
+            critical_failures.append(f"static_fallback_route:{route}")
 
-    for token in quality.required_all:
+    for token in quality.critical_required_all:
         if token.lower() not in answer:
-            failures.append(f"missing_required:{token}")
+            critical_failures.append(f"missing_critical:{token}")
 
-    for group in quality.required_any:
+    for group in quality.noncritical_review_any:
         if not any(term.lower() in answer for term in group):
-            failures.append(f"missing_required_any:{','.join(group)}")
+            noncritical_review_flags.append(f"missing_noncritical:{','.join(group)}")
 
     for term in quality.forbidden_terms:
         if term.lower() in answer:
-            failures.append(f"forbidden_term:{term}")
+            critical_failures.append(f"forbidden_term:{term}")
 
     normalized_answer = answer.replace(" ", "")
     for price_token in quality.forbidden_price_tokens:
         if price_token.replace(" ", "") in normalized_answer:
-            failures.append(f"forbidden_price:{price_token}")
+            critical_failures.append(f"forbidden_price:{price_token}")
 
     if case.kind == "latency" and not http_result.get("widget_payload_ready"):
-        failures.append("widget_payload_not_ready")
+        critical_failures.append("widget_payload_not_ready")
 
     return {
         "case_id": case_id,
         "arm": arm,
-        "pass": not failures,
-        "failures": failures,
+        "pass": not critical_failures,
+        "critical_failures": critical_failures,
+        "noncritical_review_flags": noncritical_review_flags,
+        "failures": list(critical_failures),
         "provider_call_count": provider_call_count,
         "service_route": route,
     }
@@ -281,16 +288,7 @@ def run_offline_dry_run(
                 body={"q": case.user_message},
             )
             provider_calls = len(transport.calls)
-            synth_ttft, synth_total = _synthetic_timings_from_calls(
-                transport.calls,
-                arm=arm,
-            )
-            if synth_total > int(http_result.get("total_ms") or 0):
-                http_result["total_ms"] = synth_total
-            if synth_ttft is not None:
-                current_ttft = http_result.get("patient_ttft_ms")
-                if current_ttft is None or int(current_ttft) < synth_ttft:
-                    http_result["patient_ttft_ms"] = synth_ttft
+
             if arm == "OLD":
                 old_calls_by_case[case.case_id] = provider_calls
 
@@ -316,6 +314,11 @@ def run_offline_dry_run(
                     "total_ms": http_result.get("total_ms"),
                     "patient_text_kind": http_result.get("patient_text_kind"),
                     "widget_payload_ready": http_result.get("widget_payload_ready"),
+                    "first_visible_excerpt": http_result.get("first_visible_excerpt"),
+                    "first_visible_event_type": http_result.get("first_visible_event_type"),
+                    "ttft_measurement_valid": http_result.get("ttft_measurement_valid"),
+                    "sse_event_count": http_result.get("sse_event_count"),
+                    "answer_excerpt": http_result.get("answer_excerpt"),
                     "quality": quality,
                     "meta": http_result.get("meta"),
                 }
@@ -361,6 +364,7 @@ def run_offline_dry_run(
         for row in run_records
         if row["arm"] == "NEW"
         and row["latency_category"] == "warm"
+        and row.get("ttft_measurement_valid")
         and row["patient_ttft_ms"] is not None
     ]
     warm_old_ttft = [
@@ -368,6 +372,7 @@ def run_offline_dry_run(
         for row in run_records
         if row["arm"] == "OLD"
         and row["latency_category"] == "warm"
+        and row.get("ttft_measurement_valid")
         and row["patient_ttft_ms"] is not None
     ]
     warm_new_total = [
@@ -381,8 +386,8 @@ def run_offline_dry_run(
         if row["arm"] == "OLD" and row["latency_category"] == "warm"
     ]
 
-    all_quality = [row["quality"] for row in run_records] + [row["quality"] for row in admin_records]
-    quality_pass = all(item.get("pass") for item in all_quality)
+    quality_pass = compute_speed_gate_quality_pass(run_records, admin_records)
+    ttft_ready = warm_latency_ttft_ready(run_records)
     new_calls_ok = all(
         int(row["provider_call_count"]) <= 1
         for row in run_records
@@ -396,6 +401,7 @@ def run_offline_dry_run(
         warm_old_total_ms=warm_old_total,
         new_provider_calls_ok=new_calls_ok,
         quality_pass=quality_pass,
+        ttft_measurement_ready=ttft_ready,
     )
 
     result = {

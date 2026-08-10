@@ -70,25 +70,29 @@ def test_call_plan_live_budget() -> None:
 
 
 def test_patient_ttft_excludes_control_markers() -> None:
+    delta_payload = json.dumps({"delta": "Видимый текст"})
     stream = (
         "event: status\ndata: {\"message\":\"…\"}\n\n"
         "event: typing\ndata: {\"phase\":\"writing\"}\n\n"
-        "event: text_delta\ndata: @ANSWER\n\n"
-        "event: text_delta\ndata: Видимый текст\n\n"
+        f"event: text_delta\ndata: {json.dumps({'delta': '@ANSWER'})}\n\n"
+        f"event: text_delta\ndata: {delta_payload}\n\n"
         "event: ui\ndata: {\"answer\":\"Видимый текст\"}\n\n"
         "event: done\ndata: {}\n\n"
     )
     timing = measure_patient_visible_timing(
         stream_text=stream,
         request_started_monotonic=0.0,
+        first_visible_monotonic=0.18,
         completed_monotonic=1.0,
     )
     assert timing.patient_text_kind == "text_delta"
     assert timing.first_visible_excerpt is not None
     assert timing.first_visible_excerpt.startswith("В")
+    assert timing.patient_ttft_ms == 180
+    assert timing.ttft_measurement_valid
 
 
-def test_patient_ttft_ui_only_uses_total() -> None:
+def test_patient_ttft_ui_only_uses_explicit_timestamp() -> None:
     stream = (
         "event: status\ndata: {\"message\":\"…\"}\n\n"
         "event: ui\ndata: {\"answer\":\"Ответ пациенту\"}\n\n"
@@ -97,9 +101,11 @@ def test_patient_ttft_ui_only_uses_total() -> None:
     timing = measure_patient_visible_timing(
         stream_text=stream,
         request_started_monotonic=0.0,
+        first_visible_monotonic=0.5,
         completed_monotonic=0.5,
     )
     assert timing.patient_ttft_ms == 500
+    assert timing.ttft_measurement_valid
 
 
 def test_speed_gate_threshold_boundary_pass() -> None:

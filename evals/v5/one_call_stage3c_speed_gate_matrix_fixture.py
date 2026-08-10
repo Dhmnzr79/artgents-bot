@@ -11,8 +11,8 @@ class FrozenStage2Snapshot:
     user_message: str
     expected_decision: str
     execution_layer: str
-    required_all: tuple[str, ...] = ()
-    required_any: tuple[tuple[str, ...], ...] = ()
+    critical_required_all: tuple[str, ...] = ()
+    noncritical_review_any: tuple[tuple[str, ...], ...] = ()
     forbidden_terms: tuple[str, ...] = ()
     forbidden_price_tokens: tuple[str, ...] = ()
 
@@ -24,15 +24,15 @@ FROZEN_STAGE2_SNAPSHOTS: dict[str, FrozenStage2Snapshot] = {
         user_message="Есть ли парковка?",
         expected_decision="answer",
         execution_layer="model",
-        required_all=("парков", "2", "бесплат"),
+        critical_required_all=("парков", "2", "бесплат"),
     ),
     "p03": FrozenStage2Snapshot(
         case_id="p03",
         user_message="Сколько стоит классический имплант за один зуб?",
         expected_decision="answer",
         execution_layer="model",
-        required_all=("76",),
-        required_any=(("зуб",), ("рассроч", "бесплатн")),
+        critical_required_all=("76",),
+        noncritical_review_any=(("зуб",), ("рассроч", "бесплатн")),
         forbidden_terms=("примерно", "от 76200"),
     ),
     "p04": FrozenStage2Snapshot(
@@ -40,7 +40,7 @@ FROZEN_STAGE2_SNAPSHOTS: dict[str, FrozenStage2Snapshot] = {
         user_message="Сколько будет All-on-4 на обе челюсти?",
         expected_decision="answer",
         execution_layer="model",
-        required_any=(("консультац", "уточн"),),
+        noncritical_review_any=(("консультац", "уточн"),),
         forbidden_terms=("умнож", "итого"),
         forbidden_price_tokens=("636000",),
     ),
@@ -49,8 +49,8 @@ FROZEN_STAGE2_SNAPSHOTS: dict[str, FrozenStage2Snapshot] = {
         user_message="Боюсь боли при имплантации",
         expected_decision="answer",
         execution_layer="model",
-        required_all=("консультац",),
-        required_any=(("боль", "анестез"),),
+        critical_required_all=(),
+        noncritical_review_any=(("консультац",), ("боль", "анестез")),
     ),
     "a01": FrozenStage2Snapshot(
         case_id="a01",

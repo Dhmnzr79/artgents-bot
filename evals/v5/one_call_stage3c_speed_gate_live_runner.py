@@ -63,7 +63,11 @@ from evals.v5.one_call_stage3c_speed_gate_matrix import (
     frozen_matrix_sha256,
 )
 from evals.v5.one_call_stage3c_speed_gate_patient_ttft import execute_stream_turn
-from evals.v5.one_call_stage3c_speed_gate_speed_gate import evaluate_speed_gate
+from evals.v5.one_call_stage3c_speed_gate_speed_gate import (
+    compute_speed_gate_quality_pass,
+    evaluate_speed_gate,
+    warm_latency_ttft_ready,
+)
 from session import mem_reset
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -619,6 +623,11 @@ def _run_measurement_in_child(job: dict[str, Any], conn: Any) -> None:
                 "total_ms": http_result.get("total_ms"),
                 "patient_text_kind": http_result.get("patient_text_kind"),
                 "widget_payload_ready": http_result.get("widget_payload_ready"),
+                "first_visible_excerpt": http_result.get("first_visible_excerpt"),
+                "first_visible_event_type": http_result.get("first_visible_event_type"),
+                "ttft_measurement_valid": http_result.get("ttft_measurement_valid"),
+                "sse_event_count": http_result.get("sse_event_count"),
+                "answer_excerpt": http_result.get("answer_excerpt"),
                 "quality": quality,
                 "stable_prefix_sha256": prefix_sha if arm == "NEW" else None,
             }
@@ -847,6 +856,7 @@ def _build_speed_summary(
         for row in latency_runs
         if row["arm"] == "NEW"
         and row.get("latency_category") == "warm"
+        and row.get("ttft_measurement_valid")
         and row.get("patient_ttft_ms") is not None
     ]
     warm_old_ttft = [
@@ -854,6 +864,7 @@ def _build_speed_summary(
         for row in latency_runs
         if row["arm"] == "OLD"
         and row.get("latency_category") == "warm"
+        and row.get("ttft_measurement_valid")
         and row.get("patient_ttft_ms") is not None
     ]
     warm_new_total = [
@@ -866,8 +877,8 @@ def _build_speed_summary(
         for row in latency_runs
         if row["arm"] == "OLD" and row.get("latency_category") == "warm"
     ]
-    all_quality = [row["quality"] for row in latency_runs] + [row["quality"] for row in admin_runs]
-    quality_pass = all(item.get("pass") for item in all_quality)
+    quality_pass = compute_speed_gate_quality_pass(latency_runs, admin_runs)
+    ttft_ready = warm_latency_ttft_ready(latency_runs)
     new_calls_ok = all(
         int(row["provider_call_count"]) <= 1
         for row in latency_runs
@@ -881,6 +892,7 @@ def _build_speed_summary(
         warm_old_total_ms=warm_old_total,
         new_provider_calls_ok=new_calls_ok,
         quality_pass=quality_pass,
+        ttft_measurement_ready=ttft_ready,
     )
     if status != "completed":
         summary["verdict"] = "inconclusive"

@@ -17,7 +17,13 @@ class FrozenStage2Snapshot:
     forbidden_price_tokens: tuple[str, ...] = ()
 
 
-# Pinned subset of tests/fixtures/one_call_stage2_cases.json referenced by Stage 3C matrix.
+# Owner decision required (eval vs clinic strategy):
+# p03/s03 matrix pins Implantium stem "76" from stage2 fixture source_ref;
+# demo clinic_strategy.yaml default_offer_priorities ranks classic.one_tooth.impro first.
+STAGE3C_S03_OWNER_DECISION = (
+    "matrix_expects_implantium_76200_vs_clinic_default_impro_85200"
+)
+
 FROZEN_STAGE2_SNAPSHOTS: dict[str, FrozenStage2Snapshot] = {
     "m01": FrozenStage2Snapshot(
         case_id="m01",

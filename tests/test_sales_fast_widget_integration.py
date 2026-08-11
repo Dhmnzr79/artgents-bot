@@ -489,7 +489,7 @@ def test_widget_path_sterility_answer_uses_one_provider_call(monkeypatch: pytest
 
 def test_widget_path_exact_one_tooth_price_from_clinic_pack(monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _CountingBackend(
-        "@ANSWER\nКлассическая имплантация Implantium — 76 200 ₽ за один зуб под ключ."
+        "@ANSWER\nКлассическая имплантация Implantium — 85 200 ₽ за один зуб под ключ."
     )
     payload = _orchestrate_ask(
         monkeypatch,
@@ -498,10 +498,14 @@ def test_widget_path_exact_one_tooth_price_from_clinic_pack(monkeypatch: pytest.
         sid="widget-one-tooth",
     )
     answer = payload["answer"]
-    assert "76" in answer and "200" in answer
+    assert "от" in answer.lower() and "76" in answer and "200" in answer
+    assert "Implantium" in answer and "Impro" in answer and "Nobel" in answer
+    assert "85" in answer and "200" in answer
     assert backend.call_count == 1
     offer = payload.get("offer") or {}
-    assert offer.get("amount") == 85200
+    assert offer.get("mode") == "overview"
+    assert offer.get("entry_amount") == 76200
+    assert offer.get("featured_offer_id") == "classic.one_tooth.impro"
 
 
 def test_widget_path_few_teeth_does_not_invent_total(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -370,12 +370,30 @@ class TargetStrategyMatch(TargetSchemaModel):
     reported_context: ReportedContext | None = None
 
 
+GenericPriceMode = Literal["overview", "entry_from", "featured_single"]
+
+
+class TargetGenericPricePolicy(TargetSchemaModel):
+    """Clinic-owned policy for generic (non-brand-specific) price questions."""
+
+    mode: GenericPriceMode
+    featured_offer_id: NonBlankStr | None = None
+    max_price_options: Annotated[StrictInt, Field(ge=2, le=3)] | None = None
+
+    @model_validator(mode="after")
+    def _featured_required_for_single(self) -> "TargetGenericPricePolicy":
+        if self.mode == "featured_single" and self.featured_offer_id is None:
+            raise ValueError("generic_price_featured_offer_required")
+        return self
+
+
 class TargetStrategyRule(TargetSchemaModel):
     id: NonBlankStr
     match: TargetStrategyMatch = Field(default_factory=TargetStrategyMatch)
     max_options: Annotated[StrictInt, Field(ge=2, le=3)] | None = None
     service_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
     offer_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
+    generic_price_policy: TargetGenericPricePolicy | None = None
 
     @model_validator(mode="after")
     def _match_is_not_empty(self) -> "TargetStrategyRule":
@@ -392,6 +410,7 @@ class TargetClinicStrategy(TargetSchemaModel):
     default_max_options: Annotated[StrictInt, Field(ge=2, le=3)] = 3
     default_service_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
     default_offer_priorities: dict[NonBlankStr, Priority] = Field(default_factory=dict)
+    default_generic_price_policy: TargetGenericPricePolicy | None = None
     rules: list[TargetStrategyRule] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -546,6 +565,15 @@ class ResponseSchemaBundle(TargetSchemaModel):
                 raise ValueError("bundle_strategy_service_missing")
             if any(offer_id not in offer_id_set for offer_id in rule.offer_priorities):
                 raise ValueError("bundle_strategy_offer_missing")
+            self._validate_generic_price_policy_refs(
+                rule.generic_price_policy,
+                offer_id_set=offer_id_set,
+            )
+
+        self._validate_generic_price_policy_refs(
+            self.strategy.default_generic_price_policy,
+            offer_id_set=offer_id_set,
+        )
 
         for ref in self._marketing_refs():
             if ref.startswith("fact:") and ref.removeprefix("fact:") not in self.facts:
@@ -559,6 +587,17 @@ class ResponseSchemaBundle(TargetSchemaModel):
                 raise ValueError("bundle_family_price_service_missing")
 
         return self
+
+    def _validate_generic_price_policy_refs(
+        self,
+        policy: TargetGenericPricePolicy | None,
+        *,
+        offer_id_set: set[str],
+    ) -> None:
+        if policy is None or policy.featured_offer_id is None:
+            return
+        if policy.featured_offer_id not in offer_id_set:
+            raise ValueError("bundle_strategy_generic_price_offer_missing")
 
     def _marketing_refs(self) -> list[str]:
         refs: list[str] = []
@@ -590,6 +629,7 @@ S1_MODEL_TYPES = (
     TargetStrategyMatch,
     TargetStrategyRule,
     TargetClinicStrategy,
+    TargetGenericPricePolicy,
     TargetMarketingLimits,
     TargetInitialCommercialBlock,
     TargetScenarioRule,

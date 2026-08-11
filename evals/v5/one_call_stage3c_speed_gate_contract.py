@@ -29,7 +29,12 @@ SpeedGateVerdict = Literal["pass", "fail", "inconclusive"]
 LatencyCategory = Literal["cold", "warm"]
 CaseKind = Literal["latency", "admin"]
 
-# Speed Gate thresholds (frozen before LIVE — § Stage 3C spec).
+# Speed Gate thresholds — owner product contract (Stage 3C v2 post-LIVE).
+SPEED_GATE_NEW_WARM_TOTAL_P50_MAX_MS = 8000
+SPEED_GATE_NEW_CASE_TOTAL_MAX_MS = 10000
+SPEED_GATE_NEW_WARM_TTFT_P95_MAX_MS = 6000
+
+# Diagnostic-only relative comparison vs OLD (not blocking).
 SPEED_GATE_TTFT_P50_MIN_RELATIVE_IMPROVEMENT = 0.30
 SPEED_GATE_TTFT_P50_MIN_ABSOLUTE_MS = 2000
 SPEED_GATE_ENDPOINT = (

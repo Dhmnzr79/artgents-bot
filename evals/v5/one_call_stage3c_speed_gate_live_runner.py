@@ -893,6 +893,10 @@ def _build_speed_summary(
         new_provider_calls_ok=new_calls_ok,
         quality_pass=quality_pass,
         ttft_measurement_ready=ttft_ready,
+        new_latency_runs=[
+            row for row in latency_runs
+            if row.get("arm") == "NEW" and row.get("kind") == "latency"
+        ],
     )
     if status != "completed":
         summary["verdict"] = "inconclusive"

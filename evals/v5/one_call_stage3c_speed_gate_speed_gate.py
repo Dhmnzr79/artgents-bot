@@ -1,4 +1,4 @@
-"""Speed Gate verdict logic (frozen thresholds, Stage 3C)."""
+"""Speed Gate verdict logic (absolute NEW latency contract, Stage 3C)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,9 @@ from typing import Any, Literal
 
 from evals.v5.one_call_stage3c_speed_gate_contract import (
     NEW_MAX_PROVIDER_CALLS_PER_FREE_TEXT,
+    SPEED_GATE_NEW_CASE_TOTAL_MAX_MS,
+    SPEED_GATE_NEW_WARM_TOTAL_P50_MAX_MS,
+    SPEED_GATE_NEW_WARM_TTFT_P95_MAX_MS,
     SPEED_GATE_TTFT_P50_MIN_ABSOLUTE_MS,
     SPEED_GATE_TTFT_P50_MIN_RELATIVE_IMPROVEMENT,
     SpeedGateVerdict,
@@ -28,6 +31,18 @@ def _p95(values: list[int]) -> float | None:
     ordered = sorted(values)
     index = max(0, int(round(0.95 * (len(ordered) - 1))))
     return float(ordered[index])
+
+
+def _valid_total_ms(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
 
 
 def warm_latency_ttft_ready(latency_runs: list[dict[str, Any]]) -> bool:
@@ -59,6 +74,22 @@ def compute_speed_gate_quality_pass(
     return True
 
 
+def _new_latency_rows(latency_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in latency_runs
+        if row.get("arm") == "NEW" and row.get("kind") == "latency"
+    ]
+
+
+def _new_warm_latency_rows(latency_runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in _new_latency_rows(latency_runs)
+        if row.get("latency_category") == "warm"
+    ]
+
+
 def evaluate_speed_gate(
     *,
     warm_new_ttft_ms: list[int],
@@ -68,6 +99,7 @@ def evaluate_speed_gate(
     new_provider_calls_ok: bool,
     quality_pass: bool,
     ttft_measurement_ready: bool = True,
+    new_latency_runs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     new_p50 = _p50(warm_new_ttft_ms)
     old_p50 = _p50(warm_old_ttft_ms)
@@ -83,32 +115,49 @@ def evaluate_speed_gate(
         ttft_relative_ok = improvement >= SPEED_GATE_TTFT_P50_MIN_RELATIVE_IMPROVEMENT
         ttft_absolute_ok = (old_p50 - new_p50) >= SPEED_GATE_TTFT_P50_MIN_ABSOLUTE_MS
 
-    ttft_p50_pass = ttft_relative_ok or ttft_absolute_ok
-    ttft_p95_pass = (
-        new_p95 is not None
-        and old_p95 is not None
-        and new_p95 <= old_p95
+    latency_rows = list(new_latency_runs or [])
+    totals_valid = True
+    case_totals: list[int] = []
+    for row in latency_rows:
+        total = _valid_total_ms(row.get("total_ms"))
+        if total is None:
+            totals_valid = False
+            continue
+        case_totals.append(total)
+
+    case_total_pass = totals_valid and all(
+        total <= SPEED_GATE_NEW_CASE_TOTAL_MAX_MS for total in case_totals
     )
-    total_p50_pass = (
+    new_total_p50_pass = (
         new_total_p50 is not None
-        and old_total_p50 is not None
-        and new_total_p50 <= old_total_p50
+        and new_total_p50 <= SPEED_GATE_NEW_WARM_TOTAL_P50_MAX_MS
+    )
+    new_ttft_p95_pass = (
+        new_p95 is not None and new_p95 <= SPEED_GATE_NEW_WARM_TTFT_P95_MAX_MS
     )
     provider_budget_pass = new_provider_calls_ok
     quality_guard_pass = quality_pass
     ttft_measurement_pass = ttft_measurement_ready
+    new_latency_present = bool(latency_rows)
 
     speed_pass = (
-        ttft_measurement_pass
-        and ttft_p50_pass
-        and ttft_p95_pass
-        and total_p50_pass
+        new_latency_present
+        and totals_valid
+        and ttft_measurement_pass
+        and new_total_p50_pass
+        and case_total_pass
+        and new_ttft_p95_pass
         and provider_budget_pass
         and quality_guard_pass
     )
 
     verdict: SpeedGateVerdict
-    if not ttft_measurement_ready or not warm_new_ttft_ms or not warm_old_ttft_ms:
+    if (
+        not new_latency_present
+        or not totals_valid
+        or not ttft_measurement_ready
+        or not warm_new_ttft_ms
+    ):
         verdict = "inconclusive"
     elif speed_pass:
         verdict = "pass"
@@ -119,18 +168,27 @@ def evaluate_speed_gate(
         "speed_pass": speed_pass,
         "verdict": verdict,
         "thresholds": {
-            "ttft_p50_min_relative_improvement": SPEED_GATE_TTFT_P50_MIN_RELATIVE_IMPROVEMENT,
-            "ttft_p50_min_absolute_ms": SPEED_GATE_TTFT_P50_MIN_ABSOLUTE_MS,
+            "new_warm_total_p50_max_ms": SPEED_GATE_NEW_WARM_TOTAL_P50_MAX_MS,
+            "new_case_total_max_ms": SPEED_GATE_NEW_CASE_TOTAL_MAX_MS,
+            "new_warm_ttft_p95_max_ms": SPEED_GATE_NEW_WARM_TTFT_P95_MAX_MS,
             "new_max_provider_calls_per_free_text": NEW_MAX_PROVIDER_CALLS_PER_FREE_TEXT,
+            "diagnostic_ttft_p50_min_relative_improvement": (
+                SPEED_GATE_TTFT_P50_MIN_RELATIVE_IMPROVEMENT
+            ),
+            "diagnostic_ttft_p50_min_absolute_ms": SPEED_GATE_TTFT_P50_MIN_ABSOLUTE_MS,
         },
         "warm_ttft_p50": {"new": new_p50, "old": old_p50},
         "warm_ttft_p95": {"new": new_p95, "old": old_p95},
         "warm_total_p50": {"new": new_total_p50, "old": old_total_p50},
+        "diagnostic_ttft_p50_relative_ok": ttft_relative_ok,
+        "diagnostic_ttft_p50_absolute_ok": ttft_absolute_ok,
         "checks": {
             "ttft_measurement_pass": ttft_measurement_pass,
-            "ttft_p50_pass": ttft_p50_pass,
-            "ttft_p95_pass": ttft_p95_pass,
-            "total_p50_pass": total_p50_pass,
+            "new_latency_present": new_latency_present,
+            "new_totals_valid": totals_valid,
+            "new_total_p50_pass": new_total_p50_pass,
+            "new_case_total_pass": case_total_pass,
+            "new_ttft_p95_pass": new_ttft_p95_pass,
             "provider_budget_pass": provider_budget_pass,
             "quality_guard_pass": quality_guard_pass,
         },

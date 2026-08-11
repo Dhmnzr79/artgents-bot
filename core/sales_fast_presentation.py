@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.turn_frame import TurnFrame
+from contracts.response_schema import TargetStrategyMatch
+from core.sales_fast_authoritative_commerce import (
+    apply_authoritative_commerce_to_patient_text,
+    build_authoritative_commerce_result,
+)
 from core.target_contact_authority import fallback_answer_with_phone
 from core.target_presentation_decision import TargetPresentationCadenceState
 from core.target_response_verifier import TargetVerifiedComposedResponse
@@ -170,11 +176,29 @@ def materialize_sales_fast_answer_payload(
     sid: str,
     cadence: TargetPresentationCadenceState,
     allow_situation: bool,
+    resolution: object | None = None,
+    strategy_context: TargetStrategyMatch | None = None,
 ) -> TargetRuntimeMaterializedPayload:
-    final_patient_text = supplement_sales_fast_patient_text_with_marketing(
+    commerce_result = None
+    if isinstance(resolution, ExactSalesResolution) and strategy_context is not None:
+        commerce_result = build_authoritative_commerce_result(
+            bound_package=bound_package,
+            resolution=resolution,
+            bundle=context.bundle,
+            strategy_context=strategy_context,
+        )
+
+    supplemented_text = supplement_sales_fast_patient_text_with_marketing(
         patient_text=patient_text,
         bound_package=bound_package,
     )
+    final_patient_text = supplemented_text
+    if commerce_result is not None:
+        final_patient_text = apply_authoritative_commerce_to_patient_text(
+            supplemented_text,
+            commerce_result,
+        )
+
     verified = build_sales_fast_verified_response(
         bound_package=bound_package,
         context=context,
@@ -196,17 +220,18 @@ def materialize_sales_fast_answer_payload(
     meta["service_route"] = "sales_fast_materialized"
     payload["meta"] = meta
     offer = None
-    materials = bound_package.package.materials
-    if materials.offers:
-        offer = {
-            "fact_refs": list(offer_fact_refs(bound_package)),
-            "amount": (
-                int(materials.offers[0].price.amount)
-                if materials.offers[0].price.mode == "fixed"
-                and materials.offers[0].price.amount is not None
-                else None
-            ),
-        }
+    if commerce_result is not None and commerce_result.widget_offer_payload is not None:
+        widget_payload = dict(commerce_result.widget_offer_payload)
+        widget_payload["fact_refs"] = list(offer_fact_refs(bound_package))
+        if commerce_result.presentation_mode == "exact_offer":
+            offer = {
+                "fact_refs": widget_payload["fact_refs"],
+                "amount": widget_payload.get("amount"),
+                "offer_id": widget_payload.get("offer_id"),
+                "mode": "exact_offer",
+            }
+        else:
+            offer = widget_payload
     payload["offer"] = offer
     cta = build_target_runtime_widget_cta(
         client_id=context.client_id,

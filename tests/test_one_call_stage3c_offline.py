@@ -34,6 +34,7 @@ from evals.v5.one_call_stage3c_speed_gate_matrix import (
     frozen_matrix_sha256,
     assert_frozen_matrix_unchanged,
 )
+from evals.v5.one_call_stage3c_speed_gate_matrix_fixture import STAGE3C_S03_OWNER_DECISION
 from evals.v5.one_call_stage3c_speed_gate_patient_ttft import measure_patient_visible_timing
 from evals.v5.one_call_stage3c_speed_gate_speed_gate import evaluate_speed_gate
 
@@ -41,6 +42,12 @@ _OLD_ARTIFACT = Path(__file__).resolve().parents[1] / "evals" / "v5" / "artifact
     "one_call_flash_capability_v1_2026-08-10-01"
 )
 _OLD_SHA = "143c66bd2370563c0f7f2c3593290ed70309b2e460485bd9cb56aa01430c95e8"
+
+
+def test_s03_owner_decision_documented() -> None:
+    assert STAGE3C_S03_OWNER_DECISION == (
+        "matrix_expects_implantium_76200_vs_clinic_default_impro_85200"
+    )
 
 
 def test_live_gate_default_none() -> None:
@@ -108,29 +115,101 @@ def test_patient_ttft_ui_only_uses_explicit_timestamp() -> None:
     assert timing.ttft_measurement_valid
 
 
-def test_speed_gate_threshold_boundary_pass() -> None:
+def test_speed_gate_absolute_contract_pass() -> None:
+    warm_rows = [
+        {"arm": "NEW", "latency_category": "warm", "total_ms": 5000},
+        {"arm": "NEW", "latency_category": "warm", "total_ms": 6000},
+    ]
     summary = evaluate_speed_gate(
-        warm_new_ttft_ms=[1000, 1100],
-        warm_old_ttft_ms=[2000, 2100],
-        warm_new_total_ms=[1200, 1300],
-        warm_old_total_ms=[2000, 2100],
+        warm_new_ttft_ms=[3000, 4000],
+        warm_old_ttft_ms=[9000, 10000],
+        warm_new_total_ms=[5000, 6000],
+        warm_old_total_ms=[4000, 4500],
         new_provider_calls_ok=True,
         quality_pass=True,
+        new_latency_runs=warm_rows,
     )
-    assert summary["checks"]["ttft_p50_pass"]
+    assert summary["checks"]["new_total_p50_pass"]
+    assert summary["checks"]["new_case_total_pass"]
+    assert summary["checks"]["new_ttft_p95_pass"]
     assert summary["verdict"] == "pass"
+    assert not summary["checks"].get("ttft_p50_pass")
+
+
+def test_speed_gate_case_over_10s_fails() -> None:
+    warm_rows = [{"arm": "NEW", "latency_category": "warm", "total_ms": 11000}]
+    summary = evaluate_speed_gate(
+        warm_new_ttft_ms=[3000],
+        warm_old_ttft_ms=[2000],
+        warm_new_total_ms=[11000],
+        warm_old_total_ms=[2000],
+        new_provider_calls_ok=True,
+        quality_pass=True,
+        new_latency_runs=warm_rows,
+    )
+    assert not summary["checks"]["new_case_total_pass"]
+    assert summary["verdict"] == "fail"
 
 
 def test_speed_gate_threshold_boundary_fail_p95() -> None:
+    warm_rows = [
+        {"arm": "NEW", "latency_category": "warm", "total_ms": 2000},
+        {"arm": "NEW", "latency_category": "warm", "total_ms": 2500},
+    ]
     summary = evaluate_speed_gate(
-        warm_new_ttft_ms=[1000, 3000],
+        warm_new_ttft_ms=[1000, 7000],
         warm_old_ttft_ms=[2000, 2100],
         warm_new_total_ms=[1200, 1300],
         warm_old_total_ms=[2000, 2100],
         new_provider_calls_ok=True,
         quality_pass=True,
+        new_latency_runs=warm_rows,
     )
-    assert not summary["checks"]["ttft_p95_pass"]
+    assert not summary["checks"]["new_ttft_p95_pass"]
+
+
+def test_speed_gate_empty_new_latency_inconclusive() -> None:
+    summary = evaluate_speed_gate(
+        warm_new_ttft_ms=[3000],
+        warm_old_ttft_ms=[9000],
+        warm_new_total_ms=[5000],
+        warm_old_total_ms=[4000],
+        new_provider_calls_ok=True,
+        quality_pass=True,
+        new_latency_runs=[],
+    )
+    assert summary["verdict"] == "inconclusive"
+    assert not summary["checks"]["new_latency_present"]
+
+
+def test_speed_gate_missing_total_ms_inconclusive() -> None:
+    rows = [{"arm": "NEW", "kind": "latency", "latency_category": "warm", "total_ms": None}]
+    summary = evaluate_speed_gate(
+        warm_new_ttft_ms=[3000],
+        warm_old_ttft_ms=[9000],
+        warm_new_total_ms=[5000],
+        warm_old_total_ms=[4000],
+        new_provider_calls_ok=True,
+        quality_pass=True,
+        new_latency_runs=rows,
+    )
+    assert summary["verdict"] == "inconclusive"
+    assert not summary["checks"]["new_totals_valid"]
+
+
+def test_speed_gate_cold_case_over_10s_fails() -> None:
+    rows = [{"arm": "NEW", "kind": "latency", "latency_category": "cold", "total_ms": 11000}]
+    summary = evaluate_speed_gate(
+        warm_new_ttft_ms=[3000],
+        warm_old_ttft_ms=[2000],
+        warm_new_total_ms=[5000],
+        warm_old_total_ms=[2000],
+        new_provider_calls_ok=True,
+        quality_pass=True,
+        new_latency_runs=rows,
+    )
+    assert not summary["checks"]["new_case_total_pass"]
+    assert summary["verdict"] == "fail"
 
 
 def test_speed_gate_formula_constants() -> None:

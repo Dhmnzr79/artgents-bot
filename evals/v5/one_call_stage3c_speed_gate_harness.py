@@ -38,6 +38,10 @@ from evals.v5.one_call_stage3c_speed_gate_matrix import (
     frozen_matrix_sha256,
     assert_frozen_matrix_unchanged,
 )
+from evals.v5.one_call_stage3c_speed_gate_quality_rules import (
+    matches_forbidden_computed_total,
+    matches_forbidden_term,
+)
 from evals.v5.one_call_stage3c_speed_gate_patient_ttft import execute_stream_turn
 from evals.v5.one_call_stage3c_speed_gate_speed_gate import (
     compute_speed_gate_quality_pass,
@@ -177,8 +181,11 @@ def _evaluate_quality(
             noncritical_review_flags.append(f"missing_noncritical:{','.join(group)}")
 
     for term in quality.forbidden_terms:
-        if term.lower() in answer:
+        if matches_forbidden_term(term, answer):
             critical_failures.append(f"forbidden_term:{term}")
+
+    if matches_forbidden_computed_total(answer):
+        critical_failures.append("forbidden_term:computed_total")
 
     normalized_answer = answer.replace(" ", "")
     for price_token in quality.forbidden_price_tokens:
@@ -402,6 +409,10 @@ def run_offline_dry_run(
         new_provider_calls_ok=new_calls_ok,
         quality_pass=quality_pass,
         ttft_measurement_ready=ttft_ready,
+        new_latency_runs=[
+            row for row in run_records
+            if row["arm"] == "NEW" and row.get("kind") == "latency"
+        ],
     )
 
     result = {
@@ -493,6 +504,86 @@ def build_frozen_turn_plan() -> list[dict[str, object]]:
             }
         )
     return turns
+
+
+def replay_speed_gate_interpretation(result: dict[str, Any]) -> dict[str, Any]:
+    """Read-only reinterpretation of a frozen LIVE artifact with current scorer/gate."""
+
+    latency_runs = list(result.get("latency_runs") or [])
+    admin_runs = list(result.get("admin_runs") or [])
+    reinterpreted_latency: list[dict[str, Any]] = []
+    for row in latency_runs:
+        copied = dict(row)
+        if row.get("arm") == "NEW":
+            copied["quality"] = _evaluate_quality(
+                str(row.get("case_id") or ""),
+                arm="NEW",
+                http_result={
+                    "answer_text": row.get("answer_excerpt") or "",
+                    "meta": {
+                        "service_route": (row.get("quality") or {}).get("service_route"),
+                    },
+                    "widget_payload_ready": row.get("widget_payload_ready"),
+                },
+                provider_call_count=int(row.get("provider_call_count") or 0),
+            )
+        reinterpreted_latency.append(copied)
+
+    warm_new_ttft = [
+        int(row["patient_ttft_ms"])
+        for row in reinterpreted_latency
+        if row.get("arm") == "NEW"
+        and row.get("latency_category") == "warm"
+        and row.get("ttft_measurement_valid")
+        and row.get("patient_ttft_ms") is not None
+    ]
+    warm_old_ttft = [
+        int(row["patient_ttft_ms"])
+        for row in latency_runs
+        if row.get("arm") == "OLD"
+        and row.get("latency_category") == "warm"
+        and row.get("ttft_measurement_valid")
+        and row.get("patient_ttft_ms") is not None
+    ]
+    warm_new_total = [
+        int(row["total_ms"])
+        for row in reinterpreted_latency
+        if row.get("arm") == "NEW" and row.get("latency_category") == "warm"
+    ]
+    warm_old_total = [
+        int(row["total_ms"])
+        for row in latency_runs
+        if row.get("arm") == "OLD" and row.get("latency_category") == "warm"
+    ]
+    quality_pass = compute_speed_gate_quality_pass(reinterpreted_latency, admin_runs)
+    ttft_ready = warm_latency_ttft_ready(reinterpreted_latency)
+    new_calls_ok = all(
+        int(row.get("provider_call_count") or 0) <= 1
+        for row in reinterpreted_latency
+        if row.get("arm") == "NEW"
+    ) and all(int(row.get("provider_call_count") or 0) == 0 for row in admin_runs)
+    speed_gate = evaluate_speed_gate(
+        warm_new_ttft_ms=warm_new_ttft,
+        warm_old_ttft_ms=warm_old_ttft,
+        warm_new_total_ms=warm_new_total,
+        warm_old_total_ms=warm_old_total,
+        new_provider_calls_ok=new_calls_ok,
+        quality_pass=quality_pass,
+        ttft_measurement_ready=ttft_ready,
+        new_latency_runs=[
+            row for row in reinterpreted_latency
+            if row.get("arm") == "NEW" and row.get("kind") == "latency"
+        ],
+    )
+    return {
+        "historical_speed_gate": result.get("speed_gate"),
+        "corrected_quality_by_case": {
+            row["case_id"]: row.get("quality")
+            for row in reinterpreted_latency
+            if row.get("arm") == "NEW"
+        },
+        "corrected_speed_gate": speed_gate,
+    }
 
 
 def evaluate_turn_quality(

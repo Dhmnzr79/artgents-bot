@@ -125,7 +125,19 @@ def test_invalid_ttft_yields_inconclusive_speed_gate() -> None:
     assert not summary["checks"]["ttft_measurement_pass"]
 
 
-def test_v1_live_artifact_unmodified() -> None:
+def test_s04_itogovaya_summa_phrase_not_critical() -> None:
+    quality = _evaluate_quality(
+        "s04_both_jaws",
+        arm="NEW",
+        http_result={
+            "answer_text": "Итоговая сумма уточняется после консультации с администратором.",
+            "meta": {"service_route": "sales_fast_materialized"},
+            "widget_payload_ready": True,
+        },
+        provider_call_count=1,
+    )
+    assert quality["pass"]
+    assert not any(item.startswith("forbidden_term:итого") for item in quality["critical_failures"])
     repo = Path(__file__).resolve().parents[1]
     result_path = repo / "evals/v5/artifacts/one_call_stage3c_speed_gate_v1_2026-08-10-01/result.json"
     assert result_path.exists()

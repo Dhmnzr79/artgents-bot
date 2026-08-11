@@ -91,9 +91,14 @@ EXPECTED_RULES = [
     {
         "id": "one_tooth_restore",
         "match": {"extent": "one_tooth"},
-        "max_options": 2,
+        "max_options": 3,
         "service_priorities": {"classic": 100, "one_stage": 80},
         "offer_priorities": {},
+        "generic_price_policy": {
+            "mode": "overview",
+            "featured_offer_id": "classic.one_tooth.impro",
+            "max_price_options": 3,
+        },
     },
     {
         "id": "few_teeth_restore",

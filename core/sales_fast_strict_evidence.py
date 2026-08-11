@@ -137,6 +137,7 @@ def strict_facts_and_sales_context(
     bound_package: TargetSpecBoundOfflineResponsePackage,
     resolution: ExactSalesResolution,
     bundle: ResponseSchemaBundle,
+    strategy_context: TargetStrategyMatch,
 ) -> tuple[tuple[SalesOnePlusStrictFact, ...], dict[str, object]]:
     materials = bound_package.package.materials
     strict_facts: list[SalesOnePlusStrictFact] = []
@@ -178,12 +179,31 @@ def strict_facts_and_sales_context(
         "topic": turn_frame_topic_hint(bound_package),
         "service_id": resolution.service_id,
     }
-    if offers:
-        primary = offers[0]
-        sales_context["offer_id"] = primary.offer_id
-        if primary.price.mode == "fixed" and primary.price.amount is not None:
-            sales_context["amount"] = int(primary.price.amount)
+    from core.sales_fast_authoritative_commerce import build_authoritative_commerce_result
+
+    explicit_offer_id = None
+    if materials.selected_brand_id:
+        brand = str(materials.selected_brand_id).strip().lower()
+        for offer in offers:
+            if str(offer.brand_id or "").strip().lower() == brand:
+                explicit_offer_id = offer.offer_id
+                break
+    commerce = build_authoritative_commerce_result(
+        bound_package=bound_package,
+        resolution=resolution,
+        bundle=bundle,
+        strategy_context=strategy_context,
+    )
+    selected_exact = commerce.selected_exact_offer
+    if selected_exact is not None and not commerce.needs_consultation_quote:
+        sales_context["offer_id"] = selected_exact.offer_id
+        if selected_exact.price.mode == "fixed" and selected_exact.price.amount is not None:
+            sales_context["amount"] = int(selected_exact.price.amount)
             sales_context["currency"] = "RUB"
+    elif commerce.presentation_mode in {"overview", "entry_from"}:
+        sales_context["generic_price_mode"] = commerce.presentation_mode
+        if commerce.entry_price_amount is not None:
+            sales_context["entry_amount"] = int(commerce.entry_price_amount)
     if _needs_admin_quote(resolution, offers=offers):
         sales_context["needs_admin_quote"] = True
         sales_context["offer_id"] = None

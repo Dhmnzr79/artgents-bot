@@ -346,6 +346,7 @@ def run_sales_fast_widget_turn(
         bound_package=bound,
         resolution=resolution,
         bundle=context.bundle,
+        strategy_context=strategy_context,
     )
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
@@ -402,6 +403,8 @@ def run_sales_fast_widget_turn(
         effective_scope=effective_scope,
         session_state=session_state,
         provider_calls=provider_calls,
+        resolution=resolution,
+        strategy_context=strategy_context,
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
@@ -430,6 +433,8 @@ def _materialize_result(
     effective_scope: object,
     session_state: object,
     provider_calls: int,
+    resolution: ExactSalesResolution,
+    strategy_context: object,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
         return SalesFastWidgetOutcome(
@@ -459,6 +464,8 @@ def _materialize_result(
         sid=sid,
         cadence=cadence,
         allow_situation=True,
+        resolution=resolution,
+        strategy_context=strategy_context,  # type: ignore[arg-type]
     )
     turn_timing.stage_end("sales_fast_presentation", status="completed")
     from contracts.turn_frame import TurnFrame

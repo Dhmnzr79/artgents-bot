@@ -1,32 +1,66 @@
-"""Incremental marker filter for the dormant one-Plus candidate.
-
-The provider emits raw text chunks.  This parser withholds control markers
-until they are complete, then streams only the answer body to the patient
-callback.  ``@ADMIN`` and everything after it stay internal.
-"""
+"""Buffered fail-closed JSON envelope accumulator for production streaming."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
-from core.sales_one_plus_protocol import SalesOnePlusMarkerScanner
-
-SalesOnePlusStreamDecision = Literal["answer", "admin"]
+from contracts.one_call_envelope import OneCallEnvelope
+from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_envelope_protocol import (
+    MAX_ENVELOPE_UTF8_BYTES,
+    OneCallEnvelopeProtocolError,
+    envelope_utf8_byte_length,
+    parse_production_envelope_json,
+)
 
 
 class SalesOnePlusStreamParser:
-    """Parse arbitrary provider chunk boundaries without leaking control text."""
+    """Accumulate raw provider JSON until finalize; no patient callback before validation."""
 
-    def __init__(self, on_delta: Callable[[str], None]) -> None:
-        self._scanner = SalesOnePlusMarkerScanner(on_delta)
+    def __init__(
+        self,
+        on_delta: Callable[[str], None],
+        *,
+        active_service_catalog: ActiveServiceCatalogSnapshot,
+    ) -> None:
+        self._on_delta = on_delta
+        self._active_service_catalog = active_service_catalog
+        self._buffer = ""
+        self._buffer_bytes = 0
+        self._validated_envelope: OneCallEnvelope | None = None
+
+    @property
+    def has_partial_content(self) -> bool:
+        return bool(self._buffer)
 
     @property
     def answer_text(self) -> str:
-        return self._scanner.answer_text
+        if self._validated_envelope is None:
+            return ""
+        return self._validated_envelope.patient_text or ""
+
+    @property
+    def validated_envelope(self) -> OneCallEnvelope | None:
+        return self._validated_envelope
 
     def ingest(self, raw: object) -> None:
-        self._scanner.ingest(raw)
+        if not isinstance(raw, str) or not raw:
+            return
+        chunk_bytes = envelope_utf8_byte_length(raw)
+        if self._buffer_bytes + chunk_bytes > MAX_ENVELOPE_UTF8_BYTES:
+            raise OneCallEnvelopeProtocolError("envelope_oversized")
+        self._buffer += raw
+        self._buffer_bytes += chunk_bytes
 
-    def finalize(self) -> tuple[SalesOnePlusStreamDecision, str | None]:
-        return self._scanner.finalize()
+    def finalize(self) -> OneCallEnvelope:
+        envelope = parse_production_envelope_json(
+            self._buffer,
+            active_service_catalog=self._active_service_catalog,
+        )
+        self._validated_envelope = envelope
+        if envelope.route in {"ANSWER", "CLARIFY"}:
+            patient_text = envelope.patient_text
+            if patient_text is None or not patient_text.strip():
+                raise OneCallEnvelopeProtocolError("patient_text_required")
+            self._on_delta(patient_text)
+        return envelope

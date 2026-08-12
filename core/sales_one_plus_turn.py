@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from typing import Protocol
+from typing import Literal, Protocol
 
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
+from contracts.one_call_envelope import OneCallEnvelope
 from contracts.sales_one_plus import (
     SalesOnePlusInvocation,
     SalesOnePlusResult,
@@ -17,18 +18,18 @@ from contracts.target_cached_full_context import TargetCachedFullContext
 from core import turn_timing
 from core.local_problem_gate import decide_local_problem_gate
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
-from core.one_call_client_pack_identity import build_client_pack_identity
-from core.one_call_prefix_cache import get_or_build_stable_prefix
-from core.sales_one_plus_protocol import (
-    build_sales_one_plus_dynamic_suffix,
-    parse_sales_one_plus_output,
-    SalesOnePlusProtocolError,
+from core.one_call_envelope_protocol import (
+    OneCallEnvelopeProtocolError,
+    parse_production_envelope_json,
 )
+from core.one_call_prefix_cache import get_or_build_stable_prefix
+from core.sales_one_plus_protocol import build_sales_one_plus_dynamic_suffix
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
 
 
 RawDeltaCallback = Callable[[str], None]
 PatientDeltaCallback = Callable[[str], None]
+ModelRouteDecision = Literal["answer", "admin", "clarify"]
 
 
 class SalesOnePlusBackend(Protocol):
@@ -136,12 +137,34 @@ def _admin_result(
     source: str,
     reason: str,
     static_handoff: str,
+    envelope: OneCallEnvelope | None = None,
 ) -> SalesOnePlusResult:
     return SalesOnePlusResult(
         decision="admin",
         source=source,
         reason=reason,
         handoff_text=static_handoff,
+        envelope=envelope,
+    )
+
+
+def _model_result_from_envelope(envelope: OneCallEnvelope) -> SalesOnePlusResult:
+    if envelope.route == "ADMIN":
+        raise ValueError("admin_envelope_requires_static_handoff")
+    if envelope.route == "CLARIFY":
+        return SalesOnePlusResult(
+            decision="clarify",
+            source="model",
+            reason="model_clarify",
+            patient_text=envelope.patient_text,
+            envelope=envelope,
+        )
+    return SalesOnePlusResult(
+        decision="answer",
+        source="model",
+        reason="model_answer",
+        patient_text=envelope.patient_text,
+        envelope=envelope,
     )
 
 
@@ -187,25 +210,24 @@ def run_sales_one_plus_candidate(
             static_handoff=static_handoff,
         )
     try:
-        decision, text = parse_sales_one_plus_output(raw)
-    except SalesOnePlusProtocolError as exc:
+        envelope = parse_production_envelope_json(
+            raw,
+            active_service_catalog=active_service_catalog,
+        )
+    except OneCallEnvelopeProtocolError as exc:
         return _admin_result(
             source="protocol",
             reason=exc.code,
             static_handoff=static_handoff,
         )
-    if decision == "admin":
+    if envelope.route == "ADMIN":
         return _admin_result(
             source="model",
             reason="model_admin",
             static_handoff=static_handoff,
+            envelope=envelope,
         )
-    return SalesOnePlusResult(
-        decision="answer",
-        source="model",
-        reason="model_answer",
-        patient_text=text,
-    )
+    return _model_result_from_envelope(envelope)
 
 
 def run_sales_one_plus_candidate_stream(
@@ -222,7 +244,7 @@ def run_sales_one_plus_candidate_stream(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
 ) -> SalesOnePlusResult:
-    """Stream answer body after its marker using one backend call and no retry."""
+    """Buffer provider JSON fully, validate once, then emit patient_text only."""
 
     static_handoff = _require_static_handoff(static_admin_handoff_text)
     local_result = _local_terminal_result(
@@ -239,7 +261,10 @@ def run_sales_one_plus_candidate_stream(
         except Exception as exc:
             raise _ConsumerCallbackError(exc) from exc
 
-    parser = SalesOnePlusStreamParser(emit_patient_delta)
+    parser = SalesOnePlusStreamParser(
+        emit_patient_delta,
+        active_service_catalog=active_service_catalog,
+    )
     invocation = _make_invocation(
         user_message=user_message,
         cached_full_context=cached_full_context,
@@ -251,47 +276,28 @@ def run_sales_one_plus_candidate_stream(
     )
     try:
         backend.generate_stream(invocation, parser.ingest)
-        decision, text = parser.finalize()
+        envelope = parser.finalize()
     except _ConsumerCallbackError as exc:
         raise exc.cause
-    except SalesOnePlusProtocolError as exc:
-        if parser.answer_text:
-            return SalesOnePlusResult(
-                decision="answer",
-                source="backend",
-                reason=exc.code,
-                patient_text=parser.answer_text,
-                interrupted=True,
-            )
+    except OneCallEnvelopeProtocolError as exc:
         return _admin_result(
             source="protocol",
             reason=exc.code,
             static_handoff=static_handoff,
         )
     except Exception:
-        if parser.answer_text:
-            return SalesOnePlusResult(
-                decision="answer",
-                source="backend",
-                reason="stream_interrupted",
-                patient_text=parser.answer_text,
-                interrupted=True,
-            )
+        reason = "stream_interrupted" if parser.has_partial_content else "backend_failed"
         return _admin_result(
             source="backend",
-            reason="backend_failed",
+            reason=reason,
             static_handoff=static_handoff,
         )
 
-    if decision == "admin":
+    if envelope.route == "ADMIN":
         return _admin_result(
             source="model",
             reason="model_admin",
             static_handoff=static_handoff,
+            envelope=envelope,
         )
-    return SalesOnePlusResult(
-        decision="answer",
-        source="model",
-        reason="model_answer",
-        patient_text=text,
-    )
+    return _model_result_from_envelope(envelope)

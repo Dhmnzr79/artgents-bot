@@ -21,7 +21,9 @@ from core.one_call_client_pack_identity import (
     build_client_pack_identity,
 )
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from tests.test_sales_one_plus_turn import answer_envelope, admin_envelope
 from core.one_call_fullcontext_messages import build_one_call_stable_prefix
+from core.one_call_envelope_protocol import dumps_production_envelope
 from core.one_call_closed_envelope_validation import (
     ClosedEnvelopeValidationError,
     closed_envelope_template,
@@ -335,7 +337,7 @@ def test_capability_legacy_transport_error_no_retry() -> None:
     from evals.v5.one_call_flash_capability_contract import case_by_id
 
     transport = FakeProviderTransport(
-        [FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content="@ANSWER\nok", raise_error=RuntimeError("net"))]
+        [FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content=answer_envelope("ok"), raise_error=RuntimeError("net"))]
     )
     result = execute_capability_case(transport, case_by_id("legacy_blocking"))
     assert result.outcome == "transport_error"
@@ -463,7 +465,7 @@ def test_catalog_change_updates_pack_identity_and_prefix(
 
 
 def test_active_service_catalog_not_in_dynamic_suffix() -> None:
-    backend = _Backend("@ANSWER\nok")
+    backend = _Backend(answer_envelope("ok"))
     catalog = _demo_catalog()
     run_sales_one_plus_candidate(
         user_message="вопрос",
@@ -703,7 +705,7 @@ def test_client_pack_changed_during_load_retries_once(monkeypatch: pytest.Monkey
 
 def test_invocation_puts_corpus_in_system_not_user() -> None:
     fact = SalesOnePlusStrictFact(id="f", kind="offer", text="Цена 100 000 ₽.")
-    backend = _Backend("@ANSWER\nОтвет.")
+    backend = _Backend(answer_envelope("Ответ."))
     identity = _shared_test_identity()
     result = run_sales_one_plus_candidate(
         user_message="Есть парковка?",
@@ -724,7 +726,7 @@ def test_invocation_puts_corpus_in_system_not_user() -> None:
 def test_local_prefix_cache_hit_same_identity_and_corpus() -> None:
     identity = _shared_test_identity()
     corpus = _context("repeat-corpus-marker")
-    backend = _Backend("@ANSWER\nДа")
+    backend = _Backend(answer_envelope("Да"))
     run_sales_one_plus_candidate(
         user_message="q1",
         cached_full_context=corpus,
@@ -735,7 +737,7 @@ def test_local_prefix_cache_hit_same_identity_and_corpus() -> None:
         active_service_catalog=_EMPTY_CATALOG,
     )
     assert backend.invocation.local_prefix_cache_hit is False
-    backend2 = _Backend("@ANSWER\nДа")
+    backend2 = _Backend(answer_envelope("Да"))
     run_sales_one_plus_candidate(
         user_message="q2",
         cached_full_context=corpus,
@@ -853,7 +855,7 @@ def test_capability_fake_model_mismatch() -> None:
     from evals.v5.one_call_flash_capability_contract import case_by_id
 
     transport = FakeProviderTransport(
-        [FakeProviderResponse(model="wrong-model", content="@ANSWER\nok")]
+        [FakeProviderResponse(model="wrong-model", content=answer_envelope("ok"))]
     )
     result = execute_capability_case(transport, case_by_id("legacy_blocking"))
     assert result.outcome == "model_mismatch"
@@ -875,7 +877,7 @@ def test_capability_fake_transport_error_no_retry() -> None:
     from evals.v5.one_call_flash_capability_contract import case_by_id
 
     transport = FakeProviderTransport(
-        [FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content="@ANSWER\nok", raise_error=RuntimeError("net"))]
+        [FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content=answer_envelope("ok"), raise_error=RuntimeError("net"))]
     )
     result = execute_capability_case(transport, case_by_id("legacy_blocking"))
     assert result.outcome == "transport_error"
@@ -904,8 +906,8 @@ def test_capability_cache_repeat_without_cached_tokens_is_cache_miss() -> None:
 
     transport = FakeProviderTransport(
         [
-            FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content="@ANSWER\ncold", cached_tokens=0),
-            FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content="@ANSWER\nrepeat", cached_tokens=0),
+            FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content=answer_envelope("cold"), cached_tokens=0),
+            FakeProviderResponse(model=config.SALES_ONE_PLUS_FLASH_MODEL, content=answer_envelope("repeat"), cached_tokens=0),
         ]
     )
     repeat = execute_capability_case(transport, case_by_id("cache_repeat"))

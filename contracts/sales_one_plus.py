@@ -10,8 +10,9 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
+from contracts.one_call_envelope import OneCallEnvelope
 
-SalesOnePlusDecision = Literal["answer", "admin", "spam"]
+SalesOnePlusDecision = Literal["answer", "admin", "spam", "clarify"]
 SalesOnePlusSource = Literal["local_gate", "model", "backend", "protocol"]
 
 
@@ -62,6 +63,7 @@ class SalesOnePlusResult(BaseModel):
     patient_text: str | None = None
     handoff_text: str | None = None
     interrupted: bool = False
+    envelope: OneCallEnvelope | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -76,6 +78,24 @@ class SalesOnePlusResult(BaseModel):
                 or self.interrupted != (self.source == "backend")
             ):
                 raise ValueError("sales_one_plus_answer_inconsistent")
+            if self.source == "model":
+                if self.envelope is None or self.envelope.route != "ANSWER":
+                    raise ValueError("sales_one_plus_answer_envelope_required")
+                if self.patient_text != self.envelope.patient_text:
+                    raise ValueError("sales_one_plus_answer_patient_text_mismatch")
+        elif self.decision == "clarify":
+            if (
+                self.source != "model"
+                or not self.patient_text
+                or not self.patient_text.strip()
+                or self.handoff_text is not None
+                or self.interrupted
+                or self.envelope is None
+                or self.envelope.route != "CLARIFY"
+            ):
+                raise ValueError("sales_one_plus_clarify_inconsistent")
+            if self.patient_text != self.envelope.patient_text:
+                raise ValueError("sales_one_plus_clarify_patient_text_mismatch")
         elif self.decision == "admin":
             if (
                 self.patient_text is not None
@@ -84,6 +104,11 @@ class SalesOnePlusResult(BaseModel):
                 or self.interrupted
             ):
                 raise ValueError("sales_one_plus_admin_inconsistent")
-        elif self.patient_text is not None or self.handoff_text is not None or self.interrupted:
+            if self.source == "model":
+                if self.envelope is None or self.envelope.route != "ADMIN":
+                    raise ValueError("sales_one_plus_admin_envelope_required")
+            elif self.envelope is not None:
+                raise ValueError("sales_one_plus_admin_envelope_forbidden")
+        elif self.patient_text is not None or self.handoff_text is not None or self.interrupted or self.envelope is not None:
             raise ValueError("sales_one_plus_spam_text_forbidden")
         return self

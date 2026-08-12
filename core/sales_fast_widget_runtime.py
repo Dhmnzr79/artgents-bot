@@ -494,10 +494,11 @@ def _materialize_result(
             effective_scope=effective_scope,  # type: ignore[arg-type]
             presentation_cadence_update=widget.presentation_cadence_update,
         )
+    model_route = "clarify" if result.decision == "clarify" else "model"
     return SalesFastWidgetOutcome(
         widget=widget,
         provider_calls=provider_calls,
-        model_route="model",
+        model_route=model_route,
         failure_kind=result.reason if result.interrupted else None,
     )
 

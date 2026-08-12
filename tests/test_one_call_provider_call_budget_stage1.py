@@ -26,6 +26,7 @@ from contracts.sales_one_plus import SalesOnePlusInvocation
 from core import turn_timing
 from core.sales_fast_observability import record_sales_fast_observability
 from core.sales_one_plus_live_backend import SalesOnePlusLiveBackend
+from tests.test_sales_one_plus_turn import answer_envelope
 
 
 class _FakeCompletion:
@@ -257,8 +258,8 @@ def test_flag_on_free_text_routes_sales_fast_without_legacy_llm(
         (),
         {
             "call_count": 0,
-            "generate": lambda self, _inv: "@ANSWER\nok",
-            "generate_stream": lambda self, _inv, on_delta: on_delta("@ANSWER\nok"),
+            "generate": lambda self, _inv: answer_envelope("ok"),
+            "generate_stream": lambda self, _inv, on_delta: on_delta(answer_envelope("ok")),
         },
     )()
     monkeypatch.setattr(

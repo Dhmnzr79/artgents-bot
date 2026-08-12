@@ -95,6 +95,7 @@ class SalesOnePlusLiveBackend:
             max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC,
             messages=_messages(invocation),
+            response_format={"type": "json_object"},
             provider_call_source="sales_fast",
         )
         self.last_observability = _build_observability(
@@ -121,6 +122,7 @@ class SalesOnePlusLiveBackend:
             max_completion_tokens=1024,
             timeout=LLM_REQUEST_TIMEOUT_SEC,
             messages=_messages(invocation),
+            response_format={"type": "json_object"},
             stream=True,
             stream_options={"include_usage": True},
             provider_call_source="sales_fast",

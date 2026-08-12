@@ -25,6 +25,7 @@ from orchestration.sales_one_plus_ask_turn import GOVERNED_TYPED_UI_GATE
 from session import mem_reset
 from tests.test_s61_correction_target_runtime import _seed_followups
 from tests.test_sales_fast_widget_integration import _CountingBackend, _install_sales_fast_transport
+from tests.test_sales_one_plus_turn import answer_envelope
 
 
 class _FakeCompletion:
@@ -57,7 +58,7 @@ def test_on_http_free_text_never_calls_pre_resolver_or_classify_ingress(
 ) -> None:
     _enable_flag_on(monkeypatch)
     spies = _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ANSWER\nответ по базе")
+    backend = _CountingBackend(answer_envelope("ответ по базе"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-http-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
@@ -80,7 +81,7 @@ def test_on_http_gate_before_corpus_resolver_and_factory(
 ) -> None:
     _enable_flag_on(monkeypatch)
     order: list[str] = []
-    backend = _CountingBackend("@ANSWER\nЕсть парковка у здания.")
+    backend = _CountingBackend(answer_envelope("Есть парковка у здания."))
 
     def _gate(text: str):
         order.append("gate")
@@ -196,7 +197,7 @@ def test_on_http_sales_fears_pass_with_one_call(
     case = next(c for c in cases if c.case_id == case_id)
     _enable_flag_on(monkeypatch)
     _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ANSWER\nответ по базе клиники")
+    backend = _CountingBackend(answer_envelope("ответ по базе клиники"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"fear-{case_id}"
     mem_reset(sid)
@@ -213,7 +214,7 @@ def test_on_http_sales_fears_pass_with_one_call(
 def test_on_http_contacts_after_gate_zero_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_flag_on(monkeypatch)
     _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ANSWER\nignored")
+    backend = _CountingBackend(answer_envelope("ignored"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-contacts-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
@@ -231,7 +232,7 @@ def test_on_http_contacts_after_gate_zero_calls(monkeypatch: pytest.MonkeyPatch)
 def test_on_http_booking_after_gate_zero_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_flag_on(monkeypatch)
     _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ANSWER\nignored")
+    backend = _CountingBackend(answer_envelope("ignored"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-booking-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
@@ -250,7 +251,7 @@ def test_on_http_booking_after_gate_zero_calls(monkeypatch: pytest.MonkeyPatch) 
 def test_on_typed_ui_candidate_without_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
     _enable_flag_on(monkeypatch)
     spies = _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ANSWER\nЦена на всю челюсть.")
+    backend = _CountingBackend(answer_envelope("Цена на всю челюсть."))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-typed-{uuid.uuid4().hex[:8]}"
     ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
@@ -421,7 +422,7 @@ def test_observability_excludes_patient_text_and_corpus(
     caplog.set_level(logging.INFO)
     _enable_flag_on(monkeypatch)
     patient = "у меня кровь и сильная боль после имплантации"
-    backend = _CountingBackend("@ANSWER\nответ")
+    backend = _CountingBackend(answer_envelope("ответ"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-obs-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)

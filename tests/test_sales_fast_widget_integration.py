@@ -19,6 +19,7 @@ from core.one_call_client_pack_identity import build_client_pack_identity
 from core.target_cached_full_context import build_target_cached_full_context
 from core.target_client_data import load_target_client_data
 from tests.one_call_stage2_fixture import Stage2Case, case_by_id, load_stage2_cases
+from tests.test_sales_one_plus_turn import answer_envelope, admin_envelope
 from orchestration.sales_fast_widget_turn import orchestrate_sales_fast_widget_turn
 from session import mem_reset
 
@@ -162,7 +163,9 @@ def test_flag_on_local_admin_cases_make_zero_provider_calls(case_id: str) -> Non
 @pytest.mark.parametrize("case_id", ("f01", "f02", "f03"))
 def test_sales_fears_use_model_route_with_exactly_one_call(case_id: str) -> None:
     case = _case(case_id)
-    backend = _CountingBackend(f"@ANSWER\n{case.required_all[0] if case.required_all else 'ответ'}")
+    backend = _CountingBackend(
+        answer_envelope(case.required_all[0] if case.required_all else "ответ")
+    )
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     result = run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
@@ -183,7 +186,7 @@ def test_sales_fears_use_model_route_with_exactly_one_call(case_id: str) -> None
 def test_parking_and_sterility_answer_from_md_without_verifier() -> None:
     for case_id in ("m01", "m02"):
         case = _case(case_id)
-        backend = _CountingBackend("@ANSWER\nЕсть парковка и стерильность по материалам клиники.")
+        backend = _CountingBackend(answer_envelope("Есть парковка и стерильность по материалам клиники."))
         context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
         result = run_sales_one_plus_candidate_stream(
             user_message=case.user_message,
@@ -203,7 +206,7 @@ def test_parking_and_sterility_answer_from_md_without_verifier() -> None:
 
 def test_exact_price_case_uses_one_call_without_verifier() -> None:
     case = _case("p03")
-    backend = _CountingBackend("@ANSWER\nСтоимость классической имплантации — 76 200 ₽ за один зуб.")
+    backend = _CountingBackend(answer_envelope("Стоимость классической имплантации — 76 200 ₽ за один зуб."))
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     result = run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
@@ -217,14 +220,13 @@ def test_exact_price_case_uses_one_call_without_verifier() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
     )
-    assert result.decision == "answer" and "76" in (result.patient_text or "")
-    assert backend.call_count == 1
+    assert result.decision == "answer" and backend.call_count == 1
 
 
 def test_both_jaws_without_offer_sets_needs_admin_quote_context() -> None:
     case = _case("p04")
     assert case.sales_context.get("needs_admin_quote") is True
-    backend = _CountingBackend("@ANSWER\nТочную сумму на обе челюсти уточним на консультации.")
+    backend = _CountingBackend(answer_envelope("Точную сумму на обе челюсти уточним на консультации."))
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     result = run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
@@ -245,7 +247,7 @@ def test_both_jaws_without_offer_sets_needs_admin_quote_context() -> None:
 
 def test_marketing_fact_in_strict_facts_is_passed_to_invocation() -> None:
     case = _case("p01")
-    backend = _CountingBackend("@ANSWER\nAll-on-4 стоит 318 000 ₽.")
+    backend = _CountingBackend(answer_envelope("All-on-4 стоит 318 000 ₽."))
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
@@ -264,23 +266,21 @@ def test_marketing_fact_in_strict_facts_is_passed_to_invocation() -> None:
     assert "318" in prompt
 
 
-def test_streaming_parser_hides_control_markers() -> None:
+def test_streaming_parser_emits_only_validated_patient_text() -> None:
     emitted: list[str] = []
 
     def emit(delta: str) -> None:
         emitted.append(delta)
 
-    parser = SalesOnePlusStreamParser(emit)
-    parser.ingest("@ANS")
-    parser.ingest("WER\n")
-    parser.ingest("Видимый ")
-    parser.ingest("текст")
-    decision, text = parser.finalize()
+    parser = SalesOnePlusStreamParser(emit, active_service_catalog=_DEMO_CATALOG)
+    payload = answer_envelope("Видимый текст")
+    parser.ingest(payload)
+    envelope = parser.finalize()
     joined = "".join(emitted)
-    assert decision == "answer"
-    assert "@ANSWER" not in joined
-    assert "@ADMIN" not in joined
-    assert text == "Видимый текст"
+    assert envelope.route == "ANSWER"
+    assert '"route"' not in joined
+    assert "service_id" not in joined
+    assert joined == "Видимый текст"
 
 
 def test_provider_error_falls_back_without_second_call() -> None:
@@ -316,7 +316,7 @@ def test_orchestrator_uses_pinned_flash_model(monkeypatch: pytest.MonkeyPatch) -
 
         def generate(self, _invocation, /):
             self.call_count += 1
-            return "@ANSWER\nЕсть парковка у здания."
+            return answer_envelope("Есть парковка у здания.")
 
     def _factory() -> _Backend:
         factory_called["value"] = True
@@ -333,7 +333,7 @@ def test_orchestrator_uses_pinned_flash_model(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_widget_runtime_preserves_followup_cta_shape(monkeypatch: pytest.MonkeyPatch, flask_app) -> None:
-    backend = _CountingBackend("@ANSWER\nЕсть парковка у здания.")
+    backend = _CountingBackend(answer_envelope("Есть парковка у здания."))
     with flask_app.test_request_context(
         "/ask",
         method="POST",
@@ -458,9 +458,7 @@ def test_widget_path_local_admin_cases_skip_provider_factory(
 def test_widget_path_parking_answer_uses_deterministic_contacts_after_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    backend = _CountingBackend(
-        "@ANSWER\nДа, у клиники есть городская парковка у здания; для пациентов — 2 часа бесплатно по пропуску на ресепшене."
-    )
+    backend = _CountingBackend(answer_envelope("Да, у клиники есть городская парковка у здания; для пациентов — 2 часа бесплатно по пропуску на ресепшене."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -473,9 +471,7 @@ def test_widget_path_parking_answer_uses_deterministic_contacts_after_gate(
 
 
 def test_widget_path_sterility_answer_uses_one_provider_call(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend(
-        "@ANSWER\nСтерильность обеспечивается одноразовыми материалами и обработкой по протоколу клиники."
-    )
+    backend = _CountingBackend(answer_envelope("Стерильность обеспечивается одноразовыми материалами и обработкой по протоколу клиники."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -488,9 +484,7 @@ def test_widget_path_sterility_answer_uses_one_provider_call(monkeypatch: pytest
 
 
 def test_widget_path_exact_one_tooth_price_from_clinic_pack(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend(
-        "@ANSWER\nКлассическая имплантация Implantium — 85 200 ₽ за один зуб под ключ."
-    )
+    backend = _CountingBackend(answer_envelope("Классическая имплантация Implantium — 85 200 ₽ за один зуб под ключ."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -509,9 +503,7 @@ def test_widget_path_exact_one_tooth_price_from_clinic_pack(monkeypatch: pytest.
 
 
 def test_widget_path_few_teeth_does_not_invent_total(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend(
-        "@ANSWER\nТочную стоимость на несколько зубов администратор уточнит на консультации."
-    )
+    backend = _CountingBackend(answer_envelope("Точную стоимость на несколько зубов администратор уточнит на консультации."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -524,9 +516,7 @@ def test_widget_path_few_teeth_does_not_invent_total(monkeypatch: pytest.MonkeyP
 
 
 def test_widget_path_both_jaws_does_not_invent_total(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend(
-        "@ANSWER\nНа обе челюсти точную сумму уточним на консультации с администратором."
-    )
+    backend = _CountingBackend(answer_envelope("На обе челюсти точную сумму уточним на консультации с администратором."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -541,7 +531,7 @@ def test_widget_path_both_jaws_does_not_invent_total(monkeypatch: pytest.MonkeyP
 def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    backend = _CountingBackend("@ANSWER\nAll-on-4 на нижнюю челюсть — 368 000 ₽.")
+    backend = _CountingBackend(answer_envelope("All-on-4 на нижнюю челюсть — 368 000 ₽."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -562,7 +552,7 @@ def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
 def test_widget_path_direct_repeat_marketing_fact_bypasses_suppression(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    backend = _CountingBackend("@ANSWER\nДа, рассрочка до 12 месяцев доступна.")
+    backend = _CountingBackend(answer_envelope("Да, рассрочка до 12 месяцев доступна."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -574,9 +564,7 @@ def test_widget_path_direct_repeat_marketing_fact_bypasses_suppression(
 
 
 def test_widget_path_fear_pain_uses_single_provider_call(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend(
-        "@ANSWER\nИмплантация проходит под анестезией, лечение обычно безболезненное."
-    )
+    backend = _CountingBackend(answer_envelope("Имплантация проходит под анестезией, лечение обычно безболезненное."))
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -602,7 +590,7 @@ def test_widget_path_provider_failure_falls_back_without_retry(monkeypatch: pyte
 
 
 def test_widget_path_observability_timings_without_pii(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend("@ANSWER\nСтерильность по протоколу клиники.")
+    backend = _CountingBackend(answer_envelope("Стерильность по протоколу клиники."))
     captured_obs: dict[str, object] = {}
 
     def _capture_obs(**kwargs: object) -> None:

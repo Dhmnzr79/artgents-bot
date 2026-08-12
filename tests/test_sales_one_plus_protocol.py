@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
+from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError, parse_production_envelope_json, production_envelope_template
 from core.sales_one_plus_protocol import (
     SALES_ONE_PLUS_SYSTEM_POLICY,
     SalesOnePlusProtocolError,
     parse_sales_one_plus_output,
 )
+from tests.test_sales_one_plus_turn import _EMPTY_CATALOG, answer_envelope, admin_envelope
 
 
-def test_line_protocol_answer_and_admin_body_rules() -> None:
+def test_legacy_line_protocol_answer_and_admin_body_rules() -> None:
     assert parse_sales_one_plus_output("\n@ANSWER\nГотовый ответ") == ("answer", "Готовый ответ")
     assert parse_sales_one_plus_output("@ADMIN\nmodel prose is ignored") == ("admin", None)
     assert parse_sales_one_plus_output("@ANSWER Да, у здания есть парковка") == (
@@ -30,31 +34,55 @@ def test_line_protocol_answer_and_admin_body_rules() -> None:
         3,
     ],
 )
-def test_line_protocol_rejects_malformed_output(raw: object) -> None:
+def test_legacy_line_protocol_rejects_malformed_output(raw: object) -> None:
     with pytest.raises(SalesOnePlusProtocolError):
         parse_sales_one_plus_output(raw)
 
 
-def test_policy_keeps_sales_fears_but_hands_medical_dialogue_to_admin() -> None:
-    assert "Future fears about pain, price, osseointegration, trust, or timing" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
-    )
+def test_production_policy_requires_json_only_transport() -> None:
+    assert "@ANSWER" not in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "@ADMIN" not in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "Return exactly one JSON control envelope" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "route=ADMIN" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "route=CLARIFY" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "Future fears about pain, price, osseointegration, trust, or timing" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "SALES_CONTEXT.needs_admin_quote is true" in SALES_ONE_PLUS_SYSTEM_POLICY
-    assert "return @ANSWER without any price amount or calculation" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "Classify commercial_intent only" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "deterministic code renders those values" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "Marketing promotions" not in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "A price for several teeth" not in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "deterministic code owns follow-ups, button slots, and CTA" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "Never calculate, multiply, sum, or interpolate prices" in SALES_ONE_PLUS_SYSTEM_POLICY
+
+
+def test_production_parser_accepts_valid_answer_envelope() -> None:
+    envelope = parse_production_envelope_json(
+        answer_envelope("Готовый ответ"),
+        active_service_catalog=_EMPTY_CATALOG,
     )
-    assert "@ADMIN is only for problematic or medical requests" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
+    assert envelope.route == "ANSWER"
+    assert envelope.patient_text == "Готовый ответ"
+
+
+def test_production_parser_rejects_non_json() -> None:
+    with pytest.raises(OneCallEnvelopeProtocolError, match="json_invalid"):
+        parse_production_envelope_json("hello", active_service_catalog=_EMPTY_CATALOG)
+
+
+def test_production_parser_rejects_admin_with_patient_text() -> None:
+    payload = production_envelope_template(
+        route="ADMIN",
+        patient_text="nope",
+        clarify_axis=None,
+        clarify_service_options=None,
     )
-    assert "CURRENT_STRICT_FACTS for the active service scope" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
+    with pytest.raises(OneCallEnvelopeProtocolError, match="patient_text_forbidden_for_admin"):
+        parse_production_envelope_json(json.dumps(payload), active_service_catalog=_EMPTY_CATALOG)
+
+
+def test_production_parser_accepts_admin_envelope() -> None:
+    envelope = parse_production_envelope_json(
+        admin_envelope(),
+        active_service_catalog=_EMPTY_CATALOG,
     )
-    assert "Do not lift 13%, 15%, or other promos from the general corpus" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
-    )
-    assert "deterministic code owns follow-ups, button slots, and CTA" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
-    )
-    assert "Never calculate, multiply, sum, or interpolate prices" in (
-        SALES_ONE_PLUS_SYSTEM_POLICY
-    )
+    assert envelope.route == "ADMIN"

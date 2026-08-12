@@ -35,10 +35,14 @@ from core.widget_cors import (
     widget_cors_preflight_response,
 )
 from core.routing_loader import THRESHOLDS
+from core.runtime_diagnostics import (
+    SseRenderDiagnosticTracker,
+    build_runtime_turn_diagnostic_payload,
+)
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
 from core.observability_pii import observability_turn_preview, observability_user_texts
-from logging_setup import LOG_FILE, emit_bot_event, get_logger, make_request_context, log_json, redact_text
+from logging_setup import LOG_FILE, emit_bot_event, get_logger, log_json, log_json_no_context, make_request_context, redact_text
 from session import (
     bind_client_id,
     get_topic_state,
@@ -60,6 +64,183 @@ from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
 from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
+
+
+def _current_transport_kind() -> str:
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context():
+            path = str(
+                getattr(flask_request, "path", "")
+                or (getattr(flask_request, "ctx", {}) or {}).get("path")
+                or ""
+            )
+            if path.endswith("/ask/stream"):
+                return "sse"
+    except Exception:
+        pass
+    return "json"
+
+
+def _route_from_orch_result(orch_r: AskOrchestrationResult | None) -> str | None:
+    if orch_r is None:
+        return None
+    route = getattr(orch_r, "service_route", None)
+    if route:
+        return str(route)
+    kind = getattr(orch_r, "kind", None)
+    if kind:
+        return str(kind)
+    return None
+
+
+def _snapshot_provider_budget(budget) -> None:
+    turn_timing.set_flag("provider_calls", budget.call_count)
+    turn_timing.set_flag("provider_policy", budget.policy.value)
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            flask_request.ctx["provider_calls"] = int(budget.call_count)
+            flask_request.ctx["provider_policy"] = budget.policy.value
+    except Exception:
+        pass
+
+
+def _provider_snapshot_from_context() -> tuple[int, str | None]:
+    provider_calls = 0
+    provider_policy: str | None = None
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = flask_request.ctx
+            if ctx.get("provider_calls") is not None:
+                provider_calls = int(ctx["provider_calls"])
+            if ctx.get("provider_policy") is not None:
+                provider_policy = str(ctx["provider_policy"])
+    except Exception:
+        pass
+    if provider_calls == 0:
+        bucket = turn_timing.summary_for_turn_complete()
+        flag_calls = bucket.get("provider_calls")
+        if isinstance(flag_calls, int):
+            provider_calls = flag_calls
+    if provider_policy is None:
+        try:
+            from flask import has_request_context, request as flask_request
+
+            if has_request_context():
+                flags = (flask_request.ctx.get("turn_timing") or {}).get("flags") or {}
+                raw_policy = flags.get("provider_policy")
+                if raw_policy is not None:
+                    provider_policy = str(raw_policy)
+        except Exception:
+            pass
+    return provider_calls, provider_policy
+
+
+def _emit_runtime_turn_diagnostic(
+    *,
+    status: str,
+    route: str | None,
+    transport: str,
+    provider_calls: int | None = None,
+    provider_policy: str | None = None,
+    request_id: str | None = None,
+    client_id: str | None = None,
+) -> None:
+    if provider_calls is None or provider_policy is None:
+        snap_calls, snap_policy = _provider_snapshot_from_context()
+        if provider_calls is None:
+            provider_calls = snap_calls
+        if provider_policy is None:
+            provider_policy = snap_policy
+    ctx: dict[str, Any] = {}
+    sales_fast_obs = None
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = dict(flask_request.ctx)
+            bucket = ctx.get("turn_timing") or {}
+            flags = bucket.get("flags") or {}
+            sales_fast_obs = flags.get("sales_fast_observability")
+    except Exception:
+        pass
+    resolved_request_id = request_id
+    if resolved_request_id is None and ctx.get("request_id"):
+        resolved_request_id = str(ctx.get("request_id"))
+    resolved_client_id = client_id
+    if resolved_client_id is None and ctx.get("client_id"):
+        resolved_client_id = str(ctx.get("client_id"))
+    payload = build_runtime_turn_diagnostic_payload(
+        request_id=resolved_request_id,
+        client_id=resolved_client_id,
+        transport=transport,
+        route=route,
+        status=status,
+        provider_calls=int(provider_calls),
+        provider_policy=provider_policy,
+        timing_summary=turn_timing.summary_for_turn_complete(),
+        sales_fast_observability=sales_fast_obs,
+    )
+    log_json_no_context(logger, "runtime_turn_diagnostic", **payload)
+
+
+def _runtime_turn_diagnostic_ready() -> bool:
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = flask_request.ctx
+            if ctx.get("provider_calls") is not None:
+                return True
+            marks = (ctx.get("turn_timing") or {}).get("marks") or {}
+            if marks.get("orchestrate_done") is not None:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _emit_runtime_turn_diagnostic_once(
+    *,
+    status: str,
+    route: str | None,
+    transport: str,
+    request_id: str | None = None,
+    client_id: str | None = None,
+    provider_calls: int | None = None,
+    provider_policy: str | None = None,
+) -> None:
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            ctx = flask_request.ctx
+            if ctx.get("runtime_turn_diagnostic_emitted"):
+                return
+            ctx["runtime_turn_diagnostic_emitted"] = True
+    except Exception:
+        pass
+    _emit_runtime_turn_diagnostic(
+        status=status,
+        route=route,
+        transport=transport,
+        request_id=request_id,
+        client_id=client_id,
+        provider_calls=provider_calls,
+        provider_policy=provider_policy,
+    )
+
+
+def _emit_sse_render_diagnostic(tracker: SseRenderDiagnosticTracker) -> None:
+    if tracker.emitted:
+        return
+    tracker.emitted = True
+    log_json_no_context(logger, "sse_render_diagnostic", **tracker.build_payload())
 
 
 def _enqueue_v5_resolver_trace(
@@ -315,8 +496,11 @@ def _orchestrate_ask_turn(data: dict):
     with http_provider_budget_scope(
         request_id=request_id,
         sales_one_plus_on=bool(SALES_ONE_PLUS_ON),
-    ):
-        return _orchestrate_ask_turn_inner(data)
+    ) as budget:
+        try:
+            return _orchestrate_ask_turn_inner(data)
+        finally:
+            _snapshot_provider_budget(budget)
 
 
 def _orchestrate_ask_turn_inner(data: dict):
@@ -411,8 +595,28 @@ def ask():
 
         mark("orchestrate_done")
         q = orch_r.q or ""
-        return _dispatch_orchestration_json(orch_r)
+        try:
+            resp = _dispatch_orchestration_json(orch_r)
+            _emit_runtime_turn_diagnostic_once(
+                status="completed",
+                route=_route_from_orch_result(orch_r),
+                transport="json",
+            )
+            return resp
+        except Exception:
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route=_route_from_orch_result(orch_r),
+                transport="json",
+            )
+            raise
     except Exception as e:
+        if _runtime_turn_diagnostic_ready():
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route="error",
+                transport="json",
+            )
         logger.exception("ask_failed", extra={"q": q, "err": str(e)})
         if request.ctx.get("sid") and (q or "").strip():
             emit_bot_event(
@@ -591,6 +795,8 @@ def _run_sse_worker_turn(
     shares request.ctx with the request-handling/generator thread. Never raises:
     mirrors ask_stream()'s own top-level error handling so the caller's
     Future.result() is always safe to read."""
+    diagnostic_emitted = False
+    worker_error: Exception | None = None
     try:
         with worker_execution_context(
             app,
@@ -601,16 +807,45 @@ def _run_sse_worker_turn(
             status_emit=status_emit,
             text_emit=text_emit,
         ):
-            orch_r = _orchestrate_ask_turn(data)
-            turn_timing.mark("orchestrate_done")
-            return _build_sse_payload(orch_r)
+            try:
+                orch_r = _orchestrate_ask_turn(data)
+                turn_timing.mark("orchestrate_done")
+                out, http_status = _build_sse_payload(orch_r)
+                route = str((out.get("meta") or {}).get("service_route") or _route_from_orch_result(orch_r))
+                _emit_runtime_turn_diagnostic_once(
+                    status="completed",
+                    route=route or None,
+                    transport="sse",
+                )
+                diagnostic_emitted = True
+                return out, http_status
+            except Exception as exc:
+                worker_error = exc
+                _emit_runtime_turn_diagnostic_once(
+                    status="error",
+                    route="error",
+                    transport="sse",
+                )
+                diagnostic_emitted = True
+                raise
     except Exception as e:
-        logger.exception("ask_stream_worker_failed", extra={"sid": sid, "err": str(e)})
+        if not diagnostic_emitted:
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route="error",
+                transport="sse",
+                request_id=request_id,
+                client_id=client_id,
+                provider_calls=0,
+                provider_policy=None,
+            )
+        err = worker_error or e
+        logger.exception("ask_stream_worker_failed", extra={"sid": sid, "err": str(err)})
         emit_bot_event(
             logger,
             "ask_stream_failed",
             status="error",
-            details={"error": str(e)[:500]},
+            details={"error": str(err)[:500]},
             request_id=request_id,
             sid=sid,
             client_id=client_id,
@@ -664,82 +899,103 @@ def _stream_ask_turn_response(data: dict, client_id: str):
                 yield _sse_text_delta_line(delta)
 
     def _gen():
-        # Requirement: first SSE event before orchestration starts or waits on
-        # anything — this yield happens before any pipeline call whatsoever.
-        yield _sse_status_line(_SSE_INITIAL_STATUS_PHRASE)
-        bucket["marks"]["first_server_event"] = time.monotonic()
+        tracker = SseRenderDiagnosticTracker(
+            request_id=request_id,
+            client_id=client_id,
+        )
+        try:
+            # Requirement: first SSE event before orchestration starts or waits on
+            # anything — this yield happens before any pipeline call whatsoever.
+            yield tracker.track(_sse_status_line(_SSE_INITIAL_STATUS_PHRASE))
+            bucket["marks"]["first_server_event"] = time.monotonic()
 
-        acquired = _sse_worker_admission.acquire(blocking=False)
-        if not acquired:
-            # Safe synchronous fallback, inside the generator, after the first
-            # status — runs the same _run_sse_worker_turn inline (own
-            # independent context, not the live one), on this thread. Never
-            # worse than pre-PERF-1 behavior.
-            out, _http_status = _run_sse_worker_turn(
-                data=data,
-                client_id=client_id,
-                request_id=request_id,
-                sid=sid,
-                turn_t0_monotonic=turn_t0,
-                status_emit=None,
-                text_emit=text_queue.put,
-            )
-            yield from _drain_text_queue()
-            route = str((out.get("meta") or {}).get("service_route") or "")
-            yield _sse_typing_line(_sse_typing_phase(kind="service_reply", route=route))
-            yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
-            bucket["marks"]["request_complete"] = time.monotonic()
-            yield "event: done\ndata: {}\n\n"
-            return
-
-        emitter = _make_status_emitter(status_queue, already_sent=_SSE_INITIAL_STATUS_PHRASE)
-
-        def _worker_entry():
-            try:
-                return _run_sse_worker_turn(
+            acquired = _sse_worker_admission.acquire(blocking=False)
+            if not acquired:
+                # Safe synchronous fallback, inside the generator, after the first
+                # status — runs the same _run_sse_worker_turn inline (own
+                # independent context, not the live one), on this thread. Never
+                # worse than pre-PERF-1 behavior.
+                out, _http_status = _run_sse_worker_turn(
                     data=data,
                     client_id=client_id,
                     request_id=request_id,
                     sid=sid,
                     turn_t0_monotonic=turn_t0,
-                    status_emit=emitter,
+                    status_emit=None,
                     text_emit=text_queue.put,
                 )
-            finally:
+                for line in _drain_text_queue():
+                    yield tracker.track(line)
+                route = str((out.get("meta") or {}).get("service_route") or "")
+                tracker.route = route or tracker.route
+                yield tracker.track(_sse_typing_line(_sse_typing_phase(kind="service_reply", route=route)))
+                yield tracker.track(
+                    f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+                )
+                bucket["marks"]["request_complete"] = time.monotonic()
+                yield tracker.track("event: done\ndata: {}\n\n")
+                return
+
+            emitter = _make_status_emitter(status_queue, already_sent=_SSE_INITIAL_STATUS_PHRASE)
+
+            def _worker_entry():
+                try:
+                    return _run_sse_worker_turn(
+                        data=data,
+                        client_id=client_id,
+                        request_id=request_id,
+                        sid=sid,
+                        turn_t0_monotonic=turn_t0,
+                        status_emit=emitter,
+                        text_emit=text_queue.put,
+                    )
+                finally:
+                    _sse_worker_admission.release()
+
+            try:
+                future = _sse_worker_executor.submit(_worker_entry)
+            except Exception:
                 _sse_worker_admission.release()
+                raise
 
-        try:
-            future = _sse_worker_executor.submit(_worker_entry)
-        except Exception:
-            _sse_worker_admission.release()
-            raise
-
-        while not future.done():
-            yielded_text = False
+            while not future.done():
+                yielded_text = False
+                for line in _drain_text_queue():
+                    yielded_text = True
+                    yield tracker.track(line)
+                if yielded_text:
+                    continue
+                try:
+                    phrase = status_queue.get(timeout=_SSE_STATUS_POLL_INTERVAL_SEC)
+                except queue.Empty:
+                    continue
+                yield tracker.track(_sse_status_line(phrase))
             for line in _drain_text_queue():
-                yielded_text = True
-                yield line
-            if yielded_text:
-                continue
-            try:
-                phrase = status_queue.get(timeout=_SSE_STATUS_POLL_INTERVAL_SEC)
-            except queue.Empty:
-                continue
-            yield _sse_status_line(phrase)
-        yield from _drain_text_queue()
-        while True:
-            try:
-                phrase = status_queue.get_nowait()
-            except queue.Empty:
-                break
-            yield _sse_status_line(phrase)
+                yield tracker.track(line)
+            while True:
+                try:
+                    phrase = status_queue.get_nowait()
+                except queue.Empty:
+                    break
+                yield tracker.track(_sse_status_line(phrase))
 
-        out, _http_status = future.result()
-        route = str((out.get("meta") or {}).get("service_route") or "")
-        yield _sse_typing_line(_sse_typing_phase(kind="service_reply", route=route))
-        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
-        bucket["marks"]["request_complete"] = time.monotonic()
-        yield "event: done\ndata: {}\n\n"
+            out, _http_status = future.result()
+            route = str((out.get("meta") or {}).get("service_route") or "")
+            tracker.route = route or tracker.route
+            yield tracker.track(_sse_typing_line(_sse_typing_phase(kind="service_reply", route=route)))
+            yield tracker.track(
+                f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+            )
+            bucket["marks"]["request_complete"] = time.monotonic()
+            yield tracker.track("event: done\ndata: {}\n\n")
+        except GeneratorExit:
+            tracker.status = "client_closed"
+            raise
+        except Exception:
+            tracker.status = "error"
+            raise
+        finally:
+            _emit_sse_render_diagnostic(tracker)
 
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
 
@@ -782,12 +1038,44 @@ def _sse_service_reply(
     turn_timing.mark("first_server_event")
     turn_timing.mark("request_complete")
 
+    _emit_runtime_turn_diagnostic_once(
+        status="completed",
+        route=str(route or "") or None,
+        transport="sse",
+    )
+
     phase = _sse_typing_phase(kind="service_reply", route=route)
+    request_id = None
+    client_id = None
+    try:
+        from flask import has_request_context, request as flask_request
+
+        if has_request_context() and getattr(flask_request, "ctx", None):
+            request_id = str(flask_request.ctx.get("request_id") or "") or None
+            client_id = str(flask_request.ctx.get("client_id") or "") or None
+    except Exception:
+        pass
 
     def _gen():
-        yield _sse_typing_line(phase)
-        yield f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
-        yield "event: done\ndata: {}\n\n"
+        tracker = SseRenderDiagnosticTracker(
+            request_id=request_id,
+            client_id=client_id,
+        )
+        tracker.route = str(route or "") or tracker.route
+        try:
+            yield tracker.track(_sse_typing_line(phase))
+            yield tracker.track(
+                f"event: ui\ndata: {json.dumps(_sanitize(out), ensure_ascii=False)}\n\n"
+            )
+            yield tracker.track("event: done\ndata: {}\n\n")
+        except GeneratorExit:
+            tracker.status = "client_closed"
+            raise
+        except Exception:
+            tracker.status = "error"
+            raise
+        finally:
+            _emit_sse_render_diagnostic(tracker)
 
     return app.response_class(_gen(), mimetype="text/event-stream", headers=_SSE_HEADERS)
 
@@ -841,10 +1129,22 @@ def ask_stream():
             orch_r = _orchestrate_ask_turn(data)
             turn_timing.mark("orchestrate_done")
             q = orch_r.q or ""
-            return _dispatch_orchestration_sse(orch_r)
+            resp = _dispatch_orchestration_sse(orch_r)
+            _emit_runtime_turn_diagnostic_once(
+                status="completed",
+                route=_route_from_orch_result(orch_r),
+                transport="sse",
+            )
+            return resp
 
         return _stream_ask_turn_response(data, client_id)
     except Exception as e:
+        if _runtime_turn_diagnostic_ready():
+            _emit_runtime_turn_diagnostic_once(
+                status="error",
+                route="error",
+                transport="sse",
+            )
         logger.exception("ask_stream_failed", extra={"q": q, "err": str(e)})
         if request.ctx.get("sid") and (q or "").strip():
             emit_bot_event(

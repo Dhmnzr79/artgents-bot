@@ -2,8 +2,8 @@
 
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
 offline в S1, demo target policy материализована в S20, pure deterministic selector —
-в S21, one-service offline evidence package — в S22. Session/runtime wiring и authority
-отсутствуют.
+в S21, one-service offline evidence package — в S22. Session/runtime wiring и единый
+`PresentationResult` **частично существуют**, но **не приняты** как Stage 5.1 product path.
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
@@ -29,17 +29,17 @@ S20 наполняет demo только ordered source refs/contexts и не п
 
 | Режим | Порядок | Что важно |
 |---|---|---|
-| Обычный первый вопрос об услуге | Ответ по базе → initial commercial block → CTA | Базовые факты показываются сразу, если они есть и применимы |
+| Обычный первый ответ об услуге | Ответ по базе → обязательная priority service promo → до двух amplifiers primary `scenario` → CTA | Priority promo — marketing fact, не amplifier; consultation/installment не автодобавляются |
 | Обычное продолжение | Ответ по базе → CTA | Нейтральный follow-up не прокручивает pool усилителей |
-| Маркетинговое сомнение | `acknowledge_concern` → `answer_from_sources` → `select_marketing_facts` → CTA | Flow задаёт порядок, а не текст; лимит 3/2 общий |
+| Маркетинговое сомнение | `acknowledge_concern` → `answer_from_sources` → priority promo (если первый eligible service turn) → `select_marketing_facts` → CTA | Flow задаёт порядок, а не текст; лимит 3/2 общий |
 | Прямой вопрос о факте | Ответ по источнику → CTA | Не подменяется сценарием; история автопоказа не может скрыть ответ |
 
 Если первый вопрос об услуге уже содержит маркетинговое сомнение, основной ответ по
-источникам остаётся вне marketing slots. Затем выбираются до двух релевантных усилителей
-активного сценария, а оставшиеся места общего лимита трёх facts занимают применимые
-коммерческие предложения по приоритету клиники. Один усилитель оставляет до двух мест
-для предложений, два усилителя — до одного. CTA добавляется отдельно; пустые места не
-заполняются нерелевантными фактами.
+источникам остаётся вне marketing slots. Затем при первом eligible service turn
+резервируется обязательная priority service promo (если применима), после чего выбираются
+до двух релевантных усилителей активного primary `scenario`. Оставшиеся места общего
+лимита трёх facts могут занять другие применимые commercial facts. CTA добавляется
+отдельно; пустые места не заполняются нерелевантными фактами.
 
 ## Что считается marketing fact
 
@@ -51,19 +51,37 @@ S20 наполняет demo только ordered source refs/contexts и не п
 - налоговый вычет;
 - гарантия, врач, технология или другой факт, если он добавлен для убеждения.
 
-В лимит не входят основной ответ по базе, цена и карточки услуг, CTA и follow-up-кнопки. Если пациент сам спросил о гарантии, враче или приживаемости, соответствующий факт — часть прямого ответа. Если он добавлен поверх ответа для убеждения, это усилитель и один слот.
+**Priority service promo** — обязательный marketing fact первого eligible service turn; **не** amplifier.
 
-## Базовый коммерческий блок
+В лимит не входят основной ответ по базе, цена и карточки услуг, CTA и follow-up-кнопки. Если пациент сам спросил о гарантии, враче или приживаемости, соответствующий факт — часть прямого ответа. Если он добавлен поверх ответа для убеждения, это усилитель и один amplifier slot.
 
-В первом обычном ответе по услуге бот показывает при наличии и применимости:
+## Priority service promo (первый ответ об услуге)
 
-1. одну бесплатную консультацию;
-2. один вариант рассрочки;
-3. одну главную акцию или подарок по приоритету клиники.
+На первом допустимом содержательном ответе с authoritative non-null `service_id` бот
+обязан показать **ровно одну** главную active, непросроченную, service-linked акцию этой
+услуги по clinic-authored priority. Текст, процент, срок и условия — только из
+authoritative client data; модель не выбирает точную акцию и не генерирует её условия.
 
-Если одной категории нет, её слот может занять следующий применимый факт. При прямом вопросе об акциях показываются до трёх применимых акций/подарков по приоритету.
+- priority promo — marketing fact; входит в лимит **3**, **не** в лимит **2** amplifiers;
+- selector **сначала** резервирует priority promo, **затем** выбирает amplifiers;
+- при `commercial_intent=none` — единственное bounded commercial исключение; **не** открывает
+  price amount, price/offer card, payment terms или included items;
+- при `service_id=null` автоматическая service promo запрещена;
+- прямой вопрос об **уже показанной конкретной** акции получает ответ повторно; suppression повтора обходится; eligibility, active dates и service applicability **не** обходятся.
 
-Бесплатная консультация не означает бесплатную КТ. Отдельная акция на КТ хранится отдельным фактом. Налоговый вычет не входит в базовый первый блок: он используется при финансовом сценарии, прямом вопросе или как усилитель.
+**Бесплатная консультация и рассрочка** в первом ответе **не** добавляются автоматически
+сверх priority promo и усилителей. Рассрочка — при прямом вопросе об оплате или валидном
+cost/payment context. Консультация — как применимый выбранный fact или через отдельный
+CTA/consultation flow. Нельзя автоматически показывать promo + consultation + installment
++ amplifiers сверх общего лимита **3**.
+
+Общий вопрос «Какие акции есть?» — **unresolved semantic seam** Stage 5.1: отдельного promo
+intent в closed envelope нет; точное количество promo facts для overview **не** определяется
+в этом docs pass. До owner decision и read-only seam audit не утверждать нормативно
+автоматический показ нескольких promo/gift facts.
+
+Налоговый вычет не входит в обязательный первый service promo: он используется при
+финансовом сценарии, прямом вопросе или как усилитель.
 
 ## Сценарии и усилители
 
@@ -75,7 +93,14 @@ S20 наполняет demo только ordered source refs/contexts и не п
 - `doctor_trust` — сомнение в опыте/доверии к врачу;
 - `result_reliability` — сомнение в результате, приживаемости или надёжности.
 
-`marketing_scenarios` — список из 0–2 значений: это позволяет сохранить составное сомнение вроде «боюсь, что будет больно и дорого». Прямой вопрос «кто у вас ставит импланты?» не означает `doctor_trust`; сценарий нужен при выраженном сомнении/недоверии.
+Для ONE_CALL target Flash возвращает **один** primary `scenario` из закрытого enum
+(§ ONE_CALL Architecture Lock §9). Один primary scenario может дать до двух релевантных
+amplifiers. Прямой вопрос «кто у вас ставит импланты?» не означает `doctor_trust`;
+сценарий нужен при выраженном сомнении/недоверии.
+
+Исторический offline/legacy контракт `marketing_scenarios` 0–2 и `TurnFrame` multi-scenario
+**не** являются текущим ONE_CALL Stage 5.1 envelope. Их нельзя выдавать за принятый
+ONE_CALL target contract.
 
 Усилители — ссылки на уже утверждённый факт из KB, commercial facts или профиля врача. В `marketing.yaml` хранятся правила, ограничения scenario/pool context, порядок и ссылки, а не source-fact eligibility или дубли текста. Обычно клинике достаточно 2–4 усилителей на сценарий, но сама schema не ограничивает размер pool. Порядок ссылок задаёт приоритет; нейтральный follow-up не прокручивает pool.
 
@@ -97,19 +122,21 @@ scenario_rules:
 
 ## Отбор и повторы
 
-Целевой селектор:
+Целевой селектор (post-Flash deterministic presentation):
 
-1. уважает прямой вопрос пациента;
-2. собирает кандидатов из initial commercial block или активных сценариев;
-3. отбрасывает неактивные, неприменимые к услуге/теме, просроченные и уже показанные автоматически факты;
-4. объединяет pool не более двух одновременных сценариев;
-5. для первого marketing-concern хода берёт до двух релевантных усилителей, затем заполняет оставшиеся из трёх мест применимыми коммерческими facts по порядку клиники;
+1. уважает прямой запрошенный fact, если есть;
+2. на первом eligible service turn с authoritative `service_id` резервирует обязательную priority service promo;
+3. выбирает до двух релевантных amplifiers одного primary `scenario`;
+4. заполняет оставшиеся из трёх marketing slots только применимыми commercial facts по порядку клиники;
+5. отбрасывает неактивные, неприменимые к услуге/теме, просроченные и уже показанные автоматически факты;
 6. в остальных режимах сохраняет предусмотренный режимом порядок клиники;
-7. всегда берёт не более трёх marketing facts, из них не более двух усилителей;
+7. всегда берёт не более трёх marketing facts, из них не более двух amplifiers;
 8. не дополняет ответ нерелевантными фактами ради лимита;
 9. добавляет CTA отдельно.
 
-`shown_fact_ids` и `shown_amplifier_ids` хранятся в текущем `session_id`. Новый диалог/сброс чата создаёт новую сессию; TTL пока не вводится. Тот же ID автоматически не повторяется; новый факт с другим ID может быть показан. Прямой вопрос о факте обходит только подавление автопоказа; активность и применимость источника остаются обязательными.
+Priority promo **не** может быть вытеснена amplifiers. Amplifiers **не** занимают promo slot.
+
+`shown_fact_ids` и `shown_amplifier_ids` хранятся в текущем `session_id`. Новый диалог/сброс чата создаёт новую сессию; TTL пока не вводится. Тот же ID автоматически не повторяется; новый факт с другим ID может быть показан. Прямой вопрос об **уже показанной конкретной** акции/факте обходит только подавление автопоказа; активность и применимость источника остаются обязательными.
 
 ## Несовместимые предложения
 
@@ -164,13 +191,12 @@ choice menu относится к лимиту 4, а не к price-detail или
 ровно один navigation channel: choice **или** content secondary **или** price-detail.
 Запрещено `choice+price` и `secondary+price` в одном `quick_replies`. CTA отдельно.
 
-**Marketing scenario projection (`FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE`):** canonical
-`TurnFrame.marketing_scenarios: list[pain_fear|cost|time|doctor_trust|result_reliability]` (0–2),
-emitted by Turn Planner in the **same** LLM call. No extra classifiers, no regex. Direct
-informational questions do **not** create scenarios (duration ≠ time, warranty ≠ result_reliability,
-doctors info ≠ doctor_trust). Runtime uses only validated `TurnFrame.marketing_scenarios`; remove
-heuristic `derive_marketing_scenarios` after cutover. Malformed → empty list. See
-`docs/evidence/presentation/FULLCONTEXT_DIALOGUE_PRESENTATION_CONVERGENCE_SEAM_AUDIT.md`.
+**Marketing scenario projection (ONE_CALL target):** Flash envelope несёт **один** primary
+`scenario` (`pain_fear` | `cost` | `time` | `doctor_trust` | `result_reliability` | `none`).
+Post-model deterministic presentation владеет priority promo и amplifier selection.
+Direct informational questions do **not** create scenarios (duration ≠ time, warranty ≠
+result_reliability, doctors info ≠ doctor_trust). Исторический `TurnFrame.marketing_scenarios`
+0–2 — legacy/offline projection, не текущий ONE_CALL envelope.
 
 Price-ответ имеет отдельные два navigation slots и не смешивается с content follow-up.
 Кнопками становятся только элементы из `service.followups`; `fact_refs` добавляют
@@ -200,7 +226,7 @@ price-ответе demo приоритет при наличии в `followups`:
 | Doctor layer | Имя, должность, стаж и связи с услугами; общий продающий профиль хранится в exact MD chunk |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
 | Session state | `shown_fact_ids`, `shown_amplifier_ids`, `shown_consultation_value_refs`, текущая тема/услуга, lead/refusal state |
-| Common planner/TurnFrame target | `marketing_scenarios` как общее структурированное понимание, а не отдельный regex/classifier на каждый сценарий |
+| ONE_CALL Flash envelope | один primary `scenario`; конкретные facts и priority promo выбирает post-Flash deterministic code |
 
 Полная target ownership услуг, offers, брендов и client strategy находится в
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md). Marketing schema ниже
@@ -217,14 +243,13 @@ version: 1
 limits:
   max_marketing_facts_per_turn: 3
   max_amplifiers_per_turn: 2
-  max_scenarios_per_turn: 2
 
 initial_commercial_blocks:
   service_family_context:
     ordered_fact_refs:
+      - fact:priority_service_promo_ref
       - fact:consultation_offer
       - fact:installment_offer
-      - fact:discount_offer
 
 scenario_rules:
   pain_fear:
@@ -317,20 +342,19 @@ target-моделей: exact service record с `content_ref`, все authored of
 не ранжирует врачей, не читает source text и не формирует ответ. Подключение builder к
 dialog focus/product path и любая authority остаются отдельным checkpoint.
 
-### Structured scenarios
+### Structured scenario (ONE_CALL)
 
-Target planner output содержит список `marketing_scenarios` из 0–2 стандартных значений:
-`pain_fear`, `cost`, `time`, `doctor_trust`, `result_reliability`. Значение означает
-потребность применить общий порядок
-операций, но не выбирает готовую реплику:
+ONE_CALL Flash envelope возвращает **один** primary `scenario`. Значение означает
+потребность применить общий порядок операций, но не выбирает готовую реплику:
 
 1. ответить по релевантному source content;
-2. выбрать до двух source-backed amplifiers этого сценария;
-3. заполнить оставшиеся из трёх marketing slots применимыми commercial facts;
-4. добавить одну CTA отдельно.
+2. зарезервировать priority service promo на первом eligible service turn (если применимо);
+3. выбрать до двух source-backed amplifiers этого сценария;
+4. заполнить оставшиеся из трёх marketing slots применимыми commercial facts;
+5. добавить одну CTA отдельно.
 
-Отдельные regex/classifier paths для боли, цены, врача и приживаемости запрещены. До
-отдельного authority checkpoint новое поле не управляет product answer.
+Отдельные regex/classifier paths для боли, цены, врача и приживаемости запрещены.
+Stage 5.1 **не** расширяет envelope до массива сценариев.
 
 ### Session и cadence
 
@@ -345,8 +369,9 @@ Target session изолирован по `client_id + session_id` и храни�
 - lead/refusal state.
 
 Тот же fact/amplifier автоматически не повторяется в session. Новый диалог/сброс создаёт
-новую session; TTL пока нет. Прямой вопрос обходит только suppression повтора, но не
-active dates, eligibility, source fidelity, incompatibility или manual-contact boundary.
+новую session; TTL пока нет. Прямой вопрос об **уже показанной конкретной** акции/факте
+обходит только suppression повтора, но не active dates, eligibility, source fidelity,
+incompatibility или manual-contact boundary.
 
 ### CTA selector
 
@@ -357,39 +382,80 @@ pure clarify, после явного отказа или внутри акти�
 
 ### Offline selector S21
 
-S21 реализует только pure отбор автоматических ingredients из already-validated target
-models. Явные inputs: semantic context, optional already-selected service, ordered
-scenarios, explicit date, флаг initial block и read-only shown snapshots. Результат —
-immutable tuples refs/scenarios и CTA key; selector не читает client files, clock или
-session и не формирует текст.
+S21 — **offline pure selector** из already-validated target models. Он **не** является
+принятым Stage 5.1 product path и **не** реализует accepted target order.
 
-Exact порядок:
+#### Current pre-Stage-5.1 S21 behavior (historical, offline)
+
+**Does not satisfy accepted target.** Сохранено как честное описание текущей offline
+реализации; должно быть заменено Stage 5.1.
+
+Явные inputs: semantic context, optional already-selected service, ordered scenarios,
+explicit date, флаг initial block и read-only shown snapshots. Результат — immutable
+tuples refs/scenarios и CTA key; selector не читает client files, clock или session и
+не формирует текст.
+
+Historical exact order:
 
 1. scenarios фильтруются по exact allowed context, затем ограничиваются policy cap;
-2. до двух pools объединяются round-robin: по одному eligible ref на scenario за круг,
-   сохраняя pool order и пропуская ineligible/duplicate refs без потери хода;
+2. до двух pools объединяются round-robin: по одному eligible ref на scenario за круг;
 3. каждый scenario ref занимает один общий marketing slot и один amplifier slot;
 4. оставшиеся из максимум трёх marketing slots заполняются только exact initial block
-   текущего context, без fallback к чужому context;
-5. fact проходит active/inclusive-date/service/shown и bidirectional incompatibility
-   gates; KB/doctor ref должен существовать в explicit index, а doctor при выбранной
-   услуге — иметь exact service link;
-6. без service doctor ref разрешён только в exact general context `doctors`;
-7. CTA выбирается exact context → required default и не занимает slots.
+   текущего context;
+5. fact проходит active/inclusive-date/service/shown и incompatibility gates;
+6. CTA выбирается exact context → required default.
+
+Direct fact question и automatic `consultation_value` **не входят** в S21.
+
+Historical demo examples (pre-Stage-5.1):
+
+- `cost + price + all_on_4` → два ценовых amplifiers и CTA `price`; initial block
+  `service` **не** подмешивается;
+- context `service` → после двух amplifiers может добавиться `fact:free_implant_consult`,
+  CTA `plan`.
+
+Это **не** резервирует priority service promo до amplifiers и **не** соответствует
+accepted Stage 5.1 contract.
+
+#### Target Stage 5.1 behavior (to be implemented)
+
+Post-Flash deterministic presentation / unified `PresentationResult` **должны**
+реализовать **один** target order везде:
+
+1. конкретный direct requested fact — **только** когда semantic seam достоверно доступен
+   (не regex/keyword; без второго provider call);
+2. обязательная priority service promo первого eligible service turn;
+3. до двух amplifiers primary `scenario`;
+4. остальные применимые facts в свободных местах общего лимита **3**;
+5. CTA отдельно.
+
+Priority promo резервируется **до** amplifiers и **не** вытесняется ими. Current S21
+**не** реализует этот порядок; Stage 5.1 implementation должна заменить historical
+behavior, а не декларировать S21 как уже принятый selector.
 
 Missing optional external amplifier пропускается, но pack acceptance S3/S6 остаётся
 обязательной. Missing local `fact:` по-прежнему fail-closed отклоняет bundle до
-selector. При двух conflicting facts побеждает первый по фактическому authored order.
+selector. Selector принимает shown snapshots, но не изменяет их.
 
-Selector принимает shown snapshots, но не изменяет их: будущая session сможет отметить
-ref только после фактического включения в ответ. Direct fact question и automatic
-`consultation_value` не входят в S21. Для consultation close future evidence assembly
-должен отдельно проверить оставшиеся marketing/amplifier slots.
+### Priority promo authority seam (Stage 5.1 read-only audit finding)
 
-На demo `cost + price + all_on_4` выбирает два ценовых amplifiers и CTA `price`; initial
-block `service` не подмешивается. В context `service` после тех же двух amplifiers может
-добавиться `fact:free_implant_consult`, а CTA будет `plan`. Это разные exact contexts,
-не скрытая эвристика.
+Docs-only correction **не** меняет schema/config. Обязательный seam audit finding:
+
+- `kind=promo` **недостаточно** для определения главной priority service promo;
+- в current demo `free_implant_consult` и discount facts (`implant_same_day_discount`,
+  `professional_whitening_discount`) одновременно имеют `kind=promo`;
+- clinic-authored order в `initial_commercial_blocks.service.ordered_fact_refs` сейчас
+  ставит consultation/installment **раньше** discount;
+- discount fact одновременно может находиться в `scenario_rules.cost.ordered_amplifier_refs`.
+
+**Stage 5.1 seam audit must:**
+
+1. найти существующий однозначный authored authority для priority promo;
+2. если его нет — доказать необходимость **минимального** schema/config изменения;
+3. **не** определять главную акцию по тексту, словам «скидка», проценту, fact ID, regex
+   или Python hardcode;
+4. сохранить multiclient ownership;
+5. **не** считать бесплатную консультацию главной скидкой без явной client authority.
 
 ### Offline evidence package S22
 
@@ -415,7 +481,7 @@ eligibility/strategy projection обязана выполняться отдел
 - создавать отдельную схему для каждой услуги и информационного подтопика;
 - ротировать усилители на нейтральных follow-up ходах;
 - добавлять готовые сценарные ответы или списки вступительных фраз;
-- передавать product authority новому `marketing_scenarios` до schema/runtime/tests и отдельного authority-решения;
+- передавать product authority единому `PresentationResult` до Stage 5.1 implementation checkpoint;
 - менять или перезапускать A9 raw/harness/live.
 
 ## Будущий runtime checkpoint
@@ -423,7 +489,8 @@ eligibility/strategy projection обязана выполняться отдел
 Schema governance зафиксирован этим документом и
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), demo policy
 материализована offline в S20, pure selector — в S21, one-service evidence package —
-в S22. Ничего ещё не подключено к product path. Перед session/runtime/composer wiring
+в S22. Частичные selector/schema/session pieces существуют, но единый `PresentationResult`
+и принятый Stage 5.1 product path **ещё не реализованы**. Перед production wiring
 нужны отдельные TASK и checker-review.
 Они должны доказать:
 

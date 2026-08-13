@@ -15,11 +15,12 @@ Target-контракт лимитов, сценариев, усилителей
 1. **Authority базы над содержанием ответа.** Согласованные md, pricebook, marketing и policies конкретной клиники определяют факты и силу утверждений. Это не связано с запрещённой product authority A9 `patient_scope`: A9 остаётся shadow-only и не управляет ответом.
 2. **Запрет семантического смягчения.** Composer может добавлять только связующий текст. Числа, проценты, модальность, гарантии, обещания, отрицания и оговорки источника должны сохраняться точно; будущая проверка должна обнаруживать их ослабление, усиление или подмену.
 3. **Единый marketing-fact limit.** В ответе максимум три marketing facts, из них максимум два усилителя. Основной ответ, price/service cards, CTA и follow-up не считаются слотами.
-4. **Eligibility и cadence.** Селектор использует только активные и применимые source-owned facts. `shown_fact_ids` и `shown_amplifier_ids` подавляют повторный автопоказ внутри `session_id`; прямой вопрос о факте всегда обрабатывается.
+4. **Eligibility и cadence.** Селектор использует только активные и применимые source-owned facts. `shown_fact_ids` и `shown_amplifier_ids` подавляют повторный автопоказ внутри `session_id`; прямой вопрос об **уже показанной конкретной** акции/факте получает ответ повторно (suppression bypass only).
 5. **CTA cadence независима.** Одна основная CTA может появляться после каждого содержательного коммерчески релевантного ответа и не блокируется показанными marketing facts.
-6. **Structured scenarios.** Target `marketing_scenarios` содержит 0–2 стандартных значения и определяется общим пониманием вопроса без отдельного regex/classifier на каждый сценарий. Общий flow задаёт порядок смысловых операций, но не готовые фразы.
-7. **Manual-contact boundary.** В обычном диалоге любая текущая личная боль, активное осложнение после лечения, жалоба, спор или отзыв, требующий реакции, должны завершаться до marketing/retrieval/composer/UI-policy и возвращать только фиксированный шаблон с номером из client config. Явно выбранный `situation_intake` — отдельный conversion state: он не генерирует ответ и сохраняет любое стоматологическое описание как lead note.
-8. **Отзывы разделяются по смыслу.** Обычный вопрос о том, где посмотреть отзывы, остаётся content/trust-вопросом. Негативный отзыв или претензия включают manual contact.
+6. **Structured scenario (ONE_CALL).** Flash envelope несёт **один** primary `scenario` (`pain_fear` | `cost` | `time` | `doctor_trust` | `result_reliability` | `none`). Исторический `marketing_scenarios` 0–2 — legacy/offline, не текущий ONE_CALL envelope. Общий flow задаёт порядок смысловых операций, но не готовые фразы.
+7. **Priority service promo.** Post-Flash deterministic presentation владеет выбором и render priority service promo; модель не придумывает точные условия акции.
+8. **Manual-contact boundary.** В обычном диалоге любая текущая личная боль, активное осложнение после лечения, жалоба, спор или отзыв, требующий реакции, должны завершаться до marketing/retrieval/composer/UI-policy и возвращать только фиксированный шаблон с номером из client config. Явно выбранный `situation_intake` — отдельный conversion state: он не генерирует ответ и сохраняет любое стоматологическое описание как lead note.
+9. **Отзывы разделяются по смыслу.** Обычный вопрос о том, где посмотреть отзывы, остаётся content/trust-вопросом. Негативный отзыв или претензия включают manual contact.
 
 Точный требуемый manual-contact шаблон:
 
@@ -60,7 +61,7 @@ Target-контракт лимитов, сценариев, усилителей
 | `comparison_route` | `query_mode=comparison`, skip catalog |
 | `composite` | `is_composite_question`, 2+ аспекта |
 | `not_offered` | `clinic_policies` + альтернатива |
-| `marketing_scenario_policy` | Target: scenario pools → eligibility/no-repeat → общий лимит 3/2 |
+| `marketing_scenario_policy` | Target: priority promo → scenario amplifiers → eligibility/no-repeat → общий лимит 3/2 |
 | `lead_flow` | Имя → телефон → demo-msg |
 | `handoff_template` | Фиксированный шаблон §10 |
 | `policy_ui` | CTA, `suggest_h3`, video, situation |
@@ -135,13 +136,37 @@ Target-контракт лимитов, сценариев, усилителей
 
 | Подтип | Технически |
 |---|---|
-| Какие акции сейчас | Target selector: до 3 применимых promo/gift facts по приоритету; direct-question override |
+| Какие акции сейчас | Unresolved semantic seam Stage 5.1: общий promo overview без отдельного promo intent; прямой вопрос об already-shown конкретной акции — repeat + suppression bypass only |
 | Акция на услугу | `marketing` rules + commercial facts; фильтр активности/услуги/session |
 | Как сделать дешевле | `retrieval` clinic md + `price_route`; `marketing` опц. |
 | Условия оплаты | `clinic__info__payment_terms` → `composer`; `suggest_h3`, CTA `callback` |
 | Скидка у врача | `marketing.yaml`; без персональных скидок |
 
-**Текущий долг:** runtime ещё не реализует общий selector, лимит 3/2, `shown_amplifier_ids`, incompatibility и structured `marketing_scenarios`. Текущий promo-блок также использует отдельные ограничения аспектов. Это меняется только отдельной code/runtime-задачей с тестами.
+**Текущий долг / Stage 5.1 seams:** частичные selector/schema/session pieces существуют,
+но единый `PresentationResult` **ещё не создан** и current selector/presentation **не
+объявлены принятыми** Stage 5.1. Historical offline S21 **does not satisfy** accepted
+target order (amplifiers before initial block; no priority promo reservation). Runtime
+ещё не реализует полный contract: priority service promo на первом eligible service turn,
+лимит 3/2 с promo в **3** не в **2**, `shown_amplifier_ids`, incompatibility,
+render-proven shown-state и один primary `scenario` из ONE_CALL envelope.
+
+**Read-only Stage 5.1 seam audits (обязательны до implementation):**
+
+1. **Direct promo overview:** общий вопрос «Какие акции есть?» — unresolved; без
+   regex/keyword classifier, без второго provider call, без нового envelope field.
+2. **Priority promo authority:** `kind=promo` недостаточно; в demo `free_implant_consult`
+   и discount facts одновременно `kind=promo`; consultation/installment стоят раньше
+   discount в order; discount также в amplifier pool. Audit must: найти однозначный authored
+   authority; иначе доказать минимальное schema/config изменение; не выбирать по тексту/
+   «скидка»/проценту/fact ID/regex/hardcode; сохранить multiclient ownership; не считать
+   consultation главной скидкой без explicit client authority.
+
+**Performance invariant (Stage 5.1):** 0/1 provider calls; selector/`PresentationResult`
+локально после Flash; без marketing LLM/retry/второй materialization/сетевого re-read
+marketing data на каждом turn; один локальный presentation pass; gates 8s/10s/6s не
+ослабляются; diagnostics OK, новый hard ms-SLO — только по owner decision.
+
+Это меняется только отдельной code/runtime-задачей с тестами.
 
 ---
 
@@ -302,11 +327,12 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 1. `retrieval` / `composer` / `price_route` — основные пути контента.
 2. `policy_ui` решает, показать ли CTA и follow-up.
 3. `clarify` — только услуга / масштаб / этап.
-4. Текущий promo-блок требуется заменить общим source-owned selector из `MARKETING_SCENARIO_ARCHITECTURE.md`: eligibility, лимит 3/2, no-repeat, direct-question override и incompatibility.
+4. Текущий promo-блок требуется заменить единым `PresentationResult` и source-owned selector из `MARKETING_SCENARIO_ARCHITECTURE.md`: priority service promo, eligibility, лимит 3/2 (promo в **3**, не в **2**), no-repeat, direct-question override, incompatibility, render-proven shown-state.
 5. Текущий composer/verifier требуется отдельно проверить на точное сохранение силы согласованных утверждений.
 6. Demo: `lead_flow` не шлёт в CRM.
 7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую границу для любой текущей личной боли.
 8. `comparison_route` — catalog fast-path не перебивает comparison-md.
+9. **Stage 5.1 не реализован:** docs sync зафиксировал contract; implementation unit ещё должна создать `PresentationResult` и принять post-Flash deterministic presentation.
 
 ### Target service consultation close
 
@@ -329,9 +355,13 @@ session, composer placement или authority.
 1. Target schema услуг/цен и marketing policy зафиксирована в
    [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md) и
    [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md); runtime
-   пока не мигрирован.
-2. S18 отдельно материализует offline source contract для `consultation_value`; demo
+   пока не мигрирован на принятый Stage 5.1 `PresentationResult`.
+2. Read-only Stage 5.1 seam audits: (a) direct promo overview; (b) priority promo authority
+   in current demo data (`kind=promo` insufficient; consultation before discount in order).
+   Без regex/keyword classifier, без второго provider call, без нового envelope field.
+3. Performance invariant §13.5: 0/1 calls, local presentation pass, no marketing LLM.
+3. S18 отдельно материализует offline source contract для `consultation_value`; demo
    content, session/runtime wiring и authority остаются будущими checkpoint-ами.
-3. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
-4. Regression будущей реализации должен доказать no-repeat, direct-question override,
-   межклиентскую изоляцию, hard-stop и точность source-owned facts.
+4. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
+5. Regression будущей реализации должен доказать priority promo, no-repeat,
+   direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts.

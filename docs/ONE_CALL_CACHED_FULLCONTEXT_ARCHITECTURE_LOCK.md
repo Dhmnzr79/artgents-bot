@@ -1,13 +1,13 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
-**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.0, docs-only).
-**Дата:** 2026-08-12.
+**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — docs-only marketing contract sync, implementation не начата).
+**Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.
-**Baseline HEAD:** `fce68be6dacfd2607293d52eb07d48e45f5cc759`.
+**Baseline HEAD:** `6345b37eec2807bc2008e68f8a01018407af044f`.
 
-Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–3. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
+Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–4.3. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
 
-### Current implementation status (Stage 0–3 accepted)
+### Current implementation status (Stage 0–4.3 accepted)
 
 | Этап | Статус |
 |------|--------|
@@ -18,10 +18,14 @@
 | Stage 3B — Flash capability JSON/streaming на точном snapshot | **Принят**; подтверждён управляемым LIVE-прогоном (`5b1b8a7`, `f2ecc8d`) |
 | Stage 3C — Production-faithful speed measurement + absolute speed gates | **Принят** (`4fe1465`, `daabe2a`, `28f9c3e`, `0c18ad0`) |
 | Clinic-owned price strategy + единый authoritative commerce result (text/card) | **Принят** в текущем baseline (`fce68be`) |
+| Stage 4.0 — Architecture Lock sync (docs) | **Принят** (`06e3f0b`) |
+| Stage 4.1 — Windows logging | **Принят** (`1d89190`) |
+| Stage 4.2 — Production closed JSON envelope | **Принят** (`b833482`) |
+| Stage 4.3 — Semantic ownership | **Принят** (`6345b37`) |
 | `SALES_ONE_PLUS_ON` | **default OFF** — без изменений |
 | Alibaba LIVE после Stage 4.0 | **Запрещён** без отдельной явной команды владельца |
 
-Stage 4.1+ **не считаются реализованными** этим документом. Gaps §17 **не объявлены исправленными**.
+Stage 5.1+ **не считаются реализованными** этим документом. Оставшиеся gaps §17 **не объявлены исправленными**, пока соответствующий этап не принят checker.
 
 ### Приоритет и supersession
 
@@ -313,7 +317,7 @@ Flash возвращает валидируемый **control envelope**. Все
 
 | Значение | Нормативная семантика |
 |----------|----------------------|
-| `none` | Не открывает ни одну коммерческую поверхность |
+| `none` | Не открывает price / payment / included surfaces; см. bounded exception §9.1 |
 | `price` | Явный интерес к цене / стоимости |
 | `payment` | Явный интерес к оплате, рассрочке или способам платежа |
 | `included` | Вопрос о составе или включённых услугах |
@@ -324,7 +328,8 @@ Flash возвращает валидируемый **control envelope**. Все
 - price, сумма и price offer card показываются **только** при `commercial_intent=price` и наличии validated price result из authoritative commerce result;
 - `commercial_intent=payment` открывает **только** validated clinic-owned payment terms/data и **не** открывает price surface (сумму, price offer card);
 - `commercial_intent=included` открывает **только** validated included items / состав и **не** открывает price surface (сумму, price offer card);
-- `commercial_intent=none` **не** открывает ни одну коммерческую поверхность;
+- `commercial_intent=none` **не** открывает price, payment или included surfaces и **не** разрешает дополнительные случайные commercial facts;
+- **единственное owner-approved bounded исключение при `commercial_intent=none`:** обязательная **priority service promo** на первом допустимом `ANSWER` с authoritative non-null `service_id` (§13). Исключение **не** открывает price amount, price/offer card, payment terms или included items; при `service_id=null` автоматическая service promo **запрещена**;
 - модель **не придумывает** и **не вычисляет** коммерческие значения; все значения берутся **только** из authoritative commerce result.
 
 Невалидное значение любого closed-field → invalid envelope → neutral presentation или safe handoff по route, **не** повторный вызов.
@@ -333,11 +338,13 @@ Flash возвращает валидируемый **control envelope**. Все
 
 **Stage 3B (принято):** capability JSON/streaming на точном Flash snapshot подтверждён управляемым LIVE-прогоном.
 
-**Целевой transport (Stage 4.2):**
+**Stage 4.2 (принято):** production closed JSON envelope — provider-supported schema-constrained output; versioned typed envelope с **единым** blocking/streaming parser; `@ANSWER` line protocol **не** является целевым transport.
+
+**Нормативно:**
 
 - **предпочтителен** provider-supported schema-constrained output;
 - versioned typed envelope с **единым** blocking/streaming parser;
-- старый хрупкий `@ANSWER` line protocol **не является** целевым контрактом (gap §17 — пока сосуществует с typed envelope);
+- старый хрупкий `@ANSWER` line protocol **не является** целевым контрактом;
 - control должен завершиться **до** streaming patient text;
 - medical/route protocol **не должен** утекать пациенту.
 
@@ -377,8 +384,9 @@ Medical/problematic request → `ADMIN`, без диалога.
 4. Текстовый блок, карточка, CTA и кнопки **соответствующей** поверхности строятся из **одного** validated authoritative commerce result для этой поверхности.
 5. **Невозможна** ситуация, когда текст показывает одну цену, а карточка — другую.
 6. Без `commercial_intent=price` сумма и price offer card **не показываются** и **не вычисляются**; это **не** запрещает релевантный payment- или included-ответ при соответствующем intent.
-7. При `commercial_intent=none` — ни одна коммерческая поверхность не рендерится.
+7. При `commercial_intent=none` price / payment / included surfaces **не** рендерятся. **Исключение:** priority service promo §13 — единственный разрешённый commercial fact при `none`; она **не** открывает price amount, price/offer card, payment terms или included items.
 8. Медицинские и некоммерческие числа из утверждённого MD **не запрещаются**.
+9. Priority service promo, marketing facts и amplifiers выбираются и рендерятся **детерминированным кодом после Flash**; Flash не придумывает и не пересказывает точные условия акции.
 
 **Clinic-owned price strategy (принято в baseline `fce68be`):**
 
@@ -402,7 +410,7 @@ Medical/problematic request → `ADMIN`, без диалога.
 - deterministic client data;
 - 0 LLM;
 - не `ADMIN`;
-- specific contact question (например parking) **должен** возвращать **только** требуемое поле, не весь contacts payload (gap §17 — пока может возвращаться полный набор).
+- specific contact question (например parking) **должен** возвращать **только** требуемое поле, не весь contacts payload (принято Stage 4.3).
 
 **Booking:**
 
@@ -426,21 +434,88 @@ Medical/problematic request → `ADMIN`, без диалога.
 
 ## 13. Marketing contract
 
-Flash выбирает только `scenario` из закрытого enum (§9). Flash **не** придумывает offer/fact/CTA. Flash возвращает `commercial_intent`; код решает, какая коммерческая поверхность допустима.
+Flash выбирает только один primary `scenario` из закрытого enum (§9). Flash **не** придумывает offer/fact/CTA и **не** пересказывает точные условия акции. Flash возвращает `commercial_intent`; код решает, какая коммерческая поверхность допустима.
+
+### 13.1 Priority service promo (первый ответ об услуге)
+
+На первом допустимом содержательном `ANSWER` с authoritative non-null `service_id` бот обязан показать **ровно одну** главную active, непросроченную, service-linked акцию этой услуги:
+
+- выбирается детерминированным кодом **после Flash** по clinic-authored priority из client data;
+- текст, процент, срок и условия — **только** из authoritative client data; Flash не придумывает и не пересказывает;
+- правило действует для первого допустимого ответа о конкретной услуге, а не только для «что это?» / «делаете ли вы?»;
+- priority promo — **marketing fact**, **не** amplifier; входит в общий лимит **3** marketing facts, но **не** занимает лимит **2** amplifiers;
+- при `commercial_intent=none` — **единственное** разрешённое commercial исключение (§9.1, §11); **не** открывает price amount, price/offer card, payment terms или included items;
+- при `service_id=null` автоматическая service promo **запрещена**;
+- показывается **один раз** после фактического render; прямой вопрос об **уже показанной конкретной** акции получает ответ повторно — suppression повтора обходится, eligibility/active dates/service applicability **не** обходятся; общий вопрос «Какие акции есть?» — unresolved semantic seam Stage 5.1 (без отдельного promo intent в envelope).
+
+### 13.2 Лимиты marketing facts и amplifiers
+
+Для demo/client policy:
+
+- максимум **3** marketing facts в ответе;
+- максимум **2** textual amplifiers;
+- priority promo входит в **3**, но **не** в **2**;
+- selector **сначала** резервирует priority promo (если eligible), **затем** выбирает до двух релевантных amplifiers одного primary `scenario`;
+- остальные применимые facts — только в оставшихся местах общего лимита **3**;
+- пустые места **не** заполняются нерелевантными фактами;
+- бесплатная консультация и рассрочка **не** добавляются автоматически в первом ответе сверх priority promo и усилителей; рассрочка — при прямом вопросе об оплате или валидном cost/payment context; консультация — как применимый выбранный fact или через отдельный CTA/consultation flow.
+
+Историческая формулировка «максимум один hook» согласована с client config **3/2**: один обязательный priority promo + до двух amplifiers **не** противоречат друг другу.
+
+### 13.3 CTA и navigation slots
+
+**CTA** существует отдельно:
+
+- не занимает marketing-fact limit **3**;
+- не занимает amplifier slots **2**;
+- не занимает два secondary UI slots;
+- выбирается из client-authored CTA config; Flash не придумывает CTA;
+- запрещена в hard-stop / `ADMIN` / жалобе / urgent / manual-contact и там, где текущий контракт её подавляет.
+
+**Content secondary slots (max 2):** video (если существует, применимо и ещё не показано) → следующие ещё не показанные content follow-up → «Рассказать о ситуации», если разрешено и остался слот.
+
+**Channel mutex:** choice menu (max 4), content secondary (max 2), price-detail (max 2) — отдельные каналы; один ответ использует **только один** navigation channel.
+
+### 13.4 Исключения и shown-state
+
+Автоматическая priority promo и остальные marketing facts **запрещены** в: `CLARIFY`, `ADMIN`, current personal pain / urgent medical, active complication, complaint/dispute/reaction-required review, manual-contact hard-stop, spam/off-topic, provider/error fallback, turn без authoritative `service_id`.
+
+**Shown-state:**
+
+- записывается **только** после фактического materialized render;
+- выбранный, но не отображённый факт **не** считается показанным;
+- marketing facts, amplifiers, video, content follow-up, price follow-up и situation имеют соответствующий cadence/shown-state;
+- price follow-up после реального показа **всегда** фиксируется как shown;
+- прямой вопрос об already-shown fact должен получить ответ повторно.
 
 **Deterministic presentation** (через `COMMERCIAL_RENDER_CONTRACT` и marketing layer):
 
-- выбирает только active client-authored service-linked facts;
-- добавляет выбранный fact в patient text;
-- не дублирует уже показанное;
-- direct request обходит suppression;
-- shown-state записывается только после фактического render;
-- сохраняет follow-up;
-- сохраняет два button slots;
-- сохраняет CTA;
-- neutral/general запрос / `commercial_intent=none` **не** получает случайный implantation marketing или цену;
-- максимум один уместный marketing hook, если client config явно не требует другого;
+- порядок отбора: (1) direct requested fact, если есть; (2) обязательная priority service promo первого eligible service turn; (3) до двух релевантных amplifiers primary `scenario`; (4) остальные применимые facts в оставшихся местах лимита **3**; (5) CTA отдельно;
+- direct request обходит только suppression повтора;
+- neutral/general запрос / `commercial_intent=none` **не** получает случайный implantation marketing или цену, кроме bounded priority service promo §13.1;
 - marketing supplement и offer card **не** меняют presentation независимо друг от друга.
+
+### 13.5 Performance invariant (Stage 5.1)
+
+Stage 5.1 **не** добавляет provider call; invariant `provider_calls ∈ {0, 1}` на HTTP-запрос
+сохраняется.
+
+**Запрещено в Stage 5.1:**
+
+- отдельный marketing LLM, retry или model repair;
+- второй provider call ради marketing/presentation;
+- сетевое чтение marketing/client data на каждом turn;
+- вторая полная сборка package/materialization.
+
+**Разрешено:**
+
+- selector и `PresentationResult` работают **локально после Flash**;
+- **один** локальный presentation pass на turn;
+- диагностика локального времени selector/presentation (без нового hard SLO без owner decision).
+
+Абсолютные speed gates §15.2 (8s / 10s / 6s) **не ослабляются**. Конкретные миллисекунды
+(например 20–50 ms) **не** фиксируются как обязательный нормативный gate — владелец их
+отдельно не утверждал.
 
 ---
 
@@ -453,7 +528,8 @@ Flash выбирает только `scenario` из закрытого enum (§9
 | Medical/problematic | 0 false `ANSWER` на protected cases (§ ANSWER/ADMIN) |
 | Sales fears | 0 false `ADMIN` на protected fear cases |
 | Price | `COMMERCIAL_RENDER_CONTRACT`: один validated result; 0 invented/computed amounts; price/sum/price card **только** при `commercial_intent=price`; ambiguous scope без суммы |
-| Commercial intent | closed enum §9.1; каждый intent открывает только соответствующую поверхность; `payment` и `included` **не** открывают price surface |
+| Commercial intent | closed enum §9.1; каждый intent открывает только соответствующую поверхность; `payment` и `included` **не** открывают price surface; `none` не открывает price/payment/included, кроме bounded priority service promo §13.1 |
+| Marketing | лимит 3/2; priority promo в **3**, не в **2**; первый eligible service turn с `service_id` обязан показать одну priority promo; CTA и navigation slots отдельны; shown-state только после render; price follow-up always shown |
 | Microfacts | вопросы по всему MD-корпусу, включая неизвестные заранее темы; допустим `service_id=null` |
 | Semantic ownership | без implantation default; без сужения generic topic; `CLARIFY` только при реальной зависимости |
 | Multiclient | минимум два client packs; отсутствие cross-client data leakage |
@@ -528,20 +604,29 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 
 ---
 
-## 17. Current known gaps (post Stage 0–3 baseline)
+## 17. Current known gaps (post Stage 4.3 baseline)
 
-Проверяемые расхождения **после** принятого Stage 0–3 baseline (`fce68be`). **Не исправлены** Stage 4.0; Stage 4.1+ **не объявлены выполненными**.
+Проверяемые расхождения **после** принятого Stage 4.3 baseline (`6345b37`). Ниже — только **оставшиеся** gaps; закрытые Stage 4.1–4.3 перечислены отдельно с commit mapping.
 
-1. **Dual prompt protocol:** prompt одновременно использует typed envelope и старый `@ANSWER` / `@ADMIN`; control fields могут утечь в widget.
-2. **Specific contact question:** вопрос о конкретном contact field (например parking) может вернуть **весь** набор контактов вместо одного требуемого поля.
-3. **APRF / биоматериал:** тема APRF или биоматериала из собственной крови может ошибочно вызвать `CLARIFY` или лишнюю цену.
-4. **«Отбеливание» — двойной ответ:** наблюдается двойной ответ; **причина не утверждается** без доказанной SSE-трассы (Stage 5.2).
-5. **Survivability microfact:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене.
-6. **Generic topic narrowing:** generic topic может быть самовольно сужен до технологии / бренда / offer.
-7. **Price without intent:** price может появляться без подтверждённого `commercial_intent`.
-8. **Marketing overload:** marketing layer может добавлять слишком много фактов.
-9. **Price-follow-up shown-state:** основная price-follow-up ветка может не записывать реально показанные кнопки в cadence / shown-state.
-10. **Windows logging:** относительный log path / обычный rotating handler недостаточны для SSE / duplicate diagnostics (Stage 4.1).
+### 17.1 Оставшиеся gaps
+
+1. **«Отбеливание» — двойной ответ:** наблюдается двойной ответ; **причина не утверждается** без доказанной SSE-трассы (Stage 5.2).
+2. **Survivability microfact:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене.
+3. **Marketing overload / priority promo / `PresentationResult`:** marketing layer может добавлять слишком много фактов; обязательная priority service promo на первом service turn и единый `PresentationResult` **не реализованы** (Stage 5.1).
+4. **Direct promo overview seam:** общий вопрос «Какие акции есть?» не имеет отдельного promo intent в closed envelope; точное количество promo facts для overview **не** определено до owner decision и read-only Stage 5.1 seam audit.
+5. **Price-follow-up shown-state:** основная price-follow-up ветка может не записывать реально показанные кнопки в cadence / shown-state.
+6. **Priority promo authority unresolved:** в current demo data нет однозначного authored authority для главной priority service promo (`kind=promo` недостаточно; consultation/installment стоят раньше discount в order; discount также в amplifier pool). Требуется read-only Stage 5.1 seam audit (§13, `MARKETING_SCENARIO_ARCHITECTURE.md`).
+
+### 17.2 Закрыто принятыми Stage 4.1–4.3 (не перечислять как gaps)
+
+| Gap | Закрыт этапом | Evidence |
+|-----|---------------|----------|
+| Dual prompt protocol (`@ANSWER` сосуществует с typed envelope) | Stage 4.2 | `b833482e1cf6f00637fbfa7525df5d29e5f79a57` |
+| Windows logging / SSE diagnostics path | Stage 4.1 | `1d89190ea0bb334e57fe782f8f121458fa3c329e` |
+| Specific contact question возвращает весь contacts payload | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
+| APRF / биоматериал → лишний `CLARIFY` или цена | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
+| Generic topic narrowing до brand / technology / offer | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
+| Price without подтверждённого `commercial_intent` | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
 
 **Закрыто в Stage 0–3 (не перечислять как gaps):** HTTP-scoped provider-call governance; Problem Gate first; typed UI в candidate path; cached FullContext prefix + pack identity; Flash capability JSON/streaming; production-faithful speed measurement; absolute speed gates; clinic-owned price strategy + единый authoritative commerce result для text/card.
 
@@ -565,7 +650,7 @@ Architecture Lock изменяется только:
 
 Roadmap **заморожен** после Stage 4.0. Этапы разделены; gaps §17 **не считаются исправленными**, пока этап не принят checker.
 
-### Stage 4.0 — Architecture Lock sync (текущий, docs-only)
+### Stage 4.0 — Architecture Lock sync (принят, docs-only)
 
 - статусы Stage 0–3;
 - абсолютные speed gates §15.2;
@@ -575,7 +660,7 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - актуальные gaps §17;
 - **никаких** изменений кода; **никакого** LIVE.
 
-### Stage 4.1 — Windows logging
+### Stage 4.1 — Windows logging (принят)
 
 - абсолютный log path от корня проекта;
 - Windows-safe single writer;
@@ -583,7 +668,7 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - PII-free route / timings / provider / SSE diagnostics;
 - streamed / final length + hash для диагностики дублей.
 
-### Stage 4.2 — Production closed JSON envelope
+### Stage 4.2 — Production closed JSON envelope (принят)
 
 - убрать `@ANSWER` line protocol;
 - closed `route` / `service_id` / scope / `scenario` / `commercial_intent` / clarify fields + `patient_text`;
@@ -592,7 +677,7 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - invalid envelope → safe result без retry;
 - `0/1` provider calls.
 
-### Stage 4.3 — Semantic ownership
+### Stage 4.3 — Semantic ownership (принят)
 
 - свободный язык понимает Flash;
 - убрать authoritative implantation default;
@@ -604,17 +689,21 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - specific contact question возвращает только нужное поле;
 - **никаких** APRF / whitening-specific regex.
 
-### Stage 5.1 — Единый marketing/commercial `PresentationResult`
+### Stage 5.1 — Единый marketing/commercial `PresentationResult` (docs-only contract synchronization; implementation **не** начата)
 
-- один источник final text, offer/card, marketing fact, CTA, follow-up, двух button slots, cadence и shown-state;
-- marketing fact реально включается в текст;
-- нет дублирования;
-- direct request обходит suppression;
-- shown-state только после фактического render;
-- scenario выбирает Flash, конкретный fact выбирает код;
-- neutral microfact не получает случайный implantation marketing;
-- максимум один уместный marketing hook, если client config явно не требует другого;
-- price follow-up **всегда** фиксируется как показанный.
+**Нормативный marketing contract (§13) зафиксирован docs-only.** Реализация ещё должна создать единый `PresentationResult`:
+
+- один источник final text, offer/card, marketing facts, CTA, follow-up, двух secondary button slots, cadence и shown-state;
+- priority service promo на первом eligible `ANSWER` с authoritative `service_id` — детерминированный post-Flash selector; один active service-linked promo по clinic priority; входит в лимит **3**, не в **2**; при `commercial_intent=none` — единственное bounded commercial исключение без price/payment/included surfaces;
+- selector: direct requested fact → priority promo → до двух amplifiers primary `scenario` → остальные facts в оставшихся местах **3**; CTA отдельно;
+- consultation/installment **не** автодобавляются в первом ответе сверх priority promo и amplifiers;
+- marketing fact реально включается в текст; нет дублирования;
+- direct request об **уже показанной конкретной** акции обходит suppression повтора; eligibility/active dates/service applicability — нет; общий promo overview — unresolved seam (read-only audit);
+- shown-state только после фактического render; price follow-up **всегда** фиксируется как shown;
+- один primary `scenario` из envelope; конкретные facts выбирает код;
+- neutral microfact / `service_id=null` не получает автоматическую service promo;
+- read-only seam audits: (a) direct promo overview semantic seam; (b) priority promo authority in current client data — **без** regex/keyword classifier и **без** второго provider call;
+- **performance invariant §13.5:** 0/1 provider calls; один локальный presentation pass после Flash; без marketing LLM/retry/network re-read; absolute gates §15.2 не ослабляются; без нового hard ms-SLO без owner decision.
 
 ### Stage 5.2 — Widget / SSE
 
@@ -653,7 +742,9 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 
 ---
 
-## Checker scoped allowlist (Stage 4.0 revision)
+## Checker scoped allowlist (historical — Stage 4.0 revision)
+
+> **Исторический checklist.** Не является текущим acceptance gate. Актуальный baseline — Stage 4.3 (`6345b37`); Stage 5.1 docs sync ожидает отдельного Checker review.
 
 | Разрешено | Запрещено |
 |-----------|-----------|

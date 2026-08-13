@@ -216,6 +216,84 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 
 В brand-list сценарии допустимы кнопки брендов; в protocol/service сценарии — кнопки соответствующих услуг. Отдельная кнопка «Показать цены» не добавляется.
 
+## Service availability, authored alternatives and price gaps (Stage 5.1B)
+
+**Статус:** docs-only owner decision; implementation **не** начата. Канон: [`ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md`](ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md) §11.1.
+
+### Три независимые оси
+
+**Service availability**
+
+| Состояние | Источник | Семантика |
+|-----------|----------|-----------|
+| `offered` | `service_catalog.json`, `active=true` | Услуга оказывается |
+| `known_not_offered` | catalog record, `active=false` | Услуга известна, но не оказывается |
+| `unresolved` | нет canonical match | Термин не разрешён |
+
+Отсутствие цены **не** означает отсутствие услуги. Catalog miss **не** превращается автоматически в confirmed not-offered.
+
+**Price coverage**
+
+| Уровень | Источник |
+|---------|----------|
+| exact numeric offer | service offer `fixed` / `from` / `range` |
+| exact `no_public_price` | offer `mode=no_public_price` + `approved_text` |
+| explicitly applicable family context | family price + `applies_to_service_ids` + `approved_context` |
+| no applicable price evidence | controlled data-gap / CTA |
+
+**Alternative authority**
+
+Target — typed evolution `clients/<client_id>/clinic_policies.yaml` → `service_alternatives`. **Не** создавать `service_relations.json` в этом amendment.
+
+```yaml
+service_alternatives:
+  - requested_service_id: braces
+    alternative_service_ids:
+      - aligners
+    approved_text: >-
+      Брекеты мы не устанавливаем. Для выравнивания зубов
+      в клинике используются элайнеры.
+```
+
+**Current legacy seam (demo):** keyword-based entries с `match_keywords`, `mention`, `suggest_ref`, `note` — pre-Stage-5.1B; **не** target identity authority.
+
+**Правила target:** `requested_service_id` exists; each `alternative_service_id` exists и `active`; max 2 alternatives; clinic priority by ID order; alternative name/content/price — из её own sources; no keyword/regex/fuzzy/LLM; brands (Osstem) — separate brand seam.
+
+### Price precedence
+
+1. exact numeric service offer;
+2. exact `no_public_price`;
+3. optional family-level context **only** with explicit `applies_to_service_ids` + `approved_context`;
+4. no amount / data-gap response.
+
+Family context **never** replaces exact offer or `no_public_price`. Even when applicable, family price **does not** become exact offer or price card for the named service.
+
+**Current runtime seam:** `core/target_family_price_resolution.py` returns safe `data_gap` when named service exists but must not inherit family price — это защита, **не** завершённый Stage 5.1B user-facing response.
+
+### Обязательная матрица (owner-facing summary)
+
+| # | Ситуация | Target response |
+|---|----------|-----------------|
+| 1 | Not-offered, no alternatives | Confirmed not-offered; no price/card/promo/random services |
+| 2 | Not-offered + alternatives | Not-offered, then 1–2 authored alternatives; alt buttons → secondary slots |
+| 3 | Offered + `no_public_price` | Confirm service; `approved_text`; no amount/card/family-as-price |
+| 4 | Price request → unavailable | Absence of service, not «price not listed» |
+| 5 | Price request → unavailable + alts | Not-offered + alts; alt price labelled as **other** service only |
+| 6 | Named service + family-only price | No «X costs …»; family context only with explicit applicability + disclaimer |
+| 7 | Unresolved term | No confident not-offered; safe clarify wording; no random alt/price |
+
+### Stage 5.1 promotion interaction
+
+- unavailable service: no priority promo;
+- alternative promo: not automatic until patient selects alternative and `service_id` switches;
+- offered + `no_public_price`: may get priority promo per Stage 5.1;
+- promo does not invent base price; no discount computed from family price;
+- assembled in unified `PresentationResult`; `commercial_intent` / `promotion_scope` gates preserved.
+
+### Performance
+
+0/1 provider calls; local post-semantic presentation; no regex/keyword classifier; no marketing LLM; gates 8s/10s/6s unchanged.
+
 ## Target-файлы и единственные владельцы данных
 
 Это логическая схема будущего client pack. Она не означает, что текущие demo-файлы уже
@@ -228,6 +306,7 @@ Brand dictionary в target хранит canonical name, country и aliases. Pric
 | `pricebook/services/*.json` | offers: service/option/brand, price state, unit, package, optional payment stages, fact refs, price follow-ups | применимость услуги и приоритет клиники |
 | `pricebook/facts.json` | точный commercial fact, даты, eligibility, detail ref, `incompatible_with` | scenario order и CTA-copy |
 | `clinic_strategy.yaml` | priority уже допустимых services/offers, max 2–3, редкие context overrides | active, selection, деньги, fact text, CTA |
+| `clinic_policies.yaml` | not-offered policy, OMS, **target** `service_alternatives` (`requested_service_id`, `alternative_service_ids`, `approved_text`) | цены, marketing text, keyword identity |
 | `marketing.yaml` | limits, scenario pools, ordered refs, cadence, CTA-key selection | дубли source text, dates и incompatibility |
 | KB/md | утверждённый содержательный ответ и сравнения; optional `consultation_value` в frontmatter того же service-документа | цена, CTA и runtime routing |
 | doctor layer | имя, должность, стаж, связи с услугами и exact MD-ref общего продающего профиля | `active`, образование, фото, расписание, рейтинг, отдельная UI-card schema и готовый ответ сценария |

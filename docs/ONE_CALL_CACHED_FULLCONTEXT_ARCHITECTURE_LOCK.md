@@ -1,6 +1,6 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
-**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — docs-only marketing contract + promotion intent amendment; implementation **не** начата).
+**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — docs-only marketing contract + promotion intent amendment; Stage 5.1B — docs-only service availability / alternatives / price gaps amendment; implementation **не** начата).
 **Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.
 **Baseline HEAD:** `6345b37eec2807bc2008e68f8a01018407af044f`.
@@ -25,7 +25,7 @@
 | `SALES_ONE_PLUS_ON` | **default OFF** — без изменений |
 | Alibaba LIVE после Stage 4.0 | **Запрещён** без отдельной явной команды владельца |
 
-Stage 5.1+ **не считаются реализованными** этим документом. Оставшиеся gaps §17 **не объявлены исправленными**, пока соответствующий этап не принят checker.
+Stage 5.1+ **не считаются реализованными** этим документом. Stage 5.1B **не считается реализованным** этим документом. Оставшиеся gaps §17 **не объявлены исправленными**, пока соответствующий этап не принят checker.
 
 ### Приоритет и supersession
 
@@ -424,6 +424,79 @@ Medical/problematic request → `ADMIN`, без диалога.
 
 **Не вводить** общий deny-by-default numeric gate и **не возвращать** строгий LLM Verifier.
 
+### 11.1 Service availability, authored alternatives and price gaps (Stage 5.1B)
+
+Три **независимые** оси. Отсутствие цены **не** означает отсутствие услуги. Catalog miss **не** должен автоматически превращаться в уверенное «клиника не оказывает услугу».
+
+#### Service availability
+
+| Состояние | Семантика |
+|-----------|-----------|
+| `offered` | Canonical service существует и `active=true` |
+| `known_not_offered` | Canonical service существует, но `active=false` |
+| `unresolved` | Термин не разрешён в canonical service |
+
+#### Price coverage
+
+| Уровень | Семантика |
+|---------|-----------|
+| exact numeric offer | `fixed` \| `from` \| `range` для конкретной услуги |
+| exact `no_public_price` | Утверждённый `approved_text` без суммы |
+| explicitly applicable family-level context | Family price только при явном `applies_to_service_ids` + `approved_context`; **не** exact offer и **не** price card |
+| no applicable price evidence | Без суммы; допустим controlled data-gap / CTA |
+
+**Price precedence (нормативно):**
+
+1. exact numeric service offer;
+2. exact `no_public_price`;
+3. optional family-level context with explicit applicability;
+4. no amount / data-gap response.
+
+Family-level context **никогда** не заменяет exact service offer или `no_public_price`. Даже при явной applicability family price **не** наследуется как exact offer и **не** создаёт price card конкретной услуги.
+
+#### Alternative authority
+
+Альтернатива существует **только** при явной clinic-authored связи. Target использует typed evolution существующего `clinic_policies.yaml` → `service_alternatives` (не новый `service_relations.json`):
+
+```yaml
+service_alternatives:
+  - requested_service_id: braces
+    alternative_service_ids:
+      - aligners
+    approved_text: >-
+      Брекеты мы не устанавливаем. Для выравнивания зубов
+      в клинике используются элайнеры.
+```
+
+**Правила:** `requested_service_id` и каждый `alternative_service_id` существуют в catalog; alternative **active**; максимум **2** alternatives; порядок IDs = clinic priority; название, content ref и price альтернативы — из её собственных authoritative sources; **никаких** keyword/regex/fuzzy/LLM similarity; legacy `match_keywords` / `mention` / `suggest_ref` / `note` — **не** второй источник identity; бренды (Osstem и т.п.) — отдельный brand seam, не service alternative; unknown term без canonical match **не** получает придуманную альтернативу.
+
+#### Обязательная матрица поведения
+
+1. **Not-offered, без alternatives:** confirmed not-offered; **без** цены, price card, promo; **без** случайных услуг; допустим только нейтральный clinic-policy CTA/handoff, если отдельно разрешён.
+2. **Not-offered, с authored alternatives:** сначала confirmed not-offered; затем 1–2 authored alternatives **отдельно**; не описывать как эквивалентные/лучшие/лично подходящие без source authority; alternative buttons → content secondary slots; CTA отдельно.
+3. **Offered, `no_public_price`:** подтвердить наличие услуги; exact `approved_text`; **без** суммы/price card; **без** похожей, вычисленной, component или family price как цены услуги.
+4. **Price request к unavailable service:** ответ об **отсутствии услуги**, не «цена не указана»; запрещены сумма, price card, promo отсутствующей услуги, чужая цена без явной маркировки альтернативы.
+5. **Price request к unavailable + alternatives:** not-offered + authored alternatives; цена альтернативы **только** как цена явно названной другой услуги с exact name, amount, currency, billing unit, package; **никогда** как цена исходной услуги.
+6. **Named service exists, только family price:** запрещено «All-on-4 стоит от 35 000 ₽», price card All-on-4 с общей ценой имплантации, вычисление из компонентов. Family price допустима **только** как отдельный контекстный текст при `applies_to_service_ids` + `approved_context` + exact amount/currency/billing unit + явное «ориентир направления, не цена конкретной услуги». Current safe `data_gap` для named protocol + family-only price — существующая защита, **не** завершённый пользовательский Stage 5.1B response.
+7. **Unresolved service term:** **не** утверждать уверенно, что клиника не оказывает услугу; безопасная формулировка вроде «Не вижу такой услуги в перечне клиники. Возможно, она называется иначе — уточните название»; **без** случайной альтернативы или цены.
+
+#### Взаимодействие со Stage 5.1 promotion contract
+
+- unavailable service **не** получает priority promo;
+- promo альтернативы **не** показывается автоматически в том же ответе, пока пациент явно не выбрал альтернативу и authoritative `service_id` не переключился;
+- offered service с `no_public_price` **может** получить свою priority service promo по Stage 5.1;
+- promo **не** создаёт отсутствующую base price; скидка **не** вычисляется от family price; family price + promo **не** создают рассчитанную сумму;
+- availability/alternative/price-gap элементы собираются единым `PresentationResult`; commercial surfaces сохраняют `commercial_intent` / `promotion_scope` gates.
+
+#### Performance / ownership (Stage 5.1B)
+
+- **не** добавляет provider call;
+- **не** добавляет classifier / marketing LLM / retry;
+- **не** использует regex или keyword routing;
+- работает локально после authoritative semantic result;
+- входит в единый presentation pass;
+- **не** ослабляет gates 8s / 10s / 6s.
+
 ---
 
 ## 12. Contacts, booking, urgent
@@ -592,6 +665,7 @@ Stage 5.1 **не** добавляет provider call; invariant `provider_calls �
 | Commercial intent | closed enum §9.1 (`none` \| `price` \| `payment` \| `included` \| `promotion`); `promotion_scope` §9.3; каждый intent открывает только соответствующую поверхность; `payment` и `included` **не** открывают price surface; `promotion` **не** открывает price amount, price/offer card, payment terms или included items; `none` + `promotion_scope=none` не открывает price/payment/included/promotion, кроме bounded priority service promo §13.1 |
 | Promotion | `commercial_intent=promotion` + closed `promotion_scope`; `general` → до 3 по `promotion_overview`; `service` → одна promo услуги по `priority_service_promos`; `shown` → последняя rendered promo session (fail closed без session-bound promo); arbitrary promo guessing запрещён; `CLARIFY`/`ADMIN` не открывают promotion surface |
 | Marketing | лимит 3/2; priority promo в **3**, не в **2**; первый eligible service turn с `service_id` обязан показать одну priority promo по service-id mapping; session-global suppression по `fact_id`; CTA и navigation slots отдельны; shown-state только после render; price follow-up always shown |
+| Service availability / price gaps (Stage 5.1B) | три оси availability / price coverage / alternative authority §11.1; price precedence; not-offered / unresolved / no_public_price / family-context / alternative-price labelling; no invented/computed amount; no promo leakage from unavailable service; `0/1` calls |
 | Microfacts | вопросы по всему MD-корпусу, включая неизвестные заранее темы; допустим `service_id=null` |
 | Semantic ownership | без implantation default; без сужения generic topic; `CLARIFY` только при реальной зависимости |
 | Multiclient | минимум два client packs; отсутствие cross-client data leakage |
@@ -676,6 +750,7 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 2. **Survivability microfact:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене.
 3. **Marketing overload / `PresentationResult` / promotion intent:** marketing layer может добавлять слишком много фактов; обязательная priority service promo на первом service turn, `commercial_intent=promotion`, `promotion_scope`, service-id mapping (`priority_service_promos` / `promotion_overview`), session-global suppression и единый `PresentationResult` **не реализованы** (Stage 5.1). Docs-only promotion intent amendment зафиксировал target contract; implementation потребует envelope contract/version update, parser/schema/prompt update, cached-prefix identity/invalidation review, offline regression и отдельного Checker acceptance.
 4. **Price-follow-up shown-state:** основная price-follow-up ветка может не записывать реально показанные кнопки в cadence / shown-state.
+5. **Service availability / alternatives / price gaps (Stage 5.1B):** keyword-based legacy `service_alternatives` (`match_keywords`, `mention`, `suggest_ref`, `note`); отсутствие canonical ID-based alternative authority; неединое presentation-поведение для unavailable service / price gaps; безопасный `data_gap` для named service + family-only price ещё **не** превращён в согласованный пользовательский ответ; unknown/unresolved service term может смешиваться с confirmed not-offered service. Docs-only Stage 5.1B amendment зафиксировал target contract; implementation **не** начата.
 
 ### 17.2 Закрыто принятыми Stage 4.1–4.3 (не перечислять как gaps)
 
@@ -766,6 +841,19 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - **implementation потребует:** envelope contract/version update; parser/schema/prompt update; cached-prefix identity/invalidation review; offline regression; отдельного Checker acceptance;
 - **performance invariant §13.7:** 0/1 provider calls; один локальный presentation pass после Flash; без marketing LLM/retry/network re-read; absolute gates §15.2 не ослабляются; без нового hard ms-SLO без owner decision.
 
+### Stage 5.1B — Service availability, authored alternatives and price gaps (docs-only amendment; implementation **не** начата)
+
+**Нормативный contract §11.1 зафиксирован docs-only.** Реализация ещё должна:
+
+- разделить три оси: service availability (`offered` / `known_not_offered` / `unresolved`), price coverage, alternative authority;
+- мигрировать `service_alternatives` с keyword legacy на canonical `requested_service_id` + `alternative_service_ids` + `approved_text` в существующем `clinic_policies.yaml`;
+- реализовать обязательную матрицу поведения §11.1 (7 кейсов) в едином `PresentationResult`;
+- соблюдать price precedence: exact offer → `no_public_price` → explicit family context → data-gap;
+- запретить family price как exact offer/price card; запретить promo/price leakage для unavailable service;
+- сохранить interaction со Stage 5.1 promotion contract;
+- **не** добавлять provider call, regex/keyword classifier, marketing LLM или retry;
+- offline regression + отдельный Checker acceptance.
+
 ### Stage 5.2 — Widget / SSE
 
 - один user turn → один bot bubble;
@@ -776,6 +864,7 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 ### Stage 5.3 — Frozen multiclient E2E
 
 - услуги, свободные формулировки, цены и scopes;
+- **обязательная frozen matrix Stage 5.1B:** `offered` / `known_not_offered` / `unresolved`; not-offered без alternatives; not-offered с 1–2 alternatives; price request к unavailable service; exact `no_public_price`; exact service + explicitly applicable family context; exact service + non-applicable family price; alternative price clearly labelled; no promo leakage from unavailable/alternative service; no invented/computed amount; client isolation;
 - APRF, технологии, parking, стерильность и произвольные строки полного MD;
 - врачи, страхи, medical ADMIN;
 - contacts и booking;
@@ -826,7 +915,7 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - [ ] §3 — active runtime до/при flag ON/после Stage 6.
 - [ ] §15.2 — абсолютные gates (8s / 10s / 6s); superseded relative-only activation; diagnostic-only legacy comparison allowed.
 - [ ] §17 — актуальные gaps; принятые Stage 0–3 **не** перечислены как незакрытые; будущие Stage 4.1+ **не** названы исправленными.
-- [ ] §19 — frozen roadmap Stage 4.0, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 6 раздельно.
+- [ ] §19 — frozen roadmap Stage 4.0, 4.1, 4.2, 4.3, 5.1, 5.1B, 5.2, 5.3, 5.4, 6 раздельно.
 - [ ] Supersession `ARCH_TARGET_DESIGN.md` и ANSWER/ADMIN граница сохранены.
 - [ ] §9.2 — structured output; Stage 3B accepted; `@ANSWER` не целевой transport.
 - [ ] §8 — typed UI не интерпретируется моделью; 0-call contacts/booking/urgent.

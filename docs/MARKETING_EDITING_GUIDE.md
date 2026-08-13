@@ -26,7 +26,7 @@ marketing layer.
 | Текст CTA-кнопки и первый вопрос после клика | `clients/demo/tone.yaml` |
 | Видео | `clients/demo/video_catalog.yaml` |
 | Текст меню или fallback | `clients/demo/ui.yaml` |
-| Услугу не оказываем / ОМС / альтернатива | `clients/demo/clinic_policies.yaml` |
+| Услугу не оказываем / ОМС / **service alternatives (target Stage 5.1B)** | `clients/<client_id>/clinic_policies.yaml` → `service_alternatives` |
 | Содержание услуги, FAQ, медицинские пояснения | `clients/demo/md/**` |
 
 ## Разделение ownership
@@ -136,6 +136,33 @@ Session-global suppression: один `fact_id` автоматически пок
 Прямой promotion request (`promotion_scope=shown`) повторяет последнюю rendered promo session.
 
 Первый service turn при `commercial_intent=none`, `promotion_scope=none` показывает **одну** priority service promo, не весь block сразу.
+
+## Service alternatives и availability (Stage 5.1B — target, не реализовано)
+
+**Current demo** (`clients/demo/clinic_policies.yaml`): legacy keyword-based `service_alternatives` с `match_keywords`, `mention`, `suggest_ref`, `note`. Это **pre-Stage-5.1B** seam — docs amendment **не** меняет actual YAML.
+
+**Target authoring** (typed evolution того же файла):
+
+```yaml
+service_alternatives:
+  - requested_service_id: braces
+    alternative_service_ids:
+      - aligners
+    approved_text: >-
+      Брекеты мы не устанавливаем. Для выравнивания зубов
+      в клинике используются элайнеры.
+```
+
+Правила:
+
+- `requested_service_id` — canonical catalog ID (`active=false` для not-offered);
+- каждый `alternative_service_ids` — exists и `active=true`;
+- max 2 alternatives; порядок = clinic priority;
+- название, content и price альтернативы — из её own sources (`service_catalog`, pricebook, md);
+- **не** дублировать keyword/mention/suggest_ref как identity;
+- бренды (Osstem) — отдельный brand seam, не service alternative.
+
+**Price / promo interaction:** unavailable service не получает priority promo; promo альтернативы не автоматическая до явного выбора альтернативы; `no_public_price` услуга может получить свою promo по Stage 5.1.
 
 ## Консультационный смысл и CTA
 

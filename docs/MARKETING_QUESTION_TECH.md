@@ -259,16 +259,29 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 
 ---
 
-## 11. Услуги, бренды и условия, которых нет
+## 11. Услуги, бренды и условия, которых нет (Stage 5.1B target)
+
+Канон: [`ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md`](ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md) §11.1, [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md). Implementation **не** начата.
 
 | Подтип | Технически |
 |---|---|
-| Есть альтернатива | `not_offered` → policies → `retrieval` alt-md |
-| Нет бренда | `info` implant_systems; + `price_route` |
-| Политика клиники | `clinic_policies` шаблон |
-| Неизвестная услуга | policy шаблон |
+| Not-offered, no alt | `known_not_offered` (`active=false`); `approved_text` / policy; **no** price_route, price card, promo |
+| Not-offered + authored alt | `service_alternatives[requested_service_id].alternative_service_ids`; alt content/price from own sources; alt buttons → secondary slots |
+| Price → unavailable | availability answer, not `no_public_price` mask |
+| Price → unavailable + alt | not-offered + alt offers; alt price labelled as other service |
+| Offered + `no_public_price` | `price_route` → `approved_text` only; no amount/card; family price forbidden as service price |
+| Named service + family-only | `target_family_price_resolution` data_gap today; target: optional explicit family context only |
+| Unresolved term | `unresolved`; safe clarify; no confident not-offered |
+| Нет бренда | brand seam (S24/S25); **not** service alternative |
+| Политика клиники | `clients/<client_id>/clinic_policies.yaml` template |
 
-≠ §2 `price_unavailable`: там услуга есть в каталоге, но нет прайса.
+**Current legacy seam:** `clinic_policies.yaml` → `service_alternatives` with `match_keywords` / `mention` / `suggest_ref` / `note` — keyword-based, pre-Stage-5.1B.
+
+**Price precedence:** exact offer → `no_public_price` → explicit family context → data-gap.
+
+**Promotion interaction:** unavailable: no priority promo; alt promo not automatic; `commercial_intent` / `promotion_scope` gates preserved.
+
+≠ §2 `price_unavailable`: там `offered` service без публичной цены.
 
 ---
 
@@ -331,7 +344,8 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 6. Demo: `lead_flow` не шлёт в CRM.
 7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую границу для любой текущей личной боли.
 8. `comparison_route` — catalog fast-path не перебивает comparison-md.
-9. **Stage 5.1 не реализован:** docs-only promotion intent amendment зафиксировал contract (`commercial_intent=promotion`, `promotion_scope`, `priority_service_promos`, `promotion_overview`); implementation unit ещё должна создать `PresentationResult`, обновить envelope/parser/prompt и принять post-Flash deterministic presentation.
+9. **Stage 5.1 не реализован:** docs-only promotion intent amendment зафиксировал contract; implementation unit ещё должна создать `PresentationResult`, обновить envelope/parser/prompt и принять post-Flash deterministic presentation.
+10. **Stage 5.1B не реализован:** docs-only service availability / alternatives / price gaps amendment зафиксировал contract §11.1; implementation должна мигрировать `service_alternatives` на canonical IDs, реализовать price precedence и 7-case matrix в `PresentationResult`; current keyword legacy и safe `data_gap` — pre-target seams.
 
 ### Target service consultation close
 
@@ -356,9 +370,10 @@ session, composer placement или authority.
    [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md); runtime
    пока не мигрирован на принятый Stage 5.1 `PresentationResult` и promotion intent.
 2. Stage 5.1 implementation: envelope/parser/prompt/cache migration для `commercial_intent=promotion` и `promotion_scope`; client config migration на `priority_service_promos` / `promotion_overview`. Без regex/keyword classifier, без второго provider call.
-3. Performance invariant §13.7: 0/1 calls, local presentation pass, no marketing LLM.
-4. S18 отдельно материализует offline source contract для `consultation_value`; demo
+3. Stage 5.1B implementation: `service_alternatives` ID migration; availability/price-gap matrix §11.1; family price explicit-context only; unified `PresentationResult`. Без regex/keyword classifier, без второго provider call.
+4. Performance invariant §13.7: 0/1 calls, local presentation pass, no marketing LLM.
+5. S18 отдельно материализует offline source contract для `consultation_value`; demo
    content, session/runtime wiring и authority остаются будущими checkpoint-ами.
-5. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
-6. Regression будущей реализации должен доказать priority promo, promotion scopes, session-global suppression,
-   direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts.
+6. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
+7. Regression будущей реализации должен доказать priority promo, promotion scopes, session-global suppression,
+   Stage 5.1B availability/price-gap matrix, direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts.

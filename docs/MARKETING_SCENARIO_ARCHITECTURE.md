@@ -217,6 +217,29 @@ price-ответе demo приоритет при наличии в `followups`:
 этапам». Показанные/нажатые price follow-up автоматически не повторяются. CTA существует
 отдельно.
 
+## Service availability, alternatives and price gaps (Stage 5.1B)
+
+**Статус:** docs-only owner decision; implementation **не** начата. Канон: Architecture Lock §11.1.
+
+Единый post-Flash `PresentationResult` владеет **всеми** commercial и navigation surfaces, включая:
+
+- service availability (`offered` / `known_not_offered` / `unresolved`);
+- not-offered + authored alternatives (max 2; buttons → content secondary slots);
+- `no_public_price` и family-level context (explicit applicability only);
+- price cards только при exact numeric offer и `commercial_intent=price`;
+- CTA отдельно от secondary slots.
+
+**Promotion interaction (Stage 5.1):**
+
+- unavailable service: **no** priority promo;
+- alternative promo: **not** automatic in same turn until patient selects alternative and `service_id` switches;
+- offered + `no_public_price`: may receive priority promo per Stage 5.1;
+- promo never invents base price; no discount from family price.
+
+**Current seams (pre-Stage-5.1B):** keyword `service_alternatives` in `clinic_policies.yaml`; `target_family_price_resolution` safe `data_gap` for named service + family-only price; inconsistent unavailable/price-gap presentation.
+
+**Performance:** 0/1 provider calls; local presentation pass; no regex/keyword classifier; no marketing LLM.
+
 ## Manual-contact boundary
 
 В обычном диалоге в ручной контакт до основного ответа переходят:
@@ -236,6 +259,7 @@ price-ответе demo приоритет при наличии в `followups`:
 | KB/md | Содержательный утверждённый контент и факты клиники; optional `consultation_value` в frontmatter того же service-документа |
 | Doctor layer | Имя, должность, стаж и связи с услугами; общий продающий профиль хранится в exact MD chunk |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
+| `clients/<client_id>/clinic_policies.yaml` | Target `service_alternatives` (`requested_service_id`, `alternative_service_ids`, `approved_text`); not-offered / OMS policy |
 | Session state | `shown_fact_ids`, `shown_amplifier_ids`, `shown_consultation_value_refs`, текущая тема/услуга, lead/refusal state |
 | ONE_CALL Flash envelope | один primary `scenario`; `commercial_intent` и `promotion_scope`; конкретные facts и priority promo выбирает post-Flash deterministic code |
 

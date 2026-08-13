@@ -1308,19 +1308,66 @@ export function mountWidget(root, config) {
     let fullText = "";
     let uiData = null;
     let writingRevealTimer = 0;
+    let turnFinalized = false;
     const liveAttributionKind = predictLiveAttributionKind(body, state.lastPayload);
 
-    const revealLiveBubble = () => {
+    const clearWritingRevealTimer = () => {
       if (writingRevealTimer) {
         clearTimeout(writingRevealTimer);
         writingRevealTimer = 0;
       }
+    };
+
+    const revealLiveBubble = () => {
+      if (turnFinalized) return;
+      clearWritingRevealTimer();
       if (!liveBubble && fullText.length > 0) {
         liveBubble = _createLiveBubble(feed, config.botName, liveAttributionKind);
         _updateLiveBubble(liveBubble, fullText, feed);
       } else if (liveBubble) {
         _updateLiveBubble(liveBubble, fullText, feed);
       }
+    };
+
+    const finalizeTurn = () => {
+      if (turnFinalized) return;
+      turnFinalized = true;
+      clearWritingRevealTimer();
+      const streamedText = fullText.trim();
+      if (uiData) {
+        if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
+        const turn = botTurnFromPayload(uiData);
+        if (turn) {
+          // The verified final payload remains the source of truth. A blocked
+          // or corrected route must replace speculative streamed prose.
+          if (streamedText && streamedText === String(turn.text || "").trim()) {
+            turn.text = streamedText;
+          }
+          state.messages.push(turn);
+        }
+        state.lastPayload = uiData;
+        if (!state.isOpen) state.unread = true;
+      } else if (streamedText) {
+        state.messages.push({
+          role: "bot",
+          text: streamedText,
+          followups: [],
+          quickReplies: [],
+          linksDismissed: false,
+          videoKey: "",
+          videoSrc: "",
+          videoTitleText: "",
+          videoRevealed: false,
+          situation: null,
+          cta: null,
+          trailingDismissed: false,
+          attributionKind: liveAttributionKind,
+        });
+      }
+      endPendingRequest();
+      if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
+      renderFeed();
+      syncSendState();
     };
 
     const logFirstLocalStatusOnce = () => {
@@ -1344,6 +1391,7 @@ export function mountWidget(root, config) {
         setTypingPhase(phase);
       },
       onDelta(delta) {
+        if (turnFinalized) return;
         const chunk = String(delta || "");
         if (!chunk) return;
         fullText += chunk;
@@ -1368,57 +1416,15 @@ export function mountWidget(root, config) {
         }
       },
       onUi(data) {
+        if (turnFinalized || uiData) return;
         uiData = data;
       },
       onDone() {
-        if (writingRevealTimer) {
-          clearTimeout(writingRevealTimer);
-          writingRevealTimer = 0;
-        }
-        if (!liveBubble && fullText.length > 0) {
-          revealLiveBubble();
-        }
-        const streamedText = fullText.trim();
-        if (uiData) {
-          if (uiData.meta && uiData.meta.sid) setSid(uiData.meta.sid);
-          const turn = botTurnFromPayload(uiData);
-          if (turn) {
-            // The verified final payload remains the source of truth. A blocked
-            // or corrected route must replace speculative streamed prose.
-            if (streamedText && streamedText === String(turn.text || "").trim()) {
-              turn.text = streamedText;
-            }
-            state.messages.push(turn);
-          }
-          state.lastPayload = uiData;
-          if (!state.isOpen) state.unread = true;
-        } else if (streamedText) {
-          state.messages.push({
-            role: "bot",
-            text: streamedText,
-            followups: [],
-            quickReplies: [],
-            linksDismissed: false,
-            videoKey: "",
-            videoSrc: "",
-            videoTitleText: "",
-            videoRevealed: false,
-            situation: null,
-            cta: null,
-            trailingDismissed: false,
-            attributionKind: liveAttributionKind,
-          });
-        }
-        endPendingRequest();
-        if (state.unread && !state.isOpen) unreadDot?.classList.add("is-visible");
-        renderFeed();
-        syncSendState();
+        finalizeTurn();
       },
       onError(msg) {
-        if (writingRevealTimer) {
-          clearTimeout(writingRevealTimer);
-          writingRevealTimer = 0;
-        }
+        if (turnFinalized) return;
+        clearWritingRevealTimer();
         setError(msg);
         endPendingRequest();
         renderFeed();

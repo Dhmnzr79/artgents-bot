@@ -67,6 +67,47 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
   const markPerfOnce = (key) => {
     if (perfMs[key] === null) perfMs[key] = Math.round(performance.now() - perfT0);
   };
+
+  /** @param {unknown} data */
+  const isValidUiPayload = (data) => {
+    if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+    return Boolean(data.answer || data.meta);
+  };
+
+  let uiAccepted = false;
+  let finalized = false;
+
+  /** @param {unknown} data */
+  const acceptUiOnce = (data) => {
+    if (uiAccepted || finalized || !isValidUiPayload(data)) return;
+    uiAccepted = true;
+    markPerfOnce("ui");
+    onUi?.(data);
+  };
+
+  const finalizeOnce = () => {
+    if (finalized) return;
+    finalized = true;
+    markPerfOnce("done");
+    onDone?.();
+  };
+
+  /** @param {string} msg */
+  const notifyErrorOnce = (msg) => {
+    if (finalized || uiAccepted) return;
+    onError?.(msg);
+  };
+
+  /** @param {string} msg */
+  const handleTransportTermination = (msg) => {
+    if (finalized) return;
+    if (uiAccepted) {
+      finalizeOnce();
+      return;
+    }
+    notifyErrorOnce(msg);
+  };
+
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -85,9 +126,9 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
     const contentType = res.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const data = await res.json();
-      if (data && typeof data === "object" && (data.answer || data.meta)) {
-        onUi?.(data);
-        onDone?.();
+      if (isValidUiPayload(data)) {
+        acceptUiOnce(data);
+        finalizeOnce();
       } else {
         throw new Error("Некорректный ответ сервера");
       }
@@ -98,8 +139,6 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
     const decoder = new TextDecoder();
     let buffer = "";
     let currentEvent = "";
-    let uiReceived = false;
-    let doneReceived = false;
 
     while (true) {
       const { value, done } = await reader.read();
@@ -128,13 +167,9 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
               markPerfOnce("text_delta");
               onDelta?.(String(data.delta ?? ""));
             } else if (currentEvent === "ui") {
-              markPerfOnce("ui");
-              uiReceived = true;
-              onUi?.(data);
+              acceptUiOnce(data);
             } else if (currentEvent === "done") {
-              markPerfOnce("done");
-              doneReceived = true;
-              onDone?.();
+              finalizeOnce();
             }
           } catch { /* ignore malformed SSE data */ }
           currentEvent = "";
@@ -142,14 +177,13 @@ export async function streamAsk(apiBase, body, { onStatus, onTyping, onDelta, on
       }
     }
 
-    if (!doneReceived) {
-      if (uiReceived) onDone?.();
-      else onError?.("Не удалось получить ответ");
+    if (!finalized) {
+      handleTransportTermination("Не удалось получить ответ");
     }
     if (typeof console !== "undefined" && console.debug) {
       console.debug("[perf] ask_stream_client_ms", perfMs);
     }
   } catch (e) {
-    onError?.(e instanceof Error ? e.message : "Ошибка сети");
+    handleTransportTermination(e instanceof Error ? e.message : "Ошибка сети");
   }
 }

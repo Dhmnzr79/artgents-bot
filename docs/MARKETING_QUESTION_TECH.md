@@ -6,11 +6,11 @@
 
 Нумерация разделов совпадает с foundation. Колонка **«На экране»** там; здесь — **«Технически»**.
 
-Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Документ синхронизирует accepted Stage 5.1 (`a268878`) и Stage 5.1B (`51621af`) runtime с technical integration map; historical seams (S21 и др.) маркированы отдельно; Stage 5.2 остаётся future.
+Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Документ синхронизирует accepted Stage 5.1 (`a268878`), Stage 5.1B (`51621af`) и Stage 5.2 Widget/SSE (`490bdbb`) runtime с technical integration map; historical seams (S21 и др.) маркированы отдельно; Stage 5.3 остаётся future.
 
 ## Обязательные продуктовые требования
 
-Этот раздел описывает **нормативное поведение** marketing layer. **Stage 5.1** в своём принятом scope реализован current ONE_CALL runtime (`a268878`). **Stage 5.1B** availability/alternatives/price gaps реализован current ONE_CALL runtime (`51621af`). Stage 5.2 Widget/SSE остаётся future.
+Этот раздел описывает **нормативное поведение** marketing layer. **Stage 5.1** в своём принятом scope реализован current ONE_CALL runtime (`a268878`). **Stage 5.1B** availability/alternatives/price gaps реализован current ONE_CALL runtime (`51621af`). **Stage 5.2** Widget/SSE terminal idempotency принят (`490bdbb`); marketing semantic ownership Stage 5.1/5.1B **не менялся**. Stage 5.3 остаётся future.
 
 1. **Authority базы над содержанием ответа.** Согласованные md, pricebook, marketing и policies конкретной клиники определяют факты и силу утверждений. Это не связано с запрещённой product authority A9 `patient_scope`: A9 остаётся shadow-only и не управляет ответом.
 2. **Запрет семантического смягчения.** Composer может добавлять только связующий текст. Числа, проценты, модальность, гарантии, обещания, отрицания и оговорки источника должны сохраняться точно; будущая проверка должна обнаруживать их ослабление, усиление или подмену.
@@ -150,7 +150,7 @@ Target-контракт лимитов, сценариев, усилителей
 marketing data на каждом turn; один локальный presentation pass; gates 8s/10s/6s не
 ослабляются; diagnostics OK, новый hard ms-SLO — только по owner decision.
 
-Stage 5.1B availability/alternatives/price-gap behavior — current accepted ONE_CALL runtime (`51621af`); не смешивать с Stage 5.2 Widget/SSE path.
+Stage 5.1B availability/alternatives/price-gap behavior — current accepted ONE_CALL runtime (`51621af`). Stage 5.2 Widget/SSE lifecycle — accepted parser/widget contract (`490bdbb`); **не** смешивать с marketing selector/presentation ownership Stage 5.1/5.1B.
 
 ---
 
@@ -351,7 +351,7 @@ session, composer placement или authority.
 
 1. **Stage 5.1 — completed/accepted** (`a268878`): envelope v3, typed `PresentationResult`, promotion selector/config authority, runtime presentation/session wiring.
 2. **Stage 5.1B — completed/accepted** (`51621af`): envelope v4 / cache p4, canonical service reference, availability states, authored alternatives, price precedence, family intent gating, billing unit, 313 offline tests.
-3. **Stage 5.2 — отдельный Widget/SSE этап:** один user turn → один bot bubble; double-response «Отбеливание» только по доказанной SSE-трассе.
+3. **Stage 5.2 — completed/accepted** (`490bdbb`; test EOL cleanup `984ab65`): Widget/SSE terminal idempotency — one user turn → one bot bubble; parser/widget finalize-once; live→final replacement; safe transport termination after accepted UI. Historical whitening double-response root cause **`NOT PROVEN`** (см. Architecture Lock §17.3).
 4. Performance invariant §13.7: 0/1 calls, local presentation pass, no marketing LLM.
 5. S18 отдельно материализует offline source contract для `consultation_value`; demo
    content, session/runtime wiring и authority остаются будущими checkpoint-ами.

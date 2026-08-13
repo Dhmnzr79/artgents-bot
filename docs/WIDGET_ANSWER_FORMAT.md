@@ -62,9 +62,42 @@ Telemetry в `meta`: `price_offers_applied`, `price_offer_ids`, `price_offer_uni
 - Промпт: `RESPONSE_FORMAT` в `llm.py` (все ветки Generator, включая стрим).
 - Рендер: `static/widget/answer_format.js` + стили `.clinic-msg__body--rich` в `widget.css`.
 
-## Стриминг (один источник правды для текста)
+## Стриминг и terminal lifecycle (current widget/SSE contract)
 
-1. Сервер копит **prebuffer** (120–250 символов или старт списка) — `core/stream_answer_text.py`.
-2. На буфере один раз считается **display-текст** (lead-before-list и т.д.).
-3. Только после этого идут `text_delta`; дальше — только хвост, без переписывания начала.
-4. `ui` после `done` добавляет кнопки/видео; **текст** в виджете берётся из накопленного стрима, не из подмены `answer` в payload.
+**Статус:** синхронизировано с принятым Stage 5.2 (`490bdbb`; test EOL cleanup `984ab65`). Server SSE schema/order **не менялись** в Stage 5.2.
+
+### Terminal protocol (инварианты важнее единого event order)
+
+- На один user turn server path эмитит **не более одного** `event: ui` и **не более одного** `event: done`.
+- **`ui` принимается до `done`.** `done` завершает уже принятый turn, а не предшествует final UI.
+- Конкретный порядок control events (`status`, `typing`, `text_delta`) может отличаться по path (direct/0-call vs normal stream); инварианты `ui≤1`, `done≤1`, `done` terminal сохраняются.
+
+### Источник final text
+
+- **Final `ui.answer` — authoritative final text** для state-backed bot bubble.
+- `text_delta` — live presentation only; виджет может показать временный live bubble во время stream.
+- При совпадении streamed и final текста виджет может использовать streamed форму без визуальной подмены.
+- При расхождении authoritative final UI **заменяет** speculative/partial live text; live и final **не складываются** в два сообщения.
+- Direct/0-call path может не иметь `text_delta`; normal stream — 0..N `text_delta`.
+- `status` / `typing` — control/lifecycle events, не patient answer.
+
+### Parser (`static/widget/api.js`)
+
+- State принадлежит одному `streamAsk()`.
+- Valid UI payload: plain object с `answer` или `meta`; `{}`/массив/примитив не занимают authoritative slot.
+- Первый valid `ui` принимается; duplicate/late `ui` игнорируется; `onUi` максимум один раз.
+- `onDone` максимум один раз; duplicate `done` игнорируется.
+- EOF после accepted UI без `done` → безопасная синтетическая финализация.
+- Reader/network error после accepted UI → `finalizeOnce()` без `onError` и без второго lifecycle.
+- Transport error до valid UI → обычный error path (`onError`, pending cleared, без final bot message).
+- JSON fallback проходит тот же exactly-once lifecycle.
+
+### Widget (`static/widget/widget.js`)
+
+- Один user turn → максимум один `state.messages.push`, один terminal `renderFeed`, один `endPendingRequest`.
+- `finalizeTurn()` идемпотентен: duplicate terminal callbacks не создают второй bubble.
+- Control metadata (`meta.service_route`, `provider_calls` и т.п.) пациенту **не показывается**.
+
+### Historical / server-side prebuffer
+
+Серверный **prebuffer** (`core/stream_answer_text.py`) может применяться на server stream path для lead-before-list и display-текста **до** `text_delta`. Это **не** заменяет authoritative `ui.answer` в виджете и **не** является stream owner final bubble. Если path не использует prebuffer (direct/0-call), виджет всё равно финализируется по `ui` / streamed fallback rules Stage 5.2.

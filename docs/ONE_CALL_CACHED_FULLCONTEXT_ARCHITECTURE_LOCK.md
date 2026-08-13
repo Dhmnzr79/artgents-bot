@@ -1,13 +1,13 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
-**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — **принят**; Stage 5.1B — **принят**).
+**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — **принят**; Stage 5.1B — **принят**; Stage 5.2 — **принят**).
 **Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.
-**Baseline HEAD:** `51621af40c873c728f3f5bc01141dc8d2440a6ce`.
+**Baseline HEAD:** `984ab65a5a653576b065b692043d07a6d5daaee7`.
 
-Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–5.1B. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
+Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–5.2. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
 
-### Current implementation status (Stage 0–5.1B accepted)
+### Current implementation status (Stage 0–5.2 accepted)
 
 | Этап | Статус |
 |------|--------|
@@ -24,11 +24,12 @@
 | Stage 4.3 — Semantic ownership | **Принят** (`6345b37`) |
 | Stage 5.1 — Единый marketing/commercial `PresentationResult` | **Принят** (`a268878`) |
 | Stage 5.1B — Service availability / alternatives / price gaps | **Принят** (`51621af`) |
-| Stage 5.2 — Widget / SSE | **Не** начат |
+| Stage 5.2 — Widget / SSE terminal idempotency | **Принят** (`490bdbb`; test EOL cleanup `984ab65`) |
+| Stage 5.3 — Frozen multiclient E2E | **Не** начат |
 | `SALES_ONE_PLUS_ON` | **default OFF** — без изменений |
 | Alibaba LIVE после Stage 4.0 | **Запрещён** без отдельной явной команды владельца |
 
-Stage 5.1 **считается реализованным и принятым** (`a268878`). Stage 5.1B **считается реализованным и принятым** (`51621af`). Stage 5.2+ **не считаются реализованными**, пока соответствующий этап не принят checker. Оставшиеся gaps §17 **не объявлены исправленными**, пока этап не принят checker.
+Stage 5.1 **считается реализованным и принятым** (`a268878`). Stage 5.1B **считается реализованным и принятым** (`51621af`). Stage 5.2 **считается реализованным и принятым** (`490bdbb`; test line-ending cleanup `984ab65`). Stage 5.3+ **не считаются реализованными**, пока соответствующий этап не принят checker. Оставшиеся gaps §17 **не объявлены исправленными**, пока этап не принят checker.
 
 ### Приоритет и supersession
 
@@ -745,16 +746,15 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 
 ---
 
-## 17. Current known gaps (post Stage 5.1B baseline)
+## 17. Current known gaps (post Stage 5.2 baseline)
 
-Проверяемые расхождения **после** принятого Stage 5.1B baseline (`51621af`). Ниже — только **оставшиеся** gaps; закрытые Stage 4.1–5.1B перечислены отдельно с commit mapping.
+Проверяемые расхождения **после** принятого Stage 5.2 baseline (`984ab65`). Ниже — только **оставшиеся** material gaps; закрытые Stage 4.1–5.2 перечислены отдельно с commit mapping.
 
-### 17.1 Оставшиеся gaps
+### 17.1 Оставшиеся material gaps
 
-1. **«Отбеливание» — двойной ответ:** наблюдается двойной ответ; **причина не утверждается** без доказанной SSE-трассы (Stage 5.2).
-2. **Survivability answer overload/quality gap:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене. Informational 99,8% sanitizer regression **протестирован** в Stage 5.1 — это **не** закрывает overload/quality gap.
+1. **Survivability answer overload/quality gap:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене. Informational 99,8% sanitizer regression **протестирован** в Stage 5.1 — это **не** закрывает overload/quality gap.
 
-### 17.2 Закрыто принятыми Stage 4.1–5.1B (не перечислять как gaps)
+### 17.2 Закрыто принятыми Stage 4.1–5.2 (не перечислять как gaps)
 
 | Gap | Закрыт этапом | Evidence |
 |-----|---------------|----------|
@@ -769,6 +769,14 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 | Session-global suppression, rendered promo state, `last_rendered_promo_fact_id` | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
 | Price-follow-up shown-state | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
 | Service availability / alternatives / price gaps | Stage 5.1B | `51621af40c873c728f3f5bc01141dc8d2440a6ce` |
+| Widget/SSE terminal idempotency (parser + widget finalize-once; duplicate `ui`/`done`; live→final replacement; safe EOF/reader-error after accepted UI) | Stage 5.2 | `490bdbb0f1b456eb5d2fe0d7689bcfe90244b739` |
+| Stage 5.2 test line-ending normalization (LF-only committed blobs) | Stage 5.2 cleanup | `984ab65a5a653576b065b692043d07a6d5daaee7` |
+
+### 17.3 Informational / historical (не material gaps)
+
+1. **Historical «Отбеливание» double-response incident:** root cause остаётся **`NOT PROVEN`**. Production-faithful offline Chrome harness: normal и partial whitening scenarios дают **один** bot bubble. Generic terminal-idempotency vulnerability (duplicate `ui`/`done`, missing finalize after accepted UI) **доказана и исправлена** в Stage 5.2. При повторении исторического инцидента использовать существующую PII-free SSE diagnostics для корреляции server event counts (`ui≤1`, `done≤1`) и DOM behavior. **Не** утверждать, что historical whitening root cause найден или что сервер отправлял duplicate terminal events.
+2. **I1 (informational, non-blocking):** `reader.read()` с одновременными `value` и `done:true` — pre-existing low-risk seam; Stage 5.2 не менял этот transport edge.
+3. **I2 (informational, non-blocking):** отдельный harness E7→next normal turn не входил в принятый Stage 5.2 scope; pending guard E8 задокументирован отдельно.
 
 **Закрыто в Stage 0–3 (не перечислять как gaps):** HTTP-scoped provider-call governance; Problem Gate first; typed UI в candidate path; cached FullContext prefix + pack identity; Flash capability JSON/streaming; production-faithful speed measurement; absolute speed gates; clinic-owned price strategy + единый authoritative commerce result для text/card.
 
@@ -870,14 +878,21 @@ Evidence: `51621af40c873c728f3f5bc01141dc8d2440a6ce`.
 
 **Historical compatibility:** legacy `match_keywords` rows в `clinic_policies.yaml` остаются для `SALES_ONE_PLUS_ON=OFF` path; current ONE_CALL owner — canonical ID-based rows only.
 
-### Stage 5.2 — Widget / SSE
+### Stage 5.2 — Widget / SSE terminal idempotency (принят)
 
-- один user turn → один bot bubble;
-- final UI атомарно заменяет live bubble;
-- control fields не видны пациенту;
-- двойной ответ «Отбеливание» исправляется **только** по доказанной реальной SSE-трассе.
+**Evidence:** implementation `490bdbb0f1b456eb5d2fe0d7689bcfe90244b739`; test line-ending cleanup `984ab65a5a653576b065b692043d07a6d5daaee7`.
 
-### Stage 5.3 — Frozen multiclient E2E
+**Parser (`static/widget/api.js`):** per-`streamAsk()` state; первый valid `ui` (`answer` или `meta`) — authoritative final payload; invalid/malformed `ui` не занимает slot; duplicate/late `ui` игнорируется; `onUi`/`onDone` максимум один раз; duplicate `done` игнорируется; EOF после accepted UI безопасно завершает turn; reader/network error после accepted UI вызывает `finalizeOnce()` без второго error lifecycle; transport error до UI — обычный error path; JSON fallback — тот же exactly-once lifecycle.
+
+**Widget (`static/widget/widget.js`):** один user turn → максимум один final bot message; один `state.messages.push`, один terminal `renderFeed`, один `endPendingRequest`; live `text_delta` bubble временный; final UI заменяет live bubble одним state-backed bubble; streamed-only fallback один раз; duplicate terminal events идемпотентны; поздние delta/ui/done/error не меняют final answer; guards одного stream не протекают в следующий turn; control metadata пациенту не показывается.
+
+**Scope (не менялось):** server SSE schema/order; `app.py` diagnostics; provider budget **0/1**; Stage 5.1/5.1B semantic/commercial contracts; `SALES_ONE_PLUS_ON` default OFF; speed gates 8s/10s/6s; whitening-specific regex/branch не добавлялись.
+
+**Offline evidence (не LIVE/frozen E2E):** production-faithful Chrome/CDP harness (`tests/js/stage52_widget_sse_harness.mjs`); targeted **29 passed ×2**; Checker regression **218 passed, 1 skipped**; provider/external network attempts **0**.
+
+**Historical whitening:** incident **не воспроизведён** offline; root cause **`NOT PROVEN`** (см. §17.3).
+
+### Stage 5.3 — Frozen multiclient E2E (не начат)
 
 - услуги, свободные формулировки, цены и scopes;
 - **обязательная frozen matrix Stage 5.1B:** `offered` / `known_not_offered` / `unresolved`; not-offered без alternatives; not-offered с 1–2 alternatives; price request к unavailable service; exact `no_public_price`; exact service + explicitly applicable family context; exact service + non-applicable family price; alternative price clearly labelled; no promo leakage from unavailable/alternative service; no invented/computed amount; client isolation;

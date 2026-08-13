@@ -3,7 +3,7 @@
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
 offline в S1, demo target policy материализована в S20, pure deterministic selector —
 в S21 (historical offline seam), one-service offline evidence package — в S22.
-**Stage 5.1 ONE_CALL product path принят** (`a268878`). **Stage 5.1B availability/alternatives/price gaps принят** (`51621af`).
+**Stage 5.1 ONE_CALL product path принят** (`a268878`). **Stage 5.1B availability/alternatives/price gaps принят** (`51621af`). **Stage 5.2 Widget/SSE terminal idempotency принят** (`490bdbb`; test EOL cleanup `984ab65`).
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
@@ -11,9 +11,9 @@ offline в S1, demo target policy материализована в S20, pure de
 
 | Слой | Содержание |
 |------|------------|
-| **Current accepted** (Stage 5.1, `a268878`; Stage 5.1B, `51621af`) | ONE_CALL product path: unified `PresentationResult`, promotion authority, availability/alternatives/price gaps, `select_stage51_marketing`, session/render state, limits **3/2**, CTA/secondary separation |
-| **Historical** | S20/S21/S22 и другие offline pieces — источники/seams происхождения архитектуры; **не** current presentation owner |
-| **Future** | Stage 5.2 Widget/SSE; Stage 5.3 frozen multiclient E2E |
+| **Current accepted** (Stage 5.1, `a268878`; Stage 5.1B, `51621af`; Stage 5.2, `490bdbb`) | ONE_CALL product path: unified `PresentationResult`, promotion authority, availability/alternatives/price gaps, `select_stage51_marketing`, session/render state, limits **3/2**, CTA/secondary separation; Widget/SSE terminal idempotency (parser finalize-once + widget single-bubble lifecycle) |
+| **Historical** | S20/S21/S22 и другие offline pieces — источники/seams происхождения архитектуры; **не** current presentation owner; historical whitening double-response incident — root cause **NOT PROVEN** |
+| **Future** | Stage 5.3 frozen multiclient E2E |
 
 **Precedence:** для marketing contract semantics этот документ имеет приоритет над legacy promo-ограничениями в `MARKETING_EDITING_GUIDE.md` и `PRICEBOOK_V2.md`. Stage 5.1 current runtime реализует принятый promotion/presentation contract в своём scope.
 
@@ -538,7 +538,7 @@ eligibility/strategy projection обязана выполняться отдел
 - передавать product authority единому `PresentationResult` — **выполнено** Stage 5.1 (`a268878`);
 - менять или перезапускать A9 raw/harness/live.
 
-## Runtime status (post Stage 5.1B)
+## Runtime status (post Stage 5.2)
 
 Schema governance зафиксирован этим документом и
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), demo policy
@@ -547,6 +547,7 @@ evidence package — в S22. **Stage 5.1 ONE_CALL product path принят** (`
 **Stage 5.1B availability/alternatives/price gaps принят** (`51621af`): envelope v4 / cache p4,
 canonical service reference, availability states, authored alternatives, price precedence,
 family intent gating, billing unit presentation, unified `PresentationResult`.
+**Stage 5.2 Widget/SSE terminal idempotency принят** (`490bdbb`; test EOL cleanup `984ab65`).
 
 **Accepted evidence (Stage 5.1, `a268878`):** limits **3/2**; session-global suppression;
 direct promotion scopes; authoritative promo rendering; render-proven shown-state;
@@ -556,9 +557,10 @@ direct promotion scopes; authoritative promo rendering; render-proven shown-stat
 billing unit; promo preservation for offered + family-only + `commercial_intent=none`;
 313 offline tests; **0/1** provider calls.
 
-**Remaining proof scope (не Stage 5.1/5.1B):**
+**Accepted evidence (Stage 5.2, `490bdbb`):** parser first-valid-UI authority; terminal idempotency (`ui`/`done` exactly-once); widget finalize-once (one bubble per turn); live→final replacement; safe EOF/reader-error after accepted UI; invalid `ui` does not occupy slot; production-faithful offline Chrome/CDP harness; targeted **29 passed ×2**; Checker regression **218 passed, 1 skipped**; provider/external network **0**. Historical whitening double-response root cause **`NOT PROVEN`**; normal/partial whitening harness → one bubble.
 
-- Stage 5.2 Widget/SSE (double-response trace);
+**Remaining proof scope (не Stage 5.1/5.1B/5.2):**
+
 - Stage 5.3 frozen multiclient E2E;
 - межклиентская изоляция и manual-contact boundary на полном E2E corpus;
 - optional two-alternative full-widget E2E (lower-level regression exists; not a production defect).

@@ -1,10 +1,12 @@
-"""Production v3 typed model control envelope (Stage 4.2 / 5.1)."""
+"""Production v4 typed model control envelope (Stage 4.2 / 5.1 / 5.1B)."""
 
 from __future__ import annotations
 
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
+
+from contracts.service_reference import ServiceReferenceStatus
 
 OneCallRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
 OneCallExtent = Literal["one_tooth", "few_teeth", "full_arch"]
@@ -34,6 +36,8 @@ _REQUIRED_FIELD_NAMES = frozenset(
         "clarify_axis",
         "clarify_service_options",
         "patient_text",
+        "service_reference_status",
+        "requested_service_id",
     }
 )
 
@@ -59,7 +63,7 @@ def _validate_clarify_service_options(options: tuple[str, ...] | None) -> None:
 
 
 class OneCallEnvelope(BaseModel):
-    """Exactly eleven model-returned control fields — no extras."""
+    """Exactly thirteen model-returned control fields — no extras."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -74,6 +78,8 @@ class OneCallEnvelope(BaseModel):
     clarify_axis: OneCallClarifyAxis | None
     clarify_service_options: tuple[str, ...] | None
     patient_text: str | None
+    service_reference_status: ServiceReferenceStatus
+    requested_service_id: str | None
 
     @model_validator(mode="after")
     def _field_and_route_invariants(self) -> Self:
@@ -83,6 +89,16 @@ class OneCallEnvelope(BaseModel):
             raise ValueError("stage_invalid")
 
         _validate_clarify_service_options(self.clarify_service_options)
+
+        if self.service_reference_status == "none":
+            if self.requested_service_id is not None:
+                raise ValueError("requested_service_id_forbidden_for_none")
+        elif self.service_reference_status == "unresolved":
+            if self.requested_service_id is not None:
+                raise ValueError("requested_service_id_forbidden_for_unresolved")
+        elif self.service_reference_status == "resolved":
+            if self.requested_service_id is None:
+                raise ValueError("requested_service_id_required_for_resolved")
 
         if self.commercial_intent != "promotion" and self.promotion_scope != "none":
             raise ValueError("promotion_scope_forbidden")

@@ -7,6 +7,7 @@ from typing import Any
 
 import yaml
 
+from contracts.authored_service_alternative import AuthoredServiceAlternative
 from core.client_config_loader import resolve_pack_client_id
 
 
@@ -38,6 +39,7 @@ class ClinicPoliciesBundle:
 
 _LOCK = threading.Lock()
 _CACHE: dict[str, ClinicPoliciesBundle] = {}
+_AUTHORED_ALTS_CACHE: dict[str, tuple[AuthoredServiceAlternative, ...]] = {}
 
 
 def _policies_path(client_id: str) -> str:
@@ -121,6 +123,61 @@ def load_clinic_policies(client_id: str) -> ClinicPoliciesBundle | None:
     with _LOCK:
         _CACHE[cid] = bundle
     return bundle
+
+
+def _parse_authored_service_alternatives(raw: object) -> tuple[AuthoredServiceAlternative, ...]:
+    if not isinstance(raw, list):
+        return ()
+    out: list[AuthoredServiceAlternative] = []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        requested_service_id = str(row.get("requested_service_id") or "").strip()
+        if not requested_service_id:
+            continue
+        alt_ids_raw = row.get("alternative_service_ids")
+        approved_text = str(row.get("approved_text") or "").strip()
+        alt_ids = (
+            [str(x).strip() for x in alt_ids_raw if str(x).strip()]
+            if isinstance(alt_ids_raw, list)
+            else []
+        )
+        if not alt_ids or not approved_text:
+            continue
+        deduped: list[str] = []
+        for alt_id in alt_ids:
+            if alt_id == requested_service_id or alt_id in deduped:
+                continue
+            deduped.append(alt_id)
+            if len(deduped) >= 2:
+                break
+        if not deduped:
+            continue
+        out.append(
+            AuthoredServiceAlternative(
+                requested_service_id=requested_service_id,
+                alternative_service_ids=tuple(deduped),
+                approved_text=approved_text,
+            )
+        )
+    return tuple(out)
+
+
+def load_authored_service_alternatives(client_id: str) -> tuple[AuthoredServiceAlternative, ...]:
+    cid = resolve_pack_client_id(client_id)
+    with _LOCK:
+        if cid in _AUTHORED_ALTS_CACHE:
+            return _AUTHORED_ALTS_CACHE[cid]
+    path = _policies_path(cid)
+    if not os.path.isfile(path):
+        authored: tuple[AuthoredServiceAlternative, ...] = ()
+    else:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        authored = _parse_authored_service_alternatives(raw.get("service_alternatives"))
+    with _LOCK:
+        _AUTHORED_ALTS_CACHE[cid] = authored
+    return authored
 
 
 def match_clinic_policy_key(text: str, client_id: str) -> str | None:

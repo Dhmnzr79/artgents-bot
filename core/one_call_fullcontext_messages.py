@@ -11,6 +11,7 @@ from core.one_call_prompt_contract import (
     ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
     one_call_contract_header,
 )
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_one_plus_protocol import (
     SALES_ONE_PLUS_SYSTEM_POLICY,
     build_sales_one_plus_dynamic_suffix,
@@ -49,8 +50,9 @@ def build_one_call_stable_prefix(
     identity: ClientPackIdentityKey,
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> str:
-    """Byte-stable prefix: contract, envelope instructions, catalog, corpus, pack identity."""
+    """Byte-stable prefix: contract, envelope instructions, catalogs, corpus, pack identity."""
 
     corpus = cached_full_context.model_corpus_text
     sections = (
@@ -58,6 +60,7 @@ def build_one_call_stable_prefix(
         "=== SYSTEM_POLICY ===\n" + SALES_ONE_PLUS_SYSTEM_POLICY,
         "=== TYPED_ENVELOPE_INSTRUCTIONS ===\n" + ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
         _pack_identity_block(identity),
+        service_reference_catalog.block_text(),
         active_service_catalog.block_text(),
         "=== APPROVED_MD_CORPUS ===\n" + corpus,
         "=== DOCUMENT_INDEX ===\n" + "\n".join(cached_full_context.document_paths),
@@ -70,6 +73,7 @@ def build_one_call_prompt_assembly(
     identity: ClientPackIdentityKey,
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
     exact_sales_resolution,
     current_strict_facts,
     sales_context,
@@ -85,6 +89,7 @@ def build_one_call_prompt_assembly(
         identity=identity,
         cached_full_context=cached_full_context,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     return OneCallPromptAssembly(
         stable_prefix=stable_prefix,

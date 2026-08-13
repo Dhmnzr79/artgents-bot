@@ -25,6 +25,7 @@ from core.one_call_envelope_protocol import (
 from core.one_call_prefix_cache import get_or_build_stable_prefix
 from core.sales_one_plus_protocol import build_sales_one_plus_dynamic_suffix
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 
 RawDeltaCallback = Callable[[str], None]
@@ -68,6 +69,7 @@ def _make_invocation(
     sales_context: Mapping[str, object] | None,
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> SalesOnePlusInvocation:
     corpus = cached_full_context.model_corpus_text
     strict_facts = tuple(current_strict_facts)
@@ -76,6 +78,7 @@ def _make_invocation(
         identity=pack_identity,
         cached_full_context=cached_full_context,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     dynamic_suffix = build_sales_one_plus_dynamic_suffix(
         exact_sales_resolution=exact_sales_resolution,
@@ -180,6 +183,7 @@ def run_sales_one_plus_candidate(
     local_gate_result: LocalProblemGateResult | None = None,
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> SalesOnePlusResult:
     """Make exactly one blocking backend call after a local pass."""
 
@@ -200,6 +204,7 @@ def run_sales_one_plus_candidate(
         sales_context=sales_context,
         pack_identity=pack_identity,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     try:
         raw = backend.generate(invocation)
@@ -213,6 +218,7 @@ def run_sales_one_plus_candidate(
         envelope = parse_production_envelope_json(
             raw,
             active_service_catalog=active_service_catalog,
+            service_reference_catalog=service_reference_catalog,
         )
     except OneCallEnvelopeProtocolError as exc:
         return _admin_result(
@@ -243,6 +249,7 @@ def run_sales_one_plus_candidate_stream(
     local_gate_result: LocalProblemGateResult | None = None,
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> SalesOnePlusResult:
     """Buffer provider JSON fully, validate once, then emit patient_text only."""
 
@@ -264,6 +271,7 @@ def run_sales_one_plus_candidate_stream(
     parser = SalesOnePlusStreamParser(
         emit_patient_delta,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     invocation = _make_invocation(
         user_message=user_message,
@@ -273,6 +281,7 @@ def run_sales_one_plus_candidate_stream(
         sales_context=sales_context,
         pack_identity=pack_identity,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     try:
         backend.generate_stream(invocation, parser.ingest)

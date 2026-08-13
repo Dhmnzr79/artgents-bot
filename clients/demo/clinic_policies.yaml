@@ -39,6 +39,13 @@ policies:
       Подробности по оплате могу подсказать отдельно.
 
 service_alternatives:
+  - requested_service_id: braces
+    alternative_service_ids:
+      - aligners
+    approved_text: >-
+      Брекеты мы не устанавливаем. Для выравнивания зубов
+      в клинике используются элайнеры.
+
   - match_keywords:
       - "брекет"
     mention: "элайнеры"

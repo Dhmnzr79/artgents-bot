@@ -178,6 +178,55 @@ def validate_client_pack(
         phone = str(contact.get("phone_display") or "").strip()
         if not phone:
             errors.append("clinic_policies.yaml: contact.phone_display_required")
+        service_ids = set(bundle.services.keys()) if bundle is not None else set()
+        alts_raw = raw.get("service_alternatives")
+        if isinstance(alts_raw, list):
+            for idx, row in enumerate(alts_raw):
+                if not isinstance(row, dict):
+                    continue
+                requested = str(row.get("requested_service_id") or "").strip()
+                if not requested:
+                    continue
+                approved_text = str(row.get("approved_text") or "").strip()
+                if not approved_text:
+                    errors.append(
+                        f"clinic_policies.yaml: service_alternatives[{idx}]:approved_text_required"
+                    )
+                if requested not in service_ids:
+                    errors.append(
+                        f"clinic_policies.yaml: service_alternatives[{idx}]:requested_service_unknown"
+                    )
+                elif bundle is not None and bundle.services[requested].active:
+                    errors.append(
+                        f"clinic_policies.yaml: service_alternatives[{idx}]:requested_service_must_be_inactive"
+                    )
+                alt_ids_raw = row.get("alternative_service_ids")
+                if not isinstance(alt_ids_raw, list) or not alt_ids_raw:
+                    errors.append(
+                        f"clinic_policies.yaml: service_alternatives[{idx}]:alternative_service_ids_required"
+                    )
+                    continue
+                seen: set[str] = set()
+                for alt_id in alt_ids_raw[:2]:
+                    token = str(alt_id or "").strip()
+                    if not token or token in seen or token == requested:
+                        errors.append(
+                            f"clinic_policies.yaml: service_alternatives[{idx}]:alternative_service_ids_invalid"
+                        )
+                        break
+                    seen.add(token)
+                    if token not in service_ids:
+                        errors.append(
+                            f"clinic_policies.yaml: service_alternatives[{idx}]:alternative_service_unknown"
+                        )
+                    elif bundle is not None and not bundle.services[token].active:
+                        errors.append(
+                            f"clinic_policies.yaml: service_alternatives[{idx}]:alternative_service_inactive"
+                        )
+                if len(alt_ids_raw) > 2:
+                    errors.append(
+                        f"clinic_policies.yaml: service_alternatives[{idx}]:alternative_service_ids_max_2"
+                    )
     contacts_md = md_root / "clinic__info__contacts.md"
     if contacts_md.is_file():
         body = contacts_md.read_text(encoding="utf-8")

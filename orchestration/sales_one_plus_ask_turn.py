@@ -200,6 +200,7 @@ def _resolve_governed_typed_ui_ref(
         return q
 
     from contracts.ui_scope_action import is_ui_scope_ref
+    from contracts.ui_service_action import is_ui_service_ref
     from contracts.ui_stage_action import is_ui_stage_ref
     from core.target_runtime_followup_nav import build_target_unknown_ref_clarify_payload
     from core.target_runtime_session import (
@@ -208,6 +209,7 @@ def _resolve_governed_typed_ui_ref(
         write_session_patient_facts_from_ui_stage_action,
     )
     from core.target_ui_scope_action import resolve_ui_scope_ref_click
+    from core.target_ui_service_action import resolve_ui_service_ref_click
     from core.target_ui_stage_action import resolve_ui_stage_ref_click
 
     session_state = read_target_runtime_session(sid)
@@ -232,6 +234,50 @@ def _resolve_governed_typed_ui_ref(
         write_session_patient_facts_from_ui_action(sid, ui_resolution.action)
         try:
             request.ctx["current_ui_scope_action"] = ui_resolution.action.model_dump()
+        except Exception:
+            pass
+        return "продолжить"
+    if is_ui_service_ref(ref_eff):
+        from core.target_runtime_client_context import load_target_runtime_client_context
+        from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
+
+        try:
+            runtime_context = load_target_runtime_client_context(client_id)
+            active_ids = ServiceReferenceCatalogSnapshot.from_bundle(
+                runtime_context.bundle
+            ).active_service_ids
+        except Exception:
+            active_ids = frozenset()
+        ui_resolution = resolve_ui_service_ref_click(
+            ref=ref_eff,
+            followups=session_state.followups,
+            active_service_ids=active_ids,
+            expected_client_id=client_id,
+        )
+        if ui_resolution.kind != "ok" or ui_resolution.action is None:
+            payload = build_target_unknown_ref_clarify_payload(
+                client_id=client_id,
+                sid=sid,
+            )
+            return AskOrchestrationResult(
+                kind="service_reply",
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                service_payload=payload,
+                service_route="sales_fast_followup_unknown",
+            )
+        try:
+            request.ctx["current_ui_service_action"] = ui_resolution.action.model_dump()
+        except Exception:
+            pass
+        try:
+            request.ctx["current_ui_scope_action"] = {
+                "service_id": ui_resolution.action.service_id,
+                "extent": None,
+                "jaw": None,
+                "provenance": ui_resolution.action.ref,
+            }
         except Exception:
             pass
         return "продолжить"
@@ -435,10 +481,11 @@ def orchestrate_sales_one_plus_ask_turn(
 
     local_gate_result: LocalProblemGateResult | None = None
     from contracts.ui_scope_action import is_ui_scope_ref
+    from contracts.ui_service_action import is_ui_service_ref
     from contracts.ui_stage_action import is_ui_stage_ref
 
     governed_typed_ui = bool(ref) and not q and (
-        is_ui_scope_ref(ref) or is_ui_stage_ref(ref)
+        is_ui_scope_ref(ref) or is_ui_stage_ref(ref) or is_ui_service_ref(ref)
     )
 
     if governed_typed_ui:

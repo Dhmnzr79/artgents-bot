@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from contracts.authored_service_alternative import AuthoredServiceAlternative
+from contracts.service_reference import AvailabilityStatus, PriceCoverageKind
+
 PresentationStatus = Literal["ok", "fail_closed"]
 
 
@@ -59,3 +62,11 @@ class OneCallPresentationResult:
     rendered_ids: PresentationRenderedIds
     pending_session_delta: PresentationSessionDelta | None
     offer_fact_refs: tuple[str, ...] = ()
+    availability_status: AvailabilityStatus = "none"
+    requested_service_id: str | None = None
+    authored_alternatives: tuple[AuthoredServiceAlternative, ...] = ()
+    price_coverage_kind: PriceCoverageKind = "none"
+    family_price_context: str | None = None
+    alternative_price_lines: tuple[str, ...] = ()
+    rendered_alternative_service_ids: tuple[str, ...] = ()
+    rendered_alternative_refs: tuple[str, ...] = ()

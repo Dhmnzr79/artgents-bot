@@ -12,6 +12,7 @@ from contracts.target_cached_full_context import TargetCachedFullContext
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_fullcontext_messages import build_one_call_stable_prefix
 from core.one_call_prefix_input_fingerprint import prefix_cache_lookup_key
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 _MAX_ENTRIES = 8
 _LOCK = threading.Lock()
@@ -41,6 +42,7 @@ def get_or_build_stable_prefix(
     identity: ClientPackIdentityKey,
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> tuple[StablePrefixBundle, bool]:
     """Return immutable stable prefix; second value is local_prefix_cache_hit."""
 
@@ -48,6 +50,7 @@ def get_or_build_stable_prefix(
         identity,
         cached_full_context,
         active_service_catalog,
+        service_reference_catalog,
     )
     with _LOCK:
         cached = _CACHE.get(lookup_key)
@@ -60,6 +63,7 @@ def get_or_build_stable_prefix(
         identity=identity,
         cached_full_context=cached_full_context,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     build_ms = max(0, int((time.monotonic() - started) * 1000))
     fingerprint = lookup_key.rsplit(":pf", 1)[-1]

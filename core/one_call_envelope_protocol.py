@@ -17,6 +17,7 @@ from contracts.one_call_envelope import (
     required_envelope_field_names,
 )
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 MAX_ENVELOPE_UTF8_BYTES = 64 * 1024
 
@@ -29,6 +30,7 @@ _ALLOWED_SCENARIO = frozenset(
 _ALLOWED_COMMERCIAL_INTENT = frozenset({"none", "price", "payment", "included", "promotion"})
 _ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
 _ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
+_ALLOWED_SERVICE_REFERENCE_STATUS = frozenset({"none", "resolved", "unresolved"})
 
 
 class OneCallEnvelopeProtocolError(ValueError):
@@ -154,6 +156,26 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
         if route in {"ANSWER", "CLARIFY"} and not patient_text.strip():
             raise OneCallEnvelopeProtocolError("patient_text_required")
 
+    service_reference_status = payload["service_reference_status"]
+    _reject_bool(service_reference_status, code="service_reference_status_invalid")
+    if (
+        not isinstance(service_reference_status, str)
+        or service_reference_status not in _ALLOWED_SERVICE_REFERENCE_STATUS
+    ):
+        raise OneCallEnvelopeProtocolError("service_reference_status_invalid")
+
+    requested_service_id = _optional_nonblank_string(
+        payload["requested_service_id"],
+        code="requested_service_id_invalid",
+    )
+
+    if service_reference_status == "none" and requested_service_id is not None:
+        raise OneCallEnvelopeProtocolError("requested_service_id_forbidden_for_none")
+    if service_reference_status == "unresolved" and requested_service_id is not None:
+        raise OneCallEnvelopeProtocolError("requested_service_id_forbidden_for_unresolved")
+    if service_reference_status == "resolved" and requested_service_id is None:
+        raise OneCallEnvelopeProtocolError("requested_service_id_required_for_resolved")
+
     if route == "CLARIFY" and clarify_axis == "service":
         if clarify_service_options is None:
             raise OneCallEnvelopeProtocolError("clarify_service_options_invalid")
@@ -191,6 +213,8 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
             clarify_axis=clarify_axis,  # type: ignore[arg-type]
             clarify_service_options=clarify_service_options,
             patient_text=patient_text,
+            service_reference_status=service_reference_status,  # type: ignore[arg-type]
+            requested_service_id=requested_service_id,
         )
     except ValueError as exc:
         message = str(exc)
@@ -233,9 +257,31 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
                     "clarify_service_options_invalid",
                     "promotion_scope_forbidden",
                     "promotion_scope_invalid",
+                    "service_reference_status_invalid",
+                    "requested_service_id_invalid",
+                    "requested_service_id_forbidden_for_none",
+                    "requested_service_id_forbidden_for_unresolved",
+                    "requested_service_id_required_for_resolved",
                 }:
                     raise OneCallEnvelopeProtocolError(message) from exc
         raise OneCallEnvelopeProtocolError("envelope_invariant_violation") from exc
+
+
+def _validate_reference_context(
+    envelope: OneCallEnvelope,
+    *,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
+) -> None:
+    if envelope.service_reference_status != "resolved":
+        return
+    requested = envelope.requested_service_id
+    if requested is None:
+        raise OneCallEnvelopeProtocolError("requested_service_id_required_for_resolved")
+    if requested not in service_reference_catalog.service_ids:
+        raise OneCallEnvelopeProtocolError("requested_service_id_invalid")
+    if not service_reference_catalog.is_active(requested):
+        if envelope.service_id is not None:
+            raise OneCallEnvelopeProtocolError("service_id_conflict_inactive_reference")
 
 
 def _validate_pack_context(
@@ -296,8 +342,9 @@ def parse_production_envelope_json(
     raw: object,
     *,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> OneCallEnvelope:
-    """Parse and validate a production v2 envelope from provider raw text."""
+    """Parse and validate a production v4 envelope from provider raw text."""
 
     if not isinstance(raw, str):
         raise OneCallEnvelopeProtocolError("envelope_output_invalid")
@@ -308,6 +355,10 @@ def parse_production_envelope_json(
 
     payload = _loads_strict_json_object(raw)
     envelope = _validate_structure(payload)
+    _validate_reference_context(
+        envelope,
+        service_reference_catalog=service_reference_catalog,
+    )
     _validate_pack_context(envelope, active_service_catalog=active_service_catalog)
     return envelope
 
@@ -325,6 +376,8 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
         "clarify_axis": None,
         "clarify_service_options": None,
         "patient_text": "Probe text.",
+        "service_reference_status": "none",
+        "requested_service_id": None,
     }
     base.update(overrides)
     return base

@@ -1,4 +1,4 @@
-"""Authoritative post-envelope semantic frame (Stage 4.3 / 5.1)."""
+"""Authoritative post-envelope semantic frame (Stage 4.3 / 5.1 / 5.1B)."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from contracts.one_call_envelope import (
     OneCallRoute,
     OneCallScenario,
 )
+from contracts.service_reference import AvailabilityStatus, ServiceReferenceStatus
 
 SemanticFieldProvenance = Literal["local_gate", "governed_ui", "envelope", "null"]
 SemanticRebindKind = Literal["full_rebuild"]
@@ -40,6 +41,9 @@ class SalesOnePlusSemanticFrame(BaseModel):
     promotion_scope: OneCallPromotionScope
     clarify_axis: OneCallClarifyAxis | None
     clarify_service_options: tuple[str, ...] | None
+    service_reference_status: ServiceReferenceStatus
+    requested_service_id: str | None
+    availability_status: AvailabilityStatus
     rebind_kind: SemanticRebindKind = "full_rebuild"
 
     @model_validator(mode="after")
@@ -79,4 +83,7 @@ class SalesOnePlusSemanticFrame(BaseModel):
             promotion_scope=envelope.promotion_scope,
             clarify_axis=envelope.clarify_axis,
             clarify_service_options=envelope.clarify_service_options,
+            service_reference_status=envelope.service_reference_status,
+            requested_service_id=envelope.requested_service_id,
+            availability_status="none",
         )

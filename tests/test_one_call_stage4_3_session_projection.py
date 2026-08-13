@@ -6,6 +6,7 @@ from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_envelope_protocol import production_envelope_template
 from core.sales_fast_strict_evidence import effective_scope_from_semantic_frame
 from core.sales_fast_turn_frame import build_turn_frame_from_semantic_frame
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_one_plus_semantic_authority import bind_semantic_frame, governed_ui_authority_from_resolution
 from core.target_client_data import load_target_client_data
 from core.target_runtime_session import (
@@ -44,10 +45,12 @@ def test_null_service_turn_preserves_historical_focus_set_at_turn() -> None:
         unknown,
     )
     catalog = ActiveServiceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
+    ref_catalog = ServiceReferenceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
     semantic = bind_semantic_frame(
         envelope=_envelope(service_id=None),
         governed_ui=governed_ui_authority_from_resolution(resolution),
         active_service_catalog=catalog,
+        service_reference_catalog=ref_catalog,
     )
     turn_frame = build_turn_frame_from_semantic_frame(
         semantic=semantic,
@@ -73,6 +76,7 @@ def test_null_service_turn_preserves_historical_focus_set_at_turn() -> None:
         shown_price_followup_refs=(),
         situation_offered=False,
         followups=(),
+        last_rendered_promo_fact_id=None,
     )
     write_target_runtime_session_after_materialized(
         sid,
@@ -86,6 +90,7 @@ def test_null_service_turn_preserves_historical_focus_set_at_turn() -> None:
                 "shown_fact_ids": (),
                 "shown_amplifier_refs": (),
                 "shown_consultation_value_refs": (),
+                "last_rendered_promo_fact_id": None,
             },
         )(),
         followups=(),

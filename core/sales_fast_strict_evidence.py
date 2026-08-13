@@ -232,6 +232,122 @@ def assemble_sales_fast_bound_package(
     )
 
 
+def assemble_stage51b_availability_bound_package(
+    *,
+    turn_frame: TurnFrame,
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    external_index: object,
+    consultation_values: Sequence[ServiceConsultationValue],
+    strategy_context: TargetStrategyMatch,
+    effective_scope: EffectiveScope,
+    allowed_topics: tuple[str, ...],
+    today: date,
+    md_root: Path,
+    client_id: str,
+) -> TargetSpecBoundOfflineResponsePackage:
+    """Minimal materializable bound package for Stage 5.1B availability presentation."""
+
+    from core.target_generic_fullcontext_content import (
+        build_generic_fullcontext_content_policy_request,
+    )
+
+    envelope = TargetTurnFramePolicyEnvelope(
+        boundary_decision="none",
+        tone_key="commercial_warm",
+        allowed_topics=allowed_topics,
+        forbidden_topics=("diagnosis", "personal_eligibility"),
+        allow_marketing_facts=False,
+        allow_consultation_close=False,
+        allow_cta=True,
+        min_topic_confidence=0.0,
+        min_service_confidence=0.0,
+        min_intent_confidence=0.0,
+    )
+    policy_request = build_generic_fullcontext_content_policy_request(
+        response_mode="answer",
+        envelope=envelope,
+    )
+    bound_spec = build_target_response_spec(policy_request)
+    semantic_context = resolve_target_semantic_context(turn_frame, bound_spec)
+    return _assemble_bound_package(
+        policy_request,
+        bundle,
+        doctor_catalog,  # type: ignore[arg-type]
+        external_index,  # type: ignore[arg-type]
+        consultation_values,  # type: ignore[arg-type]
+        brand_term=None,
+        strategy_context=strategy_context,
+        semantic_context=semantic_context,
+        today=today,
+        md_root=md_root,
+        include_initial_block=False,
+        include_consultation_close=False,
+        include_cta=True,
+        marketing_scenarios=(),
+        shown_fact_ids=(),
+        shown_amplifier_refs=(),
+        shown_consultation_value_refs=(),
+        turn_topic=turn_frame.topic,
+        effective_scope=effective_scope,
+        client_id=client_id,
+    )
+
+
+def resolve_sales_fast_bound_package(
+    *,
+    turn_frame: TurnFrame,
+    semantic: SalesOnePlusSemanticFrame,
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    external_index: object,
+    consultation_values: Sequence[ServiceConsultationValue],
+    strategy_context: TargetStrategyMatch,
+    effective_scope: EffectiveScope,
+    allowed_topics: tuple[str, ...],
+    today: date,
+    md_root: Path,
+    client_id: str,
+    shown_fact_ids: Sequence[str] = (),
+    shown_amplifier_refs: Sequence[str] = (),
+    shown_consultation_value_refs: Sequence[str] = (),
+) -> TargetSpecBoundOfflineResponsePackage | TargetTurnFrameBoundTerminalResponse:
+    bound = assemble_sales_fast_bound_package(
+        turn_frame=turn_frame,
+        bundle=bundle,
+        doctor_catalog=doctor_catalog,
+        external_index=external_index,
+        consultation_values=consultation_values,
+        strategy_context=strategy_context,
+        effective_scope=effective_scope,
+        allowed_topics=allowed_topics,
+        today=today,
+        md_root=md_root,
+        client_id=client_id,
+        shown_fact_ids=shown_fact_ids,
+        shown_amplifier_refs=shown_amplifier_refs,
+        shown_consultation_value_refs=shown_consultation_value_refs,
+    )
+    if (
+        isinstance(bound, TargetTurnFrameBoundTerminalResponse)
+        and semantic.availability_status in {"known_not_offered", "unresolved"}
+    ):
+        return assemble_stage51b_availability_bound_package(
+            turn_frame=turn_frame,
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            external_index=external_index,
+            consultation_values=consultation_values,
+            strategy_context=strategy_context,
+            effective_scope=effective_scope,
+            allowed_topics=allowed_topics,
+            today=today,
+            md_root=md_root,
+            client_id=client_id,
+        )
+    return bound
+
+
 def strict_facts_and_sales_context(
     *,
     bound_package: TargetSpecBoundOfflineResponsePackage,

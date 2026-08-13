@@ -19,6 +19,7 @@ from core.exact_sales_resolver import ExactSalesResolverInputs, resolve_exact_sa
 from core.local_problem_gate import decide_local_problem_gate
 from core.provider_call_budget import current_provider_call_budget
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_fast_observability import collect_sales_fast_timings_ms, record_sales_fast_observability
 from core.sales_fast_presentation import (
     materialize_sales_fast_admin_payload,
@@ -34,6 +35,7 @@ from core.sales_fast_strict_evidence import (
     build_pre_flash_prompt_hints,
     effective_scope_from_semantic_frame,
     exact_sales_resolution_from_semantic_frame,
+    resolve_sales_fast_bound_package,
 )
 from core.sales_fast_turn_frame import (
     build_provisional_turn_frame,
@@ -280,6 +282,7 @@ def _rebuild_authoritative_context(
     client_id: str,
     session_state: object,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
     resolution: ExactSalesResolution,
 ) -> tuple[
     TurnFrame,
@@ -296,6 +299,7 @@ def _rebuild_authoritative_context(
         envelope=result.envelope,
         governed_ui=governed_ui,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     turn_frame = build_turn_frame_from_semantic_frame(
         semantic=semantic,
@@ -315,8 +319,9 @@ def _rebuild_authoritative_context(
         ).family,
     )
     commerce_resolution = exact_sales_resolution_from_semantic_frame(semantic)
-    bound = assemble_sales_fast_bound_package(
+    bound = resolve_sales_fast_bound_package(
         turn_frame=turn_frame,
+        semantic=semantic,
         bundle=context.bundle,
         doctor_catalog=context.doctor_catalog,
         external_index=context.external_index,
@@ -451,6 +456,7 @@ def run_sales_fast_widget_turn(
     )
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
+    service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
     turn_timing.stage_start("sales_fast_model")
     if on_delta is None:
         result = run_sales_one_plus_candidate(
@@ -464,6 +470,7 @@ def run_sales_fast_widget_turn(
             local_gate_result=local_gate,
             pack_identity=context.pack_identity,
             active_service_catalog=active_service_catalog,
+            service_reference_catalog=service_reference_catalog,
         )
     else:
         result = run_sales_one_plus_candidate_stream(
@@ -478,6 +485,7 @@ def run_sales_fast_widget_turn(
             local_gate_result=local_gate,
             pack_identity=context.pack_identity,
             active_service_catalog=active_service_catalog,
+            service_reference_catalog=service_reference_catalog,
         )
     backend_invocations = int(getattr(backend, "call_count", 0) or 0)
     cache_obs = getattr(backend, "last_observability", None)
@@ -504,6 +512,7 @@ def run_sales_fast_widget_turn(
         provider_calls=provider_calls,
         resolution=resolution,
         active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
@@ -532,6 +541,7 @@ def _materialize_result(
     provider_calls: int,
     resolution: ExactSalesResolution,
     active_service_catalog: ActiveServiceCatalogSnapshot,
+    service_reference_catalog: ServiceReferenceCatalogSnapshot,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
         return SalesFastWidgetOutcome(
@@ -566,6 +576,7 @@ def _materialize_result(
             client_id=client_id,
             session_state=session_state,
             active_service_catalog=active_service_catalog,
+            service_reference_catalog=service_reference_catalog,
             resolution=resolution,
         )
     except SalesOnePlusSemanticConflictError as exc:
@@ -657,6 +668,7 @@ def _materialize_result(
             followups=_followups_from_widget(widget),
             effective_scope=effective_scope,  # type: ignore[arg-type]
             presentation_cadence_update=widget.presentation_cadence_update,
+            availability_status=semantic.availability_status,
         )
     model_route = "clarify" if result.decision == "clarify" else "model"
     return SalesFastWidgetOutcome(

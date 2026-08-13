@@ -15,6 +15,7 @@ from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
 from core.sales_one_plus_turn import run_sales_one_plus_candidate_stream
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_client_pack_identity import build_client_pack_identity
 from core.target_cached_full_context import build_target_cached_full_context
 from core.target_client_data import load_target_client_data
@@ -27,6 +28,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _FIXTURE_PATH = _REPO_ROOT / "tests" / "fixtures" / "one_call_stage2_cases.json"
 _PACK_IDENTITY = build_client_pack_identity("demo")
 _DEMO_CATALOG = ActiveServiceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
+_DEMO_REF_CATALOG = ServiceReferenceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
 
 
 class _CountingBackend:
@@ -155,6 +157,7 @@ def test_flag_on_local_admin_cases_make_zero_provider_calls(case_id: str) -> Non
         on_delta=lambda _delta: None,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     assert result.decision == "admin"
     assert backend.call_count == 0
@@ -178,6 +181,7 @@ def test_sales_fears_use_model_route_with_exactly_one_call(case_id: str) -> None
         on_delta=lambda _delta: None,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     assert result.decision == "answer"
     assert backend.call_count == 1
@@ -199,6 +203,7 @@ def test_parking_and_sterility_answer_from_md_without_verifier() -> None:
             on_delta=lambda _delta: None,
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_DEMO_CATALOG,
+            service_reference_catalog=_DEMO_REF_CATALOG,
         )
         assert result.decision == "answer"
         assert backend.call_count == 1
@@ -219,6 +224,7 @@ def test_exact_price_case_uses_one_call_without_verifier() -> None:
         on_delta=lambda _delta: None,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     assert result.decision == "answer" and backend.call_count == 1
 
@@ -239,6 +245,7 @@ def test_both_jaws_without_offer_sets_needs_admin_quote_context() -> None:
         on_delta=lambda _delta: None,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     assert result.decision == "answer"
     assert "636000" not in (result.patient_text or "")
@@ -260,6 +267,7 @@ def test_marketing_fact_is_not_passed_to_pre_flash_invocation() -> None:
         on_delta=lambda _delta: None,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     prompt = backend.invocation.user_prompt
     assert "PRE_MODEL_HINTS" in prompt
@@ -273,7 +281,11 @@ def test_streaming_parser_emits_only_validated_patient_text() -> None:
     def emit(delta: str) -> None:
         emitted.append(delta)
 
-    parser = SalesOnePlusStreamParser(emit, active_service_catalog=_DEMO_CATALOG)
+    parser = SalesOnePlusStreamParser(
+        emit,
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+    )
     payload = answer_envelope("Видимый текст")
     parser.ingest(payload)
     envelope = parser.finalize()
@@ -299,6 +311,7 @@ def test_provider_error_falls_back_without_second_call() -> None:
         on_delta=lambda _delta: None,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     assert result.decision == "admin"
     assert result.handoff_text == "Позвоните администратору."
@@ -653,7 +666,9 @@ def test_governed_ui_envelope_conflict_is_admin_without_model_text(
     backend = _CountingBackend(
         answer_envelope(
             model_text,
-            service_id="all_on_4",
+            service_id=None,
+            service_reference_status="resolved",
+            requested_service_id="all_on_4",
             commercial_intent="price",
         )
     )

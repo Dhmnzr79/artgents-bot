@@ -11,6 +11,7 @@ from contracts.sales_one_plus import SalesOnePlusStrictFact
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.one_call_client_pack_identity import build_client_pack_identity
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_envelope_protocol import dumps_production_envelope
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.target_cached_full_context import build_target_cached_full_context
@@ -73,12 +74,19 @@ _DEMO_PACK_IDENTITY = build_client_pack_identity("demo")
 _EMPTY_CATALOG = ActiveServiceCatalogSnapshot(
     canonical_json='{"services":[],"allowed_patient_stages":[]}',
 )
+_EMPTY_REF_CATALOG = ServiceReferenceCatalogSnapshot(
+    canonical_json='{"services":[]}',
+)
 _DEMO_CATALOG = ActiveServiceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
+_DEMO_REF_CATALOG = ServiceReferenceCatalogSnapshot.from_bundle(
+    load_target_client_data("demo").bundle
+)
 
 
 def _run(**kwargs):
     kwargs.setdefault("pack_identity", _PACK_IDENTITY)
     kwargs.setdefault("active_service_catalog", _EMPTY_CATALOG)
+    kwargs.setdefault("service_reference_catalog", _EMPTY_REF_CATALOG)
     return run_sales_one_plus_candidate(static_admin_handoff_text="Позвоните администратору.", **kwargs)
 
 
@@ -199,6 +207,7 @@ def test_live_demo_model_corpus_and_every_numeric_line_reach_invocation() -> Non
         backend=backend,
         pack_identity=_DEMO_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
 
     assert result.decision == "answer"

@@ -303,6 +303,24 @@
     },
     "options": []
   },
+  "braces": {
+    "name": "Брекеты",
+    "aliases": [
+      "брекеты",
+      "брекет",
+      "брекет-система",
+      "брекет система",
+      "металлические брекеты",
+      "керамические брекеты"
+    ],
+    "family": "orthodontics",
+    "roles": [],
+    "active": false,
+    "selection": {
+      "mode": "context"
+    },
+    "options": []
+  },
   "aligners": {
     "name": "Элайнеры для выравнивания зубов",
     "aliases": [

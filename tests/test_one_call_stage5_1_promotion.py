@@ -27,7 +27,7 @@ from core.target_client_data import client_pack_root, load_target_client_data
 from core.target_marketing_selector import select_stage51_marketing
 from core.target_presentation_decision import decide_target_presentation, TargetPresentationCadenceState
 from contracts.target_response_spec import TargetResponseSpec
-from tests.test_sales_one_plus_turn import _DEMO_CATALOG, answer_envelope
+from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_REF_CATALOG, answer_envelope
 
 _DEMO_MD_ROOT = client_pack_root("demo") / "md"
 
@@ -41,8 +41,8 @@ def _demo_stage51_inputs():
     return data.bundle, doctors, external_index
 
 
-def test_prompt_contract_version_three() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 3
+def test_prompt_contract_version_four() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 4
 
 
 def test_envelope_promotion_scope_invariants() -> None:
@@ -50,6 +50,7 @@ def test_envelope_promotion_scope_invariants() -> None:
         parse_production_envelope_json(
             answer_envelope("Ответ.", commercial_intent="none", promotion_scope="general"),
             active_service_catalog=_DEMO_CATALOG,
+            service_reference_catalog=_DEMO_REF_CATALOG,
         )
     envelope = parse_production_envelope_json(
         answer_envelope(
@@ -58,6 +59,7 @@ def test_envelope_promotion_scope_invariants() -> None:
             promotion_scope="general",
         ),
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     assert envelope.commercial_intent == "promotion"
     assert envelope.promotion_scope == "general"
@@ -79,6 +81,9 @@ def test_clarify_forces_promotion_scope_none() -> None:
         promotion_scope="none",
         clarify_axis="service",
         clarify_service_options=("all_on_4", "classic"),
+        service_reference_status="none",
+        requested_service_id=None,
+        availability_status="none",
     )
     assert frame.promotion_scope == "none"
 
@@ -683,13 +688,20 @@ def _run_presentation_result(
     user_message: str = "тест",
     marketing_scenarios: tuple[str, ...] | None = None,
     today: date = date(2026, 8, 1),
+    context_override: object | None = None,
+    shown_fact_ids: tuple[str, ...] = (),
+    shown_amplifier_refs: tuple[str, ...] = (),
+    shown_consultation_value_refs: tuple[str, ...] = (),
+    last_rendered_promo_fact_id: str | None = None,
 ) -> object:
+    from dataclasses import replace
+
     from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
     from core.one_call_presentation_pass import build_one_call_presentation_result
     from core.sales_fast_strict_evidence import (
-        assemble_sales_fast_bound_package,
         effective_scope_from_semantic_frame,
         exact_sales_resolution_from_semantic_frame,
+        resolve_sales_fast_bound_package,
     )
     from core.sales_fast_turn_frame import build_turn_frame_from_semantic_frame
     from core.sales_one_plus_semantic_authority import bind_semantic_frame, governed_ui_authority_from_resolution
@@ -701,12 +713,17 @@ def _run_presentation_result(
     governed_ui = governed_ui_authority_from_resolution(
         ExactSalesResolution(None, None, None, None, None, unknown, unknown, unknown, unknown, unknown)
     )
-    context = load_target_runtime_client_context("demo")
-    envelope = parse_production_envelope_json(envelope_json, active_service_catalog=_DEMO_CATALOG)
+    context = context_override or load_target_runtime_client_context("demo")
+    envelope = parse_production_envelope_json(
+        envelope_json,
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+    )
     semantic = bind_semantic_frame(
         envelope=envelope,
         governed_ui=governed_ui,
         active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
     )
     turn_frame = build_turn_frame_from_semantic_frame(
         semantic=semantic,
@@ -729,8 +746,9 @@ def _run_presentation_result(
             service_id=turn_frame.service_id,
         ).family,
     )
-    bound = assemble_sales_fast_bound_package(
+    bound = resolve_sales_fast_bound_package(
         turn_frame=turn_frame,
+        semantic=semantic,
         bundle=context.bundle,
         doctor_catalog=context.doctor_catalog,
         external_index=context.external_index,
@@ -741,6 +759,9 @@ def _run_presentation_result(
         today=today,
         md_root=context.md_root,
         client_id="demo",
+        shown_fact_ids=shown_fact_ids,
+        shown_amplifier_refs=shown_amplifier_refs,
+        shown_consultation_value_refs=shown_consultation_value_refs,
     )
     resolution = exact_sales_resolution_from_semantic_frame(semantic)
     return build_one_call_presentation_result(
@@ -754,10 +775,10 @@ def _run_presentation_result(
         allow_situation=False,
         resolution=resolution,
         strategy_context=strategy_context,
-        shown_fact_ids=(),
-        shown_amplifier_refs=(),
-        shown_consultation_value_refs=(),
-        last_rendered_promo_fact_id=None,
+        shown_fact_ids=shown_fact_ids,
+        shown_amplifier_refs=shown_amplifier_refs,
+        shown_consultation_value_refs=shown_consultation_value_refs,
+        last_rendered_promo_fact_id=last_rendered_promo_fact_id,
         today=today,
     )
 

@@ -10,7 +10,7 @@ from core.sales_one_plus_protocol import (
     SalesOnePlusProtocolError,
     parse_sales_one_plus_output,
 )
-from tests.test_sales_one_plus_turn import _EMPTY_CATALOG, answer_envelope, admin_envelope
+from tests.test_sales_one_plus_turn import _EMPTY_CATALOG, _EMPTY_REF_CATALOG, answer_envelope, admin_envelope
 
 
 def test_legacy_line_protocol_answer_and_admin_body_rules() -> None:
@@ -92,6 +92,7 @@ def test_production_parser_accepts_valid_answer_envelope() -> None:
     envelope = parse_production_envelope_json(
         answer_envelope("Готовый ответ"),
         active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
     )
     assert envelope.route == "ANSWER"
     assert envelope.patient_text == "Готовый ответ"
@@ -99,7 +100,11 @@ def test_production_parser_accepts_valid_answer_envelope() -> None:
 
 def test_production_parser_rejects_non_json() -> None:
     with pytest.raises(OneCallEnvelopeProtocolError, match="json_invalid"):
-        parse_production_envelope_json("hello", active_service_catalog=_EMPTY_CATALOG)
+        parse_production_envelope_json(
+            "hello",
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+        )
 
 
 def test_production_parser_rejects_admin_with_patient_text() -> None:
@@ -110,12 +115,17 @@ def test_production_parser_rejects_admin_with_patient_text() -> None:
         clarify_service_options=None,
     )
     with pytest.raises(OneCallEnvelopeProtocolError, match="patient_text_forbidden_for_admin"):
-        parse_production_envelope_json(json.dumps(payload), active_service_catalog=_EMPTY_CATALOG)
+        parse_production_envelope_json(
+            json.dumps(payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+        )
 
 
 def test_production_parser_accepts_admin_envelope() -> None:
     envelope = parse_production_envelope_json(
         admin_envelope(),
         active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
     )
     assert envelope.route == "ADMIN"

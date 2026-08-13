@@ -173,8 +173,9 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
                 continue
             ref = str(entry.get("ref") or "").strip()
             label = str(entry.get("label") or "").strip()
+            client_id = str(entry.get("client_id") or "").strip() or None
             if ref:
-                items.append(TargetRuntimeFollowupItem(ref=ref, label=label))
+                items.append(TargetRuntimeFollowupItem(ref=ref, label=label, client_id=client_id))
         followups = tuple(items)
     patient_facts = read_session_patient_facts(st.get(_PATIENT_FACTS_KEY))
     if not isinstance(raw, dict):
@@ -374,6 +375,7 @@ def write_target_runtime_session_after_materialized(
     followups: tuple[TargetRuntimeFollowupItem, ...],
     effective_scope: EffectiveScope | None = None,
     presentation_cadence_update: TargetPresentationCadenceUpdate | None = None,
+    availability_status: str | None = None,
 ) -> None:
     """Persist target continuity only after a successful materialized response."""
 
@@ -426,6 +428,8 @@ def write_target_runtime_session_after_materialized(
         if last_rendered_promo is not None:
             payload["last_rendered_promo_fact_id"] = last_rendered_promo
         service_id = str(turn_frame.service_id or "").strip() or None
+        if availability_status in {"known_not_offered", "unresolved"}:
+            service_id = None
         if service_id:
             payload.update(
                 {
@@ -446,7 +450,13 @@ def write_target_runtime_session_after_materialized(
             )
         st[_TARGET_SESSION_KEY] = payload
         st[_TARGET_FOLLOWUPS_KEY] = [
-            {"ref": item.ref, "label": item.label} for item in followups if item.ref
+            {
+                "ref": item.ref,
+                "label": item.label,
+                **({"client_id": item.client_id} if item.client_id else {}),
+            }
+            for item in followups
+            if item.ref
         ]
         if effective_scope is not None:
             _apply_a9_patient_facts_to_state(

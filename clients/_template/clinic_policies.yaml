@@ -7,4 +7,25 @@ contact:
 
 policies: {}
 
-service_alternatives: []
+service_alternatives:
+  - requested_service_id: example_inactive_service
+    alternative_service_ids:
+      - example_active_alternative
+    approved_text: >-
+      Example inactive service is not offered. Example active alternative
+      is available instead.
+
+service_not_offered_template: >-
+  К сожалению, услугу «{requested_service}» в нашей клинике не оказываем.
+  Могу подсказать по направлениям, которые у нас есть.
+
+hard_stop_template: >-
+  Я помогаю по вопросам клиники: услуги, цены, запись и контакты.
+  Если у вас есть вопрос по стоматологии в рамках нашей клиники — напишите, пожалуйста.
+
+manual_contact_template: >-
+  Такой вопрос лучше решить напрямую с клиникой — так будет быстрее и корректнее.
+  Пожалуйста, позвоните нам{phone_suffix}.{urgent_suffix}
+
+manual_contact_urgent_suffix: >-
+   Если ситуация срочная, не ждите ответа в чате — лучше позвонить сразу.

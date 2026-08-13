@@ -14,6 +14,7 @@ from core.sales_one_plus_stream import SalesOnePlusStreamParser
 from core.sales_one_plus_turn import run_sales_one_plus_candidate_stream
 from tests.test_sales_one_plus_turn import (
     _EMPTY_CATALOG,
+    _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
     _resolution,
@@ -32,11 +33,16 @@ def _run_stream(*, backend, on_delta: Callable[[str], None]):
         on_delta=on_delta,
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
     )
 
 
 def _parser(on_delta: Callable[[str], None]) -> SalesOnePlusStreamParser:
-    return SalesOnePlusStreamParser(on_delta, active_service_catalog=_EMPTY_CATALOG)
+    return SalesOnePlusStreamParser(
+        on_delta,
+        active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
+    )
 
 
 @pytest.mark.parametrize("split_at", range(1, 20))
@@ -142,6 +148,7 @@ def test_candidate_local_admin_and_spam_make_zero_calls_and_zero_deltas() -> Non
             on_delta=emitted.append,
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
         )
         assert result.decision == expected and emitted == []
     assert backend.calls == 0
@@ -196,6 +203,8 @@ def test_result_contract_marks_only_partial_backend_answers_interrupted() -> Non
         clarify_axis=None,
         clarify_service_options=None,
         patient_text="partial",
+        service_reference_status="none",
+        requested_service_id=None,
     )
     with pytest.raises(ValidationError):
         SalesOnePlusResult(

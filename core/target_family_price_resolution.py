@@ -7,8 +7,11 @@ from contracts.effective_scope import EffectiveScope
 from contracts.response_schema import (
     ResponseSchemaBundle,
     TargetFamilyPrice,
+    TargetFixedPrice,
+    TargetFromPrice,
     TargetOffer,
     TargetPricePackage,
+    TargetRangePrice,
 )
 from contracts.target_scope_aware_selection import TargetScopeAwareSelectionResult
 from contracts.target_service_content_topic import service_catalog_content_topic_matches
@@ -266,4 +269,63 @@ def service_offer_precedence(
         return no_public
     if family_price is not None:
         return None
+    return None
+
+
+def _rubles(amount: int) -> str:
+    return f"{amount:,}".replace(",", "\u00a0") + " ₽"
+
+
+_BILLING_UNIT_PATIENT_LABELS: dict[str, str] = {
+    "tooth": "за один зуб",
+    "implant": "за один имплант",
+    "tooth_package": "за лечение одного зуба под ключ",
+    "jaw": "за одну челюсть",
+    "both_jaws": "за обе челюсти",
+    "procedure": "за одну процедуру",
+    "unit": "за одну единицу",
+    "course": "за курс лечения",
+}
+
+
+def _format_billing_unit(billing_unit: str) -> str:
+    label = _BILLING_UNIT_PATIENT_LABELS.get(str(billing_unit or "").strip())
+    if label is None:
+        raise ValueError("family_price_billing_unit_invalid")
+    return label
+
+
+def _format_family_level_price(
+    price: TargetFixedPrice | TargetFromPrice | TargetRangePrice,
+) -> str:
+    unit = _format_billing_unit(price.billing_unit)
+    if price.mode == "fixed":
+        return f"{_rubles(int(price.amount))} {unit}"
+    if price.mode == "from":
+        return f"от {_rubles(int(price.min_amount))} {unit}"
+    if price.mode == "range":
+        return (
+            f"от {_rubles(int(price.min_amount))} "
+            f"до {_rubles(int(price.max_amount))} {unit}"
+        )
+    raise ValueError("family_price_mode_invalid")
+
+
+def resolve_family_price_context_for_service(
+    bundle: ResponseSchemaBundle,
+    service_id: str,
+) -> str | None:
+    """Return labeled family context text only when explicit applies_to_service_ids match."""
+
+    token = str(service_id or "").strip()
+    if not token:
+        return None
+    for record in bundle.family_prices.records:
+        if not family_price_applies_to_service(record, token):
+            continue
+        amount_text = _format_family_level_price(record.price)
+        context = str(record.approved_context).strip()
+        if not context:
+            continue
+        return f"{context} {amount_text}."
     return None

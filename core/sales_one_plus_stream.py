@@ -12,6 +12,7 @@ from core.one_call_envelope_protocol import (
     envelope_utf8_byte_length,
     parse_production_envelope_json,
 )
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 
 class SalesOnePlusStreamParser:
@@ -22,9 +23,11 @@ class SalesOnePlusStreamParser:
         on_delta: Callable[[str], None],
         *,
         active_service_catalog: ActiveServiceCatalogSnapshot,
+        service_reference_catalog: ServiceReferenceCatalogSnapshot,
     ) -> None:
         self._on_delta = on_delta
         self._active_service_catalog = active_service_catalog
+        self._service_reference_catalog = service_reference_catalog
         self._buffer = ""
         self._buffer_bytes = 0
         self._validated_envelope: OneCallEnvelope | None = None
@@ -56,6 +59,7 @@ class SalesOnePlusStreamParser:
         envelope = parse_production_envelope_json(
             self._buffer,
             active_service_catalog=self._active_service_catalog,
+            service_reference_catalog=self._service_reference_catalog,
         )
         self._validated_envelope = envelope
         if envelope.route in {"ANSWER", "CLARIFY"}:

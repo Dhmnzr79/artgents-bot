@@ -254,8 +254,29 @@ def decide_target_presentation(
     primary_content_ref: str | None,
     cadence: TargetPresentationCadenceState,
     allow_situation: bool,
+    alternative_secondary_override: tuple[object, ...] | None = None,
 ) -> TargetPresentationDecision:
     """Apply governed slot limits with exactly one navigation channel per response."""
+
+    if alternative_secondary_override:
+        from contracts.one_call_presentation_result import PresentationQuickReply
+
+        secondary_qr = tuple(
+            {"label": item.label, "ref": item.ref}
+            for item in alternative_secondary_override
+            if isinstance(item, PresentationQuickReply)
+        )
+        return TargetPresentationDecision(
+            quick_replies=secondary_qr,
+            video=None,
+            situation={"show": False, "mode": "normal"},
+            dropped=tuple(
+                f"content_suppressed_by_alternative:{item.ref}"
+                for item in selected_followups.content
+            ),
+            cadence_update=TargetPresentationCadenceUpdate(),
+            channel="content",
+        )
 
     all_dropped: list[str] = []
     shown_all = cadence.shown_content_followup_refs | cadence.shown_price_followup_refs

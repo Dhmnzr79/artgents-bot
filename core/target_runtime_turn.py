@@ -88,15 +88,21 @@ class TargetRuntimeTurnOutcome:
 
 def _followups_from_widget(widget: TargetRuntimeWidgetPayload) -> tuple[TargetRuntimeFollowupItem, ...]:
     payload = widget.payload
+    meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+    widget_client_id = str(meta.get("client_id") or "").strip() or None
     quick = payload.get("quick_replies") if isinstance(payload.get("quick_replies"), list) else []
     items: list[TargetRuntimeFollowupItem] = []
+    from contracts.ui_service_action import is_ui_service_ref
+
     for entry in quick:
         if not isinstance(entry, dict):
             continue
         ref = str(entry.get("ref") or "").strip()
         label = str(entry.get("label") or "").strip()
-        if ref:
-            items.append(TargetRuntimeFollowupItem(ref=ref, label=label))
+        if not ref:
+            continue
+        client_id = widget_client_id if is_ui_service_ref(ref) else None
+        items.append(TargetRuntimeFollowupItem(ref=ref, label=label, client_id=client_id))
     return tuple(items)
 
 

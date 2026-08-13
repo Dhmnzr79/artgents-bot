@@ -12,6 +12,7 @@ from contracts.ui_stage_action import is_ui_stage_ref
 class TargetRuntimeFollowupItem:
     ref: str
     label: str
+    client_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

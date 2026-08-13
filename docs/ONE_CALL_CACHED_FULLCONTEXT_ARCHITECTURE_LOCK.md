@@ -1,6 +1,6 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
-**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — docs-only marketing contract sync, implementation не начата).
+**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — docs-only marketing contract + promotion intent amendment; implementation **не** начата).
 **Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.
 **Baseline HEAD:** `6345b37eec2807bc2008e68f8a01018407af044f`.
@@ -308,7 +308,8 @@ Flash возвращает валидируемый **control envelope**. Все
 | `jaw` | `upper` \| `lower` \| `both` \| `null` |
 | `stage` | значение из client-authored allowlist **или** `null` |
 | `scenario` | `pain_fear` \| `cost` \| `time` \| `doctor_trust` \| `result_reliability` \| `none` |
-| `commercial_intent` | `none` \| `price` \| `payment` \| `included` |
+| `commercial_intent` | `none` \| `price` \| `payment` \| `included` \| `promotion` |
+| `promotion_scope` | `none` \| `general` \| `service` \| `shown` |
 | `clarify_axis` | `service` \| `extent` \| `jaw` \| `stage` \| `null` |
 | clarify service options | максимум 3 `service_id` из активного client pack |
 | patient answer text | narrative для пациента (без коммерческих значений — см. §11) |
@@ -317,10 +318,11 @@ Flash возвращает валидируемый **control envelope**. Все
 
 | Значение | Нормативная семантика |
 |----------|----------------------|
-| `none` | Не открывает price / payment / included surfaces; см. bounded exception §9.1 |
+| `none` | Не открывает price / payment / included / promotion surfaces; см. bounded exception §9.1 |
 | `price` | Явный интерес к цене / стоимости |
 | `payment` | Явный интерес к оплате, рассрочке или способам платежа |
 | `included` | Вопрос о составе или включённых услугах |
+| `promotion` | Явный интерес к акции, скидке или специальному предложению; см. §9.3 |
 
 **Правила:**
 
@@ -328,9 +330,29 @@ Flash возвращает валидируемый **control envelope**. Все
 - price, сумма и price offer card показываются **только** при `commercial_intent=price` и наличии validated price result из authoritative commerce result;
 - `commercial_intent=payment` открывает **только** validated clinic-owned payment terms/data и **не** открывает price surface (сумму, price offer card);
 - `commercial_intent=included` открывает **только** validated included items / состав и **не** открывает price surface (сумму, price offer card);
-- `commercial_intent=none` **не** открывает price, payment или included surfaces и **не** разрешает дополнительные случайные commercial facts;
-- **единственное owner-approved bounded исключение при `commercial_intent=none`:** обязательная **priority service promo** на первом допустимом `ANSWER` с authoritative non-null `service_id` (§13). Исключение **не** открывает price amount, price/offer card, payment terms или included items; при `service_id=null` автоматическая service promo **запрещена**;
-- модель **не придумывает** и **не вычисляет** коммерческие значения; все значения берутся **только** из authoritative commerce result.
+- `commercial_intent=promotion` открывает **только** validated promo facts из authoritative client data по `promotion_scope` §9.3; **не** открывает price amount, price/offer card, payment terms или included items; модель **не** генерирует процент, срок или условия акции;
+- `commercial_intent=none` **не** открывает price, payment, included или promotion surfaces и **не** разрешает дополнительные случайные commercial facts;
+- **единственное owner-approved bounded исключение при `commercial_intent=none` и `promotion_scope=none`:** обязательная **priority service promo** на первом допустимом `ANSWER` с authoritative non-null `service_id` (§13). Исключение **не** открывает price amount, price/offer card, payment terms или included items; при `service_id=null` автоматическая service promo **запрещена**; обычный вопрос об услуге **не** превращается в promotion request;
+- модель **не придумывает** и **не вычисляет** коммерческие значения; все значения берутся **только** из authoritative commerce result и client promo data.
+
+### 9.3 `promotion_scope` (closed field)
+
+| Значение | Нормативная семантика |
+|----------|----------------------|
+| `none` | Promotion request отсутствует |
+| `general` | Общий вопрос «Какие акции есть?» |
+| `service` | Вопрос об акциях конкретной authoritative услуги |
+| `shown` | Вопрос о ранее **фактически rendered** promo текущей session |
+
+**Invariants:**
+
+- если `commercial_intent != promotion`, то `promotion_scope=none`;
+- если `commercial_intent=promotion`, то `promotion_scope` ∈ {`general`, `service`, `shown`};
+- `service` требует authoritative non-null `service_id`;
+- `general` допускает `service_id=null`;
+- `shown` требует session-bound последнюю реально показанную promo; если такой promo нет — **fail closed**, факт **не** угадывается;
+- `CLARIFY` и `ADMIN` принудительно **не** открывают promotion surface;
+- **`promotion_ref` не добавляется** в этом amendment; arbitrary specific promo, которая ранее не была показана и не определяется service priority, **не** угадывается по тексту, regex или keyword classifier.
 
 Невалидное значение любого closed-field → invalid envelope → neutral presentation или safe handoff по route, **не** повторный вызов.
 
@@ -377,14 +399,15 @@ Medical/problematic request → `ADMIN`, без диалога.
 
 1. Модель **не является** источником цен, скидок, рассрочки и коммерческой гарантии.
 2. Модель возвращает narrative **без** таких коммерческих значений.
-3. Код **после** ответа выбирает validated commerce data по `service_id`, `extent`, `jaw`, scope **и** подтверждённому `commercial_intent`:
+3. Код **после** ответа выбирает validated commerce data по `service_id`, `extent`, `jaw`, scope **и** подтверждённому `commercial_intent` / `promotion_scope`:
    - **price surface** — только при `commercial_intent=price` и validated price offer;
    - **payment surface** — только при `commercial_intent=payment` и validated clinic-owned payment terms/data; **не** открывает сумму или price offer card;
-   - **included surface** — только при `commercial_intent=included` и validated included items / состав; **не** открывает сумму или price offer card.
+   - **included surface** — только при `commercial_intent=included` и validated included items / состав; **не** открывает сумму или price offer card;
+   - **promotion surface** — только при `commercial_intent=promotion` и validated promo facts по `promotion_scope` §9.3; **не** открывает price amount, price/offer card, payment terms или included items.
 4. Текстовый блок, карточка, CTA и кнопки **соответствующей** поверхности строятся из **одного** validated authoritative commerce result для этой поверхности.
 5. **Невозможна** ситуация, когда текст показывает одну цену, а карточка — другую.
 6. Без `commercial_intent=price` сумма и price offer card **не показываются** и **не вычисляются**; это **не** запрещает релевантный payment- или included-ответ при соответствующем intent.
-7. При `commercial_intent=none` price / payment / included surfaces **не** рендерятся. **Исключение:** priority service promo §13 — единственный разрешённый commercial fact при `none`; она **не** открывает price amount, price/offer card, payment terms или included items.
+7. При `commercial_intent=none` и `promotion_scope=none` price / payment / included / promotion surfaces **не** рендерятся. **Исключение:** priority service promo §13 — единственный разрешённый commercial fact при `none`; она **не** открывает price amount, price/offer card, payment terms или included items.
 8. Медицинские и некоммерческие числа из утверждённого MD **не запрещаются**.
 9. Priority service promo, marketing facts и amplifiers выбираются и рендерятся **детерминированным кодом после Flash**; Flash не придумывает и не пересказывает точные условия акции.
 
@@ -434,19 +457,21 @@ Medical/problematic request → `ADMIN`, без диалога.
 
 ## 13. Marketing contract
 
-Flash выбирает только один primary `scenario` из закрытого enum (§9). Flash **не** придумывает offer/fact/CTA и **не** пересказывает точные условия акции. Flash возвращает `commercial_intent`; код решает, какая коммерческая поверхность допустима.
+Flash выбирает только один primary `scenario` из закрытого enum (§9). Flash **не** придумывает offer/fact/CTA и **не** пересказывает точные условия акции. Flash возвращает `commercial_intent` и `promotion_scope`; код решает, какая коммерческая поверхность допустима.
 
 ### 13.1 Priority service promo (первый ответ об услуге)
 
-На первом допустимом содержательном `ANSWER` с authoritative non-null `service_id` бот обязан показать **ровно одну** главную active, непросроченную, service-linked акцию этой услуги:
+На первом допустимом содержательном `ANSWER` с authoritative non-null `service_id` и `commercial_intent=none`, `promotion_scope=none` бот обязан показать **ровно одну** первую active, применимую promo этой услуги:
 
-- выбирается детерминированным кодом **после Flash** по clinic-authored priority из client data;
+- authority: client-authored **`priority_service_promos`** mapping `service_id → ordered_fact_refs` (§13.6); **нет** одной «главной акции клиники»;
+- выбирается детерминированным кодом **после Flash**; первый eligible ref из списка **конкретной** услуги;
+- promo другой услуги **не** подмешивается; consultation/installment **не** используются как fallback;
 - текст, процент, срок и условия — **только** из authoritative client data; Flash не придумывает и не пересказывает;
 - правило действует для первого допустимого ответа о конкретной услуге, а не только для «что это?» / «делаете ли вы?»;
 - priority promo — **marketing fact**, **не** amplifier; входит в общий лимит **3** marketing facts, но **не** занимает лимит **2** amplifiers;
-- при `commercial_intent=none` — **единственное** разрешённое commercial исключение (§9.1, §11); **не** открывает price amount, price/offer card, payment terms или included items;
-- при `service_id=null` автоматическая service promo **запрещена**;
-- показывается **один раз** после фактического render; прямой вопрос об **уже показанной конкретной** акции получает ответ повторно — suppression повтора обходится, eligibility/active dates/service applicability **не** обходятся; общий вопрос «Какие акции есть?» — unresolved semantic seam Stage 5.1 (без отдельного promo intent в envelope).
+- при `commercial_intent=none` и `promotion_scope=none` — **единственное** bounded automatic commercial исключение (§9.1, §11); **не** открывает price amount, price/offer card, payment terms или included items;
+- при `service_id=null` или отсутствии eligible promo автоматическая service promo **запрещена**;
+- session-global suppression: один `fact_id` автоматически показывается **один раз** за `session_id`, даже если применим к нескольким услугам; новый session/reset очищает suppression; прямой promotion request может повторно открыть факт, если он active и applicable (§13.5).
 
 ### 13.2 Лимиты marketing facts и amplifiers
 
@@ -495,7 +520,43 @@ Flash выбирает только один primary `scenario` из закры�
 - neutral/general запрос / `commercial_intent=none` **не** получает случайный implantation marketing или цену, кроме bounded priority service promo §13.1;
 - marketing supplement и offer card **не** меняют presentation независимо друг от друга.
 
-### 13.5 Performance invariant (Stage 5.1)
+### 13.5 Promotion request (`commercial_intent=promotion`)
+
+| `promotion_scope` | Поведение |
+|-------------------|-----------|
+| `general` | До **3** active clinic-authored promo facts по `promotion_overview.ordered_fact_refs`; фильтр active dates и общей применимости; отсутствие promo → никакой выдуманной акции |
+| `service` | Authoritative `service_id` обязателен; одна первая eligible promo из `priority_service_promos[service_id]`; promo других услуг **не** подмешиваются |
+| `shown` | Повторяется последняя **фактически rendered** promo текущей session; только если active и applicable; suppression обходится; выбор по словам пользователя **не** выполняется; если session-bound promo отсутствует — fail closed |
+
+`commercial_intent=promotion` **не** открывает price amount, price/offer card, payment terms или included items.
+
+### 13.6 Client-owned promo authority (target schema)
+
+Точное итоговое имя полей schema может быть уточнено implementation seam audit, но нормативная семантика — **service-id mapping**, не общий context block:
+
+```yaml
+priority_service_promos:
+  all_on_4:
+    ordered_fact_refs:
+      - fact:all_on_4_discount
+  professional_whitening:
+    ordered_fact_refs:
+      - fact:professional_whitening_discount
+
+promotion_overview:
+  ordered_fact_refs:
+    - fact:...
+```
+
+- `priority_service_promos` управляет automatic first-service promo и `promotion_scope=service`;
+- `promotion_overview` управляет **только** `promotion_scope=general`;
+- оба списка содержат refs на authoritative facts; тексты и условия — в `facts.json`;
+- один fact может присутствовать в service mapping и overview;
+- `initial_commercial_blocks` **не** является новым promo authority;
+- validator при реализации проверяет refs, service IDs, применимость и отсутствие дублей; runtime проверяет active dates и `incompatible_with`;
+- **нельзя** выбирать акцию по тексту, проценту, ID, regex или Python hardcode.
+
+### 13.7 Performance invariant (Stage 5.1)
 
 Stage 5.1 **не** добавляет provider call; invariant `provider_calls ∈ {0, 1}` на HTTP-запрос
 сохраняется.
@@ -528,8 +589,9 @@ Stage 5.1 **не** добавляет provider call; invariant `provider_calls �
 | Medical/problematic | 0 false `ANSWER` на protected cases (§ ANSWER/ADMIN) |
 | Sales fears | 0 false `ADMIN` на protected fear cases |
 | Price | `COMMERCIAL_RENDER_CONTRACT`: один validated result; 0 invented/computed amounts; price/sum/price card **только** при `commercial_intent=price`; ambiguous scope без суммы |
-| Commercial intent | closed enum §9.1; каждый intent открывает только соответствующую поверхность; `payment` и `included` **не** открывают price surface; `none` не открывает price/payment/included, кроме bounded priority service promo §13.1 |
-| Marketing | лимит 3/2; priority promo в **3**, не в **2**; первый eligible service turn с `service_id` обязан показать одну priority promo; CTA и navigation slots отдельны; shown-state только после render; price follow-up always shown |
+| Commercial intent | closed enum §9.1 (`none` \| `price` \| `payment` \| `included` \| `promotion`); `promotion_scope` §9.3; каждый intent открывает только соответствующую поверхность; `payment` и `included` **не** открывают price surface; `promotion` **не** открывает price amount, price/offer card, payment terms или included items; `none` + `promotion_scope=none` не открывает price/payment/included/promotion, кроме bounded priority service promo §13.1 |
+| Promotion | `commercial_intent=promotion` + closed `promotion_scope`; `general` → до 3 по `promotion_overview`; `service` → одна promo услуги по `priority_service_promos`; `shown` → последняя rendered promo session (fail closed без session-bound promo); arbitrary promo guessing запрещён; `CLARIFY`/`ADMIN` не открывают promotion surface |
+| Marketing | лимит 3/2; priority promo в **3**, не в **2**; первый eligible service turn с `service_id` обязан показать одну priority promo по service-id mapping; session-global suppression по `fact_id`; CTA и navigation slots отдельны; shown-state только после render; price follow-up always shown |
 | Microfacts | вопросы по всему MD-корпусу, включая неизвестные заранее темы; допустим `service_id=null` |
 | Semantic ownership | без implantation default; без сужения generic topic; `CLARIFY` только при реальной зависимости |
 | Multiclient | минимум два client packs; отсутствие cross-client data leakage |
@@ -612,10 +674,8 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 
 1. **«Отбеливание» — двойной ответ:** наблюдается двойной ответ; **причина не утверждается** без доказанной SSE-трассы (Stage 5.2).
 2. **Survivability microfact:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене.
-3. **Marketing overload / priority promo / `PresentationResult`:** marketing layer может добавлять слишком много фактов; обязательная priority service promo на первом service turn и единый `PresentationResult` **не реализованы** (Stage 5.1).
-4. **Direct promo overview seam:** общий вопрос «Какие акции есть?» не имеет отдельного promo intent в closed envelope; точное количество promo facts для overview **не** определено до owner decision и read-only Stage 5.1 seam audit.
-5. **Price-follow-up shown-state:** основная price-follow-up ветка может не записывать реально показанные кнопки в cadence / shown-state.
-6. **Priority promo authority unresolved:** в current demo data нет однозначного authored authority для главной priority service promo (`kind=promo` недостаточно; consultation/installment стоят раньше discount в order; discount также в amplifier pool). Требуется read-only Stage 5.1 seam audit (§13, `MARKETING_SCENARIO_ARCHITECTURE.md`).
+3. **Marketing overload / `PresentationResult` / promotion intent:** marketing layer может добавлять слишком много фактов; обязательная priority service promo на первом service turn, `commercial_intent=promotion`, `promotion_scope`, service-id mapping (`priority_service_promos` / `promotion_overview`), session-global suppression и единый `PresentationResult` **не реализованы** (Stage 5.1). Docs-only promotion intent amendment зафиксировал target contract; implementation потребует envelope contract/version update, parser/schema/prompt update, cached-prefix identity/invalidation review, offline regression и отдельного Checker acceptance.
+4. **Price-follow-up shown-state:** основная price-follow-up ветка может не записывать реально показанные кнопки в cadence / shown-state.
 
 ### 17.2 Закрыто принятыми Stage 4.1–4.3 (не перечислять как gaps)
 
@@ -689,21 +749,22 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - specific contact question возвращает только нужное поле;
 - **никаких** APRF / whitening-specific regex.
 
-### Stage 5.1 — Единый marketing/commercial `PresentationResult` (docs-only contract synchronization; implementation **не** начата)
+### Stage 5.1 — Единый marketing/commercial `PresentationResult` (docs-only contract + promotion intent amendment; implementation **не** начата)
 
-**Нормативный marketing contract (§13) зафиксирован docs-only.** Реализация ещё должна создать единый `PresentationResult`:
+**Нормативный marketing contract (§13) и promotion intent amendment зафиксированы docs-only.** Реализация ещё должна создать единый `PresentationResult` и внедрить promotion surfaces:
 
 - один источник final text, offer/card, marketing facts, CTA, follow-up, двух secondary button slots, cadence и shown-state;
-- priority service promo на первом eligible `ANSWER` с authoritative `service_id` — детерминированный post-Flash selector; один active service-linked promo по clinic priority; входит в лимит **3**, не в **2**; при `commercial_intent=none` — единственное bounded commercial исключение без price/payment/included surfaces;
+- `commercial_intent` расширяется до `none` \| `price` \| `payment` \| `included` \| `promotion`; envelope получает closed `promotion_scope` (`none` \| `general` \| `service` \| `shown`);
+- priority service promo на первом eligible `ANSWER` с authoritative `service_id` при `commercial_intent=none`, `promotion_scope=none` — детерминированный post-Flash selector по `priority_service_promos[service_id]`; первая eligible promo **конкретной** услуги; **нет** clinic-wide «главной акции»; входит в лимит **3**, не в **2**; единственное bounded automatic commercial исключение без price/payment/included/promotion surfaces;
+- `commercial_intent=promotion`: `general` → до 3 active promo по `promotion_overview`; `service` → одна promo услуги; `shown` → последняя rendered promo session (fail closed без session-bound promo); **не** открывает price amount, price/offer card, payment terms или included items;
+- session-global suppression: один `fact_id` автоматически показывается один раз за `session_id`; direct promotion request может повторно открыть факт; per-service shown-state для одного fact ID **не** вводится;
 - selector: direct requested fact → priority promo → до двух amplifiers primary `scenario` → остальные facts в оставшихся местах **3**; CTA отдельно;
 - consultation/installment **не** автодобавляются в первом ответе сверх priority promo и amplifiers;
 - marketing fact реально включается в текст; нет дублирования;
-- direct request об **уже показанной конкретной** акции обходит suppression повтора; eligibility/active dates/service applicability — нет; общий promo overview — unresolved seam (read-only audit);
-- shown-state только после фактического render; price follow-up **всегда** фиксируется как shown;
-- один primary `scenario` из envelope; конкретные facts выбирает код;
-- neutral microfact / `service_id=null` не получает автоматическую service promo;
-- read-only seam audits: (a) direct promo overview semantic seam; (b) priority promo authority in current client data — **без** regex/keyword classifier и **без** второго provider call;
-- **performance invariant §13.5:** 0/1 provider calls; один локальный presentation pass после Flash; без marketing LLM/retry/network re-read; absolute gates §15.2 не ослабляются; без нового hard ms-SLO без owner decision.
+- shown-state только после фактического render; selected-but-not-rendered **не** считается shown; price follow-up **всегда** фиксируется как shown;
+- один primary `scenario` из envelope; конкретные facts выбирает код; arbitrary promo guessing по тексту/regex/keyword **запрещён**; `promotion_ref` **не** добавляется;
+- **implementation потребует:** envelope contract/version update; parser/schema/prompt update; cached-prefix identity/invalidation review; offline regression; отдельного Checker acceptance;
+- **performance invariant §13.7:** 0/1 provider calls; один локальный presentation pass после Flash; без marketing LLM/retry/network re-read; absolute gates §15.2 не ослабляются; без нового hard ms-SLO без owner decision.
 
 ### Stage 5.2 — Widget / SSE
 
@@ -757,8 +818,8 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - [ ] Изменён **ровно один** docs-файл; нет кода и тестовых изменений; нет LIVE; нет commit.
 - [ ] Current implementation status: Stage 0–2 приняты; Stage 3A/3B/3C приняты; clinic-owned price + authoritative commerce приняты; `SALES_ONE_PLUS_ON` default OFF; Alibaba LIVE запрещён после Stage 4.0.
 - [ ] Неизменяемая архитектурная основа §1 сохранена без ослабления.
-- [ ] §9 — closed envelope incl. `commercial_intent` (`none` \| `price` \| `payment` \| `included`); `scenario` enum; uppercase `route`.
-- [ ] §9.1, §11, §13, §14 — согласованная семантика `commercial_intent`.
+- [ ] §9 — closed envelope incl. `commercial_intent` (`none` \| `price` \| `payment` \| `included` \| `promotion`); `promotion_scope` (`none` \| `general` \| `service` \| `shown`); `scenario` enum; uppercase `route`.
+- [ ] §9.1, §9.3, §11, §13, §14 — согласованная семантика `commercial_intent` и `promotion_scope`.
 - [ ] §4, §10 — `service_id=null`, semantic ownership, bare service без обязательного `CLARIFY`.
 - [ ] §11 — `COMMERCIAL_RENDER_CONTRACT` + clinic-owned authoritative commerce result.
 - [ ] §6 — FullContext vs selected context; cache key §6.3; Stage 3A accepted noted.

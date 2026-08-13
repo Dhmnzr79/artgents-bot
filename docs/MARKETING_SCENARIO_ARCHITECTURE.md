@@ -57,31 +57,42 @@ S20 наполняет demo только ordered source refs/contexts и не п
 
 ## Priority service promo (первый ответ об услуге)
 
-На первом допустимом содержательном ответе с authoritative non-null `service_id` бот
-обязан показать **ровно одну** главную active, непросроченную, service-linked акцию этой
-услуги по clinic-authored priority. Текст, процент, срок и условия — только из
-authoritative client data; модель не выбирает точную акцию и не генерирует её условия.
+На первом допустимом содержательном ответе с authoritative non-null `service_id`,
+`commercial_intent=none` и `promotion_scope=none` бот обязан показать **ровно одну** первую
+active, применимую promo **конкретной** услуги. **Нет** одной «главной акции клиники» —
+для каждой услуги клиника задаёт отдельный упорядоченный список в `priority_service_promos`.
+Текст, процент, срок и условия — только из authoritative client data; модель не выбирает
+точную акцию и не генерирует её условия.
 
+- authority: `priority_service_promos.<service_id>.ordered_fact_refs` — первый eligible ref;
+- promo другой услуги **не** подмешивается; consultation/installment **не** используются как fallback;
 - priority promo — marketing fact; входит в лимит **3**, **не** в лимит **2** amplifiers;
 - selector **сначала** резервирует priority promo, **затем** выбирает amplifiers;
-- при `commercial_intent=none` — единственное bounded commercial исключение; **не** открывает
-  price amount, price/offer card, payment terms или included items;
-- при `service_id=null` автоматическая service promo запрещена;
-- прямой вопрос об **уже показанной конкретной** акции получает ответ повторно; suppression повтора обходится; eligibility, active dates и service applicability **не** обходятся.
+- при `commercial_intent=none` и `promotion_scope=none` — единственное bounded automatic commercial исключение; **не** открывает price amount, price/offer card, payment terms или included items; обычный вопрос об услуге **не** превращается в promotion request;
+- при `service_id=null` или отсутствии eligible promo автоматическая service promo **запрещена**;
+- session-global suppression: один `fact_id` автоматически показывается **один раз** за `session_id`, даже если применим к нескольким услугам; новый session/reset очищает suppression; per-service shown-state для одного fact ID **не** вводится.
 
 **Бесплатная консультация и рассрочка** в первом ответе **не** добавляются автоматически
-сверх priority promo и усилителей. Рассрочка — при прямом вопросе об оплате или валидном
-cost/payment context. Консультация — как применимый выбранный fact или через отдельный
-CTA/consultation flow. Нельзя автоматически показывать promo + consultation + installment
-+ amplifiers сверх общего лимита **3**.
+сверх priority promo и усилителей. Рассрочка — при прямом вопросе об оплате (`commercial_intent=payment`) или валидном payment context. Консультация — как применимый выбранный fact или через отдельный CTA/consultation flow. Нельзя автоматически показывать promo + consultation + installment + amplifiers сверх общего лимита **3**.
 
-Общий вопрос «Какие акции есть?» — **unresolved semantic seam** Stage 5.1: отдельного promo
-intent в closed envelope нет; точное количество promo facts для overview **не** определяется
-в этом docs pass. До owner decision и read-only seam audit не утверждать нормативно
-автоматический показ нескольких promo/gift facts.
+## Promotion request (`commercial_intent=promotion`)
 
-Налоговый вычет не входит в обязательный первый service promo: он используется при
-финансовом сценарии, прямом вопросе или как усилитель.
+Новый closed enum: `commercial_intent=promotion` означает явный интерес пациента к акции,
+скидке или специальному предложению. Он **не** открывает price amount, price/offer card,
+payment terms или included items; разрешает только validated promo facts из authoritative
+client data.
+
+Closed `promotion_scope`:
+
+| Scope | Поведение |
+|-------|-----------|
+| `general` | Общий вопрос «Какие акции есть?» → до **3** active clinic-authored promo facts по `promotion_overview.ordered_fact_refs`; фильтр active dates и общей применимости |
+| `service` | Вопрос об акциях конкретной услуги → одна первая eligible promo из `priority_service_promos[service_id]`; authoritative `service_id` обязателен |
+| `shown` | Вопрос о ранее **фактически rendered** promo → повтор последней session promo; suppression обходится; fail closed, если session-bound promo отсутствует |
+
+Invariants: если `commercial_intent != promotion`, то `promotion_scope=none`; `CLARIFY` и `ADMIN` не открывают promotion surface; arbitrary specific promo не угадывается по тексту, regex или keyword classifier; `promotion_ref` не добавляется.
+
+Налоговый вычет не входит в обязательный первый service promo: он используется при финансовом сценарии, прямом вопросе или как усилитель.
 
 ## Сценарии и усилители
 
@@ -136,7 +147,7 @@ scenario_rules:
 
 Priority promo **не** может быть вытеснена amplifiers. Amplifiers **не** занимают promo slot.
 
-`shown_fact_ids` и `shown_amplifier_ids` хранятся в текущем `session_id`. Новый диалог/сброс чата создаёт новую сессию; TTL пока не вводится. Тот же ID автоматически не повторяется; новый факт с другим ID может быть показан. Прямой вопрос об **уже показанной конкретной** акции/факте обходит только подавление автопоказа; активность и применимость источника остаются обязательными.
+`shown_fact_ids` и `shown_amplifier_ids` хранятся в текущем `session_id`. Новый диалог/сброс чата создаёт новую сессию; TTL пока не вводится. **Session-global suppression:** один и тот же `fact_id` автоматически показывается **один раз** за весь `session_id`, даже если применим к нескольким услугам (например, скидка показана для All-on-4, затем пациент спрашивает о classic — тот же `fact_id` автоматически не повторяется). Новый fact с другим ID может быть показан. Прямой promotion request (`commercial_intent=promotion`, `promotion_scope=shown`) может повторно открыть факт, если он active и applicable; per-service shown-state для одного fact ID **не** вводится.
 
 ## Несовместимые предложения
 
@@ -220,13 +231,13 @@ price-ответе demo приоритет при наличии в `followups`:
 
 | Владелец | Что хранит |
 |---|---|
-| `clients/<client_id>/marketing.yaml` | Лимиты, scenario rules, упорядоченные amplifier refs, ограничения scenario/pool context, CTA key selection и fact/scenario cadence policy; без дублей текста и без source-fact eligibility |
+| `clients/<client_id>/target_response/marketing.yaml` | Лимиты, `priority_service_promos`, `promotion_overview`, scenario rules, упорядоченные amplifier refs, ограничения scenario/pool context, CTA key selection и fact/scenario cadence policy; без дублей текста и без source-fact eligibility |
 | Pricebook/commercial facts | Консультация, рассрочка, скидка/подарок, вычет, гарантия как commercial fact, даты, точные условия и `incompatible_with` |
 | KB/md | Содержательный утверждённый контент и факты клиники; optional `consultation_value` в frontmatter того же service-документа |
 | Doctor layer | Имя, должность, стаж и связи с услугами; общий продающий профиль хранится в exact MD chunk |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
 | Session state | `shown_fact_ids`, `shown_amplifier_ids`, `shown_consultation_value_refs`, текущая тема/услуга, lead/refusal state |
-| ONE_CALL Flash envelope | один primary `scenario`; конкретные facts и priority promo выбирает post-Flash deterministic code |
+| ONE_CALL Flash envelope | один primary `scenario`; `commercial_intent` и `promotion_scope`; конкретные facts и priority promo выбирает post-Flash deterministic code |
 
 Полная target ownership услуг, offers, брендов и client strategy находится в
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md). Marketing schema ниже
@@ -244,12 +255,17 @@ limits:
   max_marketing_facts_per_turn: 3
   max_amplifiers_per_turn: 2
 
-initial_commercial_blocks:
-  service_family_context:
+priority_service_promos:
+  all_on_4:
     ordered_fact_refs:
-      - fact:priority_service_promo_ref
-      - fact:consultation_offer
-      - fact:installment_offer
+      - fact:all_on_4_discount
+  professional_whitening:
+    ordered_fact_refs:
+      - fact:professional_whitening_discount
+
+promotion_overview:
+  ordered_fact_refs:
+    - fact:...
 
 scenario_rules:
   pain_fear:
@@ -264,6 +280,12 @@ cta_contexts:
   doctors: doctor
   default: callback
 ```
+
+- `priority_service_promos` управляет automatic first-service promo и `promotion_scope=service`;
+- `promotion_overview` управляет **только** `promotion_scope=general` (до 3 active promo);
+- оба списка содержат refs на authoritative facts; тексты и условия — в `facts.json`;
+- один fact может присутствовать в service mapping и overview;
+- `initial_commercial_blocks` **не** является новым promo authority (historical S21/current config — pre-Stage-5.1, не соответствует target);
 
 Это схема ссылок и порядка, а не готовых фраз. В одном scenario pool может быть сколько
 угодно проверяемых refs конкретной клиники; selector берёт максимум два усилителя на ход и
@@ -437,25 +459,24 @@ Missing optional external amplifier пропускается, но pack acceptan
 обязательной. Missing local `fact:` по-прежнему fail-closed отклоняет bundle до
 selector. Selector принимает shown snapshots, но не изменяет их.
 
-### Priority promo authority seam (Stage 5.1 read-only audit finding)
+### Priority promo authority (owner decision — Stage 5.1 promotion intent amendment)
 
-Docs-only correction **не** меняет schema/config. Обязательный seam audit finding:
+Docs-only amendment **не** меняет schema/config. **Принято:** нет одной «главной акции клиники»; authority — service-id mapping `priority_service_promos.<service_id>.ordered_fact_refs` + `promotion_overview.ordered_fact_refs` для general overview.
 
-- `kind=promo` **недостаточно** для определения главной priority service promo;
-- в current demo `free_implant_consult` и discount facts (`implant_same_day_discount`,
-  `professional_whitening_discount`) одновременно имеют `kind=promo`;
-- clinic-authored order в `initial_commercial_blocks.service.ordered_fact_refs` сейчас
-  ставит consultation/installment **раньше** discount;
-- discount fact одновременно может находиться в `scenario_rules.cost.ordered_amplifier_refs`.
+**Historical S21/current config (pre-Stage-5.1, не соответствует target):**
 
-**Stage 5.1 seam audit must:**
+- `kind=promo` **недостаточно** для определения priority service promo;
+- в current demo `free_implant_consult` и discount facts одновременно имеют `kind=promo`;
+- `initial_commercial_blocks.service.ordered_fact_refs` ставит consultation/installment **раньше** discount;
+- discount fact также в `scenario_rules.cost.ordered_amplifier_refs`.
 
-1. найти существующий однозначный authored authority для priority promo;
-2. если его нет — доказать необходимость **минимального** schema/config изменения;
-3. **не** определять главную акцию по тексту, словам «скидка», проценту, fact ID, regex
-   или Python hardcode;
-4. сохранить multiclient ownership;
-5. **не** считать бесплатную консультацию главной скидкой без явной client authority.
+**Stage 5.1 implementation must:**
+
+1. мигрировать на `priority_service_promos` service-id mapping и `promotion_overview`;
+2. **не** определять акцию по тексту, словам «скидка», проценту, fact ID, regex или Python hardcode;
+3. сохранить multiclient ownership;
+4. **не** считать consultation/installment fallback для automatic promo;
+5. validator проверяет refs, service IDs, применимость и отсутствие дублей.
 
 ### Offline evidence package S22
 

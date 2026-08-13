@@ -22,7 +22,7 @@ marketing layer.
 | Цена услуги | `clients/demo/target_response/pricebook/services/*.json` |
 | Что входит в цену / этапы оплаты | `clients/demo/target_response/pricebook/services/*.json` |
 | Акция, скидка, рассрочка, вычет, гарантия — **текст и условия** | `clients/demo/target_response/pricebook/facts.json` |
-| Порядок, ссылки, лимиты, scenario pools, CTA context keys | `clients/demo/target_response/marketing.yaml` → `limits`, `initial_commercial_blocks`, `scenario_rules`, `cta_contexts` |
+| Порядок, ссылки, лимиты, scenario pools, service promo mapping, overview list, CTA context keys | `clients/<client_id>/target_response/marketing.yaml` → `limits`, `priority_service_promos`, `promotion_overview`, `scenario_rules`, `cta_contexts` |
 | Текст CTA-кнопки и первый вопрос после клика | `clients/demo/tone.yaml` |
 | Видео | `clients/demo/video_catalog.yaml` |
 | Текст меню или fallback | `clients/demo/ui.yaml` |
@@ -34,12 +34,13 @@ marketing layer.
 | Слой | Что хранит |
 |---|---|
 | `facts.json` | Фактический текст акции/рассрочки/гарантии, active dates, `allowed_service_ids`, `incompatible_with` |
-| `marketing.yaml` | Порядок refs, scenario amplifier pools, лимиты **3/2**, CTA context keys; **не** дублирует текст факта |
+| `marketing.yaml` | `priority_service_promos` (service_id → ordered promo refs), `promotion_overview` (general list), scenario amplifier pools, лимиты **3/2**, CTA context keys; **не** дублирует текст факта |
 | `tone.yaml` | Видимый copy CTA и lead-flow |
 | `video_catalog.yaml` | Тематические ролики для secondary UI slot |
 
 LLM **не** выбирает точную акцию и **не** генерирует её условия. Priority service promo
-выбирается и рендерится детерминированным post-Flash кодом по clinic-authored priority.
+и promotion surfaces выбираются детерминированным post-Flash кодом по `priority_service_promos`
+и `promotion_overview` — **не** по тексту, проценту или regex.
 
 ## Канон акций demo (2026-07-10)
 
@@ -52,8 +53,9 @@ LLM **не** выбирает точную акцию и **не** генерир
 | `tax_deduction` | benefit | Налоговый вычет 13% |
 | `implant_warranty` | warranty | Гарантии на работу и импланты |
 
-**`marketing.yaml` schema (актуальная):** `initial_commercial_blocks`, `scenario_rules`,
-`limits`, `cta_contexts`. Старый `promo_rules` в текущем target pack **не используется**.
+**`marketing.yaml` target schema (future, implementation pass):** `priority_service_promos`,
+`promotion_overview`, `scenario_rules`, `limits`, `cta_contexts`. Current demo still uses
+historical `initial_commercial_blocks` — pre-Stage-5.1, требует migration. Старый `promo_rules` в текущем target pack **не используется**.
 
 Известный current-runtime долг: `free_implant_consult` с `kind: promo` блокируется на pain/safety. Не исправлять это старым тематическим route; будущая реализация следует общей target policy.
 
@@ -67,22 +69,25 @@ LLM **не** выбирает точную акцию и **не** генерир
 - «Рассрочка на имплантацию и протезирование до 12 месяцев.»
 - «Можно оформить налоговый вычет 13%.»
 
-`target_response/marketing.yaml` — **когда и в каком порядке это можно показывать?**
+`target_response/marketing.yaml` — **когда, для какой услуги и в каком порядке это можно показывать?**
 
-Примеры:
+Примеры (target, после migration):
 
-- `initial_commercial_blocks.service.ordered_fact_refs` — clinic priority для commercial facts;
+- `priority_service_promos.all_on_4.ordered_fact_refs` — promo и порядок для конкретной услуги;
+- `promotion_overview.ordered_fact_refs` — порядок общего списка «Какие акции есть?» (до 3);
 - `scenario_rules.<scenario>.ordered_amplifier_refs` — pool усилителей;
 - `limits.max_marketing_facts_per_turn: 3`, `max_amplifiers_per_turn: 2`;
 - `cta_contexts` — выбор CTA key по semantic context.
+
+Один и тот же fact может присутствовать в service mapping и overview. `initial_commercial_blocks` **не** является новым promo authority.
 
 Текст акции **не** дублировать в `marketing.yaml` — только правила, порядок и ссылки.
 
 ## Как добавить новую акцию
 
-1. Факт в `clients/demo/target_response/pricebook/facts.json`.
-2. `fact_refs` в `clients/demo/target_response/pricebook/services/{service_id}.json`.
-3. Ссылку и порядок в `clients/demo/target_response/marketing.yaml` → `initial_commercial_blocks` и/или `scenario_rules`.
+1. Факт в `clients/<client_id>/target_response/pricebook/facts.json`.
+2. `fact_refs` в `clients/<client_id>/target_response/pricebook/services/{service_id}.json`.
+3. Ссылку и порядок в `clients/<client_id>/target_response/marketing.yaml` → `priority_service_promos.<service_id>` и/или `promotion_overview` и/или `scenario_rules`.
 4. Не дублировать текст акции в `md/**` (кроме нейтральных условий оплаты в `payment_terms`).
 
 Мини-пример (отбеливание):
@@ -101,8 +106,8 @@ LLM **не** выбирает точную акцию и **не** генерир
 ```
 
 ```yaml
-initial_commercial_blocks:
-  service:
+priority_service_promos:
+  professional_whitening:
     ordered_fact_refs:
       - fact:professional_whitening_discount
 
@@ -116,26 +121,21 @@ Priority promo (`professional_whitening_discount` в примере выше) �
 не amplifier. В `scenario_rules` для усилителей используются source-backed KB/doctor/fact
 refs, которые действительно являются amplifiers.
 
-**Config migration seam / priority authority:** в current demo `target_response/marketing.yaml`:
+**Config migration (current demo — pre-Stage-5.1):** в current `target_response/marketing.yaml`:
 
-- `initial_commercial_blocks.service.ordered_fact_refs` ставит `free_implant_consult` и
+- historical `initial_commercial_blocks.service.ordered_fact_refs` ставит `free_implant_consult` и
   `installment_12` **раньше** discount facts;
-- `implant_same_day_discount` и `professional_whitening_discount` также в
-  `scenario_rules.cost.ordered_amplifier_refs`;
-- несколько facts имеют `kind=promo`, но **нет** однозначного authored поля «главная
-  priority service promo».
+- discount facts также в `scenario_rules.cost.ordered_amplifier_refs`;
+- **нет** `priority_service_promos` / `promotion_overview`.
 
-Docs sync **не** меняет actual `marketing.yaml`. Stage 5.1 seam audit должен найти
-однозначный authored authority или доказать необходимость минимального schema/config
-изменения. **Нельзя** выбирать главную акцию по тексту, слову «скидка», проценту, fact ID,
-regex или Python hardcode. Бесплатная консультация **не** считается главной скидкой без
-явной client authority.
+Docs amendment **не** меняет actual `marketing.yaml`. Stage 5.1 implementation должна
+мигрировать на service-id mapping. **Нельзя** выбирать акцию по тексту, слову «скидка», проценту, fact ID,
+regex или Python hardcode. Consultation/installment **не** являются fallback для automatic promo.
 
-Прямой вопрос об **уже показанной конкретной** акции получает ответ повторно (suppression
-bypass only). Общий вопрос «есть акции?» — unresolved semantic seam Stage 5.1; точное
-количество promo facts **не** определяется в этом docs pass.
+Session-global suppression: один `fact_id` автоматически показывается один раз за `session_id`.
+Прямой promotion request (`promotion_scope=shown`) повторяет последнюю rendered promo session.
 
-Первый service turn показывает **одну** priority service promo, не весь block сразу.
+Первый service turn при `commercial_intent=none`, `promotion_scope=none` показывает **одну** priority service promo, не весь block сразу.
 
 ## Консультационный смысл и CTA
 
@@ -150,7 +150,7 @@ Service `consultation_value` (optional frontmatter service MD) и amplifier pool
 - Не добавлять `promo_note` в md (слоты сняты с runtime).
 - Не дублировать «запишитесь на консультацию» в каждый md.
 - Не просить LLM выбирать акцию, priority promo или CTA.
-- Не ссылаться на несуществующие пути `clients/demo/pricebook/...` или `clients/demo/marketing.yaml` без `target_response/`.
+- Не ссылаться на несуществующие пути `clients/<client_id>/pricebook/...` или `clients/<client_id>/marketing.yaml` без `target_response/`.
 
 **Про `ui.yaml`:** шаблоны вроде `price_symptom_consult` — служебный UI-текст, не замена `facts.json`.
 

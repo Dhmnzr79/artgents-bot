@@ -1,4 +1,4 @@
-"""Authoritative post-envelope semantic frame (Stage 4.3)."""
+"""Authoritative post-envelope semantic frame (Stage 4.3 / 5.1)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from contracts.one_call_envelope import (
     OneCallEnvelope,
     OneCallExtent,
     OneCallJaw,
+    OneCallPromotionScope,
     OneCallRoute,
     OneCallScenario,
 )
@@ -36,6 +37,7 @@ class SalesOnePlusSemanticFrame(BaseModel):
     stage_provenance: SemanticFieldProvenance
     scenario: OneCallScenario
     commercial_intent: OneCallCommercialIntent
+    promotion_scope: OneCallPromotionScope
     clarify_axis: OneCallClarifyAxis | None
     clarify_service_options: tuple[str, ...] | None
     rebind_kind: SemanticRebindKind = "full_rebuild"
@@ -47,8 +49,15 @@ class SalesOnePlusSemanticFrame(BaseModel):
                 raise ValueError("clarify_axis_required")
             if self.clarify_axis == "service" and self.clarify_service_options is None:
                 raise ValueError("clarify_service_options_required")
+            if self.commercial_intent != "none" or self.promotion_scope != "none":
+                raise ValueError("promotion_surface_forbidden")
+        elif self.route == "ADMIN":
+            if self.commercial_intent != "none" or self.promotion_scope != "none":
+                raise ValueError("promotion_surface_forbidden")
         elif self.clarify_axis is not None or self.clarify_service_options is not None:
             raise ValueError("clarify_fields_forbidden")
+        if self.commercial_intent != "promotion" and self.promotion_scope != "none":
+            raise ValueError("promotion_scope_forbidden")
         return self
 
     @classmethod
@@ -67,6 +76,7 @@ class SalesOnePlusSemanticFrame(BaseModel):
             stage_provenance="envelope" if envelope.stage is not None else "null",
             scenario=envelope.scenario,
             commercial_intent=envelope.commercial_intent,
+            promotion_scope=envelope.promotion_scope,
             clarify_axis=envelope.clarify_axis,
             clarify_service_options=envelope.clarify_service_options,
         )

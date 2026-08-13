@@ -11,6 +11,7 @@ from contracts.one_call_envelope import (
     OneCallEnvelope,
     OneCallExtent,
     OneCallJaw,
+    OneCallPromotionScope,
     OneCallRoute,
     OneCallScenario,
     required_envelope_field_names,
@@ -25,7 +26,8 @@ _ALLOWED_JAW = frozenset({"upper", "lower", "both"})
 _ALLOWED_SCENARIO = frozenset(
     {"pain_fear", "cost", "time", "doctor_trust", "result_reliability", "none"}
 )
-_ALLOWED_COMMERCIAL_INTENT = frozenset({"none", "price", "payment", "included"})
+_ALLOWED_COMMERCIAL_INTENT = frozenset({"none", "price", "payment", "included", "promotion"})
+_ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
 _ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
 
 
@@ -116,6 +118,15 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
     if not isinstance(commercial_intent, str) or commercial_intent not in _ALLOWED_COMMERCIAL_INTENT:
         raise OneCallEnvelopeProtocolError("commercial_intent_invalid")
 
+    promotion_scope = payload["promotion_scope"]
+    _reject_bool(promotion_scope, code="promotion_scope_invalid")
+    if not isinstance(promotion_scope, str) or promotion_scope not in _ALLOWED_PROMOTION_SCOPE:
+        raise OneCallEnvelopeProtocolError("promotion_scope_invalid")
+    if commercial_intent != "promotion" and promotion_scope != "none":
+        raise OneCallEnvelopeProtocolError("promotion_scope_forbidden")
+    if commercial_intent == "promotion" and promotion_scope not in {"general", "service", "shown"}:
+        raise OneCallEnvelopeProtocolError("promotion_scope_invalid")
+
     clarify_axis = payload["clarify_axis"]
     if clarify_axis is not None:
         _reject_bool(clarify_axis, code="clarify_axis_invalid")
@@ -176,6 +187,7 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
             stage=stage,
             scenario=scenario,  # type: ignore[arg-type]
             commercial_intent=commercial_intent,  # type: ignore[arg-type]
+            promotion_scope=promotion_scope,  # type: ignore[arg-type]
             clarify_axis=clarify_axis,  # type: ignore[arg-type]
             clarify_service_options=clarify_service_options,
             patient_text=patient_text,
@@ -194,6 +206,8 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
             "service_id_invalid",
             "stage_invalid",
             "clarify_service_options_invalid",
+            "promotion_scope_forbidden",
+            "promotion_scope_invalid",
         }:
             raise OneCallEnvelopeProtocolError(message) from exc
         raise OneCallEnvelopeProtocolError("envelope_invariant_violation") from exc
@@ -217,6 +231,8 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
                     "service_id_invalid",
                     "stage_invalid",
                     "clarify_service_options_invalid",
+                    "promotion_scope_forbidden",
+                    "promotion_scope_invalid",
                 }:
                     raise OneCallEnvelopeProtocolError(message) from exc
         raise OneCallEnvelopeProtocolError("envelope_invariant_violation") from exc
@@ -305,6 +321,7 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
         "stage": None,
         "scenario": "none",
         "commercial_intent": "none",
+        "promotion_scope": "none",
         "clarify_axis": None,
         "clarify_service_options": None,
         "patient_text": "Probe text.",

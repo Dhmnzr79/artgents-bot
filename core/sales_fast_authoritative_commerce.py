@@ -24,6 +24,10 @@ _CURRENCY_AMOUNT_RE = re.compile(
     r"(?<!\d)(?:от\s+)?\d[\d\s\u00a0]*(?:\d{3})*(?:[.,]\d+)?\s*(?:₽|руб\.?|rub)(?!\w)",
     re.IGNORECASE,
 )
+_PERCENT_LITERAL_RE = re.compile(
+    r"(?<!\d)(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d+)?\s*(?:%|процент(?:а|ов)?)",
+    re.IGNORECASE,
+)
 _FORBIDDEN_TOTAL_LINE_RE = re.compile(
     r"(?:^|\n)\s*итого\s*[:\-—]?\s*\d",
     re.IGNORECASE,
@@ -37,6 +41,10 @@ _METADATA_LINE_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+|\n+")
+_COMMERCIAL_PERCENT_CLAIM_MARKER_RE = re.compile(
+    r"\b(?:скидк\w*|акци\w*|промо\w*)\b",
+    re.IGNORECASE,
+)
 
 AuthoritativeCommercePresentationMode = Literal[
     "none",
@@ -482,7 +490,33 @@ def gate_commerce_result_by_intent(
             patient_price_block=None,
             widget_offer_payload=None,
         )
-    return commerce
+    if commercial_intent == "promotion":
+        return AuthoritativeCommerceResult(
+            service_id=commerce.service_id,
+            presentation_mode="none",
+            entry_price_amount=None,
+            entry_price_text=None,
+            ordered_offers=(),
+            featured_offer_id=None,
+            selected_exact_offer=None,
+            needs_consultation_quote=commerce.needs_consultation_quote,
+            authoritative_amounts=frozenset(),
+            patient_price_block=None,
+            widget_offer_payload=None,
+        )
+    return AuthoritativeCommerceResult(
+        service_id=commerce.service_id,
+        presentation_mode="none",
+        entry_price_amount=None,
+        entry_price_text=None,
+        ordered_offers=(),
+        featured_offer_id=None,
+        selected_exact_offer=None,
+        needs_consultation_quote=commerce.needs_consultation_quote,
+        authoritative_amounts=frozenset(),
+        patient_price_block=None,
+        widget_offer_payload=None,
+    )
 
 
 def build_authoritative_commerce_result(
@@ -569,6 +603,117 @@ def _sentence_has_unauthorized_amount(sentence: str, allowed_amounts: frozenset[
     if not allowed_amounts:
         return True
     return not amounts.issubset(allowed_amounts)
+
+
+def _normalize_percent_value(raw: str) -> str:
+    normalized = re.sub(r"[ \u00a0\u202f]", "", raw)
+    normalized = normalized.replace(",", ".")
+    if normalized.endswith("%"):
+        normalized = normalized[:-1]
+    try:
+        value = float(normalized)
+    except ValueError:
+        return normalized
+    if value == int(value):
+        return str(int(value))
+    return str(value).rstrip("0").rstrip(".")
+
+
+def _percents_in_text(text: str) -> set[str]:
+    percents: set[str] = set()
+    for match in _PERCENT_LITERAL_RE.finditer(text):
+        digits = re.search(
+            r"(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d+)?",
+            match.group(0),
+        )
+        if digits is not None:
+            percents.add(_normalize_percent_value(digits.group(0)))
+    return percents
+
+
+def _sentence_is_commercial_percent_claim(sentence: str) -> bool:
+    if not _percents_in_text(sentence):
+        return False
+    return _COMMERCIAL_PERCENT_CLAIM_MARKER_RE.search(sentence) is not None
+
+
+def _sentence_has_unauthorized_commercial_percent_claim(
+    sentence: str,
+    allowed_commercial_percents: frozenset[str],
+) -> bool:
+    if not _sentence_is_commercial_percent_claim(sentence):
+        return False
+    percents = _percents_in_text(sentence)
+    if not allowed_commercial_percents:
+        return True
+    return not percents.issubset(allowed_commercial_percents)
+
+
+def _remove_unauthorized_commercial_claim_sentences(
+    text: str,
+    *,
+    allowed_amounts: frozenset[int],
+    allowed_commercial_percents: frozenset[str],
+) -> str:
+    if not text.strip():
+        return text
+    paragraphs = re.split(r"\n\s*\n", text)
+    kept_paragraphs: list[str] = []
+    for paragraph in paragraphs:
+        parts = _SENTENCE_SPLIT_RE.split(paragraph)
+        kept_parts: list[str] = []
+        for part in parts:
+            sentence = part.strip()
+            if not sentence:
+                continue
+            if _FORBIDDEN_TOTAL_LINE_RE.search(sentence):
+                continue
+            if _sentence_has_unauthorized_amount(sentence, allowed_amounts):
+                continue
+            if _sentence_has_unauthorized_commercial_percent_claim(
+                sentence,
+                allowed_commercial_percents,
+            ):
+                continue
+            kept_parts.append(sentence)
+        if kept_parts:
+            kept_paragraphs.append(" ".join(kept_parts))
+    return "\n\n".join(kept_paragraphs).strip()
+
+
+def sanitize_model_text_for_authoritative_marketing(
+    text: str,
+    *,
+    allowed_amounts: frozenset[int],
+    allowed_percents: frozenset[str],
+) -> str:
+    """Strip model commercial numeric claims not present in authoritative sources."""
+
+    return _remove_unauthorized_commercial_claim_sentences(
+        _strip_route_metadata(text),
+        allowed_amounts=allowed_amounts,
+        allowed_commercial_percents=allowed_percents,
+    )
+
+
+def collect_planned_render_commercial_allowlist(
+    *,
+    planned_commercial_fact_texts: tuple[str, ...],
+    commerce: AuthoritativeCommerceResult | None,
+    commercial_intent: str,
+) -> tuple[frozenset[int], frozenset[str]]:
+    """Build commercial allowlist only from planned promo/commerce render owners."""
+
+    allowed_amounts: set[int] = set()
+    allowed_percents: set[str] = set()
+    if commerce is not None and commercial_intent == "price":
+        allowed_amounts.update(commerce.authoritative_amounts)
+        for amount in _amounts_in_text(commerce.patient_price_block or ""):
+            allowed_amounts.add(amount)
+    for text in planned_commercial_fact_texts:
+        allowed_amounts.update(_amounts_in_text(text))
+        allowed_percents.update(_percents_in_text(text))
+    return frozenset(allowed_amounts), frozenset(allowed_percents)
 
 
 def _remove_unauthorized_currency_sentences(

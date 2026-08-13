@@ -130,6 +130,7 @@ class TargetRuntimeSessionState:
     shown_content_followup_refs: tuple[str, ...]
     shown_price_followup_refs: tuple[str, ...]
     situation_offered: bool
+    last_rendered_promo_fact_id: str | None
     followups: tuple[TargetRuntimeFollowupItem, ...]
     patient_facts: SessionPatientFacts | None = None
 
@@ -190,6 +191,7 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             shown_content_followup_refs=(),
             shown_price_followup_refs=(),
             situation_offered=False,
+            last_rendered_promo_fact_id=None,
             followups=followups,
             patient_facts=patient_facts,
         )
@@ -228,6 +230,7 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             if str(x).strip()
         ),
         situation_offered=bool(raw.get("situation_offered")),
+        last_rendered_promo_fact_id=str(raw.get("last_rendered_promo_fact_id") or "").strip() or None,
         followups=followups,
         patient_facts=patient_facts,
     )
@@ -405,6 +408,9 @@ def write_target_runtime_session_after_materialized(
     situation_offered = prior.situation_offered or bool(
         presentation_cadence_update and presentation_cadence_update.situation_offered
     )
+    last_rendered_promo: str | None = prior.last_rendered_promo_fact_id
+    if current_selection.last_rendered_promo_fact_id:
+        last_rendered_promo = current_selection.last_rendered_promo_fact_id
     with _lock:
         st = mem_get(sid)
         turn_count = int(st.get("session_turn_count") or 0)
@@ -417,6 +423,8 @@ def write_target_runtime_session_after_materialized(
             "shown_price_followup_refs": list(shown_price_followup_refs),
             "situation_offered": situation_offered,
         }
+        if last_rendered_promo is not None:
+            payload["last_rendered_promo_fact_id"] = last_rendered_promo
         service_id = str(turn_frame.service_id or "").strip() or None
         if service_id:
             payload.update(

@@ -443,6 +443,28 @@ class TargetInitialCommercialBlock(TargetSchemaModel):
         return value
 
 
+class TargetServicePromoMapping(TargetSchemaModel):
+    ordered_fact_refs: list[FactSourceRef] = Field(default_factory=list)
+
+    @field_validator("ordered_fact_refs", mode="after")
+    @classmethod
+    def _refs_unique(cls, value: list[str]) -> list[str]:
+        if _duplicates(value):
+            raise ValueError("priority_service_promo_ref_duplicate")
+        return value
+
+
+class TargetPromotionOverview(TargetSchemaModel):
+    ordered_fact_refs: list[FactSourceRef] = Field(default_factory=list)
+
+    @field_validator("ordered_fact_refs", mode="after")
+    @classmethod
+    def _refs_unique(cls, value: list[str]) -> list[str]:
+        if _duplicates(value):
+            raise ValueError("promotion_overview_ref_duplicate")
+        return value
+
+
 class TargetScenarioRule(TargetSchemaModel):
     ordered_amplifier_refs: list[SourceRef] = Field(default_factory=list)
     allowed_semantic_contexts: list[NonBlankStr] = Field(default_factory=list)
@@ -492,6 +514,12 @@ class TargetMarketingPolicy(TargetSchemaModel):
     limits: TargetMarketingLimits
     initial_commercial_blocks: dict[NonBlankStr, TargetInitialCommercialBlock] = Field(
         default_factory=dict
+    )
+    priority_service_promos: dict[NonBlankStr, TargetServicePromoMapping] = Field(
+        default_factory=dict
+    )
+    promotion_overview: TargetPromotionOverview = Field(
+        default_factory=TargetPromotionOverview
     )
     scenario_rules: dict[MarketingScenario, TargetScenarioRule] = Field(default_factory=dict)
     cta_contexts: dict[NonBlankStr, NonBlankStr]
@@ -579,6 +607,8 @@ class ResponseSchemaBundle(TargetSchemaModel):
             if ref.startswith("fact:") and ref.removeprefix("fact:") not in self.facts:
                 raise ValueError("bundle_marketing_fact_missing")
 
+        self._validate_promo_authority_refs()
+
         for record in self.family_prices.records:
             if any(
                 service_id not in self.services
@@ -603,9 +633,38 @@ class ResponseSchemaBundle(TargetSchemaModel):
         refs: list[str] = []
         for block in self.marketing.initial_commercial_blocks.values():
             refs.extend(block.ordered_fact_refs)
+        for mapping in self.marketing.priority_service_promos.values():
+            refs.extend(mapping.ordered_fact_refs)
+        refs.extend(self.marketing.promotion_overview.ordered_fact_refs)
         for rule in self.marketing.scenario_rules.values():
             refs.extend(rule.ordered_amplifier_refs)
         return refs
+
+    def _validate_promo_authority_refs(self) -> None:
+        promo_kinds = frozenset({"promo"})
+        for service_id, mapping in self.marketing.priority_service_promos.items():
+            if service_id not in self.services:
+                raise ValueError("marketing_priority_service_missing")
+            for ref in mapping.ordered_fact_refs:
+                if not ref.startswith("fact:"):
+                    raise ValueError("marketing_priority_promo_ref_invalid")
+                fact_id = ref.removeprefix("fact:")
+                fact = self.facts.get(fact_id)
+                if fact is None:
+                    raise ValueError("bundle_marketing_fact_missing")
+                if fact.kind not in promo_kinds:
+                    raise ValueError("marketing_priority_promo_kind_invalid")
+                if fact.allowed_service_ids and service_id not in fact.allowed_service_ids:
+                    raise ValueError("marketing_priority_promo_service_applicability_invalid")
+        for ref in self.marketing.promotion_overview.ordered_fact_refs:
+            if not ref.startswith("fact:"):
+                raise ValueError("marketing_overview_ref_invalid")
+            fact_id = ref.removeprefix("fact:")
+            fact = self.facts.get(fact_id)
+            if fact is None:
+                raise ValueError("bundle_marketing_fact_missing")
+            if fact.kind not in promo_kinds:
+                raise ValueError("marketing_overview_promo_kind_invalid")
 
 
 S1_MODEL_TYPES = (

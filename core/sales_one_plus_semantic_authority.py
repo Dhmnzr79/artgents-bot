@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
-from contracts.one_call_envelope import OneCallCommercialIntent, OneCallEnvelope
+from contracts.one_call_envelope import OneCallCommercialIntent, OneCallEnvelope, OneCallPromotionScope
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame, SemanticFieldProvenance
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
@@ -103,6 +103,9 @@ def bind_semantic_frame(
     commercial_intent: OneCallCommercialIntent = (
         "none" if envelope.route == "CLARIFY" else envelope.commercial_intent
     )
+    promotion_scope: OneCallPromotionScope = (
+        "none" if envelope.route in {"CLARIFY", "ADMIN"} else envelope.promotion_scope
+    )
     return SalesOnePlusSemanticFrame(
         route=envelope.route,
         service_id=service_id,
@@ -115,6 +118,7 @@ def bind_semantic_frame(
         stage_provenance=stage_provenance,
         scenario=envelope.scenario,
         commercial_intent=commercial_intent,
+        promotion_scope=promotion_scope,
         clarify_axis=envelope.clarify_axis,
         clarify_service_options=envelope.clarify_service_options,
     )
@@ -123,8 +127,18 @@ def bind_semantic_frame(
 def presentation_commercial_intent(
     semantic: SalesOnePlusSemanticFrame,
 ) -> OneCallCommercialIntent:
-    """Route-aware presentation intent — CLARIFY is always non-commercial."""
+    """Route-aware presentation intent — CLARIFY/ADMIN close commercial surfaces."""
 
-    if semantic.route == "CLARIFY":
+    if semantic.route in {"CLARIFY", "ADMIN"}:
         return "none"
     return semantic.commercial_intent
+
+
+def presentation_promotion_scope(
+    semantic: SalesOnePlusSemanticFrame,
+) -> OneCallPromotionScope:
+    """Route-aware promotion scope — CLARIFY/ADMIN close promotion surface."""
+
+    if semantic.route in {"CLARIFY", "ADMIN"}:
+        return "none"
+    return semantic.promotion_scope

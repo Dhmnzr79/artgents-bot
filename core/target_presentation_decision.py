@@ -290,6 +290,9 @@ def decide_target_presentation(
     elif price_qr and "price" in spec.required_components:
         channel = "price"
         quick_replies = price_qr
+        cadence_update = TargetPresentationCadenceUpdate(
+            shown_price_followup_refs=tuple(item["ref"] for item in price_qr),
+        )
         if selected_followups.content:
             for item in selected_followups.content:
                 all_dropped.append(f"content_suppressed_by_price_channel:{item.ref}")

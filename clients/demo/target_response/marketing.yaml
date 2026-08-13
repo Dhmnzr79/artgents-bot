@@ -5,6 +5,23 @@ limits:
   max_amplifiers_per_turn: 2
   max_scenarios_per_turn: 2
 
+priority_service_promos:
+  all_on_4:
+    ordered_fact_refs:
+      - fact:implant_same_day_discount
+  all_on_6:
+    ordered_fact_refs:
+      - fact:implant_same_day_discount
+  professional_whitening:
+    ordered_fact_refs:
+      - fact:professional_whitening_discount
+
+promotion_overview:
+  ordered_fact_refs:
+    - fact:implant_same_day_discount
+    - fact:professional_whitening_discount
+    - fact:free_implant_consult
+
 initial_commercial_blocks:
   service:
     ordered_fact_refs:

@@ -28,6 +28,7 @@ from core.sales_fast_presentation import (
     sales_fast_session_selection,
     static_sales_fast_admin_handoff,
 )
+from core.one_call_presentation_pass import build_one_call_presentation_result
 from core.sales_fast_strict_evidence import (
     assemble_sales_fast_bound_package,
     build_pre_flash_prompt_hints,
@@ -286,6 +287,7 @@ def _rebuild_authoritative_context(
     object,
     ExactSalesResolution,
     object,
+    object,
 ]:
     if result.envelope is None:
         raise ValueError("authoritative_rebuild_requires_envelope")
@@ -329,7 +331,7 @@ def _rebuild_authoritative_context(
         shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
         shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
     )
-    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context
+    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context, semantic
 
 
 def run_sales_fast_widget_turn(
@@ -556,6 +558,7 @@ def _materialize_result(
             effective_scope,
             commerce_resolution,
             strategy_context,
+            semantic,
         ) = _rebuild_authoritative_context(
             result=result,
             context=context,
@@ -588,10 +591,24 @@ def _materialize_result(
             provider_calls=provider_calls,
             model_route=terminal_route,
         )
-    commercial_intent = "none"
-    if result.envelope is not None and result.decision != "clarify" and result.envelope.route != "CLARIFY":
-        commercial_intent = result.envelope.commercial_intent
     turn_timing.stage_start("sales_fast_presentation")
+    presentation = build_one_call_presentation_result(
+        bound_package=bound,
+        context=context,
+        turn_frame=authoritative_turn_frame,
+        semantic=semantic,  # type: ignore[arg-type]
+        patient_text=result.patient_text or "",
+        user_message=user_message,
+        cadence=cadence,
+        allow_situation=True,
+        resolution=commerce_resolution,
+        strategy_context=strategy_context,  # type: ignore[arg-type]
+        shown_fact_ids=session_state.shown_fact_ids,  # type: ignore[attr-defined]
+        shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
+        shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
+        last_rendered_promo_fact_id=session_state.last_rendered_promo_fact_id,  # type: ignore[attr-defined]
+        today=runtime_today(),
+    )
     widget = materialize_sales_fast_answer_payload(
         bound_package=bound,
         context=context,
@@ -603,11 +620,13 @@ def _materialize_result(
         allow_situation=True,
         resolution=commerce_resolution,
         strategy_context=strategy_context,  # type: ignore[arg-type]
-        commercial_intent=commercial_intent,
+        presentation=presentation,
     )
     turn_timing.stage_end("sales_fast_presentation", status="completed")
     if widget.kind == "materialized":
         final_patient_text = str(widget.payload.get("answer") or "")
+        from core.target_session_selection import TargetMaterializedSessionSelection
+
         verified = build_sales_fast_verified_for_session(
             bound_package=bound,
             context=context,
@@ -615,11 +634,20 @@ def _materialize_result(
             patient_text=final_patient_text,
             user_message=user_message,
         )
-        selection = sales_fast_session_selection(
-            bound_package=bound,
-            patient_text=final_patient_text,
-            used_content_refs=verified.used_content_refs,
-        )
+        session_delta = presentation.pending_session_delta
+        if session_delta is not None:
+            selection = TargetMaterializedSessionSelection(
+                shown_fact_ids=session_delta.shown_fact_ids,
+                shown_amplifier_refs=session_delta.shown_amplifier_refs,
+                shown_consultation_value_refs=session_delta.shown_consultation_value_refs,
+                last_rendered_promo_fact_id=session_delta.last_rendered_promo_fact_id,
+            )
+        else:
+            selection = sales_fast_session_selection(
+                bound_package=bound,
+                patient_text=final_patient_text,
+                used_content_refs=verified.used_content_refs,
+            )
         write_target_runtime_session_after_materialized(
             sid,
             turn_frame=authoritative_turn_frame,

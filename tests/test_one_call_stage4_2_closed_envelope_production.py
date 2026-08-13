@@ -132,11 +132,15 @@ def test_blocking_valid_admin_route() -> None:
     assert result.envelope.route == "ADMIN"
 
 
-@pytest.mark.parametrize("commercial_intent", ("none", "price", "payment", "included"))
+@pytest.mark.parametrize("commercial_intent", ("none", "price", "payment", "included", "promotion"))
 def test_blocking_accepts_all_commercial_intent_values(commercial_intent: str) -> None:
-    result = _run_blocking(answer_envelope("Ответ.", commercial_intent=commercial_intent))
+    scope = "general" if commercial_intent == "promotion" else "none"
+    result = _run_blocking(
+        answer_envelope("Ответ.", commercial_intent=commercial_intent, promotion_scope=scope)
+    )
     assert result.envelope is not None
     assert result.envelope.commercial_intent == commercial_intent
+    assert result.envelope.promotion_scope == scope
 
 
 def test_exact_ten_key_contract() -> None:
@@ -331,8 +335,8 @@ def test_invalid_envelope_does_not_retry() -> None:
         assert backend.calls == 1
 
 
-def test_prompt_contract_version_is_two() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 2
+def test_prompt_contract_version_is_three() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 3
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
@@ -394,6 +398,7 @@ def test_sales_one_plus_result_rejects_answer_route_mismatch() -> None:
         stage=None,
         scenario="none",
         commercial_intent="none",
+        promotion_scope="none",
         clarify_axis="extent",
         clarify_service_options=None,
         patient_text="Текст",
@@ -419,6 +424,7 @@ def test_sales_one_plus_result_rejects_patient_text_mismatch() -> None:
         stage=None,
         scenario="none",
         commercial_intent="none",
+        promotion_scope="none",
         clarify_axis=None,
         clarify_service_options=None,
         patient_text="Envelope text",
@@ -445,6 +451,7 @@ def test_one_call_envelope_rejects_blank_service_id_direct() -> None:
             stage=None,
             scenario="none",
             commercial_intent="none",
+            promotion_scope="none",
             clarify_axis=None,
             clarify_service_options=None,
             patient_text="Ответ.",
@@ -461,6 +468,7 @@ def test_one_call_envelope_rejects_blank_stage_direct() -> None:
             stage="  ",
             scenario="none",
             commercial_intent="none",
+            promotion_scope="none",
             clarify_axis=None,
             clarify_service_options=None,
             patient_text="Ответ.",
@@ -478,6 +486,7 @@ def test_one_call_envelope_rejects_invalid_option_sets_direct(options: tuple[str
             stage=None,
             scenario="none",
             commercial_intent="none",
+            promotion_scope="none",
             clarify_axis="service",
             clarify_service_options=options,
             patient_text="Уточните.",
@@ -492,7 +501,7 @@ def test_duplicate_json_keys_rejected() -> None:
 
 
 def test_unencodable_unicode_rejected_blocking_and_streaming() -> None:
-    bad = '{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":"\ud800"}'
+    bad = '{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","promotion_scope":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":"\ud800"}'
     result = _run_blocking(bad)
     assert result.decision == "admin"
     assert result.reason == "envelope_encoding_invalid"

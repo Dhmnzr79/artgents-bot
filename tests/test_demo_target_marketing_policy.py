@@ -88,7 +88,7 @@ EXPECTED_CURRENT_HASHES = {
     TONE: "b357142967527e0cdd50387efbeaf2d8d3b2a7218a1c5cd8112a316e17f6076f",
 }
 EXPECTED_PREEXISTING_TARGET_DIGEST = (
-    "1fbf9b045f69aeb9b08394e9416fe5c7f62a285ea2aa8ec3818d9e658ead9126"
+    "7f155234139bafbcac5a0edc3e41bfee7ef21a0205955ec6a4f7743779c1f175"
 )
 
 
@@ -178,6 +178,12 @@ def test_real_demo_source_and_cta_owner_boundaries_cover_every_policy_ref() -> N
         for block in bundle.marketing.initial_commercial_blocks.values()
         for ref in block.ordered_fact_refs
     }
+    fact_refs.update(
+        ref
+        for mapping in bundle.marketing.priority_service_promos.values()
+        for ref in mapping.ordered_fact_refs
+    )
+    fact_refs.update(bundle.marketing.promotion_overview.ordered_fact_refs)
     fact_refs.update(
         ref
         for rule in bundle.marketing.scenario_rules.values()

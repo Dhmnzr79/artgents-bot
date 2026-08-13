@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.one_call_envelope import OneCallCommercialIntent
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
@@ -62,6 +64,27 @@ def supplement_sales_fast_patient_text_with_marketing(
         separator = "\n\n" if text.strip() else ""
         text = f"{text.rstrip()}{separator}{fact_text}"
     return text
+
+
+def build_direct_promotion_patient_text(
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+) -> str:
+    """Deterministic promotion answer from selected authoritative promo facts only."""
+
+    facts_by_id = {
+        fact.id: fact for fact in bound_package.package.materials.commercial_facts
+    }
+    texts: list[str] = []
+    for ref in bound_package.package.materials.marketing_selection.selected_refs:
+        if not ref.startswith("fact:"):
+            continue
+        fact = facts_by_id.get(ref.removeprefix("fact:"))
+        if fact is None or str(fact.kind) != "promo":
+            continue
+        fact_text = str(fact.text_fact).strip()
+        if fact_text and fact_text not in texts:
+            texts.append(fact_text)
+    return "\n\n".join(texts)
 
 
 def static_sales_fast_admin_handoff(*, client_id: str) -> str:
@@ -168,6 +191,86 @@ def build_sales_fast_verified_response(
     )
 
 
+def materialize_sales_fast_from_presentation_result(
+    *,
+    presentation: object,
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+    context: TargetRuntimeClientContext,
+    turn_frame: TurnFrame,
+    sid: str,
+) -> TargetRuntimeMaterializedPayload:
+    from contracts.one_call_presentation_result import OneCallPresentationResult
+    from core.sales_fast_authoritative_commerce import AuthoritativeCommerceResult
+
+    if not isinstance(presentation, OneCallPresentationResult):
+        raise TypeError("presentation_must_be_one_call_presentation_result")
+    commerce = presentation.authoritative_commerce
+    quick_replies = [
+        {"label": qr.label, "ref": qr.ref} for qr in presentation.quick_replies
+    ]
+    meta = {
+        "client_id": context.client_id,
+        "sid": sid,
+        "intent": "content",
+        "answer_path": "sales_fast",
+        "service_route": "sales_fast_materialized",
+        "ui_source_family": "md_navigation",
+        "attribution_kind": "content",
+        "matched_service_id": turn_frame.service_id or bound_package.spec.service_id,
+        "service_topic": turn_frame.topic or bound_package.spec.scope_price_topic,
+        "followup_count": len(quick_replies),
+        "followup_source": "quick_replies",
+        "presentation_channel": presentation.presentation_channel,
+    }
+    if presentation.reason_code:
+        meta["presentation_fail_closed"] = presentation.reason_code
+    cta = build_target_runtime_widget_cta(
+        client_id=context.client_id,
+        selected_cta_key=presentation.selected_cta_key,
+    )
+    if presentation.selected_cta_key:
+        meta["cta_key"] = presentation.selected_cta_key
+        meta["cta_action"] = "lead"
+    offer = None
+    if isinstance(commerce, AuthoritativeCommerceResult) and commerce.widget_offer_payload is not None:
+        widget_payload = dict(commerce.widget_offer_payload)
+        widget_payload["fact_refs"] = list(presentation.offer_fact_refs)
+        if commerce.presentation_mode == "exact_offer":
+            offer = {
+                "fact_refs": widget_payload["fact_refs"],
+                "amount": widget_payload.get("amount"),
+                "offer_id": widget_payload.get("offer_id"),
+                "mode": "exact_offer",
+            }
+        else:
+            offer = widget_payload
+    cadence_update = None
+    if presentation.pending_session_delta is not None:
+        from core.target_presentation_decision import TargetPresentationCadenceUpdate
+
+        delta = presentation.pending_session_delta.cadence_update
+        cadence_update = TargetPresentationCadenceUpdate(
+            shown_video_ids=delta.shown_video_ids,
+            shown_content_followup_refs=delta.shown_content_followup_refs,
+            shown_price_followup_refs=delta.shown_price_followup_refs,
+            situation_offered=delta.situation_offered,
+        )
+    payload = {
+        "answer": presentation.final_patient_text,
+        "quick_replies": quick_replies,
+        "cta": cta,
+        "video": presentation.video,
+        "situation": presentation.situation,
+        "offer": offer,
+        "meta": meta,
+    }
+    return TargetRuntimeMaterializedPayload(
+        kind="materialized",
+        payload=payload,
+        presentation_cadence_update=cadence_update,
+    )
+
+
 def materialize_sales_fast_answer_payload(
     *,
     bound_package: TargetSpecBoundOfflineResponsePackage,
@@ -181,7 +284,59 @@ def materialize_sales_fast_answer_payload(
     resolution: object | None = None,
     strategy_context: TargetStrategyMatch | None = None,
     commercial_intent: OneCallCommercialIntent = "none",
+    presentation: object | None = None,
+    semantic: object | None = None,
+    shown_fact_ids: tuple[str, ...] = (),
+    shown_amplifier_refs: tuple[str, ...] = (),
+    shown_consultation_value_refs: tuple[str, ...] = (),
+    last_rendered_promo_fact_id: str | None = None,
+    today: object | None = None,
 ) -> TargetRuntimeMaterializedPayload:
+    from contracts.one_call_presentation_result import OneCallPresentationResult
+    from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
+    from core.one_call_presentation_pass import build_one_call_presentation_result
+    from core.target_runtime_client_context import runtime_today
+
+    if isinstance(presentation, OneCallPresentationResult):
+        return materialize_sales_fast_from_presentation_result(
+            presentation=presentation,
+            bound_package=bound_package,
+            context=context,
+            turn_frame=turn_frame,
+            sid=sid,
+        )
+
+    if (
+        semantic is not None
+        and isinstance(semantic, SalesOnePlusSemanticFrame)
+        and isinstance(resolution, ExactSalesResolution)
+        and strategy_context is not None
+    ):
+        built = build_one_call_presentation_result(
+            bound_package=bound_package,
+            context=context,
+            turn_frame=turn_frame,
+            semantic=semantic,
+            patient_text=patient_text,
+            user_message=user_message,
+            cadence=cadence,
+            allow_situation=allow_situation,
+            resolution=resolution,
+            strategy_context=strategy_context,
+            shown_fact_ids=shown_fact_ids,
+            shown_amplifier_refs=shown_amplifier_refs,
+            shown_consultation_value_refs=shown_consultation_value_refs,
+            last_rendered_promo_fact_id=last_rendered_promo_fact_id,
+            today=today if isinstance(today, date) else runtime_today(),
+        )
+        return materialize_sales_fast_from_presentation_result(
+            presentation=built,
+            bound_package=bound_package,
+            context=context,
+            turn_frame=turn_frame,
+            sid=sid,
+        )
+
     if turn_frame.needs_clarification:
         commercial_intent = "none"
     commerce_result = None

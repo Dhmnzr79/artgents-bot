@@ -192,6 +192,7 @@ def test_result_contract_marks_only_partial_backend_answers_interrupted() -> Non
         stage=None,
         scenario="none",
         commercial_intent="none",
+        promotion_scope="none",
         clarify_axis=None,
         clarify_service_options=None,
         patient_text="partial",

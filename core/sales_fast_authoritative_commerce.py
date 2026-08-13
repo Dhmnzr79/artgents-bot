@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from contracts.exact_sales_resolution import ExactSalesResolution
+from contracts.one_call_envelope import OneCallCommercialIntent
 from contracts.response_schema import (
     ResponseSchemaBundle,
     TargetGenericPricePolicy,
@@ -442,6 +443,46 @@ def resolve_authoritative_commerce(
         patient_price_block=patient_block,
         widget_offer_payload=widget,
     )
+
+
+def gate_commerce_result_by_intent(
+    commerce: AuthoritativeCommerceResult,
+    *,
+    commercial_intent: OneCallCommercialIntent,
+) -> AuthoritativeCommerceResult:
+    """Open only the commercial surface matching envelope commercial_intent."""
+
+    if commercial_intent == "none":
+        return AuthoritativeCommerceResult(
+            service_id=commerce.service_id,
+            presentation_mode="none",
+            entry_price_amount=None,
+            entry_price_text=None,
+            ordered_offers=(),
+            featured_offer_id=None,
+            selected_exact_offer=None,
+            needs_consultation_quote=commerce.needs_consultation_quote,
+            authoritative_amounts=frozenset(),
+            patient_price_block=commerce.patient_price_block if commerce.needs_consultation_quote else None,
+            widget_offer_payload=None,
+        )
+    if commercial_intent == "price":
+        return commerce
+    if commercial_intent in {"payment", "included"}:
+        return AuthoritativeCommerceResult(
+            service_id=commerce.service_id,
+            presentation_mode="none",
+            entry_price_amount=None,
+            entry_price_text=None,
+            ordered_offers=(),
+            featured_offer_id=None,
+            selected_exact_offer=None,
+            needs_consultation_quote=commerce.needs_consultation_quote,
+            authoritative_amounts=frozenset(),
+            patient_price_block=None,
+            widget_offer_payload=None,
+        )
+    return commerce
 
 
 def build_authoritative_commerce_result(

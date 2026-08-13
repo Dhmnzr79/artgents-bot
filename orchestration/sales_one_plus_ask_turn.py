@@ -81,6 +81,45 @@ def _service_reply_from_gate(
     )
 
 
+def _contact_aspects_from_message(q: str) -> tuple[str, ...] | None:
+    """Map existing CONTACTS_RE matches to planner contact aspects; None → pass to Flash."""
+
+    from config import CONTACTS_RE
+
+    if not q:
+        return None
+    aspects: list[str] = []
+    seen: set[str] = set()
+    for match in CONTACTS_RE.finditer(q):
+        token = match.group(0).lower()
+        aspect: str | None = None
+        if "парков" in token:
+            aspect = "contact_parking"
+        elif "телефон" in token:
+            aspect = "contact_phone"
+        elif "whatsapp" in token:
+            aspect = "contact_whatsapp"
+        elif "график" in token or "время" in token or "суббот" in token or "воскресен" in token:
+            aspect = "contact_hours"
+        elif any(
+            part in token
+            for part in ("адрес", "наход", "доехать", "проехать", "клиник", "метро", "располож", "карт")
+        ):
+            aspect = "contact_address"
+        if aspect is None:
+            return None
+        if aspect not in seen:
+            seen.add(aspect)
+            aspects.append(aspect)
+    if aspects:
+        return tuple(aspects)
+    if "контакт" in q.lower():
+        return ("contacts",)
+    if contacts_intent(q):
+        return None
+    return None
+
+
 def _try_deterministic_contacts_terminal(
     *,
     q: str,
@@ -88,14 +127,18 @@ def _try_deterministic_contacts_terminal(
     client_id: str,
     service_payload: Callable[..., dict],
 ) -> AskOrchestrationResult | None:
-    if not q or not contacts_intent(q):
+    aspects = _contact_aspects_from_message(q)
+    if aspects is None:
         return None
-    from core.target_contact_authority import _GENERAL_CONTACT_FIELDS
+    from core.target_contact_authority import contact_fields_from_turn_aspects
     from core.target_structured_answer import materialize_structured_contact_answer_text
 
+    contact_fields = contact_fields_from_turn_aspects(aspects, primary_aspect=aspects[0])
+    if contact_fields is None:
+        return None
     answer = materialize_structured_contact_answer_text(
         client_id,
-        contact_fields=_GENERAL_CONTACT_FIELDS,
+        contact_fields=contact_fields,
     )
     if not answer.strip():
         return None

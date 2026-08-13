@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from contracts.exact_sales_resolution import ExactSalesResolution
+from contracts.one_call_envelope import OneCallCommercialIntent
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.turn_frame import TurnFrame
 from contracts.response_schema import TargetStrategyMatch
 from core.sales_fast_authoritative_commerce import (
     apply_authoritative_commerce_to_patient_text,
     build_authoritative_commerce_result,
+    gate_commerce_result_by_intent,
 )
 from core.target_contact_authority import fallback_answer_with_phone
 from core.target_presentation_decision import TargetPresentationCadenceState
@@ -178,20 +180,33 @@ def materialize_sales_fast_answer_payload(
     allow_situation: bool,
     resolution: object | None = None,
     strategy_context: TargetStrategyMatch | None = None,
+    commercial_intent: OneCallCommercialIntent = "none",
 ) -> TargetRuntimeMaterializedPayload:
+    if turn_frame.needs_clarification:
+        commercial_intent = "none"
     commerce_result = None
-    if isinstance(resolution, ExactSalesResolution) and strategy_context is not None:
-        commerce_result = build_authoritative_commerce_result(
-            bound_package=bound_package,
-            resolution=resolution,
-            bundle=context.bundle,
-            strategy_context=strategy_context,
+    if (
+        not turn_frame.needs_clarification
+        and isinstance(resolution, ExactSalesResolution)
+        and strategy_context is not None
+    ):
+        commerce_result = gate_commerce_result_by_intent(
+            build_authoritative_commerce_result(
+                bound_package=bound_package,
+                resolution=resolution,
+                bundle=context.bundle,
+                strategy_context=strategy_context,
+            ),
+            commercial_intent=commercial_intent,
         )
 
-    supplemented_text = supplement_sales_fast_patient_text_with_marketing(
-        patient_text=patient_text,
-        bound_package=bound_package,
-    )
+    if turn_frame.needs_clarification:
+        supplemented_text = patient_text
+    else:
+        supplemented_text = supplement_sales_fast_patient_text_with_marketing(
+            patient_text=patient_text,
+            bound_package=bound_package,
+        )
     final_patient_text = supplemented_text
     if commerce_result is not None:
         final_patient_text = apply_authoritative_commerce_to_patient_text(

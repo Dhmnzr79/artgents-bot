@@ -8,9 +8,9 @@ from contracts.answer_plan import AspectKind
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.patient_scope_projection import ProjectedPatientScope, ProjectedScopeAxis
 from contracts.response_schema import ResponseSchemaBundle
+from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
 from contracts.turn_frame import FieldMeta, PatientScopeFrame, PatientScopeFrameMeta, TurnFrame, TurnFrameMeta
 from core.answer_planner import detect_aspects_regex
-from core.target_client_data import match_service_from_bundle
 
 _CLINIC_INFO_RE = re.compile(
     r"парков|адрес|как добраться|где наход|режим работ|график|контакт|телефон",
@@ -31,6 +31,7 @@ _JAW_UPPER_RE = re.compile(r"верхн\w*", re.I | re.U)
 _SCOPE_PROVENANCE = "sales_fast.message_scope"
 
 _SALES_FAST_PROVENANCE = "sales_fast.exact_turn"
+_SEMANTIC_PROVENANCE = "sales_fast.semantic_authority"
 _ASPECT_TO_SCENARIO: dict[AspectKind, str] = {
     "pain": "pain_fear",
     "payment": "cost",
@@ -39,14 +40,21 @@ _ASPECT_TO_SCENARIO: dict[AspectKind, str] = {
     "overview": "result_reliability",
     "warranty": "result_reliability",
 }
+_SCENARIO_TO_ASPECT: dict[str, AspectKind] = {
+    "pain_fear": "pain",
+    "cost": "price",
+    "time": "duration",
+    "result_reliability": "overview",
+    "none": "overview",
+}
 
 
-def _valid_meta() -> FieldMeta:
-    return FieldMeta(confidence=1.0, provenance=_SALES_FAST_PROVENANCE, status="valid")
+def _valid_meta(*, provenance: str = _SALES_FAST_PROVENANCE) -> FieldMeta:
+    return FieldMeta(confidence=1.0, provenance=provenance, status="valid")
 
 
-def _defaulted_meta() -> FieldMeta:
-    return FieldMeta(confidence=0.0, provenance=_SALES_FAST_PROVENANCE, status="defaulted")
+def _defaulted_meta(*, provenance: str = _SALES_FAST_PROVENANCE) -> FieldMeta:
+    return FieldMeta(confidence=0.0, provenance=provenance, status="defaulted")
 
 
 def _default_patient_scope_meta() -> PatientScopeFrameMeta:
@@ -60,44 +68,45 @@ def _default_patient_scope_meta() -> PatientScopeFrameMeta:
     )
 
 
-def _topic_for_resolution(
+def _topic_for_confirmed_service(
     *,
-    resolution: ExactSalesResolution,
+    service_id: str | None,
     bundle: ResponseSchemaBundle,
-    client_id: str,
     user_message: str,
-) -> str:
+) -> str | None:
     if _CLINIC_INFO_RE.search(user_message):
         return "clinic"
-    match = match_service_from_bundle(user_message, bundle)
-    catalog_topic = str(match.get("catalog_topic") or match.get("matched_topic") or "").strip().lower()
-    if catalog_topic:
-        return catalog_topic
-    if resolution.service_id:
-        service = bundle.services.get(resolution.service_id)
-        if service is not None and service.family:
-            family = str(service.family).strip().lower()
-            if family == "implantology":
-                return "implantation"
-            return family
-    return "implantation"
+    if not service_id:
+        return None
+    service = bundle.services.get(service_id)
+    if service is None or not service.family:
+        return None
+    family = str(service.family).strip().lower()
+    if family == "implantology":
+        return "implantation"
+    return family
 
 
-def build_sales_fast_turn_frame(
+def build_provisional_turn_frame(
     *,
     resolution: ExactSalesResolution,
     user_message: str,
     client_id: str,
     bundle: ResponseSchemaBundle,
 ) -> TurnFrame:
+    """Pre-Flash neutral frame — no implantation default, no catalog authority."""
+
+    _ = client_id
     aspects = tuple(detect_aspects_regex(user_message))
     if resolution.aspect is not None and resolution.aspect not in aspects:
         aspects = (resolution.aspect, *aspects)
     primary_aspect = resolution.aspect or (aspects[0] if aspects else "overview")
-    topic = _topic_for_resolution(
-        resolution=resolution,
+    governed_service_id = (
+        resolution.service_id if resolution.service_id_authority.authority == "governed_ui" else None
+    )
+    topic = _topic_for_confirmed_service(
+        service_id=governed_service_id,
         bundle=bundle,
-        client_id=client_id,
         user_message=user_message,
     )
     intent = "price_lookup" if primary_aspect in {"price", "payment", "included"} else "content"
@@ -107,30 +116,113 @@ def build_sales_fast_turn_frame(
     return TurnFrame(
         intent=intent,
         topic=topic,
-        aspects=aspects,
+        aspects=list(aspects),
         primary_aspect=primary_aspect,
         emotion="none",
         specificity="unknown",
         patient_scope=PatientScopeFrame(),
-        service_id=resolution.service_id,
+        service_id=governed_service_id,
         follow_up=False,
         followup_of=None,
         needs_clarification=False,
         marketing_scenarios=marketing_scenarios,  # type: ignore[arg-type]
         field_meta=TurnFrameMeta(
             intent=valid,
-            topic=valid,
+            topic=valid if topic else _defaulted_meta(),
             aspects=valid,
             primary_aspect=valid,
             emotion=valid,
             specificity=valid,
             patient_scope=_default_patient_scope_meta(),
-            service_id=valid if resolution.service_id else _defaulted_meta(),
+            service_id=valid if governed_service_id else _defaulted_meta(),
             follow_up=valid,
             followup_of=_defaulted_meta(),
             needs_clarification=valid,
             marketing_scenarios=valid if marketing_scenarios else _defaulted_meta(),
         ),
+    )
+
+
+def build_turn_frame_from_semantic_frame(
+    *,
+    semantic: SalesOnePlusSemanticFrame,
+    user_message: str,
+    bundle: ResponseSchemaBundle,
+) -> TurnFrame:
+    """Post-envelope authoritative TurnFrame for full bound-package rebuild."""
+
+    aspects = list(detect_aspects_regex(user_message))
+    scenario_aspect = _SCENARIO_TO_ASPECT.get(semantic.scenario, "overview")
+    if scenario_aspect not in aspects:
+        aspects = [scenario_aspect, *aspects]
+    primary_aspect = scenario_aspect if semantic.scenario != "none" else (aspects[0] if aspects else "overview")
+    if semantic.commercial_intent == "price":
+        primary_aspect = "price"
+    elif semantic.commercial_intent == "payment":
+        primary_aspect = "payment"
+    elif semantic.commercial_intent == "included":
+        primary_aspect = "included"
+    if primary_aspect not in aspects:
+        aspects = [primary_aspect, *aspects]
+    topic = _topic_for_confirmed_service(
+        service_id=semantic.service_id,
+        bundle=bundle,
+        user_message=user_message,
+    )
+    intent = "price_lookup" if semantic.commercial_intent in {"price", "payment", "included"} else "content"
+    if semantic.route == "CLARIFY":
+        intent = "content"
+    marketing_scenarios = (semantic.scenario,) if semantic.scenario != "none" else ()
+    valid = _valid_meta(provenance=_SEMANTIC_PROVENANCE)
+    patient_scope = PatientScopeFrame(
+        extent=semantic.extent or "unknown",  # type: ignore[arg-type]
+        jaw=semantic.jaw or "unknown",  # type: ignore[arg-type]
+        stage=semantic.stage or "unknown",  # type: ignore[arg-type]
+    )
+    return TurnFrame(
+        intent=intent,
+        topic=topic,
+        aspects=list(aspects),
+        primary_aspect=primary_aspect,
+        emotion="none",
+        specificity="unknown",
+        patient_scope=patient_scope,
+        service_id=semantic.service_id,
+        follow_up=False,
+        followup_of=None,
+        needs_clarification=semantic.route == "CLARIFY",
+        marketing_scenarios=marketing_scenarios,  # type: ignore[arg-type]
+        field_meta=TurnFrameMeta(
+            intent=valid,
+            topic=valid if topic else _defaulted_meta(provenance=_SEMANTIC_PROVENANCE),
+            aspects=valid,
+            primary_aspect=valid,
+            emotion=valid,
+            specificity=valid,
+            patient_scope=_default_patient_scope_meta(),
+            service_id=valid if semantic.service_id else _defaulted_meta(provenance=_SEMANTIC_PROVENANCE),
+            follow_up=valid,
+            followup_of=_defaulted_meta(provenance=_SEMANTIC_PROVENANCE),
+            needs_clarification=valid if semantic.route == "CLARIFY" else _defaulted_meta(provenance=_SEMANTIC_PROVENANCE),
+            marketing_scenarios=valid if marketing_scenarios else _defaulted_meta(provenance=_SEMANTIC_PROVENANCE),
+        ),
+    )
+
+
+def build_sales_fast_turn_frame(
+    *,
+    resolution: ExactSalesResolution,
+    user_message: str,
+    client_id: str,
+    bundle: ResponseSchemaBundle,
+) -> TurnFrame:
+    """Backward-compatible alias for provisional pre-Flash frame."""
+
+    return build_provisional_turn_frame(
+        resolution=resolution,
+        user_message=user_message,
+        client_id=client_id,
+        bundle=bundle,
     )
 
 

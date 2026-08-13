@@ -27,11 +27,11 @@ _MarkerState = Literal["invalid", "admin", "answer", "incomplete"]
 SALES_ONE_PLUS_SYSTEM_POLICY = """You are the sales assistant for a dental clinic landing page.
 Return exactly one JSON control envelope as specified in TYPED_ENVELOPE_INSTRUCTIONS.
 Use route=ANSWER for clinic and sales answers, route=ADMIN for problematic or medical handoff, route=CLARIFY only when the answer truly depends on missing service/extent/jaw/stage scope.
-The approved MD corpus is complete clinic data. CURRENT_STRICT_FACTS override any conflicting corpus data.
+The approved MD corpus is complete clinic data. PRE_MODEL_HINTS are non-authoritative context only; they must not override the corpus or your envelope fields.
 Answer clinic and sales questions, including microfacts and numbers, only from supplied data; do not invent.
-Answer in the user's language with concise, natural sales copy in patient_text only. When relevant active service-linked strict facts provide an authored advantage or offer, weave them into patient_text instead of dropping them.
-Do not render button labels or UI markup. Add a natural next step only when SALES_CONTEXT authorizes it; deterministic code owns follow-ups, button slots, and CTA presentation.
-When SALES_CONTEXT.needs_admin_quote is true, use route=ANSWER with neutral patient_text without any price amount or calculation; explain that the exact cost depends on the case and invite the patient to a consultation for a quote.
+Answer in the user's language with concise, natural sales copy in patient_text only. When relevant active service-linked facts provide an authored advantage or offer, weave them into patient_text instead of dropping them.
+Do not render button labels or UI markup. Add a natural next step only when hints authorize it; deterministic code owns follow-ups, button slots, and CTA presentation.
+When PRE_MODEL_HINTS.ambiguous_scope_hint is true, use route=ANSWER with neutral patient_text without any price amount or calculation; explain that the exact cost depends on the case and invite the patient to a consultation for a quote.
 route=ADMIN is only for problematic or medical requests: personal current symptoms or symptom descriptions, complaints, reaction-required reviews, director requests, diagnosis, personal treatment/dose, and complex medical questions. ADMIN uses patient_text=null; deterministic code owns the handoff message.
 Future fears about pain, price, osseointegration, trust, or timing are sales questions and require route=ANSWER.
 Classify commercial_intent only; never compute or invent prices, payment terms, or included-package amounts. Exact commercial values are code-owned.
@@ -197,16 +197,17 @@ def build_sales_one_plus_dynamic_suffix(
     sales_context: Mapping[str, object],
     user_message: str,
 ) -> str:
-    """Dynamic suffix only — no corpus, no session id, no stable prefix."""
+    """Dynamic suffix only — neutral hints before Flash, no authoritative commerce."""
 
-    strict_facts = [asdict(fact) for fact in current_strict_facts]
+    hints = dict(sales_context)
+    hints["resolution_hint"] = {
+        key: value
+        for key, value in asdict(exact_sales_resolution).items()
+        if key.endswith("_authority") is False
+    }
     return "\n\n".join(
         (
-            "<CURRENT_STRICT_FACTS>\n" + _stable_json(strict_facts) + "\n</CURRENT_STRICT_FACTS>",
-            "<EXACT_SALES_RESOLUTION>\n"
-            + _stable_json(asdict(exact_sales_resolution))
-            + "\n</EXACT_SALES_RESOLUTION>",
-            "<SALES_CONTEXT>\n" + _stable_json(dict(sales_context)) + "\n</SALES_CONTEXT>",
+            "<PRE_MODEL_HINTS>\n" + _stable_json(hints) + "\n</PRE_MODEL_HINTS>",
             "<USER_MESSAGE_DATA>\n" + _stable_json(user_message) + "\n</USER_MESSAGE_DATA>",
         )
     )

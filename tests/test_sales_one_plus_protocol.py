@@ -46,13 +46,46 @@ def test_production_policy_requires_json_only_transport() -> None:
     assert "route=ADMIN" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "route=CLARIFY" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Future fears about pain, price, osseointegration, trust, or timing" in SALES_ONE_PLUS_SYSTEM_POLICY
-    assert "SALES_CONTEXT.needs_admin_quote is true" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "PRE_MODEL_HINTS.ambiguous_scope_hint is true" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "PRE_MODEL_HINTS are non-authoritative context only" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "SALES_CONTEXT.needs_admin_quote is true" not in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Classify commercial_intent only" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "deterministic code renders those values" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Marketing promotions" not in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "A price for several teeth" not in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "deterministic code owns follow-ups, button slots, and CTA" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Never calculate, multiply, sum, or interpolate prices" in SALES_ONE_PLUS_SYSTEM_POLICY
+
+
+def test_pre_flash_hints_expose_ambiguous_scope_without_authoritative_resolution() -> None:
+    from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
+    from core.sales_fast_strict_evidence import build_pre_flash_prompt_hints
+    from core.sales_one_plus_protocol import build_sales_one_plus_dynamic_suffix
+
+    unknown = ExactSalesFieldAuthority(authority="unknown", provenance="unknown")
+    resolution = ExactSalesResolution(
+        "classic",
+        "price",
+        "few_teeth",
+        "both",
+        None,
+        unknown,
+        unknown,
+        unknown,
+        unknown,
+        unknown,
+    )
+    _, hints = build_pre_flash_prompt_hints(resolution=resolution, catalog_service_hint=None)
+    assert hints.get("ambiguous_scope_hint") is True
+    suffix = build_sales_one_plus_dynamic_suffix(
+        exact_sales_resolution=resolution,
+        current_strict_facts=(),
+        sales_context=hints,
+        user_message="Сколько стоит?",
+    )
+    assert "ambiguous_scope_hint" in suffix
+    assert "EXACT_SALES_RESOLUTION" not in suffix
+    assert '"service_id": "classic"' not in suffix.split("resolution_hint", 1)[0]
 
 
 def test_production_parser_accepts_valid_answer_envelope() -> None:

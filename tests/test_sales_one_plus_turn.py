@@ -95,26 +95,26 @@ def test_local_gate_bypasses_backend_for_admin_and_spam() -> None:
     assert backend.calls == 0
 
 
-def test_pass_uses_model_corpus_strict_facts_and_exact_resolution_once() -> None:
-    fact = SalesOnePlusStrictFact(id="f", kind="offer", text="Цена 100 000 ₽.")
+def test_pass_uses_model_corpus_and_pre_model_hints_once() -> None:
     backend = _Backend(answer_envelope("Есть парковка, цена по прайсу."))
     result = _run(
         user_message="Есть парковка и сколько стоит?",
         cached_full_context=_context(),
         exact_sales_resolution=_resolution(),
-        current_strict_facts=(fact,),
-        sales_context={"cta": "lead", "numbers": [73.5]},
+        current_strict_facts=(),
+        sales_context={"catalog_service_hint": "имплантация"},
         backend=backend,
     )
     assert (result.decision, result.patient_text, backend.calls) == ("answer", "Есть парковка, цена по прайсу.", 1)
     assert result.envelope is not None and result.envelope.commercial_intent == "none"
     assert "MD number 73.5" in backend.invocation.system_prompt
     assert "WRONG CORPUS" not in backend.invocation.system_prompt
-    assert "Цена 100 000 ₽." in backend.invocation.user_prompt
-    assert "EXACT_SALES_RESOLUTION" in backend.invocation.user_prompt
+    assert "PRE_MODEL_HINTS" in backend.invocation.user_prompt
+    assert "CURRENT_STRICT_FACTS" not in backend.invocation.user_prompt
+    assert "EXACT_SALES_RESOLUTION" not in backend.invocation.user_prompt
 
 
-def test_scoped_service_axes_and_all_authored_strict_evidence_are_lossless() -> None:
+def test_scoped_service_axes_pre_flash_hints_are_neutral() -> None:
     authority = ExactSalesFieldAuthority(
         authority="governed_ui",
         provenance="target:ui_scope/implantation/few_teeth",
@@ -137,11 +137,6 @@ def test_scoped_service_axes_and_all_authored_strict_evidence_are_lossless() -> 
             kind="offer",
             text="Несколько зубов: от 321 000 ₽; единица — согласованный объём.",
         ),
-        SalesOnePlusStrictFact(
-            id="package:implant-alpha",
-            kind="package",
-            text="В цену входят КТ и два контрольных осмотра.",
-        ),
     )
     backend = _Backend(answer_envelope("Цена указана в согласованном оффере.", commercial_intent="price"))
     result = _run(
@@ -153,15 +148,9 @@ def test_scoped_service_axes_and_all_authored_strict_evidence_are_lossless() -> 
     )
 
     assert result.decision == "answer" and backend.calls == 1
-    for expected in (
-        "implant_alpha",
-        "few_teeth",
-        "both",
-        "extraction_context",
-        "321 000 ₽",
-        "КТ и два контрольных осмотра",
-    ):
-        assert expected in backend.invocation.user_prompt
+    assert "PRE_MODEL_HINTS" in backend.invocation.user_prompt
+    assert "321 000 ₽" not in backend.invocation.user_prompt
+    assert "implant_alpha" in backend.invocation.user_prompt
 
 
 def test_model_admin_ignores_prose_and_failures_are_technical_admin() -> None:

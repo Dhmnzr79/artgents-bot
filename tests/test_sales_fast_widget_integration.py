@@ -245,16 +245,16 @@ def test_both_jaws_without_offer_sets_needs_admin_quote_context() -> None:
     assert backend.call_count == 1
 
 
-def test_marketing_fact_in_strict_facts_is_passed_to_invocation() -> None:
+def test_marketing_fact_is_not_passed_to_pre_flash_invocation() -> None:
     case = _case("p01")
-    backend = _CountingBackend(answer_envelope("All-on-4 стоит 318 000 ₽."))
+    backend = _CountingBackend(answer_envelope("All-on-4 стоит 318 000 ₽.", commercial_intent="price"))
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
         cached_full_context=context,
         exact_sales_resolution=_resolution(case),
         current_strict_facts=_strict_facts(case),
-        sales_context=case.sales_context,
+        sales_context={},
         static_admin_handoff_text="Позвоните администратору.",
         backend=backend,
         on_delta=lambda _delta: None,
@@ -262,8 +262,9 @@ def test_marketing_fact_in_strict_facts_is_passed_to_invocation() -> None:
         active_service_catalog=_DEMO_CATALOG,
     )
     prompt = backend.invocation.user_prompt
-    assert "рассроч" in prompt.lower()
-    assert "318" in prompt
+    assert "PRE_MODEL_HINTS" in prompt
+    assert "CURRENT_STRICT_FACTS" not in prompt
+    assert "318" not in prompt
 
 
 def test_streaming_parser_emits_only_validated_patient_text() -> None:
@@ -484,7 +485,14 @@ def test_widget_path_sterility_answer_uses_one_provider_call(monkeypatch: pytest
 
 
 def test_widget_path_exact_one_tooth_price_from_clinic_pack(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = _CountingBackend(answer_envelope("Классическая имплантация Implantium — 85 200 ₽ за один зуб под ключ."))
+    backend = _CountingBackend(
+        answer_envelope(
+            "Классическая имплантация Implantium — 85 200 ₽ за один зуб под ключ.",
+            commercial_intent="price",
+            service_id="classic",
+            extent="one_tooth",
+        )
+    )
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -531,7 +539,16 @@ def test_widget_path_both_jaws_does_not_invent_total(monkeypatch: pytest.MonkeyP
 def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    backend = _CountingBackend(answer_envelope("All-on-4 на нижнюю челюсть — 368 000 ₽."))
+    backend = _CountingBackend(
+        answer_envelope(
+            "All-on-4 на нижнюю челюсть — 368 000 ₽.",
+            commercial_intent="price",
+            scenario="cost",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        )
+    )
     payload = _orchestrate_ask(
         monkeypatch,
         backend=backend,
@@ -622,3 +639,66 @@ def test_widget_path_observability_timings_without_pii(monkeypatch: pytest.Monke
     blob = json.dumps(obs, ensure_ascii=False)
     assert "Как обеспечивается стерильность" not in blob
     assert "Стерильность по протоколу" not in blob
+
+
+def test_governed_ui_envelope_conflict_is_admin_without_model_text(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from contracts.local_problem_gate import LocalProblemGateResult
+    from core.target_presentation_decision import TargetPresentationCadenceState
+    from core.target_runtime_session import read_target_runtime_session
+
+    model_text = "MODEL CONFLICT TEXT MUST NOT APPEAR"
+    backend = _CountingBackend(
+        answer_envelope(
+            model_text,
+            service_id="all_on_4",
+            commercial_intent="price",
+        )
+    )
+    ui = _authority()
+    ui_governed = ExactSalesFieldAuthority(authority="governed_ui", provenance="ui")
+    governed_resolution = ExactSalesResolution(
+        "classic",
+        "price",
+        "one_tooth",
+        None,
+        None,
+        ui_governed,
+        ui,
+        ui_governed,
+        ui,
+        ui,
+    )
+    cadence = TargetPresentationCadenceState()
+
+    def _resolve(**kwargs: object):
+        sid = str(kwargs.get("sid") or "ui-conflict")
+        session_state = read_target_runtime_session(sid)
+        return governed_resolution, session_state, cadence
+
+    monkeypatch.setattr("core.sales_fast_widget_runtime._resolve_sales_context", _resolve)
+    governed_gate = LocalProblemGateResult(
+        decision="pass",
+        reason_code="governed_typed_ui",
+    )
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Сколько стоит?", "sid": "ui-conflict", "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = {"request_id": "rid"}
+        outcome = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid="ui-conflict",
+            user_message="Сколько стоит?",
+            backend=backend,
+            local_gate_result=governed_gate,
+        )
+    assert outcome.model_route == "model_admin"
+    assert outcome.failure_kind == "semantic_ui_envelope_conflict_service_id"
+    assert model_text not in str(outcome.widget.payload.get("answer") or "")
+    assert backend.call_count == 1

@@ -30,11 +30,19 @@ from core.sales_fast_presentation import (
 )
 from core.sales_fast_strict_evidence import (
     assemble_sales_fast_bound_package,
-    strict_facts_and_sales_context,
+    build_pre_flash_prompt_hints,
+    effective_scope_from_semantic_frame,
+    exact_sales_resolution_from_semantic_frame,
 )
 from core.sales_fast_turn_frame import (
-    build_sales_fast_turn_frame,
+    build_provisional_turn_frame,
+    build_turn_frame_from_semantic_frame,
     project_sales_fast_scope_from_message,
+)
+from core.sales_one_plus_semantic_authority import (
+    SalesOnePlusSemanticConflictError,
+    bind_semantic_frame,
+    governed_ui_authority_from_resolution,
 )
 from core.sales_one_plus_turn import (
     run_sales_one_plus_candidate,
@@ -181,6 +189,10 @@ def _exact_service_term(user_message: str, context: TargetRuntimeClientContext) 
     return term or None
 
 
+def _catalog_service_hint(user_message: str, context: TargetRuntimeClientContext) -> str | None:
+    return _exact_service_term(user_message, context)
+
+
 def _resolve_sales_context(
     *,
     context: TargetRuntimeClientContext,
@@ -203,7 +215,7 @@ def _resolve_sales_context(
             session_turn_count=session_state.session_turn_count,
             current_ui_scope_action=current_ui_scope_action,
             current_ui_stage_action=current_ui_stage_action,
-            exact_service_term=_exact_service_term(user_message, context),
+            exact_service_term=None,
             exact_aspect=exact_aspect,
             projected_turn_scope=projected_turn_scope,
             session_facts=session_state.patient_facts,
@@ -216,6 +228,108 @@ def _resolve_sales_context(
         situation_offered=session_state.situation_offered,
     )
     return resolution, session_state, cadence
+
+
+def _maybe_pre_flash_terminal(
+    *,
+    turn_frame: TurnFrame,
+    context: TargetRuntimeClientContext,
+    session_state: object,
+    client_id: str,
+    sid: str,
+    effective_scope: object,
+    strategy_context: object,
+) -> SalesFastWidgetOutcome | None:
+    if not _is_governed_typed_ui_turn():
+        return None
+    bound = assemble_sales_fast_bound_package(
+        turn_frame=turn_frame,
+        bundle=context.bundle,
+        doctor_catalog=context.doctor_catalog,
+        external_index=context.external_index,
+        consultation_values=context.consultation_values,
+        strategy_context=strategy_context,  # type: ignore[arg-type]
+        effective_scope=effective_scope,  # type: ignore[arg-type]
+        allowed_topics=context.allowed_topics,
+        today=runtime_today(),
+        md_root=context.md_root,
+        client_id=client_id,
+        shown_fact_ids=session_state.shown_fact_ids,  # type: ignore[attr-defined]
+        shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
+        shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
+    )
+    if not isinstance(bound, TargetTurnFrameBoundTerminalResponse):
+        return None
+    return SalesFastWidgetOutcome(
+        widget=materialize_sales_fast_terminal_from_dispatch(
+            terminal=bound,
+            client_id=client_id,
+            sid=sid,
+        ),
+        provider_calls=0,
+        model_route="local",
+    )
+
+
+def _rebuild_authoritative_context(
+    *,
+    result: SalesOnePlusResult,
+    context: TargetRuntimeClientContext,
+    user_message: str,
+    client_id: str,
+    session_state: object,
+    active_service_catalog: ActiveServiceCatalogSnapshot,
+    resolution: ExactSalesResolution,
+) -> tuple[
+    TurnFrame,
+    TargetSpecBoundOfflineResponsePackage | TargetTurnFrameBoundTerminalResponse,
+    object,
+    ExactSalesResolution,
+    object,
+]:
+    if result.envelope is None:
+        raise ValueError("authoritative_rebuild_requires_envelope")
+    governed_ui = governed_ui_authority_from_resolution(resolution)
+    semantic = bind_semantic_frame(
+        envelope=result.envelope,
+        governed_ui=governed_ui,
+        active_service_catalog=active_service_catalog,
+    )
+    turn_frame = build_turn_frame_from_semantic_frame(
+        semantic=semantic,
+        user_message=user_message,
+        bundle=context.bundle,
+    )
+    effective_scope = effective_scope_from_semantic_frame(
+        semantic,
+        current_ui_action=_current_ui_scope_action(),
+        current_ui_stage_action=_current_ui_stage_action(),
+    )
+    strategy_context = strategy_match_from_effective_scope(
+        effective_scope,  # type: ignore[arg-type]
+        service_family=resolve_target_runtime_strategy_context(
+            context.bundle,
+            service_id=turn_frame.service_id,
+        ).family,
+    )
+    commerce_resolution = exact_sales_resolution_from_semantic_frame(semantic)
+    bound = assemble_sales_fast_bound_package(
+        turn_frame=turn_frame,
+        bundle=context.bundle,
+        doctor_catalog=context.doctor_catalog,
+        external_index=context.external_index,
+        consultation_values=context.consultation_values,
+        strategy_context=strategy_context,
+        effective_scope=effective_scope,
+        allowed_topics=context.allowed_topics,
+        today=runtime_today(),
+        md_root=context.md_root,
+        client_id=client_id,
+        shown_fact_ids=session_state.shown_fact_ids,  # type: ignore[attr-defined]
+        shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
+        shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
+    )
+    return turn_frame, bound, effective_scope, commerce_resolution, strategy_context
 
 
 def run_sales_fast_widget_turn(
@@ -286,7 +400,7 @@ def run_sales_fast_widget_turn(
         user_message=user_message,
     )
     projected_turn_scope = project_sales_fast_scope_from_message(user_message)
-    turn_frame = build_sales_fast_turn_frame(
+    turn_frame = build_provisional_turn_frame(
         resolution=resolution,
         user_message=user_message,
         client_id=client_id,
@@ -295,10 +409,10 @@ def run_sales_fast_widget_turn(
     effective_scope = resolve_effective_scope(
         current_ui_action=_current_ui_scope_action(),
         current_ui_stage_action=_current_ui_stage_action(),
-        session_facts=session_state.patient_facts,
+        session_facts=session_state.patient_facts if _is_governed_typed_ui_turn() else None,
         current_topic=turn_frame.topic,
         session_turn_count=session_state.session_turn_count,
-        projected_turn_scope=projected_turn_scope,
+        projected_turn_scope=projected_turn_scope if _is_governed_typed_ui_turn() else None,
     )
     strategy_context = strategy_match_from_effective_scope(
         effective_scope,
@@ -307,24 +421,17 @@ def run_sales_fast_widget_turn(
             service_id=turn_frame.service_id,
         ).family,
     )
-    bound = assemble_sales_fast_bound_package(
+    pre_flash_terminal = _maybe_pre_flash_terminal(
         turn_frame=turn_frame,
-        bundle=context.bundle,
-        doctor_catalog=context.doctor_catalog,
-        external_index=context.external_index,
-        consultation_values=context.consultation_values,
-        strategy_context=strategy_context,
-        effective_scope=effective_scope,
-        allowed_topics=context.allowed_topics,
-        today=runtime_today(),
-        md_root=context.md_root,
+        context=context,
+        session_state=session_state,
         client_id=client_id,
-        shown_fact_ids=session_state.shown_fact_ids,
-        shown_amplifier_refs=session_state.shown_amplifier_refs,
-        shown_consultation_value_refs=session_state.shown_consultation_value_refs,
+        sid=sid,
+        effective_scope=effective_scope,
+        strategy_context=strategy_context,
     )
-    turn_timing.stage_end("sales_fast_resolver", status="completed")
-    if isinstance(bound, TargetTurnFrameBoundTerminalResponse):
+    if pre_flash_terminal is not None:
+        turn_timing.stage_end("sales_fast_resolver", status="completed", reason="terminal_dispatch")
         turn_timing.stage_end("sales_fast", status="completed", reason="terminal_dispatch")
         record_sales_fast_observability(
             architecture="new",
@@ -332,21 +439,13 @@ def run_sales_fast_widget_turn(
             provider_calls=0,
             model=None,
         )
-        return SalesFastWidgetOutcome(
-            widget=materialize_sales_fast_terminal_from_dispatch(
-                terminal=bound,
-                client_id=client_id,
-                sid=sid,
-            ),
-            provider_calls=0,
-            model_route="local",
-        )
-
-    strict_facts, sales_context = strict_facts_and_sales_context(
-        bound_package=bound,
+        return pre_flash_terminal
+    turn_timing.stage_end("sales_fast_resolver", status="completed")
+    catalog_hint = _catalog_service_hint(user_message, context)
+    strict_facts, sales_context = build_pre_flash_prompt_hints(
         resolution=resolution,
-        bundle=context.bundle,
-        strategy_context=strategy_context,
+        catalog_service_hint=catalog_hint,
+        session_service_hint=session_state.last_service_id,
     )
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
@@ -393,18 +492,16 @@ def run_sales_fast_widget_turn(
     )
     outcome = _materialize_result(
         result=result,
-        bound=bound,
         context=context,
         turn_frame=turn_frame,
         user_message=user_message,
         sid=sid,
         cadence=cadence,
         client_id=client_id,
-        effective_scope=effective_scope,
         session_state=session_state,
         provider_calls=provider_calls,
         resolution=resolution,
-        strategy_context=strategy_context,
+        active_service_catalog=active_service_catalog,
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
@@ -423,18 +520,16 @@ def run_sales_fast_widget_turn(
 def _materialize_result(
     *,
     result: SalesOnePlusResult,
-    bound: TargetSpecBoundOfflineResponsePackage,
     context: TargetRuntimeClientContext,
-    turn_frame: object,
+    turn_frame: TurnFrame,
     user_message: str,
     sid: str,
     cadence: TargetPresentationCadenceState,
     client_id: str,
-    effective_scope: object,
     session_state: object,
     provider_calls: int,
     resolution: ExactSalesResolution,
-    strategy_context: object,
+    active_service_catalog: ActiveServiceCatalogSnapshot,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
         return SalesFastWidgetOutcome(
@@ -454,28 +549,69 @@ def _materialize_result(
             model_route="local" if result.source == "local_gate" else "model_admin",
             failure_kind=None if result.source == "local_gate" else result.reason,
         )
+    try:
+        (
+            authoritative_turn_frame,
+            bound,
+            effective_scope,
+            commerce_resolution,
+            strategy_context,
+        ) = _rebuild_authoritative_context(
+            result=result,
+            context=context,
+            user_message=user_message,
+            client_id=client_id,
+            session_state=session_state,
+            active_service_catalog=active_service_catalog,
+            resolution=resolution,
+        )
+    except SalesOnePlusSemanticConflictError as exc:
+        handoff = static_sales_fast_admin_handoff(client_id=client_id)
+        return SalesFastWidgetOutcome(
+            widget=materialize_sales_fast_admin_payload(
+                client_id=client_id,
+                sid=sid,
+                handoff_text=handoff,
+            ),
+            provider_calls=provider_calls,
+            model_route="model_admin",
+            failure_kind=exc.code,
+        )
+    if isinstance(bound, TargetTurnFrameBoundTerminalResponse):
+        terminal_route = "clarify" if result.decision == "clarify" else "local"
+        return SalesFastWidgetOutcome(
+            widget=materialize_sales_fast_terminal_from_dispatch(
+                terminal=bound,
+                client_id=client_id,
+                sid=sid,
+            ),
+            provider_calls=provider_calls,
+            model_route=terminal_route,
+        )
+    commercial_intent = "none"
+    if result.envelope is not None and result.decision != "clarify" and result.envelope.route != "CLARIFY":
+        commercial_intent = result.envelope.commercial_intent
     turn_timing.stage_start("sales_fast_presentation")
     widget = materialize_sales_fast_answer_payload(
         bound_package=bound,
         context=context,
-        turn_frame=turn_frame,  # type: ignore[arg-type]
+        turn_frame=authoritative_turn_frame,
         patient_text=result.patient_text or "",
         user_message=user_message,
         sid=sid,
         cadence=cadence,
         allow_situation=True,
-        resolution=resolution,
+        resolution=commerce_resolution,
         strategy_context=strategy_context,  # type: ignore[arg-type]
+        commercial_intent=commercial_intent,
     )
     turn_timing.stage_end("sales_fast_presentation", status="completed")
-    from contracts.turn_frame import TurnFrame
-
-    if widget.kind == "materialized" and isinstance(turn_frame, TurnFrame):
+    if widget.kind == "materialized":
         final_patient_text = str(widget.payload.get("answer") or "")
         verified = build_sales_fast_verified_for_session(
             bound_package=bound,
             context=context,
-            turn_frame=turn_frame,  # type: ignore[arg-type]
+            turn_frame=authoritative_turn_frame,
             patient_text=final_patient_text,
             user_message=user_message,
         )
@@ -486,7 +622,7 @@ def _materialize_result(
         )
         write_target_runtime_session_after_materialized(
             sid,
-            turn_frame=turn_frame,  # type: ignore[arg-type]
+            turn_frame=authoritative_turn_frame,
             verified=verified,
             prior=session_state,  # type: ignore[arg-type]
             current_selection=selection,

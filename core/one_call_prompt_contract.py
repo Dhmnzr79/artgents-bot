@@ -26,6 +26,7 @@ ANSWER — nonblank patient_text; clarify_axis=null; clarify_service_options=nul
 ADMIN — patient_text=null; clarify_axis=null; clarify_service_options=null.
 CLARIFY — nonblank patient_text; clarify_axis required; for clarify_axis=service use 2-3 unique active service_id values; for other axes clarify_service_options=null.
 patient_text is the only model prose surface. Control fields must be separate JSON values, never embedded in patient_text.
+PRE_MODEL_HINTS are observability-only; envelope fields are authoritative for your response.
 Classify commercial_intent only; never compute or invent prices, payment terms, or included-package amounts.
 Exact commercial values are code-owned after the model response."""
 

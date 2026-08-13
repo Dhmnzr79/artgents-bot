@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from pathlib import Path
 
 from contracts.doctor_schema import TargetDoctorCatalog
-from contracts.effective_scope import EffectiveScope
-from contracts.exact_sales_resolution import ExactSalesResolution
+from contracts.effective_scope import EffectiveScope, ScopeAxisProvenance
+from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
 from contracts.response_schema import ResponseSchemaBundle, TargetOffer, TargetStrategyMatch
 from contracts.sales_one_plus import SalesOnePlusStrictFact
+from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame, SemanticFieldProvenance
 from contracts.service_consultation import ServiceConsultationValue
+from contracts.ui_scope_action import UiScopeAction
+from contracts.ui_stage_action import UiStageAction
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.target_turn_frame_policy_envelope import TargetTurnFramePolicyEnvelope
 from contracts.turn_frame import TurnFrame
@@ -46,6 +49,103 @@ def _offer_price_text(offer: TargetOffer) -> str:
     if package_label:
         return f"{value} {package_label}"
     return value
+
+
+def _authority_for_provenance(provenance: SemanticFieldProvenance) -> ExactSalesFieldAuthority:
+    if provenance == "governed_ui":
+        return ExactSalesFieldAuthority(authority="governed_ui", provenance="governed_ui")
+    if provenance == "envelope":
+        return ExactSalesFieldAuthority(authority="unknown", provenance="envelope")
+    return ExactSalesFieldAuthority(authority="unknown", provenance="null")
+
+
+def exact_sales_resolution_from_semantic_frame(
+    semantic: SalesOnePlusSemanticFrame,
+) -> ExactSalesResolution:
+    """Post-envelope commerce resolution — envelope/governed UI only, no session/catalog fill."""
+
+    aspect = None
+    if semantic.commercial_intent == "price":
+        aspect = "price"
+    elif semantic.commercial_intent == "payment":
+        aspect = "payment"
+    elif semantic.commercial_intent == "included":
+        aspect = "included"
+    aspect_authority = ExactSalesFieldAuthority(authority="unknown", provenance="envelope")
+    return ExactSalesResolution(
+        service_id=semantic.service_id,
+        aspect=aspect,
+        extent=semantic.extent,  # type: ignore[arg-type]
+        jaw=semantic.jaw,  # type: ignore[arg-type]
+        stage=semantic.stage,  # type: ignore[arg-type]
+        service_id_authority=_authority_for_provenance(semantic.service_id_provenance),
+        aspect_authority=aspect_authority,
+        extent_authority=_authority_for_provenance(semantic.extent_provenance),
+        jaw_authority=_authority_for_provenance(semantic.jaw_provenance),
+        stage_authority=_authority_for_provenance(semantic.stage_provenance),
+    )
+
+
+def effective_scope_from_semantic_frame(
+    semantic: SalesOnePlusSemanticFrame,
+    *,
+    current_ui_action: UiScopeAction | None,
+    current_ui_stage_action: UiStageAction | None,
+) -> EffectiveScope:
+    """Authoritative scope for post-envelope rebuild without stale session service focus."""
+
+    if current_ui_action is not None or current_ui_stage_action is not None:
+        from core.target_effective_scope import resolve_effective_scope
+
+        return resolve_effective_scope(
+            current_ui_action=current_ui_action,
+            current_ui_stage_action=current_ui_stage_action,
+            session_facts=None,
+            current_topic=None,
+            session_turn_count=0,
+            projected_turn_scope=None,
+        )
+
+    envelope_provenance = ScopeAxisProvenance(source="unknown", provenance="envelope")
+    return EffectiveScope(
+        extent=semantic.extent or "unknown",  # type: ignore[arg-type]
+        jaw=semantic.jaw or "unknown",  # type: ignore[arg-type]
+        stage=semantic.stage,
+        topic=None,
+        source="unknown",
+        provenance="semantic_authority",
+        extent_axis=envelope_provenance if semantic.extent is not None else ScopeAxisProvenance(),
+        jaw_axis=envelope_provenance if semantic.jaw is not None else ScopeAxisProvenance(),
+        stage_axis=envelope_provenance if semantic.stage is not None else ScopeAxisProvenance(),
+    )
+
+
+def build_pre_flash_prompt_hints(
+    *,
+    resolution: ExactSalesResolution,
+    catalog_service_hint: str | None,
+    session_service_hint: str | None = None,
+) -> tuple[tuple[SalesOnePlusStrictFact, ...], dict[str, object]]:
+    """Neutral pre-model hints only — no exact commercial amounts or authoritative service_id."""
+
+    hints: dict[str, object] = {}
+    if resolution.aspect is not None:
+        hints["aspect_hint"] = resolution.aspect
+    if catalog_service_hint:
+        hints["catalog_service_hint"] = catalog_service_hint
+    if session_service_hint:
+        hints["session_service_hint"] = session_service_hint
+    if resolution.service_id_authority.authority == "governed_ui" and resolution.service_id:
+        hints["governed_ui_service_id"] = resolution.service_id
+    if resolution.extent_authority.authority == "governed_ui" and resolution.extent:
+        hints["governed_ui_extent"] = resolution.extent
+    if resolution.jaw_authority.authority == "governed_ui" and resolution.jaw:
+        hints["governed_ui_jaw"] = resolution.jaw
+    if resolution.stage_authority.authority == "governed_ui" and resolution.stage:
+        hints["governed_ui_stage"] = resolution.stage
+    if resolution.jaw == "both" or resolution.extent == "few_teeth":
+        hints["ambiguous_scope_hint"] = True
+    return (), hints
 
 
 def _needs_admin_quote(

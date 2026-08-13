@@ -3,9 +3,7 @@
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
 offline в S1, demo target policy материализована в S20, pure deterministic selector —
 в S21 (historical offline seam), one-service offline evidence package — в S22.
-**Stage 5.1 ONE_CALL product path принят** (`a268878`): unified typed `PresentationResult`,
-deterministic promotion selector, session-global suppression и render-proven shown-state —
-current ONE_CALL runtime owner.
+**Stage 5.1 ONE_CALL product path принят** (`a268878`). **Stage 5.1B availability/alternatives/price gaps принят** (`51621af`).
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
@@ -13,9 +11,9 @@ current ONE_CALL runtime owner.
 
 | Слой | Содержание |
 |------|------------|
-| **Current accepted** (Stage 5.1, `a268878`) | ONE_CALL product path: unified `PresentationResult`, promotion authority (`priority_service_promos` / `promotion_overview`), `select_stage51_marketing`, session/render state, limits **3/2**, CTA/secondary separation |
+| **Current accepted** (Stage 5.1, `a268878`; Stage 5.1B, `51621af`) | ONE_CALL product path: unified `PresentationResult`, promotion authority, availability/alternatives/price gaps, `select_stage51_marketing`, session/render state, limits **3/2**, CTA/secondary separation |
 | **Historical** | S20/S21/S22 и другие offline pieces — источники/seams происхождения архитектуры; **не** current presentation owner |
-| **Future target** | Stage 5.1B — availability, canonical alternatives, price gaps |
+| **Future** | Stage 5.2 Widget/SSE; Stage 5.3 frozen multiclient E2E |
 
 **Precedence:** для marketing contract semantics этот документ имеет приоритет над legacy promo-ограничениями в `MARKETING_EDITING_GUIDE.md` и `PRICEBOOK_V2.md`. Stage 5.1 current runtime реализует принятый promotion/presentation contract в своём scope.
 
@@ -227,9 +225,9 @@ price-ответе demo приоритет при наличии в `followups`:
 этапам». Показанные/нажатые price follow-up автоматически не повторяются. CTA существует
 отдельно.
 
-## Service availability, alternatives and price gaps (Stage 5.1B)
+## Service availability, alternatives and price gaps (Stage 5.1B — **принят**, `51621af`)
 
-**Статус:** docs-only owner decision; implementation **не** начата. Канон: Architecture Lock §11.1.
+**Статус:** current accepted ONE_CALL runtime. Канон: Architecture Lock §11.1.
 
 Единый post-Flash `PresentationResult` владеет **всеми** commercial и navigation surfaces, включая:
 
@@ -239,14 +237,15 @@ price-ответе demo приоритет при наличии в `followups`:
 - price cards только при exact numeric offer и `commercial_intent=price`;
 - CTA отдельно от secondary slots.
 
-**Promotion interaction (Stage 5.1):**
+**Promotion interaction (Stage 5.1 + 5.1B):**
 
 - unavailable service: **no** priority promo;
 - alternative promo: **not** automatic in same turn until patient selects alternative and `service_id` switches;
 - offered + `no_public_price`: may receive priority promo per Stage 5.1;
+- offered + family-only coverage + `commercial_intent=none`: priority promo preserved; family amount suppressed;
 - promo never invents base price; no discount from family price.
 
-**Current seams (pre-Stage-5.1B):** keyword `service_alternatives` in `clinic_policies.yaml`; `target_family_price_resolution` safe `data_gap` for named service + family-only price; inconsistent unavailable/price-gap presentation.
+**Historical compatibility:** legacy keyword `service_alternatives` rows в `clinic_policies.yaml` остаются для `SALES_ONE_PLUS_ON=OFF`; current ONE_CALL owner — canonical ID-based rows.
 
 **Performance:** 0/1 provider calls; local presentation pass; no regex/keyword classifier; no marketing LLM.
 
@@ -269,7 +268,7 @@ price-ответе demo приоритет при наличии в `followups`:
 | KB/md | Содержательный утверждённый контент и факты клиники; optional `consultation_value` в frontmatter того же service-документа |
 | Doctor layer | Имя, должность, стаж и связи с услугами; общий продающий профиль хранится в exact MD chunk |
 | CTA/tone config | Подписи CTA и lead-flow copy; не готовые вступления сценарных ответов |
-| `clients/<client_id>/clinic_policies.yaml` | Target `service_alternatives` (`requested_service_id`, `alternative_service_ids`, `approved_text`); not-offered / OMS policy |
+| `clients/<client_id>/clinic_policies.yaml` | Accepted `service_alternatives` (`requested_service_id`, `alternative_service_ids`, `approved_text`); not-offered / OMS policy |
 | Session state | `shown_fact_ids`, `shown_amplifier_ids`, `shown_consultation_value_refs`, текущая тема/услуга, lead/refusal state |
 | ONE_CALL Flash envelope | один primary `scenario`; `commercial_intent` и `promotion_scope`; конкретные facts и priority promo выбирает post-Flash deterministic code |
 
@@ -539,23 +538,27 @@ eligibility/strategy projection обязана выполняться отдел
 - передавать product authority единому `PresentationResult` — **выполнено** Stage 5.1 (`a268878`);
 - менять или перезапускать A9 raw/harness/live.
 
-## Runtime status (post Stage 5.1)
+## Runtime status (post Stage 5.1B)
 
 Schema governance зафиксирован этим документом и
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), demo policy
 материализована offline в S20, pure selector — в S21 (historical offline), one-service
-evidence package — в S22. **Stage 5.1 ONE_CALL product path принят:** unified typed
-`PresentationResult`, `select_stage51_marketing`, session-global suppression, render-proven
-shown-state, promotion scopes и authoritative promo rendering (`a268878`). Stage 5.1B
-implementation **не** начата.
+evidence package — в S22. **Stage 5.1 ONE_CALL product path принят** (`a268878`).
+**Stage 5.1B availability/alternatives/price gaps принят** (`51621af`): envelope v4 / cache p4,
+canonical service reference, availability states, authored alternatives, price precedence,
+family intent gating, billing unit presentation, unified `PresentationResult`.
 
 **Accepted evidence (Stage 5.1, `a268878`):** limits **3/2**; session-global suppression;
 direct promotion scopes; authoritative promo rendering; render-proven shown-state;
 `last_rendered_promo_fact_id`; price-follow-up shown fix; **0/1** provider calls.
 
-**Remaining proof scope (не Stage 5.1):**
+**Accepted evidence (Stage 5.1B, `51621af`):** availability matrix §11.1; family intent gating;
+billing unit; promo preservation for offered + family-only + `commercial_intent=none`;
+313 offline tests; **0/1** provider calls.
 
-- Stage 5.1B availability/alternatives/price-gap matrix;
+**Remaining proof scope (не Stage 5.1/5.1B):**
+
 - Stage 5.2 Widget/SSE (double-response trace);
 - Stage 5.3 frozen multiclient E2E;
-- межклиентская изоляция и manual-contact boundary на полном E2E corpus.
+- межклиентская изоляция и manual-contact boundary на полном E2E corpus;
+- optional two-alternative full-widget E2E (lower-level regression exists; not a production defect).

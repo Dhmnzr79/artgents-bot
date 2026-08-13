@@ -6,11 +6,11 @@
 
 Нумерация разделов совпадает с foundation. Колонка **«На экране»** там; здесь — **«Технически»**.
 
-Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Документ синхронизирует accepted Stage 5.1 runtime с technical integration map; historical seams (S21 и др.) маркированы отдельно; Stage 5.1B/5.2 остаются future.
+Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Документ синхронизирует accepted Stage 5.1 (`a268878`) и Stage 5.1B (`51621af`) runtime с technical integration map; historical seams (S21 и др.) маркированы отдельно; Stage 5.2 остаётся future.
 
 ## Обязательные продуктовые требования
 
-Этот раздел описывает **нормативное поведение** marketing layer. **Stage 5.1** в своём принятом scope реализован current ONE_CALL runtime (`a268878`). Пункты, относящиеся к Stage 5.1B availability/alternatives или Stage 5.2 Widget/SSE, остаются future target.
+Этот раздел описывает **нормативное поведение** marketing layer. **Stage 5.1** в своём принятом scope реализован current ONE_CALL runtime (`a268878`). **Stage 5.1B** availability/alternatives/price gaps реализован current ONE_CALL runtime (`51621af`). Stage 5.2 Widget/SSE остаётся future.
 
 1. **Authority базы над содержанием ответа.** Согласованные md, pricebook, marketing и policies конкретной клиники определяют факты и силу утверждений. Это не связано с запрещённой product authority A9 `patient_scope`: A9 остаётся shadow-only и не управляет ответом.
 2. **Запрет семантического смягчения.** Composer может добавлять только связующий текст. Числа, проценты, модальность, гарантии, обещания, отрицания и оговорки источника должны сохраняться точно; будущая проверка должна обнаруживать их ослабление, усиление или подмену.
@@ -150,8 +150,7 @@ Target-контракт лимитов, сценариев, усилителей
 marketing data на каждом turn; один локальный presentation pass; gates 8s/10s/6s не
 ослабляются; diagnostics OK, новый hard ms-SLO — только по owner decision.
 
-Stage 5.1B availability/alternatives/price-gap behavior меняется только отдельной
-code/runtime-задачей с тестами — не Stage 5.1 promotion path.
+Stage 5.1B availability/alternatives/price-gap behavior — current accepted ONE_CALL runtime (`51621af`); не смешивать с Stage 5.2 Widget/SSE path.
 
 ---
 
@@ -245,27 +244,27 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 
 ---
 
-## 11. Услуги, бренды и условия, которых нет (Stage 5.1B target)
+## 11. Услуги, бренды и условия, которых нет (Stage 5.1B — **принят**, `51621af`)
 
-Канон: [`ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md`](ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md) §11.1, [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md). Implementation **не** начата.
+Канон: [`ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md`](ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md) §11.1, [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md).
 
 | Подтип | Технически |
 |---|---|
 | Not-offered, no alt | `known_not_offered` (`active=false`); `approved_text` / policy; **no** price_route, price card, promo |
-| Not-offered + authored alt | `service_alternatives[requested_service_id].alternative_service_ids`; alt content/price from own sources; alt buttons → secondary slots |
+| Not-offered + authored alt | `service_alternatives[requested_service_id].alternative_service_ids`; alt content/price from own sources; alt buttons → secondary slots; labels from alternative service records |
 | Price → unavailable | availability answer, not `no_public_price` mask |
 | Price → unavailable + alt | not-offered + alt offers; alt price labelled as other service |
 | Offered + `no_public_price` | `price_route` → `approved_text` only; no amount/card; family price forbidden as service price |
-| Named service + family-only | `target_family_price_resolution` data_gap today; target: optional explicit family context only |
+| Named service + family-only | `resolve_family_price_context_for_service` + billing unit; only when `commercial_intent=price`; no price card |
 | Unresolved term | `unresolved`; safe clarify; no confident not-offered |
 | Нет бренда | brand seam (S24/S25); **not** service alternative |
 | Политика клиники | `clients/<client_id>/clinic_policies.yaml` template |
 
-**Current legacy seam:** `clinic_policies.yaml` → `service_alternatives` with `match_keywords` / `mention` / `suggest_ref` / `note` — keyword-based, pre-Stage-5.1B.
+**Historical legacy:** `clinic_policies.yaml` → `service_alternatives` with `match_keywords` / `mention` / `suggest_ref` / `note` — keyword-based, `SALES_ONE_PLUS_ON=OFF` compatibility only.
 
-**Price precedence:** exact offer → `no_public_price` → explicit family context → data-gap.
+**Price precedence:** exact offer → `no_public_price` → explicit family context (only `commercial_intent=price`) → data-gap.
 
-**Promotion interaction:** unavailable: no priority promo; alt promo not automatic; `commercial_intent` / `promotion_scope` gates preserved.
+**Promotion interaction:** unavailable: no priority promo; alt promo not automatic; offered + family-only + `commercial_intent=none`: priority promo preserved, family amount suppressed; `commercial_intent` / `promotion_scope` gates preserved.
 
 ≠ §2 `price_unavailable`: там `offered` service без публичной цены.
 
@@ -330,7 +329,7 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 6. Demo: `lead_flow` не шлёт в CRM.
 7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую границу для любой текущей личной боли.
 8. `comparison_route` — catalog fast-path не перебивает comparison-md.
-9. **Stage 5.1B не реализован:** docs-only service availability / alternatives / price gaps amendment зафиксировал contract §11.1; implementation должна мигрировать `service_alternatives` на canonical IDs, реализовать price precedence и 7-case matrix в `PresentationResult`; current keyword legacy и safe `data_gap` — pre-target seams.
+9. **Stage 5.1B принят** (`51621af`): canonical ID-based `service_alternatives`, availability/price-gap matrix §11.1, price precedence, family intent gating, billing unit presentation, unified `PresentationResult`; legacy keyword rows — historical compatibility only.
 
 ### Target service consultation close
 
@@ -351,10 +350,10 @@ session, composer placement или authority.
 ## Что дальше
 
 1. **Stage 5.1 — completed/accepted** (`a268878`): envelope v3, typed `PresentationResult`, promotion selector/config authority, runtime presentation/session wiring.
-2. **Следующий semantic этап — Stage 5.1B implementation:** `service_alternatives` ID migration; availability/price-gap matrix §11.1; family price explicit-context only; unified `PresentationResult`. Без regex/keyword classifier, без второго provider call.
-3. **Stage 5.2 — отдельный Widget/SSE этап:** один user turn → один bot bubble; double-response «Отбеливание» только по доказанной SSE-трассе. Не смешивать с Stage 5.1B.
+2. **Stage 5.1B — completed/accepted** (`51621af`): envelope v4 / cache p4, canonical service reference, availability states, authored alternatives, price precedence, family intent gating, billing unit, 313 offline tests.
+3. **Stage 5.2 — отдельный Widget/SSE этап:** один user turn → один bot bubble; double-response «Отбеливание» только по доказанной SSE-трассе.
 4. Performance invariant §13.7: 0/1 calls, local presentation pass, no marketing LLM.
 5. S18 отдельно материализует offline source contract для `consultation_value`; demo
    content, session/runtime wiring и authority остаются будущими checkpoint-ами.
 6. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
-7. Regression будущей реализации должен доказать Stage 5.1B availability/price-gap matrix, direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts (Stage 5.1 promotion matrix уже покрыта accepted bundle).
+7. Stage 5.3 frozen multiclient E2E matrix — future; Stage 5.1B offline regression уже покрыт accepted bundle.

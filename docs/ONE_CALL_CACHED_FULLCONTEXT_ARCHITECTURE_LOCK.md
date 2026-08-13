@@ -1,13 +1,13 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
-**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — **принят**; Stage 5.1B — docs-only service availability / alternatives / price gaps amendment; implementation **не** начата).
+**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — **принят**; Stage 5.1B — **принят**).
 **Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.
-**Baseline HEAD:** `a2688781d43534605664a3d11217c51dd1576d1c`.
+**Baseline HEAD:** `51621af40c873c728f3f5bc01141dc8d2440a6ce`.
 
-Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–5.1. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
+Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–5.1B. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
 
-### Current implementation status (Stage 0–5.1 accepted)
+### Current implementation status (Stage 0–5.1B accepted)
 
 | Этап | Статус |
 |------|--------|
@@ -23,12 +23,12 @@
 | Stage 4.2 — Production closed JSON envelope | **Принят** (`b833482`) |
 | Stage 4.3 — Semantic ownership | **Принят** (`6345b37`) |
 | Stage 5.1 — Единый marketing/commercial `PresentationResult` | **Принят** (`a268878`) |
-| Stage 5.1B — Service availability / alternatives / price gaps | **Docs-only amendment**; implementation **не** начата |
+| Stage 5.1B — Service availability / alternatives / price gaps | **Принят** (`51621af`) |
 | Stage 5.2 — Widget / SSE | **Не** начат |
 | `SALES_ONE_PLUS_ON` | **default OFF** — без изменений |
 | Alibaba LIVE после Stage 4.0 | **Запрещён** без отдельной явной команды владельца |
 
-Stage 5.1 **считается реализованным и принятым** этим документом (`a268878`). Stage 5.1B+ **не считаются реализованными**, пока соответствующий этап не принят checker. Оставшиеся gaps §17 **не объявлены исправленными**, пока этап не принят checker.
+Stage 5.1 **считается реализованным и принятым** (`a268878`). Stage 5.1B **считается реализованным и принятым** (`51621af`). Stage 5.2+ **не считаются реализованными**, пока соответствующий этап не принят checker. Оставшиеся gaps §17 **не объявлены исправленными**, пока этап не принят checker.
 
 ### Приоритет и supersession
 
@@ -427,7 +427,7 @@ Medical/problematic request → `ADMIN`, без диалога.
 
 **Не вводить** общий deny-by-default numeric gate и **не возвращать** строгий LLM Verifier.
 
-### 11.1 Service availability, authored alternatives and price gaps (Stage 5.1B)
+### 11.1 Service availability, authored alternatives and price gaps (Stage 5.1B — **принят**, `51621af`)
 
 Три **независимые** оси. Отсутствие цены **не** означает отсутствие услуги. Catalog miss **не** должен автоматически превращаться в уверенное «клиника не оказывает услугу».
 
@@ -459,7 +459,7 @@ Family-level context **никогда** не заменяет exact service offe
 
 #### Alternative authority
 
-Альтернатива существует **только** при явной clinic-authored связи. Target использует typed evolution существующего `clinic_policies.yaml` → `service_alternatives` (не новый `service_relations.json`):
+Альтернатива существует **только** при явной clinic-authored связи. Current accepted runtime использует typed evolution `clinic_policies.yaml` → `service_alternatives`:
 
 ```yaml
 service_alternatives:
@@ -471,7 +471,7 @@ service_alternatives:
       в клинике используются элайнеры.
 ```
 
-**Правила:** `requested_service_id` и каждый `alternative_service_id` существуют в catalog; alternative **active**; максимум **2** alternatives; порядок IDs = clinic priority; название, content ref и price альтернативы — из её собственных authoritative sources; **никаких** keyword/regex/fuzzy/LLM similarity; legacy `match_keywords` / `mention` / `suggest_ref` / `note` — **не** второй источник identity; бренды (Osstem и т.п.) — отдельный brand seam, не service alternative; unknown term без canonical match **не** получает придуманную альтернативу.
+**Правила:** `requested_service_id` и каждый `alternative_service_id` существуют в catalog; alternative **active**; максимум **2** alternatives; порядок IDs = clinic priority; label, content ref и price альтернативы — из её собственных authoritative sources; **никаких** keyword/regex/fuzzy/LLM similarity; legacy `match_keywords` / `mention` / `suggest_ref` / `note` — **historical compatibility only** при `SALES_ONE_PLUS_ON=OFF`, **не** current ONE_CALL identity owner; бренды (Osstem и т.п.) — отдельный brand seam, не service alternative; unknown term без canonical match **не** получает придуманную альтернативу.
 
 #### Обязательная матрица поведения
 
@@ -480,7 +480,7 @@ service_alternatives:
 3. **Offered, `no_public_price`:** подтвердить наличие услуги; exact `approved_text`; **без** суммы/price card; **без** похожей, вычисленной, component или family price как цены услуги.
 4. **Price request к unavailable service:** ответ об **отсутствии услуги**, не «цена не указана»; запрещены сумма, price card, promo отсутствующей услуги, чужая цена без явной маркировки альтернативы.
 5. **Price request к unavailable + alternatives:** not-offered + authored alternatives; цена альтернативы **только** как цена явно названной другой услуги с exact name, amount, currency, billing unit, package; **никогда** как цена исходной услуги.
-6. **Named service exists, только family price:** запрещено «All-on-4 стоит от 35 000 ₽», price card All-on-4 с общей ценой имплантации, вычисление из компонентов. Family price допустима **только** как отдельный контекстный текст при `applies_to_service_ids` + `approved_context` + exact amount/currency/billing unit + явное «ориентир направления, не цена конкретной услуги». Current safe `data_gap` для named protocol + family-only price — существующая защита, **не** завершённый пользовательский Stage 5.1B response.
+6. **Named service exists, только family price:** запрещено «All-on-4 стоит от 35 000 ₽», price card All-on-4 с общей ценой имплантации, вычисление из компонентов. Family price допустима **только** при `commercial_intent=price` как отдельный контекстный текст при `applies_to_service_ids` + `approved_context` + exact amount/currency + patient-facing billing unit + явное «ориентир направления, не цена конкретной услуги». При `commercial_intent=none` / `payment` / `included` / `promotion` family amount **не** протекает.
 7. **Unresolved service term:** **не** утверждать уверенно, что клиника не оказывает услугу; безопасная формулировка вроде «Не вижу такой услуги в перечне клиники. Возможно, она называется иначе — уточните название»; **без** случайной альтернативы или цены.
 
 #### Взаимодействие со Stage 5.1 promotion contract
@@ -488,6 +488,7 @@ service_alternatives:
 - unavailable service **не** получает priority promo;
 - promo альтернативы **не** показывается автоматически в том же ответе, пока пациент явно не выбрал альтернативу и authoritative `service_id` не переключился;
 - offered service с `no_public_price` **может** получить свою priority service promo по Stage 5.1;
+- offered service с family-only price coverage и `commercial_intent=none` **может** получить priority service promo; family amount при этом **не** показывается;
 - promo **не** создаёт отсутствующую base price; скидка **не** вычисляется от family price; family price + promo **не** создают рассчитанную сумму;
 - availability/alternative/price-gap элементы собираются единым `PresentationResult`; commercial surfaces сохраняют `commercial_intent` / `promotion_scope` gates.
 
@@ -744,17 +745,16 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 
 ---
 
-## 17. Current known gaps (post Stage 5.1 baseline)
+## 17. Current known gaps (post Stage 5.1B baseline)
 
-Проверяемые расхождения **после** принятого Stage 5.1 baseline (`a268878`). Ниже — только **оставшиеся** gaps; закрытые Stage 4.1–5.1 перечислены отдельно с commit mapping.
+Проверяемые расхождения **после** принятого Stage 5.1B baseline (`51621af`). Ниже — только **оставшиеся** gaps; закрытые Stage 4.1–5.1B перечислены отдельно с commit mapping.
 
 ### 17.1 Оставшиеся gaps
 
 1. **«Отбеливание» — двойной ответ:** наблюдается двойной ответ; **причина не утверждается** без доказанной SSE-трассы (Stage 5.2).
 2. **Survivability answer overload/quality gap:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене. Informational 99,8% sanitizer regression **протестирован** в Stage 5.1 — это **не** закрывает overload/quality gap.
-3. **Service availability / alternatives / price gaps (Stage 5.1B):** keyword-based legacy `service_alternatives` (`match_keywords`, `mention`, `suggest_ref`, `note`); отсутствие canonical ID-based alternative authority; неединое presentation-поведение для unavailable service / price gaps; безопасный `data_gap` для named service + family-only price ещё **не** превращён в согласованный пользовательский ответ; unknown/unresolved service term может смешиваться с confirmed not-offered service. Docs-only Stage 5.1B amendment зафиксировал target contract; implementation **не** начата.
 
-### 17.2 Закрыто принятыми Stage 4.1–5.1 (не перечислять как gaps)
+### 17.2 Закрыто принятыми Stage 4.1–5.1B (не перечислять как gaps)
 
 | Gap | Закрыт этапом | Evidence |
 |-----|---------------|----------|
@@ -768,6 +768,7 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 | `commercial_intent=promotion`, `promotion_scope`, `priority_service_promos`, `promotion_overview` | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
 | Session-global suppression, rendered promo state, `last_rendered_promo_fact_id` | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
 | Price-follow-up shown-state | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
+| Service availability / alternatives / price gaps | Stage 5.1B | `51621af40c873c728f3f5bc01141dc8d2440a6ce` |
 
 **Закрыто в Stage 0–3 (не перечислять как gaps):** HTTP-scoped provider-call governance; Problem Gate first; typed UI в candidate path; cached FullContext prefix + pack identity; Flash capability JSON/streaming; production-faithful speed measurement; absolute speed gates; clinic-owned price strategy + единый authoritative commerce result для text/card.
 
@@ -846,18 +847,28 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 
 Evidence: `a2688781d43534605664a3d11217c51dd1576d1c`.
 
-### Stage 5.1B — Service availability, authored alternatives and price gaps (docs-only amendment; implementation **не** начата)
+### Stage 5.1B — Service availability, authored alternatives and price gaps (**принят**, `51621af`)
 
-**Нормативный contract §11.1 зафиксирован docs-only.** Реализация ещё должна:
+**Принятый результат (offline Checker bundle 313 tests, `provider_calls ∈ {0, 1}`):**
 
-- разделить три оси: service availability (`offered` / `known_not_offered` / `unresolved`), price coverage, alternative authority;
-- мигрировать `service_alternatives` с keyword legacy на canonical `requested_service_id` + `alternative_service_ids` + `approved_text` в существующем `clinic_policies.yaml`;
-- реализовать обязательную матрицу поведения §11.1 (7 кейсов) в едином `PresentationResult`;
-- соблюдать price precedence: exact offer → `no_public_price` → explicit family context → data-gap;
-- запретить family price как exact offer/price card; запретить promo/price leakage для unavailable service;
-- сохранить interaction со Stage 5.1 promotion contract;
-- **не** добавлять provider call, regex/keyword classifier, marketing LLM или retry;
-- offline regression + отдельный Checker acceptance.
+- envelope/prompt contract **v4**, prefix cache identity **p4**;
+- authoritative `service_reference`: `service_reference_status`, `requested_service_id`; `service_id` — active offered service only;
+- три состояния availability: `offered` / `known_not_offered` / `unresolved`;
+- unavailable/unresolved **не** используют свободный model patient body;
+- canonical ID-based authored alternatives в `clinic_policies.yaml` (`requested_service_id`, `alternative_service_ids`, `approved_text`);
+- максимум **2** alternatives в clinic-authored order; labels из records альтернативных услуг;
+- cross-client references fail closed; UI service actions (`target:ui_service/{service_id}`) с session-bound `client_id`;
+- price precedence: exact offer → `no_public_price` → family context (только при `commercial_intent=price`) → data-gap;
+- family context: amount/range + currency + patient-facing billing unit + disclaimer; **не** exact service price; **не** price/offer card; **не** discount computation;
+- intent gating family price surface: открывается только при `commercial_intent=price`; при `none` / `payment` / `included` / `promotion` family amount **не** протекает;
+- unavailable service **не** получает promo; offered service + family-only coverage + `commercial_intent=none` сохраняет одну priority service promo;
+- **0/1** provider calls; без keyword/regex service classifier; без второго LLM call.
+
+Evidence: `51621af40c873c728f3f5bc01141dc8d2440a6ce`.
+
+**Дополнительное E2E coverage (не production defect):** two-alternative full-widget E2E покрыт lower-level regression (slot builder + single-alternative widget path); отдельный full-widget E2E с двумя alternatives — optional future coverage, не незавершённая Stage 5.1B архитектура.
+
+**Historical compatibility:** legacy `match_keywords` rows в `clinic_policies.yaml` остаются для `SALES_ONE_PLUS_ON=OFF` path; current ONE_CALL owner — canonical ID-based rows only.
 
 ### Stage 5.2 — Widget / SSE
 
@@ -899,7 +910,7 @@ Evidence: `a2688781d43534605664a3d11217c51dd1576d1c`.
 
 ## Checker scoped allowlist (historical — Stage 4.0 revision)
 
-> **Исторический checklist.** Не является текущим acceptance gate. Актуальный baseline — Stage 5.1 (`a268878`); Stage 5.1B docs sync ожидает отдельного Checker review.
+> **Исторический checklist.** Не является текущим acceptance gate. Актуальный baseline — Stage 5.1B (`51621af`).
 
 | Разрешено | Запрещено |
 |-----------|-----------|

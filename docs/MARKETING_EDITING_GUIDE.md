@@ -1,6 +1,6 @@
 # Как редактировать маркетинг клиента
 
-**Статус:** current demo target_response config + authoring guide; Stage 5.1 runtime **принят** (`a268878`).
+**Статус:** current demo target_response config + authoring guide; Stage 5.1 runtime **принят** (`a268878`); Stage 5.1B availability/alternatives **принят** (`51621af`).
 
 Короткая памятка для demo-клиента и будущих паков. Канон demo target policy на дату:
 `clients/demo/target_response/pricebook/facts.json` + `clients/demo/target_response/marketing.yaml`.
@@ -13,7 +13,7 @@
 лечения или вопрос о противопоказаниях может получить source-grounded ответ и применимый
 marketing layer.
 
-**Этот guide описывает actual demo config после Stage 5.1.** Stage 5.1B service alternatives — target only.
+**Этот guide описывает actual demo config после Stage 5.1 и Stage 5.1B.**
 
 ## Быстрая карта
 
@@ -26,7 +26,7 @@ marketing layer.
 | Текст CTA-кнопки и первый вопрос после клика | `clients/demo/tone.yaml` |
 | Видео | `clients/demo/video_catalog.yaml` |
 | Текст меню или fallback | `clients/demo/ui.yaml` |
-| Услугу не оказываем / ОМС / **service alternatives (target Stage 5.1B)** | `clients/<client_id>/clinic_policies.yaml` → `service_alternatives` |
+| Услугу не оказываем / ОМС / **service alternatives (Stage 5.1B)** | `clients/<client_id>/clinic_policies.yaml` → `service_alternatives` |
 | Содержание услуги, FAQ, медицинские пояснения | `clients/demo/md/**` |
 
 ## Разделение ownership
@@ -130,11 +130,9 @@ Session-global suppression: один `fact_id` автоматически пок
 
 Первый service turn при `commercial_intent=none`, `promotion_scope=none` показывает **одну** priority service promo, не весь block сразу.
 
-## Service alternatives и availability (Stage 5.1B — target, не реализовано)
+## Service alternatives и availability (Stage 5.1B — **принят**, `51621af`)
 
-**Current demo** (`clients/demo/clinic_policies.yaml`): legacy keyword-based `service_alternatives` с `match_keywords`, `mention`, `suggest_ref`, `note`. Это **pre-Stage-5.1B** seam — docs amendment **не** меняет actual YAML.
-
-**Target authoring** (typed evolution того же файла):
+**Current accepted authoring** (typed evolution того же файла):
 
 ```yaml
 service_alternatives:
@@ -151,11 +149,13 @@ service_alternatives:
 - `requested_service_id` — canonical catalog ID (`active=false` для not-offered);
 - каждый `alternative_service_ids` — exists и `active=true`;
 - max 2 alternatives; порядок = clinic priority;
-- название, content и price альтернативы — из её own sources (`service_catalog`, pricebook, md);
-- **не** дублировать keyword/mention/suggest_ref как identity;
+- label, content и price альтернативы — из её own sources (`service_catalog`, pricebook, md);
+- **не** использовать keyword/mention/suggest_ref как identity в ONE_CALL path;
 - бренды (Osstem) — отдельный brand seam, не service alternative.
 
-**Price / promo interaction:** unavailable service не получает priority promo; promo альтернативы не автоматическая до явного выбора альтернативы; `no_public_price` услуга может получить свою promo по Stage 5.1.
+**Historical legacy rows** (`match_keywords`, `mention`, `suggest_ref`, `note`) в demo YAML остаются для `SALES_ONE_PLUS_ON=OFF` compatibility; current ONE_CALL owner — canonical ID-based rows above.
+
+**Price / promo interaction:** unavailable service не получает priority promo; promo альтернативы не автоматическая до явного выбора альтернативы; offered + family-only coverage + `commercial_intent=none` сохраняет priority promo; family amount при `commercial_intent=none` не показывается; `no_public_price` услуга может получить свою promo по Stage 5.1.
 
 ## Консультационный смысл и CTA
 

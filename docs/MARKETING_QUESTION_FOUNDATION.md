@@ -343,7 +343,7 @@ commercial facts. CTA идёт отдельно. Если уместных фа�
 
 ---
 
-## 11. Услуги, бренды и условия, которых нет (Stage 5.1B target)
+## 11. Услуги, бренды и условия, которых нет (Stage 5.1B — **принят**, `51621af`)
 
 Три оси не смешиваются: **availability** (`offered` / `known_not_offered` / `unresolved`), **price coverage**, **alternative authority**. Отсутствие цены ≠ отсутствие услуги.
 
@@ -354,12 +354,12 @@ commercial facts. CTA идёт отдельно. Если уместных фа�
 | Цена на неоказываемую услугу | «Сколько стоит брекеты?» | Ответ об **отсутствии услуги**, не «цена не указана» | Сумма, price card, promo отсутствующей услуги |
 | Цена на неоказываемую + alternatives | «Сколько стоит брекеты?» + authored alt | Not-offered + alternatives; цена альтернативы **только** как цена другой услуги | Цена альтернативы как цена исходной |
 | Услуга есть, публичной цены нет | «Сколько стоит лечение дёсен?» | Подтверждение услуги + exact `no_public_price` текст; **без** карточки | Похожая/вычисленная/family price как цена услуги |
-| Сложная услуга, только family price | «Сколько All-on-4?» (нет exact, есть family) | **Не** «All-on-4 стоит …»; family context только с explicit applicability + disclaimer | Price card All-on-4 с общей ценой имплантации |
+| Сложная услуга, только family price | «Сколько All-on-4?» (нет exact, есть family) | **Не** «All-on-4 стоит …»; family context только при `commercial_intent=price` с explicit applicability + disclaimer + billing unit | Price card All-on-4 с общей ценой имплантации; family amount при `commercial_intent=none` |
 | Термин не распознан | «Делаете услугу X?» | «Не вижу такой услуги в перечне… уточните название»; **без** уверенного not-offered | Случайная альтернатива или цена |
 | Нет бренда | «Ставите Osstem?» | Какие бренды есть; при цене — их карточки | Обещать отсутствующий бренд; **не** путать с service alternative |
 | Политика клиники | «По ОМС?» | Прямой ответ текстом; без лишних кнопок | — |
 
-**Promotion (Stage 5.1):** unavailable service не получает priority promo; promo альтернативы не автоматическая в том же ответе; offered + `no_public_price` может получить свою promo.
+**Promotion (Stage 5.1 + 5.1B):** unavailable service не получает priority promo; promo альтернативы не автоматическая в том же ответе; offered + `no_public_price` может получить свою promo; offered + family-only coverage + `commercial_intent=none` сохраняет priority promo без показа family amount.
 
 **≠ §2 «Услуга есть, цены нет»:** там canonical service `offered`, но нет публичной цены — не путать с `known_not_offered` или `unresolved`.
 

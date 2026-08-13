@@ -2,18 +2,28 @@
 
 **Статус:** согласованный product/design-контракт; frozen schema models реализованы
 offline в S1, demo target policy материализована в S20, pure deterministic selector —
-в S21, one-service offline evidence package — в S22. Session/runtime wiring и единый
-`PresentationResult` **частично существуют**, но **не приняты** как Stage 5.1 product path.
+в S21 (historical offline seam), one-service offline evidence package — в S22.
+**Stage 5.1 ONE_CALL product path принят** (`a268878`): unified typed `PresentationResult`,
+deterministic promotion selector, session-global suppression и render-proven shown-state —
+current ONE_CALL runtime owner.
 
 **Режим:** documentation-only. Документ не меняет ответы demo, client config, prompts, UI или authority A9.
 
-**Precedence:** для будущей marketing-реализации этот документ имеет приоритет над
-current-runtime promo-ограничениями из `MARKETING_EDITING_GUIDE.md` и `PRICEBOOK_V2.md`.
-Он не утверждает, что current runtime уже соответствует target.
+**Три слоя этого документа:**
 
-Этот контракт описывает, как будущий бот-продавец собирает ответ из утверждённой базы,
+| Слой | Содержание |
+|------|------------|
+| **Current accepted** (Stage 5.1, `a268878`) | ONE_CALL product path: unified `PresentationResult`, promotion authority (`priority_service_promos` / `promotion_overview`), `select_stage51_marketing`, session/render state, limits **3/2**, CTA/secondary separation |
+| **Historical** | S20/S21/S22 и другие offline pieces — источники/seams происхождения архитектуры; **не** current presentation owner |
+| **Future target** | Stage 5.1B — availability, canonical alternatives, price gaps |
+
+**Precedence:** для marketing contract semantics этот документ имеет приоритет над legacy promo-ограничениями в `MARKETING_EDITING_GUIDE.md` и `PRICEBOOK_V2.md`. Stage 5.1 current runtime реализует принятый promotion/presentation contract в своём scope.
+
+Этот контракт описывает, как бот-продавец собирает ответ из утверждённой базы,
 коммерческих фактов, сценарных усилителей и CTA. Он не задаёт готовые тексты ответов.
-S20 наполняет demo только ordered source refs/contexts и не подключает их к ответам.
+Historical S20 наполняет demo только ordered source refs/contexts и **не** подключает их
+к production ответам сам по себе — current Stage 5.1 runtime использует отдельный
+presentation path (`build_one_call_presentation_result`).
 
 ## Главные законы
 
@@ -309,7 +319,7 @@ cta_contexts:
 - `promotion_overview` управляет **только** `promotion_scope=general` (до 3 active promo);
 - оба списка содержат refs на authoritative facts; тексты и условия — в `facts.json`;
 - один fact может присутствовать в service mapping и overview;
-- `initial_commercial_blocks` **не** является новым promo authority (historical S21/current config — pre-Stage-5.1, не соответствует target);
+- `initial_commercial_blocks` остаётся legacy compatibility data в demo config; **не** является current Stage 5.1 promo authority;
 
 Это схема ссылок и порядка, а не готовых фраз. В одном scenario pool может быть сколько
 угодно проверяемых refs конкретной клиники; selector берёт максимум два усилителя на ход и
@@ -426,15 +436,16 @@ CTA key берётся один раз для semantic context. Context-specific
 занимает marketing или navigation slots и не показывается в manual contact, spam/off-topic,
 pure clarify, после явного отказа или внутри активного lead-flow.
 
-### Offline selector S21
+### Offline selector S21 (historical)
 
 S21 — **offline pure selector** из already-validated target models. Он **не** является
-принятым Stage 5.1 product path и **не** реализует accepted target order.
+current ONE_CALL Stage 5.1 product path и **не** реализует accepted target order.
 
-#### Current pre-Stage-5.1 S21 behavior (historical, offline)
+#### Historical S21 behavior (offline legacy)
 
-**Does not satisfy accepted target.** Сохранено как честное описание текущей offline
-реализации; должно быть заменено Stage 5.1.
+**Does not satisfy accepted target.** Сохранено как честное описание historical offline
+реализации; current Stage 5.1 runtime использует `build_one_call_presentation_result` /
+`select_stage51_marketing`, а не S21.
 
 Явные inputs: semantic context, optional already-selected service, ordered scenarios,
 explicit date, флаг initial block и read-only shown snapshots. Результат — immutable
@@ -463,10 +474,10 @@ Historical demo examples (pre-Stage-5.1):
 Это **не** резервирует priority service promo до amplifiers и **не** соответствует
 accepted Stage 5.1 contract.
 
-#### Target Stage 5.1 behavior (to be implemented)
+#### Accepted Stage 5.1 behavior (current ONE_CALL runtime, `a268878`)
 
-Post-Flash deterministic presentation / unified `PresentationResult` **должны**
-реализовать **один** target order везде:
+Post-Flash deterministic presentation / unified `PresentationResult` **реализуют**
+**один** target order в production ONE_CALL path:
 
 1. конкретный direct requested fact — **только** когда semantic seam достоверно доступен
    (не regex/keyword; без второго provider call);
@@ -475,31 +486,30 @@ Post-Flash deterministic presentation / unified `PresentationResult` **долж�
 4. остальные применимые facts в свободных местах общего лимита **3**;
 5. CTA отдельно.
 
-Priority promo резервируется **до** amplifiers и **не** вытесняется ими. Current S21
-**не** реализует этот порядок; Stage 5.1 implementation должна заменить historical
-behavior, а не декларировать S21 как уже принятый selector.
+Priority promo резервируется **до** amplifiers и **не** вытесняется ими. Historical S21
+**не** является current runtime owner; Stage 5.1 path заменил S21 для ONE_CALL sales-fast.
 
 Missing optional external amplifier пропускается, но pack acceptance S3/S6 остаётся
 обязательной. Missing local `fact:` по-прежнему fail-closed отклоняет bundle до
 selector. Selector принимает shown snapshots, но не изменяет их.
 
-### Priority promo authority (owner decision — Stage 5.1 promotion intent amendment)
+### Priority promo authority (Stage 5.1 — принят)
 
-Docs-only amendment **не** меняет schema/config. **Принято:** нет одной «главной акции клиники»; authority — service-id mapping `priority_service_promos.<service_id>.ordered_fact_refs` + `promotion_overview.ordered_fact_refs` для general overview.
+**Принято:** нет одной «главной акции клиники»; authority — service-id mapping `priority_service_promos.<service_id>.ordered_fact_refs` + `promotion_overview.ordered_fact_refs` для general overview. Demo `marketing.yaml` уже содержит эти поля; runtime selector (`select_stage51_marketing`) использует target order.
 
-**Historical S21/current config (pre-Stage-5.1, не соответствует target):**
+**Historical S21/legacy config (не current Stage 5.1 authority):**
 
 - `kind=promo` **недостаточно** для определения priority service promo;
-- в current demo `free_implant_consult` и discount facts одновременно имеют `kind=promo`;
+- в demo `free_implant_consult` и discount facts одновременно имеют `kind=promo`;
 - `initial_commercial_blocks.service.ordered_fact_refs` ставит consultation/installment **раньше** discount;
 - discount fact также в `scenario_rules.cost.ordered_amplifier_refs`.
 
-**Stage 5.1 implementation must:**
+**Stage 5.1 runtime (принят):**
 
-1. мигрировать на `priority_service_promos` service-id mapping и `promotion_overview`;
-2. **не** определять акцию по тексту, словам «скидка», проценту, fact ID, regex или Python hardcode;
-3. сохранить multiclient ownership;
-4. **не** считать consultation/installment fallback для automatic promo;
+1. использует `priority_service_promos` service-id mapping и `promotion_overview`;
+2. **не** определяет акцию по тексту, словам «скидка», проценту, fact ID, regex или Python hardcode;
+3. сохраняет multiclient ownership;
+4. **не** считает consultation/installment fallback для automatic promo;
 5. validator проверяет refs, service IDs, применимость и отсутствие дублей.
 
 ### Offline evidence package S22
@@ -526,23 +536,26 @@ eligibility/strategy projection обязана выполняться отдел
 - создавать отдельную схему для каждой услуги и информационного подтопика;
 - ротировать усилители на нейтральных follow-up ходах;
 - добавлять готовые сценарные ответы или списки вступительных фраз;
-- передавать product authority единому `PresentationResult` до Stage 5.1 implementation checkpoint;
+- передавать product authority единому `PresentationResult` — **выполнено** Stage 5.1 (`a268878`);
 - менять или перезапускать A9 raw/harness/live.
 
-## Будущий runtime checkpoint
+## Runtime status (post Stage 5.1)
 
 Schema governance зафиксирован этим документом и
 [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md), demo policy
-материализована offline в S20, pure selector — в S21, one-service evidence package —
-в S22. Частичные selector/schema/session pieces существуют, но единый `PresentationResult`
-и принятый Stage 5.1 product path **ещё не реализованы**. Перед production wiring
-нужны отдельные TASK и checker-review.
-Они должны доказать:
+материализована offline в S20, pure selector — в S21 (historical offline), one-service
+evidence package — в S22. **Stage 5.1 ONE_CALL product path принят:** unified typed
+`PresentationResult`, `select_stage51_marketing`, session-global suppression, render-proven
+shown-state, promotion scopes и authoritative promo rendering (`a268878`). Stage 5.1B
+implementation **не** начата.
 
-- schema и source-ref validation;
-- отсутствие межклиентского переноса приоритетов и session state;
-- лимит 3/2, no-repeat и direct-question override;
-- точную передачу силы утверждений и чисел;
-- приоритет manual-contact boundary;
-- отсутствие второго regex/classifier path;
-- UI с одной CTA и точными source-owned facts.
+**Accepted evidence (Stage 5.1, `a268878`):** limits **3/2**; session-global suppression;
+direct promotion scopes; authoritative promo rendering; render-proven shown-state;
+`last_rendered_promo_fact_id`; price-follow-up shown fix; **0/1** provider calls.
+
+**Remaining proof scope (не Stage 5.1):**
+
+- Stage 5.1B availability/alternatives/price-gap matrix;
+- Stage 5.2 Widget/SSE (double-response trace);
+- Stage 5.3 frozen multiclient E2E;
+- межклиентская изоляция и manual-contact boundary на полном E2E corpus.

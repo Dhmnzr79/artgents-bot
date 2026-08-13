@@ -6,11 +6,11 @@
 
 Нумерация разделов совпадает с foundation. Колонка **«На экране»** там; здесь — **«Технически»**.
 
-Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Этот документ показывает места интеграции и честно отделяет требуемое поведение от текущего runtime.
+Target-контракт лимитов, сценариев, усилителей, CTA и session state: [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md). Документ синхронизирует accepted Stage 5.1 runtime с technical integration map; historical seams (S21 и др.) маркированы отдельно; Stage 5.1B/5.2 остаются future.
 
 ## Обязательные продуктовые требования
 
-Этот раздел описывает **требуемое поведение**, а не утверждает, что оно уже полностью реализовано в текущем runtime.
+Этот раздел описывает **нормативное поведение** marketing layer. **Stage 5.1** в своём принятом scope реализован current ONE_CALL runtime (`a268878`). Пункты, относящиеся к Stage 5.1B availability/alternatives или Stage 5.2 Widget/SSE, остаются future target.
 
 1. **Authority базы над содержанием ответа.** Согласованные md, pricebook, marketing и policies конкретной клиники определяют факты и силу утверждений. Это не связано с запрещённой product authority A9 `patient_scope`: A9 остаётся shadow-only и не управляет ответом.
 2. **Запрет семантического смягчения.** Composer может добавлять только связующий текст. Числа, проценты, модальность, гарантии, обещания, отрицания и оговорки источника должны сохраняться точно; будущая проверка должна обнаруживать их ослабление, усиление или подмену.
@@ -143,29 +143,15 @@ Target-контракт лимитов, сценариев, усилителей
 | Условия оплаты | `clinic__info__payment_terms` → `composer`; `suggest_h3`, CTA `callback` |
 | Скидка у врача | `marketing.yaml`; без персональных скидок |
 
-**Текущий долг / Stage 5.1 (implementation не начата):** частичные selector/schema/session pieces существуют,
-но единый `PresentationResult` **ещё не создан** и current selector/presentation **не
-объявлены принятыми** Stage 5.1. Historical offline S21 **does not satisfy** accepted
-target order (amplifiers before initial block; no priority promo reservation). Runtime
-ещё не реализует полный contract: `commercial_intent=promotion`, `promotion_scope`,
-`priority_service_promos` / `promotion_overview`, session-global suppression, priority service promo на первом eligible service turn,
-лимит 3/2 с promo в **3** не в **2**, `shown_amplifier_ids`, incompatibility,
-render-proven shown-state и один primary `scenario` из ONE_CALL envelope.
-
-**Stage 5.1 implementation потребует (docs amendment зафиксировал target, код ещё нет):**
-
-1. Envelope contract/version update: `commercial_intent` → 5 значений; новое поле `promotion_scope`;
-2. Parser/schema/prompt update; cached-prefix identity/invalidation review;
-3. Client config migration: `priority_service_promos`, `promotion_overview` (current `initial_commercial_blocks` — pre-Stage-5.1);
-4. Offline regression + отдельный Checker acceptance;
-5. **Без** regex/keyword classifier, **без** второго provider call, **без** `promotion_ref`.
+**Stage 5.1 (принят, `a268878`):** единый typed `PresentationResult` создан; envelope/parser/prompt/cache migration выполнена (v3 / p3); `select_stage51_marketing` и `build_one_call_presentation_result` — current ONE_CALL runtime owners; `priority_service_promos` / `promotion_overview` в demo config; session-global suppression, render-proven shown-state, `last_rendered_promo_fact_id`, price-follow-up shown gap закрыт; JSON/SSE используют общий final result без Stage 5.2 protocol redesign; **0/1** provider calls сохранены. Historical offline S21 **does not satisfy** accepted target order и **не** является current runtime path.
 
 **Performance invariant (Stage 5.1):** 0/1 provider calls; selector/`PresentationResult`
 локально после Flash; без marketing LLM/retry/второй materialization/сетевого re-read
 marketing data на каждом turn; один локальный presentation pass; gates 8s/10s/6s не
 ослабляются; diagnostics OK, новый hard ms-SLO — только по owner decision.
 
-Это меняется только отдельной code/runtime-задачей с тестами.
+Stage 5.1B availability/alternatives/price-gap behavior меняется только отдельной
+code/runtime-задачей с тестами — не Stage 5.1 promotion path.
 
 ---
 
@@ -339,13 +325,12 @@ hard-stop и marketing rules. Реализация и parity текущего ru
 1. `retrieval` / `composer` / `price_route` — основные пути контента.
 2. `policy_ui` решает, показать ли CTA и follow-up.
 3. `clarify` — только услуга / масштаб / этап.
-4. Текущий promo-блок требуется заменить единым `PresentationResult` и source-owned selector из `MARKETING_SCENARIO_ARCHITECTURE.md`: priority service promo, eligibility, лимит 3/2 (promo в **3**, не в **2**), no-repeat, direct-question override, incompatibility, render-proven shown-state.
+4. Stage 5.1 **принят** (`a268878`): unified `PresentationResult`, promotion intent/scopes, priority promo, session-global suppression, render-proven shown-state, limits 3/2, price-follow-up shown fix.
 5. Текущий composer/verifier требуется отдельно проверить на точное сохранение силы согласованных утверждений.
 6. Demo: `lead_flow` не шлёт в CRM.
 7. `handoff_template` (§10) уже исключает retrieval и CTA, но должен получить новый согласованный текст и строгую границу для любой текущей личной боли.
 8. `comparison_route` — catalog fast-path не перебивает comparison-md.
-9. **Stage 5.1 не реализован:** docs-only promotion intent amendment зафиксировал contract; implementation unit ещё должна создать `PresentationResult`, обновить envelope/parser/prompt и принять post-Flash deterministic presentation.
-10. **Stage 5.1B не реализован:** docs-only service availability / alternatives / price gaps amendment зафиксировал contract §11.1; implementation должна мигрировать `service_alternatives` на canonical IDs, реализовать price precedence и 7-case matrix в `PresentationResult`; current keyword legacy и safe `data_gap` — pre-target seams.
+9. **Stage 5.1B не реализован:** docs-only service availability / alternatives / price gaps amendment зафиксировал contract §11.1; implementation должна мигрировать `service_alternatives` на canonical IDs, реализовать price precedence и 7-case matrix в `PresentationResult`; current keyword legacy и safe `data_gap` — pre-target seams.
 
 ### Target service consultation close
 
@@ -365,15 +350,11 @@ session, composer placement или authority.
 
 ## Что дальше
 
-1. Target schema услуг/цен и marketing policy зафиксирована в
-   [`PRICE_SERVICE_ARCHITECTURE.md`](PRICE_SERVICE_ARCHITECTURE.md) и
-   [`MARKETING_SCENARIO_ARCHITECTURE.md`](MARKETING_SCENARIO_ARCHITECTURE.md); runtime
-   пока не мигрирован на принятый Stage 5.1 `PresentationResult` и promotion intent.
-2. Stage 5.1 implementation: envelope/parser/prompt/cache migration для `commercial_intent=promotion` и `promotion_scope`; client config migration на `priority_service_promos` / `promotion_overview`. Без regex/keyword classifier, без второго provider call.
-3. Stage 5.1B implementation: `service_alternatives` ID migration; availability/price-gap matrix §11.1; family price explicit-context only; unified `PresentationResult`. Без regex/keyword classifier, без второго provider call.
+1. **Stage 5.1 — completed/accepted** (`a268878`): envelope v3, typed `PresentationResult`, promotion selector/config authority, runtime presentation/session wiring.
+2. **Следующий semantic этап — Stage 5.1B implementation:** `service_alternatives` ID migration; availability/price-gap matrix §11.1; family price explicit-context only; unified `PresentationResult`. Без regex/keyword classifier, без второго provider call.
+3. **Stage 5.2 — отдельный Widget/SSE этап:** один user turn → один bot bubble; double-response «Отбеливание» только по доказанной SSE-трассе. Не смешивать с Stage 5.1B.
 4. Performance invariant §13.7: 0/1 calls, local presentation pass, no marketing LLM.
 5. S18 отдельно материализует offline source contract для `consultation_value`; demo
    content, session/runtime wiring и authority остаются будущими checkpoint-ами.
 6. Сверить с foundation «На экране» в виджете и отметить расхождения маршрут ↔ UI.
-7. Regression будущей реализации должен доказать priority promo, promotion scopes, session-global suppression,
-   Stage 5.1B availability/price-gap matrix, direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts.
+7. Regression будущей реализации должен доказать Stage 5.1B availability/price-gap matrix, direct-question override, межклиентскую изоляцию, hard-stop и точность source-owned facts (Stage 5.1 promotion matrix уже покрыта accepted bundle).

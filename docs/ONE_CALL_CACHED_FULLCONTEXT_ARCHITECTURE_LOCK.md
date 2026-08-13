@@ -1,13 +1,13 @@
 # ONE_CALL_CACHED_FULLCONTEXT — Architecture Lock
 
-**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — docs-only marketing contract + promotion intent amendment; Stage 5.1B — docs-only service availability / alternatives / price gaps amendment; implementation **не** начата).
+**Статус:** нормативный TARGET-контракт + синхронизация принятого baseline (Stage 4.3 принят; Stage 5.1 — **принят**; Stage 5.1B — docs-only service availability / alternatives / price gaps amendment; implementation **не** начата).
 **Дата:** 2026-08-13.
 **Модель:** `qwen3.7-flash-2026-07-15`.
-**Baseline HEAD:** `6345b37eec2807bc2008e68f8a01018407af044f`.
+**Baseline HEAD:** `a2688781d43534605664a3d11217c51dd1576d1c`.
 
-Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–4.3. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
+Этот документ фиксирует **целевую** архитектуру продукта и **контракт** принятого состояния Stage 0–5.1. Разделы §1–§16 — нормативный TARGET; § «Current implementation status» и §17 — проверяемое текущее состояние baseline и оставшиеся gaps. Закрытие gaps §17 — отдельные этапы frozen roadmap §19.
 
-### Current implementation status (Stage 0–4.3 accepted)
+### Current implementation status (Stage 0–5.1 accepted)
 
 | Этап | Статус |
 |------|--------|
@@ -22,10 +22,13 @@
 | Stage 4.1 — Windows logging | **Принят** (`1d89190`) |
 | Stage 4.2 — Production closed JSON envelope | **Принят** (`b833482`) |
 | Stage 4.3 — Semantic ownership | **Принят** (`6345b37`) |
+| Stage 5.1 — Единый marketing/commercial `PresentationResult` | **Принят** (`a268878`) |
+| Stage 5.1B — Service availability / alternatives / price gaps | **Docs-only amendment**; implementation **не** начата |
+| Stage 5.2 — Widget / SSE | **Не** начат |
 | `SALES_ONE_PLUS_ON` | **default OFF** — без изменений |
 | Alibaba LIVE после Stage 4.0 | **Запрещён** без отдельной явной команды владельца |
 
-Stage 5.1+ **не считаются реализованными** этим документом. Stage 5.1B **не считается реализованным** этим документом. Оставшиеся gaps §17 **не объявлены исправленными**, пока соответствующий этап не принят checker.
+Stage 5.1 **считается реализованным и принятым** этим документом (`a268878`). Stage 5.1B+ **не считаются реализованными**, пока соответствующий этап не принят checker. Оставшиеся gaps §17 **не объявлены исправленными**, пока этап не принят checker.
 
 ### Приоритет и supersession
 
@@ -603,18 +606,15 @@ Flash выбирает только один primary `scenario` из закры�
 
 `commercial_intent=promotion` **не** открывает price amount, price/offer card, payment terms или included items.
 
-### 13.6 Client-owned promo authority (target schema)
+### 13.6 Client-owned promo authority (accepted schema)
 
-Точное итоговое имя полей schema может быть уточнено implementation seam audit, но нормативная семантика — **service-id mapping**, не общий context block:
+Нормативная семантика — **service-id mapping**, не общий context block. Принятые имена полей:
 
 ```yaml
 priority_service_promos:
-  all_on_4:
+  <service_id>:
     ordered_fact_refs:
-      - fact:all_on_4_discount
-  professional_whitening:
-    ordered_fact_refs:
-      - fact:professional_whitening_discount
+      - fact:...
 
 promotion_overview:
   ordered_fact_refs:
@@ -625,9 +625,13 @@ promotion_overview:
 - `promotion_overview` управляет **только** `promotion_scope=general`;
 - оба списка содержат refs на authoritative facts; тексты и условия — в `facts.json`;
 - один fact может присутствовать в service mapping и overview;
-- `initial_commercial_blocks` **не** является новым promo authority;
-- validator при реализации проверяет refs, service IDs, применимость и отсутствие дублей; runtime проверяет active dates и `incompatible_with`;
+- `initial_commercial_blocks` **не** является promo authority Stage 5.1 (legacy compatibility data);
+- **нет** одной «главной акции клиники»; service mapping и general overview — разные authorities;
 - **нельзя** выбирать акцию по тексту, проценту, ID, regex или Python hardcode.
+
+**Pack-load validation** (при загрузке client pack): service IDs; fact refs; `kind=promo` для priority mapping; duplicates; priority mapping applicability.
+
+**Runtime eligibility** (post-Flash selector/presentation): active dates; current applicability; session-global suppression; `incompatible_with`.
 
 ### 13.7 Performance invariant (Stage 5.1)
 
@@ -740,19 +744,17 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 
 ---
 
-## 17. Current known gaps (post Stage 4.3 baseline)
+## 17. Current known gaps (post Stage 5.1 baseline)
 
-Проверяемые расхождения **после** принятого Stage 4.3 baseline (`6345b37`). Ниже — только **оставшиеся** gaps; закрытые Stage 4.1–4.3 перечислены отдельно с commit mapping.
+Проверяемые расхождения **после** принятого Stage 5.1 baseline (`a268878`). Ниже — только **оставшиеся** gaps; закрытые Stage 4.1–5.1 перечислены отдельно с commit mapping.
 
 ### 17.1 Оставшиеся gaps
 
 1. **«Отбеливание» — двойной ответ:** наблюдается двойной ответ; **причина не утверждается** без доказанной SSE-трассы (Stage 5.2).
-2. **Survivability microfact:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене.
-3. **Marketing overload / `PresentationResult` / promotion intent:** marketing layer может добавлять слишком много фактов; обязательная priority service promo на первом service turn, `commercial_intent=promotion`, `promotion_scope`, service-id mapping (`priority_service_promos` / `promotion_overview`), session-global suppression и единый `PresentationResult` **не реализованы** (Stage 5.1). Docs-only promotion intent amendment зафиксировал target contract; implementation потребует envelope contract/version update, parser/schema/prompt update, cached-prefix identity/invalidation review, offline regression и отдельного Checker acceptance.
-4. **Price-follow-up shown-state:** основная price-follow-up ветка может не записывать реально показанные кнопки в cadence / shown-state.
-5. **Service availability / alternatives / price gaps (Stage 5.1B):** keyword-based legacy `service_alternatives` (`match_keywords`, `mention`, `suggest_ref`, `note`); отсутствие canonical ID-based alternative authority; неединое presentation-поведение для unavailable service / price gaps; безопасный `data_gap` для named service + family-only price ещё **не** превращён в согласованный пользовательский ответ; unknown/unresolved service term может смешиваться с confirmed not-offered service. Docs-only Stage 5.1B amendment зафиксировал target contract; implementation **не** начата.
+2. **Survivability answer overload/quality gap:** нейтральный вопрос о приживаемости имплантов после корректного факта 99,8% может получить нерелевантные сведения о птеригоидных имплантах, консультации, гарантии и цене. Informational 99,8% sanitizer regression **протестирован** в Stage 5.1 — это **не** закрывает overload/quality gap.
+3. **Service availability / alternatives / price gaps (Stage 5.1B):** keyword-based legacy `service_alternatives` (`match_keywords`, `mention`, `suggest_ref`, `note`); отсутствие canonical ID-based alternative authority; неединое presentation-поведение для unavailable service / price gaps; безопасный `data_gap` для named service + family-only price ещё **не** превращён в согласованный пользовательский ответ; unknown/unresolved service term может смешиваться с confirmed not-offered service. Docs-only Stage 5.1B amendment зафиксировал target contract; implementation **не** начата.
 
-### 17.2 Закрыто принятыми Stage 4.1–4.3 (не перечислять как gaps)
+### 17.2 Закрыто принятыми Stage 4.1–5.1 (не перечислять как gaps)
 
 | Gap | Закрыт этапом | Evidence |
 |-----|---------------|----------|
@@ -762,6 +764,10 @@ Quality, medical, multiclient и `0/1 calls` gates **не ослабляются
 | APRF / биоматериал → лишний `CLARIFY` или цена | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
 | Generic topic narrowing до brand / technology / offer | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
 | Price without подтверждённого `commercial_intent` | Stage 4.3 | `6345b37eec2807bc2008e68f8a01018407af044f` |
+| Marketing overload / unified `PresentationResult` / promotion intent | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
+| `commercial_intent=promotion`, `promotion_scope`, `priority_service_promos`, `promotion_overview` | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
+| Session-global suppression, rendered promo state, `last_rendered_promo_fact_id` | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
+| Price-follow-up shown-state | Stage 5.1 | `a2688781d43534605664a3d11217c51dd1576d1c` |
 
 **Закрыто в Stage 0–3 (не перечислять как gaps):** HTTP-scoped provider-call governance; Problem Gate first; typed UI в candidate path; cached FullContext prefix + pack identity; Flash capability JSON/streaming; production-faithful speed measurement; absolute speed gates; clinic-owned price strategy + единый authoritative commerce result для text/card.
 
@@ -824,22 +830,21 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 - specific contact question возвращает только нужное поле;
 - **никаких** APRF / whitening-specific regex.
 
-### Stage 5.1 — Единый marketing/commercial `PresentationResult` (docs-only contract + promotion intent amendment; implementation **не** начата)
+### Stage 5.1 — Единый marketing/commercial `PresentationResult` (**принят**, `a268878`)
 
-**Нормативный marketing contract (§13) и promotion intent amendment зафиксированы docs-only.** Реализация ещё должна создать единый `PresentationResult` и внедрить promotion surfaces:
+**Принятый результат (offline Checker bundle 247 tests, `provider_calls ∈ {0, 1}`):**
 
-- один источник final text, offer/card, marketing facts, CTA, follow-up, двух secondary button slots, cadence и shown-state;
-- `commercial_intent` расширяется до `none` \| `price` \| `payment` \| `included` \| `promotion`; envelope получает closed `promotion_scope` (`none` \| `general` \| `service` \| `shown`);
-- priority service promo на первом eligible `ANSWER` с authoritative `service_id` при `commercial_intent=none`, `promotion_scope=none` — детерминированный post-Flash selector по `priority_service_promos[service_id]`; первая eligible promo **конкретной** услуги; **нет** clinic-wide «главной акции»; входит в лимит **3**, не в **2**; единственное bounded automatic commercial исключение без price/payment/included/promotion surfaces;
-- `commercial_intent=promotion`: `general` → до 3 active promo по `promotion_overview`; `service` → одна promo услуги; `shown` → последняя rendered promo session (fail closed без session-bound promo); **не** открывает price amount, price/offer card, payment terms или included items;
-- session-global suppression: один `fact_id` автоматически показывается один раз за `session_id`; direct promotion request может повторно открыть факт; per-service shown-state для одного fact ID **не** вводится;
-- selector: direct requested fact → priority promo → до двух amplifiers primary `scenario` → остальные facts в оставшихся местах **3**; CTA отдельно;
-- consultation/installment **не** автодобавляются в первом ответе сверх priority promo и amplifiers;
-- marketing fact реально включается в текст; нет дублирования;
-- shown-state только после фактического render; selected-but-not-rendered **не** считается shown; price follow-up **всегда** фиксируется как shown;
-- один primary `scenario` из envelope; конкретные facts выбирает код; arbitrary promo guessing по тексту/regex/keyword **запрещён**; `promotion_ref` **не** добавляется;
-- **implementation потребует:** envelope contract/version update; parser/schema/prompt update; cached-prefix identity/invalidation review; offline regression; отдельного Checker acceptance;
-- **performance invariant §13.7:** 0/1 provider calls; один локальный presentation pass после Flash; без marketing LLM/retry/network re-read; absolute gates §15.2 не ослабляются; без нового hard ms-SLO без owner decision.
+- envelope v3: `commercial_intent` (`none` \| `price` \| `payment` \| `included` \| `promotion`) + closed `promotion_scope` (`none` \| `general` \| `service` \| `shown`);
+- prompt contract / cache identity **p3**;
+- typed `OneCallPresentationResult` и **один** post-Flash presentation pass;
+- deterministic promotion authority/selector: `priority_service_promos`, `promotion_overview`, automatic/general/service/shown paths;
+- authoritative promo text rendering; commercial-claim vs informational-percent firewall;
+- limits **3/2**; CTA/secondary separation;
+- render-proven shown-state; session `last_rendered_promo_fact_id`; price-follow-up shown-state fix;
+- commerce/promotion fail-closed gates;
+- **0/1** provider calls; absolute gates §15.2 не ослаблены.
+
+Evidence: `a2688781d43534605664a3d11217c51dd1576d1c`.
 
 ### Stage 5.1B — Service availability, authored alternatives and price gaps (docs-only amendment; implementation **не** начата)
 
@@ -894,7 +899,7 @@ Roadmap **заморожен** после Stage 4.0. Этапы разделен
 
 ## Checker scoped allowlist (historical — Stage 4.0 revision)
 
-> **Исторический checklist.** Не является текущим acceptance gate. Актуальный baseline — Stage 4.3 (`6345b37`); Stage 5.1 docs sync ожидает отдельного Checker review.
+> **Исторический checklist.** Не является текущим acceptance gate. Актуальный baseline — Stage 5.1 (`a268878`); Stage 5.1B docs sync ожидает отдельного Checker review.
 
 | Разрешено | Запрещено |
 |-----------|-----------|

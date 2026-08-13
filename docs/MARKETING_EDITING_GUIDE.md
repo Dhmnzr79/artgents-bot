@@ -1,6 +1,6 @@
 # Как редактировать маркетинг клиента
 
-**Статус:** current demo target_response config + authoring guide; не заявляет, что Stage 5.1 runtime уже реализован.
+**Статус:** current demo target_response config + authoring guide; Stage 5.1 runtime **принят** (`a268878`).
 
 Короткая памятка для demo-клиента и будущих паков. Канон demo target policy на дату:
 `clients/demo/target_response/pricebook/facts.json` + `clients/demo/target_response/marketing.yaml`.
@@ -13,7 +13,7 @@
 лечения или вопрос о противопоказаниях может получить source-grounded ответ и применимый
 marketing layer.
 
-**Этот docs sync не меняет actual client config.**
+**Этот guide описывает actual demo config после Stage 5.1.** Stage 5.1B service alternatives — target only.
 
 ## Быстрая карта
 
@@ -53,9 +53,7 @@ LLM **не** выбирает точную акцию и **не** генерир
 | `tax_deduction` | benefit | Налоговый вычет 13% |
 | `implant_warranty` | warranty | Гарантии на работу и импланты |
 
-**`marketing.yaml` target schema (future, implementation pass):** `priority_service_promos`,
-`promotion_overview`, `scenario_rules`, `limits`, `cta_contexts`. Current demo still uses
-historical `initial_commercial_blocks` — pre-Stage-5.1, требует migration. Старый `promo_rules` в текущем target pack **не используется**.
+**`marketing.yaml` current schema (Stage 5.1):** `priority_service_promos`, `promotion_overview`, `scenario_rules`, `limits`, `cta_contexts`. `initial_commercial_blocks` остаётся legacy compatibility data — **не** current priority-promo authority. Старый `promo_rules` в текущем target pack **не используется**.
 
 Известный current-runtime долг: `free_implant_consult` с `kind: promo` блокируется на pain/safety. Не исправлять это старым тематическим route; будущая реализация следует общей target policy.
 
@@ -71,7 +69,7 @@ historical `initial_commercial_blocks` — pre-Stage-5.1, требует migrati
 
 `target_response/marketing.yaml` — **когда, для какой услуги и в каком порядке это можно показывать?**
 
-Примеры (target, после migration):
+Примеры (текущие Stage 5.1 authoring examples):
 
 - `priority_service_promos.all_on_4.ordered_fact_refs` — promo и порядок для конкретной услуги;
 - `promotion_overview.ordered_fact_refs` — порядок общего списка «Какие акции есть?» (до 3);
@@ -121,16 +119,11 @@ Priority promo (`professional_whitening_discount` в примере выше) �
 не amplifier. В `scenario_rules` для усилителей используются source-backed KB/doctor/fact
 refs, которые действительно являются amplifiers.
 
-**Config migration (current demo — pre-Stage-5.1):** в current `target_response/marketing.yaml`:
+**Authoring surfaces (current):** `priority_service_promos` и `promotion_overview` — текущие runtime authoring surfaces для service-specific promo и general overview. `initial_commercial_blocks` — legacy compatibility; selector **не** использует его как priority-promo authority.
 
-- historical `initial_commercial_blocks.service.ordered_fact_refs` ставит `free_implant_consult` и
-  `installment_12` **раньше** discount facts;
-- discount facts также в `scenario_rules.cost.ordered_amplifier_refs`;
-- **нет** `priority_service_promos` / `promotion_overview`.
+**Не выбирать акцию** по тексту, слову «скидка», проценту, fact ID, regex или Python hardcode.
 
-Docs amendment **не** меняет actual `marketing.yaml`. Stage 5.1 implementation должна
-мигрировать на service-id mapping. **Нельзя** выбирать акцию по тексту, слову «скидка», проценту, fact ID,
-regex или Python hardcode. Consultation/installment **не** являются fallback для automatic promo.
+Consultation/installment **не** являются fallback для automatic promo.
 
 Session-global suppression: один `fact_id` автоматически показывается один раз за `session_id`.
 Прямой promotion request (`promotion_scope=shown`) повторяет последнюю rendered promo session.

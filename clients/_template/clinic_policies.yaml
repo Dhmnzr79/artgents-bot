@@ -7,13 +7,7 @@ contact:
 
 policies: {}
 
-service_alternatives:
-  - requested_service_id: example_inactive_service
-    alternative_service_ids:
-      - example_active_alternative
-    approved_text: >-
-      Example inactive service is not offered. Example active alternative
-      is available instead.
+service_alternatives: []
 
 service_not_offered_template: >-
   К сожалению, услугу «{requested_service}» в нашей клинике не оказываем.

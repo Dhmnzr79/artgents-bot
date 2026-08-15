@@ -717,3 +717,361 @@ def test_governed_ui_envelope_conflict_is_admin_without_model_text(
     assert outcome.failure_kind == "semantic_ui_envelope_conflict_service_id"
     assert model_text not in str(outcome.widget.payload.get("answer") or "")
     assert backend.call_count == 1
+
+
+def _run_widget_turn_with_envelope(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    client_id: str,
+    sid: str,
+    user_message: str,
+    envelope_json: str,
+    flask_app,
+) -> tuple[dict, _CountingBackend]:
+    from session import bind_session_client
+
+    backend = _CountingBackend(envelope_json)
+    _install_sales_fast_transport(monkeypatch, backend)
+    if client_id != "demo":
+        monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    bind_session_client(client_id)
+    mem_reset(sid)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": user_message, "sid": sid, "client_id": client_id},
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome = run_sales_fast_widget_turn(
+            client_id=client_id,
+            sid=sid,
+            user_message=user_message,
+            backend=backend,
+        )
+    assert outcome.widget.kind == "materialized"
+    return dict(outcome.widget.payload or {}), backend
+
+
+def test_widget_path_nikadent_all_on_4_family_price_materializes_and_persists_session(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.service_availability_presentation import FAMILY_CONTEXT_DISCLAIMER
+    from core.target_runtime_session import read_target_runtime_session
+
+    sid = "widget-nika-allon4-family"
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="nikadent",
+        sid=sid,
+        user_message="Сколько стоит All-on-4?",
+        envelope_json=answer_envelope(
+            "Короткий ответ о стоимости All-on-4.",
+            commercial_intent="price",
+            service_id="all_on_4",
+            extent="full_arch",
+        ),
+        flask_app=flask_app,
+    )
+    answer = payload["answer"]
+    assert backend.call_count == 1
+    assert payload["meta"]["service_route"] == "sales_fast_materialized"
+    assert "35" in answer and "000" in answer
+    assert FAMILY_CONTEXT_DISCLAIMER in answer
+    assert payload.get("offer") is None
+    session = read_target_runtime_session(sid)
+    assert session.last_service_id == "all_on_4"
+
+
+def test_widget_path_nikadent_crown_family_price_materializes_without_exact_offer_card(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.service_availability_presentation import FAMILY_CONTEXT_DISCLAIMER
+    from core.target_runtime_session import read_target_runtime_session
+
+    sid = "widget-nika-crown-family"
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="nikadent",
+        sid=sid,
+        user_message="Сколько стоит циркониевая коронка?",
+        envelope_json=answer_envelope(
+            "Короткий ответ о стоимости коронки.",
+            commercial_intent="price",
+            service_id="zirconia_crowns",
+        ),
+        flask_app=flask_app,
+    )
+    answer = payload["answer"]
+    assert backend.call_count == 1
+    assert "22" in answer and "000" in answer
+    assert FAMILY_CONTEXT_DISCLAIMER in answer
+    assert payload.get("offer") is None
+    session = read_target_runtime_session(sid)
+    assert session.last_service_id == "zirconia_crowns"
+
+
+def test_widget_path_demo_general_promotion_overview_materializes_and_persists_session(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_client_data import load_target_client_data
+    from core.target_runtime_session import read_target_runtime_session
+
+    data = load_target_client_data("demo")
+    expected_ids = (
+        "implant_same_day_discount",
+        "professional_whitening_discount",
+        "free_implant_consult",
+    )
+    expected_texts = tuple(str(data.bundle.facts[fact_id].text_fact) for fact_id in expected_ids)
+    sid = "widget-demo-promo-general"
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Какие акции у вас есть?",
+        envelope_json=answer_envelope(
+            "Расскажу об актуальных акциях клиники.",
+            commercial_intent="promotion",
+            promotion_scope="general",
+            service_id=None,
+        ),
+        flask_app=flask_app,
+    )
+    answer = payload["answer"]
+    assert backend.call_count == 1
+    assert payload["meta"]["service_route"] == "sales_fast_materialized"
+    for text in expected_texts:
+        assert text in answer
+    session = read_target_runtime_session(sid)
+    assert set(session.shown_fact_ids) == set(expected_ids)
+
+
+def test_widget_path_exact_price_offer_card_preserved(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    sid = "widget-nika-bridge-exact"
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="nikadent",
+        sid=sid,
+        user_message="Сколько стоит мост?",
+        envelope_json=answer_envelope(
+            "Мостовидный протез — от 10 000 ₽ за единицу.",
+            commercial_intent="price",
+            service_id="fixed_bridge",
+        ),
+        flask_app=flask_app,
+    )
+    assert backend.call_count == 1
+    offer = payload.get("offer")
+    assert isinstance(offer, dict)
+    assert offer.get("mode") == "exact_offer"
+    assert "10" in payload["answer"]
+
+
+def test_widget_path_informational_turn_has_no_price_surface(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    sid = "widget-nika-neutral"
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="nikadent",
+        sid=sid,
+        user_message="Что такое All-on-4?",
+        envelope_json=answer_envelope(
+            "All-on-4 — протокол имплантации на четырёх имплантах.",
+            service_id="all_on_4",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+    )
+    assert backend.call_count == 1
+    assert "₽" not in payload["answer"]
+    assert payload.get("offer") is None
+
+
+def test_widget_path_fail_closed_promotion_does_not_persist_session_promo_state(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_runtime_session import read_target_runtime_session
+
+    sid = "widget-fail-closed-promo"
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Какие акции на классическую имплантацию?",
+        envelope_json=answer_envelope(
+            "Какие акции на классическую имплантацию?",
+            commercial_intent="promotion",
+            promotion_scope="service",
+            service_id="classic",
+            extent="one_tooth",
+        ),
+        flask_app=flask_app,
+    )
+    assert backend.call_count == 1
+    assert payload["meta"].get("presentation_fail_closed") == "promotion_no_eligible_facts"
+    session = read_target_runtime_session(sid)
+    assert session.last_rendered_promo_fact_id is None
+    assert session.shown_fact_ids == ()
+
+
+def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_last(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_runtime_session import read_target_runtime_session
+    from session import bind_session_client
+
+    sid = "widget-promo-cadence"
+    bind_session_client("demo")
+    mem_reset(sid)
+    backend = _CountingBackend(
+        answer_envelope(
+            "Расскажу про All-on-4.",
+            service_id="all_on_4",
+            commercial_intent="none",
+        )
+    )
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Расскажите про All-on-4", "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome1 = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Расскажите про All-on-4",
+            backend=backend,
+        )
+    answer1 = str(outcome1.widget.payload.get("answer") or "")
+    assert "15" in answer1 or "скидк" in answer1.lower()
+    session1 = read_target_runtime_session(sid)
+    assert session1.last_rendered_promo_fact_id == "implant_same_day_discount"
+
+    backend2 = _CountingBackend(
+        answer_envelope(
+            "Расскажу про All-on-6.",
+            service_id="all_on_6",
+            commercial_intent="none",
+        )
+    )
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Расскажите про All-on-6", "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome2 = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Расскажите про All-on-6",
+            backend=backend2,
+        )
+    answer2 = str(outcome2.widget.payload.get("answer") or "").lower()
+    assert "implant_same_day_discount" not in answer2
+    assert "15%" not in answer2
+
+    backend3 = _CountingBackend(
+        answer_envelope(
+            "Повторю акцию.",
+            service_id="all_on_4",
+            commercial_intent="promotion",
+            promotion_scope="shown",
+        )
+    )
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={
+            "q": "Повторите акцию, которую только что показывали",
+            "sid": sid,
+            "client_id": "demo",
+        },
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome3 = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Повторите акцию, которую только что показывали",
+            backend=backend3,
+        )
+    answer3 = str(outcome3.widget.payload.get("answer") or "").lower()
+    assert "15" in answer3 or "скидк" in answer3
+
+
+def test_widget_path_multiclient_cache_isolation_without_mid_sequence_cache_clear(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_runtime_client_context import clear_target_runtime_client_context_cache
+    from session import bind_session_client
+
+    clear_target_runtime_client_context_cache()
+    sid_demo = "widget-mt-demo"
+    sid_nika = "widget-mt-nika"
+
+    payload_demo_1, _ = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid=sid_demo,
+        user_message="Сколько стоит All-on-4?",
+        envelope_json=answer_envelope(
+            "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть.",
+            commercial_intent="price",
+            service_id="all_on_4",
+        ),
+        flask_app=flask_app,
+    )
+    assert "318" in payload_demo_1["answer"]
+    assert "35 000" not in payload_demo_1["answer"].replace("\u00a0", " ")
+
+    payload_nika, _ = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="nikadent",
+        sid=sid_nika,
+        user_message="Сколько стоит All-on-4?",
+        envelope_json=answer_envelope(
+            "Короткий ответ о стоимости All-on-4.",
+            commercial_intent="price",
+            service_id="all_on_4",
+            extent="full_arch",
+        ),
+        flask_app=flask_app,
+    )
+    assert "35" in payload_nika["answer"]
+    assert "318" not in payload_nika["answer"]
+
+    bind_session_client("demo")
+    mem_reset(sid_demo)
+    payload_demo_2, _ = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid=sid_demo,
+        user_message="Сколько стоит All-on-4?",
+        envelope_json=answer_envelope(
+            "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть.",
+            commercial_intent="price",
+            service_id="all_on_4",
+        ),
+        flask_app=flask_app,
+    )
+    assert "318" in payload_demo_2["answer"]
+    clear_target_runtime_client_context_cache()

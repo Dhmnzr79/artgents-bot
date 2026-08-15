@@ -646,6 +646,7 @@ def test_result_is_frozen_slots_and_calls_are_stateless_without_mutation() -> No
         "selected_refs",
         "amplifier_refs",
         "cta_key",
+        "selection_mode",
     )
     with pytest.raises(FrozenInstanceError):
         first.cta_key = "changed"  # type: ignore[misc]

@@ -272,6 +272,8 @@ def test_exact_shapes_signature_error_surface_and_frozen_slots(md_root: Path) ->
         "scoped_evidence_topic_forbidden",
         "scoped_evidence_topic_not_allowed",
         "scoped_evidence_required_fact_missing",
+        "scoped_evidence_promotion_general_limit_exceeded",
+        "scoped_evidence_promotion_fact_kind_invalid",
     }
 
 
@@ -569,3 +571,447 @@ def test_wrong_package_precedes_root_and_import_firewall(md_root: Path) -> None:
         and node.func.attr in {"skip", "skipif", "xfail"}
         for node in ast.walk(tree)
     )
+
+
+_DEMO_ROOT = Path(__file__).resolve().parents[1] / "clients" / "demo"
+_DEMO_MD = _DEMO_ROOT / "md"
+
+
+def _demo_general_promotion_bound():
+    from datetime import date
+
+    from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
+    from core.one_call_envelope_protocol import parse_production_envelope_json
+    from core.one_call_presentation_pass import _apply_stage51_marketing
+    from core.sales_fast_strict_evidence import (
+        effective_scope_from_semantic_frame,
+        resolve_sales_fast_bound_package,
+    )
+    from core.sales_fast_turn_frame import build_turn_frame_from_semantic_frame
+    from core.sales_one_plus_semantic_authority import (
+        bind_semantic_frame,
+        governed_ui_authority_from_resolution,
+    )
+    from core.target_runtime_client_context import load_target_runtime_client_context
+    from core.target_runtime_strategy import resolve_target_runtime_strategy_context
+    from core.target_strategy_context import strategy_match_from_effective_scope
+    from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_REF_CATALOG, answer_envelope
+
+    context = load_target_runtime_client_context("demo")
+    unknown = ExactSalesFieldAuthority(authority="unknown", provenance="unknown")
+    governed_ui = governed_ui_authority_from_resolution(
+        ExactSalesResolution(
+            None, None, None, None, None, unknown, unknown, unknown, unknown, unknown
+        )
+    )
+    envelope = parse_production_envelope_json(
+        answer_envelope(
+            "Расскажу об актуальных акциях клиники.",
+            commercial_intent="promotion",
+            promotion_scope="general",
+            service_id=None,
+        ),
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+    )
+    semantic = bind_semantic_frame(
+        envelope=envelope,
+        governed_ui=governed_ui,
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+    )
+    turn_frame = build_turn_frame_from_semantic_frame(
+        semantic=semantic,
+        user_message="Какие акции у вас есть?",
+        bundle=context.bundle,
+    )
+    effective_scope = effective_scope_from_semantic_frame(
+        semantic,
+        current_ui_action=None,
+        current_ui_stage_action=None,
+    )
+    strategy_context = strategy_match_from_effective_scope(
+        effective_scope,
+        service_family=resolve_target_runtime_strategy_context(
+            context.bundle,
+            service_id=turn_frame.service_id,
+        ).family,
+    )
+    bound = resolve_sales_fast_bound_package(
+        turn_frame=turn_frame,
+        semantic=semantic,
+        bundle=context.bundle,
+        doctor_catalog=context.doctor_catalog,
+        external_index=context.external_index,
+        consultation_values=context.consultation_values,
+        strategy_context=strategy_context,
+        effective_scope=effective_scope,
+        allowed_topics=context.allowed_topics,
+        today=date(2026, 8, 1),
+        md_root=_DEMO_MD,
+        client_id="demo",
+    )
+    bound_with_marketing, fail_reason = _apply_stage51_marketing(
+        bound,
+        context=context,
+        semantic=semantic,
+        turn_frame=turn_frame,
+        shown_fact_ids=(),
+        shown_amplifier_refs=(),
+        last_rendered_promo_fact_id=None,
+        today=date(2026, 8, 1),
+    )
+    assert fail_reason is None
+    return bound_with_marketing
+
+
+def _fullcontext_single_fact_typed_bound(selection_mode: str):
+    from dataclasses import replace
+
+    from core.target_marketing_selector import TargetMarketingSelection
+
+    bound = _demo_general_promotion_bound()
+    fact = bound.package.materials.commercial_facts[0]
+    selection = TargetMarketingSelection(
+        applied_scenarios=(),
+        selected_refs=(f"fact:{fact.id}",),
+        amplifier_refs=(),
+        cta_key=bound.package.materials.marketing_selection.cta_key,
+        selection_mode=selection_mode,
+    )
+    materials = replace(
+        bound.package.materials,
+        marketing_selection=selection,
+        commercial_facts=(fact,),
+    )
+    plan = replace(bound.package.plan, commercial_fact_ids=(fact.id,))
+    return replace(bound, package=replace(bound.package, materials=materials, plan=plan))
+
+
+def _empty_typed_promotion_bound(selection_mode: str):
+    from dataclasses import replace
+
+    from core.target_marketing_selector import TargetMarketingSelection
+
+    bound = _demo_general_promotion_bound()
+    selection = TargetMarketingSelection(
+        applied_scenarios=(),
+        selected_refs=(),
+        amplifier_refs=(),
+        cta_key="callback",
+        selection_mode=selection_mode,
+    )
+    materials = replace(
+        bound.package.materials,
+        marketing_selection=selection,
+        commercial_facts=(),
+    )
+    plan = replace(bound.package.plan, commercial_fact_ids=())
+    return replace(bound, package=replace(bound.package, materials=materials, plan=plan))
+
+
+def test_promotion_general_scoped_evidence_allows_three_governed_facts() -> None:
+    bound = _demo_general_promotion_bound()
+    scoped = build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert scoped.commercial_fact_ids == (
+        "implant_same_day_discount",
+        "professional_whitening_discount",
+        "free_implant_consult",
+    )
+    assert scoped.covered_fact_ids == scoped.commercial_fact_ids
+    assert len(scoped.scope_records) == 3
+    assert tuple(record.ref for record in scoped.scope_records) == (
+        "fact:implant_same_day_discount",
+        "fact:professional_whitening_discount",
+        "fact:free_implant_consult",
+    )
+    selection = bound.package.materials.marketing_selection
+    assert selection.selected_refs == (
+        "fact:implant_same_day_discount",
+        "fact:professional_whitening_discount",
+        "fact:free_implant_consult",
+    )
+    assert tuple(fact.id for fact in bound.package.materials.commercial_facts) == (
+        "implant_same_day_discount",
+        "professional_whitening_discount",
+        "free_implant_consult",
+    )
+
+
+def test_automatic_fullcontext_multi_fact_still_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    automatic_selection = replace(
+        bound.package.materials.marketing_selection,
+        selection_mode="automatic",
+    )
+    materials = replace(
+        bound.package.materials,
+        marketing_selection=automatic_selection,
+    )
+    bound = replace(bound, package=replace(bound.package, materials=materials))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+@pytest.mark.parametrize(
+    ("mutator", "expected_code"),
+    [
+        (
+            lambda bound: replace(
+                bound,
+                package=replace(
+                    bound.package,
+                    plan=replace(
+                        bound.package.plan,
+                        commercial_fact_ids=(
+                            "implant_same_day_discount",
+                            "implant_same_day_discount",
+                            "free_implant_consult",
+                        ),
+                    ),
+                ),
+            ),
+            "scoped_evidence_package_inconsistent",
+        ),
+        (
+            lambda bound: replace(
+                bound,
+                package=replace(
+                    bound.package,
+                    materials=replace(
+                        bound.package.materials,
+                        commercial_facts=tuple(
+                            fact
+                            for fact in bound.package.materials.commercial_facts
+                            if fact.id != "free_implant_consult"
+                        ),
+                    ),
+                ),
+            ),
+            "scoped_evidence_package_inconsistent",
+        ),
+        (
+            lambda bound: replace(
+                bound,
+                package=replace(
+                    bound.package,
+                    plan=replace(
+                        bound.package.plan,
+                        commercial_fact_ids=(
+                            "implant_same_day_discount",
+                            "professional_whitening_discount",
+                            "free_implant_consult",
+                            "unknown_promo",
+                        ),
+                    ),
+                ),
+            ),
+            "scoped_evidence_package_inconsistent",
+        ),
+    ],
+)
+def test_promotion_general_invalid_selection_fail_closed(
+    mutator,
+    expected_code: str,
+) -> None:
+    from dataclasses import replace
+
+    bound = mutator(_demo_general_promotion_bound())
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == expected_code
+
+
+def test_promotion_general_non_promo_fact_kind_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    facts = list(bound.package.materials.commercial_facts)
+    bad = facts[0].model_copy(update={"kind": "commercial"})
+    materials = replace(
+        bound.package.materials,
+        commercial_facts=(bad, *facts[1:]),
+    )
+    bound = replace(bound, package=replace(bound.package, materials=materials))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_promotion_fact_kind_invalid"
+
+
+def test_promotion_general_limit_exceeded_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    extra_fact = bound.package.materials.commercial_facts[0].model_copy(
+        update={"id": "extra_promo_copy", "text_fact": "Extra promo copy."}
+    )
+    materials = replace(
+        bound.package.materials,
+        commercial_facts=bound.package.materials.commercial_facts + (extra_fact,),
+        marketing_selection=replace(
+            bound.package.materials.marketing_selection,
+            selected_refs=bound.package.materials.marketing_selection.selected_refs
+            + ("fact:extra_promo_copy",),
+        ),
+    )
+    plan = replace(
+        bound.package.plan,
+        commercial_fact_ids=bound.package.plan.commercial_fact_ids + ("extra_promo_copy",),
+    )
+    bound = replace(
+        bound,
+        package=replace(bound.package, materials=materials, plan=plan),
+    )
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_promotion_general_limit_exceeded"
+
+
+def test_promotion_general_duplicate_selection_ref_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    selection = bound.package.materials.marketing_selection
+    materials = replace(
+        bound.package.materials,
+        marketing_selection=replace(
+            selection,
+            selected_refs=selection.selected_refs + (selection.selected_refs[0],),
+        ),
+    )
+    bound = replace(bound, package=replace(bound.package, materials=materials))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_reordered_selection_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    selection = bound.package.materials.marketing_selection
+    materials = replace(
+        bound.package.materials,
+        marketing_selection=replace(
+            selection,
+            selected_refs=tuple(reversed(selection.selected_refs)),
+        ),
+    )
+    bound = replace(bound, package=replace(bound.package, materials=materials))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_extra_selection_ref_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    selection = bound.package.materials.marketing_selection
+    materials = replace(
+        bound.package.materials,
+        marketing_selection=replace(
+            selection,
+            selected_refs=selection.selected_refs + ("fact:unknown_promo",),
+        ),
+    )
+    bound = replace(bound, package=replace(bound.package, materials=materials))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_duplicate_materials_fact_id_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    duplicate = bound.package.materials.commercial_facts[0]
+    materials = replace(
+        bound.package.materials,
+        commercial_facts=bound.package.materials.commercial_facts + (duplicate,),
+    )
+    bound = replace(bound, package=replace(bound.package, materials=materials))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_nonempty_selection_empty_plan_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    plan = replace(bound.package.plan, commercial_fact_ids=())
+    bound = replace(bound, package=replace(bound.package, plan=plan))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_nonempty_materials_empty_plan_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    assert bound.package.materials.commercial_facts
+    plan = replace(bound.package.plan, commercial_fact_ids=())
+    bound = replace(bound, package=replace(bound.package, plan=plan))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_all_empty_typed_package_fail_closed() -> None:
+    bound = _empty_typed_promotion_bound("promotion_general")
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_service_nonempty_selection_empty_plan_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _fullcontext_single_fact_typed_bound("promotion_service")
+    plan = replace(bound.package.plan, commercial_fact_ids=())
+    bound = replace(bound, package=replace(bound.package, plan=plan))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_service_all_empty_typed_package_fail_closed() -> None:
+    bound = _empty_typed_promotion_bound("promotion_service")
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_shown_nonempty_selection_empty_plan_fail_closed() -> None:
+    from dataclasses import replace
+
+    bound = _fullcontext_single_fact_typed_bound("promotion_shown")
+    plan = replace(bound.package.plan, commercial_fact_ids=())
+    bound = replace(bound, package=replace(bound.package, plan=plan))
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_shown_all_empty_typed_package_fail_closed() -> None:
+    bound = _empty_typed_promotion_bound("promotion_shown")
+    with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
+        build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    assert exc_info.value.code == "scoped_evidence_package_inconsistent"
+    assert exc_info.value.value == "commercial_fact_ids"

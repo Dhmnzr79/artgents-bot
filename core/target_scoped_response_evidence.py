@@ -36,6 +36,10 @@ from core.target_response_materialization_plan import (
     TargetResponseMaterializationPlanError,
     build_target_response_materialization_plan,
 )
+from core.target_marketing_selector import (
+    PROMOTION_GENERAL_OVERVIEW_MAX_FACTS,
+    MarketingSelectionMode,
+)
 from core.target_spec_offline_response_package import (
     TargetSpecBoundOfflineResponsePackage,
 )
@@ -116,6 +120,141 @@ def _error(code: str, value: object, cause: BaseException | None = None) -> NoRe
     if cause is None:
         raise error
     raise error from cause
+
+
+_PROMO_FACT_KINDS = frozenset({"promo"})
+
+
+def _ordered_fact_ids_from_selection_refs(
+    selected_refs: tuple[str, ...],
+) -> tuple[str, ...]:
+    fact_refs = tuple(ref for ref in selected_refs if ref.startswith("fact:"))
+    if len(fact_refs) != len(set(fact_refs)):
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    if len(fact_refs) != len(selected_refs):
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    return tuple(ref.removeprefix("fact:") for ref in fact_refs)
+
+
+def _ordered_materials_fact_ids(
+    materials: TargetOfflineResponseMaterials,
+) -> tuple[str, ...]:
+    fact_ids = tuple(fact.id for fact in materials.commercial_facts)
+    if len(fact_ids) != len(set(fact_ids)):
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    return fact_ids
+
+
+def _fullcontext_fact_record_topics(
+    spec: TargetResponseSpec,
+    fact: object,
+) -> tuple[str, ...]:
+    allowed_topics = getattr(fact, "allowed_topics", ()) or ()
+    if allowed_topics:
+        matched = tuple(
+            topic for topic in spec.allowed_topics if topic in allowed_topics
+        )
+        if not matched:
+            _error("scoped_evidence_package_inconsistent", "commercial_fact_topics")
+        return matched
+    return spec.allowed_topics
+
+
+def _validate_promotion_general_commercial_facts(
+    spec: TargetResponseSpec,
+    plan: TargetResponseMaterializationPlan,
+    materials: TargetOfflineResponseMaterials,
+    facts_by_id: dict[str, object],
+) -> tuple[TargetEvidenceScopeRecord, ...]:
+    selection = materials.marketing_selection
+    if selection.selection_mode != "promotion_general":
+        _error("scoped_evidence_package_inconsistent", "selection_mode")
+    if len(plan.commercial_fact_ids) > PROMOTION_GENERAL_OVERVIEW_MAX_FACTS:
+        _error(
+            "scoped_evidence_promotion_general_limit_exceeded",
+            len(plan.commercial_fact_ids),
+        )
+    if len(plan.commercial_fact_ids) != len(set(plan.commercial_fact_ids)):
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    if len(plan.commercial_fact_ids) < 1:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    selected_fact_ids = _ordered_fact_ids_from_selection_refs(selection.selected_refs)
+    materials_fact_ids = _ordered_materials_fact_ids(materials)
+    if selected_fact_ids != plan.commercial_fact_ids:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    if materials_fact_ids != plan.commercial_fact_ids:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    records: list[TargetEvidenceScopeRecord] = []
+    for fact_id in plan.commercial_fact_ids:
+        fact = facts_by_id[fact_id]
+        ref = f"fact:{fact_id}"
+        if getattr(fact, "kind", None) not in _PROMO_FACT_KINDS:
+            _error("scoped_evidence_promotion_fact_kind_invalid", fact_id)
+        records.append(
+            TargetEvidenceScopeRecord(
+                ref=ref,
+                topics=_fullcontext_fact_record_topics(spec, fact),
+                fact_ids=(fact_id,),
+            )
+        )
+    return tuple(records)
+
+
+def _validate_typed_promotion_commercial_facts(
+    spec: TargetResponseSpec,
+    plan: TargetResponseMaterializationPlan,
+    materials: TargetOfflineResponseMaterials,
+    facts_by_id: dict[str, object],
+    *,
+    expected_mode: MarketingSelectionMode,
+) -> tuple[TargetEvidenceScopeRecord, ...]:
+    selection = materials.marketing_selection
+    if selection.selection_mode != expected_mode:
+        _error("scoped_evidence_package_inconsistent", "selection_mode")
+    if len(plan.commercial_fact_ids) != 1:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    if len(plan.commercial_fact_ids) != len(set(plan.commercial_fact_ids)):
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    selected_fact_ids = _ordered_fact_ids_from_selection_refs(selection.selected_refs)
+    materials_fact_ids = _ordered_materials_fact_ids(materials)
+    if selected_fact_ids != plan.commercial_fact_ids:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    if materials_fact_ids != plan.commercial_fact_ids:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    records: list[TargetEvidenceScopeRecord] = []
+    for fact_id in plan.commercial_fact_ids:
+        fact = facts_by_id[fact_id]
+        ref = f"fact:{fact_id}"
+        if getattr(fact, "kind", None) not in _PROMO_FACT_KINDS:
+            _error("scoped_evidence_promotion_fact_kind_invalid", fact_id)
+        records.append(
+            TargetEvidenceScopeRecord(
+                ref=ref,
+                topics=_fullcontext_fact_record_topics(spec, fact),
+                fact_ids=(fact_id,),
+            )
+        )
+    return tuple(records)
+
+
+def _validate_automatic_fullcontext_commercial_facts(
+    spec: TargetResponseSpec,
+    plan: TargetResponseMaterializationPlan,
+    facts_by_id: dict[str, object],
+) -> tuple[TargetEvidenceScopeRecord, ...]:
+    if len(plan.commercial_fact_ids) > 1:
+        _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
+    records: list[TargetEvidenceScopeRecord] = []
+    for fact_id in plan.commercial_fact_ids:
+        fact = facts_by_id[fact_id]
+        records.append(
+            TargetEvidenceScopeRecord(
+                ref=f"fact:{fact_id}",
+                topics=_fullcontext_fact_record_topics(spec, fact),
+                fact_ids=(fact_id,),
+            )
+        )
+    return tuple(records)
 
 
 def _resolved_root(md_root: object) -> Path:
@@ -223,24 +362,37 @@ def build_target_scoped_response_evidence(
             _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
         if plan.commercial_fact_ids and not spec.allow_consultation_close:
             _error("scoped_evidence_package_inconsistent", "consultation_content_ref")
-        if len(plan.commercial_fact_ids) > 1:
-            _error("scoped_evidence_package_inconsistent", "commercial_fact_ids")
         if plan.external_source_refs != materials.external_source_refs:
             _error("scoped_evidence_package_inconsistent", "external_source_refs")
-        records: list[TargetEvidenceScopeRecord] = []
-        for fact_id in plan.commercial_fact_ids:
-            fact = facts_by_id[fact_id]
-            matched_topics = tuple(
-                topic for topic in spec.allowed_topics if topic in fact.allowed_topics
+        selection_mode = materials.marketing_selection.selection_mode
+        if selection_mode == "promotion_general":
+            records = _validate_promotion_general_commercial_facts(
+                spec,
+                plan,
+                materials,
+                facts_by_id,
             )
-            if not matched_topics:
-                _error("scoped_evidence_package_inconsistent", "commercial_fact_topics")
-            records.append(
-                TargetEvidenceScopeRecord(
-                    ref=f"fact:{fact_id}",
-                    topics=matched_topics,
-                    fact_ids=(fact_id,),
-                )
+        elif selection_mode == "promotion_service":
+            records = _validate_typed_promotion_commercial_facts(
+                spec,
+                plan,
+                materials,
+                facts_by_id,
+                expected_mode="promotion_service",
+            )
+        elif selection_mode == "promotion_shown":
+            records = _validate_typed_promotion_commercial_facts(
+                spec,
+                plan,
+                materials,
+                facts_by_id,
+                expected_mode="promotion_shown",
+            )
+        else:
+            records = _validate_automatic_fullcontext_commercial_facts(
+                spec,
+                plan,
+                facts_by_id,
             )
         for ref in materials.external_source_refs:
             if not ref.startswith("kb:"):

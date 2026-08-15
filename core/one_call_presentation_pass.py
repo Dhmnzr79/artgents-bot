@@ -48,7 +48,9 @@ from core.target_presentation_decision import (
     decide_target_presentation,
 )
 from core.target_presentation_turn_projection import resolve_target_semantic_context
-from core.target_generic_fullcontext_content import is_generic_fullcontext_content_spec
+from core.target_generic_fullcontext_content import (
+    is_generic_fullcontext_content_spec,
+)
 from core.target_response_evidence import merge_marketing_selection_into_materials
 from core.target_response_materialization_plan import build_target_response_materialization_plan
 from core.target_response_policy import select_target_response_length_profile
@@ -723,6 +725,7 @@ def build_one_call_presentation_result(
             situation_shown=situation_shown if not alternative_secondary_slots else False,
         ),
         pending_session_delta=session_delta,
+        verified_for_session=verified,
         offer_fact_refs=offer_fact_refs_tuple,
         availability_status=availability_status,
         requested_service_id=requested_service_id,

@@ -146,6 +146,7 @@ def test_general_overview_exact_three_in_order() -> None:
         "fact:professional_whitening_discount",
         "fact:free_implant_consult",
     )
+    assert outcome.selection.selection_mode == "promotion_general"
 
 
 def test_general_overview_drops_expired_on_later_date() -> None:
@@ -199,7 +200,25 @@ def test_shown_repeats_last_rendered_promo() -> None:
         last_rendered_promo_fact_id="implant_same_day_discount",
     )
     assert outcome.selection is not None
+    assert outcome.selection.selection_mode == "promotion_shown"
     assert "fact:implant_same_day_discount" in outcome.selection.selected_refs
+
+
+def test_service_promotion_sets_selection_mode() -> None:
+    bundle, doctors, external_index = _demo_stage51_inputs()
+    outcome = select_stage51_marketing(
+        bundle,
+        doctors,
+        external_index,
+        route="ANSWER",
+        commercial_intent="promotion",
+        promotion_scope="service",
+        semantic_context="service",
+        service_id="all_on_4",
+        today=date(2026, 8, 1),
+    )
+    assert outcome.selection is not None
+    assert outcome.selection.selection_mode == "promotion_service"
 
 
 def test_session_global_suppression_cross_service() -> None:
@@ -781,6 +800,65 @@ def _run_presentation_result(
         last_rendered_promo_fact_id=last_rendered_promo_fact_id,
         today=today,
     )
+
+
+def test_presentation_general_promotion_verifies_all_three_overview_facts() -> None:
+    from core.doctor_schema_loader import load_doctor_catalog
+    from core.target_composer_request import materialize_target_composer_request
+    from core.target_scoped_response_evidence import build_target_scoped_response_evidence
+    from tests.test_target_scoped_response_evidence import _demo_general_promotion_bound
+
+    data = load_target_client_data("demo")
+    bundle = data.bundle
+    expected_ids = (
+        "implant_same_day_discount",
+        "professional_whitening_discount",
+        "free_implant_consult",
+    )
+    expected_refs = tuple(f"fact:{fact_id}" for fact_id in expected_ids)
+    expected_texts = tuple(str(bundle.facts[fact_id].text_fact) for fact_id in expected_ids)
+    envelope = answer_envelope(
+        "Расскажу об актуальных акциях клиники.",
+        commercial_intent="promotion",
+        promotion_scope="general",
+        service_id=None,
+    )
+    result = _run_presentation_result(
+        envelope_json=envelope,
+        patient_text="Расскажу об актуальных акциях клиники.",
+        user_message="Какие акции у вас есть?",
+    )
+    assert result.status == "ok"
+    assert result.verified_for_session is not None
+    for text in expected_texts:
+        assert text in result.final_patient_text
+    assert result.rendered_promo_fact_ids == expected_ids
+    assert result.pending_session_delta is not None
+    assert result.pending_session_delta.shown_fact_ids == expected_ids
+    used_refs = result.verified_for_session.used_content_refs
+    assert all(
+        not ref.startswith(("fact:", "offer:", "doctor:")) for ref in used_refs
+    )
+    bound = _demo_general_promotion_bound()
+    scoped = build_target_scoped_response_evidence(bound, md_root=_DEMO_MD_ROOT)
+    assert scoped.commercial_fact_ids == expected_ids
+    assert scoped.covered_fact_ids == expected_ids
+    composer = materialize_target_composer_request(
+        bound,
+        bundle,
+        load_doctor_catalog(client_pack_root("demo") / "doctor_catalog.json"),
+        (),
+        user_message="Какие акции у вас есть?",
+        md_root=_DEMO_MD_ROOT,
+        client_id="demo",
+    )
+    commercial_blocks = [
+        block for block in composer.evidence_blocks if block.kind == "commercial_fact"
+    ]
+    assert len(commercial_blocks) == 3
+    assert tuple(block.ref for block in commercial_blocks) == expected_refs
+    for block, fact_id in zip(commercial_blocks, expected_ids, strict=True):
+        assert block.text == str(bundle.facts[fact_id].text_fact)
 
 
 def test_f6_sanitize_without_selected_promo() -> None:

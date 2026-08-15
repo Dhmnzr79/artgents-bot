@@ -634,17 +634,18 @@ def _materialize_result(
         presentation=presentation,
     )
     turn_timing.stage_end("sales_fast_presentation", status="completed")
-    if widget.kind == "materialized":
+    if (
+        widget.kind == "materialized"
+        and presentation.status == "ok"
+        and presentation.verified_for_session is not None
+    ):
         final_patient_text = str(widget.payload.get("answer") or "")
+        from core.target_response_verifier import TargetVerifiedComposedResponse
         from core.target_session_selection import TargetMaterializedSessionSelection
 
-        verified = build_sales_fast_verified_for_session(
-            bound_package=bound,
-            context=context,
-            turn_frame=authoritative_turn_frame,
-            patient_text=final_patient_text,
-            user_message=user_message,
-        )
+        verified = presentation.verified_for_session
+        if not isinstance(verified, TargetVerifiedComposedResponse):
+            raise TypeError("presentation_verified_for_session_invalid")
         session_delta = presentation.pending_session_delta
         if session_delta is not None:
             selection = TargetMaterializedSessionSelection(
@@ -676,23 +677,4 @@ def _materialize_result(
         provider_calls=provider_calls,
         model_route=model_route,
         failure_kind=result.reason if result.interrupted else None,
-    )
-
-
-def build_sales_fast_verified_for_session(
-    *,
-    bound_package: TargetSpecBoundOfflineResponsePackage,
-    context: TargetRuntimeClientContext,
-    turn_frame: TurnFrame,
-    patient_text: str,
-    user_message: str,
-):
-    from core.sales_fast_presentation import build_sales_fast_verified_response
-
-    return build_sales_fast_verified_response(
-        bound_package=bound_package,
-        context=context,
-        turn_frame=turn_frame,
-        patient_text=patient_text,
-        user_message=user_message,
     )

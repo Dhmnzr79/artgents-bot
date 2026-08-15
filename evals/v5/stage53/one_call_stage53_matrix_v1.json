@@ -1,0 +1,1621 @@
+{
+  "schema": "one_call_stage53_multiclient_matrix_v1",
+  "cases": [
+    {
+      "case_id": "s53_a01_demo_clinic",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Как называется клиника?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Клиника Artgents — стоматология в Москве.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "Artgents"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Никадент",
+            "Рябикова",
+            "Елизово",
+            "+7 (900)"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_a02_nika_clinic",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Расскажите о клинике кратко",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Стоматологическая клиника Никадент на Камчатке — 16 лет работы, два филиала в Елизово.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "Никадент",
+            "16",
+            "Камчатк"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Artgents",
+            "Тверская",
+            "+7 (495) 128"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_a03_demo_aprf",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Используете APRF?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "В клинике используется технология APRF (биоматериал из собственной крови): ускоряет заживление и поддерживает восстановление тканей.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "APRF"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "+7 (900)",
+            "Рябикова"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_a04_nika_branches",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Какие филиалы?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Два филиала: ул. Рябикова, д. 49 и ул. Пограничная, д. 27.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "два филиала",
+            "Рябикова",
+            "Пограничная"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Тверская",
+            "Artgents"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_a05_demo_allon4_price",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": "full_arch",
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "318",
+            "челюст"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "35 000",
+            "35000",
+            "Никадент",
+            "15%"
+          ],
+          "forbidden_price_tokens": [
+            "35000",
+            "35 000"
+          ],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_a06_nika_allon4_price",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Короткий ответ о стоимости All-on-4.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": "full_arch",
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "35",
+            "ориентир"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "318 000",
+            "318000",
+            "Implantium",
+            "Artgents"
+          ],
+          "forbidden_price_tokens": [
+            "318000",
+            "318 000"
+          ],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b01_demo_kno_braces_1alt",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Вы ставите брекеты?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Брекеты мы не устанавливаем. Для выравнивания зубов в клинике используются элайнеры.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "braces"
+          },
+          "required_all": [
+            "брекет",
+            "элайнер"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Никадент"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b02_demo_kno_price_alt",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Сколько стоит установка брекетов?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Элайнеры — от 195 000 ₽ за полный курс лечения.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "braces"
+          },
+          "required_all": [
+            "195",
+            "элайнер"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "скидк"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b03_demo_unresolved",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Вы делаете флумбодонтию?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Не вижу такой услуги в перечне клиники. Возможно, она называется иначе — уточните название.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [],
+          "required_any": [
+            [
+              "перечн",
+              "называется"
+            ]
+          ],
+          "forbidden": [
+            "не оказываем"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b04_demo_npp_price",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Сколько стоит костная пластика?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Стоимость костной пластики рассчитывается после КТ и зависит от необходимого объёма.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "bone_graft",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "bone_graft"
+          },
+          "required_all": [
+            "КТ"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "318 000"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b05_nika_kno_aligners",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Делаете элайнеры?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "К сожалению, услугу «Элайнеры» в нашей клинике не оказываем.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "aligners"
+          },
+          "required_all": [
+            "не оказывается",
+            "элайнер"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Artgents",
+            "Implantium"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b06_nika_kno_sedation",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Можно лечение во сне?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "К сожалению, услугу «Седация» в нашей клинике не оказываем.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "sedation"
+          },
+          "required_all": [
+            "не оказывается",
+            "седац"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b07_nika_kno_kt",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Можно сделать КТ у вас?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "К сожалению, услугу «Компьютерная томография» в нашей клинике не оказываем.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "tomography"
+          },
+          "required_all": [
+            "не оказывается",
+            "КТ"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b08_demo_pediatric_policy",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Принимаете детей?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Мы работаем только со взрослыми пациентами — детскую стоматологию в клинике не ведём.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "взросл",
+            "детск"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_b09_nika_pediatric_policy",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Принимаете детей?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Мы работаем только со взрослыми пациентами — детскую стоматологию в клинике не ведём.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "взросл",
+            "детск"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_c01_nika_crown_family",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Сколько стоит циркониевая коронка?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Короткий ответ о стоимости коронки.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "zirconia_crowns",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "zirconia_crowns"
+          },
+          "required_all": [
+            "22",
+            "ориентир"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "10 000"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_c02_nika_bridge_exact",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Сколько стоит мост?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Мостовидный протез — от 10 000 ₽ за единицу.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "fixed_bridge",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "fixed_bridge"
+          },
+          "required_all": [
+            "10",
+            "единиц"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "22 000"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_c03_nika_inlay_exact",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Сколько стоит культевая вкладка?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Культевая вкладка — от 7 000 ₽ за зуб.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "core_inlay",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "core_inlay"
+          },
+          "required_all": [
+            "7",
+            "зуб"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_c04_nika_sinus_not_implant_family",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Сколько синус-лифтинг?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Синус-лифтинг — от 25 000 ₽ за процедуру.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "sinus_lift",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "sinus_lift"
+          },
+          "required_all": [
+            "25"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [
+            "35000",
+            "35 000"
+          ],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_c05_nika_tax_deduction",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Можно ли получить налоговый вычет за лечение?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Можно оформить налоговый вычет 13% от оплаченного лечения.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "13",
+            "налогов"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "рассроч",
+            "скидк"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_c06_nika_neutral_info",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Что такое All-on-4?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "All-on-4 — протокол имплантации и протезирования на четырех имплантах.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [
+            "₽",
+            "000"
+          ],
+          "forbidden_price_tokens": [
+            "35000",
+            "318000"
+          ],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_d01_demo_osse",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Какая приживаемость?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Наш результат — 99,8% приживаемости за 26 лет работы.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "99,8",
+            "26"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "16 лет"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized",
+          "diagnostic": {
+            "overload_manual": true,
+            "naturalness_manual": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "s53_d02_nika_osse",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Какая приживаемость?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Наш результат — 99,8% приживаемости за 16 лет работы.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "99,8",
+            "16"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "26 лет",
+            "APRF использ"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized",
+          "diagnostic": {
+            "overload_manual": true,
+            "naturalness_manual": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "s53_d03_demo_parking",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Есть парковка?",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [
+            "парков",
+            "2",
+            "бесплат"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "+7 (900)"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_contacts"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_d04_nika_no_aprf",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Используете APRF?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "В материалах клиники Никадент нет информации об использовании APRF.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [
+            "APRF использ",
+            "биоматериал из собственной крови",
+            "ускоряет заживление"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_d05_nika_no_demo_parking",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Есть парковка?",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [
+            "2 часа бесплатно",
+            "пропуск на ресепшене",
+            "Тверская"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_admin"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_e01_demo_doctors",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Кто у вас делает имплантацию?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Имплантацию выполняют врачи Орлов и Волков.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "classic",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "classic"
+          },
+          "required_all": [
+            "Орлов",
+            "Волков"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Кадиев",
+            "Лавренов"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_e02_nika_doctors",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Кто у вас делает имплантацию?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "В клинике работают врачи Кадиев и Лавренов.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "classic",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "classic"
+          },
+          "required_all": [
+            "Кадиев",
+            "Лавренов"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Орлов",
+            "Волков"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_e03_nika_no_demo_doctor",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Кто такой Орлов?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "В материалах клиники Никадент нет информации о враче Орлове.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [
+            "Орлов Никита",
+            "имплантолог"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_f01_demo_promo_overview",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Какие акции у вас есть?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "В клинике действуют сезонные акции и спецпредложения.",
+            "commercial_intent": "promotion",
+            "promotion_scope": "general",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "скидк",
+            "консультац"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_f02_nika_promo_overview",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Какие акции у вас есть?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Расскажу об актуальных акциях клиники.",
+            "commercial_intent": "promotion",
+            "promotion_scope": "general",
+            "scenario": "none",
+            "service_id": null,
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "none",
+            "requested_service_id": null
+          },
+          "required_all": [
+            "бесплатн",
+            "консультац"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "гарантия 1 год",
+            "work_warranty"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_f03_nika_service_promo_none",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Расскажите про All-on-4",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Бесплатная консультация по ортопедии, имплантации и протезированию.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "бесплатн",
+            "консультац"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "скидк",
+            "15%",
+            "implant_same_day"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_f04_mt_promo_cadence",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Расскажите про All-on-4",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "All-on-4 — протокол имплантации и протезирования на четырех имплантах.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "четыр",
+            "имплант"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        },
+        {
+          "user_message": "Расскажите про All-on-6",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "All-on-6 — протокол на шести имплантах.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_6",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_6"
+          },
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [
+            "15%",
+            "скидк"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        },
+        {
+          "user_message": "Повторите акцию, которую только что показывали",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "При оплате в день обращения — скидка до 15% на имплантацию.",
+            "commercial_intent": "promotion",
+            "promotion_scope": "shown",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "15%",
+            "скидк"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ],
+      "session_sid": "s53_f04_mt_promo_cadence"
+    },
+    {
+      "case_id": "s53_g01_demo_contacts",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Контакты",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [
+            "+7 (495) 128",
+            "Тверская"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Рябикова",
+            "Никадент"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_contacts"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_g02_nika_contacts",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Контакты",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [
+            "Рябикова",
+            "Пограничная"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Тверская",
+            "Artgents"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_contacts"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_g03_nika_branch_ryabikova",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Адрес на Рябикова",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [
+            "Рябикова",
+            "49"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Пограничная",
+            "Тверская"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_contacts"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_g04_nika_branch_pogranichnaya",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Телефон филиала на Пограничной",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [
+            "+7 (914) 995-78-82"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Рябикова",
+            "495"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "sales_fast_contacts"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_g05_nika_urgent_admin_branch",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Срочно, филиал Пограничная, после операции воспаление",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [],
+          "required_any": [
+            [
+              "+7 (900)",
+              "+7 (984)",
+              "позвоните"
+            ]
+          ],
+          "forbidden": [
+            "Рябикова",
+            "495"
+          ],
+          "forbidden_price_tokens": [],
+          "route": "ADMIN",
+          "service_route_contains": "sales_fast_admin"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_g06_demo_urgent_admin",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "После операции появилось воспаление, что делать?",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [
+            "+7 (495)"
+          ],
+          "required_any": [],
+          "forbidden": [
+            "Рябикова"
+          ],
+          "forbidden_price_tokens": [],
+          "route": "ADMIN",
+          "service_route_contains": "sales_fast_admin"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_g07_mt_booking",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Хочу записаться",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [],
+          "required_any": [
+            [
+              "запис",
+              "администратор",
+              "контакт"
+            ]
+          ],
+          "forbidden": [
+            "15:00",
+            "пятниц"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "lead_flow"
+        },
+        {
+          "user_message": "Можно в пятницу в 15:00?",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [],
+          "required_any": [
+            [
+              "администратор",
+              "контакт",
+              "уточн"
+            ]
+          ],
+          "forbidden": [
+            "15:00",
+            "15.00",
+            "пятницу в"
+          ],
+          "forbidden_price_tokens": [],
+          "service_route_contains": "lead_booking_date_defer"
+        }
+      ],
+      "session_sid": "s53_g07_mt_booking"
+    },
+    {
+      "case_id": "s53_h01_demo_admin_symptom",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "После операции появилось воспаление, подскажите порядок действий",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "route": "ADMIN",
+          "service_route_contains": "sales_fast_admin"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_h02_demo_fear_pain",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Боюсь боли при имплантации",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Имплантация проходит под анестезией, лечение обычно безболезненное.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "pain_fear",
+            "service_id": "classic",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "classic"
+          },
+          "required_all": [],
+          "required_any": [
+            [
+              "боль",
+              "анестез"
+            ]
+          ],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "route": "ANSWER",
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_h03_nika_admin_symptom",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Болит зуб после имплантации",
+          "provider_calls": 0,
+          "fake_envelope": null,
+          "required_all": [],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "route": "ADMIN",
+          "service_route_contains": "sales_fast_admin"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_h04_nika_fear_osse",
+      "client_id": "nikadent",
+      "turns": [
+        {
+          "user_message": "Боюсь, что имплант не приживётся",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "По статистике клиники приживаемость имплантов — 99,8%. Диагностика перед операцией показывает, подходит ли имплантация.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "classic",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "classic"
+          },
+          "required_all": [
+            "99"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "route": "ANSWER",
+          "service_route_contains": "sales_fast_materialized"
+        }
+      ]
+    },
+    {
+      "case_id": "s53_h05_demo_fear_osse",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Боюсь, что имплант не приживётся",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "По статистике клиники приживаемость имплантов — 99,8%. Современные технологии надёжны.",
+            "commercial_intent": "none",
+            "promotion_scope": "none",
+            "scenario": "result_reliability",
+            "service_id": "classic",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "classic"
+          },
+          "required_all": [
+            "99,8"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [],
+          "route": "ANSWER",
+          "service_route_contains": "sales_fast_materialized",
+          "diagnostic": {
+            "overload_manual": true,
+            "naturalness_manual": true
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "s53_j01_mt_cache_isolation",
+      "client_id": "demo",
+      "turns": [
+        {
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "318"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [
+            "35000",
+            "35 000"
+          ],
+          "sid": "sid_stage53_demo"
+        },
+        {
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Короткий ответ о стоимости All-on-4.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": "full_arch",
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "35"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [
+            "318000",
+            "318 000"
+          ],
+          "sid": "sid_stage53_nika",
+          "client_id": "nikadent"
+        },
+        {
+          "user_message": "Сколько стоит All-on-4?",
+          "provider_calls": 1,
+          "fake_envelope": {
+            "route": "ANSWER",
+            "patient_text": "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть.",
+            "commercial_intent": "price",
+            "promotion_scope": "none",
+            "scenario": "none",
+            "service_id": "all_on_4",
+            "extent": null,
+            "jaw": null,
+            "stage": null,
+            "clarify_axis": null,
+            "clarify_service_options": null,
+            "service_reference_status": "resolved",
+            "requested_service_id": "all_on_4"
+          },
+          "required_all": [
+            "318"
+          ],
+          "required_any": [],
+          "forbidden": [],
+          "forbidden_price_tokens": [
+            "35000",
+            "35 000"
+          ],
+          "sid": "sid_stage53_demo"
+        }
+      ]
+    }
+  ]
+}

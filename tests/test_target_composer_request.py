@@ -833,3 +833,35 @@ def test_nikadent_composer_prepends_contact_evidence_without_name_error(
     if expect_filial_1 and expect_filial_2:
         assert "+7 (900) 444-69-97" in combined
         assert "+7 (914) 995-78-82" in combined
+
+
+def test_demo_promotion_general_composer_emits_three_commercial_fact_blocks() -> None:
+    from tests.test_target_scoped_response_evidence import _demo_general_promotion_bound
+
+    demo_root = Path(__file__).resolve().parents[1] / "clients" / "demo"
+    demo_md = demo_root / "md"
+    data = load_target_client_data("demo")
+    doctors = load_doctor_catalog(demo_root / "doctor_catalog.json")
+    bound = _demo_general_promotion_bound()
+    request = materialize_target_composer_request(
+        bound,
+        data.bundle,
+        doctors,
+        (),
+        user_message="Какие акции у вас есть?",
+        md_root=demo_md,
+        client_id="demo",
+    )
+    expected_refs = (
+        "fact:implant_same_day_discount",
+        "fact:professional_whitening_discount",
+        "fact:free_implant_consult",
+    )
+    commercial_blocks = [
+        block for block in request.evidence_blocks if block.kind == "commercial_fact"
+    ]
+    assert tuple(block.ref for block in commercial_blocks) == expected_refs
+    assert len(commercial_blocks) == 3
+    for block, fact_id in zip(commercial_blocks, expected_refs, strict=True):
+        fact = data.bundle.facts[block.ref.removeprefix("fact:")]
+        assert block.text == str(fact.text_fact)

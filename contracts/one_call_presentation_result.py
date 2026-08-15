@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from contracts.authored_service_alternative import AuthoredServiceAlternative
 from contracts.service_reference import AvailabilityStatus, PriceCoverageKind
+
+if TYPE_CHECKING:
+    from core.target_response_verifier import TargetVerifiedComposedResponse
 
 PresentationStatus = Literal["ok", "fail_closed"]
 
@@ -61,6 +64,7 @@ class OneCallPresentationResult:
     presentation_channel: str
     rendered_ids: PresentationRenderedIds
     pending_session_delta: PresentationSessionDelta | None
+    verified_for_session: TargetVerifiedComposedResponse | None = None
     offer_fact_refs: tuple[str, ...] = ()
     availability_status: AvailabilityStatus = "none"
     requested_service_id: str | None = None

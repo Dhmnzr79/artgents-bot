@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import get_args
+from typing import Literal, get_args
 
 from contracts.doctor_schema import TargetDoctorCatalog
 from contracts.response_schema import MarketingScenario, ResponseSchemaBundle
@@ -14,6 +14,15 @@ from contracts.response_schema_refs import ResponseSchemaExternalIndex
 
 _MARKETING_SCENARIOS = frozenset(get_args(MarketingScenario))
 
+MarketingSelectionMode = Literal[
+    "automatic",
+    "promotion_general",
+    "promotion_service",
+    "promotion_shown",
+]
+
+PROMOTION_GENERAL_OVERVIEW_MAX_FACTS = 3
+
 
 @dataclass(frozen=True, slots=True)
 class TargetMarketingSelection:
@@ -21,6 +30,7 @@ class TargetMarketingSelection:
     selected_refs: tuple[str, ...]
     amplifier_refs: tuple[str, ...]
     cta_key: str
+    selection_mode: MarketingSelectionMode = "automatic"
 
 
 class TargetMarketingSelectionError(ValueError):
@@ -629,12 +639,20 @@ def select_stage51_marketing(
             semantic_context,
             policy.cta_contexts["default"],
         )
+        promo_mode: MarketingSelectionMode
+        if promotion_scope == "general":
+            promo_mode = "promotion_general"
+        elif promotion_scope == "service":
+            promo_mode = "promotion_service"
+        else:
+            promo_mode = "promotion_shown"
         return Stage51MarketingOutcome(
             selection=TargetMarketingSelection(
                 applied_scenarios=(),
                 selected_refs=tuple(promo_refs),
                 amplifier_refs=(),
                 cta_key=cta_key,
+                selection_mode=promo_mode,
             )
         )
 

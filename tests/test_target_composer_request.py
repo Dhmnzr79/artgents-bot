@@ -21,6 +21,10 @@ from core.target_composer_request import (
     TargetComposerRequestError,
     materialize_target_composer_request,
 )
+from contracts.target_response_policy import TargetResponsePolicyRequest
+from core.doctor_schema_loader import load_doctor_catalog
+from core.target_client_data import load_target_client_data
+from core.target_fullcontext_content_package import assemble_target_fullcontext_content_bound_package
 from core.target_response_policy import build_target_response_spec
 from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
 from core.target_spec_offline_response_package import (
@@ -757,3 +761,75 @@ def test_s35_called_once_and_import_firewall(md_root: Path, monkeypatch) -> None
         and node.func.attr in forbidden_calls
         for node in ast.walk(tree)
     )
+
+
+_NIKADENT_ROOT = Path(__file__).resolve().parents[1] / "clients" / "nikadent"
+_NIKADENT_MD = _NIKADENT_ROOT / "md"
+
+
+def _nikadent_content_only_policy() -> TargetResponsePolicyRequest:
+    return TargetResponsePolicyRequest.model_validate(
+        {
+            "response_mode": "answer",
+            "service_id": None,
+            "tone_key": "commercial_warm",
+            "allowed_topics": ("clinic", "implantation", "prosthetics"),
+            "forbidden_topics": ("diagnosis", "personal_eligibility"),
+            "required_fact_ids": (),
+            "requested_components": ("content",),
+            "primary_component": None,
+            "allow_marketing_facts": False,
+            "allow_consultation_close": False,
+            "allow_cta": False,
+        }
+    )
+
+
+def _materialize_nikadent_contact_composer_request(user_message: str) -> TargetComposerRequest:
+    data = load_target_client_data("nikadent")
+    doctors = load_doctor_catalog(_NIKADENT_ROOT / "doctor_catalog.json")
+    spec = build_target_response_spec(_nikadent_content_only_policy())
+    bound = assemble_target_fullcontext_content_bound_package(spec, bundle=data.bundle)
+    return materialize_target_composer_request(
+        bound,
+        data.bundle,
+        doctors,
+        (),
+        user_message=user_message,
+        md_root=_NIKADENT_MD,
+        contact_fields=("phone",),
+        client_id="nikadent",
+    )
+
+
+@pytest.mark.parametrize(
+    ("user_message", "expect_filial_1", "expect_filial_2"),
+    [
+        ("Дайте телефон филиала на Пограничной", False, True),
+        ("Дайте телефон клиники", True, True),
+    ],
+)
+def test_nikadent_composer_prepends_contact_evidence_without_name_error(
+    user_message: str,
+    expect_filial_1: bool,
+    expect_filial_2: bool,
+) -> None:
+    request = _materialize_nikadent_contact_composer_request(user_message)
+    contact_blocks = [block for block in request.evidence_blocks if block.kind == "clinic_contact"]
+    assert contact_blocks
+    combined = "\n".join(block.text for block in contact_blocks)
+    if expect_filial_1:
+        assert "Филиал 1" in combined
+        assert "+7 (900) 444-69-97" in combined
+    else:
+        assert "Филиал 1" not in combined
+        assert "+7 (900) 444-69-97" not in combined
+    if expect_filial_2:
+        assert "Филиал 2" in combined
+        assert "+7 (914) 995-78-82" in combined
+    else:
+        assert "Филиал 2" not in combined
+        assert "+7 (914) 995-78-82" not in combined
+    if expect_filial_1 and expect_filial_2:
+        assert "+7 (900) 444-69-97" in combined
+        assert "+7 (914) 995-78-82" in combined

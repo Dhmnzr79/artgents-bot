@@ -9,6 +9,7 @@ import yaml
 
 from contracts.authored_service_alternative import AuthoredServiceAlternative
 from core.client_config_loader import resolve_pack_client_id
+from core.target_contact_authority import canonical_contact_phone
 
 
 @dataclass(frozen=True)
@@ -59,8 +60,7 @@ def load_clinic_policies(client_id: str) -> ClinicPoliciesBundle | None:
         raw = yaml.safe_load(f) or {}
     if not isinstance(raw, dict):
         return None
-    contact = raw.get("contact") if isinstance(raw.get("contact"), dict) else {}
-    phone = str(contact.get("phone_display") or "").strip()
+    phone = canonical_contact_phone(cid)
 
     policies_out: list[ClinicPolicy] = []
     policies_raw = raw.get("policies")

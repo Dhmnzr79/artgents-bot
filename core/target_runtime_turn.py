@@ -219,6 +219,7 @@ def run_target_fullcontext_runtime_turn(
                 turn_frame=turn_frame,
                 contact_fields=structured_capability.contact_fields,
                 allowed_topics=context.allowed_topics,
+                branch_hint_text=user_message,
             )
         except Exception as exc:
             stage, code, value = emit_target_pipeline_failure_from_exception(exc)

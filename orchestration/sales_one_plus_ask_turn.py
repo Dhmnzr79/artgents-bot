@@ -139,6 +139,7 @@ def _try_deterministic_contacts_terminal(
     answer = materialize_structured_contact_answer_text(
         client_id,
         contact_fields=contact_fields,
+        branch_hint_text=q,
     )
     if not answer.strip():
         return None

@@ -1,0 +1,16 @@
+{
+  "pack_id": "nikadent",
+  "clientId": "nikadent",
+  "apiBase": "https://nikadent.bot.artgents.ru",
+  "allowed_origins": [
+    "https://nikadent.bot.artgents.ru"
+  ],
+  "bot_name": "Консультант Никадент",
+  "online_label": "ИИ-консультант клиники. Онлайн 24/7",
+  "launcher_subtitle": null,
+  "launcher_cta_label": "Задать вопрос",
+  "demo_launcher": false,
+  "welcome_text": null,
+  "video_aspect": "horizontal",
+  "starter_prompts": []
+}

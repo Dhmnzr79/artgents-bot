@@ -1,0 +1,17 @@
+{
+  "offer_id": "sinus_lift.default",
+  "service_id": "sinus_lift",
+  "active": true,
+  "price": {
+    "mode": "from",
+    "min_amount": 25000,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "за процедуру; объём работ уточняется на консультации",
+    "includes": []
+  },
+  "fact_refs": [],
+  "followups": []
+}

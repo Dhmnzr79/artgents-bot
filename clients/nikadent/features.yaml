@@ -1,0 +1,12 @@
+leads:
+  enabled: true
+  mode: email
+
+admin:
+  enabled: false
+
+postgres_events:
+  enabled: false
+
+ingress:
+  strict: true

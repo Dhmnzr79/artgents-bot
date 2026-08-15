@@ -58,10 +58,13 @@ def resolve_structured_answer_capability(turn_frame: TurnFrame) -> StructuredAns
 def materialize_structured_contact_answer_text(
     client_id: str,
     contact_fields: tuple[ContactFieldKind, ...],
+    *,
+    branch_hint_text: str | None = None,
 ) -> str:
     blocks = materialize_clinic_contact_primary_evidence(
         client_id,
         fields=contact_fields,
+        branch_hint_text=branch_hint_text,
     )
     lines = [block.text for block in blocks if block.text.strip()]
     return "\n".join(lines)
@@ -73,10 +76,15 @@ def materialize_structured_contact_turn_response(
     turn_frame: TurnFrame,
     contact_fields: tuple[ContactFieldKind, ...],
     allowed_topics: tuple[str, ...],
+    branch_hint_text: str | None = None,
 ) -> TargetTurnFrameBoundMaterializeResponse:
     """Build one verified structured contact response without Composer or Verifier."""
 
-    answer = materialize_structured_contact_answer_text(client_id, contact_fields)
+    answer = materialize_structured_contact_answer_text(
+        client_id,
+        contact_fields,
+        branch_hint_text=branch_hint_text,
+    )
     if not answer.strip():
         raise ValueError("structured_contact_answer_empty")
     policy_request = TargetResponsePolicyRequest.model_validate(

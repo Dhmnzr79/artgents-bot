@@ -1,0 +1,72 @@
+version: 1
+
+limits:
+  max_marketing_facts_per_turn: 3
+  max_amplifiers_per_turn: 2
+  max_scenarios_per_turn: 2
+
+priority_service_promos:
+  all_on_4:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  all_on_6:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  removable_dentures:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  clasp_dentures:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  implant_supported_prosthetics:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  zirconia_crowns:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  metal_ceramic_crowns:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  fixed_bridge:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+  core_inlay:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+
+promotion_overview:
+  ordered_fact_refs:
+    - fact:free_orthopedic_consult
+
+initial_commercial_blocks:
+  service:
+    ordered_fact_refs:
+      - fact:free_orthopedic_consult
+
+scenario_rules:
+  cost:
+    ordered_amplifier_refs:
+      - fact:tax_deduction
+      - kb:clinic__info__payment_terms.md#korotko
+    allowed_semantic_contexts:
+      - service
+      - price
+      - default
+    allowed_topics:
+      - prosthetics
+      - implantation
+  result_reliability:
+    ordered_amplifier_refs:
+      - fact:work_warranty_1year
+      - kb:clinic__info__warranty.md#korotko
+    allowed_semantic_contexts:
+      - service
+      - default
+    allowed_topics:
+      - prosthetics
+      - implantation
+
+cta_contexts:
+  service: plan
+  price: price
+  default: callback

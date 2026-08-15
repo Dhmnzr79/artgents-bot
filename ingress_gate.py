@@ -22,6 +22,7 @@ from core.clinic_policies_loader import (
     policy_answer,
     service_alternative_quick_replies,
 )
+from core.target_contact_authority import format_manual_contact_phone_suffix_for_client
 from core.routing_loader import THRESHOLDS
 from doctors_lookup import doctor_ground_truth_mention
 from llm import chat_completions_create
@@ -572,8 +573,10 @@ def build_ingress_payload(
     question: str = "",
 ) -> dict[str, Any]:
     bundle = load_clinic_policies(client_id)
-    phone = (bundle.contact_phone_display if bundle else "") or ""
-    phone_suffix = f" по номеру {phone}" if phone else ""
+    phone_suffix = format_manual_contact_phone_suffix_for_client(
+        client_id,
+        branch_hint=question,
+    )
     quick_replies: list[dict[str, str]] = []
 
     if result.route == "hard_stop_non_target":

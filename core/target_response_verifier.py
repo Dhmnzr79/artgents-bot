@@ -794,22 +794,32 @@ def verify_target_composed_response(
         has_clinic_contact = any(block.kind == "clinic_contact" for block in request.evidence_blocks)
         if has_clinic_contact:
             from core.target_contact_authority import (
+                branch_by_id,
                 canonical_contact_scalar,
-                contact_field_from_evidence_ref,
+                load_clinic_contact_facts,
                 normalize_contact_scalar,
+                parse_contact_evidence_ref,
             )
 
             contact_blocks = [
                 block for block in request.evidence_blocks if block.kind == "clinic_contact"
             ]
             normalized_answer = normalize_contact_scalar(response.text)
+            facts = load_clinic_contact_facts(client_id or "demo")
             for block in contact_blocks:
-                field = contact_field_from_evidence_ref(block.ref)
+                field, branch_id = parse_contact_evidence_ref(block.ref)
                 if field is None:
                     _error("target_verifier_clinic_contact_missing", block.ref)
+                if branch_id is not None:
+                    if branch_by_id(facts, branch_id) is None:
+                        _error("target_verifier_clinic_contact_missing", block.ref)
+                    if normalize_contact_scalar(block.text) not in normalized_answer:
+                        _error("target_verifier_clinic_contact_missing", block.ref)
+                    continue
                 canonical = canonical_contact_scalar(
                     field,
                     client_id=client_id or "demo",
+                    branch_id=None,
                 )
                 if not canonical:
                     _error("target_verifier_clinic_contact_missing", block.ref)

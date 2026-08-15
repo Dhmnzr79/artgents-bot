@@ -1,0 +1,19 @@
+{
+  "offer_id": "prosthetics_consultation.default",
+  "service_id": "prosthetics_consultation",
+  "active": true,
+  "price": {
+    "mode": "fixed",
+    "amount": 0,
+    "currency": "RUB",
+    "billing_unit": "procedure"
+  },
+  "package": {
+    "label": "консультация ортопеда по протезированию",
+    "includes": []
+  },
+  "fact_refs": [
+    "free_orthopedic_consult"
+  ],
+  "followups": []
+}

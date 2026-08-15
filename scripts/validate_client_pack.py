@@ -28,6 +28,7 @@ from core.response_schema_loader import (  # noqa: E402
     ResponseSchemaLoadError,
     load_response_schema_bundle,
 )
+from core.target_contact_authority import validate_clinic_contact_section  # noqa: E402
 
 LEGACY_MIRROR_RELATIVE = (
     "service_catalog.json",
@@ -175,9 +176,12 @@ def validate_client_pack(
 
         raw = yaml.safe_load(policies_path.read_text(encoding="utf-8")) or {}
         contact = raw.get("contact") if isinstance(raw.get("contact"), dict) else {}
-        phone = str(contact.get("phone_display") or "").strip()
-        if not phone:
-            errors.append("clinic_policies.yaml: contact.phone_display_required")
+        errors.extend(
+            validate_clinic_contact_section(
+                contact,
+                prefix="clinic_policies.yaml: contact",
+            )
+        )
         service_ids = set(bundle.services.keys()) if bundle is not None else set()
         alts_raw = raw.get("service_alternatives")
         if isinstance(alts_raw, list):

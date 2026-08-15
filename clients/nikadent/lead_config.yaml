@@ -1,0 +1,3 @@
+delivery:
+  mode: email_stub
+  to: "nikadent-leads@example.local"

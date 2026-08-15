@@ -596,12 +596,14 @@ def _prepend_contact_evidence(
     *,
     client_id: str,
     contact_fields: tuple[str, ...] | None = None,
+    branch_hint_text: str | None = None,
 ) -> tuple[TargetComposerEvidenceBlock, ...]:
     if contact_fields is None:
         return blocks
     contact_blocks = materialize_clinic_contact_primary_evidence(
         client_id,
         fields=contact_fields,  # type: ignore[arg-type]
+        branch_hint_text=branch_hint_text,
     )
     if not contact_blocks:
         return blocks
@@ -650,6 +652,7 @@ def materialize_target_composer_request(
                 blocks,
                 client_id=client_id,
                 contact_fields=contact_fields,
+                branch_hint_text=user_message,
             )
             return _attach_composer_action_context(
                 TargetComposerRequest(
@@ -687,6 +690,7 @@ def materialize_target_composer_request(
             blocks,
             client_id=client_id,
             contact_fields=contact_fields,
+            branch_hint_text=user_message,
         )
         return _attach_composer_action_context(
             TargetComposerRequest(
@@ -770,6 +774,7 @@ def materialize_target_composer_request(
         blocks,
         client_id=client_id,
         contact_fields=contact_fields,
+        branch_hint_text=user_message,
     )
     return _attach_composer_action_context(
         TargetComposerRequest(

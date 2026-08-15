@@ -30,6 +30,11 @@ _JAW_LOWER_RE = re.compile(r"нижн\w*", re.I | re.U)
 _JAW_UPPER_RE = re.compile(r"верхн\w*", re.I | re.U)
 _SCOPE_PROVENANCE = "sales_fast.message_scope"
 
+_SERVICE_FAMILY_TO_TOPIC: dict[str, str] = {
+    "implantology": "implantation",
+    "prosthodontics": "prosthetics",
+}
+
 _SALES_FAST_PROVENANCE = "sales_fast.exact_turn"
 _SEMANTIC_PROVENANCE = "sales_fast.semantic_authority"
 _ASPECT_TO_SCENARIO: dict[AspectKind, str] = {
@@ -82,8 +87,9 @@ def _topic_for_confirmed_service(
     if service is None or not service.family:
         return None
     family = str(service.family).strip().lower()
-    if family == "implantology":
-        return "implantation"
+    mapped = _SERVICE_FAMILY_TO_TOPIC.get(family)
+    if mapped is not None:
+        return mapped
     return family
 
 

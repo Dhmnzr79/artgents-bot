@@ -190,3 +190,37 @@ def test_authoritative_turn_frame_non_implant_service_not_implantation() -> None
     )
     assert frame.service_id == "professional_whitening"
     assert frame.topic == "aesthetics"
+
+
+def test_prosthodontics_family_maps_to_prosthetics_topic() -> None:
+    frame = build_turn_frame_from_semantic_frame(
+        semantic=bind_semantic_frame(
+            envelope=_envelope(service_id="zirconia_crowns"),
+            governed_ui=governed_ui_authority_from_resolution(
+                _governed_resolution(service_id="zirconia_crowns")
+            ),
+            active_service_catalog=_DEMO_CATALOG,
+            service_reference_catalog=_DEMO_REF_CATALOG,
+        ),
+        user_message="Сколько стоит циркониевая коронка?",
+        bundle=_BUNDLE,
+    )
+    assert frame.service_id == "zirconia_crowns"
+    assert frame.topic == "prosthetics"
+
+
+def test_implantology_family_still_maps_to_implantation_topic() -> None:
+    frame = build_turn_frame_from_semantic_frame(
+        semantic=bind_semantic_frame(
+            envelope=_envelope(service_id="classic"),
+            governed_ui=governed_ui_authority_from_resolution(
+                _governed_resolution(service_id="classic")
+            ),
+            active_service_catalog=_DEMO_CATALOG,
+            service_reference_catalog=_DEMO_REF_CATALOG,
+        ),
+        user_message="Сколько стоит имплант?",
+        bundle=_BUNDLE,
+    )
+    assert frame.service_id == "classic"
+    assert frame.topic == "implantation"

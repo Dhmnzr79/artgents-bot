@@ -21,6 +21,7 @@ from core.target_runtime_client_context import TargetRuntimeClientContext
 from core.target_runtime_widget import (
     TargetRuntimeMaterializedPayload,
     TargetRuntimeTerminalPayload,
+    TargetRuntimeErrorPayload,
     build_target_runtime_widget_cta,
     materialize_s41_terminal_payload,
     materialize_verified_widget_payload,
@@ -146,6 +147,40 @@ def materialize_sales_fast_spam_payload(*, client_id: str, sid: str) -> TargetRu
             },
         },
         terminal_mode="spam",
+    )
+
+
+def materialize_sales_fast_error_payload(
+    *,
+    client_id: str,
+    sid: str,
+    error_code: str,
+    patient_text: str,
+) -> TargetRuntimeErrorPayload:
+    """Neutral sales-fast technical error without clinic/admin handoff."""
+
+    return TargetRuntimeErrorPayload(
+        kind="error",
+        payload={
+            "answer": patient_text,
+            "quick_replies": [],
+            "cta": None,
+            "video": None,
+            "situation": {"show": False, "mode": "normal"},
+            "offer": None,
+            "meta": {
+                "client_id": client_id,
+                "sid": sid,
+                "intent": "content",
+                "answer_path": "sales_fast",
+                "service_route": "sales_fast_error",
+                "ui_source_family": "guided_fallback",
+                "attribution_kind": "plain",
+                "error": True,
+                "target_error_code": error_code,
+            },
+        },
+        error_code=error_code,
     )
 
 

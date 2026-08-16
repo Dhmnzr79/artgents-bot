@@ -156,6 +156,27 @@ def _intent_price_is_usable(
     return meta.confidence >= envelope.min_intent_confidence
 
 
+def _structured_price_request(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    if "price" in turn_frame.aspects or turn_frame.primary_aspect == "price":
+        return True
+    return turn_frame.intent in _PRICE_INTENTS and _intent_price_is_usable(
+        turn_frame, envelope
+    )
+
+
+def _skip_topic_compatibility_gate(
+    turn_frame: TurnFrame,
+    envelope: TargetTurnFramePolicyEnvelope,
+) -> bool:
+    return (
+        _service_id_is_usable(turn_frame, envelope)
+        and _structured_price_request(turn_frame, envelope)
+    )
+
+
 def _price_component_requested(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
@@ -196,7 +217,8 @@ def _components_from_turn_frame(
     if not _aspects_empty_exception(turn_frame, envelope):
         _reject_invalid(turn_frame.field_meta.aspects, "aspects")
     if _topic_is_usable(turn_frame, envelope):
-        _assert_topic_scope_compatible(turn_frame.topic, envelope)  # type: ignore[arg-type]
+        if not _skip_topic_compatibility_gate(turn_frame, envelope):
+            _assert_topic_scope_compatible(turn_frame.topic, envelope)  # type: ignore[arg-type]
     for aspect in turn_frame.aspects:
         if aspect == "service_availability":
             continue

@@ -124,8 +124,6 @@ def structured_route_blocks_generic(
     turn_frame: TurnFrame,
     envelope: TargetTurnFramePolicyEnvelope,
 ) -> bool:
-    if _service_id_is_usable(turn_frame, envelope):
-        return True
     if turn_frame.intent in _PRICE_INTENTS and _intent_price_is_usable(
         turn_frame,
         envelope,

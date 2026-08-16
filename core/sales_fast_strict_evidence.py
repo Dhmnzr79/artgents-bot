@@ -54,6 +54,10 @@ def _offer_price_text(offer: TargetOffer) -> str:
 def _authority_for_provenance(provenance: SemanticFieldProvenance) -> ExactSalesFieldAuthority:
     if provenance == "governed_ui":
         return ExactSalesFieldAuthority(authority="governed_ui", provenance="governed_ui")
+    if provenance == "exact_turn":
+        return ExactSalesFieldAuthority(authority="exact_turn", provenance="exact_turn")
+    if provenance == "valid_session":
+        return ExactSalesFieldAuthority(authority="valid_session", provenance="valid_session")
     if provenance == "envelope":
         return ExactSalesFieldAuthority(authority="unknown", provenance="envelope")
     return ExactSalesFieldAuthority(authority="unknown", provenance="null")

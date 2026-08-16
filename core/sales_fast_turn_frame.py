@@ -9,6 +9,7 @@ from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.patient_scope_projection import ProjectedPatientScope, ProjectedScopeAxis
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
+from contracts.target_service_content_topic import parse_service_catalog_content_topic
 from contracts.turn_frame import FieldMeta, PatientScopeFrame, PatientScopeFrameMeta, TurnFrame, TurnFrameMeta
 from core.answer_planner import detect_aspects_regex
 
@@ -29,11 +30,6 @@ _JAW_BOTH_RE = re.compile(r"обе\s+челюст", re.I | re.U)
 _JAW_LOWER_RE = re.compile(r"нижн\w*", re.I | re.U)
 _JAW_UPPER_RE = re.compile(r"верхн\w*", re.I | re.U)
 _SCOPE_PROVENANCE = "sales_fast.message_scope"
-
-_SERVICE_FAMILY_TO_TOPIC: dict[str, str] = {
-    "implantology": "implantation",
-    "prosthodontics": "prosthetics",
-}
 
 _SALES_FAST_PROVENANCE = "sales_fast.exact_turn"
 _SEMANTIC_PROVENANCE = "sales_fast.semantic_authority"
@@ -84,13 +80,9 @@ def _topic_for_confirmed_service(
     if not service_id:
         return None
     service = bundle.services.get(service_id)
-    if service is None or not service.family:
+    if service is None:
         return None
-    family = str(service.family).strip().lower()
-    mapped = _SERVICE_FAMILY_TO_TOPIC.get(family)
-    if mapped is not None:
-        return mapped
-    return family
+    return parse_service_catalog_content_topic(service.content_ref)
 
 
 def build_provisional_turn_frame(

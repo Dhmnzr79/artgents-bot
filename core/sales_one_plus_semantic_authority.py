@@ -83,11 +83,33 @@ def _resolve_availability_status(
     return "unresolved"
 
 
+def _envelope_service_candidates(envelope: OneCallEnvelope) -> tuple[str, ...]:
+    candidates: list[str] = []
+    if envelope.service_id is not None:
+        candidates.append(envelope.service_id)
+    if envelope.service_reference_status == "resolved" and envelope.requested_service_id is not None:
+        candidates.append(envelope.requested_service_id)
+    return tuple(dict.fromkeys(candidates))
+
+
+def _assert_no_envelope_service_conflict(
+    *,
+    selected_service_id: str,
+    envelope: OneCallEnvelope,
+    conflict_code: str,
+) -> None:
+    for candidate in _envelope_service_candidates(envelope):
+        if candidate != selected_service_id:
+            raise SalesOnePlusSemanticConflictError(conflict_code)
+
+
 def _project_active_service_id(
     *,
     envelope: OneCallEnvelope,
     governed_ui: GovernedUiSemanticAuthority,
     reference_catalog: ServiceReferenceCatalogSnapshot,
+    explicit_catalog_service_id: str | None = None,
+    session_service_id: str | None = None,
 ) -> tuple[str | None, SemanticFieldProvenance]:
     if governed_ui.service_id is not None:
         if governed_ui.service_id not in reference_catalog.active_service_ids:
@@ -97,6 +119,26 @@ def _project_active_service_id(
             if requested is not None and requested != governed_ui.service_id:
                 raise SalesOnePlusSemanticConflictError("semantic_ui_envelope_conflict_service_id")
         return governed_ui.service_id, "governed_ui"
+
+    if explicit_catalog_service_id is not None:
+        if explicit_catalog_service_id not in reference_catalog.active_service_ids:
+            raise SalesOnePlusSemanticConflictError("service_id_inactive")
+        _assert_no_envelope_service_conflict(
+            selected_service_id=explicit_catalog_service_id,
+            envelope=envelope,
+            conflict_code="semantic_catalog_envelope_conflict_service_id",
+        )
+        return explicit_catalog_service_id, "exact_turn"
+
+    if session_service_id is not None:
+        if session_service_id not in reference_catalog.active_service_ids:
+            raise SalesOnePlusSemanticConflictError("service_id_inactive")
+        _assert_no_envelope_service_conflict(
+            selected_service_id=session_service_id,
+            envelope=envelope,
+            conflict_code="semantic_session_envelope_conflict_service_id",
+        )
+        return session_service_id, "valid_session"
 
     envelope_service_id = envelope.service_id
     if envelope.service_reference_status == "resolved":
@@ -127,6 +169,8 @@ def bind_semantic_frame(
     governed_ui: GovernedUiSemanticAuthority,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    explicit_catalog_service_id: str | None = None,
+    session_service_id: str | None = None,
 ) -> SalesOnePlusSemanticFrame:
     """Pure local binder — no provider calls, no regex, no client reload."""
 
@@ -134,6 +178,8 @@ def bind_semantic_frame(
         envelope=envelope,
         governed_ui=governed_ui,
         reference_catalog=service_reference_catalog,
+        explicit_catalog_service_id=explicit_catalog_service_id,
+        session_service_id=session_service_id,
     )
     extent, extent_provenance = _merge_field(
         field="extent",

@@ -202,6 +202,28 @@ def test_incompatible_topic_raises_typed_error() -> None:
     assert caught.value.code == "dispatch_topic_scope_incompatible"
 
 
+def test_structured_price_skips_topic_gate_with_usable_service_id() -> None:
+    frame = build_turn_frame_from_raw(
+        {
+            "route": "content",
+            "aspects": ["price"],
+            "primary_aspect": "price",
+            "service_id": "tomography",
+            "topic": "doctors",
+            "topic_confidence": 0.95,
+        },
+        allowed_topics=frozenset({"implantation", "doctors"}),
+        allowed_service_ids=frozenset({"tomography"}),
+    )
+    result = dispatch_target_turn_frame_response(
+        frame,
+        _envelope(allowed_topics=("implantation",), forbidden_topics=("diagnosis",)),
+    )
+    assert result.kind == "materialize"
+    assert "price" in result.policy_request.requested_components  # type: ignore[union-attr]
+    assert result.policy_request.service_id == "tomography"  # type: ignore[union-attr]
+
+
 def test_invalid_topic_metadata_raises_typed_error() -> None:
     frame = _frame(topic="implantation", topic_confidence=0.9)
     broken = frame.model_copy(

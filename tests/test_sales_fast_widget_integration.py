@@ -659,6 +659,7 @@ def test_governed_ui_envelope_conflict_is_admin_without_model_text(
     flask_app,
 ) -> None:
     from contracts.local_problem_gate import LocalProblemGateResult
+    from core.sales_fast_service_identity import SalesFastServiceIdentity
     from core.target_presentation_decision import TargetPresentationCadenceState
     from core.target_runtime_session import read_target_runtime_session
 
@@ -691,7 +692,13 @@ def test_governed_ui_envelope_conflict_is_admin_without_model_text(
     def _resolve(**kwargs: object):
         sid = str(kwargs.get("sid") or "ui-conflict")
         session_state = read_target_runtime_session(sid)
-        return governed_resolution, session_state, cadence
+        identity = SalesFastServiceIdentity(
+            explicit_service_id=None,
+            explicit_service_term=None,
+            session_service_id=None,
+            catalog_ambiguous=False,
+        )
+        return governed_resolution, session_state, cadence, identity
 
     monkeypatch.setattr("core.sales_fast_widget_runtime._resolve_sales_context", _resolve)
     governed_gate = LocalProblemGateResult(
@@ -818,9 +825,19 @@ def test_widget_path_demo_general_promotion_overview_materializes_and_persists_s
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
+    from datetime import date
+
     from core.target_client_data import load_target_client_data
     from core.target_runtime_session import read_target_runtime_session
 
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
+    monkeypatch.setattr(
+        "core.sales_fast_widget_runtime.runtime_today",
+        lambda: date(2026, 8, 10),
+    )
     data = load_target_client_data("demo")
     expected_ids = (
         "implant_same_day_discount",

@@ -18,7 +18,14 @@ from contracts.one_call_envelope import (
 )
 from contracts.service_reference import AvailabilityStatus, ServiceReferenceStatus
 
-SemanticFieldProvenance = Literal["local_gate", "governed_ui", "envelope", "null"]
+SemanticFieldProvenance = Literal[
+    "local_gate",
+    "governed_ui",
+    "exact_turn",
+    "valid_session",
+    "envelope",
+    "null",
+]
 SemanticRebindKind = Literal["full_rebuild"]
 
 

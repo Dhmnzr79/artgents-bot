@@ -24,6 +24,7 @@ from core.sales_fast_observability import collect_sales_fast_timings_ms, record_
 from core.sales_fast_presentation import (
     materialize_sales_fast_admin_payload,
     materialize_sales_fast_answer_payload,
+    materialize_sales_fast_error_payload,
     materialize_sales_fast_spam_payload,
     materialize_sales_fast_terminal_from_dispatch,
     sales_fast_session_selection,
@@ -51,7 +52,11 @@ from core.sales_one_plus_turn import (
     run_sales_one_plus_candidate,
     run_sales_one_plus_candidate_stream,
 )
-from core.target_client_data import match_service_from_bundle
+from core.sales_fast_service_identity import (
+    SalesFastServiceIdentity,
+    resolve_catalog_service_identity,
+    resolve_session_service_for_followup,
+)
 from core.target_effective_scope import resolve_effective_scope
 from core.target_presentation_decision import TargetPresentationCadenceState
 from core.target_runtime_client_context import (
@@ -66,11 +71,22 @@ from core.target_runtime_session import (
 from core.target_runtime_strategy import resolve_target_runtime_strategy_context
 from core.target_runtime_turn import _followups_from_widget
 from core.target_runtime_widget import TargetRuntimeWidgetPayload, materialize_target_error_payload
+from core.target_service_resolver import TargetServiceResolutionError
 from core.target_strategy_context import strategy_match_from_effective_scope
 from core.target_spec_offline_response_package import TargetSpecBoundOfflineResponsePackage
 
 
 PatientDeltaCallback = Callable[[str], None]
+
+_TECHNICAL_ERROR_PATIENT_TEXT = (
+    "Сейчас не удалось подготовить ответ. Пожалуйста, попробуйте повторить вопрос."
+)
+_TECHNICAL_SEMANTIC_CONFLICT_CODES = frozenset(
+    {
+        "semantic_catalog_envelope_conflict_service_id",
+        "semantic_session_envelope_conflict_service_id",
+    }
+)
 
 
 class SalesFastOneCallBackend(Protocol):
@@ -181,19 +197,24 @@ def sales_fast_widget_outcome_from_local_gate(
     return _local_gate_terminal_outcome(gate, client_id=client_id, sid=sid)
 
 
-def _exact_service_term(user_message: str, context: TargetRuntimeClientContext) -> str | None:
-    match = match_service_from_bundle(user_message, context.bundle)
-    term = str(
-        match.get("matched_phrase")
-        or match.get("matched_service_term")
-        or match.get("matched_label")
-        or ""
-    ).strip()
-    return term or None
-
-
-def _catalog_service_hint(user_message: str, context: TargetRuntimeClientContext) -> str | None:
-    return _exact_service_term(user_message, context)
+def _technical_error_outcome(
+    *,
+    client_id: str,
+    sid: str,
+    error_code: str,
+    provider_calls: int,
+) -> SalesFastWidgetOutcome:
+    return SalesFastWidgetOutcome(
+        widget=materialize_sales_fast_error_payload(
+            client_id=client_id,
+            sid=sid,
+            error_code=error_code,
+            patient_text=_TECHNICAL_ERROR_PATIENT_TEXT,
+        ),
+        provider_calls=provider_calls,
+        model_route="error",
+        failure_kind=error_code,
+    )
 
 
 def _resolve_sales_context(
@@ -201,7 +222,7 @@ def _resolve_sales_context(
     context: TargetRuntimeClientContext,
     sid: str,
     user_message: str,
-) -> tuple[ExactSalesResolution, object, TargetPresentationCadenceState]:
+) -> tuple[ExactSalesResolution, object, TargetPresentationCadenceState, SalesFastServiceIdentity]:
     session_state = read_target_runtime_session(sid)
     current_ui_scope_action = _current_ui_scope_action()
     current_ui_stage_action = _current_ui_stage_action()
@@ -211,6 +232,7 @@ def _resolve_sales_context(
 
     aspects = detect_aspects_regex(user_message)
     exact_aspect: AspectKind | None = aspects[0] if aspects else None
+    service_identity = resolve_catalog_service_identity(user_message, context.bundle)
     resolution = resolve_exact_sales_inputs(
         ExactSalesResolverInputs(
             services=context.bundle.services,
@@ -218,7 +240,7 @@ def _resolve_sales_context(
             session_turn_count=session_state.session_turn_count,
             current_ui_scope_action=current_ui_scope_action,
             current_ui_stage_action=current_ui_stage_action,
-            exact_service_term=None,
+            exact_service_term=service_identity.explicit_service_term,
             exact_aspect=exact_aspect,
             projected_turn_scope=projected_turn_scope,
             session_facts=session_state.patient_facts,
@@ -230,7 +252,7 @@ def _resolve_sales_context(
         shown_price_followup_refs=frozenset(session_state.shown_price_followup_refs),
         situation_offered=session_state.situation_offered,
     )
-    return resolution, session_state, cadence
+    return resolution, session_state, cadence, service_identity
 
 
 def _maybe_pre_flash_terminal(
@@ -284,6 +306,7 @@ def _rebuild_authoritative_context(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     resolution: ExactSalesResolution,
+    service_identity: SalesFastServiceIdentity,
 ) -> tuple[
     TurnFrame,
     TargetSpecBoundOfflineResponsePackage | TargetTurnFrameBoundTerminalResponse,
@@ -295,11 +318,27 @@ def _rebuild_authoritative_context(
     if result.envelope is None:
         raise ValueError("authoritative_rebuild_requires_envelope")
     governed_ui = governed_ui_authority_from_resolution(resolution)
+    session_service_id = resolve_session_service_for_followup(
+        turn_frame=build_provisional_turn_frame(
+            resolution=resolution,
+            user_message=user_message,
+            client_id=client_id,
+            bundle=context.bundle,
+        ),
+        user_message=user_message,
+        session_state=session_state,  # type: ignore[arg-type]
+        allowed_service_ids=active_service_catalog.active_service_ids,
+        explicit_service_id=service_identity.explicit_service_id,
+        commercial_intent=result.envelope.commercial_intent,
+    )
+    bound_identity = service_identity.with_session_service(session_service_id)
     semantic = bind_semantic_frame(
         envelope=result.envelope,
         governed_ui=governed_ui,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        explicit_catalog_service_id=bound_identity.explicit_service_id,
+        session_service_id=bound_identity.session_service_id,
     )
     turn_frame = build_turn_frame_from_semantic_frame(
         semantic=semantic,
@@ -401,11 +440,28 @@ def run_sales_fast_widget_turn(
         )
 
     turn_timing.stage_start("sales_fast_resolver")
-    resolution, session_state, cadence = _resolve_sales_context(
-        context=context,
-        sid=sid,
-        user_message=user_message,
-    )
+    try:
+        resolution, session_state, cadence, service_identity = _resolve_sales_context(
+            context=context,
+            sid=sid,
+            user_message=user_message,
+        )
+    except TargetServiceResolutionError as exc:
+        turn_timing.stage_end("sales_fast_resolver", status="exception", reason=exc.code)
+        turn_timing.stage_end("sales_fast", status="exception", reason=exc.code)
+        record_sales_fast_observability(
+            architecture="new",
+            route="error",
+            provider_calls=0,
+            model=None,
+            failure_kind=exc.code,
+        )
+        return _technical_error_outcome(
+            client_id=client_id,
+            sid=sid,
+            error_code=exc.code,
+            provider_calls=0,
+        )
     projected_turn_scope = project_sales_fast_scope_from_message(user_message)
     turn_frame = build_provisional_turn_frame(
         resolution=resolution,
@@ -448,16 +504,25 @@ def run_sales_fast_widget_turn(
         )
         return pre_flash_terminal
     turn_timing.stage_end("sales_fast_resolver", status="completed")
-    catalog_hint = _catalog_service_hint(user_message, context)
     strict_facts, sales_context = build_pre_flash_prompt_hints(
         resolution=resolution,
-        catalog_service_hint=catalog_hint,
+        catalog_service_hint=service_identity.explicit_service_term,
         session_service_hint=session_state.last_service_id,
     )
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
     turn_timing.stage_start("sales_fast_model")
+    stream_on_delta: PatientDeltaCallback | None
+    if on_delta is None:
+        stream_on_delta = None
+    else:
+
+        def _buffer_model_delta(_: str) -> None:
+            return None
+
+        stream_on_delta = _buffer_model_delta
+
     if on_delta is None:
         result = run_sales_one_plus_candidate(
             user_message=user_message,
@@ -481,7 +546,7 @@ def run_sales_fast_widget_turn(
             sales_context=sales_context,
             static_admin_handoff_text=static_handoff,
             backend=backend,  # type: ignore[arg-type]
-            on_delta=on_delta,
+            on_delta=stream_on_delta,
             local_gate_result=local_gate,
             pack_identity=context.pack_identity,
             active_service_catalog=active_service_catalog,
@@ -513,6 +578,8 @@ def run_sales_fast_widget_turn(
         resolution=resolution,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        service_identity=service_identity,
+        on_patient_delta=on_delta,
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
@@ -542,6 +609,8 @@ def _materialize_result(
     resolution: ExactSalesResolution,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    service_identity: SalesFastServiceIdentity,
+    on_patient_delta: PatientDeltaCallback | None = None,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
         return SalesFastWidgetOutcome(
@@ -578,8 +647,16 @@ def _materialize_result(
             active_service_catalog=active_service_catalog,
             service_reference_catalog=service_reference_catalog,
             resolution=resolution,
+            service_identity=service_identity,
         )
     except SalesOnePlusSemanticConflictError as exc:
+        if exc.code in _TECHNICAL_SEMANTIC_CONFLICT_CODES:
+            return _technical_error_outcome(
+                client_id=client_id,
+                sid=sid,
+                error_code=exc.code,
+                provider_calls=provider_calls,
+            )
         handoff = static_sales_fast_admin_handoff(client_id=client_id)
         return SalesFastWidgetOutcome(
             widget=materialize_sales_fast_admin_payload(
@@ -591,6 +668,15 @@ def _materialize_result(
             model_route="model_admin",
             failure_kind=exc.code,
         )
+    except ValueError as exc:
+        if str(exc) == "authoritative_rebuild_requires_envelope":
+            return _technical_error_outcome(
+                client_id=client_id,
+                sid=sid,
+                error_code="authoritative_rebuild_requires_envelope",
+                provider_calls=provider_calls,
+            )
+        raise
     if isinstance(bound, TargetTurnFrameBoundTerminalResponse):
         terminal_route = "clarify" if result.decision == "clarify" else "local"
         return SalesFastWidgetOutcome(
@@ -672,9 +758,14 @@ def _materialize_result(
             availability_status=semantic.availability_status,
         )
     model_route = "clarify" if result.decision == "clarify" else "model"
-    return SalesFastWidgetOutcome(
+    outcome = SalesFastWidgetOutcome(
         widget=widget,
         provider_calls=provider_calls,
         model_route=model_route,
         failure_kind=result.reason if result.interrupted else None,
     )
+    if on_patient_delta is not None and widget.kind == "materialized":
+        final_patient_text = str(widget.payload.get("answer") or "").strip()
+        if final_patient_text:
+            on_patient_delta(final_patient_text)
+    return outcome

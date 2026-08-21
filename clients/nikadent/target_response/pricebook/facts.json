@@ -2,6 +2,7 @@
   "free_orthopedic_consult": {
     "id": "free_orthopedic_consult",
     "kind": "promo",
+    "catalog_label": "Условия консультации по ортопедии, имплантации и протезированию",
     "text_fact": "Бесплатная консультация по ортопедии, имплантации и протезированию. Врач проводит осмотр, оценивает ситуацию и предлагает варианты лечения с учётом состояния зубов, клинической ситуации и бюджета.",
     "render_mode": "natural",
     "active": true,
@@ -26,6 +27,7 @@
   "tax_deduction": {
     "id": "tax_deduction",
     "kind": "benefit",
+    "catalog_label": "Налоговый вычет за лечение",
     "text_fact": "Можно оформить налоговый вычет 13% от оплаченного лечения.",
     "render_mode": "strict",
     "active": true,
@@ -61,6 +63,7 @@
   "work_warranty_1year": {
     "id": "work_warranty_1year",
     "kind": "warranty",
+    "catalog_label": "Гарантия на стоматологические работы",
     "text_fact": "Гарантия на выполненные работы — 1 год.",
     "render_mode": "strict",
     "active": true,

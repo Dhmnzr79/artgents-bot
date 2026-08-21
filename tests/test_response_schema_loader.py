@@ -85,6 +85,7 @@ def _write_pack(root: Path) -> Path:
             "consultation_offer": {
                 "id": "consultation_offer",
                 "kind": "consultation",
+                "catalog_label": "Consultation offer topic",
                 "text_fact": "  Exact source text stays unchanged.  ",
                 "render_mode": "strict",
                 "active": True,

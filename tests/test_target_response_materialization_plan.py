@@ -95,6 +95,7 @@ def _materials(
     fact = TargetCommercialFact(
         id="fact_one",
         kind="commercial",
+        catalog_label="Marketing fact topic",
         text_fact="Exact marketing fact.",
         render_mode="strict",
         allowed_service_ids=["service_one"],

@@ -622,6 +622,7 @@ def test_runtime_context_sees_facts_change_without_manual_clear(
     facts["stage3a_probe_fact"] = {
         "id": "stage3a_probe_fact",
         "kind": "benefit",
+        "catalog_label": "Stage3a probe fact topic",
         "text_fact": "unique-fact-marker-12345",
         "render_mode": "strict",
         "active": True,

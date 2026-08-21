@@ -336,6 +336,7 @@ class TargetOffer(TargetSchemaModel):
 class TargetCommercialFact(TargetSchemaModel):
     id: NonBlankStr
     kind: NonBlankStr
+    catalog_label: NonBlankStr
     text_fact: NonBlankStr
     render_mode: NonBlankStr
     active: bool = True

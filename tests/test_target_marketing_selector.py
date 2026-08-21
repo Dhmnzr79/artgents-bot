@@ -34,6 +34,7 @@ def _fact(
     payload: dict[str, object] = {
         "id": fact_id,
         "kind": "proof",
+        "catalog_label": f"Catalog topic for {fact_id}",
         "text_fact": f"Exact {fact_id}.",
         "render_mode": "strict",
         "active": active,

@@ -47,6 +47,7 @@ def _topic_fact(
     return {
         "id": fact_id,
         "kind": "promo",
+        "catalog_label": f"Catalog topic for {fact_id}",
         "text_fact": f"Exact {fact_id}.",
         "render_mode": "natural",
         "active": active,

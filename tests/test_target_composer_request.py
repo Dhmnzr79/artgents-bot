@@ -87,6 +87,7 @@ def _fact(*, render_mode: str = "strict") -> dict[str, object]:
     return {
         "id": "selected_fact",
         "kind": "commercial",
+        "catalog_label": "Selected commercial topic",
         "text_fact": "Exact selected commercial fact.",
         "render_mode": render_mode,
         "active": True,

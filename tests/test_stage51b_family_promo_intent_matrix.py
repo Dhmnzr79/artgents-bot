@@ -35,6 +35,7 @@ def _family_only_all_on_4_bundle() -> ResponseSchemaBundle:
                 "implant_same_day_discount": {
                     "id": "implant_same_day_discount",
                     "kind": "promo",
+                    "catalog_label": "Скидка при оплате в день обращения",
                     "text_fact": _PROMO_TEXT,
                     "render_mode": "strict",
                     "active": True,

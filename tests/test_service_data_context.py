@@ -78,6 +78,7 @@ def _fact_payload(fact_id: str, service_id: str) -> dict[str, object]:
     return {
         "id": fact_id,
         "kind": "commercial",
+        "catalog_label": f"Catalog topic for {fact_id}",
         "text_fact": f"Exact fact {fact_id}",
         "render_mode": "strict",
         "active": True,

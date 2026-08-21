@@ -25,6 +25,7 @@ def _bundle(*, scenario_rules: dict[str, dict[str, object]]) -> ResponseSchemaBu
                 "fact_one": {
                     "id": "fact_one",
                     "kind": "proof",
+                    "catalog_label": "Proof fact topic",
                     "text_fact": "Exact fact text.",
                     "render_mode": "strict",
                     "active": True,

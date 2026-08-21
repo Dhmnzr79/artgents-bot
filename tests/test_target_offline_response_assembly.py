@@ -156,6 +156,7 @@ def _bundle(
                 "initial_fact": {
                     "id": "initial_fact",
                     "kind": "commercial",
+                    "catalog_label": "Initial clinic fact topic",
                     "text_fact": "Exact clinic fact.",
                     "render_mode": "strict",
                     "active": True,

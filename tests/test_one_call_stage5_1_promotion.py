@@ -491,6 +491,7 @@ def test_automatic_promo_no_rotation_when_first_shown() -> None:
                 "promo_a": {
                     "id": "promo_a",
                     "kind": "promo",
+                    "catalog_label": "Promo A topic",
                     "text_fact": "Promo A.",
                     "render_mode": "strict",
                     "active": True,
@@ -499,6 +500,7 @@ def test_automatic_promo_no_rotation_when_first_shown() -> None:
                 "promo_b": {
                     "id": "promo_b",
                     "kind": "promo",
+                    "catalog_label": "Promo B topic",
                     "text_fact": "Promo B.",
                     "render_mode": "strict",
                     "active": True,
@@ -583,6 +585,7 @@ def test_priority_promo_service_applicability_invalid_at_load() -> None:
                     "professional_whitening_discount": {
                         "id": "professional_whitening_discount",
                         "kind": "promo",
+                        "catalog_label": "Скидка на профессиональное отбеливание",
                         "text_fact": "Whitening promo.",
                         "render_mode": "strict",
                         "active": True,

@@ -89,6 +89,7 @@ def _valid_bundle_payload() -> dict[str, object]:
             "consultation_offer": {
                 "id": "consultation_offer",
                 "kind": "consultation",
+                "catalog_label": "Consultation offer topic",
                 "text_fact": "Exact source-owned fact.",
                 "render_mode": "strict",
                 "active": True,
@@ -466,6 +467,45 @@ def test_fact_dates_are_exact_and_ordered(active_from: str, active_until: str, t
     fact["active_from"] = active_from
     fact["active_until"] = active_until
     assert token in _error_text(TargetCommercialFact, fact)
+
+
+def test_catalog_label_is_required() -> None:
+    fact = _valid_bundle_payload()["facts"]["consultation_offer"]
+    missing = {key: value for key, value in fact.items() if key != "catalog_label"}
+    assert "catalog_label" in _error_text(TargetCommercialFact, missing)
+
+
+def test_catalog_label_must_not_be_blank() -> None:
+    fact = _valid_bundle_payload()["facts"]["consultation_offer"]
+    fact["catalog_label"] = "   "
+    assert "string_must_not_be_blank" in _error_text(TargetCommercialFact, fact)
+
+
+def test_catalog_label_is_preserved_exactly() -> None:
+    fact = TargetCommercialFact.model_validate(
+        _valid_bundle_payload()["facts"]["consultation_offer"]
+    )
+    assert fact.catalog_label == "Consultation offer topic"
+
+
+def test_fact_unexpected_aliases_remain_forbidden() -> None:
+    fact = _valid_bundle_payload()["facts"]["consultation_offer"]
+    fact["aliases"] = ["bad alias"]
+    assert "Extra inputs are not permitted" in _error_text(TargetCommercialFact, fact)
+
+
+def test_demo_and_nikadent_facts_load_with_catalog_label() -> None:
+    demo_root = Path("clients/demo/target_response")
+    nikadent_root = Path("clients/nikadent/target_response")
+    from core.response_schema_loader import load_response_schema_bundle
+
+    demo = load_response_schema_bundle(demo_root)
+    nikadent = load_response_schema_bundle(nikadent_root)
+    for bundle in (demo, nikadent):
+        for fact in bundle.facts.values():
+            assert fact.catalog_label.strip()
+    assert demo.facts["installment_12"].catalog_label == "Рассрочка на лечение"
+    assert nikadent.facts["work_warranty_1year"].catalog_label == "Гарантия на стоматологические работы"
 
 
 def test_strategy_limits_and_priorities_are_strict() -> None:

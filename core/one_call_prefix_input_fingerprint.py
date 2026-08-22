@@ -7,6 +7,7 @@ import hashlib
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_prompt_contract import (
     ONE_CALL_PROMPT_CONTRACT_VERSION,
@@ -24,6 +25,7 @@ def compute_prefix_input_fingerprint(
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> str:
     """Fingerprint stable prefix inputs — independent of production pack identity key."""
 
@@ -33,6 +35,7 @@ def compute_prefix_input_fingerprint(
     digest.update(_digest_hex("\n".join(cached_full_context.document_paths)).encode("ascii"))
     digest.update(_digest_hex(service_reference_catalog.canonical_json).encode("ascii"))
     digest.update(_digest_hex(active_service_catalog.canonical_json).encode("ascii"))
+    digest.update(_digest_hex(commercial_fact_catalog.canonical_json).encode("ascii"))
     digest.update(str(ONE_CALL_PROMPT_CONTRACT_VERSION).encode("utf-8"))
     digest.update(_digest_hex(SALES_ONE_PLUS_SYSTEM_POLICY).encode("ascii"))
     digest.update(_digest_hex(ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS).encode("ascii"))
@@ -44,11 +47,13 @@ def prefix_cache_lookup_key(
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> str:
     fingerprint = compute_prefix_input_fingerprint(
         identity,
         cached_full_context,
         active_service_catalog,
         service_reference_catalog,
+        commercial_fact_catalog,
     )
     return f"{identity.cache_key()}:pf{fingerprint}"

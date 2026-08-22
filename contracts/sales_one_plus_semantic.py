@@ -51,6 +51,7 @@ class SalesOnePlusSemanticFrame(BaseModel):
     service_reference_status: ServiceReferenceStatus
     requested_service_id: str | None
     availability_status: AvailabilityStatus
+    direct_fact_ids: tuple[str, ...]
     rebind_kind: SemanticRebindKind = "full_rebuild"
 
     @model_validator(mode="after")
@@ -93,4 +94,5 @@ class SalesOnePlusSemanticFrame(BaseModel):
             service_reference_status=envelope.service_reference_status,
             requested_service_id=envelope.requested_service_id,
             availability_status="none",
+            direct_fact_ids=envelope.references.direct_fact_ids,
         )

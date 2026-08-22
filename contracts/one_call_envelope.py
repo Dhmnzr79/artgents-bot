@@ -1,10 +1,10 @@
-"""Production v4 typed model control envelope (Stage 4.2 / 5.1 / 5.1B)."""
+"""Production v5 typed model control envelope (Stage 4.2 / 5.1 / 5.1B / B1)."""
 
 from __future__ import annotations
 
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from contracts.service_reference import ServiceReferenceStatus
 
@@ -38,8 +38,11 @@ _REQUIRED_FIELD_NAMES = frozenset(
         "patient_text",
         "service_reference_status",
         "requested_service_id",
+        "references",
     }
 )
+
+_REFERENCE_FIELD_NAMES = frozenset({"direct_fact_ids"})
 
 
 def _require_nonblank(value: str, *, code: str) -> str:
@@ -62,8 +65,38 @@ def _validate_clarify_service_options(options: tuple[str, ...] | None) -> None:
         normalized.append(token)
 
 
+class OneCallEnvelopeReferences(BaseModel):
+    """Closed nested references object — direct commercial fact IDs only."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    direct_fact_ids: tuple[str, ...]
+
+    @field_validator("direct_fact_ids", mode="before")
+    @classmethod
+    def _coerce_json_list_to_tuple(cls, value: object) -> object:
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+    @field_validator("direct_fact_ids")
+    @classmethod
+    def _validate_direct_fact_ids(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        for item in value:
+            if not isinstance(item, str):
+                raise ValueError("direct_fact_ids_invalid")
+            token = item.strip()
+            if not token:
+                raise ValueError("direct_fact_ids_invalid")
+            if token in normalized:
+                raise ValueError("direct_fact_id_duplicate")
+            normalized.append(token)
+        return tuple(normalized)
+
+
 class OneCallEnvelope(BaseModel):
-    """Exactly thirteen model-returned control fields — no extras."""
+    """Exactly fourteen model-returned control fields — no extras."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -80,6 +113,7 @@ class OneCallEnvelope(BaseModel):
     patient_text: str | None
     service_reference_status: ServiceReferenceStatus
     requested_service_id: str | None
+    references: OneCallEnvelopeReferences
 
     @model_validator(mode="after")
     def _field_and_route_invariants(self) -> Self:
@@ -105,6 +139,9 @@ class OneCallEnvelope(BaseModel):
         if self.commercial_intent == "promotion":
             if self.promotion_scope not in {"general", "service", "shown"}:
                 raise ValueError("promotion_scope_invalid")
+
+        if self.route in {"CLARIFY", "ADMIN"} and self.references.direct_fact_ids:
+            raise ValueError("direct_fact_ids_forbidden_for_route")
 
         if self.route == "ANSWER":
             if not self.patient_text or not self.patient_text.strip():
@@ -138,3 +175,7 @@ class OneCallEnvelope(BaseModel):
 
 def required_envelope_field_names() -> frozenset[str]:
     return _REQUIRED_FIELD_NAMES
+
+
+def required_reference_field_names() -> frozenset[str]:
+    return _REFERENCE_FIELD_NAMES

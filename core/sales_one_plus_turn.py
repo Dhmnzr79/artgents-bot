@@ -18,6 +18,7 @@ from contracts.target_cached_full_context import TargetCachedFullContext
 from core import turn_timing
 from core.local_problem_gate import decide_local_problem_gate
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_envelope_protocol import (
     OneCallEnvelopeProtocolError,
     parse_production_envelope_json,
@@ -70,6 +71,7 @@ def _make_invocation(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> SalesOnePlusInvocation:
     corpus = cached_full_context.model_corpus_text
     strict_facts = tuple(current_strict_facts)
@@ -79,6 +81,7 @@ def _make_invocation(
         cached_full_context=cached_full_context,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        commercial_fact_catalog=commercial_fact_catalog,
     )
     dynamic_suffix = build_sales_one_plus_dynamic_suffix(
         exact_sales_resolution=exact_sales_resolution,
@@ -184,6 +187,7 @@ def run_sales_one_plus_candidate(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> SalesOnePlusResult:
     """Make exactly one blocking backend call after a local pass."""
 
@@ -205,6 +209,7 @@ def run_sales_one_plus_candidate(
         pack_identity=pack_identity,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        commercial_fact_catalog=commercial_fact_catalog,
     )
     try:
         raw = backend.generate(invocation)
@@ -214,18 +219,12 @@ def run_sales_one_plus_candidate(
             reason="backend_failed",
             static_handoff=static_handoff,
         )
-    try:
-        envelope = parse_production_envelope_json(
-            raw,
-            active_service_catalog=active_service_catalog,
-            service_reference_catalog=service_reference_catalog,
-        )
-    except OneCallEnvelopeProtocolError as exc:
-        return _admin_result(
-            source="protocol",
-            reason=exc.code,
-            static_handoff=static_handoff,
-        )
+    envelope = parse_production_envelope_json(
+        raw,
+        active_service_catalog=active_service_catalog,
+        service_reference_catalog=service_reference_catalog,
+        commercial_fact_catalog=commercial_fact_catalog,
+    )
     if envelope.route == "ADMIN":
         return _admin_result(
             source="model",
@@ -250,6 +249,7 @@ def run_sales_one_plus_candidate_stream(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> SalesOnePlusResult:
     """Buffer provider JSON fully, validate once, then emit patient_text only."""
 
@@ -272,6 +272,7 @@ def run_sales_one_plus_candidate_stream(
         emit_patient_delta,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        commercial_fact_catalog=commercial_fact_catalog,
     )
     invocation = _make_invocation(
         user_message=user_message,
@@ -282,18 +283,15 @@ def run_sales_one_plus_candidate_stream(
         pack_identity=pack_identity,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        commercial_fact_catalog=commercial_fact_catalog,
     )
     try:
         backend.generate_stream(invocation, parser.ingest)
         envelope = parser.finalize()
     except _ConsumerCallbackError as exc:
         raise exc.cause
-    except OneCallEnvelopeProtocolError as exc:
-        return _admin_result(
-            source="protocol",
-            reason=exc.code,
-            static_handoff=static_handoff,
-        )
+    except OneCallEnvelopeProtocolError:
+        raise
     except Exception:
         reason = "stream_interrupted" if parser.has_partial_content else "backend_failed"
         return _admin_result(

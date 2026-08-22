@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_prompt_contract import (
     ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS,
     one_call_contract_header,
@@ -51,6 +52,7 @@ def build_one_call_stable_prefix(
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> str:
     """Byte-stable prefix: contract, envelope instructions, catalogs, corpus, pack identity."""
 
@@ -62,6 +64,7 @@ def build_one_call_stable_prefix(
         _pack_identity_block(identity),
         service_reference_catalog.block_text(),
         active_service_catalog.block_text(),
+        commercial_fact_catalog.block_text(),
         "=== APPROVED_MD_CORPUS ===\n" + corpus,
         "=== DOCUMENT_INDEX ===\n" + "\n".join(cached_full_context.document_paths),
     )
@@ -74,6 +77,7 @@ def build_one_call_prompt_assembly(
     cached_full_context: TargetCachedFullContext,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
     exact_sales_resolution,
     current_strict_facts,
     sales_context,
@@ -90,6 +94,7 @@ def build_one_call_prompt_assembly(
         cached_full_context=cached_full_context,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
+        commercial_fact_catalog=commercial_fact_catalog,
     )
     return OneCallPromptAssembly(
         stable_prefix=stable_prefix,

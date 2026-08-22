@@ -19,6 +19,8 @@ from core.exact_sales_resolver import ExactSalesResolverInputs, resolve_exact_sa
 from core.local_problem_gate import decide_local_problem_gate
 from core.provider_call_budget import current_provider_call_budget
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_fast_observability import collect_sales_fast_timings_ms, record_sales_fast_observability
 from core.sales_fast_presentation import (
@@ -512,6 +514,7 @@ def run_sales_fast_widget_turn(
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
+    commercial_fact_catalog = CommercialFactCatalogSnapshot.from_bundle(context.bundle)
     turn_timing.stage_start("sales_fast_model")
     stream_on_delta: PatientDeltaCallback | None
     if on_delta is None:
@@ -523,34 +526,63 @@ def run_sales_fast_widget_turn(
 
         stream_on_delta = _buffer_model_delta
 
-    if on_delta is None:
-        result = run_sales_one_plus_candidate(
-            user_message=user_message,
-            cached_full_context=context.cached_full_context,
-            exact_sales_resolution=resolution,
-            current_strict_facts=strict_facts,
-            sales_context=sales_context,
-            static_admin_handoff_text=static_handoff,
-            backend=backend,  # type: ignore[arg-type]
-            local_gate_result=local_gate,
-            pack_identity=context.pack_identity,
-            active_service_catalog=active_service_catalog,
-            service_reference_catalog=service_reference_catalog,
+    try:
+        if on_delta is None:
+            result = run_sales_one_plus_candidate(
+                user_message=user_message,
+                cached_full_context=context.cached_full_context,
+                exact_sales_resolution=resolution,
+                current_strict_facts=strict_facts,
+                sales_context=sales_context,
+                static_admin_handoff_text=static_handoff,
+                backend=backend,  # type: ignore[arg-type]
+                local_gate_result=local_gate,
+                pack_identity=context.pack_identity,
+                active_service_catalog=active_service_catalog,
+                service_reference_catalog=service_reference_catalog,
+                commercial_fact_catalog=commercial_fact_catalog,
+            )
+        else:
+            result = run_sales_one_plus_candidate_stream(
+                user_message=user_message,
+                cached_full_context=context.cached_full_context,
+                exact_sales_resolution=resolution,
+                current_strict_facts=strict_facts,
+                sales_context=sales_context,
+                static_admin_handoff_text=static_handoff,
+                backend=backend,  # type: ignore[arg-type]
+                on_delta=stream_on_delta,
+                local_gate_result=local_gate,
+                pack_identity=context.pack_identity,
+                active_service_catalog=active_service_catalog,
+                service_reference_catalog=service_reference_catalog,
+                commercial_fact_catalog=commercial_fact_catalog,
+            )
+    except OneCallEnvelopeProtocolError as exc:
+        backend_invocations = int(getattr(backend, "call_count", 0) or getattr(backend, "calls", 0) or 0)
+        budget = current_provider_call_budget()
+        provider_calls = int(budget.call_count) if budget is not None else backend_invocations
+        turn_timing.stage_end(
+            "sales_fast_model",
+            status="exception",
+            llm_used=provider_calls > 0,
+            reason=exc.code,
         )
-    else:
-        result = run_sales_one_plus_candidate_stream(
-            user_message=user_message,
-            cached_full_context=context.cached_full_context,
-            exact_sales_resolution=resolution,
-            current_strict_facts=strict_facts,
-            sales_context=sales_context,
-            static_admin_handoff_text=static_handoff,
-            backend=backend,  # type: ignore[arg-type]
-            on_delta=stream_on_delta,
-            local_gate_result=local_gate,
-            pack_identity=context.pack_identity,
-            active_service_catalog=active_service_catalog,
-            service_reference_catalog=service_reference_catalog,
+        turn_timing.stage_end("sales_fast", status="exception", reason=exc.code)
+        record_sales_fast_observability(
+            architecture="new",
+            route="error",
+            provider_calls=provider_calls,
+            model=SALES_ONE_PLUS_FLASH_MODEL if provider_calls else None,
+            failure_kind=exc.code,
+            timings=collect_sales_fast_timings_ms(),
+            backend_invocations=backend_invocations,
+        )
+        return _technical_error_outcome(
+            client_id=client_id,
+            sid=sid,
+            error_code=exc.code,
+            provider_calls=provider_calls,
         )
     backend_invocations = int(getattr(backend, "call_count", 0) or 0)
     cache_obs = getattr(backend, "last_observability", None)

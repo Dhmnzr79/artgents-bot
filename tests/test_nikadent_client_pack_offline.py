@@ -16,6 +16,7 @@ from contracts.doctor_schema_refs import (
 from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
 from core.doctor_schema_loader import load_doctor_catalog
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_envelope_protocol import dumps_production_envelope, parse_production_envelope_json
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
@@ -28,6 +29,9 @@ from scripts.validate_client_pack import validate_client_pack
 
 _NIKADENT = Path(__file__).resolve().parents[1] / "clients" / "nikadent"
 _REPO = Path(__file__).resolve().parents[1]
+_NIKADENT_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
+    load_target_client_data("nikadent").bundle
+)
 _MD_ROOT = _NIKADENT / "md"
 _TARGET = _NIKADENT / "target_response"
 _DOCTOR_CATALOG_PATH = _NIKADENT / "doctor_catalog.json"
@@ -320,6 +324,7 @@ def test_nikadent_sedation_known_not_offered_overlay_without_alternative() -> No
         envelope_json,
         active_service_catalog=active_catalog,
         service_reference_catalog=ref_catalog,
+        commercial_fact_catalog=_NIKADENT_COMMERCIAL_CATALOG,
     )
     semantic = bind_semantic_frame(
         envelope=envelope,

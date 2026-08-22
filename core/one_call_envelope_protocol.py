@@ -1,4 +1,4 @@
-"""Production v2 JSON envelope parser and validator (Stage 4.2)."""
+"""Production v5 JSON envelope parser and validator (Stage 4.2 / B1)."""
 
 from __future__ import annotations
 
@@ -9,14 +9,17 @@ from contracts.one_call_envelope import (
     OneCallClarifyAxis,
     OneCallCommercialIntent,
     OneCallEnvelope,
+    OneCallEnvelopeReferences,
     OneCallExtent,
     OneCallJaw,
     OneCallPromotionScope,
     OneCallRoute,
     OneCallScenario,
     required_envelope_field_names,
+    required_reference_field_names,
 )
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 
 MAX_ENVELOPE_UTF8_BYTES = 64 * 1024
@@ -86,7 +89,63 @@ def _validate_service_clarify_options(options: object) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
+def _validate_direct_fact_ids(
+    value: object,
+    *,
+    route: str,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
+) -> tuple[str, ...]:
+    if value is None:
+        raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
+    if not isinstance(value, list):
+        raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
+    normalized: list[str] = []
+    for item in value:
+        _reject_bool(item, code="direct_fact_ids_invalid")
+        if not isinstance(item, str) or not item.strip():
+            raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
+        token = item.strip()
+        if token in normalized:
+            raise OneCallEnvelopeProtocolError("direct_fact_id_duplicate")
+        normalized.append(token)
+    direct_fact_ids = tuple(normalized)
+    if route in {"CLARIFY", "ADMIN"} and direct_fact_ids:
+        raise OneCallEnvelopeProtocolError("direct_fact_ids_forbidden_for_route")
+    for fact_id in direct_fact_ids:
+        if fact_id not in commercial_fact_catalog.fact_ids:
+            raise OneCallEnvelopeProtocolError("direct_fact_id_not_in_current_pack")
+    return direct_fact_ids
+
+
+def _validate_references(
+    value: object,
+    *,
+    route: str,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
+) -> OneCallEnvelopeReferences:
+    if not isinstance(value, dict):
+        raise OneCallEnvelopeProtocolError("references_invalid")
+    keys = set(value.keys())
+    required = required_reference_field_names()
+    missing = required - keys
+    if missing:
+        raise OneCallEnvelopeProtocolError(f"missing_reference_fields:{sorted(missing)}")
+    extra = keys - required
+    if extra:
+        raise OneCallEnvelopeProtocolError(f"unknown_reference_fields:{sorted(extra)}")
+    direct_fact_ids = _validate_direct_fact_ids(
+        value["direct_fact_ids"],
+        route=route,
+        commercial_fact_catalog=commercial_fact_catalog,
+    )
+    return OneCallEnvelopeReferences(direct_fact_ids=direct_fact_ids)
+
+
+def _validate_structure(
+    payload: dict[str, Any],
+    *,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
+) -> OneCallEnvelope:
     _require_exact_key_set(payload)
 
     route = payload["route"]
@@ -169,6 +228,12 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
         code="requested_service_id_invalid",
     )
 
+    references = _validate_references(
+        payload["references"],
+        route=route,
+        commercial_fact_catalog=commercial_fact_catalog,
+    )
+
     if service_reference_status == "none" and requested_service_id is not None:
         raise OneCallEnvelopeProtocolError("requested_service_id_forbidden_for_none")
     if service_reference_status == "unresolved" and requested_service_id is not None:
@@ -215,6 +280,7 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
             patient_text=patient_text,
             service_reference_status=service_reference_status,  # type: ignore[arg-type]
             requested_service_id=requested_service_id,
+            references=references,
         )
     except ValueError as exc:
         message = str(exc)
@@ -232,6 +298,7 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
             "clarify_service_options_invalid",
             "promotion_scope_forbidden",
             "promotion_scope_invalid",
+            "direct_fact_ids_forbidden_for_route",
         }:
             raise OneCallEnvelopeProtocolError(message) from exc
         raise OneCallEnvelopeProtocolError("envelope_invariant_violation") from exc
@@ -262,6 +329,7 @@ def _validate_structure(payload: dict[str, Any]) -> OneCallEnvelope:
                     "requested_service_id_forbidden_for_none",
                     "requested_service_id_forbidden_for_unresolved",
                     "requested_service_id_required_for_resolved",
+                    "direct_fact_ids_forbidden_for_route",
                 }:
                     raise OneCallEnvelopeProtocolError(message) from exc
         raise OneCallEnvelopeProtocolError("envelope_invariant_violation") from exc
@@ -343,8 +411,9 @@ def parse_production_envelope_json(
     *,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
+    commercial_fact_catalog: CommercialFactCatalogSnapshot,
 ) -> OneCallEnvelope:
-    """Parse and validate a production v4 envelope from provider raw text."""
+    """Parse and validate a production v5 envelope from provider raw text."""
 
     if not isinstance(raw, str):
         raise OneCallEnvelopeProtocolError("envelope_output_invalid")
@@ -354,7 +423,7 @@ def parse_production_envelope_json(
         raise OneCallEnvelopeProtocolError("envelope_oversized")
 
     payload = _loads_strict_json_object(raw)
-    envelope = _validate_structure(payload)
+    envelope = _validate_structure(payload, commercial_fact_catalog=commercial_fact_catalog)
     _validate_reference_context(
         envelope,
         service_reference_catalog=service_reference_catalog,
@@ -378,6 +447,7 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
         "patient_text": "Probe text.",
         "service_reference_status": "none",
         "requested_service_id": None,
+        "references": {"direct_fact_ids": []},
     }
     base.update(overrides)
     return base

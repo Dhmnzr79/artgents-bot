@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from contracts.one_call_envelope import OneCallEnvelope, required_envelope_field_names
+from contracts.one_call_envelope import OneCallEnvelope, OneCallEnvelopeReferences, required_envelope_field_names
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_envelope_protocol import (
     OneCallEnvelopeProtocolError,
@@ -18,8 +18,10 @@ from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.target_client_data import load_target_client_data
 from tests.test_sales_one_plus_turn import (
     _DEMO_CATALOG,
+    _DEMO_COMMERCIAL_CATALOG,
     _DEMO_REF_CATALOG,
     _EMPTY_CATALOG,
+    _EMPTY_COMMERCIAL_CATALOG,
     _EMPTY_REF_CATALOG,
     answer_envelope,
 )
@@ -28,7 +30,7 @@ from tests.test_sales_one_plus_turn import (
 def test_v4_required_field_count_and_defaults() -> None:
     template = production_envelope_template()
     assert required_envelope_field_names() == frozenset(template.keys())
-    assert len(template) == 13
+    assert len(template) == 14
     assert template["service_reference_status"] == "none"
     assert template["requested_service_id"] is None
 
@@ -52,6 +54,7 @@ def test_service_reference_invariants(status: str, requested: str | None, code: 
             json.dumps(payload),
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -66,6 +69,7 @@ def test_resolved_active_reference_projects_service_id() -> None:
         payload,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert envelope.service_reference_status == "resolved"
     assert envelope.requested_service_id == "all_on_4"
@@ -83,6 +87,7 @@ def test_resolved_inactive_reference_accepts_null_active_service_id() -> None:
         payload,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert envelope.requested_service_id == "braces"
     assert envelope.service_id is None
@@ -100,6 +105,7 @@ def test_resolved_inactive_reference_rejects_active_service_id_conflict() -> Non
             payload,
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -115,6 +121,7 @@ def test_resolved_unknown_service_id_rejected() -> None:
             payload,
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -128,6 +135,7 @@ def test_inactive_service_id_still_rejected_in_active_service_id_field() -> None
             payload,
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -147,6 +155,7 @@ def test_one_call_envelope_direct_v4_invariants() -> None:
             patient_text="Ответ.",
             service_reference_status="none",
             requested_service_id="braces",
+            references=OneCallEnvelopeReferences(direct_fact_ids=()),
         )
 
 
@@ -175,6 +184,7 @@ def test_blocking_and_streaming_share_v4_parser() -> None:
         payload,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert parsed.requested_service_id == "aligners"
     assert parsed.service_reference_status == "resolved"

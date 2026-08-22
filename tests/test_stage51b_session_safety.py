@@ -14,7 +14,7 @@ from core.sales_one_plus_semantic_authority import (
 )
 from core.target_client_data import load_target_client_data
 from tests.test_one_call_stage5_1_promotion import _run_presentation_result
-from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_REF_CATALOG, answer_envelope
+from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_COMMERCIAL_CATALOG, _DEMO_REF_CATALOG, answer_envelope
 
 
 def _unknown_resolution() -> ExactSalesResolution:
@@ -37,6 +37,7 @@ def test_inactive_reference_nulls_active_service_for_commerce() -> None:
         envelope_json,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     semantic = bind_semantic_frame(
         envelope=envelope,

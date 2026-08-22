@@ -16,6 +16,11 @@ from contracts.one_call_presentation_result import (
 from contracts.response_schema import TargetStrategyMatch
 from contracts.service_reference import AvailabilityStatus
 from contracts.turn_frame import TurnFrame
+from core.one_call_direct_commercial import (
+    DirectCommercialMaterialization,
+    append_direct_commercial_without_duplicates,
+    materialize_direct_commercial,
+)
 from core.sales_fast_authoritative_commerce import (
     AuthoritativeCommerceResult,
     apply_authoritative_commerce_to_patient_text,
@@ -68,7 +73,6 @@ from core.sales_fast_presentation import (
     build_direct_promotion_patient_text,
     supplement_sales_fast_patient_text_with_marketing,
 )
-
 
 _FAIL_CLOSED_TEXT: dict[str, str] = {
     "promotion_shown_without_session_promo": (
@@ -153,13 +157,15 @@ def _sanitize_patient_text_for_render(
     bound_package: TargetSpecBoundOfflineResponsePackage,
     commerce_result: AuthoritativeCommerceResult | None,
     commercial_intent: str,
+    direct_eligible_texts: tuple[str, ...] = (),
 ) -> str:
     commercial_texts, _, _ = _planned_render_fact_allowlists(
         bound_package,
         patient_text,
     )
+    all_planned = commercial_texts + direct_eligible_texts
     allowed_amounts, allowed_percents = collect_planned_render_commercial_allowlist(
-        planned_commercial_fact_texts=commercial_texts,
+        planned_commercial_fact_texts=all_planned,
         commerce=commerce_result,
         commercial_intent=commercial_intent,
     )
@@ -461,6 +467,21 @@ def build_one_call_presentation_result(
                     commercial_intent = "none"
 
     skip_marketing = _availability_blocks_commerce(availability_status)
+    direct_materialization: DirectCommercialMaterialization | None = None
+    direct_request_present = bool(semantic.direct_fact_ids)
+    if direct_request_present and not skip_marketing:
+        direct_materialization = materialize_direct_commercial(
+            bundle=context.bundle,
+            direct_fact_ids=semantic.direct_fact_ids,
+            authoritative_service_id=presentation_active_service_id(semantic),
+            today=today,
+        )
+    direct_commercial_text = (
+        direct_materialization.rendered_text if direct_materialization is not None else ""
+    )
+    direct_eligible_texts = (
+        direct_materialization.eligible_texts if direct_materialization is not None else ()
+    )
     bound_with_marketing = bound_package
     fail_reason = None
     if not skip_marketing:
@@ -504,7 +525,7 @@ def build_one_call_presentation_result(
             md_root=context.md_root,
             client_id=context.client_id,
         )
-    if fail_reason is not None:
+    if fail_reason is not None and not semantic.direct_fact_ids:
         safe_text = _fail_closed_text(fail_reason)
         empty_decision = TargetPresentationDecision(
             quick_replies=(),
@@ -565,46 +586,100 @@ def build_one_call_presentation_result(
         if turn_frame.needs_clarification:
             supplemented_text = patient_text
         elif commercial_intent == "promotion":
-            promo_text = build_direct_promotion_patient_text(bound_with_marketing)
-            if not promo_text.strip():
-                safe_text = _fail_closed_text("promotion_no_eligible_facts")
-                return OneCallPresentationResult(
-                    status="fail_closed",
-                    reason_code="promotion_no_eligible_facts",
-                    final_patient_text=safe_text,
-                    authoritative_commerce=None,
-                    rendered_marketing_fact_ids=(),
-                    rendered_promo_fact_ids=(),
-                    rendered_amplifier_refs=(),
-                    selected_cta_key=None,
-                    quick_replies=(),
-                    secondary_content_slots=(),
-                    video=None,
-                    situation={"show": False, "mode": "normal"},
-                    presentation_channel="none",
-                    rendered_ids=PresentationRenderedIds(
-                        marketing_fact_ids=(),
-                        promo_fact_ids=(),
-                        amplifier_refs=(),
-                        followup_refs=(),
-                        video_id=None,
-                        situation_shown=False,
-                    ),
-                    pending_session_delta=None,
-                    offer_fact_refs=(),
+            if semantic.direct_fact_ids:
+                base_text = _sanitize_patient_text_for_render(
+                    patient_text=patient_text,
+                    bound_package=presentation_bound,
+                    commerce_result=commerce_result,
+                    commercial_intent=commercial_intent,
+                    direct_eligible_texts=direct_eligible_texts,
                 )
-            supplemented_text = promo_text
+                promo_text = build_direct_promotion_patient_text(bound_with_marketing)
+                supplemented_text = base_text
+                if promo_text.strip():
+                    supplemented_text = supplement_sales_fast_patient_text_with_marketing(
+                        patient_text=supplemented_text,
+                        bound_package=presentation_bound,
+                    )
+                if direct_commercial_text.strip():
+                    supplemented_text = append_direct_commercial_without_duplicates(
+                        supplemented_text,
+                        direct_commercial_text,
+                    )
+                if not supplemented_text.strip() and not direct_commercial_text.strip():
+                    safe_text = _fail_closed_text("promotion_no_eligible_facts")
+                    return OneCallPresentationResult(
+                        status="fail_closed",
+                        reason_code="promotion_no_eligible_facts",
+                        final_patient_text=safe_text,
+                        authoritative_commerce=None,
+                        rendered_marketing_fact_ids=(),
+                        rendered_promo_fact_ids=(),
+                        rendered_amplifier_refs=(),
+                        selected_cta_key=None,
+                        quick_replies=(),
+                        secondary_content_slots=(),
+                        video=None,
+                        situation={"show": False, "mode": "normal"},
+                        presentation_channel="none",
+                        rendered_ids=PresentationRenderedIds(
+                            marketing_fact_ids=(),
+                            promo_fact_ids=(),
+                            amplifier_refs=(),
+                            followup_refs=(),
+                            video_id=None,
+                            situation_shown=False,
+                        ),
+                        pending_session_delta=None,
+                        offer_fact_refs=(),
+                    )
+            else:
+                promo_text = build_direct_promotion_patient_text(bound_with_marketing)
+                if not promo_text.strip():
+                    safe_text = _fail_closed_text("promotion_no_eligible_facts")
+                    return OneCallPresentationResult(
+                        status="fail_closed",
+                        reason_code="promotion_no_eligible_facts",
+                        final_patient_text=safe_text,
+                        authoritative_commerce=None,
+                        rendered_marketing_fact_ids=(),
+                        rendered_promo_fact_ids=(),
+                        rendered_amplifier_refs=(),
+                        selected_cta_key=None,
+                        quick_replies=(),
+                        secondary_content_slots=(),
+                        video=None,
+                        situation={"show": False, "mode": "normal"},
+                        presentation_channel="none",
+                        rendered_ids=PresentationRenderedIds(
+                            marketing_fact_ids=(),
+                            promo_fact_ids=(),
+                            amplifier_refs=(),
+                            followup_refs=(),
+                            video_id=None,
+                            situation_shown=False,
+                        ),
+                        pending_session_delta=None,
+                        offer_fact_refs=(),
+                    )
+                supplemented_text = promo_text
         else:
             base_text = _sanitize_patient_text_for_render(
                 patient_text=patient_text,
                 bound_package=presentation_bound,
                 commerce_result=commerce_result,
                 commercial_intent=commercial_intent,
+                direct_eligible_texts=direct_eligible_texts,
             )
             supplemented_text = supplement_sales_fast_patient_text_with_marketing(
                 patient_text=base_text,
                 bound_package=presentation_bound,
             )
+            if direct_commercial_text.strip():
+                supplemented_text = append_direct_commercial_without_duplicates(
+                    supplemented_text,
+                    direct_commercial_text,
+                )
         final_patient_text = supplemented_text
         if commerce_result is not None:
             final_patient_text = apply_authoritative_commerce_to_patient_text(

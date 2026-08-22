@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 import core.sales_one_plus_live_backend as live_module
-from contracts.one_call_envelope import OneCallEnvelope
+from contracts.one_call_envelope import OneCallEnvelope, OneCallEnvelopeReferences
 from contracts.sales_one_plus import SalesOnePlusResult
 from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError, dumps_production_envelope
 from core.sales_one_plus_live_backend import SalesOnePlusLiveBackend
@@ -14,6 +14,7 @@ from core.sales_one_plus_stream import SalesOnePlusStreamParser
 from core.sales_one_plus_turn import run_sales_one_plus_candidate_stream
 from tests.test_sales_one_plus_turn import (
     _EMPTY_CATALOG,
+    _EMPTY_COMMERCIAL_CATALOG,
     _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
@@ -34,6 +35,7 @@ def _run_stream(*, backend, on_delta: Callable[[str], None]):
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
 
 
@@ -42,6 +44,7 @@ def _parser(on_delta: Callable[[str], None]) -> SalesOnePlusStreamParser:
         on_delta,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
 
 
@@ -148,23 +151,27 @@ def test_candidate_local_admin_and_spam_make_zero_calls_and_zero_deltas() -> Non
             on_delta=emitted.append,
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_EMPTY_CATALOG,
-            service_reference_catalog=_EMPTY_REF_CATALOG,
-        )
+        service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+    )
         assert result.decision == expected and emitted == []
     assert backend.calls == 0
 
 
 def test_candidate_model_admin_malformed_and_early_failure_use_static_handoff() -> None:
-    for backend in (
-        _StreamBackend((admin_envelope(),)),
-        _StreamBackend(("not json",)),
-        _StreamBackend((), fail_after=True),
-    ):
-        emitted: list[str] = []
-        result = _run_stream(backend=backend, on_delta=emitted.append)
-        assert result.decision == "admin"
-        assert result.handoff_text == "Позвоните администратору."
-        assert result.patient_text is None and emitted == [] and backend.calls == 1
+    emitted: list[str] = []
+    admin_result = _run_stream(backend=_StreamBackend((admin_envelope(),)), on_delta=emitted.append)
+    assert admin_result.decision == "admin"
+    assert admin_result.handoff_text == "Позвоните администратору."
+    assert admin_result.patient_text is None and emitted == []
+
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_stream(backend=_StreamBackend(("not json",)), on_delta=emitted.append)
+
+    fail_result = _run_stream(backend=_StreamBackend((), fail_after=True), on_delta=emitted.append)
+    assert fail_result.decision == "admin"
+    assert fail_result.handoff_text == "Позвоните администратору."
+    assert fail_result.patient_text is None and emitted == []
 
 
 def test_candidate_late_provider_failure_does_not_emit_partial_answer() -> None:
@@ -205,6 +212,7 @@ def test_result_contract_marks_only_partial_backend_answers_interrupted() -> Non
         patient_text="partial",
         service_reference_status="none",
         requested_service_id=None,
+        references=OneCallEnvelopeReferences(direct_fact_ids=()),
     )
     with pytest.raises(ValidationError):
         SalesOnePlusResult(

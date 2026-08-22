@@ -7,7 +7,7 @@ from pathlib import Path
 import config
 import pytest
 
-from contracts.one_call_envelope import OneCallEnvelope, required_envelope_field_names
+from contracts.one_call_envelope import OneCallEnvelope, OneCallEnvelopeReferences, required_envelope_field_names
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_envelope_protocol import (
@@ -29,8 +29,10 @@ from core.target_cached_full_context import build_target_cached_full_context
 from core.target_client_data import load_target_client_data
 from tests.test_sales_one_plus_turn import (
     _DEMO_CATALOG,
+    _DEMO_COMMERCIAL_CATALOG,
     _DEMO_REF_CATALOG,
     _EMPTY_CATALOG,
+    _EMPTY_COMMERCIAL_CATALOG,
     _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
@@ -80,6 +82,7 @@ def _run_blocking(output: object):
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
 
 
@@ -99,6 +102,7 @@ def _run_stream(chunks: tuple[str, ...], *, fail_after: bool = False):
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
     return result, emitted
 
@@ -145,8 +149,9 @@ def test_blocking_accepts_all_commercial_intent_values(commercial_intent: str) -
     assert result.envelope.promotion_scope == scope
 
 
-def test_exact_thirteen_key_contract() -> None:
+def test_exact_fourteen_key_contract() -> None:
     assert required_envelope_field_names() == frozenset(production_envelope_template().keys())
+    assert len(production_envelope_template()) == 14
 
 
 @pytest.mark.parametrize(
@@ -164,6 +169,7 @@ def test_missing_and_extra_keys_rejected(mutator, code: str) -> None:
             json.dumps(payload),
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
@@ -185,6 +191,7 @@ def test_invalid_enums_rejected(field: str, value: object, code: str) -> None:
             json.dumps(payload),
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
@@ -203,6 +210,7 @@ def test_type_confusions_rejected(field: str, value: object, code: str) -> None:
             json.dumps(payload),
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -214,6 +222,7 @@ def test_empty_and_whitespace_patient_text_rejected() -> None:
             json.dumps(payload),
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
@@ -224,6 +233,7 @@ def test_inactive_service_id_rejected() -> None:
             json.dumps(payload),
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
@@ -233,6 +243,7 @@ def test_active_service_id_accepted() -> None:
         json.dumps(payload),
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert envelope.service_id == "classic"
 
@@ -244,6 +255,7 @@ def test_forbidden_stage_rejected() -> None:
             json.dumps(payload),
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -254,6 +266,7 @@ def test_allowed_stage_accepted() -> None:
         json.dumps(payload),
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert envelope.stage == allowed
 
@@ -271,6 +284,7 @@ def test_service_clarify_accepts_two_or_three_active_options(count: int) -> None
         json.dumps(payload),
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert envelope.clarify_service_options == tuple(options)
 
@@ -288,6 +302,7 @@ def test_service_clarify_rejects_invalid_option_sets(options) -> None:
             json.dumps(payload),
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -303,6 +318,7 @@ def test_non_service_clarify_forbids_options() -> None:
             json.dumps(payload),
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
 
 
@@ -314,6 +330,7 @@ def test_streaming_splits_json_at_every_boundary() -> None:
             emitted.append,
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
         parser.ingest(payload[:split_at])
         parser.ingest(payload[split_at:])
@@ -323,9 +340,8 @@ def test_streaming_splits_json_at_every_boundary() -> None:
 
 
 def test_invalid_stream_emits_zero_patient_delta() -> None:
-    result, emitted = _run_stream(("{not json",))
-    assert result.decision == "admin"
-    assert emitted == []
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_stream(("{not json",))
 
 
 def test_interrupted_stream_emits_zero_patient_delta() -> None:
@@ -353,12 +369,10 @@ def test_admin_stream_emits_zero_patient_delta() -> None:
 def test_oversized_blocking_and_streaming_rejected() -> None:
     huge_text = "x" * (MAX_ENVELOPE_UTF8_BYTES + 1)
     payload = answer_envelope(huge_text)
-    result = _run_blocking(payload)
-    assert result.decision == "admin"
-    assert result.reason == "envelope_oversized"
-    result2, emitted = _run_stream((payload,))
-    assert result2.decision == "admin"
-    assert emitted == []
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_blocking(payload)
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_stream((payload,))
 
 
 def test_blocking_and_streaming_share_one_parser() -> None:
@@ -370,9 +384,9 @@ def test_blocking_and_streaming_share_one_parser() -> None:
 
 
 def test_invalid_envelope_does_not_retry() -> None:
-    for _ in range(2):
-        backend = _Backend("not-json")
-        result = run_sales_one_plus_candidate(
+    backend = _Backend("not-json")
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        run_sales_one_plus_candidate(
             user_message="Есть парковка?",
             cached_full_context=_context(),
             exact_sales_resolution=_resolution(),
@@ -381,13 +395,13 @@ def test_invalid_envelope_does_not_retry() -> None:
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
-        assert result.decision == "admin"
-        assert backend.calls == 1
+    assert backend.calls == 1
 
 
-def test_prompt_contract_version_is_four() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 4
+def test_prompt_contract_version_is_five() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 5
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
@@ -402,7 +416,9 @@ def test_prompt_v2_bump_changes_prefix_fingerprint() -> None:
     corpus = build_target_cached_full_context(_DEMO / "md")
     catalog = _DEMO_CATALOG
     ref_catalog = _DEMO_REF_CATALOG
-    fingerprint = compute_prefix_input_fingerprint(identity, corpus, catalog, ref_catalog)
+    fingerprint = compute_prefix_input_fingerprint(
+        identity, corpus, catalog, ref_catalog, _DEMO_COMMERCIAL_CATALOG
+    )
     assert f"p{ONE_CALL_PROMPT_CONTRACT_VERSION}" in identity.cache_key()
     clear_one_call_prefix_cache()
     bundle, hit = get_or_build_stable_prefix(
@@ -410,6 +426,7 @@ def test_prompt_v2_bump_changes_prefix_fingerprint() -> None:
         cached_full_context=corpus,
         active_service_catalog=catalog,
         service_reference_catalog=ref_catalog,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert hit is False
     assert "=== SERVICE_REFERENCE_CATALOG ===" in bundle.stable_prefix
@@ -424,10 +441,8 @@ def test_flag_default_off() -> None:
 
 
 def test_protocol_and_backend_admin_preserve_no_envelope() -> None:
-    result = _run_blocking("not-json")
-    assert result.decision == "admin"
-    assert result.source == "protocol"
-    assert result.envelope is None
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_blocking("not-json")
 
     failed = run_sales_one_plus_candidate(
         user_message="Есть парковка?",
@@ -438,6 +453,7 @@ def test_protocol_and_backend_admin_preserve_no_envelope() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
     assert failed.decision == "admin"
     assert failed.source == "backend"
@@ -459,6 +475,7 @@ def test_sales_one_plus_result_rejects_answer_route_mismatch() -> None:
             patient_text="Текст",
             service_reference_status="none",
             requested_service_id=None,
+            references=OneCallEnvelopeReferences(direct_fact_ids=()),
         )
     with pytest.raises(ValueError, match="sales_one_plus_answer_envelope_required"):
         from contracts.sales_one_plus import SalesOnePlusResult
@@ -487,6 +504,7 @@ def test_sales_one_plus_result_rejects_patient_text_mismatch() -> None:
             patient_text="Envelope text",
             service_reference_status="none",
             requested_service_id=None,
+            references=OneCallEnvelopeReferences(direct_fact_ids=()),
         )
     with pytest.raises(ValueError, match="sales_one_plus_answer_patient_text_mismatch"):
         from contracts.sales_one_plus import SalesOnePlusResult
@@ -516,6 +534,7 @@ def test_one_call_envelope_rejects_blank_service_id_direct() -> None:
             patient_text="Ответ.",
             service_reference_status="none",
             requested_service_id=None,
+            references=OneCallEnvelopeReferences(direct_fact_ids=()),
         )
 
 
@@ -535,6 +554,7 @@ def test_one_call_envelope_rejects_blank_stage_direct() -> None:
             patient_text="Ответ.",
             service_reference_status="none",
             requested_service_id=None,
+            references=OneCallEnvelopeReferences(direct_fact_ids=()),
         )
 
 
@@ -555,6 +575,7 @@ def test_one_call_envelope_rejects_invalid_option_sets_direct(options: tuple[str
             patient_text="Уточните.",
             service_reference_status="none",
             requested_service_id=None,
+            references=OneCallEnvelopeReferences(direct_fact_ids=()),
         )
 
 
@@ -566,20 +587,17 @@ def test_duplicate_json_keys_rejected() -> None:
             duplicate,
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
 def test_unencodable_unicode_rejected_blocking_and_streaming() -> None:
-    bad = '{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","promotion_scope":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":"\ud800","service_reference_status":"none","requested_service_id":null}'
-    result = _run_blocking(bad)
-    assert result.decision == "admin"
-    assert result.reason == "envelope_encoding_invalid"
-    assert result.envelope is None
+    bad = '{"route":"ANSWER","service_id":null,"extent":null,"jaw":null,"stage":null,"scenario":"none","commercial_intent":"none","promotion_scope":"none","clarify_axis":null,"clarify_service_options":null,"patient_text":"\ud800","service_reference_status":"none","requested_service_id":null,"references":{"direct_fact_ids":[]}}'
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_blocking(bad)
 
-    result2, emitted = _run_stream((bad,))
-    assert result2.decision == "admin"
-    assert result2.reason == "envelope_encoding_invalid"
-    assert emitted == []
+    with pytest.raises(OneCallEnvelopeProtocolError):
+        _run_stream((bad,))
 
 
 def test_prompt_policy_forbids_exact_commercial_values_in_patient_text() -> None:

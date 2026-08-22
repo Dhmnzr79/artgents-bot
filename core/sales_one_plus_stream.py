@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from contracts.one_call_envelope import OneCallEnvelope
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_envelope_protocol import (
     MAX_ENVELOPE_UTF8_BYTES,
     OneCallEnvelopeProtocolError,
@@ -24,10 +25,12 @@ class SalesOnePlusStreamParser:
         *,
         active_service_catalog: ActiveServiceCatalogSnapshot,
         service_reference_catalog: ServiceReferenceCatalogSnapshot,
+        commercial_fact_catalog: CommercialFactCatalogSnapshot,
     ) -> None:
         self._on_delta = on_delta
         self._active_service_catalog = active_service_catalog
         self._service_reference_catalog = service_reference_catalog
+        self._commercial_fact_catalog = commercial_fact_catalog
         self._buffer = ""
         self._buffer_bytes = 0
         self._validated_envelope: OneCallEnvelope | None = None
@@ -60,6 +63,7 @@ class SalesOnePlusStreamParser:
             self._buffer,
             active_service_catalog=self._active_service_catalog,
             service_reference_catalog=self._service_reference_catalog,
+            commercial_fact_catalog=self._commercial_fact_catalog,
         )
         self._validated_envelope = envelope
         if envelope.route in {"ANSWER", "CLARIFY"}:

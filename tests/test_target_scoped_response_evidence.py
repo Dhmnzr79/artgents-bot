@@ -596,7 +596,7 @@ def _demo_general_promotion_bound():
     from core.target_runtime_client_context import load_target_runtime_client_context
     from core.target_runtime_strategy import resolve_target_runtime_strategy_context
     from core.target_strategy_context import strategy_match_from_effective_scope
-    from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_REF_CATALOG, answer_envelope
+    from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_COMMERCIAL_CATALOG, _DEMO_REF_CATALOG, answer_envelope
 
     context = load_target_runtime_client_context("demo")
     unknown = ExactSalesFieldAuthority(authority="unknown", provenance="unknown")
@@ -614,6 +614,7 @@ def _demo_general_promotion_bound():
         ),
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     semantic = bind_semantic_frame(
         envelope=envelope,

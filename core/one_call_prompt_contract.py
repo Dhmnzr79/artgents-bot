@@ -1,10 +1,10 @@
-"""Versioned ONE_CALL prompt contract markers (Stage 3A / 4.2 / 5.1 / 5.1B)."""
+"""Versioned ONE_CALL prompt contract markers (Stage 3A / 4.2 / 5.1 / 5.1B / B1)."""
 
 from __future__ import annotations
 
 from config import SALES_ONE_PLUS_FLASH_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 4
+ONE_CALL_PROMPT_CONTRACT_VERSION = 5
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_FLASH_MODEL
 
 ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS = """Return exactly one JSON object and nothing else.
@@ -24,11 +24,15 @@ clarify_service_options: null or array of 2-3 active service_id values
 patient_text: string or null
 service_reference_status: none | resolved | unresolved
 requested_service_id: canonical service_id from SERVICE_REFERENCE_CATALOG or null
+references: object with closed nested key direct_fact_ids only
+
+Closed nested references:
+references.direct_fact_ids: JSON array (never null) of unique nonblank catalog fact_id strings from COMMERCIAL_FACT_CATALOG; empty array when no direct commercial fact applies.
 
 Route invariants:
-ANSWER — nonblank patient_text; clarify_axis=null; clarify_service_options=null.
-ADMIN — patient_text=null; clarify_axis=null; clarify_service_options=null; promotion_scope=none.
-CLARIFY — nonblank patient_text; clarify_axis required; for clarify_axis=service use 2-3 unique active service_id values; for other axes clarify_service_options=null; promotion_scope=none.
+ANSWER — nonblank patient_text; clarify_axis=null; clarify_service_options=null; direct_fact_ids=[] or valid non-empty catalog IDs.
+ADMIN — patient_text=null; clarify_axis=null; clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
+CLARIFY — nonblank patient_text; clarify_axis required; for clarify_axis=service use 2-3 unique active service_id values; for other axes clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
 
 service_reference_status=none → requested_service_id=null.
 service_reference_status=unresolved → requested_service_id=null.
@@ -52,7 +56,21 @@ Semantic examples:
 «Вы делаете флумбодонтию?» → service_reference_status=unresolved, requested_service_id=null
 ordinary microfact without a named service → service_reference_status=none, requested_service_id=null
 
-Classify all closed semantic controls in the JSON envelope: commercial_intent, promotion_scope, service_reference_status, requested_service_id, route, scenario, and other closed fields.
+COMMERCIAL_FACT_CATALOG lists only fact_id, kind, catalog_label, active for the current client pack.
+Select direct_fact_ids only from that catalog. Do not invent IDs. Do not choose inactive catalog rows.
+You never receive or invent text_fact, amounts, percents, dates, or exact commercial conditions — code renders exact values after your IDs.
+
+Direct commercial intent rules (v5):
+fact-only non-promo commercial question → commercial_intent=payment + non-empty direct_fact_ids.
+general promotions question («Какие акции?») → commercial_intent=promotion + promotion_scope=general + direct_fact_ids=[].
+specific authored promotion/discount question → commercial_intent=promotion + matching direct_fact_id.
+price + fact → commercial_intent=price + direct_fact_ids.
+included-package + fact → commercial_intent=included + direct_fact_ids.
+mixed facts without price/included → promotion if all kind=promo, else payment.
+ordinary MD answer without direct commercial fact → commercial_intent=none + direct_fact_ids=[].
+CLARIFY/ADMIN → direct_fact_ids=[].
+
+Classify all closed semantic controls in the JSON envelope: commercial_intent, promotion_scope, service_reference_status, requested_service_id, references.direct_fact_ids, route, scenario, and other closed fields.
 Never compute or invent prices, payment terms, included-package amounts, or promotion percentages or conditions in patient_text.
 Exact commercial values are code-owned after the model response.
 

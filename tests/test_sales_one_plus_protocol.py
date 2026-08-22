@@ -10,7 +10,13 @@ from core.sales_one_plus_protocol import (
     SalesOnePlusProtocolError,
     parse_sales_one_plus_output,
 )
-from tests.test_sales_one_plus_turn import _EMPTY_CATALOG, _EMPTY_REF_CATALOG, answer_envelope, admin_envelope
+from tests.test_sales_one_plus_turn import (
+    _EMPTY_CATALOG,
+    _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_REF_CATALOG,
+    answer_envelope,
+    admin_envelope,
+)
 
 
 def test_legacy_line_protocol_answer_and_admin_body_rules() -> None:
@@ -93,6 +99,7 @@ def test_production_parser_accepts_valid_answer_envelope() -> None:
         answer_envelope("Готовый ответ"),
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
     assert envelope.route == "ANSWER"
     assert envelope.patient_text == "Готовый ответ"
@@ -104,6 +111,7 @@ def test_production_parser_rejects_non_json() -> None:
             "hello",
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
@@ -119,6 +127,7 @@ def test_production_parser_rejects_admin_with_patient_text() -> None:
             json.dumps(payload),
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
 
 
@@ -127,5 +136,6 @@ def test_production_parser_accepts_admin_envelope() -> None:
         admin_envelope(),
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
     assert envelope.route == "ADMIN"

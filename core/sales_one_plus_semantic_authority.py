@@ -236,6 +236,7 @@ def bind_semantic_frame(
         service_reference_status=envelope.service_reference_status,
         requested_service_id=envelope.requested_service_id,
         availability_status=availability_status,
+        direct_fact_ids=envelope.references.direct_fact_ids,
     )
 
 

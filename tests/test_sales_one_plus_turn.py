@@ -5,12 +5,14 @@ import re
 from pathlib import Path
 
 import config
+import pytest
 from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
 from contracts.sales_one_plus import SalesOnePlusStrictFact
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.one_call_client_pack_identity import build_client_pack_identity
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_envelope_protocol import dumps_production_envelope
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
@@ -83,10 +85,19 @@ _DEMO_REF_CATALOG = ServiceReferenceCatalogSnapshot.from_bundle(
 )
 
 
+_EMPTY_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot(
+    canonical_json='{"facts":[]}',
+)
+_DEMO_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
+    load_target_client_data("demo").bundle
+)
+
+
 def _run(**kwargs):
     kwargs.setdefault("pack_identity", _PACK_IDENTITY)
     kwargs.setdefault("active_service_catalog", _EMPTY_CATALOG)
     kwargs.setdefault("service_reference_catalog", _EMPTY_REF_CATALOG)
+    kwargs.setdefault("commercial_fact_catalog", _EMPTY_COMMERCIAL_CATALOG)
     return run_sales_one_plus_candidate(static_admin_handoff_text="Позвоните администратору.", **kwargs)
 
 
@@ -162,16 +173,20 @@ def test_scoped_service_axes_pre_flash_hints_are_neutral() -> None:
 
 
 def test_model_admin_ignores_prose_and_failures_are_technical_admin() -> None:
+    from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
+
     admin = _Backend(admin_envelope())
     malformed = _Backend("not protocol")
     failed = _Backend(RuntimeError("network"))
-    for backend, reason in ((admin, "model_admin"), (malformed, "json_invalid"), (failed, "backend_failed")):
-        result = _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend)
-        assert result.decision == "admin" and result.patient_text is None and result.handoff_text == "Позвоните администратору." and result.reason == reason and backend.calls == 1
-        if reason == "model_admin":
-            assert result.envelope is not None and result.envelope.route == "ADMIN"
-        else:
-            assert result.envelope is None
+    admin_result = _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=admin)
+    assert admin_result.decision == "admin" and admin_result.patient_text is None and admin_result.handoff_text == "Позвоните администратору." and admin_result.reason == "model_admin" and admin.calls == 1
+    assert admin_result.envelope is not None and admin_result.envelope.route == "ADMIN"
+    with pytest.raises(OneCallEnvelopeProtocolError, match="json_invalid"):
+        _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=malformed)
+    assert malformed.calls == 1
+    failed_result = _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=failed)
+    assert failed_result.decision == "admin" and failed_result.patient_text is None and failed_result.handoff_text == "Позвоните администратору." and failed_result.reason == "backend_failed" and failed.calls == 1
+    assert failed_result.envelope is None
 
 
 def test_live_adapter_is_one_shot_and_requests_json_mode(monkeypatch) -> None:
@@ -208,6 +223,7 @@ def test_live_demo_model_corpus_and_every_numeric_line_reach_invocation() -> Non
         pack_identity=_DEMO_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
 
     assert result.decision == "answer"

@@ -83,7 +83,6 @@ def _fresh_defaults() -> dict:
         "lead_paused_answer_count": 0,
         "lead_preferred_datetime": "",
         "booking_intent_ever": False,
-        "anti_spam_redirect_shown": False,
         "lead_pending_name": "",
         "shown_cta_topics": [],
         "topic_state": {},
@@ -91,7 +90,6 @@ def _fresh_defaults() -> dict:
         "last_catalog_service_id": None,
         "last_aspect": None,
         "pending_lead_offer": False,
-        "user_turn_timestamps": [],
         "consult_streak": 0,
         "nav_refs_used": [],
     }
@@ -172,9 +170,6 @@ def mem_add_user(session_id: str, text: str) -> None:
         st = mem_get(session_id)
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
         st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
-        ts_list = list(st.get("user_turn_timestamps") or [])
-        ts_list.append(time.time())
-        st["user_turn_timestamps"] = ts_list[-50:]
         if is_lead_context(st):
             _persist_unlocked(session_id, st)
             return
@@ -709,13 +704,6 @@ def mark_booking_intent_ever(session_id: str) -> None:
     with _lock:
         st = mem_get(session_id)
         st["booking_intent_ever"] = True
-        _persist_unlocked(session_id, st)
-
-
-def set_anti_spam_redirect_shown(session_id: str, shown: bool = True) -> None:
-    with _lock:
-        st = mem_get(session_id)
-        st["anti_spam_redirect_shown"] = bool(shown)
         _persist_unlocked(session_id, st)
 
 

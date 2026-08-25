@@ -38,3 +38,19 @@ def test_check_rate_limit_bypassed_for_e2e_env(monkeypatch) -> None:
     ip = "eval-smoke-ip"
     for _ in range(50):
         assert check_rate_limit(ip) is True
+
+
+def test_check_rate_limit_blocks_after_bucket_exhaustion() -> None:
+    from orchestration import route_guards
+
+    ip = f"route-guard-rate-{id(object())}"
+    limit = int(route_guards.RATE_LIMIT_MAX_PER_IP)
+    with route_guards._IP_RATE_LOCK:
+        route_guards._IP_RATE_BUCKETS.pop(ip, None)
+    try:
+        for _ in range(limit):
+            assert check_rate_limit(ip) is True
+        assert check_rate_limit(ip) is False
+    finally:
+        with route_guards._IP_RATE_LOCK:
+            route_guards._IP_RATE_BUCKETS.pop(ip, None)

@@ -6,8 +6,6 @@ from typing import Any
 from flask import request
 
 from config import (
-    ANTI_SPAM_BURST_MESSAGES,
-    ANTI_SPAM_BURST_WINDOW_SEC,
     INPUT_MAX_CHARS,
     SALES_ONE_PLUS_ON,
 )
@@ -26,13 +24,10 @@ from orchestration.helpers import decision_dump
 from orchestration.lead_flow import lead_flow_orchestration_result
 from orchestration.route_guards import (
     check_rate_limit,
-    is_message_burst,
     is_obvious_noise,
     normalize_question_text,
     obvious_noise_ingress_result,
     rate_limited_response_payload,
-    should_soft_redirect_no_intent,
-    soft_redirect_payload,
 )
 from session import (
     get_topic_state,
@@ -42,7 +37,6 @@ from session import (
     mem_get,
     mem_reset,
     recent_dialog_history,
-    set_anti_spam_redirect_shown,
     sid_from_body,
 )
 from ux_builder import empty_question_response
@@ -240,51 +234,6 @@ def run_pre_resolver_turn(
         )
 
     st = mem_get(sid)
-
-    if not is_lead_context(st):
-        if is_message_burst(st):
-            set_anti_spam_redirect_shown(sid, True)
-            log_json(
-                logger,
-                "anti_spam_burst_redirect",
-                sid=sid,
-                client_id=client_id,
-                burst_window_sec=ANTI_SPAM_BURST_WINDOW_SEC,
-                burst_messages=ANTI_SPAM_BURST_MESSAGES,
-            )
-            discard_planner_speculation(speculative_handle)
-            return AskOrchestrationResult(
-                kind="service_reply",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=soft_redirect_payload(sid, client_id),
-                service_doc_id=None,
-                service_track_user=True,
-                service_route="booking_flow",
-                decision_frame=decision_frame,
-            )
-        if should_soft_redirect_no_intent(st):
-            set_anti_spam_redirect_shown(sid, True)
-            log_json(
-                logger,
-                "anti_spam_soft_redirect",
-                sid=sid,
-                client_id=client_id,
-                session_turn_count=int(st.get("session_turn_count") or 0),
-            )
-            discard_planner_speculation(speculative_handle)
-            return AskOrchestrationResult(
-                kind="service_reply",
-                q=q,
-                sid=sid,
-                client_id=client_id,
-                service_payload=soft_redirect_payload(sid, client_id),
-                service_doc_id=None,
-                service_track_user=True,
-                service_route="booking_flow",
-                decision_frame=decision_frame,
-            )
 
     if ref:
         ref_eff = str(ref).strip()

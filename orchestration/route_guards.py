@@ -7,9 +7,6 @@ import threading
 from collections import deque
 
 from config import (
-    ANTI_SPAM_BURST_MESSAGES,
-    ANTI_SPAM_BURST_WINDOW_SEC,
-    ANTI_SPAM_NO_INTENT_TURNS,
     CONTACTS_RE,
     INPUT_MAX_CHARS,
     PRICE_CONCERN_RE,
@@ -137,44 +134,6 @@ def duplicate_payload(sid: str, client_id: str | None, snap: dict | None) -> dic
         "offer": None,
         "meta": {"sid": sid, "client_id": client_id, "duplicate_short_circuit": True},
     }
-
-
-def should_soft_redirect_no_intent(st: dict) -> bool:
-    turns = int((st or {}).get("session_turn_count") or 0)
-    booking_ever = bool((st or {}).get("booking_intent_ever"))
-    shown = bool((st or {}).get("anti_spam_redirect_shown"))
-    return turns >= ANTI_SPAM_NO_INTENT_TURNS and (not booking_ever) and (not shown)
-
-
-def is_message_burst(st: dict) -> bool:
-    ts = list((st or {}).get("user_turn_timestamps") or [])
-    if not ts:
-        return False
-    now = time.time()
-    recent = [
-        float(x)
-        for x in ts
-        if isinstance(x, (int, float)) and float(x) >= (now - ANTI_SPAM_BURST_WINDOW_SEC)
-    ]
-    return len(recent) >= ANTI_SPAM_BURST_MESSAGES
-
-
-def soft_redirect_payload(sid: str, client_id: str | None) -> dict:
-    ui = load_ui_bundle(client_id)
-    payload = {
-        "answer": ui.anti_spam_soft_redirect,
-        "quick_replies": [],
-        "cta": {"text": "Связаться с администратором", "action": "lead"},
-        "video": None,
-        "situation": {"show": False, "mode": "normal"},
-        "offer": None,
-        "meta": {
-            "sid": sid,
-            "client_id": client_id,
-            "anti_spam_soft_redirect": True,
-        },
-    }
-    return payload
 
 
 def continuation_clarify_payload(sid: str, client_id: str | None) -> dict:

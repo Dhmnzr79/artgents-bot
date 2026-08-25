@@ -150,30 +150,37 @@ def test_empty_direct_fact_ids_accepted() -> None:
     assert envelope.references.direct_fact_ids == ()
 
 
-def test_unknown_current_pack_id_rejected() -> None:
+def test_unknown_current_pack_id_parses_and_preserves_id() -> None:
     payload = production_envelope_template(
+        patient_text="Ответ.",
         references={"direct_fact_ids": ["missing_fact_id"]},
     )
-    with pytest.raises(OneCallEnvelopeProtocolError, match="direct_fact_id_not_in_current_pack"):
-        parse_production_envelope_json(
-            json.dumps(payload),
-            active_service_catalog=_DEMO_CATALOG,
-            service_reference_catalog=_DEMO_REF_CATALOG,
-            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
-        )
+    envelope = parse_production_envelope_json(
+        json.dumps(payload),
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+    )
+    assert envelope.patient_text == "Ответ."
+    assert envelope.references.direct_fact_ids == ("missing_fact_id",)
 
 
-def test_demo_only_id_under_nikadent_uses_same_error_code() -> None:
+def test_demo_only_id_under_nikadent_parses_without_rewriting() -> None:
     payload = production_envelope_template(
+        patient_text="Про рассрочку.",
         references={"direct_fact_ids": ["installment_12"]},
     )
-    with pytest.raises(OneCallEnvelopeProtocolError, match="direct_fact_id_not_in_current_pack"):
-        parse_production_envelope_json(
-            json.dumps(payload),
-            active_service_catalog=_DEMO_CATALOG,
-            service_reference_catalog=_DEMO_REF_CATALOG,
-            commercial_fact_catalog=_NIKADENT_COMMERCIAL_CATALOG,
-        )
+    envelope = parse_production_envelope_json(
+        json.dumps(payload),
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_NIKADENT_COMMERCIAL_CATALOG,
+    )
+    assert envelope.patient_text == "Про рассрочку."
+    assert envelope.references.direct_fact_ids == ("installment_12",)
+    dumped = envelope.model_dump()
+    assert dumped["references"]["direct_fact_ids"] == ("installment_12",)
+    assert "text_fact" not in dumped
 
 
 @pytest.mark.parametrize("route", ("CLARIFY", "ADMIN"))

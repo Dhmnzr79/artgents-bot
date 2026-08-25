@@ -349,6 +349,24 @@ def resolve_sales_fast_bound_package(
             md_root=md_root,
             client_id=client_id,
         )
+    if (
+        isinstance(bound, TargetTurnFrameBoundTerminalResponse)
+        and semantic.route == "ANSWER"
+        and semantic.direct_fact_ids
+    ):
+        return assemble_stage51b_availability_bound_package(
+            turn_frame=turn_frame,
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            external_index=external_index,
+            consultation_values=consultation_values,
+            strategy_context=strategy_context,
+            effective_scope=effective_scope,
+            allowed_topics=allowed_topics,
+            today=today,
+            md_root=md_root,
+            client_id=client_id,
+        )
     return bound
 
 

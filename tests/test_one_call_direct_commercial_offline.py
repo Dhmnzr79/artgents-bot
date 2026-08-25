@@ -329,6 +329,33 @@ def test_widget_fact_only_payment_renders_exact_fact(
     assert _INSTALLMENT_TEXT in str(outcome.widget.payload.get("answer") or "")
 
 
+def test_widget_standalone_known_payment_fact_without_service_id(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    backend = _CountingBackend(
+        dumps_production_envelope(
+            patient_text="Можно в рассрочку по условиям клиники.",
+            commercial_intent="payment",
+            references={"direct_fact_ids": ["installment_12"]},
+        )
+    )
+    outcome = _run_widget_with_backend(
+        monkeypatch,
+        flask_app,
+        sid="b1-standalone-known",
+        user_message="Можно ли в рассрочку?",
+        backend=backend,
+    )
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert backend.call_count == 1
+    assert outcome.model_route == "model"
+    assert outcome.widget.kind == "materialized"
+    assert "Можно в рассрочку по условиям клиники." in answer
+    assert _INSTALLMENT_TEXT in answer
+    assert answer.count(_INSTALLMENT_TEXT) == 1
+
+
 def test_widget_malformed_envelope_is_technical_error_not_admin(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
@@ -347,7 +374,7 @@ def test_widget_malformed_envelope_is_technical_error_not_admin(
     assert outcome.failure_kind == "json_invalid"
 
 
-def test_widget_unknown_id_is_technical_error_not_admin(
+def test_widget_unknown_id_preserves_answer_with_ineligible_phrase(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
@@ -365,10 +392,17 @@ def test_widget_unknown_id_is_technical_error_not_admin(
         user_message="Можно ли в рассрочку?",
         backend=backend,
     )
+    answer = str(outcome.widget.payload.get("answer") or "")
     assert backend.call_count == 1
-    assert outcome.model_route == "error"
-    assert outcome.widget.kind == "error"
-    assert outcome.failure_kind == "direct_fact_id_not_in_current_pack"
+    assert outcome.model_route == "model"
+    assert outcome.widget.kind == "materialized"
+    assert outcome.widget.kind != "terminal"
+    assert outcome.widget.kind != "error"
+    assert "Ответ." in answer
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
+    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert "missing_fact_id" not in answer
+    assert outcome.failure_kind != "direct_fact_id_not_in_current_pack"
 
 
 def test_widget_backend_failure_still_admin(
@@ -756,7 +790,7 @@ def test_widget_all_ineligible_direct_id_controlled_response(
     assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
 
 
-def test_widget_nikadent_cross_pack_installment_is_technical_error(
+def test_widget_nikadent_cross_pack_installment_preserves_answer(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
@@ -775,10 +809,73 @@ def test_widget_nikadent_cross_pack_installment_is_technical_error(
         backend=backend,
         client_id="nikadent",
     )
+    answer = str(outcome.widget.payload.get("answer") or "")
     assert backend.call_count == 1
-    assert outcome.model_route == "error"
-    assert outcome.widget.kind == "error"
-    assert outcome.failure_kind == "direct_fact_id_not_in_current_pack"
+    assert outcome.model_route == "model"
+    assert outcome.widget.kind == "materialized"
+    assert outcome.widget.kind != "terminal"
+    assert outcome.widget.kind != "error"
+    assert "Про рассрочку." in answer
+    assert _INSTALLMENT_TEXT not in answer
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
+    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert "installment_12" not in answer
+    assert outcome.failure_kind != "direct_fact_id_not_in_current_pack"
+
+
+def test_widget_mixed_known_and_unknown_direct_ids_preserve_eligible_fact(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    backend = _CountingBackend(
+        dumps_production_envelope(
+            patient_text="Основной ответ про рассрочку.",
+            commercial_intent="payment",
+            references={"direct_fact_ids": ["installment_12", "missing_fact_id"]},
+        )
+    )
+    outcome = _run_widget_with_backend(
+        monkeypatch,
+        flask_app,
+        sid="b1-mixed-ids",
+        user_message="Можно ли в рассрочку?",
+        backend=backend,
+    )
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert backend.call_count == 1
+    assert outcome.model_route == "model"
+    assert outcome.widget.kind == "materialized"
+    assert "Основной ответ про рассрочку." in answer
+    assert _INSTALLMENT_TEXT in answer
+    assert answer.count(_INSTALLMENT_TEXT) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
+    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert "missing_fact_id" not in answer
+    assert outcome.failure_kind != "direct_fact_id_not_in_current_pack"
+
+
+def test_widget_payment_without_service_or_direct_ids_keeps_terminal_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    backend = _CountingBackend(
+        dumps_production_envelope(
+            patient_text="Какие есть общие условия оплаты?",
+            commercial_intent="payment",
+            references={"direct_fact_ids": []},
+        )
+    )
+    outcome = _run_widget_with_backend(
+        monkeypatch,
+        flask_app,
+        sid="b1-payment-no-ids",
+        user_message="Какие есть общие условия оплаты?",
+        backend=backend,
+    )
+    assert backend.call_count == 1
+    assert outcome.widget.kind == "terminal"
+    assert outcome.widget.kind != "materialized"
+    assert outcome.model_route == "local"
 
 
 def test_duplicate_direct_text_fact_renders_once() -> None:

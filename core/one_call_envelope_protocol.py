@@ -111,9 +111,6 @@ def _validate_direct_fact_ids(
     direct_fact_ids = tuple(normalized)
     if route in {"CLARIFY", "ADMIN"} and direct_fact_ids:
         raise OneCallEnvelopeProtocolError("direct_fact_ids_forbidden_for_route")
-    for fact_id in direct_fact_ids:
-        if fact_id not in commercial_fact_catalog.fact_ids:
-            raise OneCallEnvelopeProtocolError("direct_fact_id_not_in_current_pack")
     return direct_fact_ids
 
 

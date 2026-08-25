@@ -63,6 +63,16 @@ def test_production_policy_requires_json_only_transport() -> None:
     assert "Never calculate, multiply, sum, or interpolate prices" in SALES_ONE_PLUS_SYSTEM_POLICY
 
 
+def test_production_policy_medical_faq_boundary() -> None:
+    policy = SALES_ONE_PLUS_SYSTEM_POLICY.casefold()
+    assert "complex medical questions" not in policy
+    assert "general informational medical faq" in policy
+    assert "route=answer grounded in the corpus" in policy
+    assert "explicit requests to determine personal medical eligibility" in policy
+    assert "uncertainty alone is not grounds for admin" in policy
+    assert "if the wording does not prove a personal problematic request" in policy
+
+
 def test_pre_flash_hints_expose_ambiguous_scope_without_authoritative_resolution() -> None:
     from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
     from core.sales_fast_strict_evidence import build_pre_flash_prompt_hints

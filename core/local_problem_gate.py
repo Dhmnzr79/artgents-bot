@@ -70,19 +70,6 @@ _PERSONAL_TREATMENT_MARKERS = (
     "что мне выбрать",
     "выберите мне",
 )
-_PERSONAL_MEDICAL_CONTEXT = (
-    "диабет",
-    "беремен",
-    "онколог",
-    "антикоагулянт",
-    "разжижающ",
-    "аллерги",
-)
-_PERSONAL_MEDICAL_QUESTION = ("можно ли", "подойдет ли", "подойдёт ли", "противопоказ")
-_CHRONIC_DISEASE_MARKERS = ("хроническ", "заболеван")
-_IMPLANT_ELIGIBILITY_MARKERS = ("имплантац", "возможност")
-_CONTRAINDICATION_MARKERS = ("противопоказан",)
-_TREATMENT_SELECTION_MARKERS = ("лечен", "имплантац", "подбира")
 _POST_PROCEDURE_MARKERS = ("после",)
 _POST_PROCEDURE_CONTEXT = ("операц", "имплантац")
 _POST_PROCEDURE_SYMPTOM_MARKERS = (
@@ -129,18 +116,6 @@ def _is_review_requiring_reaction(text: str) -> bool:
     return "отзыв" in text and _contains_any(text, _REVIEW_ACTION_MARKERS)
 
 
-def _is_chronic_disease_implant_eligibility(text: str) -> bool:
-    return _contains_any(text, _CHRONIC_DISEASE_MARKERS) and _contains_any(
-        text, _IMPLANT_ELIGIBILITY_MARKERS
-    )
-
-
-def _is_contraindication_treatment_question(text: str) -> bool:
-    return _contains_any(text, _CONTRAINDICATION_MARKERS) and _contains_any(
-        text, _TREATMENT_SELECTION_MARKERS
-    )
-
-
 def _is_post_procedure_complication(text: str) -> bool:
     return (
         _contains_any(text, _POST_PROCEDURE_MARKERS)
@@ -155,6 +130,8 @@ def decide_local_problem_gate(text: str) -> LocalProblemGateResult:
     A future-oriented fear (pain, price, osseointegration, timing, trust) has
     no special rule and therefore reaches the commercial answer path.  The
     current-symptom rule is intentionally limited to explicit markers.
+    General medical FAQ about chronic disease or contraindications also passes
+    unless an explicit high-precision problem marker matches above.
     """
 
     if not isinstance(text, str):
@@ -191,21 +168,6 @@ def decide_local_problem_gate(text: str) -> LocalProblemGateResult:
     if _is_post_procedure_complication(normalized):
         return LocalProblemGateResult(
             decision="admin", reason_code="post_procedure_complication"
-        )
-    if _is_chronic_disease_implant_eligibility(normalized):
-        return LocalProblemGateResult(
-            decision="admin", reason_code="chronic_disease_implant_eligibility"
-        )
-    if _is_contraindication_treatment_question(normalized):
-        return LocalProblemGateResult(
-            decision="admin", reason_code="contraindication_treatment_question"
-        )
-    if (
-        _contains_any(normalized, _PERSONAL_MEDICAL_CONTEXT)
-        and _contains_any(normalized, _PERSONAL_MEDICAL_QUESTION)
-    ):
-        return LocalProblemGateResult(
-            decision="admin", reason_code="personal_medical_question"
         )
     return LocalProblemGateResult(
         decision="pass", reason_code="no_high_precision_match"

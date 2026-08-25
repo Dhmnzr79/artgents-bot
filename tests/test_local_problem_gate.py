@@ -22,8 +22,6 @@ from core.local_problem_gate import LocalProblemGateError, decide_local_problem_
         ("Имплант шатается и десна не заживает", "current_symptom"),
         ("Как оставить отзыв о клинике?", "complaint_or_management"),
         ("После операции появилось воспаление, подскажите порядок действий", "post_procedure_complication"),
-        ("Как тяжёлые хронические заболевания влияют на возможность имплантации?", "chronic_disease_implant_eligibility"),
-        ("Как подбирают лечение при сложных противопоказаниях к имплантации?", "contraindication_treatment_question"),
     ],
 )
 def test_explicit_problem_cases_route_to_admin(text: str, reason_code: str) -> None:
@@ -36,6 +34,10 @@ def test_explicit_problem_cases_route_to_admin(text: str, reason_code: str) -> N
 @pytest.mark.parametrize(
     "text",
     [
+        "Как тяжёлые хронические заболевания влияют на возможность имплантации?",
+        "Как подбирают лечение при сложных противопоказаниях к имплантации?",
+        "Какие бывают противопоказания к имплантации?",
+        "Как хронические заболевания учитывают перед имплантацией?",
         "Боюсь, что будет больно",
         "Боюсь, что имплант не приживется",
         "Сколько стоит имплантация?",
@@ -50,7 +52,7 @@ def test_explicit_problem_cases_route_to_admin(text: str, reason_code: str) -> N
         "",
     ],
 )
-def test_commercial_facts_future_fears_and_ambiguity_pass(text: str) -> None:
+def test_commercial_facts_future_fears_and_general_medical_faq_pass(text: str) -> None:
     result = decide_local_problem_gate(text)
 
     assert result.decision == "pass"

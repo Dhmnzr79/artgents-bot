@@ -10,9 +10,6 @@ from tests.one_call_stage2_fixture import (
 
 _LOCK_DOC = Path("docs/ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md")
 _FIXTURE_PATH = Path("tests/fixtures/one_call_stage2_cases.json")
-_NORMATIVE_ADMIN_CATEGORIES = frozenset(
-    {"current_symptom", "personal_medical_question"}
-)
 
 
 def test_stage1_provider_budget_wiring_is_present() -> None:
@@ -53,18 +50,24 @@ def test_normative_answer_admin_boundary_is_documented() -> None:
 
 
 def test_frozen_admin_matrix_cases_follow_normative_answer_admin_table() -> None:
-    """a01–a03: ADMIN per Lock § «Нормативная граница ANSWER / ADMIN».
+    """a02: local ADMIN per Lock § «Нормативная граница ANSWER / ADMIN».
 
-    Not a blanket «medical/problematic → ADMIN» rule. Future sales fears (f01–f03)
+    a01/a03: general medical FAQ → model ANSWER. Future sales fears (f01–f03)
     must stay ANSWER.
     """
     cases = load_stage2_cases(_FIXTURE_PATH)
     by_id = {case.case_id: case for case in cases}
 
-    for case_id in ("a01", "a02", "a03"):
+    for case_id in ("a01", "a03"):
         case = by_id[case_id]
-        assert case.expected_decision == "admin"
-        assert case.protected_category in _NORMATIVE_ADMIN_CATEGORIES
+        assert case.expected_decision == "answer"
+        assert case.execution_layer == "model"
+        assert case.protected_category is None
+
+    case = by_id["a02"]
+    assert case.expected_decision == "admin"
+    assert case.execution_layer == "local"
+    assert case.protected_category == "current_symptom"
 
     for case_id in ("f01", "f02", "f03"):
         case = by_id[case_id]
@@ -78,7 +81,7 @@ def test_frozen_admin_matrix_cases_follow_normative_answer_admin_table() -> None
         for row in matrix["cases"]
         if row.get("execution_layer") == "local" and row.get("expected_decision") == "admin"
     }
-    assert local_admin_ids == {"a01", "a02", "a03"}
+    assert local_admin_ids == {"a02"}
 
 
 def test_stage3a_production_stack_has_no_plus_model_fallback() -> None:

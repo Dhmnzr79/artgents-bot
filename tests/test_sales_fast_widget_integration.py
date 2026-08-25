@@ -138,11 +138,11 @@ def test_flag_off_preserves_planner_target_sequence(monkeypatch: pytest.MonkeyPa
     assert order == ["planner", "target"]
 
 
-@pytest.mark.parametrize("case_id", ("a01", "a02", "a03"))
+@pytest.mark.parametrize("case_id", ("a02",))
 def test_flag_on_local_admin_cases_make_zero_provider_calls(case_id: str) -> None:
     # Normative ADMIN boundary: docs/ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md
-    # § «Нормативная граница ANSWER / ADMIN» — current symptom / personal medical
-    # question categories. Future sales fears (f01–f03) must remain ANSWER, not ADMIN.
+    # § «Нормативная граница ANSWER / ADMIN» — explicit post-procedure complication.
+    # General medical FAQ (a01/a03) must reach model ANSWER with one provider call.
     case = _case(case_id)
     backend = _CountingBackend("@ADMIN\nignored")
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
@@ -162,6 +162,30 @@ def test_flag_on_local_admin_cases_make_zero_provider_calls(case_id: str) -> Non
     )
     assert result.decision == "admin"
     assert backend.call_count == 0
+
+
+@pytest.mark.parametrize("case_id", ("a01", "a03"))
+def test_general_medical_faq_cases_use_model_route_with_exactly_one_call(case_id: str) -> None:
+    case = _case(case_id)
+    backend = _CountingBackend(answer_envelope("Ответ по материалам клиники о безопасности имплантации."))
+    context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
+    result = run_sales_one_plus_candidate_stream(
+        user_message=case.user_message,
+        cached_full_context=context,
+        exact_sales_resolution=_resolution(case),
+        current_strict_facts=_strict_facts(case),
+        sales_context=case.sales_context,
+        static_admin_handoff_text="Позвоните администратору.",
+        backend=backend,
+        on_delta=lambda _delta: None,
+        pack_identity=_PACK_IDENTITY,
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+    )
+    assert result.decision == "answer"
+    assert backend.call_count == 1
+    assert result.patient_text
 
 
 @pytest.mark.parametrize("case_id", ("f01", "f02", "f03"))
@@ -443,9 +467,7 @@ def _orchestrate_ask(
 @pytest.mark.parametrize(
     "question",
     (
-        "Как тяжёлые хронические заболевания влияют на возможность имплантации?",
         "После операции появилось воспаление, подскажите порядок действий",
-        "Как подбирают лечение при сложных противопоказаниях к имплантации?",
     ),
 )
 def test_widget_path_local_admin_cases_skip_provider_factory(
@@ -475,6 +497,45 @@ def test_widget_path_local_admin_cases_skip_provider_factory(
     assert payload["meta"]["service_route"] == "sales_fast_admin"
     assert factory_invoked["value"] is False
     assert backend.call_count == 0
+
+
+@pytest.mark.parametrize(
+    "question",
+    (
+        "Как тяжёлые хронические заболевания влияют на возможность имплантации?",
+        "Как подбирают лечение при сложных противопоказаниях к имплантации?",
+    ),
+)
+def test_widget_path_general_medical_faq_uses_one_provider_call(
+    monkeypatch: pytest.MonkeyPatch,
+    question: str,
+) -> None:
+    backend = _CountingBackend(
+        answer_envelope("Ответ по материалам клиники о безопасности имплантации.")
+    )
+    factory_invoked = {"value": False}
+
+    def _factory() -> _CountingBackend:
+        factory_invoked["value"] = True
+        return backend
+
+    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(
+        "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
+        _factory,
+    )
+    payload = _orchestrate_ask(
+        monkeypatch,
+        backend=backend,
+        q=question,
+        sid=f"faq-{hash(question)}",
+        factory=_factory,
+    )
+    assert payload["meta"]["service_route"] != "sales_fast_admin"
+    assert factory_invoked["value"] is True
+    assert backend.call_count == 1
+    assert str(payload.get("answer") or "").strip()
 
 
 def test_widget_path_parking_answer_uses_deterministic_contacts_after_gate(

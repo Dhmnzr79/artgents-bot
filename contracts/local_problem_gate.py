@@ -18,10 +18,7 @@ LocalProblemGateReasonCode = Literal[
     "complaint_or_management",
     "diagnosis_request",
     "personal_treatment_request",
-    "personal_medical_question",
     "post_procedure_complication",
-    "chronic_disease_implant_eligibility",
-    "contraindication_treatment_question",
     "no_high_precision_match",
     "governed_typed_ui",
 ]
@@ -45,10 +42,7 @@ class LocalProblemGateResult(BaseModel):
                 "complaint_or_management",
                 "diagnosis_request",
                 "personal_treatment_request",
-                "personal_medical_question",
                 "post_procedure_complication",
-                "chronic_disease_implant_eligibility",
-                "contraindication_treatment_question",
             }
         else:
             expected = {"no_high_precision_match", "governed_typed_ui"}

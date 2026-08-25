@@ -157,7 +157,7 @@ def test_on_http_ingress_non_normal_cannot_short_circuit_before_gate(
     assert payload["meta"]["service_route"] == "sales_fast_admin"
 
 
-@pytest.mark.parametrize("case_id", ("a01", "a02", "a03"))
+@pytest.mark.parametrize("case_id", ("a02",))
 def test_on_http_admin_matrix_zero_transport(
     monkeypatch: pytest.MonkeyPatch,
     case_id: str,
@@ -183,6 +183,35 @@ def test_on_http_admin_matrix_zero_transport(
     spies["ingress"].assert_not_called()
     spies["pre_resolver"].assert_not_called()
     assert backend.call_count == 0
+
+
+@pytest.mark.parametrize("case_id", ("a01", "a03"))
+def test_on_http_general_medical_faq_pass_with_one_call(
+    monkeypatch: pytest.MonkeyPatch,
+    case_id: str,
+) -> None:
+    from tests.one_call_stage2_fixture import load_stage2_cases
+
+    fixture = Path(__file__).resolve().parent / "fixtures" / "one_call_stage2_cases.json"
+    cases = load_stage2_cases(fixture)
+    case = next(c for c in cases if c.case_id == case_id)
+    _enable_flag_on(monkeypatch)
+    _spy_legacy_wiring(monkeypatch)
+    backend = _CountingBackend(answer_envelope("Ответ по материалам клиники о безопасности имплантации."))
+    _install_sales_fast_transport(monkeypatch, backend)
+    sid = f"faq-{case_id}"
+    mem_reset(sid)
+
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={"q": case.user_message, "sid": sid, "client_id": "demo"},
+    )
+    assert resp.status_code == 200
+    assert backend.call_count == 1
+    payload = resp.get_json()
+    assert str(payload.get("answer") or "").strip()
+    assert payload["meta"]["service_route"] != "sales_fast_admin"
 
 
 @pytest.mark.parametrize("case_id", ("f01", "f02", "f03"))

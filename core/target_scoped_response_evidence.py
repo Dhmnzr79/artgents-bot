@@ -366,14 +366,14 @@ def build_target_scoped_response_evidence(
             _error("scoped_evidence_package_inconsistent", "external_source_refs")
         selection_mode = materials.marketing_selection.selection_mode
         if selection_mode == "promotion_general":
-            records = _validate_promotion_general_commercial_facts(
+            validated_records = _validate_promotion_general_commercial_facts(
                 spec,
                 plan,
                 materials,
                 facts_by_id,
             )
         elif selection_mode == "promotion_service":
-            records = _validate_typed_promotion_commercial_facts(
+            validated_records = _validate_typed_promotion_commercial_facts(
                 spec,
                 plan,
                 materials,
@@ -381,7 +381,7 @@ def build_target_scoped_response_evidence(
                 expected_mode="promotion_service",
             )
         elif selection_mode == "promotion_shown":
-            records = _validate_typed_promotion_commercial_facts(
+            validated_records = _validate_typed_promotion_commercial_facts(
                 spec,
                 plan,
                 materials,
@@ -389,15 +389,16 @@ def build_target_scoped_response_evidence(
                 expected_mode="promotion_shown",
             )
         else:
-            records = _validate_automatic_fullcontext_commercial_facts(
+            validated_records = _validate_automatic_fullcontext_commercial_facts(
                 spec,
                 plan,
                 facts_by_id,
             )
+        scope_records = list(validated_records)
         for ref in materials.external_source_refs:
             if not ref.startswith("kb:"):
                 _error("scoped_evidence_package_inconsistent", "external_source_refs")
-            records.append(
+            scope_records.append(
                 TargetEvidenceScopeRecord(
                     ref=ref,
                     topics=(_topic(root, ref, kb_ref=True),),
@@ -415,7 +416,7 @@ def build_target_scoped_response_evidence(
             consultation_content_ref=None,
             selected_followups=package.selected_followups,
             selected_cta_key=None,
-            scope_records=tuple(records),
+            scope_records=tuple(scope_records),
             covered_fact_ids=plan.commercial_fact_ids,
         )
     if is_fullcontext_doctors_only_spec(spec):

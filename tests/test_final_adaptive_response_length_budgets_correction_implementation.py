@@ -284,6 +284,8 @@ def test_7_marketing_scenario_on_turn_frame_gets_marketing_concern() -> None:
         }
     )
     assert isinstance(result, TargetTurnFrameBoundMaterializeResponse)
+    assert len(composer.invocations) == 1
+    assert result.verified.text.strip()
     assert _directives(composer)["response_length_profile"] == "marketing_concern"
 
 

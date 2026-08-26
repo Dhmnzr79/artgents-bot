@@ -190,6 +190,29 @@ def _spec(
     return build_target_response_spec(request)
 
 
+def _content_only_spec(
+    *,
+    allowed: tuple[str, ...] = ("implantation", "clinic"),
+    consultation: bool = False,
+):
+    request = TargetResponsePolicyRequest.model_validate(
+        {
+            "response_mode": "answer",
+            "service_id": None,
+            "tone_key": "commercial_warm",
+            "allowed_topics": allowed,
+            "forbidden_topics": ("diagnosis",),
+            "required_fact_ids": (),
+            "requested_components": ("content",),
+            "primary_component": None,
+            "allow_marketing_facts": False,
+            "allow_consultation_close": consultation,
+            "allow_cta": False,
+        }
+    )
+    return build_target_response_spec(request)
+
+
 def _bound(
     md_root: Path,
     *,
@@ -451,6 +474,30 @@ def test_external_kb_uses_own_topic_and_external_doctor_preserves_both(
     )
     assert doctor_result.scope_records[-1].ref == "doctor:doctor_one"
     assert doctor_result.scope_records[-1].topics == ("implantation", "doctors")
+
+
+def test_content_only_automatic_appends_external_kb_after_validator_tuple(
+    md_root: Path,
+) -> None:
+    bound = _bound(md_root, spec=_content_only_spec(), scenarios=("cost",))
+    result = build_target_scoped_response_evidence(bound, md_root=md_root)
+    refs = tuple(record.ref for record in result.scope_records)
+    assert result.external_source_refs == ("kb:clinic.md#one",)
+    assert "kb:clinic.md#one" in refs
+    assert refs[-1] == "kb:clinic.md#one"
+    assert len(refs) == len(set(refs))
+    assert result.scope_records[-1] == TargetEvidenceScopeRecord(
+        ref="kb:clinic.md#one",
+        topics=("clinic",),
+        fact_ids=(),
+    )
+
+
+def test_content_only_empty_external_refs_skips_append(md_root: Path) -> None:
+    bound = _bound(md_root, spec=_content_only_spec(), scenarios=())
+    result = build_target_scoped_response_evidence(bound, md_root=md_root)
+    assert result.external_source_refs == ()
+    assert all(not record.ref.startswith("kb:") for record in result.scope_records)
 
 
 def test_required_fact_coverage_counts_only_selected_commercial_facts(
@@ -1017,3 +1064,31 @@ def test_promotion_shown_all_empty_typed_package_fail_closed() -> None:
         build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
     assert exc_info.value.code == "scoped_evidence_package_inconsistent"
     assert exc_info.value.value == "commercial_fact_ids"
+
+
+def test_promotion_general_keeps_fact_order_then_appends_kb_ref() -> None:
+    from dataclasses import replace
+
+    bound = _demo_general_promotion_bound()
+    kb_ref = "kb:implantation__faq__pain.md#korotko"
+    materials = replace(
+        bound.package.materials,
+        external_source_refs=(kb_ref,),
+    )
+    plan = replace(bound.package.plan, external_source_refs=(kb_ref,))
+    bound = replace(bound, package=replace(bound.package, materials=materials, plan=plan))
+    scoped = build_target_scoped_response_evidence(bound, md_root=_DEMO_MD)
+    refs = tuple(record.ref for record in scoped.scope_records)
+    assert scoped.commercial_fact_ids == (
+        "implant_same_day_discount",
+        "professional_whitening_discount",
+        "free_implant_consult",
+    )
+    assert refs[:3] == (
+        "fact:implant_same_day_discount",
+        "fact:professional_whitening_discount",
+        "fact:free_implant_consult",
+    )
+    assert refs[-1] == kb_ref
+    assert len(refs) == len(set(refs))
+    assert scoped.external_source_refs == (kb_ref,)

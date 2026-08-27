@@ -365,6 +365,8 @@ Flash возвращает валидируемый **control envelope**. Все
 
 Невалидное значение любого closed-field → invalid envelope → neutral presentation или safe handoff по route, **не** повторный вызов.
 
+**G4 — grounded data-gap (owner accepted):** Normal in-scope clinic/dental questions fail open to one grounded model answer. If the supplied client corpus lacks the requested fact, the model must not invent or borrow cross-client data; it gives a concise honest data-gap answer and directs the patient to the administrator. Missing corpus data alone is not route=ADMIN. No per-topic local filters.
+
 ### 9.2 Structured output transport
 
 **Stage 3B (принято):** capability JSON/streaming на точном Flash snapshot подтверждён управляемым LIVE-прогоном.

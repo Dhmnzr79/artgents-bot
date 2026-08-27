@@ -73,6 +73,34 @@ def test_production_policy_medical_faq_boundary() -> None:
     assert "if the wording does not prove a personal problematic request" in policy
 
 
+def test_production_policy_grounded_data_gap_rule() -> None:
+    policy = SALES_ONE_PLUS_SYSTEM_POLICY.casefold()
+    assert "complete clinic data" not in policy
+    assert "authoritative supplied data for the current clinic" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "lacks confirmed information" in policy
+    assert "clinic administrator can clarify" in policy
+    assert "do not treat missing corpus data alone as route=admin" in policy
+    assert "do not use route=clarify when the missing fact cannot be supplied" in policy
+    assert "do not invent or borrow another clinic's facts" in policy
+    assert "parking" not in policy
+    assert "wi-fi" not in policy
+    assert "пандус" not in policy
+
+
+def test_production_policy_preserves_admin_and_medical_faq_boundaries() -> None:
+    policy = SALES_ONE_PLUS_SYSTEM_POLICY.casefold()
+    assert "route=admin is only for problematic requests" in policy
+    assert "general informational medical faq" in policy
+    assert "route=answer grounded in the corpus" in policy
+    assert "do not diagnose, prescribe, or give a personal eligibility verdict" in policy
+
+
+def test_production_policy_data_gap_is_answer_not_admin_or_clarify() -> None:
+    policy = SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "route=ANSWER with concise honest patient_text" in policy
+    assert "route=CLARIFY only when the answer truly depends on missing service/extent/jaw/stage scope" in policy
+
+
 def test_pre_flash_hints_expose_ambiguous_scope_without_authoritative_resolution() -> None:
     from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
     from core.sales_fast_strict_evidence import build_pre_flash_prompt_hints

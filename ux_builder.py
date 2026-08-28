@@ -84,14 +84,17 @@ def reset_session_response(sid: str) -> dict:
     }
 
 
-def internal_error_response() -> dict:
+def internal_error_response(*, client_id: str | None = None) -> dict:
     from core.target_contact_authority import fallback_answer_with_phone
 
+    base_text = "Что-то пошло не так. Попробуйте спросить ещё раз."
+    resolved_client = (client_id or "").strip() or None
+    if resolved_client:
+        answer = fallback_answer_with_phone(base_text=base_text, client_id=resolved_client)
+    else:
+        answer = base_text
     return {
-        "answer": fallback_answer_with_phone(
-            base_text="Что-то пошло не так. Попробуйте спросить ещё раз.",
-            client_id="demo",
-        ),
+        "answer": answer,
         "quick_replies": [],
         "cta": None,
         "video": None,

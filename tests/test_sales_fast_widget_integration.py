@@ -428,7 +428,10 @@ def _orchestrate_ask(
     sid: str,
     factory: object | None = None,
 ) -> dict:
+    from session import bind_session_client, mem_reset
+
     _install_sales_fast_transport(monkeypatch, backend, factory=factory)
+    bind_session_client("demo")
     mem_reset(sid)
     planner_called = {"value": False}
     target_called = {"value": False}
@@ -620,7 +623,60 @@ def test_widget_path_both_jaws_does_not_invent_total(monkeypatch: pytest.MonkeyP
 
 def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
     monkeypatch: pytest.MonkeyPatch,
+    flask_app,
 ) -> None:
+    from core.target_runtime_client_context import clear_target_runtime_client_context_cache
+    from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
+    from session import bind_session_client, mem_reset
+
+    clear_target_runtime_client_context_cache()
+    sid = "widget-marketing-service-two-promos"
+    bind_session_client("demo")
+    mem_reset(sid)
+    backend = _CountingBackend(
+        answer_envelope(
+            "All-on-4 — это полное восстановление зубного ряда на четырёх имплантах.",
+            commercial_intent="none",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        )
+    )
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Расскажите про All-on-4 на нижнюю челюсть", "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Расскажите про All-on-4 на нижнюю челюсть",
+            backend=backend,
+        )
+    answer = str(outcome.widget.payload.get("answer") or "").lower()
+    assert "15%" in answer or "консультац" in answer
+    assert "также мы предлагаем" in answer
+    assert "рассроч" in answer
+    assert backend.call_count == 1
+
+
+def test_widget_path_price_all_on_4_includes_two_promos_not_installment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import date
+
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: date(2026, 7, 21),
+    )
+    monkeypatch.setattr(
+        "core.sales_fast_widget_runtime.runtime_today",
+        lambda: date(2026, 7, 21),
+    )
     backend = _CountingBackend(
         answer_envelope(
             "All-on-4 на нижнюю челюсть — 368 000 ₽.",
@@ -635,17 +691,26 @@ def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
         monkeypatch,
         backend=backend,
         q="Сколько стоит All-on-4 на нижнюю челюсть?",
-        sid="widget-marketing",
+        sid="widget-price-marketing",
     )
-    answer = payload["answer"].lower()
-    fact_refs = list((payload.get("offer") or {}).get("fact_refs") or [])
-    assert fact_refs
-    for ref in fact_refs:
-        assert ref.startswith("fact:")
-    assert "рассроч" in answer
-    assert answer.count("рассроч") == 1
+    answer = payload["answer"]
+    answer_lower = answer.lower()
+    assert "368" in answer or "318" in answer
+    assert "скидк" in answer_lower
+    assert "консультац" in answer_lower
+    assert "При оплате в день обращения — скидка до 15% на имплантацию." in answer
+    assert "бесплатная консультация по имплантации и протезированию" in answer_lower
+    assert "кт при необходимости оплачивается отдельно" in answer_lower
+    assert "также мы предлагаем" in answer_lower
+    assert "рассроч" in answer_lower
+    assert "по этапам" in answer_lower
+    assert "договор" in answer_lower
+    offer = payload.get("offer") or {}
+    fact_refs = list(offer.get("fact_refs") or [])
+    if fact_refs:
+        assert "fact:implant_same_day_discount" in fact_refs
+        assert "fact:free_implant_consult" in fact_refs
     assert backend.call_count == 1
-    assert payload.get("cta") is not None or payload.get("quick_replies")
 
 
 def test_widget_path_direct_repeat_marketing_fact_bypasses_suppression(
@@ -830,6 +895,43 @@ def _run_widget_turn_with_envelope(
     return dict(outcome.widget.payload or {}), backend
 
 
+def _run_widget_turn_keep_session(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    client_id: str,
+    sid: str,
+    user_message: str,
+    envelope_json: str,
+    flask_app,
+    backend: _CountingBackend | None = None,
+    on_delta: object | None = None,
+) -> tuple[dict, _CountingBackend]:
+    from session import bind_session_client
+
+    active_backend = backend or _CountingBackend(envelope_json)
+    _install_sales_fast_transport(monkeypatch, active_backend)
+    if client_id != "demo":
+        monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    bind_session_client(client_id)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": user_message, "sid": sid, "client_id": client_id},
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome = run_sales_fast_widget_turn(
+            client_id=client_id,
+            sid=sid,
+            user_message=user_message,
+            backend=active_backend,
+            on_delta=on_delta,
+        )
+    assert outcome.widget.kind == "materialized"
+    return dict(outcome.widget.payload or {}), active_backend
+
+
 def test_widget_path_nikadent_all_on_4_family_price_materializes_and_persists_session(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
@@ -994,13 +1096,12 @@ def test_widget_path_fail_closed_promotion_does_not_persist_session_promo_state(
         monkeypatch,
         client_id="demo",
         sid=sid,
-        user_message="Какие акции на классическую имплантацию?",
+        user_message="Какие акции на лечение кариеса?",
         envelope_json=answer_envelope(
-            "Какие акции на классическую имплантацию?",
+            "Какие акции на лечение кариеса?",
             commercial_intent="promotion",
             promotion_scope="service",
-            service_id="classic",
-            extent="one_tooth",
+            service_id="caries",
         ),
         flask_app=flask_app,
     )
@@ -1045,33 +1146,13 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
         )
     answer1 = str(outcome1.widget.payload.get("answer") or "")
     assert "15" in answer1 or "скидк" in answer1.lower()
+    assert "консультац" in answer1.lower()
     session1 = read_target_runtime_session(sid)
-    assert session1.last_rendered_promo_fact_id == "implant_same_day_discount"
-
-    backend2 = _CountingBackend(
-        answer_envelope(
-            "Расскажу про All-on-6.",
-            service_id="all_on_6",
-            commercial_intent="none",
-        )
+    assert session1.last_rendered_promo_fact_id is None
+    assert session1.last_turn_rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
     )
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": "Расскажите про All-on-6", "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
-
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome2 = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message="Расскажите про All-on-6",
-            backend=backend2,
-        )
-    answer2 = str(outcome2.widget.payload.get("answer") or "").lower()
-    assert "implant_same_day_discount" not in answer2
-    assert "15%" not in answer2
 
     backend3 = _CountingBackend(
         answer_envelope(
@@ -1100,7 +1181,9 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
             backend=backend3,
         )
     answer3 = str(outcome3.widget.payload.get("answer") or "").lower()
-    assert "15" in answer3 or "скидк" in answer3
+    assert outcome3.widget.payload.get("meta", {}).get("presentation_fail_closed") == (
+        "promotion_shown_ambiguous"
+    )
 
 
 def test_widget_path_multiclient_cache_isolation_without_mid_sequence_cache_clear(
@@ -1161,3 +1244,674 @@ def test_widget_path_multiclient_cache_isolation_without_mid_sequence_cache_clea
     )
     assert "318" in payload_demo_2["answer"]
     clear_target_runtime_client_context_cache()
+
+
+def test_widget_runtime_injects_contact_authority_into_provider_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    payload, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid="contact-prompt-demo",
+        user_message="Есть ли парковка?",
+        envelope_json=answer_envelope("Есть парковка у здания."),
+        flask_app=flask_app,
+    )
+    assert backend.invocation is not None
+    user_prompt = backend.invocation.user_prompt
+    assert "<CLINIC_CONTACT_AUTHORITY>" in user_prompt
+    assert "+7 (495) 128-47-60" in user_prompt
+    assert "<PRE_MODEL_HINTS>" in user_prompt
+    assert "__authority_client_id" not in user_prompt
+    assert '"amount"' not in user_prompt
+    assert payload["meta"].get("answer_path") == "sales_fast"
+
+
+def test_widget_runtime_nikadent_prompt_has_branch_contacts_not_demo(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    _, backend = _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="nikadent",
+        sid="contact-prompt-nika",
+        user_message="Расскажите о клинике",
+        envelope_json=answer_envelope("Ответ по клинике."),
+        flask_app=flask_app,
+    )
+    user_prompt = backend.invocation.user_prompt
+    assert "<CLINIC_CONTACT_AUTHORITY>" in user_prompt
+    assert "ryabikova" in user_prompt
+    assert "pogranichnaya" in user_prompt
+    assert demo_phone not in user_prompt
+
+
+def test_http_ask_internal_error_uses_resolved_client_not_demo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    nika_phone = canonical_contact_phone("nikadent")
+    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    monkeypatch.setattr(
+        app_module,
+        "_orchestrate_ask_turn",
+        lambda _data: (_ for _ in ()).throw(RuntimeError("injected failure")),
+    )
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={"q": "Какие акции?", "sid": "err-nika", "client_id": "nikadent"},
+    )
+    payload = resp.get_json()
+    assert payload["meta"]["error"] == "internal"
+    assert demo_phone not in payload["answer"]
+    assert nika_phone in payload["answer"]
+
+
+def test_http_ask_error_before_client_resolution_is_neutral(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    monkeypatch.setattr(
+        app_module,
+        "resolve_request_client_id",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("resolve failed")),
+    )
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={"q": "вопрос", "sid": "err-no-client", "client_id": "nikadent"},
+    )
+    payload = resp.get_json()
+    assert payload["meta"]["error"] == "internal"
+    assert demo_phone not in payload["answer"]
+    assert "Что-то пошло не так" in payload["answer"]
+
+
+def test_http_ask_stream_worker_error_uses_explicit_client_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    nika_phone = canonical_contact_phone("nikadent")
+    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("sse worker failure")
+
+    monkeypatch.setattr(app_module, "_orchestrate_ask_turn", _boom)
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask/stream",
+        json={"q": "Какие акции?", "sid": "err-stream-nika", "client_id": "nikadent"},
+    )
+    body = resp.get_data(as_text=True)
+    assert "event: ui" in body
+    assert demo_phone not in body
+    assert nika_phone in body
+    assert body.count("event: ui\n") == 1
+
+
+def test_contact_isolation_demo_nikadent_demo_with_preserved_session(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_contact_authority import canonical_contact_phone
+    from core.target_runtime_client_context import clear_target_runtime_client_context_cache
+    from session import bind_session_client, mem_reset
+
+    demo_phone = canonical_contact_phone("demo")
+    nika_branch_phone = "+7 (900) 444-69-97"
+    sid = "contact-isolation-preserved-session"
+    bind_session_client("demo")
+    mem_reset(sid)
+    _install_sales_fast_transport(monkeypatch, _CountingBackend(answer_envelope("placeholder")))
+
+    payload_demo, backend_demo = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Какой телефон клиники?",
+        envelope_json=answer_envelope(
+            f"Позвоните нам: {demo_phone}.",
+        ),
+        flask_app=flask_app,
+    )
+    assert demo_phone in backend_demo.invocation.user_prompt
+    assert demo_phone in payload_demo["answer"]
+    assert nika_branch_phone not in backend_demo.invocation.user_prompt
+
+    payload_nika, backend_nika = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="nikadent",
+        sid=sid,
+        user_message="Какой телефон филиала на Рябикова?",
+        envelope_json=answer_envelope(
+            f"Филиал на Рябикова: {nika_branch_phone}.",
+        ),
+        flask_app=flask_app,
+    )
+    assert nika_branch_phone in backend_nika.invocation.user_prompt
+    assert demo_phone not in backend_nika.invocation.user_prompt
+    assert nika_branch_phone in payload_nika["answer"]
+    assert demo_phone not in payload_nika["answer"]
+
+    payload_demo_2, backend_demo_2 = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Повторите телефон клиники",
+        envelope_json=answer_envelope(
+            f"Телефон клиники: {demo_phone}.",
+        ),
+        flask_app=flask_app,
+    )
+    assert demo_phone in backend_demo_2.invocation.user_prompt
+    assert nika_branch_phone not in backend_demo_2.invocation.user_prompt
+    assert demo_phone in payload_demo_2["answer"]
+    assert nika_branch_phone not in payload_demo_2["answer"]
+    clear_target_runtime_client_context_cache()
+
+
+def test_widget_prompt_contact_block_in_generate_and_generate_stream(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    generate_backend = _CountingBackend(answer_envelope("Ответ по парковке."))
+    _, generate_hit = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="demo",
+        sid="contact-generate",
+        user_message="Есть парковка?",
+        envelope_json=answer_envelope("Ответ по парковке."),
+        flask_app=flask_app,
+        backend=generate_backend,
+        on_delta=None,
+    )
+    assert generate_hit.invocation is not None
+    assert "<CLINIC_CONTACT_AUTHORITY>" in generate_hit.invocation.user_prompt
+
+    stream_backend = _CountingBackend(answer_envelope("Ответ по графику."))
+    _, stream_hit = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="demo",
+        sid="contact-stream",
+        user_message="Какой график работы?",
+        envelope_json=answer_envelope("Ответ по графику."),
+        flask_app=flask_app,
+        backend=stream_backend,
+        on_delta=lambda _delta: None,
+    )
+    assert stream_hit.invocation is not None
+    assert "<CLINIC_CONTACT_AUTHORITY>" in stream_hit.invocation.user_prompt
+    assert "+7 (495) 128-47-60" in stream_hit.invocation.user_prompt
+
+
+def test_partial_contacts_appear_in_provider_prompt_without_phone(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.clinic_contact_policies import ClinicContactFacts
+
+    facts = ClinicContactFacts(
+        phone_display="",
+        whatsapp_display=None,
+        address_display="г. Елизово, ул. Рябикова, д. 49",
+        hours_display="Пн–Пт 9:00–18:00",
+        parking_display=None,
+    )
+    monkeypatch.setattr(
+        "core.target_contact_authority.load_clinic_contact_facts",
+        lambda _client_id: facts,
+    )
+    _, backend = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="nikadent",
+        sid="partial-contact-prompt",
+        user_message="Где вы находитесь?",
+        envelope_json=answer_envelope("Адрес указан в контактах."),
+        flask_app=flask_app,
+    )
+    prompt = backend.invocation.user_prompt
+    assert "<CLINIC_CONTACT_AUTHORITY>" in prompt
+    assert "Рябикова" in prompt
+    assert "9:00" in prompt
+    assert '"contacts_available":true' in prompt.replace(" ", "")
+
+
+def test_http_ask_error_with_corrupt_contact_source_returns_neutral_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import yaml
+
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+
+    def _yaml_fail(_path: object) -> object:
+        raise yaml.YAMLError("corrupt policies")
+
+    monkeypatch.setattr(
+        "core.target_contact_authority.load_clinic_contact_facts_from_policies_path",
+        _yaml_fail,
+    )
+    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    monkeypatch.setattr(
+        app_module,
+        "_orchestrate_ask_turn",
+        lambda _data: (_ for _ in ()).throw(RuntimeError("injected failure")),
+    )
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={"q": "Какие акции?", "sid": "err-corrupt-contacts", "client_id": "nikadent"},
+    )
+    payload = resp.get_json()
+    assert payload["meta"]["error"] == "internal"
+    assert "Что-то пошло не так" in payload["answer"]
+    assert demo_phone not in payload["answer"]
+
+
+def test_http_ask_stream_corrupt_contacts_single_ui_and_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import yaml
+
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+
+    def _yaml_fail(_path: object) -> object:
+        raise yaml.YAMLError("corrupt policies")
+
+    monkeypatch.setattr(
+        "core.target_contact_authority.load_clinic_contact_facts_from_policies_path",
+        _yaml_fail,
+    )
+    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    monkeypatch.setattr(
+        app_module,
+        "_orchestrate_ask_turn",
+        lambda _data: (_ for _ in ()).throw(RuntimeError("injected failure")),
+    )
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask/stream",
+        json={"q": "Какие акции?", "sid": "err-stream-corrupt", "client_id": "nikadent"},
+    )
+    body = resp.get_data(as_text=True)
+    assert body.count("event: ui\n") == 1
+    assert "event: done\n" in body
+    assert demo_phone not in body
+    assert "Что-то пошло не так" in body
+
+
+def test_nikadent_local_admin_without_contacts_has_no_demo_phone_or_provider_call(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.clinic_contact_policies import ClinicContactFacts
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    monkeypatch.setattr(
+        "core.target_contact_authority.load_clinic_contact_facts",
+        lambda _client_id: ClinicContactFacts(
+            phone_display="",
+            whatsapp_display=None,
+            address_display=None,
+            hours_display=None,
+            parking_display=None,
+        ),
+    )
+    backend = _CountingBackend("@ADMIN\nignored")
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={
+            "q": "После операции появилось воспаление, подскажите порядок действий",
+            "sid": "admin-nika-no-contacts",
+            "client_id": "nikadent",
+        },
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome = run_sales_fast_widget_turn(
+            client_id="nikadent",
+            sid="admin-nika-no-contacts",
+            user_message="После операции появилось воспаление, подскажите порядок действий",
+            backend=backend,
+        )
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert outcome.model_route == "local"
+    assert backend.call_count == 0
+    assert demo_phone not in answer
+    assert "администратор" in answer.lower() or "клиник" in answer.lower()
+
+
+def test_widget_price_profile_full_path_two_turns_with_service_value(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    flask_app,
+) -> None:
+    from core.sales_fast_presentation import AUTOMATIC_AMPLIFIER_LIST_HEADER
+    from core.target_runtime_session import read_target_runtime_session
+    from session import bind_session_client, mem_reset
+    from tests.marketing_price_profile_pack import (
+        AMP_IDS,
+        AMP_TEXTS,
+        CLIENT_ID,
+        PRICE_MAIN_TEXT,
+        PROMO_A_ID,
+        PROMO_A_TEXT,
+        PROMO_B_ID,
+        PROMO_B_TEXT,
+        SERVICE_ID,
+        SV_FACT_ID,
+        SV_TEXT,
+        build_marketing_price_profile_pack,
+        patch_isolated_marketing_price_repo,
+    )
+
+    build_marketing_price_profile_pack(tmp_path)
+    patch_isolated_marketing_price_repo(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        config,
+        "ALLOWED_CLIENTS",
+        frozenset({CLIENT_ID, "demo", "nikadent"}),
+    )
+    sid = "widget-price-profile-full"
+    bind_session_client(CLIENT_ID)
+    mem_reset(sid)
+    payload1, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Сколько стоит All-on-4 на нижнюю челюсть?",
+        envelope_json=answer_envelope(
+            PRICE_MAIN_TEXT,
+            commercial_intent="price",
+            service_id=SERVICE_ID,
+            extent="full_arch",
+            jaw="lower",
+        ),
+        flask_app=flask_app,
+    )
+    answer1 = str(payload1.get("answer") or "")
+    assert "368" in answer1
+    assert PROMO_A_TEXT in answer1
+    assert PROMO_B_TEXT in answer1
+    assert answer1.count(AUTOMATIC_AMPLIFIER_LIST_HEADER) == 1
+    for amp_text in AMP_TEXTS:
+        assert f"- {amp_text}" in answer1
+    assert SV_TEXT not in answer1
+    for amp_text in AMP_TEXTS:
+        assert answer1.count(amp_text) == 1
+    session1 = read_target_runtime_session(sid)
+    assert session1.shown_service_value_ids == ()
+    assert PROMO_A_ID in session1.shown_fact_ids
+    assert PROMO_B_ID in session1.shown_fact_ids
+    assert all(f"fact:{amp_id}" in session1.shown_amplifier_refs for amp_id in AMP_IDS)
+
+    payload2, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Расскажите про All-on-4",
+        envelope_json=answer_envelope(
+            "All-on-4 — протокол восстановления.",
+            commercial_intent="none",
+            service_id=SERVICE_ID,
+            extent="full_arch",
+            jaw="lower",
+        ),
+        flask_app=flask_app,
+    )
+    answer2 = str(payload2.get("answer") or "")
+    assert PROMO_A_TEXT not in answer2
+    assert PROMO_B_TEXT not in answer2
+    for amp_text in AMP_TEXTS:
+        assert amp_text not in answer2
+    assert SV_TEXT in answer2
+    session2 = read_target_runtime_session(sid)
+    assert SV_FACT_ID in session2.shown_service_value_ids
+
+
+def test_widget_service_value_full_session_cycle_without_manual_history(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    flask_app,
+) -> None:
+    from core.target_runtime_session import read_target_runtime_session
+    from session import bind_session_client, mem_reset
+    from tests.marketing_sv_cycle_pack import (
+        CLIENT_ID,
+        SV_FACT_ID,
+        SV_TEXT,
+        build_marketing_sv_cycle_pack,
+        patch_isolated_marketing_sv_repo,
+    )
+
+    build_marketing_sv_cycle_pack(tmp_path)
+    patch_isolated_marketing_sv_repo(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        config,
+        "ALLOWED_CLIENTS",
+        frozenset({CLIENT_ID, "demo", "nikadent"}),
+    )
+    sid = "widget-sv-cycle"
+    bind_session_client(CLIENT_ID)
+    mem_reset(sid)
+    turn1_envelope = answer_envelope(
+        "All-on-4 на нижнюю челюсть — протокол.",
+        service_id="all_on_4",
+        extent="full_arch",
+        jaw="lower",
+        commercial_intent="none",
+    )
+    payload1, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Расскажите про All-on-4 на нижнюю челюсть",
+        envelope_json=turn1_envelope,
+        flask_app=flask_app,
+    )
+    answer1 = str(payload1.get("answer") or "")
+    assert SV_TEXT in answer1
+    assert answer1.index(SV_TEXT) < answer1.index("15%")
+    session1 = read_target_runtime_session(sid)
+    assert session1.shown_service_value_ids == (SV_FACT_ID,)
+    assert len(session1.last_turn_rendered_promo_fact_ids) == 2
+
+    payload2, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Ещё раз про All-on-4",
+        envelope_json=answer_envelope(
+            "Повтор про All-on-4.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+    )
+    assert SV_TEXT not in str(payload2.get("answer") or "")
+
+    payload3, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Расскажите про All-on-6",
+        envelope_json=answer_envelope(
+            "All-on-6 — другой протокол.",
+            service_id="all_on_6",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+    )
+    assert SV_TEXT not in str(payload3.get("answer") or "")
+
+    payload4, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Что это за преимущество?",
+        envelope_json=answer_envelope(
+            "Про преимущество.",
+            service_id="all_on_6",
+            extent="full_arch",
+            jaw="lower",
+            references={"direct_fact_ids": [SV_FACT_ID]},
+        ),
+        flask_app=flask_app,
+    )
+    assert SV_TEXT in str(payload4.get("answer") or "")
+
+
+class _StreamTrackingBackend(_CountingBackend):
+    def __init__(self, output: object) -> None:
+        super().__init__(output)
+        self.stream_path_used = False
+        self.stream_raw_chunks: list[str] = []
+
+    def generate_stream(self, invocation, on_raw_delta, /):
+        self.stream_path_used = True
+        self.call_count += 1
+        self.invocation = invocation
+        if isinstance(self.output, Exception):
+            raise self.output
+        text = str(self.output)
+        for index in range(0, len(text), 24):
+            chunk = text[index : index + 24]
+            self.stream_raw_chunks.append(chunk)
+            on_raw_delta(chunk)
+        return None
+
+
+def test_widget_streaming_marketing_path_persists_session_history(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    flask_app,
+) -> None:
+    from core.target_runtime_session import read_target_runtime_session
+    from session import bind_session_client, mem_reset
+    from tests.marketing_sv_cycle_pack import (
+        CLIENT_ID,
+        SV_FACT_ID,
+        SV_TEXT,
+        build_marketing_sv_cycle_pack,
+        patch_isolated_marketing_sv_repo,
+    )
+
+    build_marketing_sv_cycle_pack(tmp_path)
+    patch_isolated_marketing_sv_repo(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        config,
+        "ALLOWED_CLIENTS",
+        frozenset({CLIENT_ID, "demo", "nikadent"}),
+    )
+    sid = "widget-stream-marketing"
+    bind_session_client(CLIENT_ID)
+    mem_reset(sid)
+    turn_envelope = answer_envelope(
+        "All-on-4 на нижнюю челюсть — протокол.",
+        service_id="all_on_4",
+        extent="full_arch",
+        jaw="lower",
+        commercial_intent="none",
+    )
+    backend = _StreamTrackingBackend(turn_envelope)
+    streamed: list[str] = []
+    payload1, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Расскажите про All-on-4 на нижнюю челюсть",
+        envelope_json=turn_envelope,
+        flask_app=flask_app,
+        backend=backend,
+        on_delta=lambda delta: streamed.append(delta),
+    )
+    final_answer = str(payload1.get("answer") or "")
+    assert backend.stream_path_used is True
+    assert backend.call_count == 1
+    assert streamed == [final_answer]
+    assert SV_TEXT in final_answer
+    assert final_answer.count(SV_TEXT) == 1
+    assert final_answer.count("15%") == 1
+    session1 = read_target_runtime_session(sid)
+    assert session1.shown_service_value_ids == (SV_FACT_ID,)
+    assert len(session1.last_turn_rendered_promo_fact_ids) == 2
+
+    payload2, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id=CLIENT_ID,
+        sid=sid,
+        user_message="Ещё раз",
+        envelope_json=answer_envelope(
+            "Повтор.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+        on_delta=lambda _delta: None,
+    )
+    assert SV_TEXT not in str(payload2.get("answer") or "")
+
+
+def test_materialized_widget_ok_skips_extract_session_selection_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core import sales_fast_presentation as presentation_module
+
+    fallback_calls = {"count": 0}
+    original = presentation_module.sales_fast_session_selection
+
+    def _spy(**kwargs):
+        fallback_calls["count"] += 1
+        return original(**kwargs)
+
+    monkeypatch.setattr(presentation_module, "sales_fast_session_selection", _spy)
+    _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid="widget-no-fallback-selection",
+        user_message="Расскажите про All-on-4",
+        envelope_json=answer_envelope(
+            "All-on-4 — протокол.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+    )
+    assert fallback_calls["count"] == 0

@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+import yaml
+
 from core.client_config_loader import resolve_pack_client_id
 from core.clinic_contact_policies import (
     ClinicContactBranch,
@@ -46,14 +48,58 @@ _GENERAL_CONTACT_FIELDS: tuple[ContactFieldKind, ...] = (
     "parking",
 )
 
+_CONTACT_SOURCE_LOAD_ERRORS: tuple[type[BaseException], ...] = (
+    OSError,
+    UnicodeError,
+    yaml.YAMLError,
+)
 
-def _policies_path(client_id: str | None) -> Path:
+
+def _empty_contact_facts() -> ClinicContactFacts:
+    return ClinicContactFacts(
+        phone_display="",
+        whatsapp_display=None,
+        address_display=None,
+        hours_display=None,
+        parking_display=None,
+    )
+
+
+def _facts_have_contact_data(facts: ClinicContactFacts) -> bool:
+    if facts.branches:
+        for branch in facts.branches:
+            if (
+                branch.phone_displays
+                or branch.address_display
+                or branch.hours_display
+                or branch.parking_display
+            ):
+                return True
+        return bool(facts.whatsapp_display)
+    return bool(
+        facts.phone_display
+        or facts.whatsapp_display
+        or facts.address_display
+        or facts.hours_display
+        or facts.parking_display
+    )
+
+
+def _policies_path(client_id: str | None) -> Path | None:
+    if not (client_id or "").strip():
+        return None
     pack = resolve_pack_client_id(client_id)
     return _REPO_ROOT / "clients" / pack / "clinic_policies.yaml"
 
 
 def load_clinic_contact_facts(client_id: str | None) -> ClinicContactFacts:
-    return load_clinic_contact_facts_from_policies_path(_policies_path(client_id))
+    path = _policies_path(client_id)
+    if path is None:
+        return _empty_contact_facts()
+    try:
+        return load_clinic_contact_facts_from_policies_path(path)
+    except _CONTACT_SOURCE_LOAD_ERRORS:
+        return _empty_contact_facts()
 
 
 def canonical_contact_phone(client_id: str | None) -> str:
@@ -193,7 +239,7 @@ def materialize_clinic_contact_primary_evidence(
             fields = ()
 
     facts = load_clinic_contact_facts(client_id)
-    if not facts.phone_display and not facts.branches and fields is None:
+    if not _facts_have_contact_data(facts) and fields is None:
         return ()
 
     resolved_fields = fields or _GENERAL_CONTACT_FIELDS
@@ -251,6 +297,72 @@ def materialize_clinic_contact_primary_evidence(
             )
         )
     return tuple(blocks)
+
+
+def build_clinic_contact_authority_payload(client_id: str | None) -> dict[str, object]:
+    """Structured contact facts for pre-model authority block (clinic_policies.yaml only)."""
+
+    raw_client = (client_id or "").strip()
+    if not raw_client:
+        return {"client_id": None, "contacts_available": False}
+
+    pack = resolve_pack_client_id(raw_client)
+    facts = load_clinic_contact_facts(pack)
+    has_data = _facts_have_contact_data(facts)
+    payload: dict[str, object] = {
+        "client_id": pack,
+        "contacts_available": has_data,
+    }
+    if not has_data:
+        return payload
+    if facts.branches:
+        branches: list[dict[str, object]] = []
+        for branch in facts.branches:
+            row: dict[str, object] = {
+                "branch_id": branch.branch_id,
+                "label": branch.label,
+                "aliases": list(branch.aliases),
+                "phones": list(branch.phone_displays),
+                "address": branch.address_display,
+                "hours": branch.hours_display,
+            }
+            if branch.parking_display:
+                row["parking"] = branch.parking_display
+            branches.append(row)
+        payload["branches"] = branches
+        if facts.whatsapp_display:
+            payload["whatsapp"] = facts.whatsapp_display
+        return payload
+
+    contact: dict[str, str] = {}
+    if facts.phone_display:
+        contact["phone"] = facts.phone_display
+    if facts.whatsapp_display:
+        contact["whatsapp"] = facts.whatsapp_display
+    if facts.address_display:
+        contact["address"] = facts.address_display
+    if facts.hours_display:
+        contact["hours"] = facts.hours_display
+    if facts.parking_display:
+        contact["parking"] = facts.parking_display
+    if contact:
+        payload["contact"] = contact
+    return payload
+
+
+def serialize_clinic_contact_authority_block(client_id: str | None) -> str:
+    """Authoritative pre-model contact block for dynamic prompt suffix."""
+
+    import json
+
+    payload = build_clinic_contact_authority_payload(client_id)
+    if not payload.get("contacts_available"):
+        return ""
+    return (
+        "<CLINIC_CONTACT_AUTHORITY>\n"
+        + json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n</CLINIC_CONTACT_AUTHORITY>"
+    )
 
 
 def fallback_answer_with_phone(*, base_text: str, client_id: str | None) -> str:
@@ -330,6 +442,7 @@ __all__ = [
     "ClinicContactFacts",
     "ContactFieldKind",
     "branch_selection_tokens",
+    "build_clinic_contact_authority_payload",
     "canonical_contact_phone",
     "canonical_contact_scalar",
     "collect_manual_contact_phone_lines",
@@ -346,5 +459,6 @@ __all__ = [
     "resolve_contact_branch_id",
     "resolve_contact_branch_id_from_facts",
     "selection_token_matches_hint",
+    "serialize_clinic_contact_authority_block",
     "validate_clinic_contact_section",
 ]

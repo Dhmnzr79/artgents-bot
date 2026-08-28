@@ -50,6 +50,7 @@ from core.sales_one_plus_semantic_authority import (
     bind_semantic_frame,
     governed_ui_authority_from_resolution,
 )
+from core.sales_one_plus_protocol import AUTHORITY_CLIENT_ID_HINT_KEY
 from core.sales_one_plus_turn import (
     run_sales_one_plus_candidate,
     run_sales_one_plus_candidate_stream,
@@ -511,6 +512,10 @@ def run_sales_fast_widget_turn(
         catalog_service_hint=service_identity.explicit_service_term,
         session_service_hint=session_state.last_service_id,
     )
+    sales_context = {
+        **sales_context,
+        AUTHORITY_CLIENT_ID_HINT_KEY: client_id,
+    }
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
@@ -735,7 +740,9 @@ def _materialize_result(
         shown_fact_ids=session_state.shown_fact_ids,  # type: ignore[attr-defined]
         shown_amplifier_refs=session_state.shown_amplifier_refs,  # type: ignore[attr-defined]
         shown_consultation_value_refs=session_state.shown_consultation_value_refs,  # type: ignore[attr-defined]
+        shown_service_value_ids=session_state.shown_service_value_ids,  # type: ignore[attr-defined]
         last_rendered_promo_fact_id=session_state.last_rendered_promo_fact_id,  # type: ignore[attr-defined]
+        last_turn_rendered_promo_fact_ids=session_state.last_turn_rendered_promo_fact_ids,  # type: ignore[attr-defined]
         today=runtime_today(),
     )
     widget = materialize_sales_fast_answer_payload(
@@ -770,7 +777,10 @@ def _materialize_result(
                 shown_fact_ids=session_delta.shown_fact_ids,
                 shown_amplifier_refs=session_delta.shown_amplifier_refs,
                 shown_consultation_value_refs=session_delta.shown_consultation_value_refs,
+                shown_service_value_ids=session_delta.shown_service_value_ids,
                 last_rendered_promo_fact_id=session_delta.last_rendered_promo_fact_id,
+                rendered_promo_fact_ids=session_delta.rendered_promo_fact_ids,
+                last_turn_rendered_promo_fact_ids=session_delta.last_turn_rendered_promo_fact_ids,
             )
         else:
             selection = sales_fast_session_selection(

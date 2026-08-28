@@ -43,7 +43,10 @@ class PresentationSessionDelta:
     shown_fact_ids: tuple[str, ...]
     shown_amplifier_refs: tuple[str, ...]
     shown_consultation_value_refs: tuple[str, ...]
+    shown_service_value_ids: tuple[str, ...]
     last_rendered_promo_fact_id: str | None
+    rendered_promo_fact_ids: tuple[str, ...]
+    last_turn_rendered_promo_fact_ids: tuple[str, ...]
     cadence_update: PresentationCadenceDelta
 
 

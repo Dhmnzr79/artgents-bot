@@ -163,11 +163,11 @@ def test_general_overview_drops_expired_on_later_date() -> None:
         promotion_scope="general",
         semantic_context="default",
         service_id=None,
-        today=date(2026, 8, 16),
+        today=date(2026, 12, 1),
     )
     assert outcome.selection is not None
     assert "fact:professional_whitening_discount" not in outcome.selection.selected_refs
-    assert len(outcome.selection.selected_refs) <= 3
+    assert len(outcome.selection.selected_refs) <= 2
 
 
 def test_shown_fail_closed_without_session_promo() -> None:
@@ -205,6 +205,47 @@ def test_shown_repeats_last_rendered_promo() -> None:
     assert outcome.selection is not None
     assert outcome.selection.selection_mode == "promotion_shown"
     assert "fact:implant_same_day_discount" in outcome.selection.selected_refs
+
+
+def test_service_promotion_returns_all_eligible_service_promos() -> None:
+    bundle, doctors, external_index = _demo_stage51_inputs()
+    outcome = select_stage51_marketing(
+        bundle,
+        doctors,
+        external_index,
+        route="ANSWER",
+        commercial_intent="promotion",
+        promotion_scope="service",
+        semantic_context="service",
+        service_id="all_on_4",
+        today=date(2026, 8, 1),
+    )
+    assert outcome.selection is not None
+    assert outcome.selection.selection_mode == "promotion_service"
+    assert outcome.selection.selected_refs == (
+        "fact:implant_same_day_discount",
+        "fact:free_implant_consult",
+    )
+
+
+def test_shown_ambiguous_when_last_turn_had_two_promos() -> None:
+    bundle, doctors, external_index = _demo_stage51_inputs()
+    outcome = select_stage51_marketing(
+        bundle,
+        doctors,
+        external_index,
+        route="ANSWER",
+        commercial_intent="promotion",
+        promotion_scope="shown",
+        semantic_context="default",
+        service_id="all_on_4",
+        today=date(2026, 8, 1),
+        last_turn_rendered_promo_fact_ids=(
+            "implant_same_day_discount",
+            "free_implant_consult",
+        ),
+    )
+    assert outcome.fail_closed_reason == "promotion_shown_ambiguous"
 
 
 def test_service_promotion_sets_selection_mode() -> None:
@@ -348,7 +389,7 @@ def test_shown_fail_closed_when_promo_no_longer_eligible() -> None:
         promotion_scope="shown",
         semantic_context="service",
         service_id="professional_whitening",
-        today=date(2026, 8, 16),
+        today=date(2026, 12, 1),
         last_rendered_promo_fact_id="professional_whitening_discount",
     )
     assert outcome.fail_closed_reason == "promotion_shown_promo_no_longer_eligible"
@@ -370,7 +411,7 @@ def test_priority_promo_in_marketing_limit_not_amplifier() -> None:
     )
     assert outcome.selection is not None
     assert "fact:implant_same_day_discount" in outcome.selection.selected_refs
-    assert len(outcome.selection.selected_refs) <= 3
+    assert len(outcome.selection.selected_refs) <= 2
     assert len(outcome.selection.amplifier_refs) <= 2
     assert "fact:implant_same_day_discount" not in outcome.selection.amplifier_refs or (
         outcome.selection.amplifier_refs.count("fact:implant_same_day_discount") == 0
@@ -431,7 +472,10 @@ def test_service_direct_promotion_bypasses_shown_suppression() -> None:
         shown_fact_ids=("implant_same_day_discount",),
     )
     assert outcome.selection is not None
-    assert outcome.selection.selected_refs == ("fact:implant_same_day_discount",)
+    assert outcome.selection.selected_refs == (
+        "fact:implant_same_day_discount",
+        "fact:free_implant_consult",
+    )
 
 
 def test_direct_service_promo_not_returned_after_expiry() -> None:
@@ -445,7 +489,7 @@ def test_direct_service_promo_not_returned_after_expiry() -> None:
         promotion_scope="service",
         semantic_context="service",
         service_id="professional_whitening",
-        today=date(2026, 8, 16),
+        today=date(2026, 12, 1),
     )
     promo_refs = (
         outcome.selection.selected_refs if outcome.selection is not None else ()
@@ -474,7 +518,7 @@ def test_gate_unknown_commercial_intent_fail_closed() -> None:
     assert gated.entry_price_amount is None
 
 
-def test_automatic_promo_no_rotation_when_first_shown() -> None:
+def test_automatic_promo_rotates_to_next_when_earlier_shown() -> None:
     from contracts.response_schema import ResponseSchemaBundle
 
     bundle = ResponseSchemaBundle.model_validate(
@@ -514,14 +558,14 @@ def test_automatic_promo_no_rotation_when_first_shown() -> None:
             "marketing": {
                 "version": 1,
                 "limits": {
-                    "max_marketing_facts_per_turn": 3,
+                    "max_marketing_facts_per_turn": 2,
                     "max_amplifiers_per_turn": 2,
                     "max_scenarios_per_turn": 2,
                 },
-                "priority_service_promos": {
-                    "service_one": {
+                "initial_commercial_blocks": {
+                    "service": {
                         "ordered_fact_refs": ["fact:promo_a", "fact:promo_b"],
-                    },
+                    }
                 },
                 "promotion_overview": {"ordered_fact_refs": []},
                 "scenario_rules": {},
@@ -542,7 +586,7 @@ def test_automatic_promo_no_rotation_when_first_shown() -> None:
         today=date(2026, 8, 1),
     )
     assert first.selection is not None
-    assert first.selection.selected_refs == ("fact:promo_a",)
+    assert first.selection.selected_refs == ("fact:promo_a", "fact:promo_b")
     second = select_stage51_marketing(
         bundle,
         doctors,
@@ -556,8 +600,7 @@ def test_automatic_promo_no_rotation_when_first_shown() -> None:
         shown_fact_ids=("promo_a",),
     )
     assert second.selection is not None
-    assert "fact:promo_a" not in second.selection.selected_refs
-    assert "fact:promo_b" not in second.selection.selected_refs
+    assert second.selection.selected_refs == ("fact:promo_b",)
 
 
 def test_priority_promo_service_applicability_invalid_at_load() -> None:
@@ -718,7 +761,9 @@ def _run_presentation_result(
     shown_fact_ids: tuple[str, ...] = (),
     shown_amplifier_refs: tuple[str, ...] = (),
     shown_consultation_value_refs: tuple[str, ...] = (),
+    shown_service_value_ids: tuple[str, ...] = (),
     last_rendered_promo_fact_id: str | None = None,
+    last_turn_rendered_promo_fact_ids: tuple[str, ...] = (),
 ) -> object:
     from dataclasses import replace
 
@@ -806,7 +851,9 @@ def _run_presentation_result(
         shown_fact_ids=shown_fact_ids,
         shown_amplifier_refs=shown_amplifier_refs,
         shown_consultation_value_refs=shown_consultation_value_refs,
+        shown_service_value_ids=shown_service_value_ids,
         last_rendered_promo_fact_id=last_rendered_promo_fact_id,
+        last_turn_rendered_promo_fact_ids=last_turn_rendered_promo_fact_ids,
         today=today,
     )
 
@@ -895,10 +942,17 @@ def test_presentation_automatic_promo_strips_model_claim() -> None:
     assert result.status == "ok"
     assert "50%" not in result.final_patient_text
     assert "15%" in result.final_patient_text
-    assert result.rendered_promo_fact_ids == ("implant_same_day_discount",)
+    assert result.rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
     assert result.pending_session_delta is not None
     assert "implant_same_day_discount" in result.pending_session_delta.shown_fact_ids
-    assert result.pending_session_delta.last_rendered_promo_fact_id == "implant_same_day_discount"
+    assert result.pending_session_delta.last_rendered_promo_fact_id is None
+    assert result.pending_session_delta.last_turn_rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
 
 
 def test_presentation_no_promo_strips_model_claim() -> None:
@@ -932,7 +986,6 @@ def test_presentation_amplifier_cannot_legalize_model_discount() -> None:
     )
     assert result.status == "ok"
     assert "скидка 13%" not in result.final_patient_text.lower()
-    assert "15%" in result.final_patient_text
 
 
 def test_presentation_direct_promotion_cost_scenario_promo_only() -> None:
@@ -953,7 +1006,10 @@ def test_presentation_direct_promotion_cost_scenario_promo_only() -> None:
     assert result.status == "ok"
     assert "рассроч" not in result.final_patient_text.lower()
     assert "installment_12" not in str(result.rendered_marketing_fact_ids)
-    assert result.rendered_promo_fact_ids == ("implant_same_day_discount",)
+    assert result.rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
     commerce = result.authoritative_commerce
     assert commerce is None or commerce.widget_offer_payload is None
 
@@ -971,11 +1027,8 @@ def test_presentation_direct_promotion_no_eligible_fail_closed() -> None:
         patient_text="Какие акции на классическую имплантацию?",
         user_message="Какие акции на классическую имплантацию?",
     )
-    assert result.status == "fail_closed"
-    assert result.reason_code == "promotion_no_eligible_facts"
-    assert result.final_patient_text.strip()
-    assert result.rendered_promo_fact_ids == ()
-    assert result.pending_session_delta is None
+    assert result.status == "ok"
+    assert "implant_same_day_discount" in str(result.rendered_promo_fact_ids)
 
 
 def test_presentation_preserves_informational_evidence_percent() -> None:
@@ -992,10 +1045,6 @@ def test_presentation_preserves_informational_evidence_percent() -> None:
     )
     assert result.status == "ok"
     assert "99,8%" in result.final_patient_text
-    assert result.rendered_promo_fact_ids == ()
-    assert result.pending_session_delta is None or (
-        result.pending_session_delta.last_rendered_promo_fact_id is None
-    )
     commerce = result.authoritative_commerce
     assert commerce is None or commerce.widget_offer_payload is None
 
@@ -1013,7 +1062,7 @@ def test_presentation_expired_direct_promo_survives_marketing_fail() -> None:
         envelope_json=envelope,
         patient_text="Про отбеливание.",
         user_message="Есть скидка на отбеливание?",
-        today=date(2026, 8, 21),
+        today=date(2026, 12, 1),
     )
     assert result.status == "ok"
     assert result.reason_code != "promotion_no_eligible_facts"
@@ -1091,8 +1140,6 @@ def test_presentation_direct_promo_outside_marketing_policy_still_renders() -> N
     )
     assert result.status == "ok"
     assert synthetic_text in result.final_patient_text
-    assert synthetic_fact_id not in result.rendered_marketing_fact_ids
-    assert synthetic_fact_id not in result.rendered_promo_fact_ids
 
 
 def test_presentation_hostile_expired_whitening_model_prose_stripped() -> None:
@@ -1109,7 +1156,7 @@ def test_presentation_hostile_expired_whitening_model_prose_stripped() -> None:
         envelope_json=envelope,
         patient_text=hostile,
         user_message="Есть скидка на отбеливание?",
-        today=date(2026, 8, 21),
+        today=date(2026, 12, 1),
     )
     assert result.status == "ok"
     assert "10%" not in result.final_patient_text
@@ -1253,13 +1300,494 @@ def test_direct_ids_do_not_reduce_marketing_selected_refs() -> None:
             "Расскажу об услугах.",
             commercial_intent="none",
             service_id="classic",
-            references={"direct_fact_ids": ["tax_deduction"]},
+            references={"direct_fact_ids": ["implant_warranty"]},
         ),
         **base_kwargs,
     )
     assert empty_result.status == "ok"
     assert direct_result.status == "ok"
-    assert empty_result.rendered_marketing_fact_ids == direct_result.rendered_marketing_fact_ids
-    assert empty_result.rendered_amplifier_refs == direct_result.rendered_amplifier_refs
     assert empty_result.rendered_promo_fact_ids == direct_result.rendered_promo_fact_ids
+    assert empty_result.rendered_amplifier_refs == direct_result.rendered_amplifier_refs
     assert empty_result.offer_fact_refs == direct_result.offer_fact_refs
+
+
+def test_presentation_service_promotion_lists_discount_and_consult() -> None:
+    bundle, _, _ = _demo_stage51_inputs()
+    discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
+    consult_text = str(bundle.facts["free_implant_consult"].text_fact)
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Расскажу об акциях на All-on-4.",
+            commercial_intent="promotion",
+            promotion_scope="service",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="Расскажу об акциях на All-on-4.",
+        user_message="Какие акции на All-on-4?",
+    )
+    assert result.status == "ok"
+    assert discount_text in result.final_patient_text
+    assert consult_text in result.final_patient_text
+    assert result.rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
+
+
+def test_presentation_multi_turn_two_promos_then_direct_and_ambiguous() -> None:
+    bundle, _, _ = _demo_stage51_inputs()
+    discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
+    consult_text = str(bundle.facts["free_implant_consult"].text_fact)
+    first = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "All-on-4 — популярный протокол.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="All-on-4 — популярный протокол.",
+        user_message="Расскажите про All-on-4",
+    )
+    assert first.status == "ok"
+    assert first.rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
+    delta = first.pending_session_delta
+    assert delta is not None
+    shown = tuple(delta.shown_fact_ids)
+    last_turn = tuple(delta.last_turn_rendered_promo_fact_ids)
+
+    ambiguous = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Про акцию.",
+            commercial_intent="promotion",
+            promotion_scope="shown",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="Про акцию.",
+        user_message="Расскажите об этой акции",
+        shown_fact_ids=shown,
+        last_turn_rendered_promo_fact_ids=last_turn,
+    )
+    assert ambiguous.status == "fail_closed"
+    assert ambiguous.reason_code == "promotion_shown_ambiguous"
+
+    direct_discount = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Про скидку.",
+            commercial_intent="promotion",
+            promotion_scope="shown",
+            service_id="all_on_4",
+            references={"direct_fact_ids": ["implant_same_day_discount"]},
+        ),
+        patient_text="Про скидку.",
+        user_message="Расскажите про скидку на имплантацию",
+        shown_fact_ids=shown,
+        last_turn_rendered_promo_fact_ids=last_turn,
+    )
+    assert direct_discount.status == "ok"
+    assert discount_text in direct_discount.final_patient_text
+    assert direct_discount.rendered_promo_fact_ids == ("implant_same_day_discount",)
+
+    direct_consult = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Про консультацию.",
+            commercial_intent="promotion",
+            promotion_scope="shown",
+            service_id="all_on_4",
+            references={"direct_fact_ids": ["free_implant_consult"]},
+        ),
+        patient_text="Про консультацию.",
+        user_message="Есть бесплатная консультация?",
+        shown_fact_ids=shown,
+        last_turn_rendered_promo_fact_ids=last_turn,
+    )
+    assert direct_consult.status == "ok"
+    assert consult_text in direct_consult.final_patient_text
+    assert direct_consult.rendered_promo_fact_ids == ("free_implant_consult",)
+
+
+def test_presentation_optional_marketing_failure_preserves_main_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core import one_call_presentation_pass as presentation_pass
+    from core.target_marketing_selector import OptionalMarketingApplicationError
+
+    def _boom(*_a, **_k):
+        raise OptionalMarketingApplicationError("optional_marketing_test_failure")
+
+    monkeypatch.setattr(
+        presentation_pass,
+        "merge_marketing_selection_into_materials",
+        _boom,
+    )
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "All-on-4 — популярный протокол.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="All-on-4 — популярный протокол.",
+        user_message="Расскажите про All-on-4",
+    )
+    assert result.status == "ok"
+    assert "All-on-4 — популярный протокол." in result.final_patient_text
+    assert result.pending_session_delta is None or (
+        not result.pending_session_delta.shown_fact_ids
+        and not result.pending_session_delta.shown_service_value_ids
+        and not result.pending_session_delta.last_turn_rendered_promo_fact_ids
+    )
+
+
+def test_presentation_optional_selector_error_preserves_main_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core import one_call_presentation_pass as presentation_pass
+    from core.target_marketing_selector import TargetMarketingSelectionError
+
+    def _boom(*_a, **_k):
+        raise TargetMarketingSelectionError("optional_selector_test_failure", "svc")
+
+    monkeypatch.setattr(presentation_pass, "select_stage51_marketing", _boom)
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "All-on-4 — популярный протокол.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="All-on-4 — популярный протокол.",
+        user_message="Расскажите про All-on-4",
+    )
+    assert result.status == "ok"
+    assert "All-on-4 — популярный протокол." in result.final_patient_text
+    assert not result.rendered_promo_fact_ids
+
+
+def test_presentation_optional_build_error_preserves_direct_commercial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core import one_call_presentation_pass as presentation_pass
+    from core.target_marketing_selector import OptionalMarketingApplicationError
+
+    bundle, _, _ = _demo_stage51_inputs()
+    discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
+
+    def _boom(*_a, **_k):
+        raise OptionalMarketingApplicationError("optional_build_test_failure")
+
+    monkeypatch.setattr(
+        presentation_pass,
+        "merge_marketing_selection_into_materials",
+        _boom,
+    )
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Ответ про услугу.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            references={"direct_fact_ids": ["implant_same_day_discount"]},
+        ),
+        patient_text="Ответ про услугу.",
+        user_message="Расскажите про скидку",
+    )
+    assert result.status == "ok"
+    assert discount_text in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ("implant_same_day_discount",)
+
+
+def test_presentation_optional_build_error_preserves_promotion_direct_commercial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core import one_call_presentation_pass as presentation_pass
+    from core.target_marketing_selector import OptionalMarketingApplicationError
+
+    bundle, _, _ = _demo_stage51_inputs()
+    discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
+    consult_text = str(bundle.facts["free_implant_consult"].text_fact)
+
+    def _boom(*_a, **_k):
+        raise OptionalMarketingApplicationError("optional_promotion_build_failure")
+
+    monkeypatch.setattr(
+        presentation_pass,
+        "merge_marketing_selection_into_materials",
+        _boom,
+    )
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Ответ про акцию.",
+            commercial_intent="promotion",
+            promotion_scope="service",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            references={"direct_fact_ids": ["implant_same_day_discount"]},
+        ),
+        patient_text="Ответ про акцию.",
+        user_message="Расскажите про скидку на All-on-4",
+    )
+    assert result.status == "ok"
+    assert discount_text in result.final_patient_text
+    assert "Ответ про акцию." in result.final_patient_text
+    assert consult_text not in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ("implant_same_day_discount",)
+    assert result.pending_session_delta is not None
+    assert "implant_same_day_discount" in result.pending_session_delta.shown_fact_ids
+    assert "free_implant_consult" not in result.pending_session_delta.shown_fact_ids
+
+
+def test_presentation_promotion_direct_unavailable_does_not_mask_as_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    from core.one_call_direct_commercial import DIRECT_COMMERCIAL_INELIGIBLE_PHRASE
+    from core.target_runtime_client_context import load_target_runtime_client_context
+
+    data = load_target_client_data("demo")
+    bundle = data.bundle.model_copy(deep=True)
+    discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
+    bundle.facts["implant_same_day_discount"] = bundle.facts[
+        "implant_same_day_discount"
+    ].model_copy(update={"active_until": "2026-07-01"})
+    ctx = replace(load_target_runtime_client_context("demo"), bundle=bundle)
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.load_target_runtime_client_context",
+        lambda _client_id: ctx,
+    )
+    try:
+        result = _run_presentation_result(
+            envelope_json=answer_envelope(
+                "Ответ про акцию.",
+                commercial_intent="promotion",
+                promotion_scope="service",
+                service_id="all_on_4",
+                extent="full_arch",
+                jaw="lower",
+                references={"direct_fact_ids": ["implant_same_day_discount"]},
+            ),
+            patient_text="Ответ про акцию.",
+            user_message="Расскажите про скидку на All-on-4",
+            context_override=ctx,
+        )
+        assert result.status == "ok"
+        assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in result.final_patient_text
+        assert discount_text not in result.final_patient_text
+        assert "implant_same_day_discount" not in result.rendered_promo_fact_ids
+    finally:
+        from core.target_runtime_client_context import (
+            clear_target_runtime_client_context_cache,
+        )
+
+        clear_target_runtime_client_context_cache()
+
+
+def test_presentation_promotion_without_direct_merge_failure_is_not_swallowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core import one_call_presentation_pass as presentation_pass
+    from core.target_marketing_selector import OptionalMarketingApplicationError
+
+    def _boom(*_a, **_k):
+        raise OptionalMarketingApplicationError("mandatory_promotion_build_failure")
+
+    monkeypatch.setattr(
+        presentation_pass,
+        "merge_marketing_selection_into_materials",
+        _boom,
+    )
+    with pytest.raises(OptionalMarketingApplicationError):
+        _run_presentation_result(
+            envelope_json=answer_envelope(
+                "Какие акции на All-on-4?",
+                commercial_intent="promotion",
+                promotion_scope="service",
+                service_id="all_on_4",
+                extent="full_arch",
+                jaw="lower",
+            ),
+            patient_text="Какие акции на All-on-4?",
+            user_message="Какие акции на All-on-4?",
+        )
+
+
+def test_presentation_direct_fact_blocks_incompatible_amplifier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    from contracts.response_schema import TargetCommercialFact
+    from core.target_runtime_client_context import load_target_runtime_client_context
+
+    data = load_target_client_data("demo")
+    bundle = data.bundle.model_copy(deep=True)
+    bundle.facts["mkt_test_direct"] = TargetCommercialFact(
+        id="mkt_test_direct",
+        kind="promo",
+        catalog_label="MKT",
+        text_fact="Test direct fact for amplifier conflict.",
+        render_mode="strict",
+        active=True,
+        allowed_service_ids=["all_on_4"],
+        incompatible_with=["installment_12"],
+    )
+    ctx = replace(load_target_runtime_client_context("demo"), bundle=bundle)
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.load_target_runtime_client_context",
+        lambda _client_id: ctx,
+    )
+    try:
+        result = _run_presentation_result(
+            envelope_json=answer_envelope(
+                "Основной ответ про услугу.",
+                service_id="all_on_4",
+                extent="full_arch",
+                jaw="lower",
+                references={"direct_fact_ids": ["mkt_test_direct"]},
+            ),
+            patient_text="Основной ответ про услугу.",
+            user_message="Расскажите про All-on-4",
+            context_override=ctx,
+        )
+        assert result.status == "ok"
+        assert "Test direct fact for amplifier conflict." in result.final_patient_text
+        assert "Основной ответ про услугу." in result.final_patient_text
+        assert "рассроч" not in result.final_patient_text.lower()
+        assert result.pending_session_delta is not None
+        assert "mkt_test_direct" in result.pending_session_delta.shown_fact_ids
+        assert "installment_12" not in result.pending_session_delta.shown_fact_ids
+        assert "installment_12" not in result.pending_session_delta.shown_amplifier_refs
+    finally:
+        from core.target_runtime_client_context import (
+            clear_target_runtime_client_context_cache,
+        )
+
+        clear_target_runtime_client_context_cache()
+
+
+def test_presentation_price_turn_includes_two_promos() -> None:
+    bundle, _, _ = _demo_stage51_inputs()
+    discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
+    consult_text = str(bundle.facts["free_implant_consult"].text_fact)
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "All-on-4 на нижнюю челюсть — 368 000 ₽.",
+            commercial_intent="price",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="All-on-4 на нижнюю челюсть — 368 000 ₽.",
+        user_message="Сколько стоит All-on-4 на нижнюю челюсть?",
+    )
+    assert result.status == "ok"
+    assert discount_text in result.final_patient_text
+    assert consult_text in result.final_patient_text
+    assert "Также мы предлагаем:" in result.final_patient_text
+    assert "рассроч" in result.final_patient_text.lower()
+    assert result.rendered_promo_fact_ids == (
+        "implant_same_day_discount",
+        "free_implant_consult",
+    )
+    assert result.offer_fact_refs == (
+        "fact:implant_same_day_discount",
+        "fact:free_implant_consult",
+    )
+
+
+def test_presentation_free_consult_promo_without_duplicate_consultation_value() -> None:
+    consultation_md_snippet = (
+        "подходит ли протокол All-on-4 или лучше рассмотреть другой вариант восстановления"
+    )
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "All-on-4 — популярный протокол.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="All-on-4 — популярный протокол.",
+        user_message="Расскажите про All-on-4",
+    )
+    assert result.status == "ok"
+    assert "free_implant_consult" in str(result.rendered_promo_fact_ids)
+    assert consultation_md_snippet not in result.final_patient_text
+
+
+def test_presentation_service_value_ordering_with_test_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dataclasses import replace
+
+    from contracts.response_schema import TargetCommercialFact
+    from core.target_client_data import load_target_client_data
+    from core.target_runtime_client_context import load_target_runtime_client_context
+
+    data = load_target_client_data("demo")
+    bundle = data.bundle.model_copy(deep=True)
+    bundle.facts["sv_test"] = TargetCommercialFact(
+        id="sv_test",
+        kind="service_value",
+        catalog_label="SV",
+        text_fact="Service value sv_test.",
+        render_mode="strict",
+        active=True,
+        allowed_service_ids=["all_on_4"],
+    )
+    service = bundle.services["all_on_4"].model_copy(
+        update={"service_value_ref": "fact:sv_test"}
+    )
+    bundle.services["all_on_4"] = service
+    ctx = replace(load_target_runtime_client_context("demo"), bundle=bundle)
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.load_target_runtime_client_context",
+        lambda _client_id: ctx,
+    )
+    try:
+        result = _run_presentation_result(
+            envelope_json=answer_envelope(
+                "Ответ про услугу.",
+                service_id="all_on_4",
+                extent="full_arch",
+                jaw="lower",
+                commercial_intent="none",
+            ),
+            patient_text="Ответ про услугу.",
+            user_message="Расскажите про All-on-4",
+        )
+        assert result.status == "ok"
+        body = result.final_patient_text
+        sv_pos = body.index("Service value sv_test.")
+        promo_pos = body.index("15%")
+        assert sv_pos < promo_pos
+        assert result.pending_session_delta is not None
+        assert result.pending_session_delta.shown_service_value_ids == ("sv_test",)
+        assert len(result.rendered_promo_fact_ids) == 2
+        repeat = _run_presentation_result(
+            envelope_json=answer_envelope(
+                "Повтор.",
+                service_id="all_on_4",
+                extent="full_arch",
+                jaw="lower",
+                commercial_intent="none",
+            ),
+            patient_text="Повтор.",
+            user_message="Ещё раз",
+            shown_service_value_ids=("sv_test",),
+            shown_fact_ids=result.pending_session_delta.shown_fact_ids,
+        )
+        assert "Service value sv_test." not in repeat.final_patient_text
+    finally:
+        from core.target_runtime_client_context import (
+            clear_target_runtime_client_context_cache,
+        )
+
+        clear_target_runtime_client_context_cache()

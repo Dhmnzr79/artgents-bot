@@ -30,7 +30,7 @@ EXPECTED = {
             "kak-rabotaet-metod-all-on-4",
             "ogranicheniya-i-uhod",
         ],
-        "body_sha256": "efa435bafef8f5400a5b01f93ea5109b3d538ee0f64951d60edeb4107f43ec27",
+        "body_sha256": "591bbb6c04724d808991655a60940d1ca0dd1baa9f3b71b55f746b3698152004",
     },
     "implantation__service__classic.md": {
         "service_id": "classic",
@@ -44,7 +44,7 @@ EXPECTED = {
             "pochemu-vybirayut-klassicheskuyu",
             "sroki-i-ogranicheniya",
         ],
-        "body_sha256": "cbd72f3339cfb91456a7ef19a5a87ea2b59214f732650253b454ca42658b6cb1",
+        "body_sha256": "4a1fec11a71fc0ff97f7607dc7630e3a7451a531660b9c6af29357c35d52358c",
     },
     "implantation__service__one_stage.md": {
         "service_id": "one_stage",
@@ -58,7 +58,7 @@ EXPECTED = {
             "kogda-ne-podhodit-odnomomentnaya",
             "v-chem-osobennost-metoda",
         ],
-        "body_sha256": "478ecab092824ef29b82433c0ee84a4bb59568a67a69290ddc9f19969bc09800",
+        "body_sha256": "caae36972da6cb353173a9879ecdf2ad02d7df8188444a69784b1fd608685296",
     },
 }
 

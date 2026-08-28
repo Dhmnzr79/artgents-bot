@@ -181,6 +181,7 @@ class TargetService(TargetSchemaModel):
     roles: list[ServiceRole] = Field(default_factory=list)
     active: bool = True
     content_ref: NonBlankStr | None = None
+    service_value_ref: FactSourceRef | None = None
     selection: TargetServiceSelection
     options: list[TargetServiceOption] = Field(default_factory=list)
 
@@ -421,16 +422,100 @@ class TargetClinicStrategy(TargetSchemaModel):
         return self
 
 
+class TargetAnswerProfileLimits(TargetSchemaModel):
+    max_promos_per_turn: Annotated[StrictInt, Field(ge=0, le=2)] = 2
+    max_amplifiers_per_turn: Annotated[StrictInt, Field(ge=0, le=4)] = 2
+
+
 class TargetMarketingLimits(TargetSchemaModel):
-    max_marketing_facts_per_turn: Annotated[StrictInt, Field(ge=0, le=3)]
-    max_amplifiers_per_turn: Annotated[StrictInt, Field(ge=0, le=2)]
-    max_scenarios_per_turn: Annotated[StrictInt, Field(ge=0, le=2)]
+    max_marketing_facts_per_turn: Annotated[StrictInt, Field(ge=0, le=3)] | None = None
+    max_amplifiers_per_turn: Annotated[StrictInt, Field(ge=0, le=4)] | None = None
+    max_scenarios_per_turn: Annotated[StrictInt, Field(ge=0, le=2)] = 2
+    service: TargetAnswerProfileLimits | None = None
+    price: TargetAnswerProfileLimits | None = None
+
+    @staticmethod
+    def _cap_promos(value: int) -> int:
+        return min(value, 2)
+
+    @staticmethod
+    def _cap_service_amplifiers(value: int) -> int:
+        return min(value, 2)
+
+    @staticmethod
+    def _cap_price_amplifiers(value: int) -> int:
+        return min(value, 4)
 
     @model_validator(mode="after")
-    def _amplifiers_fit_fact_limit(self) -> "TargetMarketingLimits":
-        if self.max_amplifiers_per_turn > self.max_marketing_facts_per_turn:
-            raise ValueError("marketing_amplifier_limit_exceeds_fact_limit")
+    def _normalize_profiles(self) -> "TargetMarketingLimits":
+        if self.service is not None:
+            if self.service.max_promos_per_turn > 2:
+                raise ValueError("marketing_service_promo_limit_exceeds_cap")
+            if self.service.max_amplifiers_per_turn > 2:
+                raise ValueError("marketing_service_amplifier_limit_exceeds_cap")
+        if self.price is not None:
+            if self.price.max_promos_per_turn > 2:
+                raise ValueError("marketing_price_promo_limit_exceeds_cap")
+            if self.price.max_amplifiers_per_turn > 4:
+                raise ValueError("marketing_price_amplifier_limit_exceeds_cap")
+
+        legacy_promos = self.max_marketing_facts_per_turn
+        legacy_amplifiers = self.max_amplifiers_per_turn
+        if self.service is None:
+            promos = self._cap_promos(legacy_promos if legacy_promos is not None else 2)
+            amplifiers = self._cap_service_amplifiers(
+                legacy_amplifiers if legacy_amplifiers is not None else 2
+            )
+            self.service = TargetAnswerProfileLimits(
+                max_promos_per_turn=promos,
+                max_amplifiers_per_turn=amplifiers,
+            )
+        if self.price is None:
+            promos = self._cap_promos(legacy_promos if legacy_promos is not None else 2)
+            amplifiers = self._cap_price_amplifiers(
+                legacy_amplifiers if legacy_amplifiers is not None else 4
+            )
+            if legacy_promos is not None:
+                amplifiers = self._cap_price_amplifiers(
+                    legacy_amplifiers if legacy_amplifiers is not None else 2
+                )
+            self.price = TargetAnswerProfileLimits(
+                max_promos_per_turn=promos,
+                max_amplifiers_per_turn=amplifiers,
+            )
+        if legacy_promos is None:
+            self.max_marketing_facts_per_turn = self.service.max_promos_per_turn
+        else:
+            self.max_marketing_facts_per_turn = self._cap_promos(legacy_promos)
+        if legacy_amplifiers is None:
+            self.max_amplifiers_per_turn = self.service.max_amplifiers_per_turn
+        else:
+            self.max_amplifiers_per_turn = legacy_amplifiers
         return self
+
+    def profile_limits(self, profile: str) -> tuple[int, int]:
+        block = self.price if profile == "price" else self.service
+        if block is None:
+            return 2, 2
+        return block.max_promos_per_turn, block.max_amplifiers_per_turn
+
+
+class TargetAutomaticCommercialRefs(TargetSchemaModel):
+    ordered_promo_refs: list[FactSourceRef] = Field(default_factory=list)
+    ordered_amplifier_refs: list[SourceRef] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _refs_unique(self) -> "TargetAutomaticCommercialRefs":
+        if _duplicates(self.ordered_promo_refs):
+            raise ValueError("automatic_promo_ref_duplicate")
+        if _duplicates(self.ordered_amplifier_refs):
+            raise ValueError("automatic_amplifier_ref_duplicate")
+        return self
+
+
+class TargetServiceAutomaticCommercial(TargetSchemaModel):
+    service: TargetAutomaticCommercialRefs | None = None
+    price: TargetAutomaticCommercialRefs | None = None
 
 
 class TargetInitialCommercialBlock(TargetSchemaModel):
@@ -516,6 +601,10 @@ class TargetMarketingPolicy(TargetSchemaModel):
     initial_commercial_blocks: dict[NonBlankStr, TargetInitialCommercialBlock] = Field(
         default_factory=dict
     )
+    service_automatic_commercial: dict[NonBlankStr, TargetServiceAutomaticCommercial] = Field(
+        default_factory=dict
+    )
+    ordered_amplifier_refs: list[SourceRef] = Field(default_factory=list)
     priority_service_promos: dict[NonBlankStr, TargetServicePromoMapping] = Field(
         default_factory=dict
     )
@@ -634,15 +723,31 @@ class ResponseSchemaBundle(TargetSchemaModel):
         refs: list[str] = []
         for block in self.marketing.initial_commercial_blocks.values():
             refs.extend(block.ordered_fact_refs)
+        refs.extend(self.marketing.ordered_amplifier_refs)
         for mapping in self.marketing.priority_service_promos.values():
             refs.extend(mapping.ordered_fact_refs)
+        for svc_policy in self.marketing.service_automatic_commercial.values():
+            for profile_block in (svc_policy.service, svc_policy.price):
+                if profile_block is None:
+                    continue
+                refs.extend(profile_block.ordered_promo_refs)
+                refs.extend(profile_block.ordered_amplifier_refs)
         refs.extend(self.marketing.promotion_overview.ordered_fact_refs)
         for rule in self.marketing.scenario_rules.values():
             refs.extend(rule.ordered_amplifier_refs)
+        service_value_refs = [
+            service.service_value_ref
+            for service in self.services.values()
+            if service.service_value_ref
+        ]
+        refs.extend(service_value_refs)
         return refs
 
     def _validate_promo_authority_refs(self) -> None:
         promo_kinds = frozenset({"promo"})
+        for service_id, mapping in self.marketing.service_automatic_commercial.items():
+            if service_id not in self.services:
+                raise ValueError("marketing_automatic_service_missing")
         for service_id, mapping in self.marketing.priority_service_promos.items():
             if service_id not in self.services:
                 raise ValueError("marketing_priority_service_missing")
@@ -691,7 +796,12 @@ S1_MODEL_TYPES = (
     TargetClinicStrategy,
     TargetGenericPricePolicy,
     TargetMarketingLimits,
+    TargetAnswerProfileLimits,
+    TargetAutomaticCommercialRefs,
+    TargetServiceAutomaticCommercial,
     TargetInitialCommercialBlock,
+    TargetServicePromoMapping,
+    TargetPromotionOverview,
     TargetScenarioRule,
     TargetMarketingPolicy,
     ResponseSchemaBundle,

@@ -28,9 +28,8 @@ MD_ROOT = DEMO_ROOT / "md"
 DOCTOR_CATALOG = DEMO_ROOT / "doctor_catalog.json"
 TONE = DEMO_ROOT / "tone.yaml"
 EXPECTED_INITIAL_REFS = [
-    "fact:free_implant_consult",
-    "fact:installment_12",
     "fact:implant_same_day_discount",
+    "fact:free_implant_consult",
     "fact:professional_whitening_discount",
 ]
 EXPECTED_SCENARIOS = {
@@ -88,7 +87,7 @@ EXPECTED_CURRENT_HASHES = {
     TONE: "b357142967527e0cdd50387efbeaf2d8d3b2a7218a1c5cd8112a316e17f6076f",
 }
 EXPECTED_PREEXISTING_TARGET_DIGEST = (
-    "d19a0c41f0f2dfa89cb5e1ab4f56bbd24917485d5549b277af1a1538fd80e179"
+    "10998e43d6b3027facb4c1dae55f8698ef31120f33a5c517814c396697889195"
 )
 
 
@@ -133,9 +132,11 @@ def test_real_demo_target_pack_loads_with_exact_marketing_policy() -> None:
 
     assert policy.version == 1
     assert policy.limits.model_dump() == {
-        "max_marketing_facts_per_turn": 3,
+        "max_marketing_facts_per_turn": 2,
         "max_amplifiers_per_turn": 2,
         "max_scenarios_per_turn": 2,
+        "service": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 2},
+        "price": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 4},
     }
     assert list(policy.initial_commercial_blocks) == ["service"]
     assert policy.initial_commercial_blocks["service"].ordered_fact_refs == (
@@ -152,9 +153,9 @@ def test_real_demo_target_pack_loads_with_exact_marketing_policy() -> None:
         "doctors": "doctor",
         "default": "callback",
     }
-    assert len(bundle.services) == 22
+    assert len(bundle.services) == 23
     assert len(bundle.offers) == 32
-    assert len(bundle.facts) == 6
+    assert len(bundle.facts) == 10
 
 
 def test_real_demo_source_and_cta_owner_boundaries_cover_every_policy_ref() -> None:

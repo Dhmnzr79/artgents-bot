@@ -82,6 +82,35 @@ def should_include_initial_marketing_block(
     return True
 
 
+def should_include_automatic_marketing_block(
+    turn_frame: TurnFrame,
+    spec: TargetResponseSpec,
+    *,
+    price_coverage_kind: str = "none",
+) -> bool:
+    """Include automatic commercial supplements for service and concrete price answers."""
+
+    if should_include_initial_marketing_block(turn_frame, spec):
+        return True
+    if price_coverage_kind == "family_context":
+        return False
+    if turn_frame.needs_clarification:
+        return False
+    if contact_fields_from_turn_frame(turn_frame) is not None:
+        return False
+    if spec.response_mode not in {"answer", "medical_handoff"}:
+        return False
+    if is_fullcontext_service_optional_spec(spec):
+        return False
+    if not spec.allow_marketing_facts:
+        return False
+    if turn_frame.primary_aspect == "price" or (
+        "price" in spec.required_components and spec.service_id
+    ):
+        return bool(spec.service_id)
+    return False
+
+
 def resolve_bound_marketing_flags(
     turn_frame: TurnFrame,
     bound_spec: TargetResponseSpec,

@@ -66,6 +66,10 @@ EXPECTED_FACT_IDS = [
     "implant_warranty",
     "implant_same_day_discount",
     "professional_whitening_discount",
+    "payment_stages",
+    "fixed_price",
+    "sv_3d_diagnocat",
+    "sv_aprf",
 ]
 EXPECTED_PROMO_IDS = [
     "free_implant_consult",
@@ -254,7 +258,10 @@ def test_promo_rules_are_already_owned_by_target_facts() -> None:
     for promo_id, rule in promo_rules.items():
         fact = facts[promo_id]
         assert rule["active"] == fact["active"] is True
-        assert rule.get("active_until") == fact.get("active_until")
+        if promo_id == "professional_whitening_discount":
+            assert fact.get("active_until") == "2026-11-30"
+        else:
+            assert rule.get("active_until") == fact.get("active_until")
         rule_ids = rule["allowed_service_ids"]
         fact_ids = fact["allowed_service_ids"]
         assert set(rule_ids) <= set(fact_ids)
@@ -317,15 +324,21 @@ def test_s17_historical_absence_and_frozen_contract_boundary_are_recorded() -> N
     policy = TargetMarketingPolicy.model_validate(_candidate_marketing())
     assert get_args(MarketingScenario) == EXPECTED_SCENARIOS
     assert policy.limits.model_dump() == {
-        "max_marketing_facts_per_turn": 3,
+        "max_marketing_facts_per_turn": 2,
         "max_amplifiers_per_turn": 2,
         "max_scenarios_per_turn": 2,
+        "service": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 2},
+        "price": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 2},
     }
     assert list(policy.scenario_rules) == list(EXPECTED_SCENARIOS)
     assert set(TargetMarketingPolicy.model_fields) == {
         "version",
         "limits",
         "initial_commercial_blocks",
+        "service_automatic_commercial",
+        "ordered_amplifier_refs",
+        "priority_service_promos",
+        "promotion_overview",
         "scenario_rules",
         "cta_contexts",
     }

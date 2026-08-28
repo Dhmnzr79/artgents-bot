@@ -82,7 +82,6 @@ def test_production_policy_grounded_data_gap_rule() -> None:
     assert "do not treat missing corpus data alone as route=admin" in policy
     assert "do not use route=clarify when the missing fact cannot be supplied" in policy
     assert "do not invent or borrow another clinic's facts" in policy
-    assert "parking" not in policy
     assert "wi-fi" not in policy
     assert "пандус" not in policy
 
@@ -104,7 +103,10 @@ def test_production_policy_data_gap_is_answer_not_admin_or_clarify() -> None:
 def test_pre_flash_hints_expose_ambiguous_scope_without_authoritative_resolution() -> None:
     from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
     from core.sales_fast_strict_evidence import build_pre_flash_prompt_hints
-    from core.sales_one_plus_protocol import build_sales_one_plus_dynamic_suffix
+    from core.sales_one_plus_protocol import (
+        AUTHORITY_CLIENT_ID_HINT_KEY,
+        build_sales_one_plus_dynamic_suffix,
+    )
 
     unknown = ExactSalesFieldAuthority(authority="unknown", provenance="unknown")
     resolution = ExactSalesResolution(
@@ -124,12 +126,56 @@ def test_pre_flash_hints_expose_ambiguous_scope_without_authoritative_resolution
     suffix = build_sales_one_plus_dynamic_suffix(
         exact_sales_resolution=resolution,
         current_strict_facts=(),
-        sales_context=hints,
+        sales_context={**hints, AUTHORITY_CLIENT_ID_HINT_KEY: "demo"},
         user_message="Сколько стоит?",
     )
     assert "ambiguous_scope_hint" in suffix
     assert "EXACT_SALES_RESOLUTION" not in suffix
     assert '"service_id": "classic"' not in suffix.split("resolution_hint", 1)[0]
+    assert "<CLINIC_CONTACT_AUTHORITY>" in suffix
+    assert "+7 (495) 128-47-60" in suffix
+    assert "<PRE_MODEL_HINTS>" in suffix
+    assert AUTHORITY_CLIENT_ID_HINT_KEY not in suffix
+
+
+def test_dynamic_suffix_contact_block_separate_from_pre_model_hints() -> None:
+    from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
+    from core.sales_one_plus_protocol import (
+        AUTHORITY_CLIENT_ID_HINT_KEY,
+        build_sales_one_plus_dynamic_suffix,
+    )
+
+    unknown = ExactSalesFieldAuthority(authority="unknown", provenance="unknown")
+    resolution = ExactSalesResolution(
+        None,
+        None,
+        None,
+        None,
+        None,
+        unknown,
+        unknown,
+        unknown,
+        unknown,
+        unknown,
+    )
+    suffix = build_sales_one_plus_dynamic_suffix(
+        exact_sales_resolution=resolution,
+        current_strict_facts=(),
+        sales_context={AUTHORITY_CLIENT_ID_HINT_KEY: "nikadent"},
+        user_message="Какой телефон филиала на Рябикова?",
+    )
+    assert suffix.index("<CLINIC_CONTACT_AUTHORITY>") < suffix.index("<PRE_MODEL_HINTS>")
+    assert "900 444-69-97" in suffix or "+7 (900) 444-69-97" in suffix
+    assert "+7 (495) 128-47-60" not in suffix
+    assert '"amount"' not in suffix
+    assert '"offer_id"' not in suffix
+
+
+def test_production_policy_contact_authority_instructions() -> None:
+    policy = SALES_ONE_PLUS_SYSTEM_POLICY.casefold()
+    assert "clinic_contact_authority" in policy
+    assert "do not invent contact fields" in policy
+    assert "missing contact data alone does not require route=admin" in policy
 
 
 def test_production_parser_accepts_valid_answer_envelope() -> None:

@@ -51,17 +51,19 @@ UNIT_LABELS = {
     ),
     "classic": (
         "tooth_package",
-        "за один зуб под ключ; КТ при необходимости — отдельно",
+        "за восстановление одного зуба (имплант + постоянная коронка); "
+        "КТ при необходимости и временная коронка — отдельно",
     ),
     "implant_supported_prosthetics": (
         "tooth",
-        "за ортопедический этап для одного зуба (коронка/мост); "
-        "имплантация оплачивается отдельно",
+        "за одну постоянную коронку на уже установленном импланте "
+        "(абатмент/основание, изготовление и фиксация включены); "
+        "хирургическая установка импланта — отдельно",
     ),
     "one_stage": (
         "tooth_package",
-        "за один зуб под ключ; КТ и лечение воспаления до операции — "
-        "по показаниям, отдельно",
+        "за восстановление одного зуба (имплант в день удаления + постоянная коронка); "
+        "КТ, лечение воспаления и временная коронка — по показаниям, отдельно",
     ),
     "periodontitis": (
         "course",
@@ -73,7 +75,8 @@ UNIT_LABELS = {
     ),
     "pterygoid_implants": (
         "implant",
-        "за один имплант; коронка или протез — отдельно",
+        "за один имплант с хирургической установкой и местной анестезией; "
+        "протезирование и диагностика (КТ) — отдельно",
     ),
     "pulpitis": (
         "tooth",
@@ -92,8 +95,8 @@ UNIT_LABELS = {
     "teeth_treatment": ("tooth", "за лечение одного зуба"),
     "temporary_teeth": (
         "tooth",
-        "за одну временную коронку на период приживления; "
-        "постоянная коронка — отдельно",
+        "за одну временную коронку на импланте (необходимые компоненты и фиксация включены); "
+        "постоянная коронка, хирургическая установка импланта и протез на челюсть — отдельно",
     ),
     "tomography": ("procedure", "за одно исследование"),
     "tooth_extraction": (
@@ -106,12 +109,14 @@ UNIT_LABELS = {
         "за один зуб; полная реставрация улыбки рассчитывается на консультации",
     ),
     "zirconia_crowns": (
-        "unit",
-        "за одну конструкцию; стоимость зависит от сложности и типа — коронка или мост",
+        "tooth",
+        "за одну циркониевую коронку на собственном зубе (изготовление, примерка и фиксация включены); "
+        "подготовительное лечение зуба — отдельно",
     ),
     "zygomatic_implants": (
         "jaw",
-        "за одну челюсть; временный и постоянный протез — по плану лечения",
+        "за хирургический этап на верхнюю челюсть (импланты по плану, местная анестезия, "
+        "временное протезирование по показаниям); постоянный протез, КТ и седация/наркоз — отдельно",
     ),
 }
 
@@ -148,6 +153,30 @@ OPTION_IDS = {
     ("sinus_lift", "open"): "open",
 }
 PAYMENT_STAGE_SERVICES = {"all_on_4", "all_on_6", "classic", "one_stage"}
+
+CHECKPOINT_SERVICE_IDS = (
+    "implant_supported_prosthetics",
+    "zirconia_crowns",
+    "temporary_teeth",
+    "pterygoid_implants",
+    "zygomatic_implants",
+    "all_on_4",
+    "all_on_6",
+    "classic",
+    "one_stage",
+)
+
+CHECKPOINT_OFFER_COUNTS = {
+    "implant_supported_prosthetics": 1,
+    "zirconia_crowns": 1,
+    "temporary_teeth": 1,
+    "pterygoid_implants": 1,
+    "zygomatic_implants": 1,
+    "all_on_4": 3,
+    "all_on_6": 3,
+    "classic": 3,
+    "one_stage": 3,
+}
 
 
 def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -235,7 +264,7 @@ def test_target_files_are_strict_complete_frozen_wire_data() -> None:
         TargetBrandCatalog.model_validate(brands_raw).model_dump(exclude_none=True)
         == brands_raw
     )
-    assert len(facts_raw) == 6
+    assert len(facts_raw) == 10
     for fact in facts_raw.values():
         parsed = TargetCommercialFact.model_validate(fact)
         normalized = parsed.model_dump(exclude_none=True)
@@ -338,7 +367,7 @@ def test_brands_and_facts_preserve_target_integrity() -> None:
     }
     assert target_alias_pairs | canonical_name_pairs
 
-    assert len(facts) == 6
+    assert len(facts) == 10
     kb_refs = set(build_response_schema_kb_refs(DEMO_ROOT / "md"))
     for fact_id, fact in facts.items():
         parsed = TargetCommercialFact.model_validate(fact)
@@ -356,11 +385,17 @@ def test_brands_and_facts_preserve_target_integrity() -> None:
         )
 
 
+def _md_body(relative_path: str) -> str:
+    parts = (DEMO_ROOT / "md" / relative_path).read_text(encoding="utf-8").split("---", 2)
+    assert len(parts) == 3
+    return parts[2]
+
+
 def test_real_bundle_builds_every_service_price_doctor_context() -> None:
     bundle = _real_bundle()
     doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
 
-    assert len(bundle.services) == 22
+    assert len(bundle.services) >= 22
     assert len(bundle.offers) == 32
     for service_id in bundle.services:
         context = build_service_data_context(bundle, doctors, service_id)
@@ -375,8 +410,14 @@ def test_real_bundle_builds_every_service_price_doctor_context() -> None:
         assert context.service_id == service_id
         assert context.service.model_dump() == bundle.services[service_id].model_dump()
         assert [offer.model_dump() for offer in context.offers] == expected_offers
-        assert expected_offers
         assert [doctor.doctor_id for doctor in context.doctors] == expected_doctor_ids
+
+    services_without_offers = {
+        service_id
+        for service_id in bundle.services
+        if not any(offer.service_id == service_id for offer in bundle.offers)
+    }
+    assert services_without_offers == {"braces"}
 
     tomography = build_service_data_context(bundle, doctors, "tomography")
     assert len(tomography.offers) == 1
@@ -425,3 +466,347 @@ def test_real_sources_are_read_only_and_test_has_no_product_wiring() -> None:
     assert called_attributes.isdisjoint(
         {"mkdir", "open", "touch", "unlink", "write_bytes", "write_text"}
     )
+
+
+CHANGED_OFFER_IDS = frozenset(
+    {
+        "implant_supported_prosthetics.default",
+        "zirconia_crowns.default",
+        "temporary_teeth.default",
+        "pterygoid_implants.default",
+        "zygomatic_implants.default",
+        "all_on_4.jaw.implantium",
+        "all_on_4.jaw.impro",
+        "all_on_4.jaw.nobel",
+        "all_on_6.jaw.implantium",
+        "all_on_6.jaw.impro",
+        "all_on_6.jaw.nobel",
+        "classic.one_tooth.implantium",
+        "classic.one_tooth.impro",
+        "classic.one_tooth.nobel",
+        "one_stage.one_tooth.implantium",
+        "one_stage.one_tooth.impro",
+        "one_stage.one_tooth.nobel",
+    }
+)
+
+UNCHANGED_OFFER_SHA256 = {
+    "aligners.default": "c78238f0482f011be0f7038d2fe4a456a51aa2530d028a609cf55066e6d0078f",
+    "bone_graft.default": "1213142c37a189c2ae811b5399135a9a7cca6a2728b58ab6a3f05664b0af1624",
+    "caries.default": "62b4fb84c6e960351f5b1f1e7671a636f9817960cca9ab6d2511b7097d085b94",
+    "clasp_dentures.default": "f92530698986e6dbc45251f2c7ace27fb6da9e40bff31515655472ef2402ad61",
+    "periodontitis.default": "76861182ad5a4d2c719d0a1b5f5aad21bea949bff39c7ddaf1f96d40198bb8a3",
+    "professional_whitening.default": "abbb6e99c72f4965ff21d097c2bb0ba659b288944620289fb0bf9984f1782fe2",
+    "pulpitis.default": "910f1d6efe19a8405a70996ea7ee954b7fccfc7725815db927036f3e67581a8d",
+    "removable_dentures.jaw.full": "e269bdc13f821d0f3c396e7f3e5bf1c3695048bf17ed4a274c23a438a411299e",
+    "removable_dentures.jaw.partial": "90c5f888160fadb126a6a88171b6750d11790c2804e651b7854f65e09e9a2c24",
+    "sinus_lift.one_site.closed": "76ff7bd492643c29649685c766afef09cfc1d460bacc9cecfd00a5dc8dafc492",
+    "sinus_lift.one_site.open": "333f654ef264d860213c3e3b437546b034121e946357e84eb00bff6415e4ab05",
+    "teeth_treatment.default": "da0acba1dfb1611bc4311303461613e91bc0e857d7b172b6e2f2f825149fa860",
+    "tomography.default": "acd8a0f55caa3fee5c9607b00317a23654b7e47c9155f6d18f86f7edfc1ba10c",
+    "tooth_extraction.default": "2010ad1d17871facd9e3f8ba72d0026bf7dfdfb629038a13e8f1136f954afe24",
+    "veneers.default": "ed5c843a0651a7c5bda203981c808d8ca74d1ae0ff8b397d211c5f5d8d8275ec",
+}
+
+
+def test_owner_decisions_disambiguate_single_unit_offers() -> None:
+    target = {offer["offer_id"]: offer for offer in _target_offer_records()}
+
+    implant_prosthetics = target["implant_supported_prosthetics.default"]
+    assert implant_prosthetics["price"]["min_amount"] == 31000
+    assert implant_prosthetics["price"]["billing_unit"] == "tooth"
+    label = implant_prosthetics["package"]["label"]
+    assert "одну постоянную коронку" in label
+    assert "мост" not in label
+    assert "хирургическая установка импланта" in label
+
+    zirconia = target["zirconia_crowns.default"]
+    assert zirconia["price"]["min_amount"] == 25000
+    assert zirconia["price"]["billing_unit"] == "tooth"
+    assert "собственном зубе" in zirconia["package"]["label"]
+    assert "мост" not in zirconia["package"]["label"]
+
+    temporary = target["temporary_teeth.default"]
+    assert temporary["price"]["min_amount"] == 18000
+    assert temporary["price"]["billing_unit"] == "tooth"
+    assert "временную коронку" in temporary["package"]["label"]
+    assert "протез на челюсть — отдельно" in temporary["package"]["label"]
+
+    pterygoid = target["pterygoid_implants.default"]
+    zygomatic = target["zygomatic_implants.default"]
+    assert pterygoid["price"]["billing_unit"] == "implant"
+    assert zygomatic["price"]["billing_unit"] == "jaw"
+    assert pterygoid["price"]["min_amount"] == 95000
+    assert zygomatic["price"]["min_amount"] == 420000
+    assert "хирургический этап" in zygomatic["package"]["label"]
+    assert "под ключ" not in zygomatic["package"]["label"].lower()
+
+
+def test_all_on_offers_distinguish_temporary_and_permanent_prosthesis() -> None:
+    for offer in _target_offer_records():
+        if offer["service_id"] not in {"all_on_4", "all_on_6"}:
+            continue
+        includes = offer["package"]["includes"]
+        assert sum("временный" in line.lower() for line in includes) == 1
+        assert sum("постоянный" in line.lower() for line in includes) == 1
+        stages = offer["payment_stages"]
+        assert len(stages) == 2
+        assert sum(stage["amount"] for stage in stages) == offer["price"]["amount"]
+        assert "временн" in stages[0]["label"].lower()
+        assert "постоянн" in stages[1]["label"].lower()
+        assert "рассроч" not in stages[0]["label"].lower()
+        assert "рассроч" not in stages[1]["label"].lower()
+
+
+def test_classic_and_one_stage_include_permanent_crown_not_silent_temporary() -> None:
+    for offer in _target_offer_records():
+        if offer["service_id"] not in {"classic", "one_stage"}:
+            continue
+        includes = offer["package"]["includes"]
+        assert any("постоянная коронка" in item for item in includes)
+        assert not any("временн" in item.lower() for item in includes)
+        label = offer["package"]["label"].lower()
+        assert "временн" in label
+        stages = offer["payment_stages"]
+        assert sum(stage["amount"] for stage in stages) == offer["price"]["amount"]
+
+
+def test_ambiguous_offer_checkpoint_touches_only_seventeen_offers() -> None:
+    offer_ids = {path.stem for path in _target_offer_files()}
+    assert len(offer_ids) == 32
+    assert len(CHANGED_OFFER_IDS) == 17
+    assert len(UNCHANGED_OFFER_SHA256) == 15
+    assert offer_ids == CHANGED_OFFER_IDS | set(UNCHANGED_OFFER_SHA256)
+    for offer_id, expected_hash in UNCHANGED_OFFER_SHA256.items():
+        path = TARGET_OFFERS / f"{offer_id}.json"
+        assert _sha256(path) == expected_hash
+
+
+def test_checkpoint_services_build_real_data_context_with_section66_semantics() -> None:
+    bundle = _real_bundle()
+    doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+    assert sum(CHECKPOINT_OFFER_COUNTS.values()) == 17
+
+    for service_id in CHECKPOINT_SERVICE_IDS:
+        context = build_service_data_context(bundle, doctors, service_id)
+        assert context.service_id == service_id
+        assert len(context.offers) == CHECKPOINT_OFFER_COUNTS[service_id]
+        assert {offer.offer_id for offer in context.offers} <= CHANGED_OFFER_IDS
+
+        for offer in context.offers:
+            price = offer.price
+            unit, label = UNIT_LABELS[service_id]
+            assert price.billing_unit == unit
+            assert offer.package.label == label
+
+            if service_id in {"implant_supported_prosthetics", "zirconia_crowns", "temporary_teeth"}:
+                assert price.mode == "from"
+                assert price.min_amount in {31000, 25000, 18000}
+                assert offer.payment_stages is None
+            elif service_id == "pterygoid_implants":
+                assert price.min_amount == 95000
+                assert price.billing_unit == "implant"
+                assert "протезирование" in offer.package.label
+            elif service_id == "zygomatic_implants":
+                assert price.min_amount == 420000
+                assert price.billing_unit == "jaw"
+                assert "хирургический этап" in offer.package.label
+                assert "под ключ" not in offer.package.label.lower()
+            elif service_id in {"all_on_4", "all_on_6"}:
+                assert price.mode == "fixed"
+                assert price.billing_unit == "jaw"
+                includes = offer.package.includes
+                assert sum("временный" in line.lower() for line in includes) == 1
+                assert sum("постоянный" in line.lower() for line in includes) == 1
+                assert offer.payment_stages is not None
+                assert sum(stage.amount for stage in offer.payment_stages) == price.amount
+            elif service_id in {"classic", "one_stage"}:
+                assert price.mode == "fixed"
+                assert price.billing_unit == "tooth_package"
+                assert any("постоянная коронка" in item for item in offer.package.includes)
+                assert "временн" in offer.package.label.lower()
+                assert offer.payment_stages is not None
+                assert sum(stage.amount for stage in offer.payment_stages) == price.amount
+
+
+def test_temporary_teeth_md_aligns_protocol_timing_without_all_on_single_crown() -> None:
+    body = _md_body("implantation__service__temporary_teeth.md")
+    korotko = body.split("### Когда ставят")[0]
+
+    assert "на один зуб" in korotko
+    assert "не временный несъёмный протез на всю челюсть" in korotko
+    assert "2–3 дня" in korotko
+    assert "3–4 месяца" in korotko
+    assert "all-on" not in korotko.lower()
+    assert "сразу после имплантации или через несколько дней" not in korotko
+
+    when_section = body.split("### Когда ставят")[1].split("### Ограничения")[0]
+    assert "одномоментной" in when_section
+    assert "классической" in when_section
+    assert "3–4 месяца" in when_section
+
+
+def test_duration_faq_md_separates_temporary_result_from_permanent_crown() -> None:
+    body = _md_body("implantation__faq__duration.md")
+    korotko = body.split("### От чего зависит")[0]
+
+    assert "Временный результат" in korotko
+    assert "Постоянная" in korotko
+    assert "первые дни" in korotko
+    assert "3–6 месяцев" in korotko
+    assert "от нескольких дней до" not in korotko
+    assert "Весь путь от диагностики до постоянной коронки" not in korotko
+
+    methods = body.split("По методам:")[1].split("### Можно ли ускорить")[0]
+    assert "классическая имплантация — **3–6 месяцев**" in methods
+    assert "постоянный протез — после приживления" in methods
+
+
+CHECKPOINT_FACT_IDS = frozenset(
+    {
+        "tax_deduction",
+        "installment_12",
+        "free_implant_consult",
+        "implant_warranty",
+        "implant_same_day_discount",
+        "professional_whitening_discount",
+        "payment_stages",
+        "fixed_price",
+        "sv_3d_diagnocat",
+        "sv_aprf",
+    }
+)
+
+CHECKPOINT_CONTROL_DATE = "2026-12-01"
+
+
+def test_commercial_facts_catalog_has_exact_ten_ids_and_validates() -> None:
+    facts_raw = _load_json(TARGET_FACTS)
+    assert set(facts_raw) == CHECKPOINT_FACT_IDS
+    for fact in facts_raw.values():
+        parsed = TargetCommercialFact.model_validate(fact)
+        normalized = parsed.model_dump(exclude_none=True)
+        for key, value in fact.items():
+            assert normalized[key] == value
+
+
+def test_canonical_fact_texts_carry_unambiguous_source_conditions() -> None:
+    bundle = _real_bundle()
+
+    installment = bundle.facts["installment_12"]
+    assert "12 месяцев" in installment.text_fact
+    assert "оформление на консультации" in installment.text_fact
+    assert "24" not in installment.text_fact
+
+    consult = bundle.facts["free_implant_consult"]
+    assert "31 декабря 2026" in consult.text_fact
+    assert "бесплатная консультация" in consult.text_fact.lower()
+    assert "три варианта плана лечения по стоимости" in consult.text_fact
+    assert "КТ при необходимости оплачивается отдельно" in consult.text_fact
+    assert "не бесплатное лечение" not in consult.text_fact.lower()
+    assert "20 000" not in consult.text_fact
+    assert "20-лет" not in consult.text_fact
+    assert "стаж" not in consult.text_fact.lower()
+
+    warranty = bundle.facts["implant_warranty"]
+    assert "корректировки и помощь бесплатно" in warranty.text_fact
+    assert "поломке конструкции" not in warranty.text_fact
+    assert "перестановка" not in warranty.text_fact.lower()
+
+    tax = bundle.facts["tax_deduction"]
+    assert tax.text_fact == (
+        "Поможем подготовить документы для оформления налогового вычета за лечение."
+    )
+    assert set(tax.allowed_service_ids) == {
+        "aligners",
+        "all_on_4",
+        "all_on_6",
+        "bone_graft",
+        "caries",
+        "classic",
+        "clasp_dentures",
+        "implant_supported_prosthetics",
+        "one_stage",
+        "periodontitis",
+        "professional_whitening",
+        "pulpitis",
+        "removable_dentures",
+        "sinus_lift",
+        "teeth_treatment",
+        "temporary_teeth",
+        "tomography",
+        "tooth_extraction",
+        "veneers",
+        "zirconia_crowns",
+        "zygomatic_implants",
+        "pterygoid_implants",
+    }
+
+    same_day = bundle.facts["implant_same_day_discount"]
+    assert "до 15%" in same_day.text_fact
+    assert same_day.text_fact.count("15%") == 1
+    assert "скидка 15%" not in same_day.text_fact
+
+    whitening = bundle.facts["professional_whitening_discount"]
+    assert whitening.active_until == "2026-11-30"
+    assert whitening.text_fact == (
+        "Сейчас на профессиональное отбеливание действует скидка 10% до 30 ноября 2026 года."
+    )
+
+    payment_stages = bundle.facts["payment_stages"]
+    assert payment_stages.text_fact == "Доступна оплата лечения по этапам."
+
+    fixed_price = bundle.facts["fixed_price"]
+    assert "фиксируется в договоре" in fixed_price.text_fact
+
+
+def test_expired_whitening_promo_excluded_on_checkpoint_control_date() -> None:
+    from core.target_marketing_selector import _fact_is_eligible
+
+    bundle = _real_bundle()
+    assert not _fact_is_eligible(
+        bundle,
+        "fact:professional_whitening_discount",
+        service_id="professional_whitening",
+        turn_topic=None,
+        today_iso=CHECKPOINT_CONTROL_DATE,
+        shown_fact_ids=frozenset(),
+        selected_fact_ids=set(),
+    )
+    assert _fact_is_eligible(
+        bundle,
+        "fact:installment_12",
+        service_id="classic",
+        turn_topic=None,
+        today_iso=CHECKPOINT_CONTROL_DATE,
+        shown_fact_ids=frozenset(),
+        selected_fact_ids=set(),
+    )
+
+
+def test_checkpoint_offers_link_facts_in_real_service_data_context() -> None:
+    bundle = _real_bundle()
+    doctors = load_doctor_catalog(DEMO_ROOT / "doctor_catalog.json")
+
+    classic = build_service_data_context(bundle, doctors, "classic")
+    classic_fact_refs = {
+        fact_ref for offer in classic.offers for fact_ref in offer.fact_refs
+    }
+    assert {"installment_12", "free_implant_consult", "implant_warranty"}.issubset(
+        classic_fact_refs
+    )
+    assert classic.offers[0].fact_refs
+    for fact_id in classic_fact_refs:
+        assert fact_id in bundle.facts
+
+    all_on = build_service_data_context(bundle, doctors, "all_on_4")
+    all_on_fact_refs = {fact_ref for offer in all_on.offers for fact_ref in offer.fact_refs}
+    assert "tax_deduction" in all_on_fact_refs
+    assert "implant_same_day_discount" in all_on_fact_refs
+    assert bundle.facts["tax_deduction"].text_fact.startswith("Поможем подготовить")
+
+    whitening = build_service_data_context(bundle, doctors, "professional_whitening")
+    whitening_fact_refs = {
+        fact_ref for offer in whitening.offers for fact_ref in offer.fact_refs
+    }
+    assert "professional_whitening_discount" in whitening_fact_refs

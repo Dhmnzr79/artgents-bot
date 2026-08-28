@@ -1,94 +1,413 @@
 version: 1
-
 limits:
-  max_marketing_facts_per_turn: 3
-  max_amplifiers_per_turn: 2
   max_scenarios_per_turn: 2
-
+  service:
+    max_promos_per_turn: 2
+    max_amplifiers_per_turn: 2
+  price:
+    max_promos_per_turn: 2
+    max_amplifiers_per_turn: 4
 priority_service_promos:
   all_on_4:
     ordered_fact_refs:
-      - fact:implant_same_day_discount
+    - fact:implant_same_day_discount
   all_on_6:
     ordered_fact_refs:
-      - fact:implant_same_day_discount
+    - fact:implant_same_day_discount
   professional_whitening:
     ordered_fact_refs:
-      - fact:professional_whitening_discount
-
+    - fact:professional_whitening_discount
 promotion_overview:
   ordered_fact_refs:
-    - fact:implant_same_day_discount
-    - fact:professional_whitening_discount
-    - fact:free_implant_consult
-
+  - fact:implant_same_day_discount
+  - fact:professional_whitening_discount
+  - fact:free_implant_consult
 initial_commercial_blocks:
   service:
     ordered_fact_refs:
-      - fact:free_implant_consult
-      - fact:installment_12
+    - fact:implant_same_day_discount
+    - fact:free_implant_consult
+    - fact:professional_whitening_discount
+ordered_amplifier_refs:
+- fact:installment_12
+- fact:tax_deduction
+- fact:payment_stages
+- fact:fixed_price
+service_automatic_commercial:
+  aligners:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  all_on_4:
+    service:
+      ordered_promo_refs:
       - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  all_on_6:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  bone_graft:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  caries:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  clasp_dentures:
+    service:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  classic:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  implant_supported_prosthetics:
+    service:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  one_stage:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  periodontitis:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  professional_whitening:
+    service:
+      ordered_promo_refs:
       - fact:professional_whitening_discount
-
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs:
+      - fact:professional_whitening_discount
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  pterygoid_implants:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  pulpitis:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  removable_dentures:
+    service:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  sinus_lift:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  teeth_treatment:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  temporary_teeth:
+    service:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  tomography:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  tooth_extraction:
+    service:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+    price:
+      ordered_promo_refs: []
+      ordered_amplifier_refs:
+      - fact:tax_deduction
+      - fact:fixed_price
+  veneers:
+    service:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  zirconia_crowns:
+    service:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
+  zygomatic_implants:
+    service:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+    price:
+      ordered_promo_refs:
+      - fact:implant_same_day_discount
+      - fact:free_implant_consult
+      ordered_amplifier_refs:
+      - fact:installment_12
+      - fact:tax_deduction
+      - fact:payment_stages
+      - fact:fixed_price
 scenario_rules:
   pain_fear:
     ordered_amplifier_refs:
-      - kb:implantation__faq__pain.md#korotko
-      - kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut
+    - kb:implantation__faq__pain.md#korotko
+    - kb:implantation__faq__pain.md#kakuyu-anesteziyu-ispolzuyut
     allowed_semantic_contexts:
-      - service
-      - default
+    - service
+    - default
     allowed_topics:
-      - implantation
+    - implantation
   cost:
     ordered_amplifier_refs:
-      - fact:installment_12
-      - fact:implant_same_day_discount
-      - fact:tax_deduction
-      - kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee
-      - kb:clinic__info__payment_terms.md#korotko
+    - fact:installment_12
+    - fact:implant_same_day_discount
+    - fact:tax_deduction
+    - kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee
+    - kb:clinic__info__payment_terms.md#korotko
     allowed_semantic_contexts:
-      - service
-      - price
-      - default
+    - service
+    - price
+    - default
     allowed_topics:
-      - implantation
+    - implantation
   time:
     ordered_amplifier_refs:
-      - kb:implantation__faq__duration.md#korotko
-      - kb:implantation__faq__duration.md#mozhno-li-uskorit-implantatsiyu
-      - kb:implantation__faq__tooth_one_day.md#korotko
-      - kb:implantation__info__steps.md#korotko
+    - kb:implantation__faq__duration.md#korotko
+    - kb:implantation__faq__duration.md#mozhno-li-uskorit-implantatsiyu
+    - kb:implantation__faq__tooth_one_day.md#korotko
+    - kb:implantation__info__steps.md#korotko
     allowed_semantic_contexts:
-      - service
-      - default
+    - service
+    - default
     allowed_topics:
-      - implantation
+    - implantation
   doctor_trust:
     ordered_amplifier_refs:
-      - doctor:doctors__doctor__volkov
-      - doctor:doctors__doctor__orlov
-      - kb:doctors__doctor__overview.md#korotko
-      - kb:clinic__info__technology.md#korotko
+    - doctor:doctors__doctor__volkov
+    - doctor:doctors__doctor__orlov
+    - kb:doctors__doctor__overview.md#korotko
+    - kb:clinic__info__technology.md#korotko
     allowed_semantic_contexts:
-      - service
-      - doctors
-      - default
+    - service
+    - doctors
+    - default
     allowed_topics:
-      - implantation
-      - doctors
+    - implantation
+    - doctors
   result_reliability:
     ordered_amplifier_refs:
-      - fact:implant_warranty
-      - kb:implantation__faq__osseointegration.md#korotko
-      - kb:implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie
-      - kb:clinic__info__warranty.md#korotko
+    - fact:implant_warranty
+    - kb:implantation__faq__osseointegration.md#korotko
+    - kb:implantation__faq__osseointegration.md#ot-chego-zavisit-prizhivlenie
+    - kb:clinic__info__warranty.md#korotko
     allowed_semantic_contexts:
-      - service
-      - default
+    - service
+    - default
     allowed_topics:
-      - implantation
-
+    - implantation
 cta_contexts:
   service: plan
   price: price

@@ -130,7 +130,10 @@ class TargetRuntimeSessionState:
     shown_content_followup_refs: tuple[str, ...]
     shown_price_followup_refs: tuple[str, ...]
     situation_offered: bool
+    shown_service_value_ids: tuple[str, ...]
     last_rendered_promo_fact_id: str | None
+    rendered_promo_fact_ids: tuple[str, ...]
+    last_turn_rendered_promo_fact_ids: tuple[str, ...]
     followups: tuple[TargetRuntimeFollowupItem, ...]
     patient_facts: SessionPatientFacts | None = None
 
@@ -188,11 +191,14 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             shown_fact_ids=(),
             shown_amplifier_refs=(),
             shown_consultation_value_refs=(),
+            shown_service_value_ids=(),
             shown_video_ids=(),
             shown_content_followup_refs=(),
             shown_price_followup_refs=(),
             situation_offered=False,
             last_rendered_promo_fact_id=None,
+            rendered_promo_fact_ids=(),
+            last_turn_rendered_promo_fact_ids=(),
             followups=followups,
             patient_facts=patient_facts,
         )
@@ -217,6 +223,11 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             for x in raw.get("shown_consultation_value_refs") or []
             if str(x).strip()
         ),
+        shown_service_value_ids=tuple(
+            str(x).strip()
+            for x in raw.get("shown_service_value_ids") or []
+            if str(x).strip()
+        ),
         shown_video_ids=tuple(
             str(x).strip() for x in raw.get("shown_video_ids") or [] if str(x).strip()
         ),
@@ -232,6 +243,16 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
         ),
         situation_offered=bool(raw.get("situation_offered")),
         last_rendered_promo_fact_id=str(raw.get("last_rendered_promo_fact_id") or "").strip() or None,
+        rendered_promo_fact_ids=tuple(
+            str(x).strip()
+            for x in raw.get("rendered_promo_fact_ids") or []
+            if str(x).strip()
+        ),
+        last_turn_rendered_promo_fact_ids=tuple(
+            str(x).strip()
+            for x in raw.get("last_turn_rendered_promo_fact_ids") or []
+            if str(x).strip()
+        ),
         followups=followups,
         patient_facts=patient_facts,
     )
@@ -391,6 +412,10 @@ def write_target_runtime_session_after_materialized(
         prior.shown_consultation_value_refs,
         current_selection.shown_consultation_value_refs,
     )
+    shown_service_value_ids = _merge_unique(
+        prior.shown_service_value_ids,
+        current_selection.shown_service_value_ids,
+    )
     shown_video_ids = _merge_unique(
         prior.shown_video_ids,
         presentation_cadence_update.shown_video_ids if presentation_cadence_update else (),
@@ -410,9 +435,17 @@ def write_target_runtime_session_after_materialized(
     situation_offered = prior.situation_offered or bool(
         presentation_cadence_update and presentation_cadence_update.situation_offered
     )
-    last_rendered_promo: str | None = prior.last_rendered_promo_fact_id
-    if current_selection.last_rendered_promo_fact_id:
+    last_rendered_promo: str | None = None
+    last_turn_promos = tuple(current_selection.last_turn_rendered_promo_fact_ids)
+    if last_turn_promos:
+        if len(last_turn_promos) == 1:
+            last_rendered_promo = last_turn_promos[0]
+    elif current_selection.last_rendered_promo_fact_id:
         last_rendered_promo = current_selection.last_rendered_promo_fact_id
+    rendered_promo_fact_ids = _merge_unique(
+        prior.rendered_promo_fact_ids,
+        current_selection.rendered_promo_fact_ids,
+    )
     with _lock:
         st = mem_get(sid)
         turn_count = int(st.get("session_turn_count") or 0)
@@ -420,6 +453,7 @@ def write_target_runtime_session_after_materialized(
             "shown_fact_ids": list(shown_fact_ids),
             "shown_amplifier_refs": list(shown_amplifier_refs),
             "shown_consultation_value_refs": list(shown_consultation_value_refs),
+            "shown_service_value_ids": list(shown_service_value_ids),
             "shown_video_ids": list(shown_video_ids),
             "shown_content_followup_refs": list(shown_content_followup_refs),
             "shown_price_followup_refs": list(shown_price_followup_refs),
@@ -427,6 +461,9 @@ def write_target_runtime_session_after_materialized(
         }
         if last_rendered_promo is not None:
             payload["last_rendered_promo_fact_id"] = last_rendered_promo
+        payload["last_turn_rendered_promo_fact_ids"] = list(last_turn_promos)
+        if rendered_promo_fact_ids:
+            payload["rendered_promo_fact_ids"] = list(rendered_promo_fact_ids)
         service_id = str(turn_frame.service_id or "").strip() or None
         if availability_status in {"known_not_offered", "unresolved"}:
             service_id = None

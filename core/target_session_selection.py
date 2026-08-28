@@ -13,7 +13,10 @@ class TargetMaterializedSessionSelection:
     shown_fact_ids: tuple[str, ...]
     shown_amplifier_refs: tuple[str, ...]
     shown_consultation_value_refs: tuple[str, ...]
+    shown_service_value_ids: tuple[str, ...] = ()
     last_rendered_promo_fact_id: str | None = None
+    rendered_promo_fact_ids: tuple[str, ...] = ()
+    last_turn_rendered_promo_fact_ids: tuple[str, ...] = ()
 
 
 def extract_target_session_selection(
@@ -40,7 +43,9 @@ def extract_target_session_selection(
             shown_fact_ids=shown_fact_ids,
             shown_amplifier_refs=shown_amplifier_refs,
             shown_consultation_value_refs=consultation_refs,
+            shown_service_value_ids=(),
             last_rendered_promo_fact_id=None,
+            rendered_promo_fact_ids=(),
         )
 
     facts_by_id = {fact.id: fact for fact in package.materials.commercial_facts}
@@ -82,5 +87,7 @@ def extract_target_session_selection(
             if external_ref_was_used(ref)
         ),
         shown_consultation_value_refs=consultation_refs,
+        shown_service_value_ids=(),
         last_rendered_promo_fact_id=None,
+        rendered_promo_fact_ids=(),
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from contracts.exact_sales_resolution import ExactSalesResolution
+from contracts.response_schema import ResponseSchemaBundle
 from contracts.one_call_envelope import OneCallCommercialIntent
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.turn_frame import TurnFrame
@@ -35,27 +35,39 @@ from core.target_composer_request import materialize_target_composer_request
 from core.target_response_policy import select_target_response_length_profile
 from core.target_session_selection import extract_target_session_selection
 
+AUTOMATIC_AMPLIFIER_LIST_HEADER = "Также мы предлагаем:"
+
 
 def supplement_sales_fast_patient_text_with_marketing(
     *,
     patient_text: str,
     bound_package: TargetSpecBoundOfflineResponsePackage,
+    bundle: ResponseSchemaBundle | None = None,
 ) -> str:
-    """Append selected clinic-authored marketing facts once when absent from model text."""
+    """Append service_value, promo paragraphs, and amplifier list once."""
 
     facts_by_id = {
         fact.id: fact for fact in bound_package.package.materials.commercial_facts
     }
-    selected_fact_ids = tuple(
-        ref.removeprefix("fact:")
-        for ref in bound_package.package.materials.marketing_selection.selected_refs
-        if ref.startswith("fact:")
-    )
-    if not selected_fact_ids:
-        return patient_text
-
+    selection = bound_package.package.materials.marketing_selection
     text = patient_text
-    for fact_id in selected_fact_ids:
+    amplifier_ref_set = frozenset(selection.amplifier_refs)
+
+    if selection.service_value_ref and selection.service_value_ref.startswith("fact:"):
+        sv_id = selection.service_value_ref.removeprefix("fact:")
+        sv_fact = facts_by_id.get(sv_id)
+        if sv_fact is None and bundle is not None:
+            sv_fact = bundle.facts.get(sv_id)
+        if sv_fact is not None:
+            sv_text = str(sv_fact.text_fact).strip()
+            if sv_text and sv_text not in text:
+                separator = "\n\n" if text.strip() else ""
+                text = f"{text.rstrip()}{separator}{sv_text}"
+
+    for ref in selection.selected_refs:
+        if not ref.startswith("fact:") or ref in amplifier_ref_set:
+            continue
+        fact_id = ref.removeprefix("fact:")
         fact = facts_by_id.get(fact_id)
         if fact is None:
             continue
@@ -64,6 +76,29 @@ def supplement_sales_fast_patient_text_with_marketing(
             continue
         separator = "\n\n" if text.strip() else ""
         text = f"{text.rstrip()}{separator}{fact_text}"
+
+    bullet_lines: list[str] = []
+    for ref in selection.amplifier_refs:
+        if not ref.startswith("fact:"):
+            continue
+        fact_id = ref.removeprefix("fact:")
+        fact = facts_by_id.get(fact_id)
+        if fact is None and bundle is not None:
+            fact = bundle.facts.get(fact_id)
+        if fact is None:
+            continue
+        fact_text = str(fact.text_fact).strip()
+        if not fact_text or fact_text in text:
+            continue
+        bullet_lines.append(fact_text)
+
+    if bullet_lines:
+        list_block = AUTOMATIC_AMPLIFIER_LIST_HEADER + "\n" + "\n".join(
+            f"- {line}" for line in bullet_lines
+        )
+        separator = "\n\n" if text.strip() else ""
+        text = f"{text.rstrip()}{separator}{list_block}"
+
     return text
 
 
@@ -324,6 +359,7 @@ def materialize_sales_fast_answer_payload(
     shown_fact_ids: tuple[str, ...] = (),
     shown_amplifier_refs: tuple[str, ...] = (),
     shown_consultation_value_refs: tuple[str, ...] = (),
+    shown_service_value_ids: tuple[str, ...] = (),
     last_rendered_promo_fact_id: str | None = None,
     today: object | None = None,
 ) -> TargetRuntimeMaterializedPayload:
@@ -361,6 +397,7 @@ def materialize_sales_fast_answer_payload(
             shown_fact_ids=shown_fact_ids,
             shown_amplifier_refs=shown_amplifier_refs,
             shown_consultation_value_refs=shown_consultation_value_refs,
+            shown_service_value_ids=shown_service_value_ids,
             last_rendered_promo_fact_id=last_rendered_promo_fact_id,
             today=today if isinstance(today, date) else runtime_today(),
         )
@@ -396,6 +433,7 @@ def materialize_sales_fast_answer_payload(
         supplemented_text = supplement_sales_fast_patient_text_with_marketing(
             patient_text=patient_text,
             bound_package=bound_package,
+            bundle=context.bundle,
         )
     final_patient_text = supplemented_text
     if commerce_result is not None:

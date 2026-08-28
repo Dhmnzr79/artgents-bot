@@ -48,7 +48,7 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_all_on_4_cost_price_context_uses_exact_pool_without_service_fallback() -> None:
+def test_all_on_4_price_context_selects_two_promos_and_amplifiers() -> None:
     bundle, doctors, index = _real_inputs()
 
     result = select_target_marketing(
@@ -59,20 +59,25 @@ def test_all_on_4_cost_price_context_uses_exact_pool_without_service_fallback() 
         service_id="all_on_4",
         today=TODAY,
         include_initial_block=True,
-        marketing_scenarios=["cost"],
         turn_topic="implantation",
     )
 
-    assert result.applied_scenarios == ("cost",)
-    assert result.selected_refs == result.amplifier_refs == (
-        "fact:installment_12",
+    assert result.applied_scenarios == ()
+    assert result.selected_refs == (
         "fact:implant_same_day_discount",
+        "fact:free_implant_consult",
+    )
+    assert result.amplifier_refs == (
+        "fact:installment_12",
+        "fact:tax_deduction",
+        "fact:payment_stages",
+        "fact:fixed_price",
     )
     assert result.cta_key == "price"
-    assert "fact:free_implant_consult" not in result.selected_refs
+    assert "fact:installment_12" not in result.selected_refs
 
 
-def test_all_on_4_cost_service_context_fills_exact_service_block() -> None:
+def test_all_on_4_service_context_selects_two_promos() -> None:
     bundle, doctors, index = _real_inputs()
 
     result = select_target_marketing(
@@ -83,19 +88,14 @@ def test_all_on_4_cost_service_context_fills_exact_service_block() -> None:
         service_id="all_on_4",
         today=TODAY,
         include_initial_block=True,
-        marketing_scenarios=["cost"],
         turn_topic="implantation",
     )
 
     assert result.selected_refs == (
-        "fact:installment_12",
         "fact:implant_same_day_discount",
         "fact:free_implant_consult",
     )
-    assert result.amplifier_refs == (
-        "fact:installment_12",
-        "fact:implant_same_day_discount",
-    )
+    assert result.amplifier_refs == ("fact:installment_12", "fact:tax_deduction")
     assert result.cta_key == "plan"
 
 
@@ -114,11 +114,11 @@ def test_professional_whitening_initial_keeps_only_applicable_discount() -> None
 
     assert result.applied_scenarios == ()
     assert result.selected_refs == ("fact:professional_whitening_discount",)
-    assert result.amplifier_refs == ()
+    assert result.amplifier_refs == ("fact:tax_deduction", "fact:fixed_price")
     assert result.cta_key == "plan"
 
 
-def test_service_doctor_trust_filters_unlinked_doctors_but_keeps_exact_sources() -> None:
+def test_service_doctor_trust_scenario_does_not_add_legacy_kb_amplifiers() -> None:
     bundle, doctors, index = _real_inputs()
 
     result = select_target_marketing(
@@ -133,18 +133,11 @@ def test_service_doctor_trust_filters_unlinked_doctors_but_keeps_exact_sources()
         turn_topic="implantation",
     )
 
-    assert result.amplifier_refs == (
-        "kb:doctors__doctor__overview.md#korotko",
-        "kb:clinic__info__technology.md#korotko",
-    )
-    assert result.selected_refs == (
-        *result.amplifier_refs,
-        "fact:professional_whitening_discount",
-    )
-    assert not any(ref.startswith("doctor:") for ref in result.selected_refs)
+    assert result.selected_refs == ("fact:professional_whitening_discount",)
+    assert not any(ref.startswith("kb:") for ref in result.selected_refs)
 
 
-def test_general_doctors_context_allows_exact_doctor_refs_and_doctor_cta() -> None:
+def test_general_doctors_context_without_initial_block_stays_empty() -> None:
     bundle, doctors, index = _real_inputs()
 
     result = select_target_marketing(
@@ -159,28 +152,23 @@ def test_general_doctors_context_allows_exact_doctor_refs_and_doctor_cta() -> No
         turn_topic="doctors",
     )
 
-    assert result.selected_refs == result.amplifier_refs == (
-        "doctor:doctors__doctor__volkov",
-        "doctor:doctors__doctor__orlov",
-    )
+    assert result.selected_refs == ()
     assert result.cta_key == "doctor"
 
 
 def test_shown_snapshots_and_explicit_date_change_only_exact_candidates() -> None:
     bundle, doctors, index = _real_inputs()
 
-    cost = select_target_marketing(
+    after_discount_shown = select_target_marketing(
         bundle,
         doctors,
         index,
-        semantic_context="price",
+        semantic_context="service",
         service_id="all_on_4",
         today=TODAY,
         include_initial_block=True,
-        marketing_scenarios=["cost"],
         turn_topic="implantation",
-        shown_fact_ids=["installment_12"],
-        shown_amplifier_refs=["fact:implant_same_day_discount"],
+        shown_fact_ids=["implant_same_day_discount"],
     )
     expired_whitening = select_target_marketing(
         bundle,
@@ -188,15 +176,37 @@ def test_shown_snapshots_and_explicit_date_change_only_exact_candidates() -> Non
         index,
         semantic_context="service",
         service_id="professional_whitening",
-        today=date(2026, 8, 16),
+        today=date(2026, 12, 1),
         include_initial_block=True,
     )
 
-    assert cost.selected_refs == cost.amplifier_refs == (
-        "fact:tax_deduction",
-        "kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee",
+    assert after_discount_shown.selected_refs == (
+        "fact:free_implant_consult",
     )
+    assert after_discount_shown.amplifier_refs == ("fact:installment_12", "fact:tax_deduction")
     assert expired_whitening.selected_refs == ()
+
+
+def test_no_promos_left_selects_configured_amplifiers() -> None:
+    bundle, doctors, index = _real_inputs()
+
+    result = select_target_marketing(
+        bundle,
+        doctors,
+        index,
+        semantic_context="service",
+        service_id="all_on_4",
+        today=TODAY,
+        include_initial_block=True,
+        shown_fact_ids=[
+            "implant_same_day_discount",
+            "free_implant_consult",
+        ],
+        turn_topic="implantation",
+    )
+
+    assert result.selected_refs == ()
+    assert result.amplifier_refs == ("fact:installment_12", "fact:tax_deduction")
 
 
 def test_real_selection_is_read_only_and_acceptance_has_no_product_wiring() -> None:

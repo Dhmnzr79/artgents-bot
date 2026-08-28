@@ -581,6 +581,7 @@ def _dispatch_orchestration_json(orch_r: AskOrchestrationResult):
 @app.post("/ask")
 def ask():
     q = ""
+    client_id: str | None = None
     request.ctx["turn_t0_monotonic"] = time.monotonic()
     try:
         data = request.get_json(force=True) or {}
@@ -646,7 +647,7 @@ def ask():
             status="error",
             details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
         )
-        return safe_jsonify(internal_error_response()), 200
+        return safe_jsonify(internal_error_response(client_id=client_id)), 200
 
 _SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -850,7 +851,7 @@ def _run_sse_worker_turn(
             sid=sid,
             client_id=client_id,
         )
-        return internal_error_response(), 200
+        return internal_error_response(client_id=client_id), 200
 
 
 def _stream_ask_turn_response(data: dict, client_id: str):
@@ -1114,6 +1115,7 @@ def ask_stream():
     (PERF-1 не относится к административным командам).
     """
     q = ""
+    client_id: str | None = None
     request.ctx["turn_t0_monotonic"] = time.monotonic()
     try:
         data = request.get_json(force=True) or {}
@@ -1174,7 +1176,7 @@ def ask_stream():
             status="error",
             details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
         )
-        return safe_jsonify(internal_error_response()), 200
+        return safe_jsonify(internal_error_response(client_id=client_id)), 200
 
 
 @app.get("/api/video-catalog")

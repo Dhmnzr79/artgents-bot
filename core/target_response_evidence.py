@@ -228,6 +228,18 @@ def merge_marketing_selection_into_materials(
             )
         else:
             external_source_refs.append(ref)
+    for ref in selection.amplifier_refs:
+        if not ref.startswith("fact:"):
+            external_source_refs.append(ref)
+            continue
+        fact_id = ref.removeprefix("fact:")
+        if fact_id in {fact.id for fact in commercial_facts}:
+            continue
+        commercial_facts.append(bundle.facts[fact_id].model_copy(deep=True))
+    if selection.service_value_ref and selection.service_value_ref.startswith("fact:"):
+        sv_id = selection.service_value_ref.removeprefix("fact:")
+        if sv_id not in {fact.id for fact in commercial_facts}:
+            commercial_facts.append(bundle.facts[sv_id].model_copy(deep=True))
     return replace(
         materials,
         marketing_selection=selection,

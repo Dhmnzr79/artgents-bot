@@ -15,6 +15,8 @@ from typing import Literal, Mapping
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.sales_one_plus import SalesOnePlusStrictFact
 
+from core.target_contact_authority import serialize_clinic_contact_authority_block
+
 _MARKER_ANSWERABLE = "@ANSWERABLE"
 _MARKER_ADMIN = "@ADMIN"
 _MARKER_ANSWER = "@ANSWER"
@@ -27,7 +29,7 @@ _MarkerState = Literal["invalid", "admin", "answer", "incomplete"]
 SALES_ONE_PLUS_SYSTEM_POLICY = """You are the sales assistant for a dental clinic landing page.
 Return exactly one JSON control envelope as specified in TYPED_ENVELOPE_INSTRUCTIONS.
 Use route=ANSWER for clinic and sales answers, route=ADMIN for problematic or medical handoff, route=CLARIFY only when the answer truly depends on missing service/extent/jaw/stage scope.
-The approved MD corpus is the authoritative supplied data for the current clinic. PRE_MODEL_HINTS are non-authoritative context only; they must not override the corpus or your envelope fields.
+The approved MD corpus is the authoritative supplied data for the current clinic. CLINIC_CONTACT_AUTHORITY in the user prompt is authoritative for all clinic contact details (phone, WhatsApp, address, hours, parking, branch identity and aliases). Do not invent contact fields, substitute missing values, or borrow another clinic's contacts. Preserve useful non-contact answer content when contact details are partial. Missing contact data alone does not require route=ADMIN. PRE_MODEL_HINTS are non-authoritative context only; they must not override the corpus, CLINIC_CONTACT_AUTHORITY, or your envelope fields.
 Answer clinic and sales questions, including microfacts and numbers, only from supplied data; do not invent or borrow another clinic's facts.
 For a normal in-scope clinic or dental question, when the supplied corpus lacks confirmed information needed to answer, use route=ANSWER with concise honest patient_text: state that confirmed information is not available and that the clinic administrator can clarify. Do not treat missing corpus data alone as route=ADMIN. Do not use route=CLARIFY when the missing fact cannot be supplied by the patient in a follow-up.
 Answer in the user's language with concise, natural sales copy in patient_text only. When relevant active service-linked facts provide an authored advantage or offer, weave them into patient_text instead of dropping them.
@@ -192,6 +194,9 @@ def _stable_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+AUTHORITY_CLIENT_ID_HINT_KEY = "__authority_client_id"
+
+
 def build_sales_one_plus_dynamic_suffix(
     *,
     exact_sales_resolution: ExactSalesResolution,
@@ -202,17 +207,28 @@ def build_sales_one_plus_dynamic_suffix(
     """Dynamic suffix only — neutral hints before Flash, no authoritative commerce."""
 
     hints = dict(sales_context)
+    authority_client_id = hints.pop(AUTHORITY_CLIENT_ID_HINT_KEY, None)
+    if isinstance(authority_client_id, str):
+        authority_client_id = authority_client_id.strip() or None
+    else:
+        authority_client_id = None
+
     hints["resolution_hint"] = {
         key: value
         for key, value in asdict(exact_sales_resolution).items()
         if key.endswith("_authority") is False
     }
-    return "\n\n".join(
+    sections: list[str] = []
+    contact_block = serialize_clinic_contact_authority_block(authority_client_id)
+    if contact_block:
+        sections.append(contact_block)
+    sections.extend(
         (
             "<PRE_MODEL_HINTS>\n" + _stable_json(hints) + "\n</PRE_MODEL_HINTS>",
             "<USER_MESSAGE_DATA>\n" + _stable_json(user_message) + "\n</USER_MESSAGE_DATA>",
         )
     )
+    return "\n\n".join(sections)
 
 
 def build_sales_one_plus_user_prompt(

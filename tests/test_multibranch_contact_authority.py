@@ -572,3 +572,43 @@ def test_sales_one_plus_deterministic_contact_pogranichnaya() -> None:
     assert "Филиал 1" not in answer
     assert "+7 (914) 995-78-82" in answer
     assert "+7 (900) 444-69-97" not in answer
+
+
+def test_nikadent_contact_authority_payload_includes_both_branches_without_mixing() -> None:
+    from core.target_contact_authority import build_clinic_contact_authority_payload
+
+    payload = build_clinic_contact_authority_payload("nikadent")
+    assert payload["client_id"] == "nikadent"
+    branches = payload["branches"]
+    assert len(branches) == 2
+    ryab = next(row for row in branches if row["branch_id"] == "ryabikova")
+    pogr = next(row for row in branches if row["branch_id"] == "pogranichnaya")
+    assert "+7 (900) 444-69-97" in ryab["phones"]
+    assert "+7 (914) 995-78-82" in pogr["phones"]
+    assert "+7 (914) 995-78-82" not in ryab["phones"]
+    assert "+7 (900) 444-69-97" not in pogr["phones"]
+    assert "рябикова" in [alias.casefold() for alias in ryab["aliases"]]
+    assert "пограничная" in [alias.casefold() for alias in pogr["aliases"]]
+
+
+def test_nikadent_urgent_manual_contact_without_own_contacts_has_no_demo_phone(
+    monkeypatch,
+) -> None:
+    from core.clinic_contact_policies import ClinicContactFacts
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    monkeypatch.setattr(
+        "core.target_contact_authority.load_clinic_contact_facts",
+        lambda _client_id: ClinicContactFacts(
+            phone_display="",
+            whatsapp_display=None,
+            address_display=None,
+            hours_display=None,
+            parking_display=None,
+        ),
+    )
+    payload = _ingress_manual("срочно болит зуб", urgent=True)
+    answer = str(payload.get("answer") or "")
+    assert demo_phone not in answer
+    assert "срочн" in answer.lower() or "позвон" in answer.lower()

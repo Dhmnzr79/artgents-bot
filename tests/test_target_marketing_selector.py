@@ -30,10 +30,11 @@ def _fact(
     active_from: str | None = None,
     active_until: str | None = None,
     incompatible_with: list[str] | None = None,
+    kind: str = "proof",
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": fact_id,
-        "kind": "proof",
+        "kind": kind,
         "catalog_label": f"Catalog topic for {fact_id}",
         "text_fact": f"Exact {fact_id}.",
         "render_mode": "strict",
@@ -55,18 +56,6 @@ def _bundle(
     scenarios: dict[str, tuple[list[str], list[str]]] | None = None,
 ) -> ResponseSchemaBundle:
     max_marketing, max_amplifiers, max_scenarios = limits
-    facts = {
-        "global": _fact("global"),
-        "service": _fact("service", services=["service_one"]),
-        "other": _fact("other", services=["service_two"]),
-        "inactive": _fact("inactive", active=False),
-        "future": _fact("future", active_from="2026-07-22"),
-        "expired": _fact("expired", active_until="2026-07-20"),
-        "starts_today": _fact("starts_today", active_from="2026-07-21"),
-        "ends_today": _fact("ends_today", active_until="2026-07-21"),
-        "conflict_a": _fact("conflict_a", incompatible_with=["conflict_b"]),
-        "conflict_b": _fact("conflict_b"),
-    }
     if initial is None:
         initial = {"service": ["fact:service", "fact:global", "fact:other"]}
     if scenarios is None:
@@ -82,6 +71,23 @@ def _bundle(
                 ["service", "doctors"],
             ),
         }
+    ordered_amplifier_refs: list[str] = []
+    for refs, _contexts in scenarios.values():
+        for ref in refs:
+            if ref not in ordered_amplifier_refs:
+                ordered_amplifier_refs.append(ref)
+    facts = {
+        "global": _fact("global", kind="promo"),
+        "service": _fact("service", services=["service_one"], kind="promo"),
+        "other": _fact("other", services=["service_two"], kind="promo"),
+        "inactive": _fact("inactive", active=False, kind="promo"),
+        "future": _fact("future", active_from="2026-07-22", kind="promo"),
+        "expired": _fact("expired", active_until="2026-07-20", kind="promo"),
+        "starts_today": _fact("starts_today", active_from="2026-07-21", kind="promo"),
+        "ends_today": _fact("ends_today", active_until="2026-07-21", kind="promo"),
+        "conflict_a": _fact("conflict_a", incompatible_with=["conflict_b"], kind="promo"),
+        "conflict_b": _fact("conflict_b", kind="promo"),
+    }
     return ResponseSchemaBundle.model_validate(
         {
             "services": {
@@ -115,6 +121,7 @@ def _bundle(
                     context: {"ordered_fact_refs": refs}
                     for context, refs in initial.items()
                 },
+                "ordered_amplifier_refs": ordered_amplifier_refs,
                 "scenario_rules": {
                     scenario: {
                         "ordered_amplifier_refs": refs,
@@ -193,17 +200,13 @@ def _select(
 def test_single_scenario_preserves_pool_order_caps_and_fills_initial() -> None:
     result = _select(marketing_scenarios=["cost"])
 
-    assert result.applied_scenarios == ("cost",)
-    assert result.amplifier_refs == ("fact:service", "kb:cost.md#one")
-    assert result.selected_refs == (
-        "fact:service",
-        "kb:cost.md#one",
-        "fact:global",
-    )
+    assert result.applied_scenarios == ()
+    assert result.selected_refs == ("fact:service", "fact:global")
+    assert result.amplifier_refs == ("kb:cost.md#one", "kb:pain.md#one")
     assert result.cta_key == "plan"
 
 
-def test_two_scenarios_round_robin_skips_shared_ref_in_same_turn() -> None:
+def test_two_scenarios_use_flat_amplifier_order_without_round_robin() -> None:
     bundle = _bundle(
         initial={},
         scenarios={
@@ -228,18 +231,19 @@ def test_two_scenarios_round_robin_skips_shared_ref_in_same_turn() -> None:
         semantic_context="service",
         service_id="service_one",
         today=TODAY,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["pain_fear", "cost"],
     )
 
-    assert result.applied_scenarios == ("pain_fear", "cost")
-    assert result.selected_refs == result.amplifier_refs == (
+    assert result.applied_scenarios == ()
+    assert result.selected_refs == ()
+    assert result.amplifier_refs == (
         "kb:shared.md#one",
-        "kb:cost.md#one",
+        "kb:pain.md#two",
     )
 
 
-def test_ineligible_pool_does_not_block_other_scenario_from_remaining_slot() -> None:
+def test_ineligible_pool_does_not_block_other_amplifier() -> None:
     bundle = _bundle(
         initial={},
         scenarios={
@@ -253,15 +257,15 @@ def test_ineligible_pool_does_not_block_other_scenario_from_remaining_slot() -> 
 
     result = _select(
         bundle,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["doctor_trust", "cost"],
     )
 
-    assert result.applied_scenarios == ("doctor_trust", "cost")
+    assert result.applied_scenarios == ()
     assert result.amplifier_refs == ("kb:cost.md#one", "kb:pain.md#one")
 
 
-def test_context_filtering_precedes_scenario_cap_and_empty_allowlist_denies() -> None:
+def test_flat_amplifier_order_ignores_legacy_scenario_cap() -> None:
     bundle = _bundle(
         limits=(3, 2, 1),
         scenarios={
@@ -273,33 +277,33 @@ def test_context_filtering_precedes_scenario_cap_and_empty_allowlist_denies() ->
 
     result = _select(
         bundle,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["pain_fear", "time", "cost"],
     )
 
-    assert result.applied_scenarios == ("cost",)
-    assert result.selected_refs == ("kb:cost.md#one",)
+    assert result.applied_scenarios == ()
+    assert result.selected_refs == ("fact:service", "fact:global")
 
 
-def test_applied_scenarios_keep_no_evidence_rules_but_zero_scenario_cap_is_empty() -> None:
+def test_applied_scenarios_are_not_used_in_flat_selector() -> None:
     no_evidence = _select(
         _bundle(
             initial={},
             scenarios={"cost": (["kb:missing.md#one"], ["service"])},
         ),
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["cost"],
     )
     zero_cap = _select(
         _bundle(limits=(3, 2, 0)),
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["cost"],
     )
 
-    assert no_evidence.applied_scenarios == ("cost",)
+    assert no_evidence.applied_scenarios == ()
     assert no_evidence.selected_refs == ()
     assert zero_cap.applied_scenarios == ()
-    assert zero_cap.selected_refs == ()
+    assert zero_cap.selected_refs == ("fact:service", "fact:global")
 
 
 def test_fact_active_dates_and_service_eligibility_are_exact_and_inclusive() -> None:
@@ -323,7 +327,6 @@ def test_fact_active_dates_and_service_eligibility_are_exact_and_inclusive() -> 
     assert result.selected_refs == (
         "fact:starts_today",
         "fact:ends_today",
-        "fact:global",
     )
 
 
@@ -345,11 +348,12 @@ def test_missing_external_refs_and_wrong_service_doctor_are_skipped() -> None:
 
     result = _select(
         bundle,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["doctor_trust"],
     )
 
-    assert result.selected_refs == (
+    assert result.selected_refs == ()
+    assert result.amplifier_refs == (
         "doctor:doctor_one",
         "kb:doctors.md#overview",
     )
@@ -373,11 +377,12 @@ def test_doctor_missing_from_explicit_index_is_optional_skip() -> None:
         semantic_context="service",
         service_id="service_one",
         today=TODAY,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["doctor_trust"],
     )
 
-    assert result.selected_refs == ("kb:doctors.md#overview",)
+    assert result.selected_refs == ()
+    assert result.amplifier_refs == ("kb:doctors.md#overview",)
 
 
 def test_doctor_present_in_index_but_absent_from_catalog_is_optional_skip() -> None:
@@ -398,11 +403,12 @@ def test_doctor_present_in_index_but_absent_from_catalog_is_optional_skip() -> N
         semantic_context="service",
         service_id="service_one",
         today=TODAY,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["doctor_trust"],
     )
 
-    assert result.selected_refs == ("kb:doctors.md#overview",)
+    assert result.selected_refs == ()
+    assert result.amplifier_refs == ("kb:doctors.md#overview",)
 
 
 def test_doctors_without_service_are_allowed_only_in_exact_doctors_context() -> None:
@@ -413,7 +419,7 @@ def test_doctors_without_service_are_allowed_only_in_exact_doctors_context() -> 
         semantic_context="doctors",
         service_id=None,
         today=TODAY,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["doctor_trust"],
     )
     no_service = select_target_marketing(
@@ -423,16 +429,18 @@ def test_doctors_without_service_are_allowed_only_in_exact_doctors_context() -> 
         semantic_context="service",
         service_id=None,
         today=TODAY,
-        include_initial_block=False,
+        include_initial_block=True,
         marketing_scenarios=["doctor_trust"],
     )
 
-    assert general.selected_refs == (
-        "doctor:doctor_other",
-        "doctor:doctor_one",
+    assert general.selected_refs == ()
+    assert general.amplifier_refs == (
+        "kb:cost.md#one",
+        "kb:pain.md#one",
     )
     assert general.cta_key == "doctor"
-    assert no_service.selected_refs == ("kb:doctors.md#overview",)
+    assert no_service.selected_refs == ("fact:global",)
+    assert no_service.amplifier_refs == ("kb:cost.md#one", "kb:pain.md#one")
 
 
 def test_shown_suppression_and_scenario_initial_dedup_are_exact() -> None:
@@ -443,7 +451,7 @@ def test_shown_suppression_and_scenario_initial_dedup_are_exact() -> None:
     )
 
     assert result.selected_refs == ("fact:global",)
-    assert result.amplifier_refs == ()
+    assert result.amplifier_refs == ("kb:pain.md#one", "kb:pain.md#two")
 
 
 @pytest.mark.parametrize(
@@ -469,7 +477,7 @@ def test_zero_limits_keep_applied_scenario_metadata_and_cta_only() -> None:
         marketing_scenarios=["cost"],
     )
 
-    assert result.applied_scenarios == ("cost",)
+    assert result.applied_scenarios == ()
     assert result.selected_refs == result.amplifier_refs == ()
     assert result.cta_key == "plan"
 
@@ -482,7 +490,7 @@ def test_partial_limits_count_each_ref_once_and_do_not_fill_from_other_context()
 
     result = _select(bundle, marketing_scenarios=["cost"])
 
-    assert result.amplifier_refs == ("fact:service",)
+    assert result.amplifier_refs == ("kb:cost.md#one",)
     assert result.selected_refs == ("fact:service",)
 
 
@@ -648,6 +656,7 @@ def test_result_is_frozen_slots_and_calls_are_stateless_without_mutation() -> No
         "amplifier_refs",
         "cta_key",
         "selection_mode",
+        "service_value_ref",
     )
     with pytest.raises(FrozenInstanceError):
         first.cta_key = "changed"  # type: ignore[misc]
@@ -710,6 +719,7 @@ def test_public_signature_and_source_boundary_are_exact() -> None:
         "contracts.doctor_schema",
         "contracts.response_schema",
         "contracts.response_schema_refs",
+        "core.service_value_selection",
     }
     assert not (
         {

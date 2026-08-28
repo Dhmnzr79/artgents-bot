@@ -14,6 +14,7 @@ from contracts.response_schema import (
     ResponseSchemaBundle,
     S1_MODEL_TYPES,
     SourceRef,
+    TargetAnswerProfileLimits,
     TargetClinicStrategy,
     TargetCommercialFact,
     TargetFixedPrice,
@@ -587,6 +588,85 @@ def test_strategy_context_rule_match_cannot_be_empty(match: object) -> None:
     assert "strategy_rule_match_empty" in _error_text(TargetClinicStrategy, strategy)
 
 
+def test_marketing_limits_profiles_are_independent() -> None:
+    limits = TargetMarketingLimits.model_validate(
+        {
+            "max_scenarios_per_turn": 2,
+            "service": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 2},
+            "price": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 4},
+        }
+    )
+    assert limits.profile_limits("service") == (2, 2)
+    assert limits.profile_limits("price") == (2, 4)
+
+
+def test_marketing_limits_legacy_fields_normalize_profiles() -> None:
+    limits = TargetMarketingLimits.model_validate(
+        {
+            "max_marketing_facts_per_turn": 3,
+            "max_amplifiers_per_turn": 2,
+            "max_scenarios_per_turn": 2,
+        }
+    )
+    assert limits.profile_limits("service") == (2, 2)
+    assert limits.profile_limits("price") == (2, 2)
+    assert limits.max_marketing_facts_per_turn == 2
+
+
+def test_marketing_limits_reject_service_profile_above_cap() -> None:
+    assert "marketing_service_amplifier_limit_exceeds_cap" in _error_text(
+        TargetMarketingLimits,
+        {
+            "max_scenarios_per_turn": 2,
+            "service": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 3},
+            "price": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 4},
+        },
+    )
+    assert "marketing_price_amplifier_limit_exceeds_cap" in _error_text(
+        TargetMarketingLimits,
+        {
+            "max_scenarios_per_turn": 2,
+            "service": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 2},
+            "price": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 5},
+        },
+    ) or "less_than_equal" in _error_text(
+        TargetMarketingLimits,
+        {
+            "max_scenarios_per_turn": 2,
+            "service": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 2},
+            "price": {"max_promos_per_turn": 2, "max_amplifiers_per_turn": 5},
+        },
+    )
+    assert (
+        "marketing_service_promo_limit_exceeds_cap" in _error_text(
+            TargetMarketingLimits,
+            {
+                "max_scenarios_per_turn": 2,
+                "service": {"max_promos_per_turn": 3, "max_amplifiers_per_turn": 2},
+            },
+        )
+        or "less_than_equal" in _error_text(
+            TargetMarketingLimits,
+            {
+                "max_scenarios_per_turn": 2,
+                "service": {"max_promos_per_turn": 3, "max_amplifiers_per_turn": 2},
+            },
+        )
+    )
+
+
+def test_marketing_limits_zero_and_reduced_profiles_allowed() -> None:
+    limits = TargetMarketingLimits.model_validate(
+        {
+            "max_scenarios_per_turn": 2,
+            "service": {"max_promos_per_turn": 0, "max_amplifiers_per_turn": 1},
+            "price": {"max_promos_per_turn": 1, "max_amplifiers_per_turn": 3},
+        }
+    )
+    assert limits.profile_limits("service") == (0, 1)
+    assert limits.profile_limits("price") == (1, 3)
+
+
 def test_marketing_limits_scenarios_and_local_fact_refs_are_strict() -> None:
     assert "less_than_equal" in _error_text(
         TargetMarketingLimits,
@@ -596,19 +676,18 @@ def test_marketing_limits_scenarios_and_local_fact_refs_are_strict() -> None:
             "max_scenarios_per_turn": 2,
         },
     )
-    assert "marketing_amplifier_limit_exceeds_fact_limit" in _error_text(
-        TargetMarketingLimits,
+    assert "less_than_equal" in _error_text(
+        TargetAnswerProfileLimits,
         {
-            "max_marketing_facts_per_turn": 1,
+            "max_promos_per_turn": 3,
             "max_amplifiers_per_turn": 2,
-            "max_scenarios_per_turn": 2,
         },
     )
     assert "less_than_equal" in _error_text(
         TargetMarketingLimits,
         {
             "max_marketing_facts_per_turn": 3,
-            "max_amplifiers_per_turn": 3,
+            "max_amplifiers_per_turn": 5,
             "max_scenarios_per_turn": 2,
         },
     )

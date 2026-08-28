@@ -67,7 +67,8 @@
         "few_teeth"
       ]
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_3d_diagnocat"
   },
   "one_stage": {
     "name": "Одномоментная имплантация",
@@ -93,7 +94,8 @@
         "extraction_context"
       ]
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_3d_diagnocat"
   },
   "all_on_4": {
     "name": "Имплантация All-on-4",
@@ -122,7 +124,8 @@
         "full_arch"
       ]
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_3d_diagnocat"
   },
   "all_on_6": {
     "name": "Имплантация All-on-6",
@@ -151,7 +154,8 @@
         "full_arch"
       ]
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_3d_diagnocat"
   },
   "temporary_teeth": {
     "name": "Временные зубы на имплантах",
@@ -359,7 +363,8 @@
     "selection": {
       "mode": "direct"
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_aprf"
   },
   "veneers": {
     "name": "Виниры E-max",
@@ -472,7 +477,8 @@
         "name": "Открытый синус-лифтинг",
         "aliases": []
       }
-    ]
+    ],
+    "service_value_ref": "fact:sv_aprf"
   },
   "zygomatic_implants": {
     "name": "Скуловая имплантация",
@@ -505,7 +511,8 @@
         "reported_bone_deficit"
       ]
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_3d_diagnocat"
   },
   "pterygoid_implants": {
     "name": "Птеригоидные импланты",
@@ -537,7 +544,8 @@
         "reported_bone_deficit"
       ]
     },
-    "options": []
+    "options": [],
+    "service_value_ref": "fact:sv_3d_diagnocat"
   },
   "removable_dentures": {
     "name": "Съёмное протезирование",

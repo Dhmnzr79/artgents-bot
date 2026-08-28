@@ -224,7 +224,7 @@ def assemble_sales_fast_bound_package(
         today=today,
         md_root=md_root,
         include_initial_block=False,
-        include_consultation_close=True,
+        include_consultation_close=False,
         include_cta=True,
         marketing_scenarios=(),
         shown_fact_ids=shown_fact_ids,

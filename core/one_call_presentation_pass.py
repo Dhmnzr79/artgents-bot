@@ -45,19 +45,34 @@ from core.service_availability_presentation import (
     resolve_family_price_context_with_disclaimer,
     resolve_price_coverage_kind,
 )
-from core.target_marketing_selector import select_stage51_marketing
+from core.service_value_selection import service_value_text_for_ref
+from core.target_marketing_selector import (
+    OptionalMarketingApplicationError,
+    TargetMarketingSelectionError,
+    fact_ids_present_in_text,
+    select_stage51_marketing,
+)
+from core.target_response_evidence import (
+    TargetResponseEvidencePackageError,
+    merge_marketing_selection_into_materials,
+)
 from core.target_presentation_decision import (
     TargetPresentationCadenceState,
     TargetPresentationCadenceUpdate,
     TargetPresentationDecision,
     decide_target_presentation,
 )
-from core.target_presentation_turn_projection import resolve_target_semantic_context
+from core.target_presentation_turn_projection import (
+    resolve_target_semantic_context,
+    should_include_automatic_marketing_block,
+)
 from core.target_generic_fullcontext_content import (
     is_generic_fullcontext_content_spec,
 )
-from core.target_response_evidence import merge_marketing_selection_into_materials
-from core.target_response_materialization_plan import build_target_response_materialization_plan
+from core.target_response_materialization_plan import (
+    TargetResponseMaterializationPlanError,
+    build_target_response_materialization_plan,
+)
 from core.target_response_policy import select_target_response_length_profile
 from core.target_scope_aware_price_package import is_scope_aware_price_spec
 from core.target_structured_service_availability import is_structured_service_availability_spec
@@ -89,6 +104,10 @@ _FAIL_CLOSED_TEXT: dict[str, str] = {
     "promotion_no_eligible_facts": (
         "Сейчас в материалах клиники нет подходящей акции для этого запроса. "
         "Могу рассказать об услугах клиники или перечислить общие акции."
+    ),
+    "promotion_shown_ambiguous": (
+        "В прошлом ответе было несколько акций. Уточните, пожалуйста, "
+        "о какой именно акции вы спрашиваете."
     ),
 }
 
@@ -176,6 +195,27 @@ def _sanitize_patient_text_for_render(
     )
 
 
+_OPTIONAL_MARKETING_APPLICATION_ERRORS = (
+    OptionalMarketingApplicationError,
+    TargetResponseEvidencePackageError,
+    TargetResponseMaterializationPlanError,
+    TypeError,
+    KeyError,
+)
+
+
+def _optional_marketing_failure_is_tolerable(
+    commercial_intent: str,
+    *,
+    required_promotion_satisfied: bool,
+) -> bool:
+    """Return True when a marketing failure may be skipped without losing the main answer."""
+
+    if commercial_intent != "promotion":
+        return True
+    return required_promotion_satisfied
+
+
 def _apply_stage51_marketing(
     bound_package: TargetSpecBoundOfflineResponsePackage,
     *,
@@ -184,59 +224,94 @@ def _apply_stage51_marketing(
     turn_frame: TurnFrame,
     shown_fact_ids: tuple[str, ...],
     shown_amplifier_refs: tuple[str, ...],
+    shown_service_value_ids: tuple[str, ...] = (),
     last_rendered_promo_fact_id: str | None,
+    last_turn_rendered_promo_fact_ids: tuple[str, ...] = (),
+    patient_text: str = "",
+    extra_present_fact_ids: tuple[str, ...] = (),
     today: date,
+    include_automatic_block: bool = True,
+    required_promotion_satisfied: bool = False,
 ) -> tuple[TargetSpecBoundOfflineResponsePackage, str | None]:
+    commercial_intent = presentation_commercial_intent(semantic)
     semantic_context = resolve_target_semantic_context(
         turn_frame,
         bound_package.spec,
     )
-    outcome = select_stage51_marketing(
-        context.bundle,
-        context.doctor_catalog,
-        context.external_index,
-        route=semantic.route,
-        commercial_intent=presentation_commercial_intent(semantic),
-        promotion_scope=presentation_promotion_scope(semantic),
-        semantic_context=semantic_context,
-        service_id=presentation_active_service_id(semantic),
-        today=today,
-        marketing_scenarios=tuple(turn_frame.marketing_scenarios),
-        shown_fact_ids=shown_fact_ids,
-        shown_amplifier_refs=shown_amplifier_refs,
-        last_rendered_promo_fact_id=last_rendered_promo_fact_id,
-        turn_topic=turn_frame.topic,
+    present_fact_ids = tuple(
+        dict.fromkeys(
+            [
+                *fact_ids_present_in_text(patient_text, context.bundle),
+                *extra_present_fact_ids,
+            ]
+        )
     )
+    try:
+        outcome = select_stage51_marketing(
+            context.bundle,
+            context.doctor_catalog,
+            context.external_index,
+            route=semantic.route,
+            commercial_intent=presentation_commercial_intent(semantic),
+            promotion_scope=presentation_promotion_scope(semantic),
+            semantic_context=semantic_context,
+            service_id=presentation_active_service_id(semantic),
+            today=today,
+            marketing_scenarios=tuple(turn_frame.marketing_scenarios),
+            shown_fact_ids=shown_fact_ids,
+            shown_amplifier_refs=shown_amplifier_refs,
+            last_rendered_promo_fact_id=last_rendered_promo_fact_id,
+            last_turn_rendered_promo_fact_ids=last_turn_rendered_promo_fact_ids,
+            turn_topic=turn_frame.topic,
+            shown_service_value_ids=shown_service_value_ids,
+            present_fact_ids=present_fact_ids,
+            include_automatic_block=include_automatic_block,
+        )
+    except TargetMarketingSelectionError:
+        if not _optional_marketing_failure_is_tolerable(
+            commercial_intent,
+            required_promotion_satisfied=required_promotion_satisfied,
+        ):
+            raise
+        return bound_package, None
     if outcome.fail_closed_reason is not None:
         return bound_package, outcome.fail_closed_reason
     if outcome.selection is None:
         return bound_package, None
-    merged_materials = merge_marketing_selection_into_materials(
-        bound_package.package.materials,
-        context.bundle,
-        outcome.selection,
-    )
-    spec = bound_package.spec
-    canonical_plan = build_target_response_materialization_plan(
-        merged_materials,
-        required_components=spec.required_components,
-        allow_missing_content=is_structured_service_availability_spec(spec),
-        requested_components=spec.required_components,
-        response_stage=spec.response_stage,
-        is_generic_fullcontext=is_generic_fullcontext_content_spec(spec),
-        is_scope_aware_price=is_scope_aware_price_spec(spec),
-        is_structured_service_availability=is_structured_service_availability_spec(spec),
-    )
-    package = replace(
-        bound_package.package,
-        materials=merged_materials,
-        plan=canonical_plan,
-    )
-    return replace(
-        bound_package,
-        package=package,
-        selected_cta_key=outcome.selection.cta_key if bound_package.spec.allow_cta else None,
-    ), None
+    try:
+        merged_materials = merge_marketing_selection_into_materials(
+            bound_package.package.materials,
+            context.bundle,
+            outcome.selection,
+        )
+        spec = bound_package.spec
+        canonical_plan = build_target_response_materialization_plan(
+            merged_materials,
+            required_components=spec.required_components,
+            allow_missing_content=is_structured_service_availability_spec(spec),
+            requested_components=spec.required_components,
+            response_stage=spec.response_stage,
+            is_generic_fullcontext=is_generic_fullcontext_content_spec(spec),
+            is_scope_aware_price=is_scope_aware_price_spec(spec),
+            is_structured_service_availability=is_structured_service_availability_spec(spec),
+        )
+        package = replace(
+            bound_package.package,
+            materials=merged_materials,
+            plan=canonical_plan,
+        )
+        return replace(
+            bound_package,
+            package=package,
+            selected_cta_key=outcome.selection.cta_key if bound_package.spec.allow_cta else None,
+        ), None
+    except _OPTIONAL_MARKETING_APPLICATION_ERRORS:
+        if not _optional_marketing_failure_is_tolerable(
+            commercial_intent,
+            required_promotion_satisfied=required_promotion_satisfied,
+        ):
+            raise
+        return bound_package, None
 
 
 def _build_verified(
@@ -304,18 +379,15 @@ def _promo_fact_ids(
     *,
     bound_package: TargetSpecBoundOfflineResponsePackage,
     rendered_fact_ids: tuple[str, ...],
+    bundle: ResponseSchemaBundle,
 ) -> tuple[str, ...]:
     promo_kinds = frozenset({"promo"})
-    return tuple(
-        fact_id
-        for fact_id in rendered_fact_ids
-        if bound_package.package.materials.marketing_selection.selected_refs
-        and fact_id in {f.id for f in bound_package.package.materials.commercial_facts}
-        and any(
-            f.id == fact_id and f.kind in promo_kinds
-            for f in bound_package.package.materials.commercial_facts
-        )
-    )
+    promo_ids: list[str] = []
+    for fact_id in rendered_fact_ids:
+        fact = bundle.facts.get(fact_id)
+        if fact is not None and str(fact.kind) in promo_kinds:
+            promo_ids.append(fact_id)
+    return tuple(dict.fromkeys(promo_ids))
 
 
 def _presentation_quick_replies(
@@ -393,8 +465,10 @@ def build_one_call_presentation_result(
     strategy_context: TargetStrategyMatch,
     shown_fact_ids: tuple[str, ...],
     shown_amplifier_refs: tuple[str, ...],
-    shown_consultation_value_refs: tuple[str, ...],
-    last_rendered_promo_fact_id: str | None,
+    shown_consultation_value_refs: tuple[str, ...] = (),
+    shown_service_value_ids: tuple[str, ...] = (),
+    last_rendered_promo_fact_id: str | None = None,
+    last_turn_rendered_promo_fact_ids: tuple[str, ...] = (),
     today: date,
 ) -> OneCallPresentationResult:
     """Run exactly one presentation pass for sales-fast widget materialization."""
@@ -484,7 +558,29 @@ def build_one_call_presentation_result(
     )
     bound_with_marketing = bound_package
     fail_reason = None
+    include_automatic_block = (
+        not skip_marketing
+        and should_include_automatic_marketing_block(
+            turn_frame,
+            bound_package.spec,
+            price_coverage_kind=price_coverage_kind,
+        )
+    )
+    extra_present_fact_ids: tuple[str, ...] = ()
+    if direct_request_present and direct_materialization is not None:
+        eligible_texts = frozenset(direct_materialization.eligible_texts)
+        extra_present_fact_ids = tuple(
+            fact_id
+            for fact_id in semantic.direct_fact_ids
+            if (fact := context.bundle.facts.get(fact_id)) is not None
+            and str(fact.text_fact).strip() in eligible_texts
+        )
     if not skip_marketing:
+        required_promotion_satisfied = (
+            original_commercial_intent == "promotion"
+            and bool(semantic.direct_fact_ids)
+            and bool(direct_commercial_text.strip())
+        )
         bound_with_marketing, fail_reason = _apply_stage51_marketing(
             bound_package,
             context=context,
@@ -492,8 +588,14 @@ def build_one_call_presentation_result(
             turn_frame=turn_frame,
             shown_fact_ids=shown_fact_ids,
             shown_amplifier_refs=shown_amplifier_refs,
+            shown_service_value_ids=shown_service_value_ids,
             last_rendered_promo_fact_id=last_rendered_promo_fact_id,
+            last_turn_rendered_promo_fact_ids=last_turn_rendered_promo_fact_ids,
+            patient_text=patient_text,
+            extra_present_fact_ids=extra_present_fact_ids,
             today=today,
+            include_automatic_block=include_automatic_block,
+            required_promotion_satisfied=required_promotion_satisfied,
         )
     show_family_price_surface = (
         price_coverage_kind == "family_context"
@@ -600,6 +702,7 @@ def build_one_call_presentation_result(
                     supplemented_text = supplement_sales_fast_patient_text_with_marketing(
                         patient_text=supplemented_text,
                         bound_package=presentation_bound,
+                        bundle=context.bundle,
                     )
                 if direct_commercial_text.strip():
                     supplemented_text = append_direct_commercial_without_duplicates(
@@ -674,6 +777,7 @@ def build_one_call_presentation_result(
             supplemented_text = supplement_sales_fast_patient_text_with_marketing(
                 patient_text=base_text,
                 bound_package=presentation_bound,
+                bundle=context.bundle,
             )
             if direct_commercial_text.strip():
                 supplemented_text = append_direct_commercial_without_duplicates(
@@ -718,9 +822,17 @@ def build_one_call_presentation_result(
         bound_package=bound_with_marketing,
         rendered_text=final_patient_text,
     )
+    if direct_materialization is not None and semantic.direct_fact_ids:
+        for fact_id in semantic.direct_fact_ids:
+            fact = context.bundle.facts.get(fact_id)
+            if fact is None:
+                continue
+            if str(fact.text_fact).strip() in final_patient_text:
+                rendered_fact_ids = tuple(dict.fromkeys((*rendered_fact_ids, fact_id)))
     rendered_promo_ids = _promo_fact_ids(
         bound_package=bound_with_marketing,
         rendered_fact_ids=rendered_fact_ids,
+        bundle=context.bundle,
     )
     facts_by_id = {f.id: f for f in bound_with_marketing.package.materials.commercial_facts}
     doctors_by_id = {d.doctor_id: d for d in bound_with_marketing.package.materials.doctors}
@@ -751,7 +863,8 @@ def build_one_call_presentation_result(
         video_id = str(presentation.video.get("video_key") or presentation.video.get("id") or "").strip() or None
     situation_shown = bool(presentation.situation.get("show"))
 
-    last_promo = rendered_promo_ids[-1] if rendered_promo_ids else None
+    last_promo = rendered_promo_ids[0] if len(rendered_promo_ids) == 1 else None
+    last_turn_promo_ids = rendered_promo_ids
     offer_fact_refs_tuple = tuple(
         ref
         for ref in bound_with_marketing.package.materials.marketing_selection.selected_refs
@@ -763,11 +876,23 @@ def build_one_call_presentation_result(
         shown_price_followup_refs=presentation.cadence_update.shown_price_followup_refs,
         situation_offered=presentation.cadence_update.situation_offered,
     )
+    service_value_selection = (
+        bound_with_marketing.package.materials.marketing_selection.service_value_ref
+    )
+    rendered_service_value_ids: tuple[str, ...] = ()
+    if service_value_selection and service_value_selection.startswith("fact:"):
+        fact_id = service_value_selection.removeprefix("fact:")
+        sv_text = service_value_text_for_ref(context.bundle, service_value_selection)
+        if sv_text and sv_text in final_patient_text:
+            rendered_service_value_ids = (fact_id,)
     session_delta = PresentationSessionDelta(
         shown_fact_ids=rendered_fact_ids,
         shown_amplifier_refs=tuple(proven_amplifiers),
         shown_consultation_value_refs=shown_consultation_value_refs,
+        shown_service_value_ids=rendered_service_value_ids,
         last_rendered_promo_fact_id=last_promo,
+        rendered_promo_fact_ids=rendered_promo_ids,
+        last_turn_rendered_promo_fact_ids=last_turn_promo_ids,
         cadence_update=cadence_delta,
     )
 

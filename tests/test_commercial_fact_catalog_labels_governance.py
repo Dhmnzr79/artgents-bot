@@ -14,6 +14,10 @@ _DEMO_LABELS = {
     "implant_warranty": "Гарантия при имплантации",
     "implant_same_day_discount": "Скидка при оплате в день обращения",
     "professional_whitening_discount": "Скидка на профессиональное отбеливание",
+    "payment_stages": "Оплата по этапам",
+    "fixed_price": "Фиксация стоимости в договоре",
+    "sv_3d_diagnocat": "3D-планирование и Diagnocat",
+    "sv_aprf": "APRF для восстановления тканей",
 }
 
 _NIKADENT_LABELS = {

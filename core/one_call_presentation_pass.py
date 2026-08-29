@@ -86,7 +86,11 @@ from core.target_verified_primary_content_cta_projection import (
     project_verified_primary_content_cta,
 )
 from core.target_verified_response_pipeline import _used_content_refs_from_package
-from core.target_composer_request import materialize_target_composer_request
+from core.target_composer_request import (
+    TargetComposerRequestError,
+    materialize_target_composer_request,
+)
+from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
 from core.sales_fast_presentation import (
     build_direct_promotion_patient_text,
     supplement_sales_fast_patient_text_with_marketing,
@@ -325,24 +329,31 @@ def _build_verified(
     patient_text: str,
     user_message: str,
 ) -> TargetVerifiedComposedResponse:
-    request = materialize_target_composer_request(
-        bound_package,
-        context.bundle,
-        context.doctor_catalog,
-        context.consultation_values,
-        user_message=user_message,
-        md_root=context.md_root,
-        client_id=context.client_id,
-        response_length_profile=select_target_response_length_profile(
-            bound_package.spec,
-            aspects=tuple(turn_frame.aspects),
-            aspects_valid=turn_frame.field_meta.aspects.status == "valid",
-            marketing_scenarios=tuple(turn_frame.marketing_scenarios),
-            needs_clarification=turn_frame.needs_clarification,
-        ),
-    )
     package_primary = bound_package.package.plan.primary_content_ref
-    package_used = _used_content_refs_from_package(bound_package, request)
+    try:
+        request = materialize_target_composer_request(
+            bound_package,
+            context.bundle,
+            context.doctor_catalog,
+            context.consultation_values,
+            user_message=user_message,
+            md_root=context.md_root,
+            client_id=context.client_id,
+            response_length_profile=select_target_response_length_profile(
+                bound_package.spec,
+                aspects=tuple(turn_frame.aspects),
+                aspects_valid=turn_frame.field_meta.aspects.status == "valid",
+                marketing_scenarios=tuple(turn_frame.marketing_scenarios),
+                needs_clarification=turn_frame.needs_clarification,
+            ),
+        )
+        package_used = _used_content_refs_from_package(bound_package, request)
+    except (TargetScopedResponseEvidenceError, TargetComposerRequestError) as exc:
+        from core import turn_timing
+
+        turn_timing.set_flag("post_composer_evidence_degraded", True)
+        turn_timing.set_flag("post_composer_evidence_error_code", exc.code)
+        package_used = ()
     verified = TargetVerifiedComposedResponse(
         text=patient_text,
         spec=bound_package.spec,

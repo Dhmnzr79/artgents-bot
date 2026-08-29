@@ -155,7 +155,7 @@ def _bundle(
             "facts": {
                 "initial_fact": {
                     "id": "initial_fact",
-                    "kind": "commercial",
+                    "kind": "promo",
                     "catalog_label": "Initial clinic fact topic",
                     "text_fact": "Exact clinic fact.",
                     "render_mode": "strict",
@@ -192,7 +192,7 @@ def _bundle(
                     "max_scenarios_per_turn": 1,
                 },
                 "initial_commercial_blocks": {
-                    "service_one": {"ordered_fact_refs": ["fact:initial_fact"]}
+                    "service": {"ordered_fact_refs": ["fact:initial_fact"]}
                 },
                 "scenario_rules": {
                     "cost": {
@@ -352,20 +352,20 @@ def test_known_brand_without_service_offer_is_empty_without_fallback() -> None:
 
 def test_marketing_materials_and_shown_state_pass_through_exactly() -> None:
     result = _assemble(
-        semantic_context="price",
+        semantic_context="service",
         include_initial_block=True,
         marketing_scenarios=["cost"],
-        shown_fact_ids=["initial_fact"],
     )
 
-    assert result.marketing_selection.applied_scenarios == ("cost",)
-    assert result.marketing_selection.selected_refs == ("kb:cost.md#value",)
-    assert result.marketing_selection.amplifier_refs == ("kb:cost.md#value",)
-    assert result.marketing_selection.cta_key == "price_consultation"
-    assert result.commercial_facts == ()
-    assert result.external_source_refs == ("kb:cost.md#value",)
-    assert result.consultation_close is None
-    assert (result.marketing_slots_used, result.amplifier_slots_used) == (1, 1)
+    assert result.marketing_selection.applied_scenarios == ()
+    assert result.marketing_selection.selected_refs == ("fact:initial_fact",)
+    assert result.marketing_selection.amplifier_refs == ()
+    assert result.marketing_selection.cta_key == "consultation"
+    assert [fact.id for fact in result.commercial_facts] == ["initial_fact"]
+    assert result.external_source_refs == ()
+    assert result.consultation_close is not None
+    assert result.marketing_slots_used == 2
+    assert result.amplifier_slots_used == 1
 
 
 def test_service_errors_and_not_found_precede_brand_and_evidence() -> None:

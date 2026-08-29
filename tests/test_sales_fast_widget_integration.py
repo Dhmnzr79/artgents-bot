@@ -2319,3 +2319,270 @@ def test_http_ask_model_admin_without_phone_exact_literal_text(
     assert payload.get("offer") is None
     assert payload.get("situation", {}).get("show") is False
     assert backend.call_count == 1
+
+
+_IMPLANTIUM_PRICE_TEXT = (
+    "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть; "
+    "КТ и костная пластика по показаниям — отдельно."
+)
+
+
+def _timing_request_ctx() -> dict[str, object]:
+    return {
+        "turn_t0_monotonic": 0.0,
+        "turn_timing": {"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}},
+    }
+
+
+def _patch_post_composer_audit_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    exc: Exception,
+) -> None:
+    def _raising(*_args: object, **_kwargs: object) -> object:
+        raise exc
+
+    monkeypatch.setattr(
+        "core.one_call_presentation_pass.materialize_target_composer_request",
+        _raising,
+    )
+
+
+def test_post_composer_scoped_evidence_degraded_preserves_materialized_answer(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
+    from session import bind_session_client, mem_reset
+
+    patient = "All-on-4 — протокол полного восстановления челюсти."
+    sid = "post-composer-scoped-degraded"
+    bind_session_client("demo")
+    mem_reset(sid)
+    _patch_post_composer_audit_failure(
+        monkeypatch,
+        TargetScopedResponseEvidenceError(
+            "scoped_evidence_required_fact_missing",
+            ("missing_fact",),
+        ),
+    )
+    backend = _CountingBackend(
+        answer_envelope(
+            patient,
+            service_id="all_on_4",
+            extent="full_arch",
+            commercial_intent="none",
+        )
+    )
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Расскажите про All-on-4", "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = _timing_request_ctx()
+        outcome = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Расскажите про All-on-4",
+            backend=backend,
+        )
+        flags = request.ctx.get("turn_timing", {}).get("flags", {})
+    assert outcome.widget.kind == "materialized"
+    payload = dict(outcome.widget.payload or {})
+    answer = str(payload.get("answer") or "")
+    assert patient in answer
+    assert payload.get("meta", {}).get("terminal_mode") != "admin"
+    assert payload.get("meta", {}).get("terminal_mode") != "clarify"
+    assert "quick_replies" in payload
+    assert flags.get("post_composer_evidence_degraded") is True
+    assert flags.get("post_composer_evidence_error_code") == (
+        "scoped_evidence_required_fact_missing"
+    )
+    assert "missing_fact" not in answer
+    assert "scoped_evidence" not in answer
+
+
+def test_post_composer_composer_request_degraded_preserves_materialized_answer(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_composer_request import TargetComposerRequestError
+    from session import bind_session_client, mem_reset
+
+    patient = "Имплантация проходит под местной анестезией."
+    sid = "post-composer-composer-degraded"
+    bind_session_client("demo")
+    mem_reset(sid)
+    _patch_post_composer_audit_failure(
+        monkeypatch,
+        TargetComposerRequestError("composer_request_material_invalid", "kb:clinic.md#one"),
+    )
+    backend = _CountingBackend(answer_envelope(patient, commercial_intent="none"))
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Больно ли ставить имплант?", "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = _timing_request_ctx()
+        outcome = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Больно ли ставить имплант?",
+            backend=backend,
+        )
+        flags = request.ctx.get("turn_timing", {}).get("flags", {})
+    assert outcome.widget.kind == "materialized"
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert patient in answer
+    assert flags.get("post_composer_evidence_degraded") is True
+    assert flags.get("post_composer_evidence_error_code") == (
+        "composer_request_material_invalid"
+    )
+    assert "kb:clinic.md#one" not in answer
+
+
+def test_post_composer_degraded_exact_price_preserves_canonical_price_line(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
+    from session import bind_session_client, mem_reset
+
+    monkeypatch.setattr(
+        "core.target_runtime_client_context.runtime_today",
+        lambda: __import__("datetime").date(2026, 8, 10),
+    )
+    user_message = "Сколько стоит All-on-4 Implantium?"
+    patient = (
+        "All-on-4 на Implantium — популярный вариант полного восстановления челюсти."
+    )
+    sid = "post-composer-price-degraded"
+    bind_session_client("demo")
+    mem_reset(sid)
+    _patch_post_composer_audit_failure(
+        monkeypatch,
+        TargetScopedResponseEvidenceError("scoped_evidence_package_inconsistent", "plan"),
+    )
+    backend = _CountingBackend(
+        answer_envelope(
+            patient,
+            commercial_intent="price",
+            scenario="cost",
+            service_id="all_on_4",
+            service_reference_status="resolved",
+            requested_service_id="all_on_4",
+            price_text=_IMPLANTIUM_PRICE_TEXT,
+        )
+    )
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": user_message, "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = _timing_request_ctx()
+        outcome = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message=user_message,
+            backend=backend,
+        )
+        flags = request.ctx.get("turn_timing", {}).get("flags", {})
+    assert outcome.widget.kind == "materialized"
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert patient in answer
+    assert _IMPLANTIUM_PRICE_TEXT in answer
+    assert answer.replace("\u00a0", "").replace(" ", "").count("318000") == 1
+    assert flags.get("post_composer_evidence_degraded") is True
+    assert flags.get("price_text_owner") == "model_price_text"
+
+
+def test_post_composer_degraded_streaming_matches_blocking_answer(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
+    from session import bind_session_client, mem_reset
+
+    patient = "All-on-4 на нижнюю челюсть — протокол."
+    sid = "post-composer-stream-degraded"
+    bind_session_client("demo")
+    mem_reset(sid)
+    _patch_post_composer_audit_failure(
+        monkeypatch,
+        TargetScopedResponseEvidenceError("scoped_evidence_md_root_invalid", "bad"),
+    )
+    backend = _StreamTrackingBackend(
+        answer_envelope(
+            patient,
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        )
+    )
+    streamed: list[str] = []
+    payload, _ = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Расскажите про All-on-4 на нижнюю челюсть",
+        envelope_json=answer_envelope(
+            patient,
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+        backend=backend,
+        on_delta=lambda delta: streamed.append(delta),
+    )
+    final_answer = str(payload.get("answer") or "")
+    assert backend.stream_path_used is True
+    assert streamed == [final_answer]
+    assert patient in final_answer
+    assert payload.get("meta", {}).get("terminal_mode") != "admin"
+
+
+def test_post_composer_unexpected_error_is_not_suppressed(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from session import bind_session_client, mem_reset
+
+    sid = "post-composer-unexpected-error"
+    bind_session_client("demo")
+    mem_reset(sid)
+
+    def _raise_type_error(*_args: object, **_kwargs: object) -> object:
+        raise TypeError("post_composer_unexpected_programming_error")
+
+    monkeypatch.setattr(
+        "core.one_call_presentation_pass.materialize_target_composer_request",
+        _raise_type_error,
+    )
+    backend = _CountingBackend(answer_envelope("Короткий ответ."))
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={"q": "Расскажите про имплантацию", "sid": sid, "client_id": "demo"},
+    ):
+        from flask import request
+
+        request.ctx = _timing_request_ctx()
+        with pytest.raises(TypeError, match="post_composer_unexpected_programming_error"):
+            run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message="Расскажите про имплантацию",
+                backend=backend,
+            )

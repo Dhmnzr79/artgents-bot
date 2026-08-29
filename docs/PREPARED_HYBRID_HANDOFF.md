@@ -126,7 +126,19 @@
 
 **Что сознательно не сделано (CP-EXACT-1B2 и далее):** multi-offer `price_text`, `used_offer_id`, multi-brand ranking, Hybrid/RAG, LIVE.
 
-**Offline (29.08.2026):** CP-EXACT-1B-SINGLE — 38/38 в `test_one_call_exact_1b_single_offline.py`; checkpoint_a — 33/33; `test_target_scoped_response_evidence.py` — 30 passed / 4 failed **pre-existing на чистом `18fe65b`** (worktree verify). Checker ACCEPT.
+**Offline (29.08.2026):** CP-EXACT-1B-SINGLE — 38/38 в `test_one_call_exact_1b_single_offline.py`; checkpoint_a — 33/33; scoped-evidence suites синхронизированы в **CP-SCOPED-EVIDENCE-SYNC-SAFE** (см. ниже).
+
+### CP-SCOPED-EVIDENCE-SYNC-SAFE — test sync + post-Composer typed fail-open (29.08.2026)
+
+**Статус:** реализован Cursor offline на базе `66591e7`; checker pending. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.
+
+**Что сделано:**
+1. Синхронизированы stale fixtures/tests после CP-MKT-1 (`c577a7b`): promo-only automatic pool; `scenario_rules` не исполняются selector'ом.
+2. External KB assertions переведены на явную инъекцию согласованных `plan/materials.external_source_refs` в unit/governance tests — без возврата scenario→KB wiring.
+3. Узкий post-Composer fail-open в `_build_verified`: только `TargetScopedResponseEvidenceError` и `TargetComposerRequestError`; готовый `patient_text`/price/marketing сохраняются; диагностика `post_composer_evidence_degraded` + `post_composer_evidence_error_code`; `TypeError` не подавляется.
+4. Strict `build_target_scoped_response_evidence` при прямом вызове без изменений.
+
+**Offline:** scoped/composer/assembly suites green; widget degraded-path tests; CP-EXACT-1B + checkpoint_a regression green.
 
 ### CP-EXACT-1B-SINGLE — isolated `price_text` for one pre-selected fixed offer (29.08.2026)
 

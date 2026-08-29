@@ -4,7 +4,7 @@ import ast
 import inspect
 import json
 import re
-from dataclasses import FrozenInstanceError, fields
+from dataclasses import FrozenInstanceError, fields, replace
 from datetime import date
 from pathlib import Path
 
@@ -86,7 +86,7 @@ def md_root(tmp_path: Path) -> Path:
 def _fact(*, render_mode: str = "strict") -> dict[str, object]:
     return {
         "id": "selected_fact",
-        "kind": "commercial",
+        "kind": "promo",
         "catalog_label": "Selected commercial topic",
         "text_fact": "Exact selected commercial fact.",
         "render_mode": render_mode,
@@ -231,6 +231,35 @@ def _spec(
     )
 
 
+def _inject_external_source_refs(
+    bound,
+    refs: tuple[str, ...],
+):
+    materials = bound.package.materials
+    injected_materials = replace(
+        materials,
+        external_source_refs=refs,
+        marketing_selection=replace(
+            materials.marketing_selection,
+            amplifier_refs=tuple(
+                dict.fromkeys((*materials.marketing_selection.amplifier_refs, *refs))
+            ),
+        ),
+    )
+    injected_plan = replace(
+        bound.package.plan,
+        external_source_refs=refs,
+    )
+    return replace(
+        bound,
+        package=replace(
+            bound.package,
+            materials=injected_materials,
+            plan=injected_plan,
+        ),
+    )
+
+
 def _inputs(
     md_root: Path,
     *,
@@ -243,14 +272,12 @@ def _inputs(
     cta: bool = False,
     scenarios: tuple[str, ...] = (),
     external_kb_ref: str = "kb:clinic.md#one",
+    external_source_refs: tuple[str, ...] | None = None,
 ) -> dict[str, object]:
     bundle = bundle or _bundle()
     doctors = doctors or _doctors()
     consultations = consultations or _consultations()
     spec = spec or _spec(("content",))
-    bundle.marketing.scenario_rules["cost"].ordered_amplifier_refs = [
-        external_kb_ref
-    ]
     bound = assemble_target_spec_offline_response_package(
         bundle,
         doctors,
@@ -270,6 +297,15 @@ def _inputs(
         include_cta=cta,
         marketing_scenarios=scenarios,
     )
+    if external_source_refs is None and scenarios:
+        refs: list[str] = []
+        if "cost" in scenarios:
+            refs.append(external_kb_ref)
+        if "doctor_trust" in scenarios:
+            refs.append("doctor:doctor_one")
+        external_source_refs = tuple(dict.fromkeys(refs))
+    if external_source_refs:
+        bound = _inject_external_source_refs(bound, external_source_refs)
     return {
         "bound_package": bound,
         "bundle": bundle,
@@ -588,7 +624,7 @@ def test_escaping_selected_md_ref_propagates_s35_fail_closed(md_root: Path) -> N
     inputs = _inputs(
         md_root,
         spec=_spec(("content",), marketing=True),
-        scenarios=("cost",),
+        external_source_refs=("kb:../outside.md#one",),
         external_kb_ref="kb:../outside.md#one",
     )
     with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:

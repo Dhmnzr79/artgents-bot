@@ -63,10 +63,10 @@ def md_root(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _fact(fact_id: str) -> dict[str, object]:
+def _fact(fact_id: str, *, kind: str = "promo") -> dict[str, object]:
     return {
         "id": fact_id,
-        "kind": "commercial",
+        "kind": kind,
         "catalog_label": f"Catalog topic for {fact_id}",
         "text_fact": f"Exact {fact_id}.",
         "render_mode": "strict",
@@ -115,7 +115,7 @@ def _bundle(*, with_offer: bool = True) -> ResponseSchemaBundle:
             "offers": offers,
             "facts": {
                 "selected_fact": _fact("selected_fact"),
-                "candidate_fact": _fact("candidate_fact"),
+                "candidate_fact": _fact("candidate_fact", kind="commercial"),
             },
             "strategy": {"version": 1, "default_max_options": 3, "rules": []},
             "marketing": {
@@ -213,6 +213,35 @@ def _content_only_spec(
     return build_target_response_spec(request)
 
 
+def _inject_external_source_refs(
+    bound,
+    refs: tuple[str, ...],
+):
+    materials = bound.package.materials
+    injected_materials = replace(
+        materials,
+        external_source_refs=refs,
+        marketing_selection=replace(
+            materials.marketing_selection,
+            amplifier_refs=tuple(
+                dict.fromkeys((*materials.marketing_selection.amplifier_refs, *refs))
+            ),
+        ),
+    )
+    injected_plan = replace(
+        bound.package.plan,
+        external_source_refs=refs,
+    )
+    return replace(
+        bound,
+        package=replace(
+            bound.package,
+            materials=injected_materials,
+            plan=injected_plan,
+        ),
+    )
+
+
 def _bound(
     md_root: Path,
     *,
@@ -222,12 +251,13 @@ def _bound(
     close: bool = False,
     cta: bool = False,
     scenarios: tuple[str, ...] = (),
+    external_source_refs: tuple[str, ...] = (),
 ):
     if spec is None:
         spec = _spec()
     if bundle is None:
         bundle = _bundle()
-    return assemble_target_spec_offline_response_package(
+    bound = assemble_target_spec_offline_response_package(
         bundle,
         _doctors(),
         ResponseSchemaExternalIndex(
@@ -251,6 +281,9 @@ def _bound(
         include_cta=cta,
         marketing_scenarios=scenarios,
     )
+    if external_source_refs:
+        bound = _inject_external_source_refs(bound, external_source_refs)
+    return bound
 
 
 def test_exact_shapes_signature_error_surface_and_frozen_slots(md_root: Path) -> None:
@@ -443,7 +476,7 @@ def test_external_kb_uses_own_topic_and_external_doctor_preserves_both(
             allowed=("implantation", "clinic"),
             marketing=True,
         ),
-        scenarios=("cost",),
+        external_source_refs=("kb:clinic.md#one",),
     )
     kb_result = build_target_scoped_response_evidence(kb_bound, md_root=md_root)
     assert kb_result.external_source_refs == ("kb:clinic.md#one",)
@@ -456,7 +489,7 @@ def test_external_kb_uses_own_topic_and_external_doctor_preserves_both(
     blocked = _bound(
         md_root,
         spec=_spec(("content",), allowed=("implantation",), marketing=True),
-        scenarios=("cost",),
+        external_source_refs=("kb:clinic.md#one",),
     )
     with pytest.raises(TargetScopedResponseEvidenceError) as exc_info:
         build_target_scoped_response_evidence(blocked, md_root=md_root)
@@ -466,7 +499,7 @@ def test_external_kb_uses_own_topic_and_external_doctor_preserves_both(
     doctor_bound = _bound(
         md_root,
         spec=_spec(("content",), allowed=("implantation",), marketing=True),
-        scenarios=("doctor_trust",),
+        external_source_refs=("doctor:doctor_one",),
     )
     doctor_result = build_target_scoped_response_evidence(
         doctor_bound,
@@ -479,7 +512,11 @@ def test_external_kb_uses_own_topic_and_external_doctor_preserves_both(
 def test_content_only_automatic_appends_external_kb_after_validator_tuple(
     md_root: Path,
 ) -> None:
-    bound = _bound(md_root, spec=_content_only_spec(), scenarios=("cost",))
+    bound = _bound(
+        md_root,
+        spec=_content_only_spec(),
+        external_source_refs=("kb:clinic.md#one",),
+    )
     result = build_target_scoped_response_evidence(bound, md_root=md_root)
     refs = tuple(record.ref for record in result.scope_records)
     assert result.external_source_refs == ("kb:clinic.md#one",)

@@ -6,6 +6,8 @@ import json
 from typing import Any
 
 from contracts.one_call_envelope import (
+    ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
+    ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS,
     OneCallClarifyAxis,
     OneCallCommercialIntent,
     OneCallEnvelope,
@@ -42,6 +44,76 @@ class OneCallEnvelopeProtocolError(ValueError):
     def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
+
+
+
+def _clear_envelope_input_normalizations() -> None:
+    try:
+        from core import turn_timing
+
+        turn_timing.set_flag("envelope_input_normalizations", [])
+    except Exception:
+        pass
+
+
+def _record_envelope_input_normalizations(codes: tuple[str, ...]) -> None:
+    try:
+        from core import turn_timing
+
+        turn_timing.set_flag("envelope_input_normalizations", list(codes))
+    except Exception:
+        pass
+
+
+def _normalize_direct_fact_ids_list(
+    direct_fact_ids: list[object],
+) -> tuple[list[str], tuple[str, ...]]:
+    """Validate every element, then dedupe identical correct IDs in order."""
+
+    codes: list[str] = []
+    normalized: list[str] = []
+    for item in direct_fact_ids:
+        if isinstance(item, bool) or not isinstance(item, str):
+            raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
+        token = item.strip()
+        if not token:
+            raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
+        if token in normalized:
+            if ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED not in codes:
+                codes.append(ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED)
+            continue
+        normalized.append(token)
+    return normalized, tuple(codes)
+
+
+def _normalize_production_payload(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    codes: list[str] = []
+    required = required_envelope_field_names()
+    keys = set(payload.keys())
+    missing = required - keys
+    if missing:
+        raise OneCallEnvelopeProtocolError(f"missing_fields:{sorted(missing)}")
+    extra = keys - required
+    if extra:
+        payload = {key: payload[key] for key in required if key in payload}
+        codes.append(ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS)
+    references = payload.get("references")
+    if isinstance(references, dict):
+        direct_fact_ids = references.get("direct_fact_ids")
+        if isinstance(direct_fact_ids, list):
+            deduped, dedupe_codes = _normalize_direct_fact_ids_list(direct_fact_ids)
+            codes.extend(dedupe_codes)
+            if deduped != direct_fact_ids:
+                payload = dict(payload)
+                payload["references"] = {
+                    **references,
+                    "direct_fact_ids": deduped,
+                }
+        elif direct_fact_ids is not None:
+            raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
+    return payload, tuple(codes)
 
 
 def _require_exact_key_set(payload: dict[str, Any]) -> None:
@@ -106,7 +178,7 @@ def _validate_direct_fact_ids(
             raise OneCallEnvelopeProtocolError("direct_fact_ids_invalid")
         token = item.strip()
         if token in normalized:
-            raise OneCallEnvelopeProtocolError("direct_fact_id_duplicate")
+            continue
         normalized.append(token)
     direct_fact_ids = tuple(normalized)
     if route in {"CLARIFY", "ADMIN"} and direct_fact_ids:
@@ -412,6 +484,8 @@ def parse_production_envelope_json(
 ) -> OneCallEnvelope:
     """Parse and validate a production v5 envelope from provider raw text."""
 
+    _clear_envelope_input_normalizations()
+
     if not isinstance(raw, str):
         raise OneCallEnvelopeProtocolError("envelope_output_invalid")
     if not raw.strip():
@@ -420,6 +494,8 @@ def parse_production_envelope_json(
         raise OneCallEnvelopeProtocolError("envelope_oversized")
 
     payload = _loads_strict_json_object(raw)
+    payload, normalization_codes = _normalize_production_payload(payload)
+    _record_envelope_input_normalizations(normalization_codes)
     envelope = _validate_structure(payload, commercial_fact_catalog=commercial_fact_catalog)
     _validate_reference_context(
         envelope,

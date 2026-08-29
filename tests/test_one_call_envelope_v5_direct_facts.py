@@ -24,6 +24,7 @@ from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.one_call_prefix_cache import clear_one_call_prefix_cache, get_or_build_stable_prefix
 from core.one_call_prefix_input_fingerprint import compute_prefix_input_fingerprint
+from core import turn_timing
 from core.target_client_data import load_target_client_data
 from tests.test_sales_one_plus_turn import (
     _DEMO_CATALOG,
@@ -43,6 +44,28 @@ _NIKADENT_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
 )
 
 
+def _normalization_codes_from_turn_timing() -> tuple[str, ...]:
+    stored = turn_timing.summary_for_turn_complete().get("envelope_input_normalizations")
+    if isinstance(stored, list):
+        return tuple(str(code) for code in stored)
+    return ()
+
+
+def _parse_envelope_in_request_context(raw: str) -> OneCallEnvelope:
+    import app as app_module
+
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        return parse_production_envelope_json(
+            raw,
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+
+
 def test_exact_fourteen_key_top_level_closure() -> None:
     assert len(required_envelope_field_names()) == 14
     assert required_envelope_field_names() == frozenset(production_envelope_template().keys())
@@ -57,10 +80,9 @@ def test_references_exactly_one_required_sub_key() -> None:
     "mutator,code",
     (
         (lambda payload: payload.pop("route"), "missing_fields"),
-        (lambda payload: payload.update(extra="x"), "unknown_fields"),
     ),
 )
-def test_missing_and_extra_top_level_rejected(mutator, code: str) -> None:
+def test_missing_top_level_field_rejected(mutator, code: str) -> None:
     payload = production_envelope_template()
     mutator(payload)
     with pytest.raises(OneCallEnvelopeProtocolError, match=code):
@@ -70,6 +92,27 @@ def test_missing_and_extra_top_level_rejected(mutator, code: str) -> None:
             service_reference_catalog=_EMPTY_REF_CATALOG,
             commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
         )
+
+
+def test_extra_top_level_field_is_normalized() -> None:
+    from contracts.one_call_envelope import ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS
+
+    import app as app_module
+
+    payload = production_envelope_template(patient_text="Ответ с лишним полем.")
+    payload["extra"] = {"ignored": True}
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        envelope = parse_production_envelope_json(
+            json.dumps(payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert envelope.patient_text == "Ответ с лишним полем."
+        assert ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS in _normalization_codes_from_turn_timing()
 
 
 @pytest.mark.parametrize(
@@ -127,17 +170,40 @@ def test_direct_fact_ids_invalid_shape(value: object) -> None:
         )
 
 
-@pytest.mark.parametrize("items", ([" "], [True], [""], ["a", "a"]))
-def test_direct_fact_ids_item_and_duplicate_rejected(items: list[object]) -> None:
+@pytest.mark.parametrize("items", ([" "], [True], [""], ["installment_12", 17], ["installment_12", None]))
+def test_direct_fact_ids_item_rejected(items: list[object]) -> None:
     payload = production_envelope_template(references={"direct_fact_ids": items})
-    pattern = "direct_fact_id_duplicate" if items == ["a", "a"] else "direct_fact_ids_invalid"
-    with pytest.raises(OneCallEnvelopeProtocolError, match=pattern):
+    with pytest.raises(OneCallEnvelopeProtocolError, match="direct_fact_ids_invalid"):
         parse_production_envelope_json(
             json.dumps(payload),
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
             commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
         )
+
+
+def test_direct_fact_ids_duplicate_is_normalized() -> None:
+    from contracts.one_call_envelope import ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED
+
+    import app as app_module
+
+    payload = production_envelope_template(
+        patient_text="Ответ с дублем.",
+        references={"direct_fact_ids": ["fact_a", "fact_a"]},
+    )
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        envelope = parse_production_envelope_json(
+            json.dumps(payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        )
+        assert envelope.patient_text == "Ответ с дублем."
+        assert envelope.references.direct_fact_ids == ("fact_a",)
+        assert ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED in _normalization_codes_from_turn_timing()
 
 
 def test_empty_direct_fact_ids_accepted() -> None:
@@ -340,3 +406,154 @@ def test_one_call_envelope_references_rejects_invalid_direct_ids(
 def test_one_call_envelope_references_strips_and_preserves_order() -> None:
     refs = OneCallEnvelopeReferences(direct_fact_ids=[" x ", "y"])
     assert refs.direct_fact_ids == ("x", "y")
+
+
+def test_envelope_normalization_diagnostics_are_request_local() -> None:
+    from contracts.one_call_envelope import ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS
+
+    import app as app_module
+
+    clean_payload = production_envelope_template(patient_text="Чистый ответ.")
+    noisy_payload = production_envelope_template(patient_text="Ответ с лишним полем.")
+    noisy_payload["extra"] = {"ignored": True}
+    invalid_payload = production_envelope_template(
+        references={"direct_fact_ids": ["installment_12", 17]},
+    )
+
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parse_production_envelope_json(
+            json.dumps(noisy_payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS in _normalization_codes_from_turn_timing()
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parse_production_envelope_json(
+            json.dumps(clean_payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert _normalization_codes_from_turn_timing() == ()
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parse_production_envelope_json(
+            json.dumps(noisy_payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        with pytest.raises(OneCallEnvelopeProtocolError, match="direct_fact_ids_invalid"):
+            parse_production_envelope_json(
+                json.dumps(invalid_payload),
+                active_service_catalog=_EMPTY_CATALOG,
+                service_reference_catalog=_EMPTY_REF_CATALOG,
+                commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+            )
+        assert _normalization_codes_from_turn_timing() == ()
+
+
+def test_envelope_normalization_diagnostics_do_not_leak_across_request_contexts() -> None:
+    from contracts.one_call_envelope import ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS
+
+    import app as app_module
+
+    payload = production_envelope_template(patient_text="Ответ с лишним полем.")
+    payload["extra"] = {"ignored": True}
+
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parse_production_envelope_json(
+            json.dumps(payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS in _normalization_codes_from_turn_timing()
+
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        clean = production_envelope_template(patient_text="Чистый ответ.")
+        parse_production_envelope_json(
+            json.dumps(clean),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert _normalization_codes_from_turn_timing() == ()
+
+
+def test_envelope_normalization_cleared_before_early_parse_failures() -> None:
+    from contracts.one_call_envelope import ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS
+
+    import app as app_module
+
+    noisy_payload = production_envelope_template(patient_text="Ответ с лишним полем.")
+    noisy_payload["extra"] = {"ignored": True}
+    clean_payload = production_envelope_template(patient_text="Чистый ответ.")
+    oversized = "x" * (MAX_ENVELOPE_UTF8_BYTES + 1)
+
+    with app_module.app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        parse_production_envelope_json(
+            json.dumps(noisy_payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS in _normalization_codes_from_turn_timing()
+
+        with pytest.raises(OneCallEnvelopeProtocolError, match="envelope_output_invalid"):
+            parse_production_envelope_json(
+                None,
+                active_service_catalog=_EMPTY_CATALOG,
+                service_reference_catalog=_EMPTY_REF_CATALOG,
+                commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            )
+        assert _normalization_codes_from_turn_timing() == ()
+
+        with pytest.raises(OneCallEnvelopeProtocolError, match="envelope_empty"):
+            parse_production_envelope_json(
+                "   ",
+                active_service_catalog=_EMPTY_CATALOG,
+                service_reference_catalog=_EMPTY_REF_CATALOG,
+                commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            )
+        assert _normalization_codes_from_turn_timing() == ()
+
+        with pytest.raises(OneCallEnvelopeProtocolError, match="envelope_oversized"):
+            parse_production_envelope_json(
+                oversized,
+                active_service_catalog=_EMPTY_CATALOG,
+                service_reference_catalog=_EMPTY_REF_CATALOG,
+                commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            )
+        assert _normalization_codes_from_turn_timing() == ()
+
+        with pytest.raises(OneCallEnvelopeProtocolError, match="json_invalid"):
+            parse_production_envelope_json(
+                "{not-json",
+                active_service_catalog=_EMPTY_CATALOG,
+                service_reference_catalog=_EMPTY_REF_CATALOG,
+                commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            )
+        assert _normalization_codes_from_turn_timing() == ()
+
+        parse_production_envelope_json(
+            json.dumps(clean_payload),
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        )
+        assert _normalization_codes_from_turn_timing() == ()

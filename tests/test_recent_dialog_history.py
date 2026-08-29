@@ -48,3 +48,30 @@ def test_current_question_not_in_history_before_mem_add_user():
     mem_add_user(sid, current)
     st = mem_get(sid)
     assert st["hist"][-1]["content"] == current
+
+
+def test_dynamic_suffix_includes_formatted_history_without_current_question() -> None:
+    from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
+    from core.sales_one_plus_protocol import build_sales_one_plus_dynamic_suffix
+
+    sid = "suffix-history"
+    mem_reset(sid)
+    mem_add_user(sid, "Делаете all-on-4?")
+    mem_add_bot(sid, "Да, выполняем All-on-4.")
+    current = "а сколько стоит?"
+    history = recent_dialog_history(sid)
+    authority = ExactSalesFieldAuthority(authority="unknown", provenance="test")
+    resolution = ExactSalesResolution(
+        None, None, None, None, None, authority, authority, authority, authority, authority
+    )
+    suffix = build_sales_one_plus_dynamic_suffix(
+        exact_sales_resolution=resolution,
+        current_strict_facts=(),
+        sales_context={},
+        user_message=current,
+        dialog_history=history,
+    )
+    assert "не источник фактов" in suffix
+    assert "all-on-4" in suffix.lower()
+    assert current in suffix
+    assert suffix.count(current) == 1

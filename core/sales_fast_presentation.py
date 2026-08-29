@@ -14,7 +14,7 @@ from core.sales_fast_authoritative_commerce import (
     build_authoritative_commerce_result,
     gate_commerce_result_by_intent,
 )
-from core.target_contact_authority import fallback_answer_with_phone
+from core.target_contact_authority import canonical_contact_phone, fallback_answer_with_phone
 from core.target_presentation_decision import TargetPresentationCadenceState
 from core.target_response_verifier import TargetVerifiedComposedResponse
 from core.target_runtime_client_context import TargetRuntimeClientContext
@@ -123,11 +123,20 @@ def build_direct_promotion_patient_text(
     return "\n\n".join(texts)
 
 
+_ADMIN_HANDOFF_BASE = (
+    "Спасибо, что написали. С этим вопросом лучше обратиться "
+    "к администратору клиники — он поможет дальше."
+)
+_ADMIN_HANDOFF_URGENT_SUFFIX = (
+    " Если ситуация срочная, пожалуйста, позвоните: {phone}."
+)
+
+
 def static_sales_fast_admin_handoff(*, client_id: str) -> str:
-    return fallback_answer_with_phone(
-        base_text="Пожалуйста, позвоните в клинику: администратор поможет дальше.",
-        client_id=client_id,
-    )
+    phone = canonical_contact_phone(client_id)
+    if not phone:
+        return _ADMIN_HANDOFF_BASE
+    return f"{_ADMIN_HANDOFF_BASE}{_ADMIN_HANDOFF_URGENT_SUFFIX.format(phone=phone)}"
 
 
 def materialize_sales_fast_admin_payload(
@@ -216,6 +225,44 @@ def materialize_sales_fast_error_payload(
             },
         },
         error_code=error_code,
+    )
+
+
+_SCOPE_CLARIFY_TEXT = (
+    "Чтобы ответить точнее, уточните, пожалуйста, о какой услуге или ситуации идёт речь."
+)
+
+
+def materialize_sales_fast_scope_clarify_payload(
+    *,
+    client_id: str,
+    sid: str,
+    conflict_code: str,
+) -> TargetRuntimeTerminalPayload:
+    """Short scope clarify when typed UI/envelope disagree without showing model price."""
+
+    return TargetRuntimeTerminalPayload(
+        kind="terminal",
+        payload={
+            "answer": _SCOPE_CLARIFY_TEXT,
+            "quick_replies": [],
+            "cta": None,
+            "video": None,
+            "situation": {"show": False, "mode": "normal"},
+            "offer": None,
+            "meta": {
+                "client_id": client_id,
+                "sid": sid,
+                "intent": "content",
+                "answer_path": "sales_fast",
+                "service_route": "sales_fast_scope_clarify",
+                "ui_source_family": "guided_fallback",
+                "attribution_kind": "plain",
+                "terminal_mode": "clarify",
+                "semantic_conflict_code": conflict_code,
+            },
+        },
+        terminal_mode="clarify",
     )
 
 

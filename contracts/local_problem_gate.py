@@ -11,21 +11,16 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, model_validator
 
 
-LocalProblemGateDecision = Literal["spam", "admin", "pass"]
+LocalProblemGateDecision = Literal["spam", "pass"]
 LocalProblemGateReasonCode = Literal[
     "obvious_text_noise",
-    "current_symptom",
-    "complaint_or_management",
-    "diagnosis_request",
-    "personal_treatment_request",
-    "post_procedure_complication",
     "no_high_precision_match",
     "governed_typed_ui",
 ]
 
 
 class LocalProblemGateResult(BaseModel):
-    """One of three local routing decisions, without retaining raw input."""
+    """Spam-only or pass-through to Composer, without retaining raw input."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -36,14 +31,6 @@ class LocalProblemGateResult(BaseModel):
     def _consistent_reason(self) -> Self:
         if self.decision == "spam":
             expected = {"obvious_text_noise"}
-        elif self.decision == "admin":
-            expected = {
-                "current_symptom",
-                "complaint_or_management",
-                "diagnosis_request",
-                "personal_treatment_request",
-                "post_procedure_complication",
-            }
         else:
             expected = {"no_high_precision_match", "governed_typed_ui"}
         if self.reason_code not in expected:

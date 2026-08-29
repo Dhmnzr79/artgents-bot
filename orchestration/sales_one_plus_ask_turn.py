@@ -480,7 +480,7 @@ def orchestrate_sales_one_plus_ask_turn(
             )
 
         local_gate_result = _run_local_problem_gate(q)
-        if local_gate_result.decision != "pass":
+        if local_gate_result.decision == "spam":
             return _service_reply_from_gate(
                 local_gate_result,
                 q=q,

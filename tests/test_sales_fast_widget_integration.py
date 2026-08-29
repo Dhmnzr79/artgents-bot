@@ -138,13 +138,43 @@ def test_flag_off_preserves_planner_target_sequence(monkeypatch: pytest.MonkeyPa
     assert order == ["planner", "target"]
 
 
+def test_widget_future_fear_faq_reaches_fake_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    model_text = "После имплантации возможен умеренный отёк — это нормальная реакция."
+    backend = _CountingBackend(
+        answer_envelope(model_text, commercial_intent="none", service_id=None)
+    )
+    _install_sales_fast_transport(monkeypatch, backend)
+    mem_reset("widget-future-fear")
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={
+            "q": "Будет ли отёк после имплантации?",
+            "sid": "widget-future-fear",
+            "client_id": "demo",
+        },
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome = run_sales_fast_widget_turn(
+            client_id="demo",
+            sid="widget-future-fear",
+            user_message="Будет ли отёк после имплантации?",
+            backend=backend,
+        )
+    assert backend.call_count == 1
+    assert outcome.model_route == "model"
+    assert model_text in str(outcome.widget.payload.get("answer") or "")
+
+
 @pytest.mark.parametrize("case_id", ("a02",))
-def test_flag_on_local_admin_cases_make_zero_provider_calls(case_id: str) -> None:
-    # Normative ADMIN boundary: docs/ONE_CALL_CACHED_FULLCONTEXT_ARCHITECTURE_LOCK.md
-    # § «Нормативная граница ANSWER / ADMIN» — explicit post-procedure complication.
-    # General medical FAQ (a01/a03) must reach model ANSWER with one provider call.
+def test_symptom_case_reaches_composer_with_one_provider_call(case_id: str) -> None:
     case = _case(case_id)
-    backend = _CountingBackend("@ADMIN\nignored")
+    backend = _CountingBackend(admin_envelope())
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     result = run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
@@ -161,7 +191,8 @@ def test_flag_on_local_admin_cases_make_zero_provider_calls(case_id: str) -> Non
         commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
     )
     assert result.decision == "admin"
-    assert backend.call_count == 0
+    assert result.reason == "model_admin"
+    assert backend.call_count == 1
 
 
 @pytest.mark.parametrize("case_id", ("a01", "a03"))
@@ -327,26 +358,27 @@ def test_streaming_parser_emits_only_validated_patient_text() -> None:
     assert joined == "Видимый текст"
 
 
-def test_provider_error_falls_back_without_second_call() -> None:
+def test_provider_error_raises_backend_failure_without_second_call() -> None:
+    from core.sales_one_plus_turn import SalesOnePlusBackendFailure
+
     case = _case("m01")
     backend = _CountingBackend(RuntimeError("timeout"))
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
-    result = run_sales_one_plus_candidate_stream(
-        user_message=case.user_message,
-        cached_full_context=context,
-        exact_sales_resolution=_resolution(case),
-        current_strict_facts=_strict_facts(case),
-        sales_context=case.sales_context,
-        static_admin_handoff_text="Позвоните администратору.",
-        backend=backend,
-        on_delta=lambda _delta: None,
-        pack_identity=_PACK_IDENTITY,
-        active_service_catalog=_DEMO_CATALOG,
-        service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
-    )
-    assert result.decision == "admin"
-    assert result.handoff_text == "Позвоните администратору."
+    with pytest.raises(SalesOnePlusBackendFailure, match="backend_failed"):
+        run_sales_one_plus_candidate_stream(
+            user_message=case.user_message,
+            cached_full_context=context,
+            exact_sales_resolution=_resolution(case),
+            current_strict_facts=_strict_facts(case),
+            sales_context=case.sales_context,
+            static_admin_handoff_text="Позвоните администратору.",
+            backend=backend,
+            on_delta=lambda _delta: None,
+            pack_identity=_PACK_IDENTITY,
+            active_service_catalog=_DEMO_CATALOG,
+            service_reference_catalog=_DEMO_REF_CATALOG,
+            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        )
     assert backend.call_count == 1
 
 
@@ -420,6 +452,49 @@ def _install_sales_fast_transport(
     )
 
 
+def _install_rotating_backend_factory(
+    monkeypatch: pytest.MonkeyPatch,
+    backends: list[_CountingBackend],
+) -> None:
+    index = {"value": 0}
+
+    def factory() -> _CountingBackend:
+        backend = backends[index["value"]]
+        index["value"] += 1
+        return backend
+
+    _install_sales_fast_transport(monkeypatch, backends[0], factory=factory)
+
+
+def _parse_sse_events(resp) -> list[tuple[str, dict]]:
+    buffer = ""
+    events: list[tuple[str, dict]] = []
+    current_event: str | None = None
+    for chunk in resp.response:
+        buffer += chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+        while "\n" in buffer:
+            line, buffer = buffer.split("\n", 1)
+            line = line.rstrip("\r")
+            if line.startswith("event: "):
+                current_event = line[len("event: ") :].strip()
+            elif line.startswith("data: "):
+                raw = line[len("data: ") :]
+                try:
+                    data = json.loads(raw) if raw.strip() else {}
+                except json.JSONDecodeError:
+                    data = {}
+                if current_event:
+                    events.append((current_event, data))
+                current_event = None
+    return events
+
+
+_ADMIN_HANDOFF_BASE_LITERAL = (
+    "Спасибо, что написали. С этим вопросом лучше обратиться "
+    "к администратору клиники — он поможет дальше."
+)
+
+
 def _orchestrate_ask(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -467,17 +542,11 @@ def _orchestrate_ask(
         return dict(orch.service_payload or {})
 
 
-@pytest.mark.parametrize(
-    "question",
-    (
-        "После операции появилось воспаление, подскажите порядок действий",
-    ),
-)
-def test_widget_path_local_admin_cases_skip_provider_factory(
+def test_widget_path_model_admin_uses_one_provider_call(
     monkeypatch: pytest.MonkeyPatch,
-    question: str,
+    question: str = "После операции появилось воспаление, подскажите порядок действий",
 ) -> None:
-    backend = _CountingBackend("@ADMIN\nignored")
+    backend = _CountingBackend(admin_envelope())
     factory_invoked = {"value": False}
 
     def _factory() -> _CountingBackend:
@@ -498,8 +567,8 @@ def test_widget_path_local_admin_cases_skip_provider_factory(
         factory=_factory,
     )
     assert payload["meta"]["service_route"] == "sales_fast_admin"
-    assert factory_invoked["value"] is False
-    assert backend.call_count == 0
+    assert factory_invoked["value"] is True
+    assert backend.call_count == 1
 
 
 @pytest.mark.parametrize(
@@ -740,7 +809,7 @@ def test_widget_path_fear_pain_uses_single_provider_call(monkeypatch: pytest.Mon
     assert backend.call_count == 1
 
 
-def test_widget_path_provider_failure_falls_back_without_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_widget_path_provider_failure_returns_technical_error_without_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     backend = _CountingBackend(RuntimeError("timeout"))
     payload = _orchestrate_ask(
         monkeypatch,
@@ -748,9 +817,56 @@ def test_widget_path_provider_failure_falls_back_without_retry(monkeypatch: pyte
         q="Как обеспечивается стерильность?",
         sid="widget-provider-fail",
     )
-    assert payload["meta"]["service_route"] == "sales_fast_admin"
+    assert payload["meta"]["service_route"] == "sales_fast_error"
     assert backend.call_count == 1
-    assert "администратор" in payload["answer"].lower() or "клиник" in payload["answer"].lower()
+    assert "не удалось подготовить ответ" in payload["answer"].lower()
+    assert "позвоните" not in payload["answer"].lower()
+
+
+def test_widget_two_turn_history_reaches_composer_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from session import bind_session_client, mem_add_bot, mem_add_user, mem_reset
+
+    sid = "widget-history-cycle"
+    bind_session_client("demo")
+    mem_reset(sid)
+    first_q = "Делаете all-on-4?"
+    first_answer = "Да, выполняем All-on-4."
+    backend1 = _CountingBackend(answer_envelope(first_answer))
+    _install_sales_fast_transport(monkeypatch, backend1)
+    with flask_app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message=first_q,
+            backend=backend1,
+        )
+    mem_add_user(sid, first_q)
+    mem_add_bot(sid, first_answer)
+
+    second_q = "а сколько стоит?"
+    backend2 = _CountingBackend(answer_envelope("Стоимость зависит от случая."))
+    _install_sales_fast_transport(monkeypatch, backend2)
+    with flask_app.test_request_context("/ask", method="POST"):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        run_sales_fast_widget_turn(
+            client_id="demo",
+            sid=sid,
+            user_message=second_q,
+            backend=backend2,
+        )
+    prompt = str(backend2.invocation.user_prompt)
+    assert "не источник фактов" in prompt
+    assert first_q.lower() in prompt.lower()
+    assert first_answer.lower() in prompt.lower()
+    assert prompt.count(second_q) == 1
 
 
 def test_widget_path_observability_timings_without_pii(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -788,7 +904,7 @@ def test_widget_path_observability_timings_without_pii(monkeypatch: pytest.Monke
     assert "Стерильность по протоколу" not in blob
 
 
-def test_governed_ui_envelope_conflict_is_admin_without_model_text(
+def test_governed_ui_envelope_conflict_is_scope_clarify_without_model_text(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
@@ -854,9 +970,10 @@ def test_governed_ui_envelope_conflict_is_admin_without_model_text(
             backend=backend,
             local_gate_result=governed_gate,
         )
-    assert outcome.model_route == "model_admin"
+    assert outcome.model_route == "clarify"
     assert outcome.failure_kind == "semantic_ui_envelope_conflict_service_id"
     assert model_text not in str(outcome.widget.payload.get("answer") or "")
+    assert outcome.widget.payload.get("offer") is None
     assert backend.call_count == 1
 
 
@@ -905,6 +1022,7 @@ def _run_widget_turn_keep_session(
     flask_app,
     backend: _CountingBackend | None = None,
     on_delta: object | None = None,
+    allow_terminal: bool = False,
 ) -> tuple[dict, _CountingBackend]:
     from session import bind_session_client
 
@@ -928,7 +1046,8 @@ def _run_widget_turn_keep_session(
             backend=active_backend,
             on_delta=on_delta,
         )
-    assert outcome.widget.kind == "materialized"
+    if not allow_terminal:
+        assert outcome.widget.kind == "materialized"
     return dict(outcome.widget.payload or {}), active_backend
 
 
@@ -1563,12 +1682,13 @@ def test_http_ask_stream_corrupt_contacts_single_ui_and_done(
     assert "Что-то пошло не так" in body
 
 
-def test_nikadent_local_admin_without_contacts_has_no_demo_phone_or_provider_call(
+def test_nikadent_model_admin_without_contacts_has_no_demo_phone_or_extra_provider_call(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
     from core.clinic_contact_policies import ClinicContactFacts
     from core.target_contact_authority import canonical_contact_phone
+    from core.one_call_envelope_protocol import dumps_production_envelope
 
     demo_phone = canonical_contact_phone("demo")
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
@@ -1582,7 +1702,14 @@ def test_nikadent_local_admin_without_contacts_has_no_demo_phone_or_provider_cal
             parking_display=None,
         ),
     )
-    backend = _CountingBackend("@ADMIN\nignored")
+    backend = _CountingBackend(
+        dumps_production_envelope(
+            route="ADMIN",
+            patient_text=None,
+            clarify_axis=None,
+            clarify_service_options=None,
+        )
+    )
     _install_sales_fast_transport(monkeypatch, backend)
     with flask_app.test_request_context(
         "/ask",
@@ -1603,10 +1730,10 @@ def test_nikadent_local_admin_without_contacts_has_no_demo_phone_or_provider_cal
             backend=backend,
         )
     answer = str(outcome.widget.payload.get("answer") or "")
-    assert outcome.model_route == "local"
-    assert backend.call_count == 0
+    assert outcome.model_route == "model_admin"
+    assert backend.call_count == 1
     assert demo_phone not in answer
-    assert "администратор" in answer.lower() or "клиник" in answer.lower()
+    assert answer == _ADMIN_HANDOFF_BASE_LITERAL
 
 
 def test_widget_price_profile_full_path_two_turns_with_service_value(
@@ -1915,3 +2042,274 @@ def test_materialized_widget_ok_skips_extract_session_selection_fallback(
         flask_app=flask_app,
     )
     assert fallback_calls["count"] == 0
+
+
+def test_http_ask_two_turn_history_reaches_composer_without_manual_mem_seed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from session import bind_session_client, mem_reset
+
+    sid = "http-ask-history-cycle"
+    first_q = "Делаете all-on-4?"
+    second_q = "а сколько стоит?"
+    backends = [
+        _CountingBackend(answer_envelope("Да, выполняем All-on-4.")),
+        _CountingBackend(answer_envelope("Стоимость зависит от случая.")),
+    ]
+    _install_rotating_backend_factory(monkeypatch, backends)
+    bind_session_client("demo")
+    mem_reset(sid)
+    client = app_module.app.test_client()
+    resp1 = client.post(
+        "/ask",
+        json={"q": first_q, "sid": sid, "client_id": "demo"},
+    )
+    assert resp1.status_code == 200
+    visible_first = str(resp1.get_json().get("answer") or "")
+    assert visible_first.strip()
+    resp2 = client.post(
+        "/ask",
+        json={"q": second_q, "sid": sid, "client_id": "demo"},
+    )
+    assert resp2.status_code == 200
+    assert backends[1].invocation is not None
+    prompt = str(backends[1].invocation.user_prompt)
+    corpus = str(backends[1].invocation.model_corpus_text)
+    assert first_q.lower() in prompt.lower()
+    assert visible_first.lower() in prompt.lower()
+    assert prompt.count(second_q) == 1
+    assert first_q.lower() not in corpus.lower()
+    assert visible_first.lower() not in corpus.lower()
+
+
+def test_http_ask_stream_two_turn_history_reaches_composer_without_manual_mem_seed(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from session import bind_session_client, mem_reset
+
+    sid = "http-stream-history-cycle"
+    first_q = "Делаете all-on-4?"
+    second_q = "а сколько стоит?"
+    backends = [
+        _CountingBackend(answer_envelope("Да, выполняем All-on-4.")),
+        _CountingBackend(answer_envelope("Стоимость зависит от случая.")),
+    ]
+    _install_rotating_backend_factory(monkeypatch, backends)
+    bind_session_client("demo")
+    mem_reset(sid)
+    client = flask_app.test_client()
+    resp1 = client.post(
+        "/ask/stream",
+        json={"q": first_q, "sid": sid, "client_id": "demo"},
+    )
+    assert resp1.status_code == 200
+    events1 = _parse_sse_events(resp1)
+    ui1 = [data for name, data in events1 if name == "ui"]
+    assert ui1
+    visible_first = str(ui1[-1].get("answer") or "")
+    assert visible_first.strip()
+    resp2 = client.post(
+        "/ask/stream",
+        json={"q": second_q, "sid": sid, "client_id": "demo"},
+    )
+    assert resp2.status_code == 200
+    _parse_sse_events(resp2)
+    assert backends[1].invocation is not None
+    prompt = str(backends[1].invocation.user_prompt)
+    corpus = str(backends[1].invocation.model_corpus_text)
+    assert first_q.lower() in prompt.lower()
+    assert visible_first.lower() in prompt.lower()
+    assert prompt.count(second_q) == 1
+    assert first_q.lower() not in corpus.lower()
+    assert visible_first.lower() not in corpus.lower()
+
+
+def test_http_ask_history_does_not_cross_clients_with_same_sid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from session import bind_session_client, mem_reset
+
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    sid = "shared-sid-history"
+    demo_q = "Сколько стоит All-on-4 в demo?"
+    nika_q = "Сколько стоит All-on-4 в nikadent?"
+    demo_answer = "Demo All-on-4 ответ."
+    nika_answer = "Nikadent All-on-4 ответ."
+    demo_followup_q = "а рассрочка?"
+    backends = [
+        _CountingBackend(answer_envelope(demo_answer, service_id="all_on_4")),
+        _CountingBackend(answer_envelope(nika_answer, service_id="all_on_4")),
+        _CountingBackend(answer_envelope("Продолжение demo.")),
+    ]
+    _install_rotating_backend_factory(monkeypatch, backends)
+    bind_session_client("demo")
+    mem_reset(sid)
+    bind_session_client("nikadent")
+    mem_reset(sid)
+    bind_session_client("demo")
+    client = app_module.app.test_client()
+    resp_demo = client.post("/ask", json={"q": demo_q, "sid": sid, "client_id": "demo"})
+    assert resp_demo.status_code == 200
+    visible_demo = str(resp_demo.get_json().get("answer") or "")
+    assert visible_demo.strip()
+    client.post("/ask", json={"q": nika_q, "sid": sid, "client_id": "nikadent"})
+    assert backends[1].invocation is not None
+    nika_prompt = str(backends[1].invocation.user_prompt)
+    assert nika_q.lower() in nika_prompt.lower()
+    assert demo_q.lower() not in nika_prompt.lower()
+    assert visible_demo.lower() not in nika_prompt.lower()
+    client.post("/ask", json={"q": demo_followup_q, "sid": sid, "client_id": "demo"})
+    assert backends[2].invocation is not None
+    demo_prompt = str(backends[2].invocation.user_prompt)
+    assert demo_followup_q.lower() in demo_prompt.lower()
+    assert demo_q.lower() in demo_prompt.lower()
+    assert visible_demo.lower() in demo_prompt.lower()
+    assert nika_q.lower() not in demo_prompt.lower()
+    assert nika_answer.lower() not in demo_prompt.lower()
+    bind_session_client("demo")
+
+
+def test_scope_clarify_preserves_service_and_marketing_session_state(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.target_runtime_session import read_target_runtime_session
+
+    sid = "scope-clarify-state"
+    _run_widget_turn_with_envelope(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Расскажите про All-on-4",
+        envelope_json=answer_envelope(
+            "All-on-4 — протокол имплантации на четырёх имплантах.",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+            commercial_intent="none",
+        ),
+        flask_app=flask_app,
+    )
+    before = read_target_runtime_session(sid)
+    assert before.last_service_id == "all_on_4"
+    assert before.shown_fact_ids or before.shown_amplifier_refs
+
+    payload, backend = _run_widget_turn_keep_session(
+        monkeypatch,
+        client_id="demo",
+        sid=sid,
+        user_message="Сколько стоит КТ?",
+        envelope_json=answer_envelope(
+            "КТ стоит 5000 ₽.",
+            commercial_intent="price",
+            service_id="professional_whitening",
+        ),
+        flask_app=flask_app,
+        allow_terminal=True,
+    )
+    after = read_target_runtime_session(sid)
+    assert after == before
+    answer = str(payload.get("answer") or "").lower()
+    assert payload["meta"]["service_route"] == "sales_fast_scope_clarify"
+    assert "позвоните" not in answer
+    assert "администратор" not in answer
+    assert "5000" not in answer
+    assert payload.get("offer") is None
+    assert payload.get("cta") is None
+    assert payload.get("video") is None
+    assert payload.get("situation", {}).get("show") is False
+    assert backend.call_count == 1
+
+
+def test_http_ask_model_admin_exact_literal_text_and_payload_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from core.one_call_envelope_protocol import dumps_production_envelope
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    expected = (
+        f"{_ADMIN_HANDOFF_BASE_LITERAL} Если ситуация срочная, пожалуйста, позвоните: {demo_phone}."
+    )
+    backend = _CountingBackend(
+        dumps_production_envelope(
+            route="ADMIN",
+            patient_text=None,
+            clarify_axis=None,
+            clarify_service_options=None,
+        )
+    )
+    payload = _orchestrate_ask(
+        monkeypatch,
+        backend=backend,
+        q="После операции появилось воспаление, подскажите порядок действий",
+        sid="admin-demo-literal",
+    )
+    assert payload["answer"] == expected
+    assert payload["quick_replies"] == []
+    assert payload.get("cta") is None
+    assert payload.get("video") is None
+    assert payload.get("offer") is None
+    assert payload.get("situation", {}).get("show") is False
+    assert payload["meta"]["service_route"] == "sales_fast_admin"
+    assert backend.call_count == 1
+
+
+def test_http_ask_model_admin_without_phone_exact_literal_text(
+    monkeypatch: pytest.MonkeyPatch,
+    flask_app,
+) -> None:
+    from core.clinic_contact_policies import ClinicContactFacts
+    from core.one_call_envelope_protocol import dumps_production_envelope
+    from core.target_contact_authority import canonical_contact_phone
+
+    demo_phone = canonical_contact_phone("demo")
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+    monkeypatch.setattr(
+        "core.target_contact_authority.load_clinic_contact_facts",
+        lambda _client_id: ClinicContactFacts(
+            phone_display="",
+            whatsapp_display=None,
+            address_display=None,
+            hours_display=None,
+            parking_display=None,
+        ),
+    )
+    backend = _CountingBackend(
+        dumps_production_envelope(
+            route="ADMIN",
+            patient_text=None,
+            clarify_axis=None,
+            clarify_service_options=None,
+        )
+    )
+    _install_sales_fast_transport(monkeypatch, backend)
+    with flask_app.test_request_context(
+        "/ask",
+        method="POST",
+        json={
+            "q": "После операции появилось воспаление",
+            "sid": "admin-no-phone-literal",
+            "client_id": "nikadent",
+        },
+    ):
+        from flask import request
+
+        request.ctx = {"turn_t0_monotonic": 0.0}
+        outcome = run_sales_fast_widget_turn(
+            client_id="nikadent",
+            sid="admin-no-phone-literal",
+            user_message="После операции появилось воспаление",
+            backend=backend,
+        )
+    payload = dict(outcome.widget.payload or {})
+    answer = str(payload.get("answer") or "")
+    assert answer == _ADMIN_HANDOFF_BASE_LITERAL
+    assert demo_phone not in answer
+    assert payload["quick_replies"] == []
+    assert payload.get("cta") is None
+    assert payload.get("video") is None
+    assert payload.get("offer") is None
+    assert payload.get("situation", {}).get("show") is False
+    assert backend.call_count == 1

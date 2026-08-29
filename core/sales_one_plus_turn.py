@@ -55,6 +55,14 @@ class _ConsumerCallbackError(Exception):
         super().__init__(type(cause).__name__)
 
 
+class SalesOnePlusBackendFailure(Exception):
+    """Provider/backend failure on the one-call path — not model ADMIN."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
+
+
 def _require_static_handoff(text: object) -> str:
     if not isinstance(text, str) or not text.strip():
         raise ValueError("sales_one_plus_static_admin_handoff_empty")
@@ -72,6 +80,7 @@ def _make_invocation(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     commercial_fact_catalog: CommercialFactCatalogSnapshot,
+    dialog_history: str = "",
 ) -> SalesOnePlusInvocation:
     corpus = cached_full_context.model_corpus_text
     strict_facts = tuple(current_strict_facts)
@@ -88,6 +97,7 @@ def _make_invocation(
         current_strict_facts=strict_facts,
         sales_context=context,
         user_message=user_message,
+        dialog_history=dialog_history,
     )
     return SalesOnePlusInvocation(
         system_prompt=prefix_bundle.stable_prefix,
@@ -113,13 +123,6 @@ def _result_from_local_gate(
             decision="spam",
             source="local_gate",
             reason=gate.reason_code,
-        )
-    if gate.decision == "admin":
-        return SalesOnePlusResult(
-            decision="admin",
-            source="local_gate",
-            reason=gate.reason_code,
-            handoff_text=static_handoff,
         )
     return None
 
@@ -188,6 +191,7 @@ def run_sales_one_plus_candidate(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     commercial_fact_catalog: CommercialFactCatalogSnapshot,
+    dialog_history: str = "",
 ) -> SalesOnePlusResult:
     """Make exactly one blocking backend call after a local pass."""
 
@@ -210,15 +214,12 @@ def run_sales_one_plus_candidate(
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
         commercial_fact_catalog=commercial_fact_catalog,
+        dialog_history=dialog_history,
     )
     try:
         raw = backend.generate(invocation)
-    except Exception:
-        return _admin_result(
-            source="backend",
-            reason="backend_failed",
-            static_handoff=static_handoff,
-        )
+    except Exception as exc:
+        raise SalesOnePlusBackendFailure("backend_failed") from exc
     envelope = parse_production_envelope_json(
         raw,
         active_service_catalog=active_service_catalog,
@@ -250,6 +251,7 @@ def run_sales_one_plus_candidate_stream(
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     commercial_fact_catalog: CommercialFactCatalogSnapshot,
+    dialog_history: str = "",
 ) -> SalesOnePlusResult:
     """Buffer provider JSON fully, validate once, then emit patient_text only."""
 
@@ -284,6 +286,7 @@ def run_sales_one_plus_candidate_stream(
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
         commercial_fact_catalog=commercial_fact_catalog,
+        dialog_history=dialog_history,
     )
     try:
         backend.generate_stream(invocation, parser.ingest)
@@ -292,13 +295,9 @@ def run_sales_one_plus_candidate_stream(
         raise exc.cause
     except OneCallEnvelopeProtocolError:
         raise
-    except Exception:
+    except Exception as exc:
         reason = "stream_interrupted" if parser.has_partial_content else "backend_failed"
-        return _admin_result(
-            source="backend",
-            reason=reason,
-            static_handoff=static_handoff,
-        )
+        raise SalesOnePlusBackendFailure(reason) from exc
 
     if envelope.route == "ADMIN":
         return _admin_result(

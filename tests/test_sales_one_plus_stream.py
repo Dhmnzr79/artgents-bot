@@ -11,7 +11,7 @@ from contracts.sales_one_plus import SalesOnePlusResult
 from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError, dumps_production_envelope
 from core.sales_one_plus_live_backend import SalesOnePlusLiveBackend
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
-from core.sales_one_plus_turn import run_sales_one_plus_candidate_stream
+from core.sales_one_plus_turn import SalesOnePlusBackendFailure, run_sales_one_plus_candidate_stream
 from tests.test_sales_one_plus_turn import (
     _EMPTY_CATALOG,
     _EMPTY_COMMERCIAL_CATALOG,
@@ -138,27 +138,45 @@ def test_candidate_emits_patient_text_only_after_finalize() -> None:
     assert result.interrupted is False
 
 
-def test_candidate_local_admin_and_spam_make_zero_calls_and_zero_deltas() -> None:
+def test_candidate_spam_makes_zero_calls_and_zero_deltas() -> None:
     backend = _StreamBackend((answer_envelope("wrong"),))
-    for message, expected in (("Сильно болит зуб", "admin"), ("!!!!!", "spam")):
-        emitted: list[str] = []
-        result = run_sales_one_plus_candidate_stream(
-            user_message=message,
-            cached_full_context=_context(),
-            exact_sales_resolution=_resolution(),
-            static_admin_handoff_text="Позвоните администратору.",
-            backend=backend,
-            on_delta=emitted.append,
-            pack_identity=_PACK_IDENTITY,
-            active_service_catalog=_EMPTY_CATALOG,
+    emitted: list[str] = []
+    result = run_sales_one_plus_candidate_stream(
+        user_message="!!!!!",
+        cached_full_context=_context(),
+        exact_sales_resolution=_resolution(),
+        static_admin_handoff_text="Позвоните администратору.",
+        backend=backend,
+        on_delta=emitted.append,
+        pack_identity=_PACK_IDENTITY,
+        active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
         commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
     )
-        assert result.decision == expected and emitted == []
+    assert result.decision == "spam" and emitted == []
     assert backend.calls == 0
 
 
-def test_candidate_model_admin_malformed_and_early_failure_use_static_handoff() -> None:
+def test_candidate_symptom_reaches_composer_once() -> None:
+    backend = _StreamBackend((answer_envelope("Ответ."),))
+    emitted: list[str] = []
+    result = run_sales_one_plus_candidate_stream(
+        user_message="Сильно болит зуб",
+        cached_full_context=_context(),
+        exact_sales_resolution=_resolution(),
+        static_admin_handoff_text="Позвоните администратору.",
+        backend=backend,
+        on_delta=emitted.append,
+        pack_identity=_PACK_IDENTITY,
+        active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+    )
+    assert result.decision == "answer"
+    assert backend.calls == 1
+
+
+def test_candidate_model_admin_malformed_and_backend_failure_are_not_admin_handoff() -> None:
     emitted: list[str] = []
     admin_result = _run_stream(backend=_StreamBackend((admin_envelope(),)), on_delta=emitted.append)
     assert admin_result.decision == "admin"
@@ -168,21 +186,16 @@ def test_candidate_model_admin_malformed_and_early_failure_use_static_handoff() 
     with pytest.raises(OneCallEnvelopeProtocolError):
         _run_stream(backend=_StreamBackend(("not json",)), on_delta=emitted.append)
 
-    fail_result = _run_stream(backend=_StreamBackend((), fail_after=True), on_delta=emitted.append)
-    assert fail_result.decision == "admin"
-    assert fail_result.handoff_text == "Позвоните администратору."
-    assert fail_result.patient_text is None and emitted == []
+    with pytest.raises(SalesOnePlusBackendFailure, match="backend_failed"):
+        _run_stream(backend=_StreamBackend((), fail_after=True), on_delta=emitted.append)
 
 
-def test_candidate_late_provider_failure_does_not_emit_partial_answer() -> None:
+def test_candidate_late_provider_failure_raises_backend_failure() -> None:
     emitted: list[str] = []
     partial = answer_envelope("Часть ответа")[:20]
     backend = _StreamBackend((partial,), fail_after=True)
-    result = _run_stream(backend=backend, on_delta=emitted.append)
-
-    assert result.decision == "admin"
-    assert result.source == "backend"
-    assert result.reason == "stream_interrupted"
+    with pytest.raises(SalesOnePlusBackendFailure, match="stream_interrupted"):
+        _run_stream(backend=backend, on_delta=emitted.append)
     assert emitted == []
 
 
@@ -259,6 +272,17 @@ def test_live_adapter_streams_raw_chunks_once_with_json_format(monkeypatch) -> N
     assert request["stream_options"] == {"include_usage": True}
     assert request["response_format"] == {"type": "json_object"}
 
-    second = _run_stream(backend=backend, on_delta=lambda _delta: None)
-    assert second.decision == "admin" and second.interrupted is False
+    spam = run_sales_one_plus_candidate_stream(
+        user_message="!!!!!",
+        cached_full_context=_context(),
+        exact_sales_resolution=_resolution(),
+        static_admin_handoff_text="Позвоните администратору.",
+        backend=backend,
+        on_delta=lambda _delta: None,
+        pack_identity=_PACK_IDENTITY,
+        active_service_catalog=_EMPTY_CATALOG,
+        service_reference_catalog=_EMPTY_REF_CATALOG,
+        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+    )
+    assert spam.decision == "spam"
     assert len(provider_calls) == 1

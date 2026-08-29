@@ -18,7 +18,7 @@ from core.one_call_envelope_protocol import dumps_production_envelope
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.target_cached_full_context import build_target_cached_full_context
 from core.target_client_data import load_target_client_data
-from core.sales_one_plus_turn import run_sales_one_plus_candidate
+from core.sales_one_plus_turn import SalesOnePlusBackendFailure, run_sales_one_plus_candidate
 import core.sales_one_plus_live_backend as live_module
 from core.sales_one_plus_live_backend import SalesOnePlusLiveBackend
 
@@ -101,17 +101,22 @@ def _run(**kwargs):
     return run_sales_one_plus_candidate(static_admin_handoff_text="Позвоните администратору.", **kwargs)
 
 
-def test_local_gate_bypasses_backend_for_admin_and_spam() -> None:
+def test_local_gate_bypasses_backend_only_for_spam() -> None:
     backend = _Backend(answer_envelope("wrong"))
-    assert _run(user_message="Сильно болит зуб", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend).decision == "admin"
-    spam = _run(
-        user_message="!!!!!",
+    symptom = _run(
+        user_message="Сильно болит зуб",
         cached_full_context=_context(),
         exact_sales_resolution=_resolution(),
         backend=backend,
     )
+    assert symptom.decision == "answer" and symptom.patient_text == "wrong" and backend.calls == 1
+    spam = _run(
+        user_message="!!!!!",
+        cached_full_context=_context(),
+        exact_sales_resolution=_resolution(),
+        backend=_Backend(answer_envelope("wrong")),
+    )
     assert spam.decision == "spam" and spam.handoff_text is None
-    assert backend.calls == 0
 
 
 def test_pass_uses_model_corpus_and_pre_model_hints_once() -> None:
@@ -172,7 +177,7 @@ def test_scoped_service_axes_pre_flash_hints_are_neutral() -> None:
     assert "implant_alpha" in backend.invocation.user_prompt
 
 
-def test_model_admin_ignores_prose_and_failures_are_technical_admin() -> None:
+def test_model_admin_ignores_prose_and_backend_failure_is_not_admin() -> None:
     from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
 
     admin = _Backend(admin_envelope())
@@ -184,9 +189,9 @@ def test_model_admin_ignores_prose_and_failures_are_technical_admin() -> None:
     with pytest.raises(OneCallEnvelopeProtocolError, match="json_invalid"):
         _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=malformed)
     assert malformed.calls == 1
-    failed_result = _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=failed)
-    assert failed_result.decision == "admin" and failed_result.patient_text is None and failed_result.handoff_text == "Позвоните администратору." and failed_result.reason == "backend_failed" and failed.calls == 1
-    assert failed_result.envelope is None
+    with pytest.raises(SalesOnePlusBackendFailure, match="backend_failed"):
+        _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=failed)
+    assert failed.calls == 1
 
 
 def test_live_adapter_is_one_shot_and_requests_json_mode(monkeypatch) -> None:
@@ -203,7 +208,8 @@ def test_live_adapter_is_one_shot_and_requests_json_mode(monkeypatch) -> None:
     assert result.decision == "answer" and len(calls) == 1
     assert calls[0]["model"] == "candidate-model"
     assert calls[0]["response_format"] == {"type": "json_object"}
-    assert _run(user_message="Есть парковка?", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend).decision == "admin"
+    spam = _run(user_message="!!!!!", cached_full_context=_context(), exact_sales_resolution=_resolution(), backend=backend)
+    assert spam.decision == "spam"
     assert len(calls) == 1
 
 

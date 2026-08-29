@@ -53,7 +53,7 @@ def test_production_policy_requires_json_only_transport() -> None:
     assert "route=CLARIFY" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Future fears about pain, price, osseointegration, trust, or timing" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "PRE_MODEL_HINTS.ambiguous_scope_hint is true" in SALES_ONE_PLUS_SYSTEM_POLICY
-    assert "PRE_MODEL_HINTS are non-authoritative context only" in SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "PRE_MODEL_HINTS and recent dialog context are non-authoritative" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "SALES_CONTEXT.needs_admin_quote is true" not in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "Classify commercial_intent only" in SALES_ONE_PLUS_SYSTEM_POLICY
     assert "deterministic code renders those values" in SALES_ONE_PLUS_SYSTEM_POLICY
@@ -68,7 +68,8 @@ def test_production_policy_medical_faq_boundary() -> None:
     assert "complex medical questions" not in policy
     assert "general informational medical faq" in policy
     assert "route=answer grounded in the corpus" in policy
-    assert "explicit requests to determine personal medical eligibility" in policy
+    assert "positive reviews" in policy
+    assert "ordinary requests to contact a doctor or staff member are route=answer" in policy
     assert "uncertainty alone is not grounds for admin" in policy
     assert "if the wording does not prove a personal problematic request" in policy
 
@@ -88,7 +89,7 @@ def test_production_policy_grounded_data_gap_rule() -> None:
 
 def test_production_policy_preserves_admin_and_medical_faq_boundaries() -> None:
     policy = SALES_ONE_PLUS_SYSTEM_POLICY.casefold()
-    assert "route=admin is only for problematic requests" in policy
+    assert "route=admin is for problematic or non-conversion requests" in policy
     assert "general informational medical faq" in policy
     assert "route=answer grounded in the corpus" in policy
     assert "do not diagnose, prescribe, or give a personal eligibility verdict" in policy

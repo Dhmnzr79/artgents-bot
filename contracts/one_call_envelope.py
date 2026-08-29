@@ -44,6 +44,13 @@ _REQUIRED_FIELD_NAMES = frozenset(
 
 _REFERENCE_FIELD_NAMES = frozenset({"direct_fact_ids"})
 
+ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS = (
+    "envelope_normalized_unknown_top_level_fields"
+)
+ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED = (
+    "envelope_normalized_direct_fact_id_deduped"
+)
+
 
 def _require_nonblank(value: str, *, code: str) -> str:
     token = value.strip()

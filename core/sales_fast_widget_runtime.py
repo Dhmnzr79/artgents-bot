@@ -27,6 +27,7 @@ from core.sales_fast_presentation import (
     materialize_sales_fast_admin_payload,
     materialize_sales_fast_answer_payload,
     materialize_sales_fast_error_payload,
+    materialize_sales_fast_scope_clarify_payload,
     materialize_sales_fast_spam_payload,
     materialize_sales_fast_terminal_from_dispatch,
     sales_fast_session_selection,
@@ -52,6 +53,7 @@ from core.sales_one_plus_semantic_authority import (
 )
 from core.sales_one_plus_protocol import AUTHORITY_CLIENT_ID_HINT_KEY
 from core.sales_one_plus_turn import (
+    SalesOnePlusBackendFailure,
     run_sales_one_plus_candidate,
     run_sales_one_plus_candidate_stream,
 )
@@ -86,6 +88,21 @@ _TECHNICAL_ERROR_PATIENT_TEXT = (
 )
 _TECHNICAL_SEMANTIC_CONFLICT_CODES = frozenset(
     {
+        "service_id_inactive",
+        "stage_not_allowed",
+        "clarify_service_options_invalid",
+        "semantic_envelope_service_id_conflict",
+        "requested_service_id_required_for_resolved",
+        "requested_service_id_invalid",
+        "service_id_conflict_inactive_reference",
+    }
+)
+_SCOPE_CLARIFY_CONFLICT_CODES = frozenset(
+    {
+        "semantic_ui_envelope_conflict_service_id",
+        "semantic_ui_envelope_conflict_extent",
+        "semantic_ui_envelope_conflict_jaw",
+        "semantic_ui_envelope_conflict_stage",
         "semantic_catalog_envelope_conflict_service_id",
         "semantic_session_envelope_conflict_service_id",
     }
@@ -175,17 +192,6 @@ def _local_gate_terminal_outcome(
             provider_calls=0,
             model_route="local",
         )
-    if gate.decision == "admin":
-        handoff = static_sales_fast_admin_handoff(client_id=client_id)
-        return SalesFastWidgetOutcome(
-            widget=materialize_sales_fast_admin_payload(
-                client_id=client_id,
-                sid=sid,
-                handoff_text=handoff,
-            ),
-            provider_calls=0,
-            model_route="local",
-        )
     return None
 
 
@@ -195,7 +201,7 @@ def sales_fast_widget_outcome_from_local_gate(
     client_id: str,
     sid: str,
 ) -> SalesFastWidgetOutcome | None:
-    """Materialize spam/admin terminal widgets from a normative gate result."""
+    """Materialize spam terminal widgets from a normative gate result."""
 
     return _local_gate_terminal_outcome(gate, client_id=client_id, sid=sid)
 
@@ -217,6 +223,25 @@ def _technical_error_outcome(
         provider_calls=provider_calls,
         model_route="error",
         failure_kind=error_code,
+    )
+
+
+def _scope_clarify_outcome(
+    *,
+    client_id: str,
+    sid: str,
+    conflict_code: str,
+    provider_calls: int,
+) -> SalesFastWidgetOutcome:
+    return SalesFastWidgetOutcome(
+        widget=materialize_sales_fast_scope_clarify_payload(
+            client_id=client_id,
+            sid=sid,
+            conflict_code=conflict_code,
+        ),
+        provider_calls=provider_calls,
+        model_route="clarify",
+        failure_kind=conflict_code,
     )
 
 
@@ -516,6 +541,9 @@ def run_sales_fast_widget_turn(
         **sales_context,
         AUTHORITY_CLIENT_ID_HINT_KEY: client_id,
     }
+    from session import recent_dialog_history
+
+    dialog_history = recent_dialog_history(sid)
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
@@ -546,6 +574,7 @@ def run_sales_fast_widget_turn(
                 active_service_catalog=active_service_catalog,
                 service_reference_catalog=service_reference_catalog,
                 commercial_fact_catalog=commercial_fact_catalog,
+                dialog_history=dialog_history,
             )
         else:
             result = run_sales_one_plus_candidate_stream(
@@ -562,7 +591,34 @@ def run_sales_fast_widget_turn(
                 active_service_catalog=active_service_catalog,
                 service_reference_catalog=service_reference_catalog,
                 commercial_fact_catalog=commercial_fact_catalog,
+                dialog_history=dialog_history,
             )
+    except SalesOnePlusBackendFailure as exc:
+        backend_invocations = int(getattr(backend, "call_count", 0) or getattr(backend, "calls", 0) or 0)
+        budget = current_provider_call_budget()
+        provider_calls = int(budget.call_count) if budget is not None else backend_invocations
+        turn_timing.stage_end(
+            "sales_fast_model",
+            status="exception",
+            llm_used=provider_calls > 0,
+            reason=exc.reason,
+        )
+        turn_timing.stage_end("sales_fast", status="exception", reason=exc.reason)
+        record_sales_fast_observability(
+            architecture="new",
+            route="error",
+            provider_calls=provider_calls,
+            model=SALES_ONE_PLUS_FLASH_MODEL if provider_calls else None,
+            failure_kind=exc.reason,
+            timings=collect_sales_fast_timings_ms(),
+            backend_invocations=backend_invocations,
+        )
+        return _technical_error_outcome(
+            client_id=client_id,
+            sid=sid,
+            error_code=exc.reason,
+            provider_calls=provider_calls,
+        )
     except OneCallEnvelopeProtocolError as exc:
         backend_invocations = int(getattr(backend, "call_count", 0) or getattr(backend, "calls", 0) or 0)
         budget = current_provider_call_budget()
@@ -687,6 +743,13 @@ def _materialize_result(
             service_identity=service_identity,
         )
     except SalesOnePlusSemanticConflictError as exc:
+        if exc.code in _SCOPE_CLARIFY_CONFLICT_CODES:
+            return _scope_clarify_outcome(
+                client_id=client_id,
+                sid=sid,
+                conflict_code=exc.code,
+                provider_calls=provider_calls,
+            )
         if exc.code in _TECHNICAL_SEMANTIC_CONFLICT_CODES:
             return _technical_error_outcome(
                 client_id=client_id,

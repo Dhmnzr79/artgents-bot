@@ -490,7 +490,7 @@ def test_checkpoint_a_explicit_service_replaces_session(
     assert "3000" not in payload["answer"].replace("\u00a0", "").replace(" ", "")
 
 
-def test_checkpoint_a_catalog_envelope_conflict_is_technical_not_admin(
+def test_checkpoint_a_catalog_envelope_conflict_is_scope_clarify_not_admin(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
@@ -508,15 +508,13 @@ def test_checkpoint_a_catalog_envelope_conflict_is_technical_not_admin(
     )
     answer = str(payload.get("answer") or "").lower()
     assert backend.call_count == 1
-    assert payload["_widget_kind"] == "error"
-    assert payload["_outcome_model_route"] == "error"
+    assert payload["_widget_kind"] == "terminal"
+    assert payload["_outcome_model_route"] == "clarify"
     assert payload["_failure_kind"] == "semantic_catalog_envelope_conflict_service_id"
     assert payload["_outcome_model_route"] != "model_admin"
     assert "5000" not in str(payload.get("answer") or "")
     assert "администратор" not in answer
-    assert "консультац" not in answer
-    assert "позвон" not in answer
-    assert not any(ch.isdigit() for ch in answer)
+    assert payload.get("offer") is None
 
 
 def test_checkpoint_a_streamed_text_matches_final_authoritative_answer(
@@ -723,7 +721,7 @@ def test_checkpoint_a_stream_http_session_followup_tomography(
     assert "999999" not in _patient_visible_text(events).replace(" ", "")
 
 
-def test_checkpoint_a_stream_http_catalog_conflict_is_technical_error(
+def test_checkpoint_a_stream_http_catalog_conflict_is_scope_clarify(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
@@ -744,16 +742,14 @@ def test_checkpoint_a_stream_http_catalog_conflict_is_technical_error(
     answer = str(ui.get("answer") or "").lower()
     meta = ui.get("meta") or {}
     assert meta.get("answer_path") == "sales_fast"
-    assert meta.get("service_route") == "sales_fast_error"
+    assert meta.get("service_route") == "sales_fast_scope_clarify"
     assert meta.get("ui_source_family") == "guided_fallback"
     assert meta.get("attribution_kind") == "plain"
-    assert meta.get("error") is True
-    assert meta.get("target_error_code") == "semantic_catalog_envelope_conflict_service_id"
+    assert meta.get("terminal_mode") == "clarify"
+    assert meta.get("semantic_conflict_code") == "semantic_catalog_envelope_conflict_service_id"
     assert hostile not in _patient_visible_text(events).replace(" ", "")
     assert "администратор" not in answer
-    assert "консультац" not in answer
-    assert "позвон" not in answer
-    assert not any(ch.isdigit() for ch in answer)
+    assert ui.get("offer") is None
     assert any(name == "done" for name, _ in events)
     deltas = [str(data.get("delta") or "") for name, data in events if name == "text_delta"]
     assert all(hostile not in delta.replace(" ", "") for delta in deltas)

@@ -41,8 +41,8 @@ def _demo_stage51_inputs():
     return data.bundle, doctors, external_index
 
 
-def test_prompt_contract_version_five() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 5
+def test_prompt_contract_version_six() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 7
 
 
 def test_envelope_promotion_scope_invariants() -> None:

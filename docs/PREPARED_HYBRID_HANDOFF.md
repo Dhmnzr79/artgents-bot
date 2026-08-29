@@ -101,7 +101,45 @@
 
 **Прогоны (29.08.2026, offline):** адресный набор checkpoint 1e — 216/216; смежный finishing pass — 206/206. LIVE/API не запускались. Checker ACCEPT. Итоговый commit публикации — в отчёте публикации.
 
-**Ограничения:** leadflow/lead-paused overlay может изменить видимый ответ после выбора текста — существующее ограничение, не расширялось. CP-EXACT-1, MD-очистка, коммерческая сборка — вне scope.
+**Ограничения:** leadflow/lead-paused overlay может изменить видимый ответ после выбора текста — существующее ограничение, не расширялось. CP-EXACT-1B, MD-очистка и Hybrid — вне scope; CP-EXACT-1A реализован offline 29.08.2026 (см. ниже).
+
+### CP-EXACT-1A — полный exact-commercial каталог до Composer (29.08.2026)
+
+**Статус:** реализован Cursor offline на базе `41bf8a8`; product/runtime presentation path не изменён. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.
+
+**Что доказано offline (wiring-checkpoint):**
+- product/runtime presentation path, authoritative commerce, direct commercial materializer, CP-MKT-1, CTA/UI и маршруты на fake/offline fixtures **не регрессировали**;
+- Composer теперь получает полный `EXACT_COMMERCIAL_CATALOG` в stable prefix и `COMMERCIAL_AS_OF` в dynamic suffix;
+- fingerprint и cache lookup key меняются при изменении exact-commercial данных и не меняются от одной только runtime-даты.
+
+**Что не доказано этим checkpoint:**
+- фактическое поведение **настоящей** модели после расширения pre-model контекста;
+- byte-for-byte неизменность реальных model answers до отдельно разрешённого LIVE-сравнения.
+
+Это ожидаемое ограничение wiring-checkpoint, а не дефект реализации.
+
+**Что сделано:**
+1. **Stable prefix:** тонкий `COMMERCIAL_FACT_CATALOG` заменён на детерминированный `EXACT_COMMERCIAL_CATALOG` из уже загруженного `ResponseSchemaBundle` (facts + offers + active services). Второй коммерческий блок в prompt не передаётся.
+2. **Dynamic suffix:** `COMMERCIAL_AS_OF` с `as_of_date` и `date_eligible_fact_ids` (не automatic-marketing allowlist). Мягкая деградация: `availability=unavailable`, пустой список — основной ответ сохраняется, ADMIN не используется.
+3. **Prompt contract v6:** модель видит полные exact-данные для grounding, но не должна самостоятельно вставлять code-owned цены/канонические тексты в `patient_text` и не должна спонтанно рекламировать service_value/promo/amplifiers/warranty. Автоматический маркетинг остаётся за `marketing.yaml` + CP-MKT-1 + существующим presentation pass.
+4. **Fingerprint:** stable prefix учитывает полный exact-каталог; смена только runtime-даты не меняет fingerprint; demo/nikadent изолированы.
+
+**Что сознательно не сделано (CP-EXACT-1B и далее):** `used_offer_ids`, pre-model offer selection, разрешение модели писать цены, post-generation exact anchors, MD-очистка, Hybrid/RAG, LIVE.
+
+**Offline (29.08.2026):** адресный набор CP-EXACT-1A + смежные prefix/fingerprint/direct/CP-MKT-1/widget — 412/412. Checker — отдельный прогон.
+
+### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
+
+**Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.
+
+**Что сделано:**
+1. Удалён `clients/demo/md/clinic__info__payment_terms.md`; `detail_ref` на него убраны у `tax_deduction`, `installment_12`, `payment_stages`, `fixed_price` в `facts.json`.
+2. Очищены demo MD: `consultation`, `implantation__faq__cost`, `tooth_loss`, `curator`, `benefits`, service scope-дубли в pterygoid/zygomatic/prosthetics/comparison. `free_implant_consult` в structured data не менялся.
+3. Из `marketing.yaml` cost-сценария убран kb-ref на удалённый payment-документ.
+4. Prompt contract **v7:** семантические примеры общего cost objection (`route=ANSWER`, `scenario=cost`, `commercial_intent=none`) vs прямого ценового вопроса (`commercial_intent=price`). Без regex/Python-классификатора.
+5. Ожидаемая сборка cost objection: полезный ответ из оставшегося cost FAQ → optional `service_value` по profile → до 2 promo → до 2 amplifiers → CTA/UI отдельно.
+
+**Что не доказано:** фактическое поведение настоящей модели на live-фразах cost objection; wiring-checkpoint only.
 
 
 - История автоматических показов общая на весь диалог по стабильному ID: смена услуги не разрешает повтор уже показанного общего усилителя. По новой услуге можно показать её подходящие, ещё не показанные элементы. По прямому запросу сведения сообщаются повторно.
@@ -128,7 +166,7 @@
 - Создать ровно **два канонических service_value**: первый объединяет 3D-планирование и Diagnocat, второй посвящён APRF. Подготовить короткие тексты и распределить по имплантационным услугам существующего каталога, максимум один ref на услугу. Это два варианта для каталога, не два абзаца в одном ответе. Точные тексты и таблица распределения ещё не подготовлены.
 - Имплантация и протезирование: обычный ответ — рассрочка до 12 месяцев и помощь в оформлении налогового вычета; ценовой — те же два усилителя плюс оплата по этапам и фиксация стоимости в договоре.
 - Все остальные услуги: помощь в оформлении налогового вычета и фиксация стоимости — **как в обычном, так и в ценовом ответе**; других усилителей не добавлять. Следовательно, фиксация стоимости не является глобально `price-only`: разрешённый набор зависит и от услуги, и от типа ответа. Общие правила актуальности, истории и прямых вопросов сохраняются.
-- `clients/demo/md/clinic__info__payment_terms.md` удалить в будущем checkpoint миграции, после сохранения всех нужных сведений в доступных источниках и переноса/перенаправления aliases, anchors, detail_ref и других ссылок. Не терять информацию об отсутствии скрытых доплат и вариантах плана, даже если она не включена в автоматические усилители. Гарантия, лаборатория и прочие знания о клинике сохраняются.
+- `clients/demo/md/clinic__info__payment_terms.md` **удалён** в CP-MD-COMMERCE-1 (29.08.2026); канон — `installment_12`, `tax_deduction`, `payment_stages`, `fixed_price` в `facts.json`. Гарантия, лаборатория и прочие знания о клинике сохраняются.
 
 ### Рабочая схема сборки ответа — для будущего checkpoint и сравнения
 
@@ -160,14 +198,14 @@
 
 **Demo commerce correction pass (28.08.2026):** из `free_implant_consult` убрано внутреннее пояснение «не бесплатное лечение/операция»; в `_orchestrate_ask` исправлен порядок `bind_session_client("demo")` → `mem_reset`; усилена проверка обеих акций на price All-on-4; добавлена регрессия загрязнения клиентской привязки. Offline: 174/174. Runtime/привязки не менялись.
 
-**Карта будущей MD-миграции (demo commerce, без правок MD сейчас):**
+**Карта MD-миграции demo commerce (обновлено CP-MD-COMMERCE-1, 29.08.2026):**
 | Исходное сведение в MD | Канон / сохранение | Что перенаправить |
 | --- | --- | --- |
-| `clinic__info__payment_terms.md` — рассрочка, вычет, этапы, фиксация | `installment_12`, `tax_deduction`, `payment_stages`, `fixed_price` в `facts.json`; этапы сумм в offers | `detail_ref` на `#korotko`; aliases в FAQ cost |
-| `consultation_value` в implantation MD (3 файла) | польза «три варианта плана» внутри `free_implant_consult`; отдельный автоблок выключен | поля MD удалить после seam exact-facts |
-| Дубли скидки/рассрочки в service MD | promo/amplifier refs в `marketing.yaml` | не дублировать тексты в MD после миграции |
+| `clinic__info__payment_terms.md` — рассрочка, вычет, этапы, фиксация | **удалён**; канон — `installment_12`, `tax_deduction`, `payment_stages`, `fixed_price` в `facts.json`; этапы сумм в offers | `detail_ref` убраны; cost FAQ очищен от commercial-дублей |
+| `consultation_value` в implantation MD (3 файла) | польза «три варианта плана» внутри `free_implant_consult`; отдельный автоблок выключен | consultation MD нейтрален; promo fact не менялся |
+| Дубли скидки/рассрочки в service MD | promo/amplifier refs в `marketing.yaml` | scope-дубли offers убраны из service/comparison MD |
 | `clinic__info__warranty.md` | `implant_warranty` (прямой ответ, не автодобавка) | scenario `result_reliability` kb-refs |
-| Гарантия/лаборатория в technology/warranty MD | знания о клинике, не автоматическая реклама | CTA/anchors сохранить при удалении payment_terms |
+| Гарантия/лаборатория в technology/warranty MD | знания о клинике, не автоматическая реклама | сохранены без содержательной чистки |
 
 Полное demo-наполнение consultation_value в MD, exact facts до модели и выбор архитектуры — открытые пункты.
 

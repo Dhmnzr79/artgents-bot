@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from datetime import date
 from typing import Literal, Protocol
 
 from contracts.exact_sales_resolution import ExactSalesResolution
@@ -19,6 +20,7 @@ from core import turn_timing
 from core.local_problem_gate import decide_local_problem_gate
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_envelope_protocol import (
     OneCallEnvelopeProtocolError,
     parse_production_envelope_json,
@@ -69,6 +71,12 @@ def _require_static_handoff(text: object) -> str:
     return text
 
 
+def _commercial_fact_catalog(
+    exact_commercial_catalog: ExactCommercialCatalogSnapshot,
+) -> CommercialFactCatalogSnapshot:
+    return CommercialFactCatalogSnapshot.from_exact_catalog(exact_commercial_catalog)
+
+
 def _make_invocation(
     *,
     user_message: str,
@@ -79,8 +87,9 @@ def _make_invocation(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
-    commercial_fact_catalog: CommercialFactCatalogSnapshot,
+    exact_commercial_catalog: ExactCommercialCatalogSnapshot,
     dialog_history: str = "",
+    as_of_date: date | None = None,
 ) -> SalesOnePlusInvocation:
     corpus = cached_full_context.model_corpus_text
     strict_facts = tuple(current_strict_facts)
@@ -90,7 +99,7 @@ def _make_invocation(
         cached_full_context=cached_full_context,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
-        commercial_fact_catalog=commercial_fact_catalog,
+        exact_commercial_catalog=exact_commercial_catalog,
     )
     dynamic_suffix = build_sales_one_plus_dynamic_suffix(
         exact_sales_resolution=exact_sales_resolution,
@@ -98,6 +107,8 @@ def _make_invocation(
         sales_context=context,
         user_message=user_message,
         dialog_history=dialog_history,
+        exact_commercial_catalog=exact_commercial_catalog,
+        as_of_date=as_of_date,
     )
     return SalesOnePlusInvocation(
         system_prompt=prefix_bundle.stable_prefix,
@@ -190,8 +201,9 @@ def run_sales_one_plus_candidate(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
-    commercial_fact_catalog: CommercialFactCatalogSnapshot,
+    exact_commercial_catalog: ExactCommercialCatalogSnapshot,
     dialog_history: str = "",
+    as_of_date: date | None = None,
 ) -> SalesOnePlusResult:
     """Make exactly one blocking backend call after a local pass."""
 
@@ -204,6 +216,7 @@ def run_sales_one_plus_candidate(
     if local_result is not None:
         return local_result
 
+    commercial_fact_catalog = _commercial_fact_catalog(exact_commercial_catalog)
     invocation = _make_invocation(
         user_message=user_message,
         cached_full_context=cached_full_context,
@@ -213,8 +226,9 @@ def run_sales_one_plus_candidate(
         pack_identity=pack_identity,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
-        commercial_fact_catalog=commercial_fact_catalog,
+        exact_commercial_catalog=exact_commercial_catalog,
         dialog_history=dialog_history,
+        as_of_date=as_of_date,
     )
     try:
         raw = backend.generate(invocation)
@@ -250,8 +264,9 @@ def run_sales_one_plus_candidate_stream(
     pack_identity: ClientPackIdentityKey,
     active_service_catalog: ActiveServiceCatalogSnapshot,
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
-    commercial_fact_catalog: CommercialFactCatalogSnapshot,
+    exact_commercial_catalog: ExactCommercialCatalogSnapshot,
     dialog_history: str = "",
+    as_of_date: date | None = None,
 ) -> SalesOnePlusResult:
     """Buffer provider JSON fully, validate once, then emit patient_text only."""
 
@@ -263,6 +278,8 @@ def run_sales_one_plus_candidate_stream(
     )
     if local_result is not None:
         return local_result
+
+    commercial_fact_catalog = _commercial_fact_catalog(exact_commercial_catalog)
 
     def emit_patient_delta(delta: str) -> None:
         try:
@@ -285,8 +302,9 @@ def run_sales_one_plus_candidate_stream(
         pack_identity=pack_identity,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
-        commercial_fact_catalog=commercial_fact_catalog,
+        exact_commercial_catalog=exact_commercial_catalog,
         dialog_history=dialog_history,
+        as_of_date=as_of_date,
     )
     try:
         backend.generate_stream(invocation, parser.ingest)

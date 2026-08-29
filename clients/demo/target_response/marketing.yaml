@@ -366,7 +366,6 @@ scenario_rules:
     - fact:implant_same_day_discount
     - fact:tax_deduction
     - kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee
-    - kb:clinic__info__payment_terms.md#korotko
     allowed_semantic_contexts:
     - service
     - price

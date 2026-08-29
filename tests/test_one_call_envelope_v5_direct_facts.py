@@ -21,6 +21,7 @@ from core.one_call_envelope_protocol import (
     production_envelope_template,
 )
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.one_call_prefix_cache import clear_one_call_prefix_cache, get_or_build_stable_prefix
 from core.one_call_prefix_input_fingerprint import compute_prefix_input_fingerprint
@@ -29,9 +30,11 @@ from core.target_client_data import load_target_client_data
 from tests.test_sales_one_plus_turn import (
     _DEMO_CATALOG,
     _DEMO_COMMERCIAL_CATALOG,
+    _DEMO_EXACT_CATALOG,
     _DEMO_REF_CATALOG,
     _EMPTY_CATALOG,
     _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
@@ -40,6 +43,9 @@ from tests.test_sales_one_plus_turn import (
 
 
 _NIKADENT_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
+    load_target_client_data("nikadent").bundle
+)
+_NIKADENT_EXACT_CATALOG = ExactCommercialCatalogSnapshot.from_bundle(
     load_target_client_data("nikadent").bundle
 )
 
@@ -285,40 +291,43 @@ def test_envelope_size_limit_unchanged() -> None:
         )
 
 
-def test_prompt_contract_version_is_five() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 5
+def test_prompt_contract_version_is_six() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 7
 
 
-def test_prefix_contains_commercial_fact_catalog_without_text_fact() -> None:
+def test_prefix_contains_exact_commercial_catalog_with_full_fields() -> None:
     clear_one_call_prefix_cache()
     bundle, _hit = get_or_build_stable_prefix(
         identity=_PACK_IDENTITY,
         cached_full_context=_context(),
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
-    assert "=== COMMERCIAL_FACT_CATALOG ===" in bundle.stable_prefix
+    assert "=== EXACT_COMMERCIAL_CATALOG ===" in bundle.stable_prefix
+    assert "=== COMMERCIAL_FACT_CATALOG ===" not in bundle.stable_prefix
     assert "installment_12" in bundle.stable_prefix
-    assert "catalog_label" in bundle.stable_prefix
-    assert "text_fact" not in bundle.stable_prefix.split("=== COMMERCIAL_FACT_CATALOG ===", 1)[1].split(
+    assert "text_fact" in bundle.stable_prefix
+    assert "all_on_4.jaw.nobel" in bundle.stable_prefix
+    assert "billing_unit" in bundle.stable_prefix
+    catalog_block = bundle.stable_prefix.split("=== EXACT_COMMERCIAL_CATALOG ===", 1)[1].split(
         "=== APPROVED_MD_CORPUS ===", 1
     )[0]
+    assert "428000" in catalog_block
 
 
-def test_commercial_catalog_mutation_changes_fingerprint() -> None:
+def test_exact_catalog_mutation_changes_fingerprint() -> None:
     corpus = _context()
     fp_a = compute_prefix_input_fingerprint(
         _PACK_IDENTITY,
         corpus,
         _DEMO_CATALOG,
         _DEMO_REF_CATALOG,
-        _DEMO_COMMERCIAL_CATALOG,
+        _DEMO_EXACT_CATALOG,
     )
-    mutated = CommercialFactCatalogSnapshot(
-        canonical_json='{"facts":[{"fact_id":"x","kind":"promo","catalog_label":"x","active":true}]}',
-        fact_ids=frozenset({"x"}),
-        active_fact_ids=frozenset({"x"}),
+    mutated = ExactCommercialCatalogSnapshot(
+        canonical_json='{"facts":[],"offers":[{"offer_id":"x","service_id":"classic","active":true,"price":{"mode":"fixed","amount":1,"currency":"RUB","billing_unit":"tooth"},"package":{"label":"x","includes":[]},"payment_stages":[],"fact_refs":[]}],"services":[]}',
+        offer_ids=frozenset({"x"}),
     )
     fp_b = compute_prefix_input_fingerprint(
         _PACK_IDENTITY,

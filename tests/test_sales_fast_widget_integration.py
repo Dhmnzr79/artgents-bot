@@ -15,12 +15,13 @@ from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 from core.sales_one_plus_stream import SalesOnePlusStreamParser
 from core.sales_one_plus_turn import run_sales_one_plus_candidate_stream
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_exact_commercial_catalog import COMMERCIAL_AS_OF_HEADER
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_client_pack_identity import build_client_pack_identity
 from core.target_cached_full_context import build_target_cached_full_context
 from core.target_client_data import load_target_client_data
 from tests.one_call_stage2_fixture import Stage2Case, case_by_id, load_stage2_cases
-from tests.test_sales_one_plus_turn import answer_envelope, admin_envelope, _DEMO_COMMERCIAL_CATALOG
+from tests.test_sales_one_plus_turn import answer_envelope, admin_envelope, _DEMO_COMMERCIAL_CATALOG, _DEMO_EXACT_CATALOG
 from orchestration.sales_fast_widget_turn import orchestrate_sales_fast_widget_turn
 from session import mem_reset
 
@@ -188,7 +189,7 @@ def test_symptom_case_reaches_composer_with_one_provider_call(case_id: str) -> N
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert result.decision == "admin"
     assert result.reason == "model_admin"
@@ -212,7 +213,7 @@ def test_general_medical_faq_cases_use_model_route_with_exactly_one_call(case_id
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert result.decision == "answer"
     assert backend.call_count == 1
@@ -238,7 +239,7 @@ def test_sales_fears_use_model_route_with_exactly_one_call(case_id: str) -> None
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert result.decision == "answer"
     assert backend.call_count == 1
@@ -261,7 +262,7 @@ def test_parking_and_sterility_answer_from_md_without_verifier() -> None:
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
-            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+            exact_commercial_catalog=_DEMO_EXACT_CATALOG,
         )
         assert result.decision == "answer"
         assert backend.call_count == 1
@@ -283,7 +284,7 @@ def test_exact_price_case_uses_one_call_without_verifier() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert result.decision == "answer" and backend.call_count == 1
 
@@ -305,22 +306,22 @@ def test_both_jaws_without_offer_sets_needs_admin_quote_context() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert result.decision == "answer"
     assert "636000" not in (result.patient_text or "")
     assert backend.call_count == 1
 
 
-def test_marketing_fact_is_not_passed_to_pre_flash_invocation() -> None:
-    case = _case("p01")
-    backend = _CountingBackend(answer_envelope("All-on-4 стоит 318 000 ₽.", commercial_intent="price"))
+def test_exact_commercial_values_are_not_duplicated_in_dynamic_suffix() -> None:
+    case = _case("f02")
+    backend = _CountingBackend(answer_envelope("Импланты приживаются хорошо."))
     context = build_target_cached_full_context(_REPO_ROOT / "clients" / "demo" / "md")
     run_sales_one_plus_candidate_stream(
         user_message=case.user_message,
         cached_full_context=context,
         exact_sales_resolution=_resolution(case),
-        current_strict_facts=_strict_facts(case),
+        current_strict_facts=(),
         sales_context={},
         static_admin_handoff_text="Позвоните администратору.",
         backend=backend,
@@ -328,12 +329,17 @@ def test_marketing_fact_is_not_passed_to_pre_flash_invocation() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
-    prompt = backend.invocation.user_prompt
-    assert "PRE_MODEL_HINTS" in prompt
-    assert "CURRENT_STRICT_FACTS" not in prompt
-    assert "318" not in prompt
+    system_prompt = backend.invocation.system_prompt
+    user_prompt = backend.invocation.user_prompt
+    assert "=== EXACT_COMMERCIAL_CATALOG ===" in system_prompt
+    assert COMMERCIAL_AS_OF_HEADER in user_prompt
+    assert "=== EXACT_COMMERCIAL_CATALOG ===" not in user_prompt
+    assert "CURRENT_STRICT_FACTS" not in user_prompt
+    assert "PRE_MODEL_HINTS" in user_prompt
+    assert '"amount":318000' in system_prompt
+    assert "318000" not in user_prompt
 
 
 def test_streaming_parser_emits_only_validated_patient_text() -> None:
@@ -377,7 +383,7 @@ def test_provider_error_raises_backend_failure_without_second_call() -> None:
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_DEMO_CATALOG,
             service_reference_catalog=_DEMO_REF_CATALOG,
-            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+            exact_commercial_catalog=_DEMO_EXACT_CATALOG,
         )
     assert backend.call_count == 1
 

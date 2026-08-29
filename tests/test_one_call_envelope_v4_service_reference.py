@@ -21,7 +21,7 @@ from tests.test_sales_one_plus_turn import (
     _DEMO_COMMERCIAL_CATALOG,
     _DEMO_REF_CATALOG,
     _EMPTY_CATALOG,
-    _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     _EMPTY_REF_CATALOG,
     answer_envelope,
 )

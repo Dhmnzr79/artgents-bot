@@ -23,8 +23,8 @@ from core.one_call_client_pack_identity import (
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from tests.test_sales_one_plus_turn import (
-    _DEMO_COMMERCIAL_CATALOG,
-    _EMPTY_COMMERCIAL_CATALOG,
+    _DEMO_EXACT_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     answer_envelope,
     admin_envelope,
 )
@@ -39,7 +39,7 @@ from core.one_call_closed_envelope_validation import (
 from core.one_call_prefix_cache import clear_one_call_prefix_cache
 from core.one_call_prefix_cache import get_or_build_stable_prefix
 from core.one_call_prefix_input_fingerprint import prefix_cache_lookup_key
-from core.sales_fast_widget_runtime import _exact_service_term
+from core.sales_fast_service_identity import resolve_catalog_service_identity
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.sales_one_plus_live_backend import sales_one_plus_model
 from core.sales_one_plus_turn import run_sales_one_plus_candidate
@@ -160,7 +160,7 @@ def test_same_identity_different_corpus_is_prefix_cache_miss() -> None:
         cached_full_context=corpus_a,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert hit_a is False
     assert "UNIQUE-CORPUS-MARKER-ALPHA-12345" in bundle_a.stable_prefix
@@ -171,7 +171,7 @@ def test_same_identity_different_corpus_is_prefix_cache_miss() -> None:
         cached_full_context=corpus_b,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert hit_b is False
     assert "UNIQUE-CORPUS-MARKER-BRAVO-67890" in bundle_b.stable_prefix
@@ -182,8 +182,8 @@ def test_prefix_cache_lookup_key_includes_corpus_fingerprint() -> None:
     identity = _shared_test_identity()
     corpus_a = _context("alpha")
     corpus_b = _context("beta")
-    assert prefix_cache_lookup_key(identity, corpus_a, _EMPTY_CATALOG, _EMPTY_REF_CATALOG, _EMPTY_COMMERCIAL_CATALOG) != prefix_cache_lookup_key(
-        identity, corpus_b, _EMPTY_CATALOG, _EMPTY_REF_CATALOG, _EMPTY_COMMERCIAL_CATALOG
+    assert prefix_cache_lookup_key(identity, corpus_a, _EMPTY_CATALOG, _EMPTY_REF_CATALOG, _EMPTY_EXACT_CATALOG) != prefix_cache_lookup_key(
+        identity, corpus_b, _EMPTY_CATALOG, _EMPTY_REF_CATALOG, _EMPTY_EXACT_CATALOG
     )
 
 
@@ -264,9 +264,9 @@ def test_bounded_prefix_cache_evicts_oldest_entry(monkeypatch: pytest.MonkeyPatc
         ONE_CALL_PROMPT_CONTRACT_VERSION,
         config.SALES_ONE_PLUS_FLASH_MODEL,
     )
-    get_or_build_stable_prefix(identity=identity_a, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG)
-    get_or_build_stable_prefix(identity=identity_b, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG)
-    _, hit_a = get_or_build_stable_prefix(identity=identity_a, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG)
+    get_or_build_stable_prefix(identity=identity_a, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, exact_commercial_catalog=_EMPTY_EXACT_CATALOG)
+    get_or_build_stable_prefix(identity=identity_b, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, exact_commercial_catalog=_EMPTY_EXACT_CATALOG)
+    _, hit_a = get_or_build_stable_prefix(identity=identity_a, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, exact_commercial_catalog=_EMPTY_EXACT_CATALOG)
     assert hit_a is False
 
 
@@ -282,8 +282,8 @@ def test_bounded_prefix_cache_respects_max_entries() -> None:
         for i in range(10)
     ]
     for identity in identities:
-        get_or_build_stable_prefix(identity=identity, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG)
-    _, hit = get_or_build_stable_prefix(identity=identities[0], cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG)
+        get_or_build_stable_prefix(identity=identity, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, exact_commercial_catalog=_EMPTY_EXACT_CATALOG)
+    _, hit = get_or_build_stable_prefix(identity=identities[0], cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, exact_commercial_catalog=_EMPTY_EXACT_CATALOG)
     assert hit is False
 
 
@@ -294,7 +294,7 @@ def test_prefix_cache_parallel_safety() -> None:
 
     def worker() -> None:
         try:
-            bundle, _ = get_or_build_stable_prefix(identity=identity, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG)
+            bundle, _ = get_or_build_stable_prefix(identity=identity, cached_full_context=corpus, active_service_catalog=_EMPTY_CATALOG, service_reference_catalog=_EMPTY_REF_CATALOG, exact_commercial_catalog=_EMPTY_EXACT_CATALOG)
             assert bundle.stable_prefix
         except Exception as exc:  # noqa: BLE001
             errors.append(exc)
@@ -365,14 +365,14 @@ def test_prefix_identical_for_different_questions_same_pack() -> None:
         cached_full_context=corpus,
         active_service_catalog=catalog,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     prefix_b = build_one_call_stable_prefix(
         identity=identity,
         cached_full_context=corpus,
         active_service_catalog=catalog,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert prefix_a == prefix_b
     assert "<USER_MESSAGE_DATA>" not in prefix_a
@@ -386,7 +386,7 @@ def test_active_service_catalog_contains_demo_active_services() -> None:
         cached_full_context=build_target_cached_full_context(_DEMO / "md"),
         active_service_catalog=catalog,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     bundle = load_target_client_data("demo").bundle
     for service_id, service in sorted(bundle.services.items()):
@@ -430,7 +430,7 @@ def test_same_identity_corpus_different_catalog_is_prefix_cache_miss() -> None:
         cached_full_context=corpus,
         active_service_catalog=catalog_a,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert hit_a is False
     assert "svc_a" in bundle_a.stable_prefix
@@ -439,7 +439,7 @@ def test_same_identity_corpus_different_catalog_is_prefix_cache_miss() -> None:
         cached_full_context=corpus,
         active_service_catalog=catalog_b,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert hit_b is False
     assert "svc_b" in bundle_b.stable_prefix
@@ -461,7 +461,7 @@ def test_catalog_change_updates_pack_identity_and_prefix(
         cached_full_context=ctx_before.cached_full_context,
         active_service_catalog=ActiveServiceCatalogSnapshot.from_bundle(ctx_before.bundle),
         service_reference_catalog=ServiceReferenceCatalogSnapshot.from_bundle(ctx_before.bundle),
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     catalog_path = pack / "target_response" / "service_catalog.json"
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -483,7 +483,7 @@ def test_catalog_change_updates_pack_identity_and_prefix(
         cached_full_context=ctx_after.cached_full_context,
         active_service_catalog=ActiveServiceCatalogSnapshot.from_bundle(ctx_after.bundle),
         service_reference_catalog=ServiceReferenceCatalogSnapshot.from_bundle(ctx_after.bundle),
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert ctx_before.pack_identity.cache_key() != ctx_after.pack_identity.cache_key()
     assert prefix_before != prefix_after
@@ -502,7 +502,7 @@ def test_active_service_catalog_not_in_dynamic_suffix() -> None:
         pack_identity=_identity(),
         active_service_catalog=catalog,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert "=== ACTIVE_SERVICE_CATALOG ===" in backend.invocation.system_prompt
     assert "=== ACTIVE_SERVICE_CATALOG ===" not in backend.invocation.user_prompt
@@ -643,7 +643,7 @@ def test_runtime_context_sees_facts_change_without_manual_clear(
         "active": True,
         "allowed_service_ids": ["classic"],
         "incompatible_with": [],
-        "detail_ref": "clinic__info__payment_terms.md#korotko",
+        "detail_ref": "clinic__info__warranty.md#korotko",
     }
     facts_path.write_text(json.dumps(facts, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -693,8 +693,9 @@ def test_service_matching_uses_same_pack_bundle(tmp_path: Path, monkeypatch: pyt
     catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
 
     ctx = load_target_runtime_client_context("match_bundle")
-    term = _exact_service_term("match probe alias unique", ctx)
-    assert term in {"Match Probe", "match probe alias unique"}
+    identity = resolve_catalog_service_identity("match probe alias unique", ctx.bundle)
+    assert identity.explicit_service_term in {"Match Probe", "match probe alias unique"}
+    assert identity.explicit_service_id == probe_id
 
 
 def test_client_pack_changed_during_load_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -747,7 +748,7 @@ def test_invocation_puts_corpus_in_system_not_user() -> None:
         pack_identity=identity,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert result.decision == "answer"
     assert "APPROVED_MD_CORPUS" in backend.invocation.system_prompt
@@ -767,7 +768,7 @@ def test_local_prefix_cache_hit_same_identity_and_corpus() -> None:
         pack_identity=identity,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert backend.invocation.local_prefix_cache_hit is False
     backend2 = _Backend(answer_envelope("Да"))
@@ -780,7 +781,7 @@ def test_local_prefix_cache_hit_same_identity_and_corpus() -> None:
         pack_identity=identity,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert backend2.invocation.local_prefix_cache_hit is True
     assert backend2.invocation.system_prompt == backend.invocation.system_prompt

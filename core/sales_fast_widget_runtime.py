@@ -19,7 +19,7 @@ from core.exact_sales_resolver import ExactSalesResolverInputs, resolve_exact_sa
 from core.local_problem_gate import decide_local_problem_gate
 from core.provider_call_budget import current_provider_call_budget
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
-from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_fast_observability import collect_sales_fast_timings_ms, record_sales_fast_observability
@@ -547,7 +547,8 @@ def run_sales_fast_widget_turn(
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
-    commercial_fact_catalog = CommercialFactCatalogSnapshot.from_bundle(context.bundle)
+    exact_commercial_catalog = ExactCommercialCatalogSnapshot.from_bundle(context.bundle)
+    today = runtime_today()
     turn_timing.stage_start("sales_fast_model")
     stream_on_delta: PatientDeltaCallback | None
     if on_delta is None:
@@ -573,8 +574,9 @@ def run_sales_fast_widget_turn(
                 pack_identity=context.pack_identity,
                 active_service_catalog=active_service_catalog,
                 service_reference_catalog=service_reference_catalog,
-                commercial_fact_catalog=commercial_fact_catalog,
+                exact_commercial_catalog=exact_commercial_catalog,
                 dialog_history=dialog_history,
+                as_of_date=today,
             )
         else:
             result = run_sales_one_plus_candidate_stream(
@@ -590,8 +592,9 @@ def run_sales_fast_widget_turn(
                 pack_identity=context.pack_identity,
                 active_service_catalog=active_service_catalog,
                 service_reference_catalog=service_reference_catalog,
-                commercial_fact_catalog=commercial_fact_catalog,
+                exact_commercial_catalog=exact_commercial_catalog,
                 dialog_history=dialog_history,
+                as_of_date=today,
             )
     except SalesOnePlusBackendFailure as exc:
         backend_invocations = int(getattr(backend, "call_count", 0) or getattr(backend, "calls", 0) or 0)

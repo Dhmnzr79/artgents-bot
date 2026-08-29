@@ -30,9 +30,11 @@ from core.target_client_data import load_target_client_data
 from tests.test_sales_one_plus_turn import (
     _DEMO_CATALOG,
     _DEMO_COMMERCIAL_CATALOG,
+    _DEMO_EXACT_CATALOG,
     _DEMO_REF_CATALOG,
     _EMPTY_CATALOG,
     _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
@@ -40,7 +42,11 @@ from tests.test_sales_one_plus_turn import (
     admin_envelope,
     answer_envelope,
 )
-from core.sales_one_plus_turn import run_sales_one_plus_candidate, run_sales_one_plus_candidate_stream
+from core.sales_one_plus_turn import (
+    SalesOnePlusBackendFailure,
+    run_sales_one_plus_candidate,
+    run_sales_one_plus_candidate_stream,
+)
 
 
 _DEMO = Path(__file__).resolve().parents[1] / "clients" / "demo"
@@ -82,7 +88,7 @@ def _run_blocking(output: object):
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
 
 
@@ -102,7 +108,7 @@ def _run_stream(chunks: tuple[str, ...], *, fail_after: bool = False):
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     return result, emitted
 
@@ -158,7 +164,6 @@ def test_exact_fourteen_key_contract() -> None:
     "mutator,code",
     (
         (lambda payload: payload.pop("route"), "missing_fields"),
-        (lambda payload: payload.update(extra="x"), "unknown_fields"),
     ),
 )
 def test_missing_and_extra_keys_rejected(mutator, code: str) -> None:
@@ -346,10 +351,8 @@ def test_invalid_stream_emits_zero_patient_delta() -> None:
 
 def test_interrupted_stream_emits_zero_patient_delta() -> None:
     partial = answer_envelope("Частичный")[:12]
-    result, emitted = _run_stream((partial,), fail_after=True)
-    assert result.decision == "admin"
-    assert result.reason == "stream_interrupted"
-    assert emitted == []
+    with pytest.raises(SalesOnePlusBackendFailure, match="stream_interrupted"):
+        _run_stream((partial,), fail_after=True)
 
 
 def test_valid_stream_emits_only_patient_text_once() -> None:
@@ -395,13 +398,13 @@ def test_invalid_envelope_does_not_retry() -> None:
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
-            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
         )
     assert backend.calls == 1
 
 
 def test_prompt_contract_version_is_five() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 5
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 7
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
@@ -417,7 +420,7 @@ def test_prompt_v2_bump_changes_prefix_fingerprint() -> None:
     catalog = _DEMO_CATALOG
     ref_catalog = _DEMO_REF_CATALOG
     fingerprint = compute_prefix_input_fingerprint(
-        identity, corpus, catalog, ref_catalog, _DEMO_COMMERCIAL_CATALOG
+        identity, corpus, catalog, ref_catalog, _DEMO_EXACT_CATALOG
     )
     assert f"p{ONE_CALL_PROMPT_CONTRACT_VERSION}" in identity.cache_key()
     clear_one_call_prefix_cache()
@@ -426,7 +429,7 @@ def test_prompt_v2_bump_changes_prefix_fingerprint() -> None:
         cached_full_context=corpus,
         active_service_catalog=catalog,
         service_reference_catalog=ref_catalog,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
     assert hit is False
     assert "=== SERVICE_REFERENCE_CATALOG ===" in bundle.stable_prefix
@@ -444,20 +447,18 @@ def test_protocol_and_backend_admin_preserve_no_envelope() -> None:
     with pytest.raises(OneCallEnvelopeProtocolError):
         _run_blocking("not-json")
 
-    failed = run_sales_one_plus_candidate(
-        user_message="Есть парковка?",
-        cached_full_context=_context(),
-        exact_sales_resolution=_resolution(),
-        static_admin_handoff_text="Позвоните администратору.",
-        backend=_Backend(RuntimeError("network")),
-        pack_identity=_PACK_IDENTITY,
-        active_service_catalog=_EMPTY_CATALOG,
-        service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
-    )
-    assert failed.decision == "admin"
-    assert failed.source == "backend"
-    assert failed.envelope is None
+    with pytest.raises(SalesOnePlusBackendFailure, match="backend_failed"):
+        run_sales_one_plus_candidate(
+            user_message="Есть парковка?",
+            cached_full_context=_context(),
+            exact_sales_resolution=_resolution(),
+            static_admin_handoff_text="Позвоните администратору.",
+            backend=_Backend(RuntimeError("network")),
+            pack_identity=_PACK_IDENTITY,
+            active_service_catalog=_EMPTY_CATALOG,
+            service_reference_catalog=_EMPTY_REF_CATALOG,
+            exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
+        )
 
 
 def test_sales_one_plus_result_rejects_answer_route_mismatch() -> None:

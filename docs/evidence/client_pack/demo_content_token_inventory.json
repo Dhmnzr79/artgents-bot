@@ -110,12 +110,6 @@
       "doc_id": "clinic__info__contacts"
     },
     {
-      "doc_path": "clients/demo/md/clinic__info__payment_terms.md",
-      "frontmatter_chars": 303,
-      "body_chars": 499,
-      "doc_id": "clinic__info__payment_terms"
-    },
-    {
       "doc_path": "clients/demo/md/clinic__info__technology.md",
       "frontmatter_chars": 421,
       "body_chars": 1402,

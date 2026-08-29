@@ -47,7 +47,6 @@ EXPECTED_SCENARIOS = {
             "fact:implant_same_day_discount",
             "fact:tax_deduction",
             "kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee",
-            "kb:clinic__info__payment_terms.md#korotko",
         ],
         "allowed_semantic_contexts": ["service", "price", "default"],
         "allowed_topics": ["implantation"],
@@ -87,7 +86,7 @@ EXPECTED_CURRENT_HASHES = {
     TONE: "b357142967527e0cdd50387efbeaf2d8d3b2a7218a1c5cd8112a316e17f6076f",
 }
 EXPECTED_PREEXISTING_TARGET_DIGEST = (
-    "10998e43d6b3027facb4c1dae55f8698ef31120f33a5c517814c396697889195"
+    "f18c2d8677b448816e9706494291d702548d9bd1b8f05bf1df0393890141a09c"
 )
 
 

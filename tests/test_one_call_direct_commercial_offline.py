@@ -35,9 +35,11 @@ import config
 from tests.test_sales_one_plus_turn import (
     _DEMO_CATALOG,
     _DEMO_COMMERCIAL_CATALOG,
+    _DEMO_EXACT_CATALOG,
     _DEMO_REF_CATALOG,
     _EMPTY_CATALOG,
     _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
@@ -165,7 +167,7 @@ def test_expired_active_until_uses_controlled_phrase() -> None:
         bundle=_DEMO_BUNDLE,
         direct_fact_ids=("professional_whitening_discount",),
         authoritative_service_id=None,
-        today=date(2026, 8, 21),
+        today=date(2026, 12, 1),
     )
     assert text == DIRECT_COMMERCIAL_INELIGIBLE_PHRASE
 
@@ -418,9 +420,9 @@ def test_widget_backend_failure_still_admin(
         backend=backend,
     )
     assert backend.call_count == 1
-    assert outcome.model_route == "model_admin"
-    assert outcome.widget.kind == "terminal"
-    assert outcome.widget.terminal_mode == "admin"
+    assert outcome.model_route == "error"
+    assert outcome.widget.kind == "error"
+    assert outcome.failure_kind == "backend_failed"
 
 
 def test_streaming_protocol_error_emits_zero_patient_deltas() -> None:
@@ -440,7 +442,7 @@ def test_streaming_protocol_error_emits_zero_patient_deltas() -> None:
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
-            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
         )
     assert emitted == []
 
@@ -475,7 +477,7 @@ def test_blocking_candidate_protocol_error_propagates() -> None:
             pack_identity=_PACK_IDENTITY,
             active_service_catalog=_EMPTY_CATALOG,
             service_reference_catalog=_EMPTY_REF_CATALOG,
-            commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+            exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
         )
 
 
@@ -554,6 +556,10 @@ def test_widget_hostile_expired_whitening_model_prose_stripped(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
+    monkeypatch.setattr(
+        "core.sales_fast_widget_runtime.runtime_today",
+        lambda: date(2026, 12, 1),
+    )
     hostile = "Сейчас действует скидка 10% до 15 августа."
     backend = _CountingBackend(
         dumps_production_envelope(
@@ -764,6 +770,10 @@ def test_widget_all_ineligible_direct_id_controlled_response(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
+    monkeypatch.setattr(
+        "core.sales_fast_widget_runtime.runtime_today",
+        lambda: date(2026, 12, 1),
+    )
     prose = "Про отбеливание."
     backend = _CountingBackend(
         dumps_production_envelope(

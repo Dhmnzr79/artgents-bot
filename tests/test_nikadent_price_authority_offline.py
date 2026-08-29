@@ -12,6 +12,7 @@ from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSale
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_envelope_protocol import dumps_production_envelope, parse_production_envelope_json
 from core.one_call_presentation_pass import build_one_call_presentation_result
 from core.sales_fast_strict_evidence import (
@@ -39,6 +40,9 @@ _COMMERCIAL_CURRENCY_RE = re.compile(
 )
 
 _NIKADENT_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
+    load_target_client_data("nikadent").bundle
+)
+_NIKADENT_EXACT_CATALOG = ExactCommercialCatalogSnapshot.from_bundle(
     load_target_client_data("nikadent").bundle
 )
 

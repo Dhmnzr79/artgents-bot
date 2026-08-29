@@ -10,11 +10,16 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import date
 from typing import Literal, Mapping
 
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.sales_one_plus import SalesOnePlusStrictFact
 
+from core.one_call_exact_commercial_catalog import (
+    ExactCommercialCatalogSnapshot,
+    build_commercial_as_of_block,
+)
 from core.target_contact_authority import serialize_clinic_contact_authority_block
 
 _MARKER_ANSWERABLE = "@ANSWERABLE"
@@ -39,6 +44,9 @@ route=ADMIN is for problematic or non-conversion requests that require administr
 General informational medical FAQ about contraindications, chronic diseases, service principles, and clinic materials require route=ANSWER grounded in the corpus; do not diagnose, prescribe, or give a personal eligibility verdict. If the wording does not prove a personal problematic request, use route=ANSWER, not ADMIN. Uncertainty alone is not grounds for ADMIN.
 Future fears about pain, price, osseointegration, trust, or timing are sales questions and require route=ANSWER.
 Classify commercial_intent only; never compute or invent prices, payment terms, or included-package amounts. Exact commercial values are code-owned.
+EXACT_COMMERCIAL_CATALOG in the stable prefix is the canonical source of exact commercial data for grounding only. On CP-EXACT-1A you must not insert code-owned exact values into patient_text: price amounts, billing units, package amounts, payment-stage amounts, promotion percentages/conditions, or canonical fact texts copied verbatim for rendering.
+Do not spontaneously insert service_value blocks, promos, amplifiers, warranty facts, or other commercial inserts into patient_text without a direct patient question. Automatic service_value, promos, and amplifiers are added later by deterministic code per marketing.yaml and CP-MKT-1.
+COMMERCIAL_AS_OF date_eligible_fact_ids is not an automatic-marketing allowlist and does not override service applicability or marketing.yaml rules. Presence in EXACT_COMMERCIAL_CATALOG or date_eligible_fact_ids does not authorize automatic advertising of that fact.
 Never diagnose or choose personal treatment. Never calculate, multiply, sum, or interpolate prices.
 patient_text must never contain exact price, payment, included-package, promotion, discount, tax, or installment amounts; deterministic code renders those values.
 patient_text must never contain protocol markers, JSON wrappers, route labels, service_id values, or other control-field prose.
@@ -204,6 +212,8 @@ def build_sales_one_plus_dynamic_suffix(
     sales_context: Mapping[str, object],
     user_message: str,
     dialog_history: str = "",
+    exact_commercial_catalog: ExactCommercialCatalogSnapshot | None = None,
+    as_of_date: date | None = None,
 ) -> str:
     """Dynamic suffix only — neutral hints before Flash, no authoritative commerce."""
 
@@ -228,6 +238,10 @@ def build_sales_one_plus_dynamic_suffix(
     history_block = format_dialog_context_for_understanding(dialog_history)
     if history_block:
         sections.append(history_block.strip())
+    effective_as_of = as_of_date or date.today()
+    sections.append(
+        build_commercial_as_of_block(exact_commercial_catalog, as_of_date=effective_as_of)
+    )
     sections.extend(
         (
             "<PRE_MODEL_HINTS>\n" + _stable_json(hints) + "\n</PRE_MODEL_HINTS>",

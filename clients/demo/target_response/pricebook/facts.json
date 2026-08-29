@@ -30,8 +30,7 @@
       "zirconia_crowns",
       "zygomatic_implants"
     ],
-    "incompatible_with": [],
-    "detail_ref": "clinic__info__payment_terms.md#korotko"
+    "incompatible_with": []
   },
   "installment_12": {
     "id": "installment_12",
@@ -56,8 +55,7 @@
       "clasp_dentures",
       "removable_dentures"
     ],
-    "incompatible_with": [],
-    "detail_ref": "clinic__info__payment_terms.md#korotko"
+    "incompatible_with": []
   },
   "free_implant_consult": {
     "id": "free_implant_consult",
@@ -164,8 +162,7 @@
       "clasp_dentures",
       "removable_dentures"
     ],
-    "incompatible_with": [],
-    "detail_ref": "clinic__info__payment_terms.md#korotko"
+    "incompatible_with": []
   },
   "fixed_price": {
     "id": "fixed_price",
@@ -198,8 +195,7 @@
       "zirconia_crowns",
       "zygomatic_implants"
     ],
-    "incompatible_with": [],
-    "detail_ref": "clinic__info__payment_terms.md#korotko"
+    "incompatible_with": []
   },
   "sv_3d_diagnocat": {
     "id": "sv_3d_diagnocat",

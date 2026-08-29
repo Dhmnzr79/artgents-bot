@@ -17,6 +17,7 @@ from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSale
 from core.doctor_schema_loader import load_doctor_catalog
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_envelope_protocol import dumps_production_envelope, parse_production_envelope_json
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
@@ -30,6 +31,9 @@ from scripts.validate_client_pack import validate_client_pack
 _NIKADENT = Path(__file__).resolve().parents[1] / "clients" / "nikadent"
 _REPO = Path(__file__).resolve().parents[1]
 _NIKADENT_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
+    load_target_client_data("nikadent").bundle
+)
+_NIKADENT_EXACT_CATALOG = ExactCommercialCatalogSnapshot.from_bundle(
     load_target_client_data("nikadent").bundle
 )
 _MD_ROOT = _NIKADENT / "md"

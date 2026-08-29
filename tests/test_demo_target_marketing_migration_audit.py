@@ -101,7 +101,6 @@ CANDIDATE_REFS = {
         "fact:implant_same_day_discount",
         "fact:tax_deduction",
         "kb:implantation__faq__cost.md#kak-sdelat-implantatsiyu-dostupnee",
-        "kb:clinic__info__payment_terms.md#korotko",
     ],
     "time": [
         "kb:implantation__faq__duration.md#korotko",
@@ -302,10 +301,10 @@ def test_exact_cta_sources_expose_unresolved_legacy_key() -> None:
     ]
 
     assert tone_keys == EXPECTED_TONE_CTA_KEYS
-    assert len(md_keys) == 55
+    assert len(md_keys) == 54
     assert Counter(md_keys) == {
         "booking": 6,
-        "callback": 2,
+        "callback": 1,
         "consult": 13,
         "doctor": 6,
         "plan": 26,

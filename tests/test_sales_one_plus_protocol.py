@@ -13,6 +13,7 @@ from core.sales_one_plus_protocol import (
 from tests.test_sales_one_plus_turn import (
     _EMPTY_CATALOG,
     _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     _EMPTY_REF_CATALOG,
     answer_envelope,
     admin_envelope,

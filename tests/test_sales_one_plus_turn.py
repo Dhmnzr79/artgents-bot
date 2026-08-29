@@ -13,6 +13,7 @@ from contracts.target_cached_full_context import TargetCachedFullContext
 from core.one_call_client_pack_identity import build_client_pack_identity
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.one_call_envelope_protocol import dumps_production_envelope
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
@@ -91,13 +92,19 @@ _EMPTY_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot(
 _DEMO_COMMERCIAL_CATALOG = CommercialFactCatalogSnapshot.from_bundle(
     load_target_client_data("demo").bundle
 )
+_EMPTY_EXACT_CATALOG = ExactCommercialCatalogSnapshot(
+    canonical_json='{"facts":[],"offers":[],"services":[]}',
+)
+_DEMO_EXACT_CATALOG = ExactCommercialCatalogSnapshot.from_bundle(
+    load_target_client_data("demo").bundle
+)
 
 
 def _run(**kwargs):
     kwargs.setdefault("pack_identity", _PACK_IDENTITY)
     kwargs.setdefault("active_service_catalog", _EMPTY_CATALOG)
     kwargs.setdefault("service_reference_catalog", _EMPTY_REF_CATALOG)
-    kwargs.setdefault("commercial_fact_catalog", _EMPTY_COMMERCIAL_CATALOG)
+    kwargs.setdefault("exact_commercial_catalog", _EMPTY_EXACT_CATALOG)
     return run_sales_one_plus_candidate(static_admin_handoff_text="Позвоните администратору.", **kwargs)
 
 
@@ -229,7 +236,7 @@ def test_live_demo_model_corpus_and_every_numeric_line_reach_invocation() -> Non
         pack_identity=_DEMO_PACK_IDENTITY,
         active_service_catalog=_DEMO_CATALOG,
         service_reference_catalog=_DEMO_REF_CATALOG,
-        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_DEMO_EXACT_CATALOG,
     )
 
     assert result.decision == "answer"

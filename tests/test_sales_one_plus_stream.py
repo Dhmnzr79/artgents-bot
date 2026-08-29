@@ -15,6 +15,7 @@ from core.sales_one_plus_turn import SalesOnePlusBackendFailure, run_sales_one_p
 from tests.test_sales_one_plus_turn import (
     _EMPTY_CATALOG,
     _EMPTY_COMMERCIAL_CATALOG,
+    _EMPTY_EXACT_CATALOG,
     _EMPTY_REF_CATALOG,
     _PACK_IDENTITY,
     _context,
@@ -35,7 +36,7 @@ def _run_stream(*, backend, on_delta: Callable[[str], None]):
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
 
 
@@ -151,7 +152,7 @@ def test_candidate_spam_makes_zero_calls_and_zero_deltas() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert result.decision == "spam" and emitted == []
     assert backend.calls == 0
@@ -170,7 +171,7 @@ def test_candidate_symptom_reaches_composer_once() -> None:
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert result.decision == "answer"
     assert backend.calls == 1
@@ -282,7 +283,7 @@ def test_live_adapter_streams_raw_chunks_once_with_json_format(monkeypatch) -> N
         pack_identity=_PACK_IDENTITY,
         active_service_catalog=_EMPTY_CATALOG,
         service_reference_catalog=_EMPTY_REF_CATALOG,
-        commercial_fact_catalog=_EMPTY_COMMERCIAL_CATALOG,
+        exact_commercial_catalog=_EMPTY_EXACT_CATALOG,
     )
     assert spam.decision == "spam"
     assert len(provider_calls) == 1

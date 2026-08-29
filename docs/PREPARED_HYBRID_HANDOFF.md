@@ -124,9 +124,33 @@
 3. **Prompt contract v6:** модель видит полные exact-данные для grounding, но не должна самостоятельно вставлять code-owned цены/канонические тексты в `patient_text` и не должна спонтанно рекламировать service_value/promo/amplifiers/warranty. Автоматический маркетинг остаётся за `marketing.yaml` + CP-MKT-1 + существующим presentation pass.
 4. **Fingerprint:** stable prefix учитывает полный exact-каталог; смена только runtime-даты не меняет fingerprint; demo/nikadent изолированы.
 
-**Что сознательно не сделано (CP-EXACT-1B и далее):** `used_offer_ids`, pre-model offer selection, разрешение модели писать цены, post-generation exact anchors, MD-очистка, Hybrid/RAG, LIVE.
+**Что сознательно не сделано (CP-EXACT-1B2 и далее):** multi-offer `price_text`, `used_offer_id`, multi-brand ranking, Hybrid/RAG, LIVE.
 
-**Offline (29.08.2026):** адресный набор CP-EXACT-1A + смежные prefix/fingerprint/direct/CP-MKT-1/widget — 412/412. Checker — отдельный прогон.
+**Offline (29.08.2026):** CP-EXACT-1B-SINGLE — 38/38 в `test_one_call_exact_1b_single_offline.py`; checkpoint_a — 33/33; `test_target_scoped_response_evidence.py` — 30 passed / 4 failed **pre-existing на чистом `18fe65b`** (worktree verify). Checker ACCEPT.
+
+### CP-EXACT-1B-SINGLE — isolated `price_text` for one pre-selected fixed offer (29.08.2026)
+
+**Статус:** correction pass + finishing pass Cursor offline на базе `18fe65b`; checker ACCEPT. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.
+
+**Поддержанные production-path случаи (demo):**
+- `tomography` — singleton fixed offer (`tomography.default`, 3 000 ₽) при authoritative `service_id`.
+- `all_on_4` + ровно один бренд из закрытого каталога (`Implantium` / `Impro` / `Nobel Biocare` и aliases) при authoritative `service_id` из governed UI / exact_turn / valid_session.
+- Продолжение диалога: `Сколько стоит All-on-4?` → `А Nobel?` — `service_id` из fresh `valid_session`, `brand_id` из текущего сообщения (offline wiring-checkpoint; понимание русского реальной моделью не доказано).
+
+**Сознательно не поддержано в 1B:** multi-brand/multi-offer в одном сообщении; подмена бренда; `from`/`range`/`no_public_price`; `jaw=both`; арифметика; `used_offer_id`; model-selected offer; multi-offer.
+
+**Что сделано:**
+1. `resolve_precomposer_selected_offer_for_turn` — pre-model resolver + catalog-driven brand mention extraction (`core/target_brand_mention_extraction.py`) + session `valid_session` для follow-up без нового service term.
+2. Dynamic `SELECTED_EXACT_OFFER` в suffix (не в stable prefix / fingerprint / history).
+3. Envelope/prompt contract **v8:** top-level `price_text`; `patient_text` остаётся основным prose; `used_offer_id` отсутствует.
+4. Узкая post-model validation только `price_text` + canonical fallback; **`patient_text` не редактируется** на precomposer path (legacy sanitizer на других путях без изменений).
+5. Видимая цена только при `commercial_intent=price`; pre-model selection допустим раньше, но non-price turn не добавляет цену автоматически.
+6. Presentation order: `price_text|fallback` → `patient_text` → promo/amplifiers (price profile, без `service_value`) → CTA/UI; legacy authoritative price block отключён на eligible turn.
+7. Observability: `price_text_patient_monetary_amount` при любой сумме в `patient_text` на price-turn; route/ADMIN/CLARIFY не меняются.
+
+**Brand mention contract:** casefold; word/phrase boundary match по `canonical_name`, `aliases`, `brand_id`; без fuzzy/substring-in-word; 0 или 2+ брендов → fail-closed; alias collision → typed ambiguity.
+
+**Residual risk:** модель может вставить сумму в `patient_text` — допустимый наблюдаемый residual; каноническая `price_text` line обязательна; удаление предложений из `patient_text` запрещено.
 
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 

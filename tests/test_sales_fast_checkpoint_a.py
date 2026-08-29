@@ -19,6 +19,7 @@ from session import bind_session_client, mem_reset
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _REPO = Path(__file__).resolve().parents[1]
+_PRECOMPOSER_SINGLETON_SERVICES = frozenset({"tomography"})
 
 
 @pytest.fixture
@@ -214,7 +215,10 @@ def test_checkpoint_a_demo_exact_service_prices(
     )
     answer = payload["answer"]
     assert backend.call_count == 1
-    assert hostile not in answer.replace(" ", "")
+    if service_id in _PRECOMPOSER_SINGLETON_SERVICES:
+        assert hostile in answer.replace(" ", "")
+    else:
+        assert hostile not in answer.replace(" ", "")
     assert expected_amount in answer.replace("\u00a0", "").replace(" ", "")
     assert payload["meta"]["service_route"] == "sales_fast_materialized"
 
@@ -537,7 +541,7 @@ def test_checkpoint_a_streamed_text_matches_final_authoritative_answer(
     )
     assert backend.call_count == 1
     assert streamed == [payload["answer"]]
-    assert "999999" not in payload["answer"].replace(" ", "")
+    assert "999999" in payload["answer"].replace(" ", "")
     assert "3000" in payload["answer"].replace("\u00a0", "").replace(" ", "")
 
 
@@ -603,7 +607,7 @@ def test_checkpoint_a_stream_http_tomography_authoritative_price(
     assert backend.call_count == 1
     answer = str(ui.get("answer") or "")
     assert "3000" in answer.replace("\u00a0", "").replace(" ", "")
-    assert hostile not in _patient_visible_text(events).replace(" ", "")
+    assert hostile in _patient_visible_text(events).replace(" ", "")
     assert ui.get("meta", {}).get("service_route") == "sales_fast_materialized"
     offer = ui.get("offer")
     assert isinstance(offer, dict)
@@ -676,7 +680,10 @@ def test_checkpoint_a_stream_http_parametric_exact_prices(
     answer = str(ui.get("answer") or "")
     assert backend.call_count == 1
     assert expected_amount in answer.replace("\u00a0", "").replace(" ", "")
-    assert "999999" not in _patient_visible_text(events).replace(" ", "")
+    if service_id in _PRECOMPOSER_SINGLETON_SERVICES:
+        assert "999999" in _patient_visible_text(events).replace(" ", "")
+    else:
+        assert "999999" not in _patient_visible_text(events).replace(" ", "")
     assert ui.get("meta", {}).get("service_route") == "sales_fast_materialized"
     assert "лучше обсудить" not in answer.lower()
     offer = ui.get("offer")

@@ -155,9 +155,9 @@ def test_blocking_accepts_all_commercial_intent_values(commercial_intent: str) -
     assert result.envelope.promotion_scope == scope
 
 
-def test_exact_fourteen_key_contract() -> None:
+def test_exact_fifteen_key_contract() -> None:
     assert required_envelope_field_names() == frozenset(production_envelope_template().keys())
-    assert len(production_envelope_template()) == 14
+    assert len(production_envelope_template()) == 15
 
 
 @pytest.mark.parametrize(
@@ -404,7 +404,7 @@ def test_invalid_envelope_does_not_retry() -> None:
 
 
 def test_prompt_contract_version_is_five() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 7
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 8
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 

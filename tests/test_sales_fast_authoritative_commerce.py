@@ -339,7 +339,11 @@ def _fake_bound_package(
     max_options: int = 3,
     service_id: str | None = "classic",
 ) -> object:
-    marketing_selection = SimpleNamespace(selected_refs=marketing_refs)
+    marketing_selection = SimpleNamespace(
+        selected_refs=marketing_refs,
+        amplifier_refs=(),
+        service_value_ref=None,
+    )
     materials = SimpleNamespace(
         offers=offers,
         consultation_close=None,

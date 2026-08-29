@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from config import SALES_ONE_PLUS_FLASH_MODEL
 
-ONE_CALL_PROMPT_CONTRACT_VERSION = 7
+ONE_CALL_PROMPT_CONTRACT_VERSION = 8
 ONE_CALL_MODEL_SNAPSHOT = SALES_ONE_PLUS_FLASH_MODEL
 
 ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS = """Return exactly one JSON object and nothing else.
@@ -22,6 +22,7 @@ promotion_scope: none | general | service | shown
 clarify_axis: service | extent | jaw | stage | null
 clarify_service_options: null or array of 2-3 active service_id values
 patient_text: string or null
+price_text: string or null
 service_reference_status: none | resolved | unresolved
 requested_service_id: canonical service_id from SERVICE_REFERENCE_CATALOG or null
 references: object with closed nested key direct_fact_ids only
@@ -31,8 +32,9 @@ references.direct_fact_ids: JSON array (never null) of unique nonblank catalog f
 
 Route invariants:
 ANSWER — nonblank patient_text; clarify_axis=null; clarify_service_options=null; direct_fact_ids=[] or valid non-empty catalog IDs.
-ADMIN — patient_text=null; clarify_axis=null; clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
-CLARIFY — nonblank patient_text; clarify_axis required; for clarify_axis=service use 2-3 unique active service_id values; for other axes clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
+price_text may be nonblank only on a direct price question when SELECTED_EXACT_OFFER.availability=selected and commercial_intent=price. On such turns keep exact amounts out of patient_text; put the exact price line in price_text only.
+ADMIN — patient_text=null; price_text=null; clarify_axis=null; clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
+CLARIFY — nonblank patient_text; price_text=null; clarify_axis required; for clarify_axis=service use 2-3 unique active service_id values; for other axes clarify_service_options=null; promotion_scope=none; direct_fact_ids=[].
 
 service_reference_status=none → requested_service_id=null.
 service_reference_status=unresolved → requested_service_id=null.
@@ -82,8 +84,9 @@ Automatic service_value, promos, amplifiers, and CTA/UI are added later by code 
 Semantic examples:
 «Я боюсь, что имплантация — это дорого» → route=ANSWER, scenario=cost, commercial_intent=none, service_reference_status=none, direct_fact_ids=[]
 «Переживаю, что лечение окажется слишком дорогим» → route=ANSWER, scenario=cost, commercial_intent=none, service_reference_status=none, direct_fact_ids=[]
-«Сколько стоит All-on-4?» → route=ANSWER, scenario=cost, commercial_intent=price, service_reference_status=resolved, requested_service_id=all_on_4, direct_fact_ids per authoritative price path
-«Можно ли в рассрочку?» → route=ANSWER, commercial_intent=payment, direct_fact_ids include installment_12 when applicable
+«Сколько стоит All-on-4?» → route=ANSWER, scenario=cost, commercial_intent=price, service_reference_status=resolved, requested_service_id=all_on_4, price_text=null when SELECTED_EXACT_OFFER.availability=none
+«Сколько стоит КТ?» with SELECTED_EXACT_OFFER.availability=selected → route=ANSWER, commercial_intent=price, price_text may contain the exact fixed amount/unit from SELECTED_EXACT_OFFER; patient_text explains without repeating the amount
+«Можно ли в рассрочку?» → route=ANSWER, commercial_intent=payment, direct_fact_ids include installment_12 when applicable, price_text=null
 
 Classify all closed semantic controls in the JSON envelope: commercial_intent, promotion_scope, service_reference_status, requested_service_id, references.direct_fact_ids, route, scenario, and other closed fields.
 Never compute or invent prices, payment terms, included-package amounts, or promotion percentages or conditions in patient_text.
@@ -91,8 +94,9 @@ Exact commercial values in the visible answer are still code-owned after the mod
 
 commercial_intent=promotion requires promotion_scope=general|service|shown; other intents require promotion_scope=none.
 promotion_scope=service classifies a service-specific promotion question; authoritative service_id may be null in envelope when governed UI supplies it later.
-patient_text is the only model prose surface. Control fields must be separate JSON values, never embedded in patient_text.
-PRE_MODEL_HINTS and COMMERCIAL_AS_OF are observability/context-only; envelope fields are authoritative for your response."""
+patient_text is the main model prose surface for explanation, empathy, and next steps. price_text is the only model prose surface for the exact fixed price line when SELECTED_EXACT_OFFER allows it. Do not return used_offer_id or any offer-selection field.
+Control fields must be separate JSON values, never embedded in patient_text or price_text.
+PRE_MODEL_HINTS, SELECTED_EXACT_OFFER, and COMMERCIAL_AS_OF are observability/context-only; envelope fields are authoritative for your response."""
 
 
 def one_call_contract_header() -> str:

@@ -36,6 +36,7 @@ _REQUIRED_FIELD_NAMES = frozenset(
         "clarify_axis",
         "clarify_service_options",
         "patient_text",
+        "price_text",
         "service_reference_status",
         "requested_service_id",
         "references",
@@ -50,6 +51,7 @@ ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS = (
 ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED = (
     "envelope_normalized_direct_fact_id_deduped"
 )
+ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT = "envelope_normalized_missing_price_text"
 
 
 def _require_nonblank(value: str, *, code: str) -> str:
@@ -103,7 +105,7 @@ class OneCallEnvelopeReferences(BaseModel):
 
 
 class OneCallEnvelope(BaseModel):
-    """Exactly fourteen model-returned control fields — no extras."""
+    """Exactly fifteen model-returned control fields — no extras."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -118,6 +120,7 @@ class OneCallEnvelope(BaseModel):
     clarify_axis: OneCallClarifyAxis | None
     clarify_service_options: tuple[str, ...] | None
     patient_text: str | None
+    price_text: str | None = None
     service_reference_status: ServiceReferenceStatus
     requested_service_id: str | None
     references: OneCallEnvelopeReferences

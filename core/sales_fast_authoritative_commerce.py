@@ -217,6 +217,47 @@ def _build_exact_offer_block(
     return f"Стоимость {service_name} — {price_text}."
 
 
+def build_canonical_exact_offer_price_line(
+    *,
+    offer: TargetOffer,
+    bundle: ResponseSchemaBundle,
+) -> str:
+    """Canonical fixed-price line for one selected offer — single formatter owner."""
+
+    return _build_exact_offer_block(offer, bundle=bundle)
+
+
+def build_precomposer_single_offer_commerce(
+    offer: TargetOffer,
+    *,
+    bundle: ResponseSchemaBundle,
+) -> AuthoritativeCommerceResult:
+    """Widget metadata for one pre-selected fixed offer without legacy price block."""
+
+    amounts = _authoritative_amounts_from_offers((offer,))
+    widget = _build_widget_offer_payload(
+        presentation_mode="exact_offer",
+        ordered_offers=(offer,),
+        featured_offer_id=None,
+        selected_exact_offer=offer,
+        entry_price_amount=None,
+        bundle=bundle,
+    )
+    return AuthoritativeCommerceResult(
+        service_id=offer.service_id,
+        presentation_mode="exact_offer",
+        entry_price_amount=_fixed_amount(offer),
+        entry_price_text=None,
+        ordered_offers=(offer,),
+        featured_offer_id=None,
+        selected_exact_offer=offer,
+        needs_consultation_quote=False,
+        authoritative_amounts=amounts,
+        patient_price_block=None,
+        widget_offer_payload=widget,
+    )
+
+
 def _build_widget_offer_payload(
     *,
     presentation_mode: AuthoritativeCommercePresentationMode,

@@ -9,6 +9,7 @@ from typing import Protocol
 from config import SALES_ONE_PLUS_FLASH_MODEL
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
+from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
 from contracts.sales_one_plus import SalesOnePlusResult
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.turn_frame import TurnFrame
@@ -34,6 +35,12 @@ from core.sales_fast_presentation import (
     static_sales_fast_admin_handoff,
 )
 from core.one_call_presentation_pass import build_one_call_presentation_result
+from core.one_call_price_text import (
+    patient_text_contains_duplicate_amount,
+    patient_text_contains_monetary_amount,
+    resolve_price_text_for_turn,
+)
+from core.resolve_precomposer_selected_offer import resolve_precomposer_selected_offer_for_turn
 from core.sales_fast_strict_evidence import (
     assemble_sales_fast_bound_package,
     build_pre_flash_prompt_hints,
@@ -549,6 +556,14 @@ def run_sales_fast_widget_turn(
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
     exact_commercial_catalog = ExactCommercialCatalogSnapshot.from_bundle(context.bundle)
     today = runtime_today()
+    precomposer_selected_offer = resolve_precomposer_selected_offer_for_turn(
+        bundle=context.bundle,
+        doctor_catalog=context.doctor_catalog,
+        resolution=resolution,
+        user_message=user_message,
+        service_identity=service_identity,
+        session_state=session_state,  # type: ignore[arg-type]
+    )
     turn_timing.stage_start("sales_fast_model")
     stream_on_delta: PatientDeltaCallback | None
     if on_delta is None:
@@ -577,6 +592,8 @@ def run_sales_fast_widget_turn(
                 exact_commercial_catalog=exact_commercial_catalog,
                 dialog_history=dialog_history,
                 as_of_date=today,
+                precomposer_selected_offer=precomposer_selected_offer,
+                response_schema_bundle=context.bundle,
             )
         else:
             result = run_sales_one_plus_candidate_stream(
@@ -595,6 +612,8 @@ def run_sales_fast_widget_turn(
                 exact_commercial_catalog=exact_commercial_catalog,
                 dialog_history=dialog_history,
                 as_of_date=today,
+                precomposer_selected_offer=precomposer_selected_offer,
+                response_schema_bundle=context.bundle,
             )
     except SalesOnePlusBackendFailure as exc:
         backend_invocations = int(getattr(backend, "call_count", 0) or getattr(backend, "calls", 0) or 0)
@@ -676,6 +695,7 @@ def run_sales_fast_widget_turn(
         service_reference_catalog=service_reference_catalog,
         service_identity=service_identity,
         on_patient_delta=on_delta,
+        precomposer_selected_offer=precomposer_selected_offer,
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
@@ -707,6 +727,7 @@ def _materialize_result(
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     service_identity: SalesFastServiceIdentity,
     on_patient_delta: PatientDeltaCallback | None = None,
+    precomposer_selected_offer: object | None = None,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
         return SalesFastWidgetOutcome(
@@ -792,6 +813,42 @@ def _materialize_result(
             model_route=terminal_route,
         )
     turn_timing.stage_start("sales_fast_presentation")
+    resolved_price_text = None
+    if result.envelope is not None:
+        selection = (
+            precomposer_selected_offer
+            if isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
+            else PrecomposerSelectedOfferResult(availability="none")
+        )
+        resolved_price_text = resolve_price_text_for_turn(
+            price_text=result.envelope.price_text,
+            commercial_intent=result.envelope.commercial_intent,
+            selection=selection,
+            bundle=context.bundle,
+        )
+        if (
+            selection.availability == "selected"
+            and selection.offer is not None
+            and result.patient_text
+            and resolved_price_text is not None
+            and resolved_price_text.owner != "none"
+            and patient_text_contains_monetary_amount(result.patient_text)
+        ):
+            turn_timing.set_flag("price_text_patient_monetary_amount", True)
+        if (
+            selection.availability == "selected"
+            and selection.offer is not None
+            and result.patient_text
+            and patient_text_contains_duplicate_amount(
+                result.patient_text,
+                offer=selection.offer,
+            )
+        ):
+            turn_timing.set_flag("price_text_patient_duplicate_amount", True)
+        if resolved_price_text.diagnostic is not None:
+            turn_timing.set_flag("price_text_diagnostic", resolved_price_text.diagnostic)
+        if resolved_price_text.owner != "none":
+            turn_timing.set_flag("price_text_owner", resolved_price_text.owner)
     presentation = build_one_call_presentation_result(
         bound_package=bound,
         context=context,
@@ -810,6 +867,10 @@ def _materialize_result(
         last_rendered_promo_fact_id=session_state.last_rendered_promo_fact_id,  # type: ignore[attr-defined]
         last_turn_rendered_promo_fact_ids=session_state.last_turn_rendered_promo_fact_ids,  # type: ignore[attr-defined]
         today=runtime_today(),
+        precomposer_selected_offer=precomposer_selected_offer
+        if isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
+        else None,
+        resolved_price_text=resolved_price_text,
     )
     widget = materialize_sales_fast_answer_payload(
         bound_package=bound,

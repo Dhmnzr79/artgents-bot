@@ -7,6 +7,7 @@ from typing import Any
 
 from contracts.one_call_envelope import (
     ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
+    ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT,
     ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS,
     OneCallClarifyAxis,
     OneCallCommercialIntent,
@@ -36,6 +37,7 @@ _ALLOWED_COMMERCIAL_INTENT = frozenset({"none", "price", "payment", "included", 
 _ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
 _ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
 _ALLOWED_SERVICE_REFERENCE_STATUS = frozenset({"none", "resolved", "unresolved"})
+ENVELOPE_NORMALIZED_UNEXPECTED_PRICE_TEXT = "envelope_normalized_unexpected_price_text"
 
 
 class OneCallEnvelopeProtocolError(ValueError):
@@ -92,6 +94,11 @@ def _normalize_production_payload(
     codes: list[str] = []
     required = required_envelope_field_names()
     keys = set(payload.keys())
+    if "price_text" not in keys:
+        payload = dict(payload)
+        payload["price_text"] = None
+        keys.add("price_text")
+        codes.append(ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT)
     missing = required - keys
     if missing:
         raise OneCallEnvelopeProtocolError(f"missing_fields:{sorted(missing)}")
@@ -284,6 +291,21 @@ def _validate_structure(
         if route in {"ANSWER", "CLARIFY"} and not patient_text.strip():
             raise OneCallEnvelopeProtocolError("patient_text_required")
 
+    price_text_raw = payload["price_text"]
+    price_text: str | None
+    if price_text_raw is None:
+        price_text = None
+    else:
+        _reject_bool(price_text_raw, code="price_text_invalid")
+        if not isinstance(price_text_raw, str):
+            raise OneCallEnvelopeProtocolError("price_text_invalid")
+        price_text = price_text_raw.strip() or None
+
+    if route in {"ADMIN", "CLARIFY"} and price_text is not None:
+        price_text = None
+    elif route == "ANSWER" and commercial_intent != "price" and price_text is not None:
+        price_text = None
+
     service_reference_status = payload["service_reference_status"]
     _reject_bool(service_reference_status, code="service_reference_status_invalid")
     if (
@@ -347,6 +369,7 @@ def _validate_structure(
             clarify_axis=clarify_axis,  # type: ignore[arg-type]
             clarify_service_options=clarify_service_options,
             patient_text=patient_text,
+            price_text=price_text,
             service_reference_status=service_reference_status,  # type: ignore[arg-type]
             requested_service_id=requested_service_id,
             references=references,
@@ -518,6 +541,7 @@ def production_envelope_template(**overrides: object) -> dict[str, object]:
         "clarify_axis": None,
         "clarify_service_options": None,
         "patient_text": "Probe text.",
+        "price_text": None,
         "service_reference_status": "none",
         "requested_service_id": None,
         "references": {"direct_fact_ids": []},

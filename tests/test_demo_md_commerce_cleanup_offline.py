@@ -144,7 +144,7 @@ def test_marketing_cost_scenario_has_no_payment_terms_kb_ref() -> None:
 
 
 def test_prompt_contract_v7_documents_cost_objection_semantics() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 7
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 8
     contract = ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "Cost scenario and general cost objection (v7)" in contract
     assert "Я боюсь, что имплантация — это дорого" in contract

@@ -90,6 +90,8 @@ def _make_invocation(
     exact_commercial_catalog: ExactCommercialCatalogSnapshot,
     dialog_history: str = "",
     as_of_date: date | None = None,
+    precomposer_selected_offer: object | None = None,
+    response_schema_bundle: object | None = None,
 ) -> SalesOnePlusInvocation:
     corpus = cached_full_context.model_corpus_text
     strict_facts = tuple(current_strict_facts)
@@ -109,6 +111,15 @@ def _make_invocation(
         dialog_history=dialog_history,
         exact_commercial_catalog=exact_commercial_catalog,
         as_of_date=as_of_date,
+        precomposer_selected_offer=precomposer_selected_offer,
+        response_schema_bundle=response_schema_bundle,
+    )
+    from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
+
+    selected = (
+        precomposer_selected_offer
+        if isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
+        else None
     )
     return SalesOnePlusInvocation(
         system_prompt=prefix_bundle.stable_prefix,
@@ -121,6 +132,7 @@ def _make_invocation(
         pack_identity=pack_identity,
         local_prefix_cache_hit=local_hit,
         prefix_build_ms=prefix_bundle.build_ms if not local_hit else 0,
+        precomposer_selected_offer=selected,
     )
 
 
@@ -204,6 +216,8 @@ def run_sales_one_plus_candidate(
     exact_commercial_catalog: ExactCommercialCatalogSnapshot,
     dialog_history: str = "",
     as_of_date: date | None = None,
+    precomposer_selected_offer: object | None = None,
+    response_schema_bundle: object | None = None,
 ) -> SalesOnePlusResult:
     """Make exactly one blocking backend call after a local pass."""
 
@@ -229,6 +243,8 @@ def run_sales_one_plus_candidate(
         exact_commercial_catalog=exact_commercial_catalog,
         dialog_history=dialog_history,
         as_of_date=as_of_date,
+        precomposer_selected_offer=precomposer_selected_offer,
+        response_schema_bundle=response_schema_bundle,
     )
     try:
         raw = backend.generate(invocation)
@@ -267,6 +283,8 @@ def run_sales_one_plus_candidate_stream(
     exact_commercial_catalog: ExactCommercialCatalogSnapshot,
     dialog_history: str = "",
     as_of_date: date | None = None,
+    precomposer_selected_offer: object | None = None,
+    response_schema_bundle: object | None = None,
 ) -> SalesOnePlusResult:
     """Buffer provider JSON fully, validate once, then emit patient_text only."""
 
@@ -305,6 +323,8 @@ def run_sales_one_plus_candidate_stream(
         exact_commercial_catalog=exact_commercial_catalog,
         dialog_history=dialog_history,
         as_of_date=as_of_date,
+        precomposer_selected_offer=precomposer_selected_offer,
+        response_schema_bundle=response_schema_bundle,
     )
     try:
         backend.generate_stream(invocation, parser.ingest)

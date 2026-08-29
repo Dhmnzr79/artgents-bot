@@ -13,6 +13,7 @@ from contracts.one_call_presentation_result import (
     PresentationRenderedIds,
     PresentationSessionDelta,
 )
+from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult, ResolvedPriceText
 from contracts.response_schema import TargetStrategyMatch
 from contracts.service_reference import AvailabilityStatus
 from contracts.turn_frame import TurnFrame
@@ -25,10 +26,12 @@ from core.sales_fast_authoritative_commerce import (
     AuthoritativeCommerceResult,
     apply_authoritative_commerce_to_patient_text,
     build_authoritative_commerce_result,
+    build_precomposer_single_offer_commerce,
     collect_planned_render_commercial_allowlist,
     gate_commerce_result_by_intent,
     sanitize_model_text_for_authoritative_marketing,
 )
+from core.one_call_price_text import assemble_price_turn_visible_text
 from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
 from core.sales_one_plus_semantic_authority import (
     presentation_active_service_id,
@@ -470,6 +473,8 @@ def build_one_call_presentation_result(
     last_rendered_promo_fact_id: str | None = None,
     last_turn_rendered_promo_fact_ids: tuple[str, ...] = (),
     today: date,
+    precomposer_selected_offer: PrecomposerSelectedOfferResult | None = None,
+    resolved_price_text: ResolvedPriceText | None = None,
 ) -> OneCallPresentationResult:
     """Run exactly one presentation pass for sales-fast widget materialization."""
 
@@ -663,20 +668,34 @@ def build_one_call_presentation_result(
         )
 
     commerce_result: AuthoritativeCommerceResult | None = None
+    precomposer_price_turn = (
+        resolved_price_text is not None
+        and resolved_price_text.line.strip()
+        and original_commercial_intent == "price"
+        and precomposer_selected_offer is not None
+        and precomposer_selected_offer.availability == "selected"
+        and precomposer_selected_offer.offer is not None
+    )
     if (
         not turn_frame.needs_clarification
         and not _availability_blocks_commerce(availability_status)
         and price_coverage_kind != "family_context"
     ):
-        commerce_result = gate_commerce_result_by_intent(
-            build_authoritative_commerce_result(
-                bound_package=bound_with_marketing,
-                resolution=resolution,
+        if precomposer_price_turn:
+            commerce_result = build_precomposer_single_offer_commerce(
+                precomposer_selected_offer.offer,  # type: ignore[union-attr]
                 bundle=context.bundle,
-                strategy_context=strategy_context,
-            ),
-            commercial_intent=commercial_intent,
-        )
+            )
+        else:
+            commerce_result = gate_commerce_result_by_intent(
+                build_authoritative_commerce_result(
+                    bound_package=bound_with_marketing,
+                    resolution=resolution,
+                    bundle=context.bundle,
+                    strategy_context=strategy_context,
+                ),
+                commercial_intent=commercial_intent,
+            )
 
     if _availability_blocks_commerce(availability_status):
         final_patient_text = _merge_availability_patient_text(
@@ -767,25 +786,37 @@ def build_one_call_presentation_result(
                     )
                 supplemented_text = promo_text
         else:
-            base_text = _sanitize_patient_text_for_render(
-                patient_text=patient_text,
-                bound_package=presentation_bound,
-                commerce_result=commerce_result,
-                commercial_intent=commercial_intent,
-                direct_eligible_texts=direct_eligible_texts,
-            )
-            supplemented_text = supplement_sales_fast_patient_text_with_marketing(
-                patient_text=base_text,
-                bound_package=presentation_bound,
-                bundle=context.bundle,
-            )
+            if precomposer_price_turn and resolved_price_text is not None:
+                marketing_only = supplement_sales_fast_patient_text_with_marketing(
+                    patient_text="",
+                    bound_package=presentation_bound,
+                    bundle=context.bundle,
+                )
+                supplemented_text = assemble_price_turn_visible_text(
+                    price_line=resolved_price_text.line,
+                    patient_text=patient_text,
+                    marketing_suffix=marketing_only,
+                )
+            else:
+                base_text = _sanitize_patient_text_for_render(
+                    patient_text=patient_text,
+                    bound_package=presentation_bound,
+                    commerce_result=commerce_result,
+                    commercial_intent=commercial_intent,
+                    direct_eligible_texts=direct_eligible_texts,
+                )
+                supplemented_text = supplement_sales_fast_patient_text_with_marketing(
+                    patient_text=base_text,
+                    bound_package=presentation_bound,
+                    bundle=context.bundle,
+                )
             if direct_commercial_text.strip():
                 supplemented_text = append_direct_commercial_without_duplicates(
                     supplemented_text,
                     direct_commercial_text,
                 )
         final_patient_text = supplemented_text
-        if commerce_result is not None:
+        if commerce_result is not None and not precomposer_price_turn:
             final_patient_text = apply_authoritative_commerce_to_patient_text(
                 supplemented_text,
                 commerce_result,

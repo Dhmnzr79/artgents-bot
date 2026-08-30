@@ -21,6 +21,7 @@ from evals.v5.arch_compare.arch_compare_live_contract import (
     MEASUREMENT_PROVIDER_BUDGET,
     TOTAL_AUTHORIZED_PROVIDER_BUDGET,
 )
+from evals.v5.arch_compare.arch_compare_prompt_build import build_preflight_messages
 from evals.v5.arch_compare.arch_compare_provider_payload import build_composer_provider_payload
 
 PreflightCheckStatus = Literal["pass", "fail"]
@@ -142,22 +143,27 @@ def _validate_preflight_envelope(*, content: str, provider_model_id: str) -> lis
     return checks
 
 
-def _run_mock_preflight_for_config(
+def _run_preflight_for_config(
     *,
-    transport: ArchCompareFakeTransport,
+    transport: Any,
     config: ArchCompareConfig,
     attempt_id: str,
+    use_fake_queue: bool,
 ) -> ArchComparePreflightResult:
-    envelope = build_fake_envelope_json(
-        scenario_id="PREFLIGHT",
-        turn_id=f"PREFLIGHT_{config.model_role}",
-        route="ANSWER",
-        patient_text=f"arch_compare_preflight:{attempt_id}:{config.model_role}",
-    )
-    transport.prepare_turn_envelopes((envelope,))
+    if use_fake_queue:
+        envelope = build_fake_envelope_json(
+            scenario_id="PREFLIGHT",
+            turn_id=f"PREFLIGHT_{config.model_role}",
+            route="ANSWER",
+            patient_text=f"arch_compare_preflight:{attempt_id}:{config.model_role}",
+        )
+        transport.prepare_turn_envelopes((envelope,))
+        messages = ({"role": "user", "content": "preflight"},)
+    else:
+        messages = build_preflight_messages(config=config, attempt_id=attempt_id)
     payload = build_composer_provider_payload(
         config=config,
-        messages=({"role": "user", "content": "preflight"},),
+        messages=messages,
         stream=False,
     )
     response = transport.chat_completions_create(**payload)
@@ -180,12 +186,28 @@ def run_mock_capability_preflight(
     transport: ArchCompareFakeTransport,
     state: ArchComparePreflightStateMachine,
 ) -> tuple[ArchComparePreflightResult, ArchComparePreflightResult | None]:
+    return run_capability_preflight(
+        attempt_id=attempt_id,
+        transport=transport,
+        state=state,
+        use_fake_queue=True,
+    )
+
+
+def run_capability_preflight(
+    *,
+    attempt_id: str,
+    transport: Any,
+    state: ArchComparePreflightStateMachine,
+    use_fake_queue: bool,
+) -> tuple[ArchComparePreflightResult, ArchComparePreflightResult | None]:
     flash_config = config_by_id(CONFIG_FLASH_FULL)
     state.reserve_preflight()
-    flash_result = _run_mock_preflight_for_config(
+    flash_result = _run_preflight_for_config(
         transport=transport,
         config=flash_config,
         attempt_id=attempt_id,
+        use_fake_queue=use_fake_queue,
     )
     state.flash_result = flash_result
     transport.reset_calls()
@@ -196,10 +218,11 @@ def run_mock_capability_preflight(
 
     state.reserve_preflight()
     plus_config = config_by_id(CONFIG_PLUS_FULL)
-    plus_result = _run_mock_preflight_for_config(
+    plus_result = _run_preflight_for_config(
         transport=transport,
         config=plus_config,
         attempt_id=attempt_id,
+        use_fake_queue=use_fake_queue,
     )
     state.plus_result = plus_result
     transport.reset_calls()

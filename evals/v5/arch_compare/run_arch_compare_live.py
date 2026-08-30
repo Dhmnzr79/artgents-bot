@@ -19,7 +19,7 @@ def _bootstrap() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Architecture compare LIVE prep runner (fake default).")
+    parser = argparse.ArgumentParser(description="Architecture compare LIVE runner (fake default).")
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--live", action="store_true", help="Request LIVE mode (requires authorization).")
     parser.add_argument(
@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--artifacts-root",
         default=None,
-        help="Artifact output root (defaults to evals/v5/artifacts/arch_compare_live_prep).",
+        help="Artifact output root (defaults depend on mode).",
     )
     args = parser.parse_args(argv)
 
@@ -41,7 +41,12 @@ def main(argv: list[str] | None = None) -> int:
         validate_run_mode,
     )
     from evals.v5.arch_compare.arch_compare_live_report import persist_live_prep_artifacts
-    from evals.v5.arch_compare.arch_compare_live_runner import run_arch_compare_fake_full_path
+    from evals.v5.arch_compare.arch_compare_live_runner import (
+        ArchCompareLiveRunnerError,
+        run_arch_compare_fake_full_path,
+        run_arch_compare_live_full_path,
+    )
+    from evals.v5.arch_compare.arch_compare_live_transport import create_guarded_live_transport
 
     authorization = None
     if args.authorization_json:
@@ -49,20 +54,22 @@ def main(argv: list[str] | None = None) -> int:
             json.loads(Path(args.authorization_json).read_text(encoding="utf-8"))
         )
 
-    artifacts_root = (
-        Path(args.artifacts_root)
-        if args.artifacts_root
+    live_requested = bool(args.live)
+    default_artifacts = (
+        repo_root / "evals" / "v5" / "artifacts" / "arch_compare"
+        if live_requested
         else repo_root / "evals" / "v5" / "artifacts" / "arch_compare_live_prep"
     )
+    artifacts_root = Path(args.artifacts_root) if args.artifacts_root else default_artifacts
     artifact_dir = artifacts_root / args.attempt_id
 
     guard_context = build_guard_context(
         repo_root=repo_root,
         attempt_id=args.attempt_id,
-        live_requested=args.live,
+        live_requested=live_requested,
         authorization=authorization,
         artifact_dir=artifact_dir,
-        transport_kind="fake",
+        transport_kind="live" if live_requested else "fake",
     )
 
     try:
@@ -72,15 +79,34 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if mode == "live":
-        print("LIVE mode is gated and not enabled in prep checkpoint.", file=sys.stderr)
-        return 2
+        transport = create_guarded_live_transport(guard_context)
+        try:
+            result = run_arch_compare_live_full_path(
+                attempt_id=args.attempt_id,
+                guard_context=guard_context,
+                transport=transport,
+            )
+        except ArchCompareLiveRunnerError as exc:
+            print(f"LIVE_RUN_REJECT:{exc.code}:{exc}", file=sys.stderr)
+            if exc.partial_result:
+                fail_dir = artifact_dir
+                fail_dir.mkdir(parents=True, exist_ok=True)
+                (fail_dir / "error_report.json").write_text(
+                    json.dumps(exc.partial_result, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+            return 3
+    else:
+        result = run_arch_compare_fake_full_path(
+            attempt_id=args.attempt_id,
+            guard_context=guard_context,
+        )
 
-    result = run_arch_compare_fake_full_path(attempt_id=args.attempt_id, guard_context=guard_context)
     paths = persist_live_prep_artifacts(
         artifacts_root=artifacts_root,
         attempt_id=args.attempt_id,
         run_result=result,
-        stdout_log=f"mode=fake attempt_id={args.attempt_id}\n",
+        stdout_log=f"mode={result.get('mode')} attempt_id={args.attempt_id}\n",
     )
     print(json.dumps({"artifact_dir": str(paths["dir"]), "mode": result["mode"]}, ensure_ascii=False))
     return 0

@@ -137,7 +137,7 @@
 
 ## CP-ARCH-COMPARE-OFFLINE-V1 (30.08.2026)
 
-Offline stand для честного сравнения Flash/Plus × FullContext/curated refs: `evals/v5/arch_compare/`, matrix 16/19, parity tests, fake dry-run, blind A–D review format. **CP-ARCH-COMPARE-LIVE-PREP-V1** (30.08.2026): coordinated four-config schedule, mock capability preflight (2) + measurement (68), default-deny LIVE guard, boundary capture, fake full-path runner — без LIVE/API. Plus pinned `qwen3.7-plus-2026-05-26`; offline readiness `READY_FOR_AUTHORIZED_PREFLIGHT`. Следующий шаг: CP-ARCH-COMPARE-LIVE-V1 после owner authorization manifest + credentials + clean HEAD.
+Offline stand для честного сравнения Flash/Plus × FullContext/curated refs: `evals/v5/arch_compare/`, matrix 16/19, parity tests, fake dry-run, blind A–D review format. **CP-ARCH-COMPARE-LIVE-PREP-V1** (30.08.2026): coordinated four-config schedule, mock capability preflight (2) + measurement (68), default-deny LIVE guard, boundary capture, fake full-path runner — без LIVE/API. **CP-ARCH-COMPARE-LIVE-RUNNER-V1** (30.08.2026): guarded LIVE branch через production `llm.chat_completions_create`; fake default сохранён; реальный transport только после guard. Plus pinned `qwen3.7-plus-2026-05-26`; offline readiness `READY_FOR_AUTHORIZED_PREFLIGHT`. Следующий шаг: owner-authorized CP-ARCH-COMPARE-LIVE-V1 (manifest + credentials + clean HEAD `e1aed0e`).
 
 ## Этап 5. Локальная готовность выбранного решения
 

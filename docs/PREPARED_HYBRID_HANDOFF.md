@@ -227,6 +227,8 @@
 
 **CP-ARCH-COMPARE-LIVE-PREP-V1 (30.08.2026):** eval-only подготовка coordinated LIVE attempt: Latin rotation schedule (16×4 scenario/config, 19×4 turn/config), session/config isolation, capability preflight budget **2** + measurement **68** = **70** authorized provider calls, default-deny guard, mock preflight state machine, boundary capture, structured fields + blind review pack, fake full-path runner (`run_arch_compare_live.py`). Inference settings Flash/Plus идентичны production Composer (`enable_thinking=false`, `temperature=0`, `max_completion_tokens=1024`, `response_format=json_object`). LIVE/API не выполнялись; offline readiness **`READY_FOR_AUTHORIZED_PREFLIGHT`**. Optional cache probe **4** — отдельно, не входит в 70.
 
+**CP-ARCH-COMPARE-LIVE-RUNNER-V1 (30.08.2026):** guarded LIVE branch подключён к существующему production provider client (`llm.chat_completions_create`) через eval-only адаптер `arch_compare_live_transport.py`. Схема: authorization guard → `create_guarded_live_transport()` → Flash preflight → Plus preflight → 68 measurement → artifacts + blind review. Default deny сохранён: без `--live`/manifest/credentials/real key transport не создаётся; unconditional `LIVE_RUNNER_NOT_ENABLED_IN_PUBLISHED_SNAPSHOT` заменён на guarded path. Offline: mock provider client, 0 network/provider calls. Статус: **`READY_FOR_AUTHORIZED_PREFLIGHT`** (реальный LIVE на этом checkpoint не запускался).
+
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 
 **Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.

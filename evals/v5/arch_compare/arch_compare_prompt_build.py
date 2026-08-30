@@ -200,3 +200,32 @@ def build_prompt_capture(
         provider_model_id_status=config.provider_model_id_status,
         prompt_contract_version=ONE_CALL_PROMPT_CONTRACT_VERSION,
     )
+
+
+def build_composer_messages(*, prompt_capture: ArchComparePromptCapture) -> tuple[dict[str, str], ...]:
+    return (
+        {"role": "system", "content": prompt_capture.stable_prefix},
+        {"role": "user", "content": prompt_capture.dynamic_suffix},
+    )
+
+
+_PREFLIGHT_SCENARIO_ID = "PRC-01"
+_PREFLIGHT_TURN_ID = "PRC-01_t1"
+
+
+def build_preflight_messages(
+    *,
+    config: ArchCompareConfig,
+    attempt_id: str,
+) -> tuple[dict[str, str], ...]:
+    from evals.v5.arch_compare.arch_compare_live_schedule import scenario_for_id
+
+    scenario = scenario_for_id(_PREFLIGHT_SCENARIO_ID)
+    turn = next(row for row in scenario.turns if row.turn_id == _PREFLIGHT_TURN_ID)
+    capture = build_prompt_capture(
+        config=config,
+        scenario=scenario,
+        turn=turn,
+        dialog_history="",
+    )
+    return build_composer_messages(prompt_capture=capture)

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from evals.v5.arch_compare.arch_compare_configs import (
+    FLASH_PROVIDER_MODEL_ID,
     PLUS_PROVIDER_MODEL_ID,
+    PLUS_OFFICIAL_SOURCES,
     all_arch_compare_configs,
     assert_config_registry,
     config_by_id,
@@ -26,11 +28,14 @@ def test_measurement_and_config_registry() -> None:
     assert len(all_arch_compare_configs()) == EXPECTED_CONFIG_COUNT
 
 
-def test_plus_provider_model_unresolved() -> None:
+def test_plus_provider_model_pinned() -> None:
     plus_full = config_by_id("plus_full")
     assert plus_full.model_role == "plus"
-    assert plus_full.provider_model_id_status == "unresolved"
-    assert PLUS_PROVIDER_MODEL_ID is None
+    assert plus_full.provider_model_id_status == "resolved"
+    assert PLUS_PROVIDER_MODEL_ID == "qwen3.7-plus-2026-05-26"
+    flash_full = config_by_id("flash_full")
+    assert flash_full.provider_model_id == FLASH_PROVIDER_MODEL_ID
+    assert len(PLUS_OFFICIAL_SOURCES) == 3
 
 
 def test_prompt_contract_version_pinned() -> None:

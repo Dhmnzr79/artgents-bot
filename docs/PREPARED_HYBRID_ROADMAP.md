@@ -137,7 +137,7 @@
 
 ## CP-ARCH-COMPARE-OFFLINE-V1 (30.08.2026)
 
-Offline stand для честного сравнения Flash/Plus × FullContext/curated refs: `evals/v5/arch_compare/`, matrix 16/19, parity tests, fake dry-run, blind A–D review format. Без LIVE, без product runtime diff. Публикация `ce3a467` остановлена до push из‑за LF/CRLF digest; correction нормализует только line endings, matrix content не менялся. Следующий шаг: CP-ARCH-COMPARE-LIVE-V1 после owner pin Plus model id.
+Offline stand для честного сравнения Flash/Plus × FullContext/curated refs: `evals/v5/arch_compare/`, matrix 16/19, parity tests, fake dry-run, blind A–D review format. **CP-ARCH-COMPARE-LIVE-PREP-V1** (30.08.2026): coordinated four-config schedule, mock capability preflight (2) + measurement (68), default-deny LIVE guard, boundary capture, fake full-path runner — без LIVE/API. Plus pinned `qwen3.7-plus-2026-05-26`; offline readiness `READY_FOR_AUTHORIZED_PREFLIGHT`. Следующий шаг: CP-ARCH-COMPARE-LIVE-V1 после owner authorization manifest + credentials + clean HEAD.
 
 ## Этап 5. Локальная готовность выбранного решения
 

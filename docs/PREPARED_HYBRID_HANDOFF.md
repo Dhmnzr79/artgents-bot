@@ -217,13 +217,15 @@
 2. FullContext через production `build_one_call_stable_prefix`; curated — subset того же corpus snapshot по allowlist refs.
 3. Parity: одинаковые exact/service catalogs, `COMMERCIAL_AS_OF`, dynamic suffix и session history; full vs curated отличаются только content-context block.
 4. Fake transport + dry-run: 0 provider/network calls; blind review A–D без утечки config/model/context.
-5. Plus `provider_model_id` = `unresolved` (канонический Plus slug в `config.py` отсутствует; hint: `.env.example` → `qwen3.7-plus`).
+5. Plus `provider_model_id` зафиксирован owner snapshot: `qwen3.7-plus-2026-05-26` (официальные источники Alibaba Model Studio — text-generation, pricing, context-cache; checked 2026-08-30). Flash snapshot: `qwen3.7-flash-2026-07-15`.
 
-**Граница:** fake/offline доказывает wiring и parity, **не** качество модели. Presentation/widget decomposition (`visible_answer`, promo/CTA ids) — `unavailable` без изменения product runtime.
+**Граница:** fake/offline доказывает wiring и parity, **не** качество модели. Presentation/widget decomposition через public response boundary (`full` / `terminal_boundary_full` / `code_only_boundary_full`); без regex/sanitizer и без `visible_answer=patient_text` fallback.
 
-**Offline:** arch_compare 31/31 + regressions (Stage3B, exact single/multi, commercial prompt, Stage3A) green.
+**Offline:** arch_compare offline + regressions (Stage3B, exact single/multi, commercial prompt, Stage3A) green.
 
-**Публикация (30.08.2026):** commit `ce3a467` остановлен до push — snapshot REJECT: `frozen_matrix_digest()` хешировал сырые байты JSON, digest зависел от LF vs CRLF на checkout. Correction pass: `matrix_digest_sha256()` нормализует только переносы строк (`CRLF`/`CR` → `LF`); matrix content, runtime и `.gitattributes` не менялись; LIVE не запускался.
+**Публикация (30.08.2026):** commit `ce3a467` остановлен до push — snapshot REJECT: `frozen_matrix_digest()` хешировал сырые байты JSON; correction `cc42fc4` нормализует только переносы строк. Оба commit опубликованы на `cc42fc4`.
+
+**CP-ARCH-COMPARE-LIVE-PREP-V1 (30.08.2026):** eval-only подготовка coordinated LIVE attempt: Latin rotation schedule (16×4 scenario/config, 19×4 turn/config), session/config isolation, capability preflight budget **2** + measurement **68** = **70** authorized provider calls, default-deny guard, mock preflight state machine, boundary capture, structured fields + blind review pack, fake full-path runner (`run_arch_compare_live.py`). Inference settings Flash/Plus идентичны production Composer (`enable_thinking=false`, `temperature=0`, `max_completion_tokens=1024`, `response_format=json_object`). LIVE/API не выполнялись; offline readiness **`READY_FOR_AUTHORIZED_PREFLIGHT`**. Optional cache probe **4** — отдельно, не входит в 70.
 
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 

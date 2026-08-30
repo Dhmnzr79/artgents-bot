@@ -77,10 +77,11 @@ def build_fake_envelope_json(
     service_id: str | None = None,
     commercial_intent: str = "none",
     promotion_scope: str = "none",
+    patient_text: str | None = None,
 ) -> str:
-    patient_text = f"{FAKE_PATIENT_TEXT_PREFIX}:{scenario_id}:{turn_id}"
+    resolved_patient_text = patient_text or f"{FAKE_PATIENT_TEXT_PREFIX}:{scenario_id}:{turn_id}"
     return dumps_production_envelope(
-        patient_text=patient_text,
+        patient_text=resolved_patient_text,
         route=route,
         service_id=service_id,
         commercial_intent=commercial_intent,

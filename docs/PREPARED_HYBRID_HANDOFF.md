@@ -231,6 +231,8 @@
 
 **CP-ARCH-COMPARE-LIVE-RELIABILITY-V1 (30.08.2026):** операционная надёжность LIVE runner без изменения product runtime. Incremental persistence после каждого provider call (`manifest.json`, `schedule.json`, `call_ledger.json`, `raw_turns.json`, `structured_turns.json`); `started` call записывается атомарно до вызова и считается в budget; measurement timeout/error → failed call + continue (retries=0); preflight failure → `PREFLIGHT_FAILED` + partial artifacts; fatal → `INCOMPLETE_FATAL`. Eval timeout **60s** Flash/Plus; production SLA reference **20s** (`production_sla_breached`). Guard требует `CHAT_API_KEY` + `CHAT_BASE_URL` (не `OPENAI_API_KEY` alone). Blind review при `MEASUREMENT_COMPLETE_WITH_ERRORS`. Attempt `arch_compare_live_v1_2026-08-30-01` не восстанавливается; следующий рекомендуемый ID: `arch_compare_live_v1_2026-08-30-02`. Статус: **`READY_FOR_NEW_ATTEMPT_AUTHORIZATION`**.
 
+**CP-ARCH-COMPARE-WINDOWS-ARTIFACT-LOCK-V1 (30.08.2026):** узкий eval-only фикс transient Windows lock на `os.replace` в `atomic_write_text`: до 6 попыток, задержки 50/100/200/400/800 мс, только `WinError 5/32`; provider/turn retries остаются 0. Attempt 02 (`INCOMPLETE_FATAL` на turn 47) не возобновляется; следующий рекомендуемый ID: `arch_compare_live_v1_2026-08-30-03`. Статус: **`READY_FOR_NEW_ATTEMPT_AUTHORIZATION`**.
+
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 
 **Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.

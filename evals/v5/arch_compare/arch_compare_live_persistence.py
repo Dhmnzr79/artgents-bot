@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,9 +34,29 @@ AttemptStatus = Literal[
 
 PROVIDER_ERROR_REVIEW_TEXT = "Ответ не получен: timeout/provider error"
 
+_REPLACE_RETRY_DELAYS_SEC = (0.05, 0.1, 0.2, 0.4, 0.8)
+_REPLACE_MAX_ATTEMPTS = len(_REPLACE_RETRY_DELAYS_SEC) + 1
+_TRANSIENT_WINDOWS_REPLACE_ERRORS = frozenset({5, 32})
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _is_transient_windows_replace_error(exc: OSError) -> bool:
+    winerror = getattr(exc, "winerror", None)
+    return winerror in _TRANSIENT_WINDOWS_REPLACE_ERRORS
+
+
+def _atomic_replace_with_retry(tmp_path: Path, path: Path) -> None:
+    for attempt in range(_REPLACE_MAX_ATTEMPTS):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except OSError as exc:
+            if not _is_transient_windows_replace_error(exc) or attempt >= _REPLACE_MAX_ATTEMPTS - 1:
+                raise
+            time.sleep(_REPLACE_RETRY_DELAYS_SEC[attempt])
 
 
 def atomic_write_text(path: Path, content: str) -> None:
@@ -51,7 +72,7 @@ def atomic_write_text(path: Path, content: str) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp_path, path)
+        _atomic_replace_with_retry(tmp_path, path)
     finally:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)

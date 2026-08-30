@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -34,6 +35,7 @@ from evals.v5.arch_compare.arch_compare_live_persistence import (
     ArchCompareCallLedger,
     ArchCompareLiveArtifactStore,
     atomic_write_json,
+    atomic_write_text,
 )
 from evals.v5.arch_compare.arch_compare_live_report import (
     assert_blind_review_secrecy,
@@ -272,6 +274,92 @@ def test_atomic_json_remains_valid_after_write_failure(tmp_path: Path) -> None:
         store.persist_core()
     monkeypatch.undo()
     assert json.loads(manifest_path.read_text(encoding="utf-8")) == original
+
+
+def _winerror_oserror(winerror: int, message: str = "Access is denied") -> OSError:
+    exc = OSError(message)
+    exc.winerror = winerror
+    return exc
+
+
+def test_atomic_replace_retries_transient_winerror_5_then_succeeds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import evals.v5.arch_compare.arch_compare_live_persistence as persistence
+
+    target = tmp_path / "state.json"
+    target.write_text("old", encoding="utf-8")
+    replace_calls = {"count": 0}
+    real_replace = os.replace
+
+    def flaky_replace(src, dst):
+        replace_calls["count"] += 1
+        if replace_calls["count"] < 3:
+            raise _winerror_oserror(5)
+        real_replace(src, dst)
+
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(persistence.os, "replace", flaky_replace)
+    monkeypatch.setattr(persistence.time, "sleep", lambda delay: sleep_calls.append(delay))
+
+    atomic_write_text(target, "new")
+
+    assert target.read_text(encoding="utf-8") == "new"
+    assert replace_calls["count"] == 3
+    assert sleep_calls == [0.05, 0.1]
+    assert not list(tmp_path.glob(f".{target.name}.*.tmp"))
+
+
+def test_atomic_replace_exhausted_retries_preserves_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import evals.v5.arch_compare.arch_compare_live_persistence as persistence
+
+    target = tmp_path / "state.json"
+    original = '{"ok": true}'
+    target.write_text(original, encoding="utf-8")
+    replace_calls = {"count": 0}
+
+    def always_fail(src, dst):
+        replace_calls["count"] += 1
+        raise _winerror_oserror(5)
+
+    monkeypatch.setattr(persistence.os, "replace", always_fail)
+    monkeypatch.setattr(persistence.time, "sleep", lambda _delay: None)
+
+    with pytest.raises(OSError):
+        atomic_write_text(target, "new content")
+
+    assert replace_calls["count"] == 6
+    assert target.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob(f".{target.name}.*.tmp"))
+
+
+def test_atomic_replace_non_transient_oserror_no_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import evals.v5.arch_compare.arch_compare_live_persistence as persistence
+
+    target = tmp_path / "state.json"
+    replace_calls = {"count": 0}
+
+    def fail_once(src, dst):
+        replace_calls["count"] += 1
+        raise OSError(28, "No space left on device")
+
+    sleep_calls: list[float] = []
+    monkeypatch.setattr(persistence.os, "replace", fail_once)
+    monkeypatch.setattr(persistence.time, "sleep", lambda delay: sleep_calls.append(delay))
+
+    with pytest.raises(OSError):
+        atomic_write_text(target, "data")
+
+    assert replace_calls["count"] == 1
+    assert sleep_calls == []
+    assert not list(tmp_path.glob(f".{target.name}.*.tmp"))
 
 
 def test_exact_call_count_from_ledger(tmp_path: Path) -> None:

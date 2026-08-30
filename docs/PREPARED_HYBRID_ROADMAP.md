@@ -135,6 +135,10 @@
 
 Если выбран Hybrid: использовать доказательства PERF-7/8/9 и пригодные компоненты, не восстанавливать вслепую старый pipeline. Отдельно проверять нахождение факта, передачу полного пакета, качество ответа. Несколько источников и exact-data слой сами по себе не гарантируют полноту. FullContext fallback — отдельное проверяемое решение, не обязательный второй генеративный проход.
 
+## CP-ARCH-COMPARE-OFFLINE-V1 (30.08.2026)
+
+Offline stand для честного сравнения Flash/Plus × FullContext/curated refs: `evals/v5/arch_compare/`, matrix 16/19, parity tests, fake dry-run, blind A–D review format. Без LIVE, без product runtime diff. Следующий шаг: CP-ARCH-COMPARE-LIVE-V1 после owner pin Plus model id.
+
 ## Этап 5. Локальная готовность выбранного решения
 
 - Расширить проверенное решение на остальные темы без special-case All-on-4.

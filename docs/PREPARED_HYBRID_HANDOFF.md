@@ -208,6 +208,21 @@
 
 **Offline:** `test_one_call_stage3b_offline.py` — 65/65; смежные cache/prompt/one-call regressions green. Product runtime не менялся.
 
+### CP-ARCH-COMPARE-OFFLINE-V1 — offline 4-way architecture compare stand (30.08.2026)
+
+**Статус:** реализован Cursor offline на базе `c7c58b6`; LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно. Hybrid не выбран.
+
+**Что сделано:**
+1. Новый eval namespace `evals/v5/arch_compare/`: 4 config_id (`flash_full`, `flash_curated`, `plus_full`, `plus_curated`), frozen matrix 16 scenarios / 19 turns, curated context из канонических MD refs без ручных выдержек.
+2. FullContext через production `build_one_call_stable_prefix`; curated — subset того же corpus snapshot по allowlist refs.
+3. Parity: одинаковые exact/service catalogs, `COMMERCIAL_AS_OF`, dynamic suffix и session history; full vs curated отличаются только content-context block.
+4. Fake transport + dry-run: 0 provider/network calls; blind review A–D без утечки config/model/context.
+5. Plus `provider_model_id` = `unresolved` (канонический Plus slug в `config.py` отсутствует; hint: `.env.example` → `qwen3.7-plus`).
+
+**Граница:** fake/offline доказывает wiring и parity, **не** качество модели. Presentation/widget decomposition (`visible_answer`, promo/CTA ids) — `unavailable` без изменения product runtime.
+
+**Offline:** arch_compare 31/31 + regressions (Stage3B, exact single/multi, commercial prompt, Stage3A) green.
+
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 
 **Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.

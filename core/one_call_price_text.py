@@ -1,4 +1,4 @@
-"""Isolated price_text validation and canonical fallback (CP-EXACT-1B-SINGLE)."""
+"""Isolated price_text validation and canonical fallback (CP-EXACT-1B-SINGLE / MULTI-V1)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from contracts.precomposer_selected_offer import (
     ResolvedPriceText,
 )
 from contracts.response_schema import ResponseSchemaBundle, TargetOffer
+from core.one_call_multi_offer_price_block import build_canonical_multi_offer_price_block
 from core.sales_fast_authoritative_commerce import (
     _amounts_in_text,
     build_canonical_exact_offer_price_line,
@@ -103,11 +104,42 @@ def resolve_price_text_for_turn(
     selection: PrecomposerSelectedOfferResult,
     bundle: ResponseSchemaBundle,
 ) -> ResolvedPriceText:
+    if commercial_intent != "price":
+        if price_text is not None and str(price_text).strip():
+            return ResolvedPriceText(
+                line="",
+                owner="none",
+                diagnostic="unexpected_nonprice",
+            )
+        return ResolvedPriceText(line="", owner="none")
+
+    if selection.availability == "multiple":
+        diagnostic: PriceTextDiagnostic | None = None
+        if price_text is not None and str(price_text).strip():
+            diagnostic = "unexpected_multi_price_text"
+        multi = build_canonical_multi_offer_price_block(
+            bundle=bundle,
+            selection=selection,
+        )
+        if multi.block:
+            return ResolvedPriceText(
+                line=multi.block,
+                owner="canonical_multi",
+                diagnostic=diagnostic,
+                multi_offer_ids=multi.offer_ids,
+            )
+        return ResolvedPriceText(
+            line="",
+            owner="none",
+            diagnostic=diagnostic or multi.diagnostic,  # type: ignore[arg-type]
+            multi_offer_ids=multi.offer_ids,
+        )
+
     canonical = build_canonical_exact_offer_price_line(offer=selection.offer, bundle=bundle) if (
         selection.availability == "selected" and selection.offer is not None
     ) else ""
 
-    if commercial_intent != "price" or selection.availability != "selected" or selection.offer is None:
+    if selection.availability != "selected" or selection.offer is None:
         if price_text is not None and str(price_text).strip():
             return ResolvedPriceText(
                 line="",
@@ -124,13 +156,13 @@ def resolve_price_text_for_turn(
             owner="model_price_text",
             selected_offer_id=offer.offer_id,
         )
-    diagnostic: PriceTextDiagnostic = failure or "canonical_fallback_used"
+    single_diagnostic: PriceTextDiagnostic = failure or "canonical_fallback_used"
     if failure is None:
-        diagnostic = "canonical_fallback_used"
+        single_diagnostic = "canonical_fallback_used"
     return ResolvedPriceText(
         line=canonical,
         owner="canonical_fallback",
-        diagnostic=diagnostic,
+        diagnostic=single_diagnostic,
         selected_offer_id=offer.offer_id,
     )
 

@@ -845,6 +845,26 @@ def _materialize_result(
             )
         ):
             turn_timing.set_flag("price_text_patient_duplicate_amount", True)
+        if (
+            selection.availability == "multiple"
+            and result.patient_text
+            and patient_text_contains_monetary_amount(result.patient_text)
+        ):
+            turn_timing.set_flag("multi_patient_monetary_amount", True)
+        if selection.availability == "multiple":
+            turn_timing.set_flag("precomposer_offer_availability", "multiple")
+            turn_timing.set_flag("multi_offer_count", len(selection.offers))
+        if selection.diagnostic is not None:
+            turn_timing.set_flag("precomposer_offer_diagnostic", selection.diagnostic)
+            if selection.diagnostic in {
+                "multi_offer_too_many",
+                "multi_offer_malformed",
+                "multi_offer_mixed_price_modes",
+                "multi_offer_unsafe_scope",
+            }:
+                turn_timing.set_flag("multi_attempted_but_unsafe", True)
+        if resolved_price_text is not None and resolved_price_text.owner == "canonical_multi":
+            turn_timing.set_flag("multi_price_owner", "canonical_multi")
         if resolved_price_text.diagnostic is not None:
             turn_timing.set_flag("price_text_diagnostic", resolved_price_text.diagnostic)
         if resolved_price_text.owner != "none":

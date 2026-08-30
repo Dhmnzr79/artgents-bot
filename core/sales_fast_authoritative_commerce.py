@@ -258,6 +258,29 @@ def build_precomposer_single_offer_commerce(
     )
 
 
+def build_precomposer_multi_offer_commerce(
+    offers: tuple[TargetOffer, ...],
+    *,
+    service_id: str,
+) -> AuthoritativeCommerceResult:
+    """Marketing-only commerce metadata for a canonical multi-offer price turn."""
+
+    amounts = _authoritative_amounts_from_offers(offers)
+    return AuthoritativeCommerceResult(
+        service_id=service_id,
+        presentation_mode="none",
+        entry_price_amount=None,
+        entry_price_text=None,
+        ordered_offers=offers,
+        featured_offer_id=None,
+        selected_exact_offer=None,
+        needs_consultation_quote=False,
+        authoritative_amounts=amounts,
+        patient_price_block=None,
+        widget_offer_payload=None,
+    )
+
+
 def _build_widget_offer_payload(
     *,
     presentation_mode: AuthoritativeCommercePresentationMode,

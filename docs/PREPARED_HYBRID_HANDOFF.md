@@ -124,7 +124,7 @@
 3. **Prompt contract v6:** модель видит полные exact-данные для grounding, но не должна самостоятельно вставлять code-owned цены/канонические тексты в `patient_text` и не должна спонтанно рекламировать service_value/promo/amplifiers/warranty. Автоматический маркетинг остаётся за `marketing.yaml` + CP-MKT-1 + существующим presentation pass.
 4. **Fingerprint:** stable prefix учитывает полный exact-каталог; смена только runtime-даты не меняет fingerprint; demo/nikadent изолированы.
 
-**Что сознательно не сделано (CP-EXACT-1B2 и далее):** multi-offer `price_text`, `used_offer_id`, multi-brand ranking, Hybrid/RAG, LIVE.
+**Что сознательно не сделано (до CP-EXACT-1B-MULTI-V1):** multi-offer canonical list в видимом ответе, `used_offer_id`, multi-brand ranking, Hybrid/RAG, LIVE.
 
 **Offline (29.08.2026):** CP-EXACT-1B-SINGLE — 38/38 в `test_one_call_exact_1b_single_offline.py`; checkpoint_a — 33/33; scoped-evidence suites синхронизированы в **CP-SCOPED-EVIDENCE-SYNC-SAFE** (см. ниже).
 
@@ -163,6 +163,35 @@
 **Brand mention contract:** casefold; word/phrase boundary match по `canonical_name`, `aliases`, `brand_id`; без fuzzy/substring-in-word; 0 или 2+ брендов → fail-closed; alias collision → typed ambiguity.
 
 **Residual risk:** модель может вставить сумму в `patient_text` — допустимый наблюдаемый residual; каноническая `price_text` line обязательна; удаление предложений из `patient_text` запрещено.
+
+### CP-EXACT-1B-MULTI-V1 — canonical multi-offer price list (30.08.2026)
+
+**Статус:** реализован Cursor offline на базе `58c4af5`; correction pass (unsafe eligible-set validation, no internal offer_id labels, jaw-scenario acceptance) — offline; checker pending. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.
+
+**Multi V1 runtime coverage (demo, structural gate: uniform jaw fixed offers):**
+- `all_on_4` — 3 brand offers (Implantium / Impro / Nobel Biocare; 318 000 / 368 000 / 428 000 ₽).
+- `all_on_6` — 3 brand offers (398 000 / 458 000 / 528 000 ₽).
+- `removable_dentures` — 2 option offers (Частичный / Полный съёмный протез; 45 000 / 65 000 ₽).
+
+**Поддержанные production-path случаи (demo v1):**
+- jaw-сервис без бренда/опции → `availability=multiple`, 2–3 jaw fixed offers в neutral catalog order.
+- один бренд → прежний single path (`availability=selected`, `price_text`).
+- два бренда в сообщении → filtered multi (catalog order); если active остался один — `selected`.
+- Неизвестный бренд → известные offers, без выдуманного бренда.
+- Non-price / broad-family price / `classic` per-tooth overview — без multi list.
+- Unsafe eligible set (malformed/mixed fixed+from/>3/mixed billing units) → `availability=none` + diagnostic; **без partial list**; legacy ranked overview blocked; `patient_text` сохранён.
+- Patient-facing labels только из `brand_catalog.canonical_name` или `service.options[].name`; internal `offer_id` не показывается.
+
+**Что сделано:**
+1. Contract `none|selected|multiple` + fail-fast invariants; generic resolver без service hardcode; neutral `brand_catalog` order; full eligible-set validation до formatter.
+2. Dynamic `SELECTED_EXACT_OFFER` payload для `multiple`; prompt contract **v9** (`price_text=null`, patient_text без сумм).
+3. `core/one_call_multi_offer_price_block.py` — code-owned canonical list + дословный shared `package.label`; без fallback на `offer_id`.
+4. Presentation `precomposer_multi_price_turn`: list → patient_text → promo → amplifiers → CTA; без `service_value` на price profile; widget v1 text-only (без `offers[]`).
+5. Diagnostics: `precomposer_offer_availability=multiple`, `multi_price_owner=canonical_multi`, `multi_patient_monetary_amount`, `multi_attempted_but_unsafe`, `unexpected_multi_price_text`.
+
+**Structural v1 gate:** multi активируется только при uniform `billing_unit=jaw` у 2–3 eligible fixed offers. Per-tooth `classic` / `one_stage` остаются на legacy overview — не маркируются как повреждённые.
+
+**Сознательно не в v1:** `from`/range support; новый public UI contract; model `price_text` на multi; service_id hardcode в production.
 
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 

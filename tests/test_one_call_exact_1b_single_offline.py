@@ -160,15 +160,6 @@ def test_precomposer_selects_demo_tomography_fixed_offer() -> None:
     assert selection.offer.price.amount == 3000
 
 
-def test_precomposer_returns_none_for_multi_offer_all_on_4() -> None:
-    selection = resolve_precomposer_selected_offer(
-        bundle=_DEMO_BUNDLE,
-        doctor_catalog=_DEMO_CONTEXT.doctor_catalog,
-        resolution=_governed_resolution("all_on_4"),
-    )
-    assert selection.availability == "none"
-
-
 def test_precomposer_returns_none_for_inactive_service() -> None:
     inactive = _DEMO_BUNDLE.model_copy(deep=True)
     service = inactive.services["tomography"].model_copy(update={"active": False})
@@ -334,8 +325,8 @@ def test_extra_amount_triggers_fallback() -> None:
     assert failure == "extra_amount"
 
 
-def test_prompt_contract_version_eight_documents_price_text() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 8
+def test_prompt_contract_version_nine_documents_price_text() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
     from core.one_call_prompt_contract import ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
     assert "price_text" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
@@ -502,40 +493,6 @@ def resolve_exact_sales_resolution_for_test(message: str, identity) -> ExactSale
             exact_aspect=exact_aspect,
         )
     )
-
-
-def test_precomposer_all_on_4_without_brand_stays_none() -> None:
-    message = "Сколько стоит All-on-4?"
-    from core.sales_fast_service_identity import resolve_catalog_service_identity
-
-    identity = resolve_catalog_service_identity(message, _DEMO_BUNDLE)
-    resolution = resolve_exact_sales_resolution_for_test(message, identity)
-    selection = resolve_precomposer_selected_offer_for_turn(
-        bundle=_DEMO_BUNDLE,
-        doctor_catalog=_DEMO_CONTEXT.doctor_catalog,
-        resolution=resolution,
-        user_message=message,
-        service_identity=identity,
-        session_state=_fresh_empty_session(),
-    )
-    assert selection.availability == "none"
-
-
-def test_precomposer_all_on_4_two_brands_stays_none() -> None:
-    message = "Сколько стоит All-on-4 Nobel или Impro?"
-    from core.sales_fast_service_identity import resolve_catalog_service_identity
-
-    identity = resolve_catalog_service_identity(message, _DEMO_BUNDLE)
-    resolution = resolve_exact_sales_resolution_for_test(message, identity)
-    selection = resolve_precomposer_selected_offer_for_turn(
-        bundle=_DEMO_BUNDLE,
-        doctor_catalog=_DEMO_CONTEXT.doctor_catalog,
-        resolution=resolution,
-        user_message=message,
-        service_identity=identity,
-        session_state=_fresh_empty_session(),
-    )
-    assert selection.availability == "none"
 
 
 def test_precomposer_known_brand_without_service_offer_not_substituted() -> None:

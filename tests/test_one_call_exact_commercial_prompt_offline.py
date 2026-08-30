@@ -275,4 +275,4 @@ def test_get_or_build_stable_prefix_uses_exact_catalog_from_demo_bundle() -> Non
     )
     assert hit is False
     assert "=== EXACT_COMMERCIAL_CATALOG ===" in bundle.stable_prefix
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 8
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9

@@ -26,6 +26,7 @@ from core.sales_fast_authoritative_commerce import (
     AuthoritativeCommerceResult,
     apply_authoritative_commerce_to_patient_text,
     build_authoritative_commerce_result,
+    build_precomposer_multi_offer_commerce,
     build_precomposer_single_offer_commerce,
     collect_planned_render_commercial_allowlist,
     gate_commerce_result_by_intent,
@@ -92,6 +93,7 @@ from core.target_composer_request import (
 )
 from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
 from core.sales_fast_presentation import (
+    AUTOMATIC_AMPLIFIER_LIST_HEADER,
     build_direct_promotion_patient_text,
     supplement_sales_fast_patient_text_with_marketing,
 )
@@ -125,6 +127,73 @@ def _fail_closed_text(reason: str) -> str:
         "Сейчас не могу надёжно ответить по этому вопросу об акции. "
         "Администратор клиники поможет уточнить детали.",
     )
+
+
+def _price_marketing_suffix_without_service_value(
+    *,
+    bound_package: TargetSpecBoundOfflineResponsePackage,
+    bundle: TargetRuntimeClientContext,
+) -> str:
+    facts_by_id = {
+        fact.id: fact for fact in bound_package.package.materials.commercial_facts
+    }
+    selection = bound_package.package.materials.marketing_selection
+    text = ""
+    amplifier_ref_set = frozenset(selection.amplifier_refs)
+
+    for ref in selection.selected_refs:
+        if not ref.startswith("fact:") or ref in amplifier_ref_set:
+            continue
+        fact_id = ref.removeprefix("fact:")
+        fact = facts_by_id.get(fact_id)
+        if fact is None:
+            continue
+        fact_text = str(fact.text_fact).strip()
+        if not fact_text or fact_text in text:
+            continue
+        separator = "\n\n" if text.strip() else ""
+        text = f"{text.rstrip()}{separator}{fact_text}"
+
+    bullet_lines: list[str] = []
+    for ref in selection.amplifier_refs:
+        if not ref.startswith("fact:"):
+            continue
+        fact_id = ref.removeprefix("fact:")
+        fact = facts_by_id.get(fact_id)
+        if fact is None:
+            fact = bundle.bundle.facts.get(fact_id)
+        if fact is None:
+            continue
+        fact_text = str(fact.text_fact).strip()
+        if not fact_text or fact_text in text:
+            continue
+        bullet_lines.append(fact_text)
+
+    if bullet_lines:
+        list_block = AUTOMATIC_AMPLIFIER_LIST_HEADER + "\n" + "\n".join(
+            f"- {line}" for line in bullet_lines
+        )
+        separator = "\n\n" if text.strip() else ""
+        text = f"{text.rstrip()}{separator}{list_block}"
+    return text
+
+
+def _precomposer_multi_unsafe_block_legacy(
+    *,
+    precomposer_selected_offer: PrecomposerSelectedOfferResult | None,
+    original_commercial_intent: str,
+    resolved_price_text: ResolvedPriceText | None,
+) -> bool:
+    if original_commercial_intent != "price":
+        return False
+    if precomposer_selected_offer is None:
+        return False
+    if precomposer_selected_offer.diagnostic is not None:
+        return True
+    if precomposer_selected_offer.availability == "multiple":
+        if resolved_price_text is None or resolved_price_text.owner != "canonical_multi":
+            return True
+    return False
 
 
 def _informational_evidence_fact_kinds() -> frozenset[str]:
@@ -687,6 +756,20 @@ def build_one_call_presentation_result(
         and precomposer_selected_offer.availability == "selected"
         and precomposer_selected_offer.offer is not None
     )
+    precomposer_multi_price_turn = (
+        resolved_price_text is not None
+        and resolved_price_text.line.strip()
+        and resolved_price_text.owner == "canonical_multi"
+        and original_commercial_intent == "price"
+        and precomposer_selected_offer is not None
+        and precomposer_selected_offer.availability == "multiple"
+        and 2 <= len(precomposer_selected_offer.offers) <= 3
+    )
+    block_legacy_authoritative_commerce = _precomposer_multi_unsafe_block_legacy(
+        precomposer_selected_offer=precomposer_selected_offer,
+        original_commercial_intent=original_commercial_intent,
+        resolved_price_text=resolved_price_text,
+    )
     if (
         not turn_frame.needs_clarification
         and not _availability_blocks_commerce(availability_status)
@@ -697,7 +780,12 @@ def build_one_call_presentation_result(
                 precomposer_selected_offer.offer,  # type: ignore[union-attr]
                 bundle=context.bundle,
             )
-        else:
+        elif precomposer_multi_price_turn:
+            commerce_result = build_precomposer_multi_offer_commerce(
+                precomposer_selected_offer.offers,  # type: ignore[union-attr]
+                service_id=str(precomposer_selected_offer.service_id),
+            )
+        elif not block_legacy_authoritative_commerce:
             commerce_result = gate_commerce_result_by_intent(
                 build_authoritative_commerce_result(
                     bound_package=bound_with_marketing,
@@ -797,12 +885,21 @@ def build_one_call_presentation_result(
                     )
                 supplemented_text = promo_text
         else:
-            if precomposer_price_turn and resolved_price_text is not None:
-                marketing_only = supplement_sales_fast_patient_text_with_marketing(
-                    patient_text="",
-                    bound_package=presentation_bound,
-                    bundle=context.bundle,
-                )
+            if (
+                (precomposer_price_turn or precomposer_multi_price_turn)
+                and resolved_price_text is not None
+            ):
+                if precomposer_multi_price_turn:
+                    marketing_only = _price_marketing_suffix_without_service_value(
+                        bound_package=presentation_bound,
+                        bundle=context,
+                    )
+                else:
+                    marketing_only = supplement_sales_fast_patient_text_with_marketing(
+                        patient_text="",
+                        bound_package=presentation_bound,
+                        bundle=context.bundle,
+                    )
                 supplemented_text = assemble_price_turn_visible_text(
                     price_line=resolved_price_text.line,
                     patient_text=patient_text,
@@ -827,7 +924,12 @@ def build_one_call_presentation_result(
                     direct_commercial_text,
                 )
         final_patient_text = supplemented_text
-        if commerce_result is not None and not precomposer_price_turn:
+        if (
+            commerce_result is not None
+            and not precomposer_price_turn
+            and not precomposer_multi_price_turn
+            and not block_legacy_authoritative_commerce
+        ):
             final_patient_text = apply_authoritative_commerce_to_patient_text(
                 supplemented_text,
                 commerce_result,

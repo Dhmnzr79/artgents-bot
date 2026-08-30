@@ -1,4 +1,4 @@
-"""Dynamic SELECTED_EXACT_OFFER block for Composer (CP-EXACT-1B-SINGLE)."""
+"""Dynamic SELECTED_EXACT_OFFER block for Composer (CP-EXACT-1B-SINGLE / MULTI-V1)."""
 
 from __future__ import annotations
 
@@ -27,8 +27,26 @@ def _option_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | Non
         return None
     for option in service.options:
         if option.option_id == offer.option_id:
-            return option.label
+            return option.name
     return offer.option_id
+
+
+def _offer_payload(bundle: ResponseSchemaBundle, offer: TargetOffer) -> dict[str, object]:
+    price = offer.price
+    payload: dict[str, object] = {
+        "offer_id": offer.offer_id,
+        "amount": int(price.amount) if price.amount is not None else None,
+        "currency": price.currency,
+        "billing_unit": price.billing_unit,
+        "package_label": str(offer.package.label or "").strip() or None,
+    }
+    if offer.brand_id:
+        payload["brand_id"] = offer.brand_id
+        payload["brand"] = _brand_label(bundle, offer.brand_id)
+    option_label = _option_label(bundle, offer)
+    if option_label is not None:
+        payload["option_label"] = option_label
+    return payload
 
 
 def build_selected_exact_offer_block(
@@ -36,12 +54,29 @@ def build_selected_exact_offer_block(
     bundle: ResponseSchemaBundle,
     selection: PrecomposerSelectedOfferResult,
 ) -> str:
+    if selection.availability == "multiple":
+        payload = {
+            "availability": "multiple",
+            "service_id": selection.service_id,
+            "price_text_allowed": False,
+            "offers": [
+                _offer_payload(bundle, offer) for offer in selection.offers
+            ],
+        }
+        return (
+            f"{SELECTED_EXACT_OFFER_HEADER}\n"
+            f"{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
+        )
+
     if selection.availability != "selected" or selection.offer is None:
         payload = {
             "availability": "none",
             "price_text_allowed": False,
         }
-        return f"{SELECTED_EXACT_OFFER_HEADER}\n{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
+        return (
+            f"{SELECTED_EXACT_OFFER_HEADER}\n"
+            f"{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
+        )
 
     offer = selection.offer
     price = offer.price
@@ -58,4 +93,7 @@ def build_selected_exact_offer_block(
         "package_label": str(offer.package.label or "").strip() or None,
         "price_text_allowed": True,
     }
-    return f"{SELECTED_EXACT_OFFER_HEADER}\n{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
+    return (
+        f"{SELECTED_EXACT_OFFER_HEADER}\n"
+        f"{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
+    )

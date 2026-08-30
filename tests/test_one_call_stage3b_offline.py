@@ -48,10 +48,12 @@ from evals.v5.one_call_flash_capability_live_transport import (
     execute_live_capability_transport,
 )
 from evals.v5.one_call_flash_capability_plan import (
+    build_demo_eval_stable_prefix,
     cache_stable_prefix_sha256,
     frozen_capability_plan_document,
     frozen_capability_plan_sha256,
     messages_for_live_case,
+    stable_prefix_sha256,
 )
 from evals.v5.one_call_flash_capability_probes import (
     JSON_MODE_CAPABILITY_PROBE_USER,
@@ -61,6 +63,19 @@ from evals.v5.one_call_flash_capability_probes import (
     probe_template_for_case_id,
 )
 from evals.v5.run_one_call_flash_capability_live import main as live_cli_main
+from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
+from core.one_call_prefix_input_fingerprint import compute_prefix_input_fingerprint
+from core.one_call_selected_exact_offer_block import SELECTED_EXACT_OFFER_HEADER
+from core.resolve_precomposer_selected_offer import resolve_precomposer_selected_offer
+from core.sales_one_plus_protocol import build_sales_one_plus_dynamic_suffix
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
+from core.target_runtime_client_context import load_target_runtime_client_context
+from tests.test_one_call_exact_1b_single_offline import (
+    _DEMO_BUNDLE,
+    _DEMO_CONTEXT,
+    _governed_resolution,
+)
 
 
 SINGAPORE_ENDPOINT = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -259,8 +274,112 @@ def test_cache_suffixes_are_production_shaped_and_distinct() -> None:
     cold = build_cache_cold_dynamic_suffix()
     repeat = build_cache_repeat_dynamic_suffix()
     assert "<USER_MESSAGE_DATA>" in cold
-    assert "<EXACT_SALES_RESOLUTION>" in cold
+    assert "<PRE_MODEL_HINTS>" in cold
+    assert "resolution_hint" in cold
+    assert "EXACT_SALES_RESOLUTION" not in cold
     assert cold != repeat
+
+
+class TestStage3bCacheContract:
+    def test_eval_stable_prefix_contains_service_and_exact_catalogs(self) -> None:
+        prefix = build_demo_eval_stable_prefix(PROPOSED_LIVE_ATTEMPT_ID)
+        assert "=== SERVICE_REFERENCE_CATALOG ===" in prefix
+        assert "=== EXACT_COMMERCIAL_CATALOG ===" in prefix
+        assert "=== ACTIVE_SERVICE_CATALOG ===" in prefix
+        assert "<USER_MESSAGE_DATA>" not in prefix
+        assert "<PRE_MODEL_HINTS>" not in prefix
+
+    def test_eval_stable_prefix_is_deterministic_for_identical_inputs(self) -> None:
+        first = build_demo_eval_stable_prefix(PROPOSED_LIVE_ATTEMPT_ID)
+        second = build_demo_eval_stable_prefix(PROPOSED_LIVE_ATTEMPT_ID)
+        assert first == second
+        assert cache_stable_prefix_sha256(PROPOSED_LIVE_ATTEMPT_ID) == stable_prefix_sha256(first)
+
+    def test_eval_stable_prefix_fingerprint_changes_when_exact_catalog_changes(self) -> None:
+        ctx = load_target_runtime_client_context("demo")
+        active = ActiveServiceCatalogSnapshot.from_bundle(ctx.bundle)
+        ref = ServiceReferenceCatalogSnapshot.from_bundle(ctx.bundle)
+        exact_a = ExactCommercialCatalogSnapshot.from_bundle(ctx.bundle)
+        exact_b = ExactCommercialCatalogSnapshot(
+            canonical_json=exact_a.canonical_json.replace(
+                '"free_implant_consult"',
+                '"free_implant_consult_probe"',
+                1,
+            )
+        )
+        fp_a = compute_prefix_input_fingerprint(
+            ctx.pack_identity,
+            ctx.cached_full_context,
+            active,
+            ref,
+            exact_a,
+        )
+        fp_b = compute_prefix_input_fingerprint(
+            ctx.pack_identity,
+            ctx.cached_full_context,
+            active,
+            ref,
+            exact_b,
+        )
+        assert fp_a != fp_b
+
+    def test_dynamic_suffix_changes_between_user_turns(self) -> None:
+        cold = build_cache_cold_dynamic_suffix()
+        repeat = build_cache_repeat_dynamic_suffix()
+        assert cold != repeat
+        assert "<USER_MESSAGE_DATA>" in cold
+        assert "<USER_MESSAGE_DATA>" in repeat
+
+    def test_selected_offer_not_in_eval_stable_prefix(self) -> None:
+        prefix = build_demo_eval_stable_prefix(PROPOSED_LIVE_ATTEMPT_ID)
+        selection = resolve_precomposer_selected_offer(
+            bundle=_DEMO_BUNDLE,
+            doctor_catalog=_DEMO_CONTEXT.doctor_catalog,
+            resolution=_governed_resolution("all_on_4", extent="full_arch", jaw="lower"),
+            selected_brand_id="implantium",
+            brand_id_authoritative=True,
+        )
+        assert selection.availability == "selected"
+        suffix = build_sales_one_plus_dynamic_suffix(
+            exact_sales_resolution=_governed_resolution("all_on_4", extent="full_arch", jaw="lower"),
+            current_strict_facts=(),
+            sales_context={"allow_price": True, "cta": "lead", "needs_admin_quote": False},
+            user_message="Сколько стоит All-on-4 Implantium?",
+            precomposer_selected_offer=selection,
+            response_schema_bundle=_DEMO_BUNDLE,
+        )
+        assert SELECTED_EXACT_OFFER_HEADER in suffix
+        assert SELECTED_EXACT_OFFER_HEADER not in prefix
+        assert '"availability": "selected"' in suffix
+
+    def test_multi_offer_resolution_not_in_eval_stable_prefix(self) -> None:
+        prefix = build_demo_eval_stable_prefix(PROPOSED_LIVE_ATTEMPT_ID)
+        selection = resolve_precomposer_selected_offer(
+            bundle=_DEMO_BUNDLE,
+            doctor_catalog=_DEMO_CONTEXT.doctor_catalog,
+            resolution=_governed_resolution("all_on_4"),
+        )
+        assert selection.availability == "multiple"
+        suffix = build_sales_one_plus_dynamic_suffix(
+            exact_sales_resolution=_governed_resolution("all_on_4"),
+            current_strict_facts=(),
+            sales_context={"allow_price": True, "cta": "lead", "needs_admin_quote": False},
+            user_message="Сколько стоит All-on-4?",
+            precomposer_selected_offer=selection,
+            response_schema_bundle=_DEMO_BUNDLE,
+        )
+        assert SELECTED_EXACT_OFFER_HEADER in suffix
+        assert '"availability": "multiple"' in suffix
+        assert SELECTED_EXACT_OFFER_HEADER not in prefix
+
+    def test_capability_dynamic_suffix_exposes_resolution_hint_without_stable_catalogs(
+        self,
+    ) -> None:
+        suffix = build_cache_cold_dynamic_suffix()
+        assert "resolution_hint" in suffix
+        assert "=== EXACT_COMMERCIAL_CATALOG ===" not in suffix
+        assert "=== SERVICE_REFERENCE_CATALOG ===" not in suffix
+        assert "=== ACTIVE_SERVICE_CATALOG ===" not in suffix
 
 
 def test_frozen_plan_sha_includes_probe_templates() -> None:

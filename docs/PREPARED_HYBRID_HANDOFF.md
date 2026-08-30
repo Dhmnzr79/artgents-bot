@@ -193,6 +193,21 @@
 
 **Сознательно не в v1:** `from`/range support; новый public UI contract; model `price_text` на multi; service_id hardcode в production.
 
+### CP-STAGE3B-EVAL-SYNC — Stage3B eval aligned with current prefix contract (30.08.2026)
+
+**Статус:** реализован Cursor offline на базе `973bd35`; LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.
+
+**Проблема (baseline debt на `973bd35`):** `tests/test_one_call_stage3b_offline.py` — 58 collected → 43 passed, 15 failed. Причины: (1) устаревший expectation `<EXACT_SALES_RESOLUTION>` в dynamic suffix; (2) `evals/v5/one_call_flash_capability_plan.py` вызывал `build_one_call_stable_prefix()` без `service_reference_catalog` / `exact_commercial_catalog`.
+
+**Что сделано:**
+1. `build_demo_eval_stable_prefix()` передаёт канонические `ServiceReferenceCatalogSnapshot` и `ExactCommercialCatalogSnapshot` из demo bundle через production builders.
+2. Cache suffix test синхронизирован с текущим dynamic contract: `<PRE_MODEL_HINTS>` + `resolution_hint`, без восстановления `<EXACT_SALES_RESOLUTION>`.
+3. Добавлен `TestStage3bCacheContract`: stable prefix содержит service/exact catalogs; deterministic fingerprint; catalog change → fingerprint change; dynamic suffix меняется между ходами; `SELECTED_EXACT_OFFER` только в dynamic suffix (single/multi), не в stable prefix.
+
+**Граница cache (актуальная):** stable prefix = contract + policy + catalogs + corpus; dynamic suffix = `COMMERCIAL_AS_OF` + `SELECTED_EXACT_OFFER` (при наличии) + `PRE_MODEL_HINTS` + `USER_MESSAGE_DATA`.
+
+**Offline:** `test_one_call_stage3b_offline.py` — 65/65; смежные cache/prompt/one-call regressions green. Product runtime не менялся.
+
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 
 **Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.

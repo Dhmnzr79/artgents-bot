@@ -6,7 +6,9 @@ import hashlib
 import json
 
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
+from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_fullcontext_messages import build_one_call_stable_prefix
+from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.target_runtime_client_context import load_target_runtime_client_context
 from evals.v5.one_call_flash_capability_contract import (
     FROZEN_CAPABILITY_CASES,
@@ -63,11 +65,16 @@ def build_demo_eval_stable_prefix(attempt_id: str) -> str:
     """Production demo stable FullContext prefix with eval-only attempt nonce prefix."""
 
     ctx = load_target_runtime_client_context("demo")
-    catalog = ActiveServiceCatalogSnapshot.from_bundle(ctx.bundle)
+    bundle = ctx.bundle
+    catalog = ActiveServiceCatalogSnapshot.from_bundle(bundle)
+    service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(bundle)
+    exact_commercial_catalog = ExactCommercialCatalogSnapshot.from_bundle(bundle)
     base_prefix = build_one_call_stable_prefix(
         identity=ctx.pack_identity,
         cached_full_context=ctx.cached_full_context,
         active_service_catalog=catalog,
+        service_reference_catalog=service_reference_catalog,
+        exact_commercial_catalog=exact_commercial_catalog,
     )
     nonce_block = (
         "=== EVAL_ATTEMPT_NONCE ===\n"

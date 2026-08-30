@@ -88,20 +88,31 @@ def main(argv: list[str] | None = None) -> int:
             )
         except ArchCompareLiveRunnerError as exc:
             print(f"LIVE_RUN_REJECT:{exc.code}:{exc}", file=sys.stderr)
-            if exc.partial_result:
-                fail_dir = artifact_dir
-                fail_dir.mkdir(parents=True, exist_ok=True)
-                (fail_dir / "error_report.json").write_text(
+            if exc.partial_result and not (artifact_dir / "manifest.json").exists():
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                (artifact_dir / "error_report.json").write_text(
                     json.dumps(exc.partial_result, ensure_ascii=False, indent=2) + "\n",
                     encoding="utf-8",
                 )
             return 3
-    else:
-        result = run_arch_compare_fake_full_path(
-            attempt_id=args.attempt_id,
-            guard_context=guard_context,
+        print(
+            json.dumps(
+                {
+                    "artifact_dir": str(artifact_dir),
+                    "mode": result.get("mode"),
+                    "status": result.get("status"),
+                },
+                ensure_ascii=False,
+            )
         )
+        if result.get("status") == "MEASUREMENT_COMPLETE_WITH_ERRORS":
+            return 4
+        return 0
 
+    result = run_arch_compare_fake_full_path(
+        attempt_id=args.attempt_id,
+        guard_context=guard_context,
+    )
     paths = persist_live_prep_artifacts(
         artifacts_root=artifacts_root,
         attempt_id=args.attempt_id,

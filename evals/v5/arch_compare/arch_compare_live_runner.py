@@ -14,6 +14,7 @@ from evals.v5.arch_compare.arch_compare_harness import build_blind_variant_mappi
 from evals.v5.arch_compare.arch_compare_live_capture import (
     build_dialog_history_for_session,
     build_structured_capture,
+    build_structured_capture_for_provider_error,
     fake_live_patient_text,
 )
 from evals.v5.arch_compare.arch_compare_live_contract import (
@@ -51,6 +52,12 @@ from evals.v5.arch_compare.arch_compare_prompt_build import (
     build_composer_messages,
     build_prompt_capture,
 )
+from evals.v5.arch_compare.arch_compare_live_persistence import (
+    ArchCompareArtifactWriteError,
+    ArchCompareLiveArtifactStore,
+    classify_provider_error,
+)
+from evals.v5.arch_compare.arch_compare_live_report import finalize_live_artifacts
 from evals.v5.arch_compare.arch_compare_provider_payload import build_composer_provider_payload
 
 
@@ -114,6 +121,17 @@ def _execute_live_provider_turn(
     )
     assert_single_provider_call_per_turn(turn_calls=len(transport.calls))
     record = transport.records[-1].to_dict() if transport.records else {}
+    from evals.v5.arch_compare.arch_compare_live_contract import (
+        EVAL_REQUEST_TIMEOUT_SEC,
+        PRODUCTION_SLA_REFERENCE_SEC,
+    )
+
+    latency_ms = record.get("latency_ms")
+    record["request_timeout_sec"] = EVAL_REQUEST_TIMEOUT_SEC
+    record["production_sla_sec"] = PRODUCTION_SLA_REFERENCE_SEC
+    record["production_sla_breached"] = (
+        latency_ms is not None and latency_ms > (PRODUCTION_SLA_REFERENCE_SEC * 1000)
+    )
     return envelope_json, patient_text, payload, record
 class ArchCompareTurnBudgetError(RuntimeError):
     pass
@@ -354,6 +372,74 @@ def run_arch_compare_fake_full_path(
     }
 
 
+def _persist_preflight_failure(
+    *,
+    store: ArchCompareLiveArtifactStore,
+    attempt_id: str,
+    guard_context: ArchCompareLiveGuardContext,
+    flash_preflight,
+    plus_preflight,
+    preflight_state: ArchComparePreflightStateMachine,
+    matrix_digest_value: str,
+    config_digest_value: str,
+    budget_plan: ArchCompareCallBudgetPlan,
+) -> dict[str, Any]:
+    store.set_status("PREFLIGHT_FAILED")
+    store.preflight = {
+        "flash": flash_preflight.to_dict(),
+        "plus": plus_preflight.to_dict() if plus_preflight else None,
+        "state_machine": preflight_state.to_dict(),
+    }
+    partial = store.build_run_result(
+        mode="live_preflight_failed",
+        head_sha=guard_context.head_sha,
+        config_registry=build_config_registry_document(),
+    )
+    partial.update(
+        {
+            "matrix_digest": matrix_digest_value,
+            "config_digest": config_digest_value,
+            "call_budget": budget_plan.to_dict(),
+            "disclaimer": None,
+            "measurement_errors": list(store.measurement_errors),
+        }
+    )
+    store.write_error_report(
+        {
+            "attempt_id": attempt_id,
+            "status": "PREFLIGHT_FAILED",
+            "preflight": store.preflight,
+            "provider_call_total": store.manifest.get("provider_call_total", 0),
+        }
+    )
+    store.persist_core()
+    finalize_live_artifacts(store=store, run_result=partial, stdout_log="status=PREFLIGHT_FAILED\n")
+    return partial
+
+
+def _handle_fatal_error(
+    *,
+    store: ArchCompareLiveArtifactStore,
+    guard_context: ArchCompareLiveGuardContext,
+    exc: BaseException,
+) -> None:
+    store.set_status("INCOMPLETE_FATAL")
+    partial = store.build_run_result(
+        mode="live_incomplete_fatal",
+        head_sha=guard_context.head_sha,
+        config_registry=build_config_registry_document(),
+    )
+    partial["fatal_error"] = {
+        "type": type(exc).__name__,
+        "message": str(exc),
+    }
+    store.write_error_report(partial["fatal_error"])
+    try:
+        finalize_live_artifacts(store=store, run_result=partial, stdout_log="status=INCOMPLETE_FATAL\n")
+    except Exception:
+        store.persist_core()
+
+
 def run_arch_compare_live_full_path(
     *,
     attempt_id: str,
@@ -363,6 +449,8 @@ def run_arch_compare_live_full_path(
     mode = validate_run_mode(guard_context)
     if mode != "live":
         raise RuntimeError("live_runner_requires_live_mode")
+    if guard_context.artifact_dir is None:
+        raise ArchCompareLiveRunnerError("artifact_dir_missing", "artifact directory required for LIVE")
 
     assert_config_registry()
     assert_frozen_matrix_unchanged()
@@ -370,127 +458,207 @@ def run_arch_compare_live_full_path(
     config_digest_value = frozen_config_digest()
     schedule = build_execution_schedule(attempt_id=attempt_id)
     budget_plan = build_call_budget_plan(schedule)
+    authorization_payload = (
+        guard_context.authorization.to_dict() if guard_context.authorization is not None else None
+    )
+    store = ArchCompareLiveArtifactStore.initialize(
+        artifact_dir=guard_context.artifact_dir,
+        attempt_id=attempt_id,
+        schedule=schedule.to_dict(),
+        budget_plan=budget_plan.to_dict(),
+        head_sha=guard_context.head_sha,
+        matrix_digest=matrix_digest_value,
+        config_digest=config_digest_value,
+        measurement_id=LIVE_MEASUREMENT_ID,
+        authorization=authorization_payload,
+    )
 
     preflight_state = ArchComparePreflightStateMachine()
-    flash_preflight, plus_preflight = run_capability_preflight(
-        attempt_id=attempt_id,
-        transport=transport,
-        state=preflight_state,
-        use_fake_queue=False,
-    )
+    try:
+        flash_preflight, plus_preflight = run_capability_preflight(
+            attempt_id=attempt_id,
+            transport=transport,
+            state=preflight_state,
+            use_fake_queue=False,
+            ledger=store.ledger,
+            store=store,
+        )
+    except Exception as exc:
+        _handle_fatal_error(store=store, guard_context=guard_context, exc=exc)
+        raise ArchCompareLiveRunnerError(
+            "preflight_provider_failed",
+            str(exc),
+            partial_result=store.build_run_result(
+                mode="live_preflight_failed",
+                head_sha=guard_context.head_sha,
+                config_registry=build_config_registry_document(),
+            ),
+        ) from exc
+
+    store.preflight = {
+        "flash": flash_preflight.to_dict(),
+        "plus": plus_preflight.to_dict() if plus_preflight else None,
+        "state_machine": preflight_state.to_dict(),
+    }
     if not preflight_state.can_start_measurement():
+        partial = _persist_preflight_failure(
+            store=store,
+            attempt_id=attempt_id,
+            guard_context=guard_context,
+            flash_preflight=flash_preflight,
+            plus_preflight=plus_preflight,
+            preflight_state=preflight_state,
+            matrix_digest_value=matrix_digest_value,
+            config_digest_value=config_digest_value,
+            budget_plan=budget_plan,
+        )
         raise ArchCompareLiveRunnerError(
             "preflight_failed",
             "capability preflight failed",
-            partial_result={
-                "attempt_id": attempt_id,
-                "mode": "live_preflight_failed",
-                "preflight": {
-                    "flash": flash_preflight.to_dict(),
-                    "plus": plus_preflight.to_dict() if plus_preflight else None,
-                    "state_machine": preflight_state.to_dict(),
-                },
-                "provider_call_total": preflight_state.preflight_consumed,
-            },
+            partial_result=partial,
         )
 
-    measurement_budget = ArchCompareProviderBudget(max_calls=budget_plan.measurement_budget)
+    store.set_status("MEASUREMENT_IN_PROGRESS")
+    store.persist_core()
     scenario_ids = tuple(dict.fromkeys(row.scenario_id for row in schedule.scenario_config_jobs))
-    blind_mapping = build_blind_variant_mapping(attempt_id=attempt_id, scenario_ids=scenario_ids)
+    store.blind_variant_mapping = build_blind_variant_mapping(attempt_id=attempt_id, scenario_ids=scenario_ids)
 
     from core.target_runtime_client_context import load_target_runtime_client_context
     from evals.v5.arch_compare.arch_compare_contract import CLIENT_ID
 
     runtime_ctx = load_target_runtime_client_context(CLIENT_ID)
-    structured_turns: list[dict[str, Any]] = []
-    raw_turns: list[dict[str, Any]] = []
     session_histories: dict[str, dict[str, str]] = {}
     executed_jobs: set[tuple[str, str, str]] = set()
-    outbound_payloads: list[dict[str, Any]] = []
+    measurement_errors: list[dict[str, Any]] = []
 
-    for job in schedule.turn_config_jobs:
-        scenario = scenario_for_id(job.scenario_id)
-        turn = turn_for_job(job)
-        config = config_for_job(job)
-        job_key = (job.scenario_id, job.turn_id, job.config_id)
-        if job_key in executed_jobs:
-            raise RuntimeError(f"duplicate_job:{job_key}")
-        executed_jobs.add(job_key)
+    try:
+        for job in schedule.turn_config_jobs:
+            scenario = scenario_for_id(job.scenario_id)
+            turn = turn_for_job(job)
+            config = config_for_job(job)
+            job_key = (job.scenario_id, job.turn_id, job.config_id)
+            if job_key in executed_jobs:
+                raise ArchCompareLiveRunnerError("duplicate_job", f"duplicate_job:{job_key}")
+            executed_jobs.add(job_key)
 
-        prior_answers = session_histories.setdefault(job.session_id, {})
-        dialog_before = build_dialog_history_for_session(
-            scenario=scenario,
-            turn=turn,
-            prior_answers=prior_answers,
-        )
-        prompt_capture = build_prompt_capture(
-            config=config,
-            scenario=scenario,
-            turn=turn,
-            dialog_history=dialog_before,
-        )
-
-        envelope_json = None
-        patient_text = None
-        provider_calls = 0
-        outbound_payload = None
-        token_metadata: dict[str, Any] = {}
-        if turn.provider_turn:
-            preflight_state.reserve_measurement()
-            measurement_budget.reserve()
-            provider_calls = 1
-            try:
-                envelope_json, patient_text, outbound_payload, token_metadata = _execute_live_provider_turn(
-                    transport=transport,
-                    scenario_id=scenario.scenario_id,
-                    turn=turn,
-                    config=config,
-                    prompt_capture=prompt_capture,
-                    ctx=runtime_ctx,
-                )
-            except Exception as exc:
-                raise ArchCompareLiveRunnerError(
-                    "provider_turn_failed",
-                    f"{job.scenario_id}/{job.turn_id}/{job.config_id}:{exc}",
-                ) from exc
-            outbound_payloads.append(
-                {
-                    "scenario_id": scenario.scenario_id,
-                    "turn_id": turn.turn_id,
-                    "config_id": config.config_id,
-                    "provider_model_id": config.provider_model_id,
-                    "outbound": outbound_payload,
-                    "token_metadata": token_metadata,
-                }
-            )
-            transport.reset_calls()
-
-        dialog_after = dialog_before
-        if turn.provider_turn and patient_text:
-            prior_answers[turn.turn_id] = patient_text
-            dialog_after = build_dialog_history_for_session(
+            prior_answers = session_histories.setdefault(job.session_id, {})
+            dialog_before = build_dialog_history_for_session(
                 scenario=scenario,
                 turn=turn,
                 prior_answers=prior_answers,
             )
+            prompt_capture = build_prompt_capture(
+                config=config,
+                scenario=scenario,
+                turn=turn,
+                dialog_history=dialog_before,
+            )
 
-        capture = build_structured_capture(
-            attempt_id=attempt_id,
-            scenario=scenario,
-            turn=turn,
-            config=config,
-            session_id=job.session_id,
-            dialog_history_before=dialog_before,
-            dialog_history_after=dialog_after,
-            envelope_json=envelope_json,
-            patient_text=patient_text,
-            prompt_capture=prompt_capture,
-            provider_call_count=provider_calls,
-            token_metadata=token_metadata,
-        )
-        structured_turns.append(capture.to_dict())
-        raw_turns.append(
-            {
+            envelope_json = None
+            patient_text = None
+            provider_calls = 0
+            outbound_payload = None
+            token_metadata: dict[str, Any] = {}
+            turn_error: dict[str, Any] | None = None
+
+            if turn.provider_turn:
+                preflight_state.reserve_measurement()
+                provider_calls = 1
+                ledger_entry = store.ledger.start_call(
+                    phase="measurement",
+                    scenario_id=scenario.scenario_id,
+                    turn_id=turn.turn_id,
+                    config_id=config.config_id,
+                    model_id=config.provider_model_id,
+                )
+                store.persist_after_call_started(ledger_entry)
+                try:
+                    envelope_json, patient_text, outbound_payload, token_metadata = _execute_live_provider_turn(
+                        transport=transport,
+                        scenario_id=scenario.scenario_id,
+                        turn=turn,
+                        config=config,
+                        prompt_capture=prompt_capture,
+                        ctx=runtime_ctx,
+                    )
+                    record = transport.records[-1].to_dict() if transport.records else {}
+                    store.ledger.complete_call(
+                        ledger_entry,
+                        latency_ms=record.get("latency_ms"),
+                        usage={
+                            "prompt_tokens": record.get("prompt_tokens"),
+                            "completion_tokens": record.get("completion_tokens"),
+                        },
+                    )
+                except Exception as exc:
+                    error_type, error_code = classify_provider_error(exc)
+                    record = transport.records[-1].to_dict() if transport.records else {}
+                    store.ledger.fail_call(
+                        ledger_entry,
+                        error_type=error_type,
+                        error_code=error_code,
+                        latency_ms=record.get("latency_ms"),
+                    )
+                    turn_error = {
+                        "scenario_id": scenario.scenario_id,
+                        "turn_id": turn.turn_id,
+                        "config_id": config.config_id,
+                        "error_type": error_type,
+                        "error_code": error_code,
+                        "message": str(exc),
+                    }
+                    measurement_errors.append(turn_error)
+                    store.record_measurement_error(turn_error)
+                    token_metadata = {
+                        "request_timeout_sec": config.inference_settings.timeout_sec,
+                        "production_sla_sec": 20,
+                        "production_sla_breached": None,
+                        "provider_error": error_code,
+                    }
+                finally:
+                    transport.reset_calls()
+                    store.persist_core()
+
+            dialog_after = dialog_before
+            if turn.provider_turn and patient_text:
+                prior_answers[turn.turn_id] = patient_text
+                dialog_after = build_dialog_history_for_session(
+                    scenario=scenario,
+                    turn=turn,
+                    prior_answers=prior_answers,
+                )
+
+            if turn_error is not None:
+                capture = build_structured_capture_for_provider_error(
+                    attempt_id=attempt_id,
+                    scenario=scenario,
+                    turn=turn,
+                    config=config,
+                    session_id=job.session_id,
+                    dialog_history_before=dialog_before,
+                    prompt_capture=prompt_capture,
+                    provider_call_count=provider_calls,
+                    error_code=str(turn_error["error_code"]),
+                    error_type=str(turn_error["error_type"]),
+                    token_metadata=token_metadata,
+                )
+            else:
+                capture = build_structured_capture(
+                    attempt_id=attempt_id,
+                    scenario=scenario,
+                    turn=turn,
+                    config=config,
+                    session_id=job.session_id,
+                    dialog_history_before=dialog_before,
+                    dialog_history_after=dialog_after,
+                    envelope_json=envelope_json,
+                    patient_text=patient_text,
+                    prompt_capture=prompt_capture,
+                    provider_call_count=provider_calls,
+                    token_metadata=token_metadata,
+                )
+
+            raw_turn = {
                 "attempt_id": attempt_id,
                 "scenario_id": job.scenario_id,
                 "turn_id": job.turn_id,
@@ -503,50 +671,69 @@ def run_arch_compare_live_full_path(
                 "outbound_payload": outbound_payload,
                 "token_metadata": token_metadata,
                 "schedule_order_index": job.order_index,
+                "turn_error": turn_error,
+            }
+            store.append_turn(raw_turn=raw_turn, structured_turn=capture.to_dict())
+
+        preflight_state.assert_total_budget()
+        assert_provider_budget(
+            consumed=store.ledger.consumed_calls,
+            max_calls=budget_plan.total_authorized_budget,
+        )
+        if len(executed_jobs) != len(schedule.turn_config_jobs):
+            raise ArchCompareLiveRunnerError("turn_job_execution_incomplete", "incomplete schedule execution")
+
+        final_status = (
+            "MEASUREMENT_COMPLETE_WITH_ERRORS" if measurement_errors else "MEASUREMENT_COMPLETE"
+        )
+        store.set_status(final_status)
+        result = store.build_run_result(
+            mode="live_full_path",
+            head_sha=guard_context.head_sha,
+            config_registry=build_config_registry_document(),
+        )
+        result.update(
+            {
+                "matrix_digest": matrix_digest_value,
+                "config_digest": config_digest_value,
+                "disclaimer": None,
+                "measurement_errors": measurement_errors,
+                "status": final_status,
+                "blind_variant_mapping": store.blind_variant_mapping,
+                "preflight": store.preflight,
             }
         )
-
-    preflight_state.assert_total_budget()
-    assert_provider_budget(
-        consumed=preflight_state.preflight_consumed + preflight_state.measurement_consumed,
-        max_calls=budget_plan.total_authorized_budget,
-    )
-    if preflight_state.preflight_consumed != CAPABILITY_PREFLIGHT_BUDGET:
-        raise RuntimeError("preflight_budget_mismatch")
-    if measurement_budget.consumed != budget_plan.measurement_budget:
-        raise RuntimeError("measurement_budget_mismatch")
-    if len(executed_jobs) != len(schedule.turn_config_jobs):
-        raise RuntimeError("turn_job_execution_incomplete")
-
-    preflight_state.readiness_state = "MEASUREMENT_COMPLETE"
-    readiness = evaluate_live_readiness(max_provider_calls=budget_plan.total_authorized_budget)
-    readiness_status = readiness.to_dict()
-    readiness_status["status"] = "MEASUREMENT_COMPLETE"
-
-    return {
-        "measurement_id": LIVE_MEASUREMENT_ID,
-        "live_prep_measurement_id": LIVE_PREP_MEASUREMENT_ID,
-        "attempt_id": attempt_id,
-        "mode": "live_full_path",
-        "disclaimer": None,
-        "matrix_digest": matrix_digest_value,
-        "config_digest": config_digest_value,
-        "config_registry": build_config_registry_document(),
-        "schedule": schedule.to_dict(),
-        "call_budget": budget_plan.to_dict(),
-        "preflight": {
-            "flash": flash_preflight.to_dict(),
-            "plus": plus_preflight.to_dict() if plus_preflight else None,
-            "state_machine": preflight_state.to_dict(),
-        },
-        "provider_call_total": (
-            preflight_state.preflight_consumed + preflight_state.measurement_consumed
-        ),
-        "fake_transport_call_total": 0,
-        "outbound_payloads": outbound_payloads,
-        "structured_turns": structured_turns,
-        "raw_turns": raw_turns,
-        "blind_variant_mapping": blind_mapping,
-        "live_readiness": readiness_status,
-        "head_sha": guard_context.head_sha,
-    }
+        finalize_live_artifacts(
+            store=store,
+            run_result=result,
+            stdout_log=f"mode=live_full_path status={final_status}\n",
+        )
+        result["artifacts_finalized"] = True
+        return result
+    except ArchCompareArtifactWriteError as exc:
+        _handle_fatal_error(store=store, guard_context=guard_context, exc=exc)
+        raise ArchCompareLiveRunnerError(
+            "incomplete_fatal",
+            str(exc),
+            partial_result=store.build_run_result(
+                mode="live_incomplete_fatal",
+                head_sha=guard_context.head_sha,
+                config_registry=build_config_registry_document(),
+            ),
+        ) from exc
+    except ArchCompareLiveRunnerError as exc:
+        _handle_fatal_error(store=store, guard_context=guard_context, exc=exc)
+        raise
+    except Exception as exc:
+        _handle_fatal_error(store=store, guard_context=guard_context, exc=exc)
+        raise ArchCompareLiveRunnerError(
+            "incomplete_fatal",
+            str(exc),
+            partial_result=store.build_run_result(
+                mode="live_incomplete_fatal",
+                head_sha=guard_context.head_sha,
+                config_registry=build_config_registry_document(),
+            ),
+        ) from exc
+    finally:
+        store.persist_core()

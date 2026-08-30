@@ -24,13 +24,15 @@ from evals.v5.arch_compare.arch_compare_contract import (
     FROZEN_MATRIX_DIGEST,
     MEASUREMENT_ID,
 )
-from evals.v5.arch_compare.arch_compare_provider_payload import inference_settings_document
 
 LIVE_PREP_MEASUREMENT_ID = "one_call_arch_compare_live_prep_v1"
 LIVE_MEASUREMENT_ID = "one_call_arch_compare_live_v1"
 
 MAX_RETRIES = 0
 DEFAULT_CLIENT_ID = CLIENT_ID
+
+EVAL_REQUEST_TIMEOUT_SEC = 60
+PRODUCTION_SLA_REFERENCE_SEC = 20
 
 CAPABILITY_PREFLIGHT_BUDGET = 2
 MEASUREMENT_PROVIDER_BUDGET = 68
@@ -45,10 +47,14 @@ FAKE_LIVE_DISCLAIMER = (
 LiveReadinessState = Literal[
     "PREPARED_LIVE_DISABLED",
     "READY_FOR_AUTHORIZED_PREFLIGHT",
+    "PREFLIGHT_PENDING",
     "PREFLIGHT_FAILED",
     "READY_FOR_MEASUREMENT",
+    "MEASUREMENT_IN_PROGRESS",
     "MEASUREMENT_COMPLETE",
+    "MEASUREMENT_COMPLETE_WITH_ERRORS",
     "MEASUREMENT_FAILED",
+    "INCOMPLETE_FATAL",
 ]
 
 OWNER_REVIEW_SCALE_FIELDS: tuple[str, ...] = (
@@ -68,6 +74,8 @@ def _digest_json(payload: object) -> str:
 
 
 def build_config_registry_document() -> dict[str, Any]:
+    from evals.v5.arch_compare.arch_compare_provider_payload import inference_settings_document
+
     rows = []
     for config in all_arch_compare_configs():
         rows.append(

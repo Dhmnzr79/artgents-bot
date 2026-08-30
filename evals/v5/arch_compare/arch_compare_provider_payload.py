@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from llm import LLM_REQUEST_TIMEOUT_SEC
-
 from evals.v5.arch_compare.arch_compare_configs import (
+    ARCH_COMPARE_EVAL_TIMEOUT_SEC,
     ARCH_COMPARE_INFERENCE_SETTINGS,
     ArchCompareConfig,
     ArchCompareInferenceSettings,
@@ -24,7 +23,7 @@ def build_composer_provider_payload(
         "model": config.provider_model_id,
         "temperature": settings.temperature,
         "max_completion_tokens": settings.max_completion_tokens,
-        "timeout": settings.timeout_sec or LLM_REQUEST_TIMEOUT_SEC,
+        "timeout": settings.timeout_sec or ARCH_COMPARE_EVAL_TIMEOUT_SEC,
         "messages": list(messages),
         "response_format": {"type": settings.response_format_type},
         "stream": stream,

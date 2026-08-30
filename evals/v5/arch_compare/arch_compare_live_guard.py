@@ -51,7 +51,8 @@ class ArchCompareLiveGuardContext:
     transport_kind: str
     working_tree_clean: bool
     head_sha: str
-    openai_api_key: str | None
+    chat_api_key: str | None
+    chat_base_url: str | None
 
 
 def _git_head(repo_root: Path) -> str:
@@ -80,11 +81,26 @@ def _working_tree_clean(repo_root: Path) -> bool:
     return proc.stdout.strip() == ""
 
 
+def _resolve_chat_api_key() -> str:
+    return (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip()
+
+
+def _resolve_chat_base_url() -> str:
+    return (os.getenv("CHAT_BASE_URL") or os.getenv("DASHSCOPE_BASE_URL") or "").strip()
+
+
 def _credentials_placeholder(value: str) -> bool:
     lowered = value.strip().lower()
     if not lowered:
         return True
     return any(marker in lowered for marker in _PLACEHOLDER_KEY_MARKERS)
+
+
+def _assert_live_credential_field(*, field_name: str, value: str) -> None:
+    if not value.strip():
+        raise ArchCompareLiveGuardError(f"{field_name}_missing", field_name)
+    if _credentials_placeholder(value):
+        raise ArchCompareLiveGuardError(f"{field_name}_placeholder", field_name)
 
 
 def assert_fake_mode_allowed(*, live_requested: bool) -> None:
@@ -168,15 +184,18 @@ def assert_live_authorized(ctx: ArchCompareLiveGuardContext) -> None:
                 "model_not_allowed",
                 f"config={config.config_id} model={config.provider_model_id}",
             )
-    api_key = (ctx.openai_api_key or "").strip()
-    if not api_key:
-        raise ArchCompareLiveGuardError("credentials_missing", "provider credentials missing")
-    if _credentials_placeholder(api_key):
-        raise ArchCompareLiveGuardError("credentials_placeholder", "provider credentials placeholder")
-    if ctx.artifact_dir is not None and ctx.artifact_dir.exists() and any(ctx.artifact_dir.iterdir()):
-        raise ArchCompareLiveGuardError("artifact_dir_not_empty", str(ctx.artifact_dir))
+    _assert_live_credential_field(
+        field_name="chat_api_key",
+        value=(ctx.chat_api_key or "").strip(),
+    )
+    _assert_live_credential_field(
+        field_name="chat_base_url",
+        value=(ctx.chat_base_url or "").strip(),
+    )
     if ctx.transport_kind == "fake":
         raise ArchCompareLiveGuardError("fake_transport_in_live", "fake transport forbidden for LIVE artifacts")
+    if ctx.artifact_dir is not None and ctx.artifact_dir.exists():
+        raise ArchCompareLiveGuardError("artifact_dir_exists", str(ctx.artifact_dir))
 
 
 def build_guard_context(
@@ -189,7 +208,8 @@ def build_guard_context(
     transport_kind: str = "fake",
     head_sha: str | None = None,
     working_tree_clean: bool | None = None,
-    openai_api_key: str | None = None,
+    chat_api_key: str | None = None,
+    chat_base_url: str | None = None,
 ) -> ArchCompareLiveGuardContext:
     return ArchCompareLiveGuardContext(
         repo_root=repo_root,
@@ -202,7 +222,8 @@ def build_guard_context(
             working_tree_clean if working_tree_clean is not None else _working_tree_clean(repo_root)
         ),
         head_sha=head_sha or _git_head(repo_root),
-        openai_api_key=openai_api_key if openai_api_key is not None else os.getenv("OPENAI_API_KEY"),
+        chat_api_key=chat_api_key if chat_api_key is not None else _resolve_chat_api_key(),
+        chat_base_url=chat_base_url if chat_base_url is not None else _resolve_chat_base_url(),
     )
 
 

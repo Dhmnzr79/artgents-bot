@@ -72,6 +72,13 @@ def _valid_manifest(*, attempt_id: str) -> dict:
     }
 
 
+def _live_credentials() -> dict[str, str]:
+    return {
+        "chat_api_key": "sk-archcompare-live-mock-abcdef123456",
+        "chat_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    }
+
+
 def _live_guard_context(tmp_path: Path, *, attempt_id: str = "live_runner_test"):
     return build_guard_context(
         repo_root=_REPO_ROOT,
@@ -81,7 +88,7 @@ def _live_guard_context(tmp_path: Path, *, attempt_id: str = "live_runner_test")
         artifact_dir=tmp_path / attempt_id,
         transport_kind="live",
         working_tree_clean=True,
-        openai_api_key="sk-archcompare-live-mock-abcdef123456",
+        **_live_credentials(),
     )
 
 
@@ -143,7 +150,7 @@ def test_live_without_manifest_rejects_before_transport(tmp_path: Path) -> None:
         authorization=None,
         artifact_dir=tmp_path,
         transport_kind="live",
-        openai_api_key="sk-archcompare-live-mock-abcdef123456",
+        **_live_credentials(),
     )
     with pytest.raises(ArchCompareLiveGuardError) as exc:
         validate_run_mode(ctx)
@@ -159,11 +166,12 @@ def test_placeholder_credentials_reject_before_transport(tmp_path: Path) -> None
         artifact_dir=tmp_path / "placeholder",
         transport_kind="live",
         working_tree_clean=True,
-        openai_api_key="offline-test-placeholder",
+        chat_api_key="offline-test-placeholder",
+        chat_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     with pytest.raises(ArchCompareLiveGuardError) as exc:
         validate_run_mode(ctx)
-    assert exc.value.code == "credentials_placeholder"
+    assert exc.value.code == "chat_api_key_placeholder"
 
 
 def test_guarded_live_branch_uses_real_runner(tmp_path: Path) -> None:
@@ -178,6 +186,7 @@ def test_guarded_live_branch_uses_real_runner(tmp_path: Path) -> None:
         transport=transport,
     )
     assert result["mode"] == "live_full_path"
+    assert result["status"] == "MEASUREMENT_COMPLETE"
     assert result["provider_call_total"] == 70
     assert result["fake_transport_call_total"] == 0
     assert state["call"] == 70
@@ -302,12 +311,8 @@ def test_secrets_not_in_live_mock_artifacts(tmp_path: Path) -> None:
         guard_context=ctx,
         transport=transport,
     )
-    paths = persist_live_prep_artifacts(
-        artifacts_root=tmp_path,
-        attempt_id="secrets_live",
-        run_result=result,
-    )
-    for path in paths.values():
+    artifact_dir = tmp_path / "secrets_live"
+    for path in artifact_dir.glob("*"):
         if path.suffix in {".json", ".md", ".log"}:
             text = path.read_text(encoding="utf-8")
             assert "OPENAI_API_KEY" not in text
@@ -356,13 +361,14 @@ def test_cli_live_without_authorization_still_rejected() -> None:
 
 def test_provider_error_surfaces_without_retry(tmp_path: Path) -> None:
     responses = [_valid_envelope(marker="ok")] * 2 + [_valid_envelope(marker="x")] * 68
-    mock_create, _ = _mock_provider(responses=responses, fail_at=3)
+    mock_create, state = _mock_provider(responses=responses, fail_at=3)
     transport = ArchCompareLiveTransport(chat_completions_create=mock_create)
     ctx = _live_guard_context(tmp_path, attempt_id="provider_error")
-    with pytest.raises(ArchCompareLiveRunnerError) as exc:
-        run_arch_compare_live_full_path(
-            attempt_id="provider_error",
-            guard_context=ctx,
-            transport=transport,
-        )
-    assert exc.value.code == "provider_turn_failed"
+    result = run_arch_compare_live_full_path(
+        attempt_id="provider_error",
+        guard_context=ctx,
+        transport=transport,
+    )
+    assert result["status"] == "MEASUREMENT_COMPLETE_WITH_ERRORS"
+    assert state["call"] == 70
+    assert len(result["measurement_errors"]) == 1

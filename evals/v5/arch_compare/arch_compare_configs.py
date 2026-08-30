@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from llm import LLM_REQUEST_TIMEOUT_SEC
-
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from evals.v5.arch_compare.arch_compare_contract import (
     CONFIG_FLASH_CURATED,
@@ -84,10 +82,12 @@ class ArchCompareInferenceSettings:
         }
 
 
+ARCH_COMPARE_EVAL_TIMEOUT_SEC = 60.0
+
 ARCH_COMPARE_INFERENCE_SETTINGS = ArchCompareInferenceSettings(
     temperature=0,
     max_completion_tokens=1024,
-    timeout_sec=LLM_REQUEST_TIMEOUT_SEC,
+    timeout_sec=ARCH_COMPARE_EVAL_TIMEOUT_SEC,
     response_format_type="json_object",
     stream=False,
     stream_include_usage=True,

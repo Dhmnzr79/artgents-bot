@@ -149,6 +149,8 @@ def _run_preflight_for_config(
     config: ArchCompareConfig,
     attempt_id: str,
     use_fake_queue: bool,
+    ledger: Any | None = None,
+    store: Any | None = None,
 ) -> ArchComparePreflightResult:
     if use_fake_queue:
         envelope = build_fake_envelope_json(
@@ -166,10 +168,51 @@ def _run_preflight_for_config(
         messages=messages,
         stream=False,
     )
-    response = transport.chat_completions_create(**payload)
-    content = response.choices[0].message.content
+    ledger_entry = None
+    if ledger is not None:
+        ledger_entry = ledger.start_call(
+            phase="preflight",
+            scenario_id="PREFLIGHT",
+            turn_id=f"PREFLIGHT_{config.model_role}",
+            config_id=config.config_id,
+            model_id=config.provider_model_id,
+        )
+        if store is not None:
+            store.persist_after_call_started(ledger_entry)
+    try:
+        response = transport.chat_completions_create(**payload)
+        content = response.choices[0].message.content
+    except Exception as exc:
+        if ledger is not None and ledger_entry is not None:
+            from evals.v5.arch_compare.arch_compare_live_persistence import classify_provider_error
+
+            error_type, error_code = classify_provider_error(exc)
+            ledger.fail_call(ledger_entry, error_type=error_type, error_code=error_code)
+            if store is not None:
+                store.persist_core()
+        raise
     checks = _validate_preflight_envelope(content=content, provider_model_id=config.provider_model_id)
     success = all(row.status == "pass" for row in checks)
+    if ledger is not None and ledger_entry is not None:
+        record = transport.records[-1].to_dict() if getattr(transport, "records", None) else {}
+        if success:
+            ledger.complete_call(
+                ledger_entry,
+                latency_ms=record.get("latency_ms"),
+                usage={
+                    "prompt_tokens": record.get("prompt_tokens"),
+                    "completion_tokens": record.get("completion_tokens"),
+                },
+            )
+        else:
+            ledger.fail_call(
+                ledger_entry,
+                error_type="preflight",
+                error_code="preflight_validation_failed",
+                latency_ms=record.get("latency_ms"),
+            )
+        if store is not None:
+            store.persist_core()
     return ArchComparePreflightResult(
         model_role=config.model_role,
         provider_model_id=config.provider_model_id,
@@ -200,6 +243,8 @@ def run_capability_preflight(
     transport: Any,
     state: ArchComparePreflightStateMachine,
     use_fake_queue: bool,
+    ledger: Any | None = None,
+    store: Any | None = None,
 ) -> tuple[ArchComparePreflightResult, ArchComparePreflightResult | None]:
     flash_config = config_by_id(CONFIG_FLASH_FULL)
     state.reserve_preflight()
@@ -208,6 +253,8 @@ def run_capability_preflight(
         config=flash_config,
         attempt_id=attempt_id,
         use_fake_queue=use_fake_queue,
+        ledger=ledger,
+        store=store,
     )
     state.flash_result = flash_result
     transport.reset_calls()
@@ -223,6 +270,8 @@ def run_capability_preflight(
         config=plus_config,
         attempt_id=attempt_id,
         use_fake_queue=use_fake_queue,
+        ledger=ledger,
+        store=store,
     )
     state.plus_result = plus_result
     transport.reset_calls()

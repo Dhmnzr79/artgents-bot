@@ -274,7 +274,8 @@ def test_live_guard_failures(tmp_path: Path) -> None:
         transport_kind="fake",
         head_sha="1" * 40,
         working_tree_clean=False,
-        openai_api_key="offline-test-placeholder",
+        chat_api_key="offline-test-placeholder",
+        chat_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     with pytest.raises(ArchCompareLiveGuardError):
         assert_live_authorized(ctx)
@@ -326,10 +327,11 @@ def test_fake_transport_cannot_be_canonical_live_artifact(tmp_path: Path) -> Non
         authorization=authorization_manifest_from_dict(
             _authorized_manifest(attempt_id="fake_live", max_calls=70)
         ),
-        artifact_dir=tmp_path,
+        artifact_dir=tmp_path / "fake_live",
         transport_kind="fake",
         working_tree_clean=True,
-        openai_api_key="sk-real-looking-but-test",
+        chat_api_key="sk-real-looking-but-test",
+        chat_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     with pytest.raises(ArchCompareLiveGuardError) as exc:
         assert_live_authorized(ctx)
@@ -347,7 +349,8 @@ def test_manifest_68_rejected_for_preflight_plus_measurement(tmp_path: Path) -> 
         artifact_dir=tmp_path,
         transport_kind="live",
         working_tree_clean=True,
-        openai_api_key="sk-real-looking-but-test",
+        chat_api_key="sk-real-looking-but-test",
+        chat_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     )
     with pytest.raises(ArchCompareLiveGuardError) as exc:
         assert_live_authorized(ctx)

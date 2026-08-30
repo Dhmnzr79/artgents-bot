@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +13,7 @@ from evals.v5.arch_compare.arch_compare_contract import (
     FROZEN_MATRIX_DIGEST,
     MATRIX_JSON_REL_PATH,
     MATRIX_SCHEMA,
+    matrix_digest_sha256,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -61,7 +61,7 @@ def load_matrix_document() -> dict[str, Any]:
 
 
 def frozen_matrix_digest() -> str:
-    return hashlib.sha256(matrix_json_path().read_bytes()).hexdigest()
+    return matrix_digest_sha256(matrix_json_path().read_bytes())
 
 
 def assert_frozen_matrix_unchanged() -> None:

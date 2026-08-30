@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 
 MEASUREMENT_ID = "one_call_arch_compare_offline_v1"
@@ -31,7 +32,7 @@ BLIND_VARIANTS: tuple[str, ...] = ("A", "B", "C", "D")
 # Deterministic eval date — same across all configs/scenarios.
 FROZEN_COMMERCIAL_AS_OF = date(2026, 8, 30)
 
-# Populated after matrix stabilization; governance tests pin raw-byte digest.
+# Populated after matrix stabilization; governance tests pin normalized-byte digest.
 FROZEN_MATRIX_DIGEST: str = "b860e58e3ed94374e4ba095bdbd75b590028d33bd8c692405aa48ecc1c7ed347"
 
 EXPECTED_SCENARIO_COUNT = 16
@@ -46,3 +47,13 @@ DRY_RUN_DISCLAIMER = (
     "Не предназначен для оценки качества модели. "
     "Fake/offline wiring only; 0 provider/network calls."
 )
+
+
+def canonical_matrix_bytes(raw: bytes) -> bytes:
+    """Normalize line endings for digest: CRLF and lone CR become LF."""
+    return raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def matrix_digest_sha256(raw: bytes) -> str:
+    """SHA-256 of matrix JSON bytes after line-ending normalization only."""
+    return hashlib.sha256(canonical_matrix_bytes(raw)).hexdigest()

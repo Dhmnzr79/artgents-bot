@@ -9,6 +9,7 @@ from evals.v5.arch_compare.arch_compare_contract import (
     EXPECTED_TURN_COUNT,
     FROZEN_MATRIX_DIGEST,
     MATRIX_SCHEMA,
+    matrix_digest_sha256,
 )
 from evals.v5.arch_compare.arch_compare_matrix import (
     assert_frozen_matrix_unchanged,
@@ -46,3 +47,25 @@ def test_matrix_has_no_model_patient_text() -> None:
     doc = load_matrix_document()
     serialized = json.dumps(doc, ensure_ascii=False)
     assert "patient_text" not in serialized
+
+
+def test_matrix_digest_normalizes_lf_crlf_and_cr_equally() -> None:
+    base = b'{"schema":"one_call_arch_compare_matrix_v1","note":"x"}'
+    lf = base
+    crlf = base.replace(b"\n", b"\r\n")
+    cr_only = base.replace(b"\n", b"\r")
+    expected = matrix_digest_sha256(lf)
+    assert matrix_digest_sha256(crlf) == expected
+    assert matrix_digest_sha256(cr_only) == expected
+
+
+def test_matrix_digest_changes_on_content_byte() -> None:
+    base = b'{"schema":"one_call_arch_compare_matrix_v1","note":"x"}'
+    changed = b'{"schema":"one_call_arch_compare_matrix_v1","note":"y"}'
+    assert matrix_digest_sha256(base) != matrix_digest_sha256(changed)
+
+
+def test_matrix_digest_on_disk_matches_frozen_pin() -> None:
+    on_disk = matrix_json_path().read_bytes()
+    assert matrix_digest_sha256(on_disk) == FROZEN_MATRIX_DIGEST
+    assert frozen_matrix_digest() == FROZEN_MATRIX_DIGEST

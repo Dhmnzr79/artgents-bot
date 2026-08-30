@@ -223,6 +223,8 @@
 
 **Offline:** arch_compare 31/31 + regressions (Stage3B, exact single/multi, commercial prompt, Stage3A) green.
 
+**Публикация (30.08.2026):** commit `ce3a467` остановлен до push — snapshot REJECT: `frozen_matrix_digest()` хешировал сырые байты JSON, digest зависел от LF vs CRLF на checkout. Correction pass: `matrix_digest_sha256()` нормализует только переносы строк (`CRLF`/`CR` → `LF`); matrix content, runtime и `.gitattributes` не менялись; LIVE не запускался.
+
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 
 **Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.

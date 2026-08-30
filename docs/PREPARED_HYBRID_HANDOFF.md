@@ -233,6 +233,8 @@
 
 **CP-ARCH-COMPARE-WINDOWS-ARTIFACT-LOCK-V1 (30.08.2026):** узкий eval-only фикс transient Windows lock на `os.replace` в `atomic_write_text`: до 6 попыток, задержки 50/100/200/400/800 мс, только `WinError 5/32`; provider/turn retries остаются 0. Attempt 02 (`INCOMPLETE_FATAL` на turn 47) не возобновляется; следующий рекомендуемый ID: `arch_compare_live_v1_2026-08-30-03`. Статус: **`READY_FOR_NEW_ATTEMPT_AUTHORIZATION`**.
 
+**CP-ARCH-COMPARE-REPORT-PARITY-V1 (31.08.2026):** offline repair достоверности LIVE-отчёта: blind review v2 (вопрос/история, разделение model vs code, `not_captured_in_attempt_02`), technical report v2 (config/model/latency/tokens отдельно), offline rebuild attempt 02 в derived каталог, fake production parity через `capture_provider_turn_boundary` (single Nobel model/fallback + multi All-on-4). Исходные artifacts attempt 02 read-only. Attempt 03 заблокирован до owner authorization. LIVE не запускался.
+
 ### CP-MD-COMMERCE-1 — очистка demo MD от structured commerce-дублей (29.08.2026)
 
 **Статус:** реализован Cursor offline на базе `41bf8a8` + companion CP-EXACT-1A WIP. LIVE/API не выполнялись. Stage53/eval WIP сохранён отдельно.

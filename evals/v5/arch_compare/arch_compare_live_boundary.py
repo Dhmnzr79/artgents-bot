@@ -9,8 +9,11 @@ from contracts.one_call_presentation_result import OneCallPresentationResult
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_commercial_fact_catalog import CommercialFactCatalogSnapshot
+from contracts.one_call_envelope import OneCallEnvelope
+from contracts.precomposer_selected_offer import ResolvedPriceText
 from core.one_call_envelope_protocol import parse_production_envelope_json
 from core.one_call_presentation_pass import build_one_call_presentation_result
+from core.one_call_price_text import resolve_price_text_for_turn
 from core.sales_fast_presentation import (
     materialize_sales_fast_admin_payload,
     materialize_sales_fast_terminal_from_dispatch,
@@ -56,6 +59,11 @@ class ArchCompareBoundaryCapture:
     amplifier_fact_ids: tuple[str, ...]
     amplifier_fact_texts: tuple[str, ...]
     canonical_price_block: str | None
+    resolved_price_text: str | None
+    resolved_price_owner: str | None
+    resolved_price_diagnostic: str | None
+    resolved_selected_offer_id: str | None
+    resolved_multi_offer_ids: tuple[str, ...]
     service_value_id: str | None
     service_value_text: str | None
     cta_ui_metadata: dict[str, Any]
@@ -71,6 +79,11 @@ class ArchCompareBoundaryCapture:
             "amplifier_fact_ids": self.amplifier_fact_ids,
             "amplifier_fact_texts": self.amplifier_fact_texts,
             "canonical_price_block": self.canonical_price_block,
+            "resolved_price_text": self.resolved_price_text,
+            "resolved_price_owner": self.resolved_price_owner,
+            "resolved_price_diagnostic": self.resolved_price_diagnostic,
+            "resolved_selected_offer_id": self.resolved_selected_offer_id,
+            "resolved_multi_offer_ids": list(self.resolved_multi_offer_ids),
             "service_value_id": self.service_value_id,
             "service_value_text": self.service_value_text,
             "cta_ui_metadata": self.cta_ui_metadata,
@@ -84,6 +97,11 @@ def _empty_structured_defaults() -> dict[str, Any]:
         "amplifier_fact_ids": (),
         "amplifier_fact_texts": (),
         "canonical_price_block": None,
+        "resolved_price_text": None,
+        "resolved_price_owner": None,
+        "resolved_price_diagnostic": None,
+        "resolved_selected_offer_id": None,
+        "resolved_multi_offer_ids": (),
         "service_value_id": None,
         "service_value_text": None,
         "cta_ui_metadata": {},
@@ -110,8 +128,10 @@ def _presentation_fields(presentation: OneCallPresentationResult) -> dict[str, A
     canonical_price_block = None
     if presentation.authoritative_commerce is not None:
         commerce = presentation.authoritative_commerce
-        canonical_price_block = getattr(commerce, "canonical_price_block", None) or getattr(
-            commerce, "price_block_text", None
+        canonical_price_block = (
+            getattr(commerce, "canonical_price_block", None)
+            or getattr(commerce, "price_block_text", None)
+            or getattr(commerce, "patient_price_block", None)
         )
     return {
         "promo_fact_ids": tuple(presentation.rendered_promo_fact_ids),
@@ -136,6 +156,24 @@ def _presentation_fields(presentation: OneCallPresentationResult) -> dict[str, A
     }
 
 
+def _resolved_price_fields(resolved: ResolvedPriceText | None) -> dict[str, Any]:
+    if resolved is None:
+        return {
+            "resolved_price_text": None,
+            "resolved_price_owner": None,
+            "resolved_price_diagnostic": None,
+            "resolved_selected_offer_id": None,
+            "resolved_multi_offer_ids": (),
+        }
+    return {
+        "resolved_price_text": resolved.line,
+        "resolved_price_owner": resolved.owner,
+        "resolved_price_diagnostic": resolved.diagnostic,
+        "resolved_selected_offer_id": resolved.selected_offer_id,
+        "resolved_multi_offer_ids": tuple(resolved.multi_offer_ids),
+    }
+
+
 def _build_presentation_from_bound(
     *,
     bound: TargetSpecBoundOfflineResponsePackage,
@@ -145,10 +183,17 @@ def _build_presentation_from_bound(
     turn_frame,
     strategy_context,
     patient_text: str,
-) -> OneCallPresentationResult:
+    envelope: OneCallEnvelope,
+) -> tuple[OneCallPresentationResult, ResolvedPriceText | None]:
     resolution = exact_sales_resolution_from_semantic_frame(semantic)
     precomposer = resolve_precomposer_for_turn(ctx, turn)
-    return build_one_call_presentation_result(
+    resolved_price_text = resolve_price_text_for_turn(
+        price_text=envelope.price_text,
+        commercial_intent=envelope.commercial_intent,
+        selection=precomposer,
+        bundle=ctx.bundle,
+    )
+    presentation = build_one_call_presentation_result(
         bound_package=bound,
         context=ctx,
         turn_frame=turn_frame,
@@ -165,6 +210,29 @@ def _build_presentation_from_bound(
         shown_service_value_ids=(),
         today=FROZEN_COMMERCIAL_AS_OF,
         precomposer_selected_offer=precomposer,
+        resolved_price_text=resolved_price_text,
+    )
+    return presentation, resolved_price_text
+
+
+def _boundary_capture_from_presentation(
+    *,
+    presentation: OneCallPresentationResult,
+    resolved: ResolvedPriceText | None,
+    patient_text: str,
+    route: str,
+    presentation_capture_status: PresentationCaptureStatus,
+) -> ArchCompareBoundaryCapture:
+    fields = _presentation_fields(presentation)
+    resolved_fields = _resolved_price_fields(resolved)
+    return ArchCompareBoundaryCapture(
+        visible_answer=presentation.final_patient_text,
+        presentation_capture_status=presentation_capture_status,
+        patient_text=patient_text,
+        route=route,
+        presentation=presentation,
+        **fields,
+        **resolved_fields,
     )
 
 
@@ -246,7 +314,7 @@ def capture_provider_turn_boundary(
     )
 
     if isinstance(bound, TargetSpecBoundOfflineResponsePackage):
-        presentation = _build_presentation_from_bound(
+        presentation, resolved_price = _build_presentation_from_bound(
             bound=bound,
             ctx=runtime_ctx,
             turn=turn,
@@ -254,15 +322,14 @@ def capture_provider_turn_boundary(
             turn_frame=turn_frame,
             strategy_context=strategy_context,
             patient_text=patient_text,
+            envelope=envelope,
         )
-        fields = _presentation_fields(presentation)
-        return ArchCompareBoundaryCapture(
-            visible_answer=presentation.final_patient_text,
-            presentation_capture_status="full",
+        return _boundary_capture_from_presentation(
+            presentation=presentation,
+            resolved=resolved_price,
             patient_text=patient_text,
             route=str(envelope.route),
-            presentation=presentation,
-            **fields,
+            presentation_capture_status="full",
         )
 
     if not isinstance(bound, TargetTurnFrameBoundTerminalResponse):
@@ -282,7 +349,7 @@ def capture_provider_turn_boundary(
             md_root=runtime_ctx.md_root,
             client_id=CLIENT_ID,
         )
-        presentation = _build_presentation_from_bound(
+        presentation, resolved_price = _build_presentation_from_bound(
             bound=stage51b_bound,
             ctx=runtime_ctx,
             turn=turn,
@@ -290,15 +357,14 @@ def capture_provider_turn_boundary(
             turn_frame=turn_frame,
             strategy_context=strategy_context,
             patient_text=patient_text,
+            envelope=envelope,
         )
-        fields = _presentation_fields(presentation)
-        return ArchCompareBoundaryCapture(
-            visible_answer=presentation.final_patient_text,
-            presentation_capture_status="terminal_boundary_full",
+        return _boundary_capture_from_presentation(
+            presentation=presentation,
+            resolved=resolved_price,
             patient_text=patient_text,
             route=str(envelope.route),
-            presentation=presentation,
-            **fields,
+            presentation_capture_status="terminal_boundary_full",
         )
 
     visible = _terminal_visible_from_dispatch(terminal=bound, session_id=session_id)

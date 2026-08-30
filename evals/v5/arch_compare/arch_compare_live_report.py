@@ -94,125 +94,29 @@ def owner_review_template() -> str:
 
 
 def build_blind_review_markdown(*, attempt_id: str, run_result: dict[str, Any]) -> str:
-    mapping = run_result.get("blind_variant_mapping") or {}
-    structured = run_result.get("structured_turns") or []
-    status = str(run_result.get("status") or "")
-    by_scenario: dict[str, list[dict[str, Any]]] = {}
-    for row in structured:
-        by_scenario.setdefault(str(row["scenario_id"]), []).append(row)
+    from evals.v5.arch_compare.arch_compare_live_report_v2 import build_blind_review_markdown_v2
 
-    disclaimer = run_result.get("disclaimer") or (
-        FAKE_LIVE_DISCLAIMER if run_result.get("mode") == "fake_full_path" else ""
+    return build_blind_review_markdown_v2(
+        attempt_id=attempt_id,
+        run_result=run_result,
+        rebuilt_with_sha=run_result.get("rebuilt_with_sha"),
     )
-    lines = [
-        f"# Architecture compare blind review — `{attempt_id}`",
-        "",
-    ]
-    if disclaimer:
-        lines.extend([f"> {disclaimer}", ""])
-    if status == "INCOMPLETE_FATAL":
-        lines.extend(
-            [
-                "> PARTIAL / НЕПОЛНЫЙ ЗАПУСК — сохранены только завершённые scenario/config.",
-                "",
-            ]
-        )
-    lines.extend(
-        [
-            owner_review_template(),
-            "",
-        ]
-    )
-    for scenario_id, rows in by_scenario.items():
-        lines.append("## Сценарий")
-        lines.append("")
-        turn_ids = []
-        for row in rows:
-            if row["turn_id"] not in turn_ids:
-                turn_ids.append(row["turn_id"])
-        for turn_id in turn_ids:
-            turn_rows = [r for r in rows if r["turn_id"] == turn_id]
-            if not turn_rows:
-                continue
-            history = _public_history_for_review(turn_rows[0].get("dialog_history_before") or "")
-            lines.append("### Вопрос / история")
-            lines.append("")
-            lines.append(history if history != "—" else f"ход `{turn_id}`")
-            lines.append("")
-            variant_to_config = mapping.get(scenario_id) or {}
-            for variant in BLIND_VARIANTS:
-                config_id = variant_to_config.get(variant)
-                match = next((r for r in turn_rows if r.get("config_id") == config_id), None)
-                code_only = not bool((match or {}).get("provider_turn"))
-                visible = _public_review_text(
-                    (match or {}).get("visible_answer"),
-                    code_only=code_only,
-                    error_code=(match or {}).get("error_code"),
-                )
-                lines.append(f"#### Вариант {variant}")
-                lines.append("")
-                lines.append(f"- основной текст модели: {visible}")
-                lines.append(
-                    f"- точная цена: {(match or {}).get('canonical_price_block') or '—'}"
-                )
-                lines.append(
-                    f"- service_value: {(match or {}).get('service_value_text') or (match or {}).get('service_value_id') or '—'}"
-                )
-                promo = (match or {}).get("promo_fact_ids") or []
-                lines.append(f"- акции: {_format_optional_list(promo)}")
-                amps = (match or {}).get("amplifier_fact_ids") or []
-                lines.append(f"- усилители: {_format_optional_list(amps)}")
-                cta = (match or {}).get("cta_ui_metadata") or {}
-                lines.append(f"- CTA: {_format_optional_dict(cta)}")
-                lines.append(f"- полный итоговый ответ:\n\n{visible}")
-                lines.append("")
-        lines.append("")
-    return "\n".join(lines)
 
 
 def build_technical_report_markdown(*, attempt_id: str, run_result: dict[str, Any]) -> str:
-    lines = [
-        f"# Architecture compare technical report — `{attempt_id}`",
-        "",
-        f"- client: `{CLIENT_ID}`",
-        f"- mode: `{run_result.get('mode')}`",
-        f"- matrix_digest: `{run_result.get('matrix_digest')}`",
-        f"- config_digest: `{run_result.get('config_digest')}`",
-        f"- provider_call_total: `{run_result.get('provider_call_total')}`",
-        f"- measurement_error_total: `{len(run_result.get('measurement_errors') or [])}`",
-        f"- request_timeout_sec: `{EVAL_REQUEST_TIMEOUT_SEC}`",
-        f"- production_sla_sec: `{PRODUCTION_SLA_REFERENCE_SEC}`",
-        f"- status: `{run_result.get('status')}`",
-        f"- fake_transport_call_total: `{run_result.get('fake_transport_call_total')}`",
-        f"- live_readiness: `{(run_result.get('live_readiness') or {}).get('status')}`",
-        "",
-        "## Config registry",
-        "",
-        "```json",
-        json.dumps(run_result.get("config_registry") or {}, ensure_ascii=False, indent=2),
-        "```",
-        "",
-        "## Preflight",
-        "",
-        "```json",
-        json.dumps(run_result.get("preflight") or {}, ensure_ascii=False, indent=2),
-        "```",
-        "",
-        "## Schedule excerpt",
-        "",
-        f"scenario_config_jobs: {len((run_result.get('schedule') or {}).get('scenario_config_jobs') or [])}",
-        f"turn_config_jobs: {len((run_result.get('schedule') or {}).get('turn_config_jobs') or [])}",
-        "",
-    ]
-    return "\n".join(lines)
+    from evals.v5.arch_compare.arch_compare_live_report_v2 import build_technical_report_markdown_v2
+
+    return build_technical_report_markdown_v2(
+        attempt_id=attempt_id,
+        run_result=run_result,
+        rebuilt_with_sha=run_result.get("rebuilt_with_sha"),
+    )
 
 
 def build_blind_review_json(*, attempt_id: str, run_result: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "attempt_id": attempt_id,
-        "disclaimer": FAKE_LIVE_DISCLAIMER,
-        "scenarios": _public_review_payload(run_result),
-    }
+    from evals.v5.arch_compare.arch_compare_live_report_v2 import build_blind_review_json_v2
+
+    return build_blind_review_json_v2(attempt_id=attempt_id, run_result=run_result)
 
 
 def _public_review_payload(run_result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -349,9 +253,23 @@ def finalize_live_artifacts(
         "mapping": run_result.get("blind_variant_mapping"),
         "note": "closed mapping — not for reviewer markdown",
     }
-    blind_review_md = build_blind_review_markdown(attempt_id=store.attempt_id, run_result=run_result)
-    technical_md = build_technical_report_markdown(attempt_id=store.attempt_id, run_result=run_result)
-    blind_review_json = build_blind_review_json(attempt_id=store.attempt_id, run_result=run_result)
+    manifest = dict(store.manifest)
+    counters = None
+    if store.ledger.entries:
+        from evals.v5.arch_compare.arch_compare_live_report_v2 import compute_persistence_counters
+
+        counters = compute_persistence_counters(
+            ledger=store.ledger.to_dict(),
+            structured_turns=store.structured_turns,
+            raw_turns=store.raw_turns,
+        )
+    run_result_with_ledger = dict(run_result)
+    run_result_with_ledger["call_ledger"] = store.ledger.to_dict()
+    if counters is not None:
+        run_result_with_ledger["persistence_counters"] = counters
+    blind_review_md = build_blind_review_markdown(attempt_id=store.attempt_id, run_result=run_result_with_ledger)
+    technical_md = build_technical_report_markdown(attempt_id=store.attempt_id, run_result=run_result_with_ledger)
+    blind_review_json = build_blind_review_json(attempt_id=store.attempt_id, run_result=run_result_with_ledger)
 
     from evals.v5.arch_compare.arch_compare_live_persistence import atomic_write_json, atomic_write_text
 

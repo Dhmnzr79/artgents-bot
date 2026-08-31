@@ -35,7 +35,7 @@ is_background: false
 - Для `ADMIN` сохраняется `patient_text=null`. Код показывает один детерминированный текст: «Спасибо, что написали. С этим вопросом лучше обратиться к администратору клиники — он поможет дальше. Если ситуация срочная, пожалуйста, позвоните: {номер клиники}.» Номер — только из канонических контактов текущего клиента. Нет своего номера — нет чужого fallback. Индивидуальный текст модели, marketing/presentation, продающий CTA и обещание фактической передачи сообщения для ADMIN запрещены.
 - `ADMIN` предназначен для проблемных/неконверсионных обращений: текущая медицинская проблема, просьба о персональном диагнозе/назначении, негативная жалоба/конфликт, обращение с необходимой реакцией руководителя. Положительный отзыв и обычная просьба связаться с врачом/сотрудником — нормальный `ANSWER`, а не проблемный ADMIN. Общий FAQ, будущие опасения и сравнения услуг также `ANSWER`; недостаточный понятный scope — `CLARIFY` без навязанного звонка.
 - Существующая история из `session.py` должна поступать в динамический контекст Composer на следующем ходу для всех тем. Не создавать новую память, Planner/RAG или дополнительный вызов. История помогает понимать продолжение, но не заменяет канонические цены, контакты и другие факты. Проверять обычный и streaming-циклы, роли/порядок, отсутствие дубля текущего вопроса, reset и изоляцию клиента/сессии.
-- Для `direct_fact_ids`: сначала валидировать список и каждый элемент, затем сворачивать только одинаковые корректные ID. Смешанный список с числом, `null` или пустым ID нельзя делать валидным удалением плохого элемента.
+- Для legacy `direct_fact_ids` (checkpoint 1e runtime): сначала валидировать список и каждый элемент, затем сворачивать только одинаковые корректные ID. Смешанный список с числом, `null` или пустым ID нельзя делать валидным удалением плохого элемента. Целевой контракт — `requested_fact_ids` (`docs/RESPONSE_CONTRACT.md`).
 
 В review checkpoint 1e немедленно отклоняй возврат медицинской/жалобной словесной маршрутизации, индивидуального model-ADMIN текста, отдельного emergency, чужого телефона, маркетинга в ADMIN или fake-тест, выдающий заранее заданный route за доказательство понимания русского языка. Offline/fake доказывает wiring; реальное понимание модели требует отдельно разрешённого LIVE/API-прогона.
 
@@ -155,6 +155,33 @@ is_background: false
 - Измерены пользовательский TTFT, полное время и расходы всего пути; оговорены размер выборки и прогрев. Бюджет включает все provider-turns и попытки, без скрытых retries.
 - Разрешение реального API конкретное и отдельное; checker не повторяет уже разрешённый исполнителю LIVE автоматически. Если scope — read-only аудит результатов, проверяй артефакты без новых вызовов.
 - Выбор архитектуры остаётся выводом из данных и решением владельца. ACCEPT эксперимента не означает одобрение миграции или production-активации.
+
+## Response-plan checkpoints (`docs/RESPONSE_CONTRACT.md`)
+
+Для checkpoint'ов, меняющих response contract, governance или implementation plan, дополнительно проверяй согласованность с `docs/RESPONSE_CONTRACT.md`:
+
+- целевая цепочка: `PreComposerPlan → Composer → ResolvedResponsePlan → TextRenderer → UIProjection`;
+- one-call invariant: ровно один Composer LLM call на обычном ходе;
+- single price owner (`exact_price`);
+- closed required-offer-condition enum (`per_jaw`, `per_tooth`, `package_includes`, `mandatory_exclusion`, `ct_separate`, `bone_grafting_separate`); no arbitrary string IDs;
+- fact-role priority: `requested_fact > required_offer_condition > promo > automatic_amplifier`;
+- **`implant_warranty` explicit_only** — automatic warranty forbidden; requested warranty has one visible role;
+- unused legacy `scenario_rules` must not be treated as active behavior;
+- direct/requested facts outside automatic caps;
+- **BASE ANSWER MUST SURVIVE** for optional promo/amplifier/service value/CTA/UI failures;
+- optional failure only before plan freeze; broken optional block removed; its ID absent from finalized visible IDs and session delta;
+- `ResolvedResponsePlan` sole owner of finalized visible commercial IDs; `UIProjection` projects/exposes plan-owned IDs only;
+- terminal plan matrix (ADMIN, CONTACTS, CLARIFY, medical terminal = ADMIN subtype) per contract §16;
+- session shown IDs from plan, not from final-text scan;
+- no post-`TextRenderer` commercial append;
+- `/ask` and `/ask/stream` share one plan/render path; transport-only difference;
+- no separate Hybrid renderer; no permanent old/new fallback;
+- no semantic regex gates for Russian medical/commercial meaning;
+- proportional tests for scope; full regression not required after every small change;
+- clean snapshot only for high-risk checkpoints;
+- foreign owner WIP outside allowlist is **not** automatic `REJECT`.
+
+Docs-only contract checkpoint: не требуй уже реализованную будущую архитектуру в production code. Проверяй только allowlist diff и согласованность документов.
 
 ## Архитектурные вопросы
 

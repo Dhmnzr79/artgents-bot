@@ -80,6 +80,25 @@
 - [ ] История поступает в динамический prompt только как контекст продолжения; актуальный канон клиники и текущий вопрос имеют приоритет. Обычный и streaming-пути не дублируют реплики и не смешивают клиентов/сессии.
 - [ ] Fake route проверяет только wiring. Он не считается доказательством, что настоящая модель верно поняла свободный русский текст.
 
+### C4. Response contract — one-call target (`docs/RESPONSE_CONTRACT.md`)
+
+Применяется к checkpoint'ам, реализующим или утверждающим новую архитектуру ответа:
+
+- [ ] **One call:** обычный ход — ровно один Composer LLM call; без дополнительных LLM для классификации, цены, гарантии, sanitizer или marketing.
+- [ ] **Shared lower path:** Full Context Strategy и Hybrid Strategy сходятся в `PreComposerPlan → Composer → ResolvedResponsePlan → TextRenderer → UIProjection`; отдельный Hybrid renderer запрещён.
+- [ ] **`TextRenderer`** — единственный владелец финального visible text; после него нет commercial append.
+- [ ] **Price lane:** один visible price block; `exact_price` — единственный owner amount/currency/unit; required offer conditions — закрытый enum (`per_jaw`, `per_tooth`, `package_includes`, `mandatory_exclusion`, `ct_separate`, `bone_grafting_separate`).
+- [ ] **Fact roles:** приоритет `requested_fact > required_offer_condition > promo > automatic_amplifier`; один ID — одна visible role.
+- [ ] **`implant_warranty` explicit_only:** automatic warranty запрещена; показ только через structured `requested_fact_ids`; misleading legacy `scenario_rules` не считается активным wiring.
+- [ ] **Requested facts** не расходуют automatic amplifier cap.
+- [ ] **BASE ANSWER MUST SURVIVE:** optional promo/amplifier/service value/CTA/UI failure не уничтожает полезный `patient_text`; optional failure до freeze плана; сломанный optional block и его ID не попадают в finalized visible IDs/session delta.
+- [ ] **Finalized IDs:** `ResolvedResponsePlan` — единственный owner finalized visible commercial IDs; `UIProjection` только проецирует plan-owned IDs; анализ visible text запрещён.
+- [ ] **Terminal plans:** matrix ADMIN / CONTACTS / CLARIFY / medical terminal (= ADMIN subtype) по contract §16.
+- [ ] **Session IDs** только из `ResolvedResponsePlan`, не из анализа final text.
+- [ ] **Blocking/streaming parity:** один plan/render path; различие только transport.
+- [ ] **No semantic regex gates** для медицинского/коммерческого смысла до/после Composer.
+- [ ] **No permanent old/new fallback** между TFC Product Runtime и one-call path после cutover.
+
 ---
 
 ### D. Тесты и evals прогнаны честно
@@ -109,7 +128,7 @@
 ```
 ВЕРДИКТ: ✅ / ❌
 
-Слой 1 (инварианты): пройдено / нарушения: <список пунктов A–E, C2, C3>
+Слой 1 (инварианты): пройдено / нарушения: <список пунктов A–E, C2, C3, C4>
 Слой 2 (критерии TASK.md): пройдено / не выполнено: <какие критерии>
 
 Замечания Исполнителю (если ❌): <конкретика — файл:строка, что не так, что проверить>

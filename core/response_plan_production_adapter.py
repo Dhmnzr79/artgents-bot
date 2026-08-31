@@ -8,6 +8,8 @@ from contracts.response_plan import (
     CodeOwnedTerminalCandidate,
     CommercialFactCandidate,
     ComposerResult,
+    ComposerSelectedRouteAuthority,
+    DeterministicBypassRouteAuthority,
     FactApplicability,
     FactRole,
     PreComposerPlan,
@@ -23,11 +25,15 @@ from contracts.response_plan import (
     UiQuickReplyCandidate,
     UiVideoCandidate,
     UiWidgetCandidate,
+    all_allowed_route_mode_pairs,
 )
 from contracts.response_plan_adapter import (
+    ResponsePlanAdapterComposerRouteAuthority,
+    ResponsePlanAdapterDeterministicRouteAuthority,
     ResponsePlanAdapterError,
     ResponsePlanAdapterMaterialAuthority,
     ResponsePlanAdapterSources,
+    ResponsePlanAdapterTerminalAuthority,
     StrictTargetComposerEnvelope,
     assert_envelope_matches_plan,
     envelope_to_composer_result,
@@ -54,14 +60,7 @@ _BILLING_UNIT_PHRASES: dict[BillingUnit, str] = {
     "unit": "за одну единицу",
     "course": "за курс лечения",
 }
-_ANSWER_STANDARD_PAIR = ("ANSWER", "standard")
-_COMPOSER_ROUTE_MODE_PAIRS: frozenset[tuple[str, str]] = frozenset(
-    {
-        _ANSWER_STANDARD_PAIR,
-        ("CLARIFY", "standard"),
-    }
-)
-_CODE_OWNED_ROUTE_MODE_PAIRS: frozenset[tuple[str, str]] = frozenset(
+_COMPOSER_TERMINAL_PAIRS: frozenset[tuple[str, str]] = frozenset(
     {
         ("ANSWER", "contacts"),
         ("ADMIN", "standard"),
@@ -75,43 +74,29 @@ def build_pre_composer_plan(sources: ResponsePlanAdapterSources) -> PreComposerP
     """Map typed runtime authorities into an isolated PreComposerPlan."""
 
     session_client_id = sources.session_key.client_id
-    route_mode = RouteModePair(
-        route=sources.route_authority.route,
-        mode=sources.route_authority.mode,
-    )
-    pair = (route_mode.route, route_mode.mode)
-    if pair not in _COMPOSER_ROUTE_MODE_PAIRS | _CODE_OWNED_ROUTE_MODE_PAIRS:
-        raise ResponsePlanAdapterError("adapter_route_mode_unsupported", route_mode)
-
     _assert_client_lane(session_client_id, sources)
-    _validate_material_authority_matrix(sources, pair)
 
     scope, selected_service_id, selected_topic_id, active_session_service_id = _resolve_scope(
         sources.turn_frame,
         sources.allowed_topic_ids,
         sources.session_state.last_service_id,
     )
-    execution_kind, terminal_candidate = _resolve_terminal(sources, route_mode, session_client_id)
 
-    if pair == _ANSWER_STANDARD_PAIR:
-        return _build_answer_standard_plan(
+    route_authority = sources.route_authority
+    if isinstance(route_authority, ResponsePlanAdapterDeterministicRouteAuthority):
+        return _build_deterministic_bypass_plan(
             sources,
             session_client_id=session_client_id,
-            route_mode=route_mode,
-            execution_kind=execution_kind,
-            terminal_candidate=terminal_candidate,
+            route_authority=route_authority,
             scope=scope,
             selected_service_id=selected_service_id,
             selected_topic_id=selected_topic_id,
             active_session_service_id=active_session_service_id,
         )
 
-    return _build_non_material_plan(
+    return _build_composer_selected_plan(
         sources,
         session_client_id=session_client_id,
-        route_mode=route_mode,
-        execution_kind=execution_kind,
-        terminal_candidate=terminal_candidate,
         scope=scope,
         selected_service_id=selected_service_id,
         selected_topic_id=selected_topic_id,
@@ -123,9 +108,7 @@ def adapt_composer_envelope(
     plan: PreComposerPlan,
     envelope: StrictTargetComposerEnvelope,
 ) -> ComposerResult:
-    if plan.execution_kind != "composer":
-        raise ResponsePlanAdapterError("adapter_composer_contract_incompatible", plan.execution_kind)
-    assert_envelope_matches_plan(envelope, plan.route_mode)
+    assert_envelope_matches_plan(envelope, plan)
     return envelope_to_composer_result(envelope)
 
 
@@ -149,13 +132,10 @@ def format_multi_price_display(offers: tuple[TargetOffer, ...]) -> str:
     return "\n".join(lines)
 
 
-def _build_answer_standard_plan(
+def _build_composer_selected_plan(
     sources: ResponsePlanAdapterSources,
     *,
     session_client_id: str,
-    route_mode: RouteModePair,
-    execution_kind: str,
-    terminal_candidate: CodeOwnedTerminalCandidate | None,
     scope: ResponseScope,
     selected_service_id: str | None,
     selected_topic_id: str | None,
@@ -163,7 +143,7 @@ def _build_answer_standard_plan(
 ) -> PreComposerPlan:
     authority = sources.material_authority
     if authority is None:
-        raise ResponsePlanAdapterError("adapter_material_authority_required", route_mode)
+        raise ResponsePlanAdapterError("adapter_material_authority_required", "composer_selected")
     material_client_id = authority.source_client_id
     if material_client_id != session_client_id:
         raise ResponsePlanAdapterError(
@@ -196,12 +176,15 @@ def _build_answer_standard_plan(
         bound_package,
         selected_followups,
     )
+    terminal_candidates = _build_terminal_candidates(sources, session_client_id)
 
     return PreComposerPlan(
         session_key=sources.session_key,
         context_strategy=sources.context_strategy,
-        execution_kind=execution_kind,
-        route_mode=route_mode,
+        route_authority=ComposerSelectedRouteAuthority(
+            allowed_route_modes=all_allowed_route_mode_pairs(),
+            terminal_candidates=terminal_candidates,
+        ),
         response_scope=scope,
         selected_service_id=selected_service_id,
         active_session_service_id=active_session_service_id,
@@ -214,7 +197,6 @@ def _build_answer_standard_plan(
         automatic_amplifier_candidate_ids=amplifier_ids,
         service_value_candidate=service_value,
         textual_cta_candidate=textual_cta,
-        terminal_candidate=terminal_candidate,
         normal_caps=ResponseCaps(),
         price_caps=ResponseCaps(max_service_value=0, max_promo=2, max_automatic_amplifiers=4),
         ui_candidates=ui_candidates,
@@ -222,23 +204,27 @@ def _build_answer_standard_plan(
     )
 
 
-def _build_non_material_plan(
+def _build_deterministic_bypass_plan(
     sources: ResponsePlanAdapterSources,
     *,
     session_client_id: str,
-    route_mode: RouteModePair,
-    execution_kind: str,
-    terminal_candidate: CodeOwnedTerminalCandidate | None,
+    route_authority: ResponsePlanAdapterDeterministicRouteAuthority,
     scope: ResponseScope,
     selected_service_id: str | None,
     selected_topic_id: str | None,
     active_session_service_id: str | None,
 ) -> PreComposerPlan:
+    pair = (route_authority.route, route_authority.mode)
+    if sources.material_authority is not None:
+        raise ResponsePlanAdapterError("adapter_material_authority_forbidden", pair)
+    terminal = _require_deterministic_terminal(sources, pair, session_client_id)
     return PreComposerPlan(
         session_key=sources.session_key,
         context_strategy=sources.context_strategy,
-        execution_kind=execution_kind,
-        route_mode=route_mode,
+        route_authority=DeterministicBypassRouteAuthority(
+            route_mode=RouteModePair(route=route_authority.route, mode=route_authority.mode),
+            terminal_candidate=terminal,
+        ),
         response_scope=scope,
         selected_service_id=selected_service_id,
         active_session_service_id=active_session_service_id,
@@ -251,25 +237,11 @@ def _build_non_material_plan(
         automatic_amplifier_candidate_ids=(),
         service_value_candidate=None,
         textual_cta_candidate=None,
-        terminal_candidate=terminal_candidate,
         normal_caps=ResponseCaps(),
         price_caps=ResponseCaps(max_service_value=0, max_promo=2, max_automatic_amplifiers=4),
         ui_candidates=_build_non_material_ui_candidates(sources, session_client_id),
         transport_kind=sources.transport_kind,
     )
-
-
-def _validate_material_authority_matrix(
-    sources: ResponsePlanAdapterSources,
-    pair: tuple[str, str],
-) -> None:
-    has_material = sources.material_authority is not None
-    if pair == _ANSWER_STANDARD_PAIR:
-        if not has_material:
-            raise ResponsePlanAdapterError("adapter_material_authority_required", pair)
-        return
-    if has_material:
-        raise ResponsePlanAdapterError("adapter_material_authority_forbidden", pair)
 
 
 def _validate_package_coherence(authority: ResponsePlanAdapterMaterialAuthority) -> None:
@@ -403,13 +375,13 @@ def _assert_client_lane(client_id: str, sources: ResponsePlanAdapterSources) -> 
             "adapter_client_mismatch",
             ("conditions", sources.condition_authority.source_client_id),
         )
-    if sources.terminal_authority is not None:
-        if sources.terminal_authority.source_client_id != client_id:
+    for authority in sources.terminal_authorities:
+        if authority.source_client_id != client_id:
             raise ResponsePlanAdapterError(
                 "adapter_client_mismatch",
-                ("terminal", sources.terminal_authority.source_client_id),
+                ("terminal", authority.source_client_id),
             )
-        contact = sources.terminal_authority.canonical_contact
+        contact = authority.canonical_contact
         if contact is not None and contact.source_client_id != client_id:
             raise ResponsePlanAdapterError(
                 "adapter_client_mismatch",
@@ -427,28 +399,8 @@ def _assert_client_lane(client_id: str, sources: ResponsePlanAdapterSources) -> 
         )
 
 
-def _resolve_terminal(
-    sources: ResponsePlanAdapterSources,
-    route_mode: RouteModePair,
-    client_id: str,
-) -> tuple[str, CodeOwnedTerminalCandidate | None]:
-    pair = (route_mode.route, route_mode.mode)
-    authority = sources.terminal_authority
-
-    if pair in _COMPOSER_ROUTE_MODE_PAIRS:
-        if authority is not None:
-            raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", pair)
-        return "composer", None
-
-    if pair not in _CODE_OWNED_ROUTE_MODE_PAIRS:
-        raise ResponsePlanAdapterError("adapter_route_mode_unsupported", pair)
-    if authority is None:
-        raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", "missing")
-    if authority.source_client_id != client_id:
-        raise ResponsePlanAdapterError("adapter_client_mismatch", ("terminal", authority.source_client_id))
-    if authority.route != route_mode.route or authority.mode != route_mode.mode:
-        raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", route_mode)
-    terminal = CodeOwnedTerminalCandidate(
+def _terminal_from_authority(authority: ResponsePlanAdapterTerminalAuthority) -> CodeOwnedTerminalCandidate:
+    return CodeOwnedTerminalCandidate(
         source_client_id=authority.source_client_id,
         route=authority.route,
         mode=authority.mode,
@@ -456,7 +408,46 @@ def _resolve_terminal(
         display_text=authority.display_text,
         canonical_contact=authority.canonical_contact,
     )
-    return "code_owned_terminal", terminal
+
+
+def _build_terminal_candidates(
+    sources: ResponsePlanAdapterSources,
+    client_id: str,
+) -> tuple[CodeOwnedTerminalCandidate, ...]:
+    candidates: list[CodeOwnedTerminalCandidate] = []
+    seen: set[tuple[str, str]] = set()
+    for authority in sources.terminal_authorities:
+        pair = (authority.route, authority.mode)
+        if pair not in _COMPOSER_TERMINAL_PAIRS:
+            raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", pair)
+        if pair in seen:
+            raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", "duplicate")
+        if authority.source_client_id != client_id:
+            raise ResponsePlanAdapterError("adapter_client_mismatch", ("terminal", authority.source_client_id))
+        candidates.append(_terminal_from_authority(authority))
+        seen.add(pair)
+    for required_pair in _COMPOSER_TERMINAL_PAIRS:
+        if required_pair not in seen:
+            raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", required_pair)
+    return tuple(candidates)
+
+
+def _require_deterministic_terminal(
+    sources: ResponsePlanAdapterSources,
+    pair: tuple[str, str],
+    client_id: str,
+) -> CodeOwnedTerminalCandidate:
+    matches = [
+        authority
+        for authority in sources.terminal_authorities
+        if (authority.route, authority.mode) == pair
+    ]
+    if len(matches) != 1:
+        raise ResponsePlanAdapterError("adapter_terminal_authority_invalid", pair)
+    authority = matches[0]
+    if authority.source_client_id != client_id:
+        raise ResponsePlanAdapterError("adapter_client_mismatch", ("terminal", authority.source_client_id))
+    return _terminal_from_authority(authority)
 
 
 def _price_intent(spec: TargetResponseSpec) -> bool:

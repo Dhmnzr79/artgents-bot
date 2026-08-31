@@ -5,10 +5,11 @@ from __future__ import annotations
 from contracts.response_plan import (
     ALLOWED_ROUTE_MODE_PAIRS,
     CODE_OWNED_ROUTE_MODE_PAIRS,
-    COMPOSER_ROUTE_MODE_PAIRS,
     CodeOwnedTerminalCandidate,
     CommercialFactCandidate,
     ComposerResult,
+    ComposerSelectedRouteAuthority,
+    DeterministicBypassRouteAuthority,
     FinalizedCommercialIds,
     PlanDiagnostic,
     PreComposerPlan,
@@ -36,58 +37,76 @@ def resolve_response_plan(
     _validate_plan_structure(precomposer_plan)
     _validate_client_ownership(precomposer_plan)
 
-    route_mode = (precomposer_plan.route_mode.route, precomposer_plan.route_mode.mode)
-    if route_mode not in ALLOWED_ROUTE_MODE_PAIRS:
-        raise ResponsePlanContractError("route_mode_conflict")
-
-    if precomposer_plan.execution_kind == "code_owned_terminal":
+    authority = precomposer_plan.route_authority
+    if isinstance(authority, DeterministicBypassRouteAuthority):
         if composer_result is not None:
             raise ResponsePlanContractError("composer_result_forbidden")
-        if route_mode not in CODE_OWNED_ROUTE_MODE_PAIRS:
-            raise ResponsePlanContractError("route_mode_conflict")
-        return _resolve_code_owned_terminal(precomposer_plan)
+        return _resolve_code_owned_terminal(precomposer_plan, authority.terminal_candidate)
 
     if composer_result is None:
         raise ResponsePlanContractError("composer_result_required")
-    if route_mode not in COMPOSER_ROUTE_MODE_PAIRS:
-        raise ResponsePlanContractError("route_mode_conflict")
-    if (composer_result.route, composer_result.mode) != route_mode:
+
+    selected_pair = (composer_result.route, composer_result.mode)
+    allowed_pairs = {(item.route, item.mode) for item in authority.allowed_route_modes}
+    if selected_pair not in allowed_pairs:
         raise ResponsePlanContractError("route_mode_conflict")
 
-    if route_mode in {("ADMIN", "standard"), ("ADMIN", "medical_terminal")}:
-        return _resolve_composer_admin(precomposer_plan, composer_result)
-    if route_mode == ("CLARIFY", "standard"):
+    if selected_pair == ("ANSWER", "standard"):
+        return _resolve_composer_answer(precomposer_plan, composer_result)
+    if selected_pair == ("ANSWER", "contacts"):
+        terminal = _require_terminal_candidate(authority, selected_pair)
+        return _resolve_composer_contacts(precomposer_plan, composer_result, terminal)
+    if selected_pair in {("ADMIN", "standard"), ("ADMIN", "medical_terminal")}:
+        terminal = _require_terminal_candidate(authority, selected_pair)
+        return _resolve_composer_admin(precomposer_plan, composer_result, terminal)
+    if selected_pair == ("CLARIFY", "standard"):
         return _resolve_composer_clarify(precomposer_plan, composer_result)
-    return _resolve_composer_answer(precomposer_plan, composer_result)
+    raise ResponsePlanContractError("route_mode_conflict")
+
+
+def _require_terminal_candidate(
+    authority: ComposerSelectedRouteAuthority,
+    pair: tuple[str, str],
+) -> CodeOwnedTerminalCandidate:
+    for terminal in authority.terminal_candidates:
+        if (terminal.route, terminal.mode) == pair:
+            return terminal
+    raise ResponsePlanContractError("plan_structure_invalid")
 
 
 def _validate_plan_structure(plan: PreComposerPlan) -> None:
-    route_mode = (plan.route_mode.route, plan.route_mode.mode)
-    if plan.execution_kind == "composer" and route_mode == ("ANSWER", "contacts"):
-        raise ResponsePlanContractError("plan_structure_invalid")
-    if plan.execution_kind == "code_owned_terminal":
-        if route_mode not in CODE_OWNED_ROUTE_MODE_PAIRS:
+    authority = plan.route_authority
+    if isinstance(authority, DeterministicBypassRouteAuthority):
+        pair = (authority.route_mode.route, authority.route_mode.mode)
+        if pair not in CODE_OWNED_ROUTE_MODE_PAIRS:
             raise ResponsePlanContractError("plan_structure_invalid")
-        if plan.terminal_candidate is None:
+        terminal = authority.terminal_candidate
+        if (terminal.route, terminal.mode) != pair:
             raise ResponsePlanContractError("plan_structure_invalid")
-        terminal = plan.terminal_candidate
-        if (terminal.route, terminal.mode) != route_mode:
-            raise ResponsePlanContractError("plan_structure_invalid")
-        if route_mode == ("ANSWER", "contacts") and terminal.authority != "contacts":
+        if pair == ("ANSWER", "contacts") and terminal.authority != "contacts":
             raise ResponsePlanContractError("terminal_authority_invalid")
-        if route_mode[0] == "ADMIN" and terminal.authority not in {
+        if pair[0] == "ADMIN" and terminal.authority not in {
             "governed_ui",
             "deterministic_policy_terminal",
         }:
             raise ResponsePlanContractError("terminal_authority_invalid")
-    if route_mode[0] == "ADMIN" and plan.execution_kind == "composer":
-        if plan.terminal_candidate is None:
+        return
+
+    allowed_pairs = {(item.route, item.mode) for item in authority.allowed_route_modes}
+    if not allowed_pairs:
+        raise ResponsePlanContractError("plan_structure_invalid")
+    for pair in allowed_pairs:
+        if pair not in ALLOWED_ROUTE_MODE_PAIRS:
             raise ResponsePlanContractError("plan_structure_invalid")
-        terminal = plan.terminal_candidate
-        if terminal.authority not in {"governed_ui", "deterministic_policy_terminal"}:
+    for terminal in authority.terminal_candidates:
+        pair = (terminal.route, terminal.mode)
+        if pair == ("ANSWER", "contacts") and terminal.authority != "contacts":
             raise ResponsePlanContractError("terminal_authority_invalid")
-        if (terminal.route, terminal.mode) != route_mode:
-            raise ResponsePlanContractError("plan_structure_invalid")
+        if pair[0] == "ADMIN" and terminal.authority not in {
+            "governed_ui",
+            "deterministic_policy_terminal",
+        }:
+            raise ResponsePlanContractError("terminal_authority_invalid")
 
 
 def _validate_client_ownership(plan: PreComposerPlan) -> None:
@@ -101,10 +120,16 @@ def _validate_client_ownership(plan: PreComposerPlan) -> None:
 
 def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
     items: list[object] = []
-    if plan.terminal_candidate is not None:
-        items.append(plan.terminal_candidate)
-        if plan.terminal_candidate.canonical_contact is not None:
-            items.append(plan.terminal_candidate.canonical_contact)
+    authority = plan.route_authority
+    if isinstance(authority, DeterministicBypassRouteAuthority):
+        items.append(authority.terminal_candidate)
+        if authority.terminal_candidate.canonical_contact is not None:
+            items.append(authority.terminal_candidate.canonical_contact)
+    else:
+        for terminal in authority.terminal_candidates:
+            items.append(terminal)
+            if terminal.canonical_contact is not None:
+                items.append(terminal.canonical_contact)
     if plan.price_plan.single is not None:
         items.append(plan.price_plan.single)
     if plan.price_plan.multi is not None:
@@ -138,10 +163,10 @@ def _session_scope_ids(plan: PreComposerPlan) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _resolve_code_owned_terminal(plan: PreComposerPlan) -> ResolvedResponsePlan:
-    terminal = plan.terminal_candidate
-    if terminal is None:
-        raise ResponsePlanContractError("plan_structure_invalid")
+def _resolve_code_owned_terminal(
+    plan: PreComposerPlan,
+    terminal: CodeOwnedTerminalCandidate,
+) -> ResolvedResponsePlan:
     terminal_state: TerminalState
     if terminal.route == "ANSWER" and terminal.mode == "contacts":
         terminal_state = "contacts"
@@ -166,13 +191,33 @@ def _resolve_code_owned_terminal(plan: PreComposerPlan) -> ResolvedResponsePlan:
     )
 
 
+def _resolve_composer_contacts(
+    plan: PreComposerPlan,
+    composer: ComposerResult,
+    terminal: CodeOwnedTerminalCandidate,
+) -> ResolvedResponsePlan:
+    ui_plan = _resolve_terminal_ui(plan, terminal)
+    finalized = FinalizedCommercialIds()
+    session_delta = _build_session_delta(plan, finalized, terminal_state="contacts")
+    return ResolvedResponsePlan(
+        route=composer.route,
+        mode=composer.mode,
+        context_strategy=plan.context_strategy,
+        response_scope=plan.response_scope,
+        transport_kind=plan.transport_kind,
+        patient_text=None,
+        terminal_text=terminal.display_text,
+        ui_plan=ui_plan,
+        finalized_commercial_ids=finalized,
+        session_delta=session_delta,
+    )
+
+
 def _resolve_composer_admin(
     plan: PreComposerPlan,
     composer: ComposerResult,
+    terminal: CodeOwnedTerminalCandidate,
 ) -> ResolvedResponsePlan:
-    terminal = plan.terminal_candidate
-    if terminal is None:
-        raise ResponsePlanContractError("plan_structure_invalid")
     terminal_state: TerminalState = (
         "medical_terminal" if composer.mode == "medical_terminal" else "admin"
     )

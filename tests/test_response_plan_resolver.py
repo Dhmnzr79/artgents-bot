@@ -15,7 +15,9 @@ from core.response_plan_resolver import resolve_response_plan
 from tests.test_response_plan_contract import (
     admin_terminal,
     compose,
+    composer_route_authority,
     contacts_terminal,
+    deterministic_route_authority,
     fact,
     make_plan,
     price_multi,
@@ -190,9 +192,7 @@ def test_unknown_requested_id_is_model_violation_not_crash() -> None:
 
 def test_composer_admin_has_no_commerce() -> None:
     plan = make_plan(
-        execution_kind="composer",
-        route_mode=route_mode("ADMIN", "standard"),
-        terminal_candidate=admin_terminal(),
+        route_authority=composer_route_authority(),
         price_plan=PricePlan(kind="none"),
         textual_cta_candidate=None,
         service_value_candidate=None,
@@ -210,9 +210,9 @@ def test_composer_admin_has_no_commerce() -> None:
 
 def test_code_owned_contacts_has_no_commerce() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ANSWER", "contacts"),
-        terminal_candidate=contacts_terminal(client_id="demo"),
+        route_authority=deterministic_route_authority(
+            terminal=contacts_terminal(client_id="demo"),
+        ),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -229,7 +229,6 @@ def test_code_owned_contacts_has_no_commerce() -> None:
 
 def test_clarify_has_no_commerce() -> None:
     plan = make_plan(
-        route_mode=route_mode("CLARIFY", "standard"),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -265,9 +264,13 @@ def test_clarify_has_no_commerce() -> None:
 
 def test_medical_terminal_inherits_admin_restrictions() -> None:
     plan = make_plan(
-        execution_kind="composer",
-        route_mode=route_mode("ADMIN", "medical_terminal"),
-        terminal_candidate=admin_terminal(mode="medical_terminal", text="MEDICAL TERMINAL"),
+        route_authority=composer_route_authority(
+            terminal_candidates=(
+                contacts_terminal(),
+                admin_terminal(),
+                admin_terminal(mode="medical_terminal", text="MEDICAL TERMINAL"),
+            ),
+        ),
         price_plan=PricePlan(kind="none"),
         textual_cta_candidate=None,
         service_value_candidate=None,
@@ -471,7 +474,12 @@ def test_same_question_different_clients_do_not_mix() -> None:
 
 
 def test_composer_route_mode_mismatch_rejected() -> None:
-    plan = make_plan(route_mode=route_mode("ANSWER", "standard"))
+    plan = make_plan(
+        route_authority=composer_route_authority(
+            allowed_route_modes=(RouteModePair(route="ANSWER", mode="standard"),),
+            terminal_candidates=(),
+        ),
+    )
     with pytest.raises(ResponsePlanContractError) as exc:
         resolve_response_plan(
             plan,
@@ -786,6 +794,62 @@ def test_requested_fact_same_id_stays_requested_on_topic_scope() -> None:
 
 
 @pytest.mark.parametrize(
+    ("route", "mode", "composer_kwargs"),
+    [
+        ("ANSWER", "standard", {"patient_text": "Ответ"}),
+        ("ANSWER", "contacts", {"patient_text": None}),
+        ("ADMIN", "standard", {"patient_text": None}),
+        ("ADMIN", "medical_terminal", {"patient_text": None}),
+        ("CLARIFY", "standard", {"patient_text": "Уточните."}),
+    ],
+)
+def test_same_composer_plan_resolves_all_five_pairs(
+    route: str,
+    mode: str,
+    composer_kwargs: dict[str, object],
+) -> None:
+    plan = make_plan(
+        route_authority=composer_route_authority(),
+        price_plan=PricePlan(kind="none"),
+        response_scope="clinic",
+        selected_service_id=None,
+        selected_topic_id=None,
+        textual_cta_candidate=None,
+        service_value_candidate=None,
+        promo_candidate_ids=(),
+        automatic_amplifier_candidate_ids=(),
+    )
+    resolved = resolve_response_plan(
+        plan,
+        ComposerResult(route=route, mode=mode, **composer_kwargs),
+    )
+    assert resolved.route == route
+    assert resolved.mode == mode
+
+
+def test_composer_contacts_strips_commerce() -> None:
+    plan = make_plan(
+        route_authority=composer_route_authority(),
+        price_plan=PricePlan(kind="none"),
+        response_scope="clinic",
+        selected_service_id=None,
+        textual_cta_candidate=None,
+        service_value_candidate=None,
+        promo_candidate_ids=(),
+        automatic_amplifier_candidate_ids=(),
+    )
+    resolved = resolve_response_plan(
+        plan,
+        ComposerResult(route="ANSWER", mode="contacts", patient_text=None),
+    )
+    assert resolved.terminal_text == "Контакты demo"
+    assert resolved.patient_text is None
+    assert resolved.price_block is None
+    assert resolved.finalized_commercial_ids.price_offer_ids == ()
+    assert resolved.finalized_commercial_ids.promo_fact_ids == ()
+
+
+@pytest.mark.parametrize(
     ("route", "mode", "terminal_state", "clarify_pending"),
     [
         (route, mode, EXPECTED_TERMINAL_STATE[(route, mode)][0], EXPECTED_TERMINAL_STATE[(route, mode)][1])
@@ -806,9 +870,7 @@ def test_route_mode_terminal_state_matrix(
     elif route == "ANSWER" and mode == "contacts":
         resolved = resolve_response_plan(
             make_plan(
-                execution_kind="code_owned_terminal",
-                route_mode=route_mode("ANSWER", "contacts"),
-                terminal_candidate=contacts_terminal(),
+                route_authority=deterministic_route_authority(),
                 price_plan=PricePlan(kind="none"),
                 response_scope="clinic",
                 selected_service_id=None,
@@ -823,9 +885,13 @@ def test_route_mode_terminal_state_matrix(
     elif route == "ADMIN":
         resolved = resolve_response_plan(
             make_plan(
-                execution_kind="composer" if mode == "standard" else "composer",
-                route_mode=route_mode("ADMIN", mode),
-                terminal_candidate=admin_terminal(mode=mode, text="TERMINAL"),
+                route_authority=composer_route_authority(
+                    terminal_candidates=(
+                        contacts_terminal(),
+                        admin_terminal(mode="standard", text="TERMINAL"),
+                        admin_terminal(mode="medical_terminal", text="TERMINAL"),
+                    ),
+                ),
                 price_plan=PricePlan(kind="none"),
                 textual_cta_candidate=None,
                 service_value_candidate=None,
@@ -837,7 +903,6 @@ def test_route_mode_terminal_state_matrix(
     else:
         resolved = resolve_response_plan(
             make_plan(
-                route_mode=route_mode("CLARIFY", "standard"),
                 price_plan=PricePlan(kind="none"),
                 response_scope="clinic",
                 selected_service_id=None,

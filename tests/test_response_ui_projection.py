@@ -9,9 +9,9 @@ from tests.test_response_plan_contract import (
     admin_terminal,
     compose,
     contacts_terminal,
+    deterministic_route_authority,
     fact,
     make_plan,
-    route_mode,
     session,
 )
 
@@ -44,9 +44,6 @@ def test_ui_projection_does_not_create_new_fact_ids() -> None:
 
 def test_admin_only_contact_action() -> None:
     plan = make_plan(
-        execution_kind="composer",
-        route_mode=route_mode("ADMIN", "standard"),
-        terminal_candidate=admin_terminal(),
         price_plan=PricePlan(kind="none"),
         textual_cta_candidate=None,
         service_value_candidate=None,
@@ -62,9 +59,7 @@ def test_admin_only_contact_action() -> None:
 
 def test_contacts_without_composer() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ANSWER", "contacts"),
-        terminal_candidate=contacts_terminal(),
+        route_authority=deterministic_route_authority(),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -82,7 +77,6 @@ def test_clarify_quick_replies_only() -> None:
     from contracts.response_plan import UiPlanCandidates, UiQuickReplyCandidate
 
     plan = make_plan(
-        route_mode=route_mode("CLARIFY", "standard"),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,

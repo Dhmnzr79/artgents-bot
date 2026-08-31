@@ -12,7 +12,10 @@ from contracts.response_plan import (
     CodeOwnedAuthority,
     CodeOwnedTerminalCandidate,
     ComposerResult,
+    ComposerSelectedRouteAuthority,
     ContextStrategy,
+    DeterministicBypassRouteAuthority,
+    PreComposerPlan,
     RequiredOfferConditionBlock,
     ResponseRoute,
     ResponseMode,
@@ -20,6 +23,7 @@ from contracts.response_plan import (
     SessionKey,
     TransportKind,
     UniqueRequestedFactIds,
+    all_allowed_route_mode_pairs,
     _require_non_blank,
     _unique_requested_fact_ids,
 )
@@ -104,7 +108,12 @@ class ResponsePlanAdapterMaterialAuthority(ResponsePlanAdapterModel):
     bound_package: TargetSpecBoundOfflineResponsePackage
 
 
-class ResponsePlanAdapterRouteAuthority(ResponsePlanAdapterModel):
+class ResponsePlanAdapterComposerRouteAuthority(ResponsePlanAdapterModel):
+    kind: Literal["composer_selected"] = "composer_selected"
+
+
+class ResponsePlanAdapterDeterministicRouteAuthority(ResponsePlanAdapterModel):
+    kind: Literal["deterministic_bypass"] = "deterministic_bypass"
     route: ResponseRoute
     mode: ResponseMode = "standard"
 
@@ -113,6 +122,11 @@ class ResponsePlanAdapterRouteAuthority(ResponsePlanAdapterModel):
         if (self.route, self.mode) not in ALLOWED_ROUTE_MODE_PAIRS:
             raise ValueError("route_mode_conflict")
         return self
+
+
+ResponsePlanAdapterRouteAuthority = (
+    ResponsePlanAdapterComposerRouteAuthority | ResponsePlanAdapterDeterministicRouteAuthority
+)
 
 
 class ResponsePlanAdapterConditionAuthority(ResponsePlanAdapterModel):
@@ -187,7 +201,7 @@ class ResponsePlanAdapterSources(ResponsePlanAdapterModel):
     )
     route_authority: ResponsePlanAdapterRouteAuthority
     condition_authority: ResponsePlanAdapterConditionAuthority | None = None
-    terminal_authority: ResponsePlanAdapterTerminalAuthority | None = None
+    terminal_authorities: tuple[ResponsePlanAdapterTerminalAuthority, ...] = ()
     ui_authority: ResponsePlanAdapterUiAuthority | None = None
     textual_cta_authority: ResponsePlanAdapterTextualCtaAuthority | None = None
 
@@ -239,10 +253,17 @@ def envelope_to_composer_result(envelope: StrictTargetComposerEnvelope) -> Compo
 
 def assert_envelope_matches_plan(
     envelope: StrictTargetComposerEnvelope,
-    route_mode: RouteModePair,
+    plan: PreComposerPlan,
 ) -> None:
-    if envelope.route != route_mode.route or envelope.mode != route_mode.mode:
+    authority = plan.route_authority
+    if not isinstance(authority, ComposerSelectedRouteAuthority):
+        raise ResponsePlanAdapterError(
+            "adapter_composer_contract_incompatible",
+            "deterministic_bypass",
+        )
+    allowed = {(item.route, item.mode) for item in authority.allowed_route_modes}
+    if (envelope.route, envelope.mode) not in allowed:
         raise ResponsePlanAdapterError(
             "adapter_composer_route_mismatch",
-            (envelope.route, envelope.mode, route_mode.route, route_mode.mode),
+            (envelope.route, envelope.mode, tuple(sorted(allowed))),
         )

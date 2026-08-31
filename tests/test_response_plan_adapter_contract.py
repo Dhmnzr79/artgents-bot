@@ -9,10 +9,11 @@ from pydantic import ValidationError
 from contracts.response_plan import ComposerResult, RouteModePair, SessionKey
 from contracts.response_plan_adapter import (
     ADAPTER_ERROR_CODES,
+    ResponsePlanAdapterComposerRouteAuthority,
     ResponsePlanAdapterConditionAuthority,
+    ResponsePlanAdapterDeterministicRouteAuthority,
     ResponsePlanAdapterError,
     ResponsePlanAdapterMaterialAuthority,
-    ResponsePlanAdapterRouteAuthority,
     ResponsePlanAdapterSessionState,
     ResponsePlanAdapterTerminalAuthority,
     StrictTargetComposerEnvelope,
@@ -58,7 +59,21 @@ def test_session_state_model_is_frozen_and_extra_forbid() -> None:
 
 def test_route_authority_rejects_invalid_pair() -> None:
     with pytest.raises(ValidationError):
-        ResponsePlanAdapterRouteAuthority(route="ANSWER", mode="medical_terminal")
+        ResponsePlanAdapterDeterministicRouteAuthority(route="ANSWER", mode="medical_terminal")
+
+
+def test_composer_route_authority_has_no_preselected_pair() -> None:
+    authority = ResponsePlanAdapterComposerRouteAuthority()
+    assert authority.kind == "composer_selected"
+    assert not hasattr(authority, "route")
+    assert not hasattr(authority, "mode")
+
+
+def test_deterministic_route_authority_requires_pair() -> None:
+    authority = ResponsePlanAdapterDeterministicRouteAuthority(route="ANSWER", mode="contacts")
+    assert authority.kind == "deterministic_bypass"
+    assert authority.route == "ANSWER"
+    assert authority.mode == "contacts"
 
 
 def test_terminal_authority_rejects_clarify() -> None:
@@ -99,12 +114,13 @@ def test_envelope_to_composer_result_admin_invariants() -> None:
     assert exc.value.code == "adapter_composer_envelope_invalid"
 
 
-def test_envelope_rejects_contacts_mode() -> None:
-    with pytest.raises(ResponsePlanAdapterError) as exc:
-        envelope_to_composer_result(
-            StrictTargetComposerEnvelope(route="ANSWER", mode="contacts", patient_text=None)
-        )
-    assert exc.value.code == "adapter_composer_envelope_invalid"
+def test_envelope_allows_contacts_mode() -> None:
+    result = envelope_to_composer_result(
+        StrictTargetComposerEnvelope(route="ANSWER", mode="contacts", patient_text=None)
+    )
+    assert result.route == "ANSWER"
+    assert result.mode == "contacts"
+    assert result.patient_text is None
 
 
 def test_legacy_unverified_composer_output_rejected() -> None:

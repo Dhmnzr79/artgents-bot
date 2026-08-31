@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Self
+from typing import Annotated, Literal, Self, Union
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
 ResponseRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
 ResponseMode = Literal["standard", "contacts", "medical_terminal"]
@@ -73,6 +73,13 @@ CODE_OWNED_ROUTE_MODE_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = fro
         ("ADMIN", "medical_terminal"),
     }
 )
+COMPOSER_TERMINAL_OUTCOME_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = frozenset(
+    {
+        ("ANSWER", "contacts"),
+        ("ADMIN", "standard"),
+        ("ADMIN", "medical_terminal"),
+    }
+)
 
 DIAGNOSTIC_CLASSIFICATION: dict[PlanDiagnosticCode, DiagnosticClass] = {
     "requested_fact_unknown": "model_contract_violation",
@@ -105,12 +112,13 @@ def _require_non_blank(value: str) -> str:
 def _unique_non_blank_ids(values: tuple[str, ...], *, duplicate_error: str) -> tuple[str, ...]:
     seen: set[str] = set()
     for item in values:
-        normalized = item.strip()
-        if not normalized:
+        if item != item.strip():
+            raise ValueError("candidate_id_whitespace_padded")
+        if not item:
             raise ValueError("candidate_id_blank")
-        if normalized in seen:
+        if item in seen:
             raise ValueError(duplicate_error)
-        seen.add(normalized)
+        seen.add(item)
     return values
 
 
@@ -185,6 +193,13 @@ class RouteModePair(ResponsePlanModel):
         return self
 
 
+def all_allowed_route_mode_pairs() -> tuple[RouteModePair, ...]:
+    return tuple(
+        RouteModePair(route=route, mode=mode)
+        for route, mode in sorted(ALLOWED_ROUTE_MODE_PAIRS)
+    )
+
+
 class PlanDiagnostic(ResponsePlanModel):
     code: PlanDiagnosticCode
     detail: str | None = None
@@ -241,6 +256,70 @@ class CodeOwnedTerminalCandidate(ResponsePlanModel):
         if self.route == "CLARIFY":
             raise ValueError("clarify_terminal_forbidden")
         return self
+
+
+class ComposerSelectedRouteAuthority(ResponsePlanModel):
+    kind: Literal["composer_selected"] = "composer_selected"
+    allowed_route_modes: tuple[RouteModePair, ...]
+    terminal_candidates: tuple[CodeOwnedTerminalCandidate, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_authority(self) -> Self:
+        if not self.allowed_route_modes:
+            raise ValueError("allowed_route_modes_empty")
+        allowed_pairs = [(item.route, item.mode) for item in self.allowed_route_modes]
+        if len(allowed_pairs) != len(set(allowed_pairs)):
+            raise ValueError("allowed_route_modes_duplicate")
+        candidate_pairs = {(item.route, item.mode) for item in self.terminal_candidates}
+        if len(candidate_pairs) != len(self.terminal_candidates):
+            raise ValueError("terminal_candidate_duplicate")
+        for pair in allowed_pairs:
+            if pair not in ALLOWED_ROUTE_MODE_PAIRS:
+                raise ValueError("route_mode_conflict")
+            if pair in COMPOSER_TERMINAL_OUTCOME_PAIRS and pair not in candidate_pairs:
+                raise ValueError("terminal_candidate_missing")
+        for terminal in self.terminal_candidates:
+            pair = (terminal.route, terminal.mode)
+            if pair not in COMPOSER_TERMINAL_OUTCOME_PAIRS:
+                raise ValueError("terminal_candidate_invalid_pair")
+            if pair not in allowed_pairs:
+                raise ValueError("terminal_candidate_not_allowed")
+        return self
+
+
+class DeterministicBypassRouteAuthority(ResponsePlanModel):
+    kind: Literal["deterministic_bypass"] = "deterministic_bypass"
+    route_mode: RouteModePair
+    terminal_candidate: CodeOwnedTerminalCandidate
+
+    @model_validator(mode="after")
+    def _validate_authority(self) -> Self:
+        pair = (self.route_mode.route, self.route_mode.mode)
+        if pair not in CODE_OWNED_ROUTE_MODE_PAIRS:
+            raise ValueError("route_mode_conflict")
+        if (self.terminal_candidate.route, self.terminal_candidate.mode) != pair:
+            raise ValueError("terminal_candidate_mismatch")
+        return self
+
+
+def _route_authority_discriminator(value: object) -> str:
+    if isinstance(value, dict):
+        kind = value.get("kind")
+        if kind in {"composer_selected", "deterministic_bypass"}:
+            return kind
+    kind = getattr(value, "kind", None)
+    if kind in {"composer_selected", "deterministic_bypass"}:
+        return kind
+    raise ValueError("route_authority_kind_invalid")
+
+
+RouteAuthority = Annotated[
+    Union[
+        Annotated[ComposerSelectedRouteAuthority, Tag("composer_selected")],
+        Annotated[DeterministicBypassRouteAuthority, Tag("deterministic_bypass")],
+    ],
+    Discriminator(_route_authority_discriminator),
+]
 
 
 class CanonicalSinglePriceCandidate(ResponsePlanModel):
@@ -361,8 +440,7 @@ class UiPlanCandidates(ResponsePlanModel):
 class PreComposerPlan(ResponsePlanModel):
     session_key: SessionKey
     context_strategy: ContextStrategy
-    execution_kind: ExecutionKind
-    route_mode: RouteModePair
+    route_authority: RouteAuthority
     response_scope: ResponseScope
     selected_service_id: str | None = None
     active_session_service_id: str | None = None
@@ -375,7 +453,6 @@ class PreComposerPlan(ResponsePlanModel):
     automatic_amplifier_candidate_ids: UniqueAmplifierCandidateIds = ()
     service_value_candidate: ServiceValueCandidate | None = None
     textual_cta_candidate: TextualCtaCandidate | None = None
-    terminal_candidate: CodeOwnedTerminalCandidate | None = None
     normal_caps: ResponseCaps = Field(default_factory=ResponseCaps)
     price_caps: ResponseCaps = Field(
         default_factory=lambda: ResponseCaps(
@@ -445,21 +522,27 @@ class ComposerResult(ResponsePlanModel):
 
     @model_validator(mode="after")
     def _validate_pair_and_invariants(self) -> Self:
-        if (self.route, self.mode) not in COMPOSER_ROUTE_MODE_PAIRS:
+        pair = (self.route, self.mode)
+        if pair not in ALLOWED_ROUTE_MODE_PAIRS:
             raise ValueError("route_mode_conflict")
-        if self.mode == "contacts":
-            raise ValueError("composer_contacts_forbidden")
-        if self.route == "ANSWER" and self.mode == "standard":
+        if pair == ("ANSWER", "standard"):
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("answer_requires_patient_text")
-        if self.route == "ADMIN":
+        elif pair == ("ANSWER", "contacts"):
+            if self.patient_text is not None:
+                raise ValueError("contacts_requires_null_patient_text")
+            if self.price_text is not None:
+                raise ValueError("contacts_forbids_price_text")
+            if self.requested_fact_ids:
+                raise ValueError("contacts_forbids_requested_facts")
+        elif self.route == "ADMIN":
             if self.patient_text is not None:
                 raise ValueError("admin_requires_null_patient_text")
             if self.price_text is not None:
                 raise ValueError("admin_forbids_price_text")
             if self.requested_fact_ids:
                 raise ValueError("admin_forbids_requested_facts")
-        if self.route == "CLARIFY":
+        elif self.route == "CLARIFY":
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("clarify_requires_patient_text")
             if self.price_text is not None:

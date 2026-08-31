@@ -11,6 +11,8 @@ from contracts.response_plan import (
     CodeOwnedTerminalCandidate,
     CommercialFactCandidate,
     ComposerResult,
+    ComposerSelectedRouteAuthority,
+    DeterministicBypassRouteAuthority,
     EXPECTED_TERMINAL_STATE,
     FinalizedCommercialIds,
     PlanDiagnostic,
@@ -35,6 +37,7 @@ from contracts.response_plan import (
     UiQuickReplyCandidate,
     UiVideoCandidate,
     UiWidgetCandidate,
+    all_allowed_route_mode_pairs,
 )
 from core.response_plan_resolver import resolve_response_plan
 
@@ -76,6 +79,47 @@ def contacts_terminal(client_id: str = "demo", text: str = "Контакты dem
         authority="contacts",
         display_text=text,
         canonical_contact=contact(client_id),
+    )
+
+
+def default_terminal_candidates(client_id: str = "demo") -> tuple[CodeOwnedTerminalCandidate, ...]:
+    return (
+        contacts_terminal(client_id=client_id),
+        admin_terminal(client_id=client_id),
+        admin_terminal(client_id=client_id, mode="medical_terminal", text="MEDICAL TERMINAL"),
+    )
+
+
+def composer_route_authority(
+    *,
+    allowed_route_modes: tuple[RouteModePair, ...] | None = None,
+    terminal_candidates: tuple[CodeOwnedTerminalCandidate, ...] | None = None,
+    client_id: str = "demo",
+) -> ComposerSelectedRouteAuthority:
+    return ComposerSelectedRouteAuthority(
+        allowed_route_modes=allowed_route_modes or all_allowed_route_mode_pairs(),
+        terminal_candidates=terminal_candidates
+        if terminal_candidates is not None
+        else default_terminal_candidates(client_id=client_id),
+    )
+
+
+def deterministic_route_authority(
+    route: str = "ANSWER",
+    mode: str = "contacts",
+    *,
+    terminal: CodeOwnedTerminalCandidate | None = None,
+    client_id: str = "demo",
+) -> DeterministicBypassRouteAuthority:
+    pair = (route, mode)
+    if terminal is None:
+        if pair == ("ANSWER", "contacts"):
+            terminal = contacts_terminal(client_id=client_id)
+        else:
+            terminal = admin_terminal(client_id=client_id, mode=mode)
+    return DeterministicBypassRouteAuthority(
+        route_mode=RouteModePair(route=route, mode=mode),
+        terminal_candidate=terminal,
     )
 
 
@@ -141,8 +185,7 @@ def make_plan(**overrides: object) -> PreComposerPlan:
     payload = {
         "session_key": session(client_id, sid),
         "context_strategy": "full_context",
-        "execution_kind": "composer",
-        "route_mode": route_mode(),
+        "route_authority": composer_route_authority(client_id=client_id),
         "response_scope": "service",
         "selected_service_id": "implantium",
         "price_plan": price_single(client_id=client_id),
@@ -231,9 +274,51 @@ def test_clarify_composer_invariants() -> None:
         ComposerResult(route="CLARIFY", mode="standard", patient_text="")
 
 
-def test_composer_contacts_mode_forbidden() -> None:
+def test_composer_contacts_mode_allowed() -> None:
+    result = ComposerResult(route="ANSWER", mode="contacts", patient_text=None)
+    assert result.patient_text is None
     with pytest.raises(ValidationError):
         ComposerResult(route="ANSWER", mode="contacts", patient_text="x")
+
+
+def test_composer_selected_route_authority_requires_terminal_candidates() -> None:
+    with pytest.raises(ValidationError):
+        ComposerSelectedRouteAuthority(
+            allowed_route_modes=all_allowed_route_mode_pairs(),
+            terminal_candidates=(),
+        )
+
+
+def test_composer_selected_route_authority_rejects_duplicate_allowed_pairs() -> None:
+    with pytest.raises(ValidationError):
+        ComposerSelectedRouteAuthority(
+            allowed_route_modes=(
+                RouteModePair(route="ANSWER", mode="standard"),
+                RouteModePair(route="ANSWER", mode="standard"),
+            ),
+            terminal_candidates=(),
+        )
+
+
+def test_deterministic_bypass_route_authority_rejects_clarify() -> None:
+    with pytest.raises(ValidationError):
+        DeterministicBypassRouteAuthority(
+            route_mode=RouteModePair(route="CLARIFY", mode="standard"),
+            terminal_candidate=admin_terminal(),
+        )
+
+
+def test_deterministic_bypass_terminal_mismatch_rejected() -> None:
+    with pytest.raises(ValidationError):
+        DeterministicBypassRouteAuthority(
+            route_mode=RouteModePair(route="ANSWER", mode="contacts"),
+            terminal_candidate=admin_terminal(),
+        )
+
+
+def test_whitespace_padded_promo_candidate_id_rejected() -> None:
+    with pytest.raises(ValidationError):
+        make_plan(promo_candidate_ids=(" promo_spring",))
 
 
 def test_duplicate_requested_ids_rejected() -> None:
@@ -315,7 +400,6 @@ def test_answer_without_composer_rejected() -> None:
 
 def test_clarify_without_composer_rejected() -> None:
     plan = make_plan(
-        route_mode=route_mode("CLARIFY", "standard"),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -331,9 +415,7 @@ def test_clarify_without_composer_rejected() -> None:
 
 def test_code_owned_contacts_without_composer_success() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ANSWER", "contacts"),
-        terminal_candidate=contacts_terminal(),
+        route_authority=deterministic_route_authority(),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -349,9 +431,7 @@ def test_code_owned_contacts_without_composer_success() -> None:
 
 def test_contacts_with_composer_rejected() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ANSWER", "contacts"),
-        terminal_candidate=contacts_terminal(),
+        route_authority=deterministic_route_authority(),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -368,9 +448,11 @@ def test_code_owned_admin_without_authority_rejected() -> None:
 
 def test_code_owned_admin_success() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ADMIN", "standard"),
-        terminal_candidate=admin_terminal(),
+        route_authority=deterministic_route_authority(
+            route="ADMIN",
+            mode="standard",
+            terminal=admin_terminal(),
+        ),
         price_plan=PricePlan(kind="none"),
         textual_cta_candidate=None,
         service_value_candidate=None,
@@ -449,9 +531,9 @@ def test_client_source_mismatch_on_service_value() -> None:
 
 def test_client_source_mismatch_on_terminal_candidate() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ANSWER", "contacts"),
-        terminal_candidate=contacts_terminal(client_id="nikadent"),
+        route_authority=deterministic_route_authority(
+            terminal=contacts_terminal(client_id="nikadent"),
+        ),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,

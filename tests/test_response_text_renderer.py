@@ -7,9 +7,9 @@ from tests.test_response_plan_contract import (
     admin_terminal,
     compose,
     contacts_terminal,
+    deterministic_route_authority,
     make_plan,
     price_single,
-    route_mode,
 )
 
 
@@ -93,9 +93,6 @@ def test_foreign_amount_in_patient_text_preserved() -> None:
 
 def test_admin_uses_terminal_text_not_patient_text() -> None:
     plan = make_plan(
-        execution_kind="composer",
-        route_mode=route_mode("ADMIN", "standard"),
-        terminal_candidate=admin_terminal(),
         price_plan=PricePlan(kind="none"),
         textual_cta_candidate=None,
         service_value_candidate=None,
@@ -112,9 +109,9 @@ def test_admin_uses_terminal_text_not_patient_text() -> None:
 
 def test_contacts_uses_terminal_text() -> None:
     plan = make_plan(
-        execution_kind="code_owned_terminal",
-        route_mode=route_mode("ANSWER", "contacts"),
-        terminal_candidate=contacts_terminal(text="Контакты demo"),
+        route_authority=deterministic_route_authority(
+            terminal=contacts_terminal(text="Контакты demo"),
+        ),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,
@@ -129,7 +126,6 @@ def test_contacts_uses_terminal_text() -> None:
 
 def test_clarify_uses_patient_text_only() -> None:
     plan = make_plan(
-        route_mode=route_mode("CLARIFY", "standard"),
         price_plan=PricePlan(kind="none"),
         response_scope="clinic",
         selected_service_id=None,

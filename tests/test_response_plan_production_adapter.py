@@ -12,10 +12,11 @@ from contracts.response_plan import (
     SessionKey,
 )
 from contracts.response_plan_adapter import (
+    ResponsePlanAdapterComposerRouteAuthority,
     ResponsePlanAdapterConditionAuthority,
+    ResponsePlanAdapterDeterministicRouteAuthority,
     ResponsePlanAdapterError,
     ResponsePlanAdapterMaterialAuthority,
-    ResponsePlanAdapterRouteAuthority,
     ResponsePlanAdapterSessionState,
     ResponsePlanAdapterSources,
     ResponsePlanAdapterTerminalAuthority,
@@ -24,6 +25,7 @@ from contracts.response_plan_adapter import (
     ResponsePlanAdapterUiWidgetAuthority,
     StrictTargetComposerEnvelope,
 )
+from contracts.response_plan import DeterministicBypassRouteAuthority, ComposerSelectedRouteAuthority
 from contracts.response_schema import TargetCommercialFact, TargetOffer
 from contracts.target_response_spec import TargetResponseSpec
 from core.response_plan_production_adapter import (
@@ -243,6 +245,14 @@ def _material_authority(
     )
 
 
+def _terminal_authorities() -> tuple[ResponsePlanAdapterTerminalAuthority, ...]:
+    return (
+        _contacts_terminal(),
+        _admin_terminal("standard"),
+        _admin_terminal("medical_terminal"),
+    )
+
+
 def _sources(**overrides: object) -> ResponsePlanAdapterSources:
     spec = _spec()
     materials = _materials(
@@ -276,7 +286,8 @@ def _sources(**overrides: object) -> ResponsePlanAdapterSources:
         "turn_frame": _turn_frame(service_id="all_on_4"),
         "material_authority": _material_authority(bound_package=bound),
         "allowed_topic_ids": tuple(sorted(ALLOWED_TOPICS)),
-        "route_authority": ResponsePlanAdapterRouteAuthority(route="ANSWER", mode="standard"),
+        "route_authority": ResponsePlanAdapterComposerRouteAuthority(),
+        "terminal_authorities": _terminal_authorities(),
     }
     payload.update(overrides)
     return ResponsePlanAdapterSources(**payload)
@@ -289,7 +300,11 @@ def _terminal_base_sources(**overrides: object) -> ResponsePlanAdapterSources:
         "turn_frame": _turn_frame(service_id=None, topic=None),
         "material_authority": None,
         "allowed_topic_ids": tuple(sorted(ALLOWED_TOPICS)),
-        "route_authority": ResponsePlanAdapterRouteAuthority(route="ANSWER", mode="contacts"),
+        "route_authority": ResponsePlanAdapterDeterministicRouteAuthority(
+            route="ANSWER",
+            mode="contacts",
+        ),
+        "terminal_authorities": (_contacts_terminal(),),
     }
     payload.update(overrides)
     return ResponsePlanAdapterSources(**payload)
@@ -323,17 +338,17 @@ def _run_flow(
     envelope: StrictTargetComposerEnvelope | None = None,
 ) -> tuple[object, object, object, str, object]:
     plan = build_pre_composer_plan(sources)
-    if plan.execution_kind == "composer":
+    if isinstance(plan.route_authority, DeterministicBypassRouteAuthority):
+        composer = None
+        env = envelope
+    else:
         env = envelope or StrictTargetComposerEnvelope(
-            route=plan.route_mode.route,
-            mode=plan.route_mode.mode,
+            route="ANSWER",
+            mode="standard",
             patient_text="Ответ пациенту",
             price_text="120 000 ₽ за одну челюсть" if plan.price_plan.kind != "none" else None,
         )
         composer = adapt_composer_envelope(plan, env)
-    else:
-        composer = None
-        env = envelope
     resolved = resolve_response_plan(plan, composer)
     text = render_response_text(resolved)
     ui = project_response_ui(resolved)
@@ -747,12 +762,15 @@ def test_quick_reply_dedup_preserves_first_owner() -> None:
     [
         {"condition_authority": ResponsePlanAdapterConditionAuthority(source_client_id="other", required_conditions=())},
         {
-            "terminal_authority": ResponsePlanAdapterTerminalAuthority(
-                source_client_id="other",
-                route="ADMIN",
-                mode="standard",
-                authority="governed_ui",
-                display_text="ADMIN",
+            "terminal_authorities": (
+                ResponsePlanAdapterTerminalAuthority(
+                    source_client_id="other",
+                    route="ADMIN",
+                    mode="standard",
+                    authority="governed_ui",
+                    display_text="ADMIN",
+                ),
+                *_terminal_authorities()[1:],
             )
         },
         {"textual_cta_authority": ResponsePlanAdapterTextualCtaAuthority(source_client_id="other", text="CTA")},
@@ -774,7 +792,11 @@ def test_admin_without_terminal_fail_closed() -> None:
     with pytest.raises(ResponsePlanAdapterError) as exc:
         build_pre_composer_plan(
             _terminal_base_sources(
-                route_authority=ResponsePlanAdapterRouteAuthority(route="ADMIN", mode="standard"),
+                route_authority=ResponsePlanAdapterDeterministicRouteAuthority(
+                    route="ADMIN",
+                    mode="standard",
+                ),
+                terminal_authorities=(),
             )
         )
     assert exc.value.code == "adapter_terminal_authority_invalid"
@@ -791,34 +813,15 @@ def test_terminal_with_material_forbidden() -> None:
     with pytest.raises(ResponsePlanAdapterError) as exc:
         build_pre_composer_plan(
             _terminal_base_sources(
-                route_authority=ResponsePlanAdapterRouteAuthority(route="ANSWER", mode="contacts"),
-                terminal_authority=_contacts_terminal(),
                 material_authority=_material_authority(bound_package=bound),
             )
         )
     assert exc.value.code == "adapter_material_authority_forbidden"
 
 
-def test_clarify_with_material_forbidden() -> None:
-    bound = _bound_package(spec=_spec(), materials=_materials())
+def test_composer_path_requires_terminal_authorities() -> None:
     with pytest.raises(ResponsePlanAdapterError) as exc:
-        build_pre_composer_plan(
-            _terminal_base_sources(
-                route_authority=ResponsePlanAdapterRouteAuthority(route="CLARIFY", mode="standard"),
-                material_authority=_material_authority(bound_package=bound),
-            )
-        )
-    assert exc.value.code == "adapter_material_authority_forbidden"
-
-
-def test_clarify_forbids_terminal_authority() -> None:
-    with pytest.raises(ResponsePlanAdapterError) as exc:
-        build_pre_composer_plan(
-            _terminal_base_sources(
-                route_authority=ResponsePlanAdapterRouteAuthority(route="CLARIFY", mode="standard"),
-                terminal_authority=_admin_terminal(),
-            )
-        )
+        build_pre_composer_plan(_sources(terminal_authorities=()))
     assert exc.value.code == "adapter_terminal_authority_invalid"
 
 
@@ -840,14 +843,19 @@ def test_route_mode_end_to_end_matrix(
 ) -> None:
     terminal = terminal_factory() if terminal_factory else None
     if route == "ANSWER" and mode == "standard":
+        sources = _sources()
+    elif route == "CLARIFY":
+        spec = _spec(service_id=None, allowed_topics=("clinic",), required_components=("content",))
+        materials = _materials()
+        bound = _bound_package(spec=spec, materials=materials)
         sources = _sources(
-            route_authority=ResponsePlanAdapterRouteAuthority(route=route, mode=mode),
-            terminal_authority=terminal,
+            turn_frame=_turn_frame(service_id=None, topic=None),
+            material_authority=_material_authority(bound_package=bound),
         )
     else:
         sources = _terminal_base_sources(
-            route_authority=ResponsePlanAdapterRouteAuthority(route=route, mode=mode),
-            terminal_authority=terminal,
+            route_authority=ResponsePlanAdapterDeterministicRouteAuthority(route=route, mode=mode),
+            terminal_authorities=(terminal,) if terminal else (),
         )
     plan = build_pre_composer_plan(sources)
     composer = None
@@ -1033,13 +1041,9 @@ def test_real_fullcontext_doctors_package_clinic_flow() -> None:
 
 
 def test_contacts_terminal_without_package_end_to_end() -> None:
-    plan, composer, resolved, text, ui = _run_flow(
-        _terminal_base_sources(
-            route_authority=ResponsePlanAdapterRouteAuthority(route="ANSWER", mode="contacts"),
-            terminal_authority=_contacts_terminal(),
-        )
-    )
+    plan, composer, resolved, text, ui = _run_flow(_terminal_base_sources())
     assert composer is None
+    assert isinstance(plan.route_authority, DeterministicBypassRouteAuthority)
     assert plan.price_plan.kind == "none"
     assert plan.commercial_facts == ()
     assert resolved.terminal_text == "Контакты demo"
@@ -1050,11 +1054,15 @@ def test_contacts_terminal_without_package_end_to_end() -> None:
 def test_admin_terminal_without_package_end_to_end() -> None:
     plan, composer, resolved, text, _ = _run_flow(
         _terminal_base_sources(
-            route_authority=ResponsePlanAdapterRouteAuthority(route="ADMIN", mode="standard"),
-            terminal_authority=_admin_terminal("standard"),
+            route_authority=ResponsePlanAdapterDeterministicRouteAuthority(
+                route="ADMIN",
+                mode="standard",
+            ),
+            terminal_authorities=(_admin_terminal("standard"),),
         )
     )
     assert composer is None
+    assert isinstance(plan.route_authority, DeterministicBypassRouteAuthority)
     assert plan.commercial_facts == ()
     assert resolved.terminal_text == "ADMIN standard"
     assert resolved.finalized_commercial_ids.price_offer_ids == ()
@@ -1062,16 +1070,21 @@ def test_admin_terminal_without_package_end_to_end() -> None:
 
 
 def test_clarify_without_package_end_to_end() -> None:
+    spec = _spec(service_id=None, allowed_topics=("clinic",), required_components=("content",))
+    materials = _materials()
+    bound = _bound_package(spec=spec, materials=materials)
     plan, composer, resolved, text, _ = _run_flow(
-        _terminal_base_sources(
-            route_authority=ResponsePlanAdapterRouteAuthority(route="CLARIFY", mode="standard"),
+        _sources(
+            turn_frame=_turn_frame(service_id=None, topic=None),
+            material_authority=_material_authority(bound_package=bound),
         ),
         envelope=StrictTargetComposerEnvelope(route="CLARIFY", mode="standard", patient_text="Уточните вопрос."),
     )
     assert composer is not None
-    assert plan.commercial_facts == ()
+    assert isinstance(plan.route_authority, ComposerSelectedRouteAuthority)
     assert plan.price_plan.kind == "none"
     assert resolved.route == "CLARIFY"
     assert resolved.session_delta.clarify_pending is True
     assert resolved.finalized_commercial_ids.price_offer_ids == ()
+    assert resolved.finalized_commercial_ids.promo_fact_ids == ()
     assert text == "Уточните вопрос."

@@ -1,7 +1,7 @@
 # Response Contract — one-call architecture
 
-**Status:** owner-approved target contract (CHECKPOINT 2 — RESPONSE-CONTRACT-1)  
-**Baseline:** `1cf8bbd200bddf5732b5723d25dc34fcc1545ac0`  
+**Status:** owner-approved target contract (CHECKPOINT 2 — RESPONSE-CONTRACT-1)
+**Baseline:** `1cf8bbd200bddf5732b5723d25dc34fcc1545ac0`
 **Scope:** target one-call path; does not require immediate runtime cutover.
 
 ---
@@ -62,7 +62,7 @@ After `TextRenderer`, no code may append or change: price, warranty, installment
 Required fields/groups:
 
 - `client_id`
-- route/mode constraints
+- **route authority** (constraints, not preselected semantic route on free-text turns)
 - session/history context (continuation only, not fact authority)
 - active service / topic
 - selected `service_id`
@@ -79,6 +79,19 @@ Required fields/groups:
 - values forbidden inside model `patient_text`
 - intended block order
 - context strategy metadata (FC vs Hybrid) — **no separate renderer**
+
+### 3.1 Route authority (ROUTE-AUTHORITY-1)
+
+On ordinary free-text turns, `PreComposerPlan` carries **route constraints**, not a preselected semantic route:
+
+| kind | when | Composer |
+|---|---|---|
+| `composer_selected` | patient free-text | required once; may return any of five closed pairs |
+| `deterministic_bypass` | structured UI/non-language event | forbidden (`ComposerResult=None`) |
+
+Closed Composer-selected pairs: `ANSWER+standard`, `ANSWER+contacts`, `ADMIN+standard`, `ADMIN+medical_terminal`, `CLARIFY+standard`.
+
+`scope` (service/topic/clinic) is independent from `route`. Code must not choose route from patient text, keywords, regex, service detection, or `last_service_id`.
 
 No semantic regex classification of Russian text before Composer.
 
@@ -405,58 +418,58 @@ Missing replay field → `not_captured`. Do not reconstruct provenance from visi
 
 ### 1. Single price
 
-**Пациент:** «Сколько стоит имплант Implantium?»  
-**Composer:** `route=ANSWER`, `price_text` (if exact match) or empty, `requested_fact_ids=[]`  
-**Resolved roles:** one `exact_price` block; optional promo/amplifiers within caps  
-**Visible:** canonical price + conditions → patient_text → optional commercial blocks → CTA  
+**Пациент:** «Сколько стоит имплант Implantium?»
+**Composer:** `route=ANSWER`, `price_text` (if exact match) or empty, `requested_fact_ids=[]`
+**Resolved roles:** one `exact_price` block; optional promo/amplifiers within caps
+**Visible:** canonical price + conditions → patient_text → optional commercial blocks → CTA
 **Запрещено:** second price block; warranty without request
 
 ### 2. Multi price
 
-**Пациент:** «Какие варианты имплантации по цене?»  
-**Composer:** `price_text` ignored for multi  
-**Resolved:** canonical multi from code  
-**Visible:** multi block → patient_text → promo/amplifiers (no service_value)  
+**Пациент:** «Какие варианты имплантации по цене?»
+**Composer:** `price_text` ignored for multi
+**Resolved:** canonical multi from code
+**Visible:** multi block → patient_text → promo/amplifiers (no service_value)
 **Запрещено:** model multi-price prose as authority
 
 ### 3. Direct installment question
 
-**Пациент:** «Есть рассрочка?»  
-**Composer:** `requested_fact_ids=["installment_12"]`  
-**Resolved:** `installment_12` → `requested_fact` only  
-**Visible:** patient_text + requested fact paragraph  
+**Пациент:** «Есть рассрочка?»
+**Composer:** `requested_fact_ids=["installment_12"]`
+**Resolved:** `installment_12` → `requested_fact` only
+**Visible:** patient_text + requested fact paragraph
 **Запрещено:** same fact again as automatic amplifier; cap consumption
 
 ### 4. Explicit warranty question
 
-**Пациент:** «Какая гарантия на импланты?»  
-**Composer:** `requested_fact_ids=["implant_warranty"]`  
-**Resolved:** `requested_fact` once  
-**Visible:** patient_text + warranty text once  
+**Пациент:** «Какая гарантия на импланты?»
+**Composer:** `requested_fact_ids=["implant_warranty"]`
+**Resolved:** `requested_fact` once
+**Visible:** patient_text + warranty text once
 **Запрещено:** automatic warranty; promo duplicate
 
 ### 5. Ordinary implant question (no warranty)
 
-**Пациент:** «Расскажите про имплантацию»  
-**Composer:** `requested_fact_ids=[]`  
-**Resolved:** no warranty role  
-**Visible:** patient_text + optional promo/amplifiers only  
+**Пациент:** «Расскажите про имплантацию»
+**Composer:** `requested_fact_ids=[]`
+**Resolved:** no warranty role
+**Visible:** patient_text + optional promo/amplifiers only
 **Запрещено:** `implant_warranty` in any automatic role
 
 ### 6. Promotion optional failure
 
-**Пациент:** «Есть акции на имплантацию?»  
-**Composer:** valid `patient_text`, promotion intent  
-**Resolved:** promo selection fails optionally  
-**Visible:** patient_text preserved; broken promo skipped  
+**Пациент:** «Есть акции на имплантацию?»
+**Composer:** valid `patient_text`, promotion intent
+**Resolved:** promo selection fails optionally
+**Visible:** patient_text preserved; broken promo skipped
 **Запрещено:** fail-closed replacement of entire answer
 
 ### 7. ADMIN / current medical problem
 
-**Пациент:** «После имплантации стало хуже»  
-**Composer:** `route=ADMIN`, `patient_text=null`  
-**Resolved:** static admin plan; no commercial blocks  
-**Visible:** deterministic admin text + clinic phone only  
+**Пациент:** «После имплантации стало хуже»
+**Composer:** `route=ADMIN`, `patient_text=null`
+**Resolved:** static admin plan; no commercial blocks
+**Visible:** deterministic admin text + clinic phone only
 **Запрещено:** promo, amplifiers, service value, selling CTA, model prose
 
 ---

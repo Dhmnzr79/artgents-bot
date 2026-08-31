@@ -13,6 +13,7 @@ CaptureProvenance = Literal[
     "derived_from_captured_structure",
     "frozen_baseline_lookup",
     "not_captured",
+    "target_contract_constant",
 ]
 ReplayFidelity = Literal["full", "partial", "not_replayable"]
 ReplayDeltaClass = Literal[
@@ -31,6 +32,8 @@ ExpectedContractChangeReason = Literal[
     "automatic_warranty_suppressed",
     "combined_multi_price_block",
 ]
+
+REPLAY_ARTIFACT_NEWLINE = "\r\n"
 
 EXPECTED_STRUCTURED_TURNS_SHA256 = (
     "98D5F672F2B54B64A3A4624BE06853D2419A3C85E7A8E9B32959557248327357"
@@ -100,6 +103,7 @@ class TargetInputSummary(ReplayModel):
     response_scope: str | None = None
     selected_service_id: str | None = None
     execution_kind: str | None = None
+    route_authority_kind: str | None = None
     route: str | None = None
     mode: str | None = None
     requested_fact_ids: tuple[str, ...] = ()

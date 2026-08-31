@@ -15,8 +15,11 @@ from typing import Any
 from pydantic import ValidationError
 
 from contracts.response_plan import (
+    CanonicalContactCandidate,
+    CodeOwnedTerminalCandidate,
     CommercialFactCandidate,
     ComposerResult,
+    ComposerSelectedRouteAuthority,
     FinalizedCommercialIds,
     PreComposerPlan,
     PricePlan,
@@ -29,6 +32,7 @@ from contracts.response_plan import (
     UiQuickReplyCandidate,
     UiVideoCandidate,
     UiWidgetCandidate,
+    all_allowed_route_mode_pairs,
 )
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
@@ -45,6 +49,7 @@ from evals.v5.response_plan_replay_contract import (
     ExpectedContractChangeReason,
     LegacySourceMetadata,
     ReplayComparison,
+    REPLAY_ARTIFACT_NEWLINE,
     ReplayManifest,
     ReplayMetrics,
     ReplayRecordResult,
@@ -64,8 +69,14 @@ DEFAULT_FACTS_SUBPATH = Path("clients/demo/target_response/pricebook/facts.json"
 FACT_PREFIX = "fact:"
 PRICE_INTENT_VALUE = "price"
 VALID_MATERIALIZED_PROVENANCE = frozenset(
-    {"captured_exact", "derived_from_captured_structure", "frozen_baseline_lookup"}
+    {
+        "captured_exact",
+        "derived_from_captured_structure",
+        "frozen_baseline_lookup",
+        "target_contract_constant",
+    }
 )
+TARGET_CONTRACT_CONSTANT_KEYS = frozenset({"route_authority_kind"})
 _PROVIDER_NETWORK_CALLS = 0
 
 
@@ -637,6 +648,9 @@ def audit_materialized_provenance_key(
     if value not in VALID_MATERIALIZED_PROVENANCE:
         findings.append(f"invalid_provenance:{key}")
         return
+    if value == "target_contract_constant" and key not in TARGET_CONTRACT_CONSTANT_KEYS:
+        findings.append(f"invalid_provenance:{key}")
+        return
     if value == "captured_exact" and key.endswith(":display_text") and key.startswith("fact:"):
         findings.append(f"frozen_lookup_marked_captured:{key}")
 
@@ -645,7 +659,7 @@ RESOLVED_REQUIRED_PROVENANCE_KEYS: tuple[str, ...] = (
     "client_id",
     "session_key.sid",
     "context_strategy",
-    "execution_kind",
+    "route_authority_kind",
     "route",
     "mode",
     "response_scope",
@@ -762,6 +776,130 @@ def collect_legacy_direct_fact_ids(envelope: dict[str, Any] | None) -> tuple[str
     return tuple(str(item) for item in direct if str(item).strip())
 
 
+def build_replay_route_authority(client_id: str) -> ComposerSelectedRouteAuthority:
+    contact = CanonicalContactCandidate(source_client_id=client_id, phone="+7 (000) 000-00-00")
+    return ComposerSelectedRouteAuthority(
+        allowed_route_modes=all_allowed_route_mode_pairs(),
+        terminal_candidates=(
+            CodeOwnedTerminalCandidate(
+                source_client_id=client_id,
+                route="ANSWER",
+                mode="contacts",
+                authority="contacts",
+                display_text="Контакты",
+                canonical_contact=contact,
+            ),
+            CodeOwnedTerminalCandidate(
+                source_client_id=client_id,
+                route="ADMIN",
+                mode="standard",
+                authority="governed_ui",
+                display_text="ADMIN",
+                canonical_contact=contact,
+            ),
+            CodeOwnedTerminalCandidate(
+                source_client_id=client_id,
+                route="ADMIN",
+                mode="medical_terminal",
+                authority="deterministic_policy_terminal",
+                display_text="MEDICAL",
+                canonical_contact=contact,
+            ),
+        ),
+    )
+
+
+def resolve_captured_composer_route(
+    envelope: dict[str, Any],
+    *,
+    capture_gaps: list[str],
+    field_provenance: dict[str, str],
+) -> tuple[str, str] | None:
+    route = envelope.get("route")
+    mode = envelope.get("mode")
+    route_valid = False
+    mode_valid = False
+
+    if route is None:
+        capture_gaps.append("composer_route_not_captured")
+        field_provenance["route"] = "not_captured"
+    elif not isinstance(route, str) or route != route.strip() or not route:
+        capture_gaps.append("composer_route_mode_invalid")
+        field_provenance["route"] = "not_captured"
+    else:
+        route_valid = True
+        field_provenance["route"] = "captured_exact"
+
+    if mode is None:
+        capture_gaps.append("composer_mode_not_captured")
+        field_provenance["mode"] = "not_captured"
+    elif not isinstance(mode, str) or mode != mode.strip() or not mode:
+        capture_gaps.append("composer_route_mode_invalid")
+        field_provenance["mode"] = "not_captured"
+    else:
+        mode_valid = True
+        field_provenance["mode"] = "captured_exact"
+
+    if not route_valid or not mode_valid:
+        return None
+
+    try:
+        RouteModePair(route=route, mode=mode)
+    except ValidationError:
+        capture_gaps.append("composer_route_mode_invalid")
+        field_provenance["route"] = "not_captured"
+        field_provenance["mode"] = "not_captured"
+        return None
+
+    return route, mode
+
+
+def validate_captured_patient_text_for_route_mode(
+    *,
+    route: str,
+    mode: str,
+    patient_text: object,
+    capture_gaps: list[str],
+    field_provenance: dict[str, str],
+) -> bool:
+    if (route, mode) not in {("ANSWER", "standard"), ("CLARIFY", "standard")}:
+        return True
+    if not isinstance(patient_text, str) or not patient_text:
+        capture_gaps.append("composer_patient_text_not_captured")
+        field_provenance["patient_text"] = "not_captured"
+        return False
+    field_provenance["patient_text"] = "captured_exact"
+    return True
+
+
+def _build_replay_composer_result(
+    *,
+    route: str,
+    mode: str,
+    patient_text: str | None,
+    price_text: str | None,
+    requested_fact_ids: tuple[str, ...],
+) -> ComposerResult:
+    pair = (route, mode)
+    if pair == ("ANSWER", "standard"):
+        return ComposerResult(
+            route=route,
+            mode=mode,
+            patient_text=patient_text,
+            price_text=price_text,
+            requested_fact_ids=requested_fact_ids,
+        )
+    if pair == ("ANSWER", "contacts"):
+        return ComposerResult(route=route, mode=mode, patient_text=None)
+    if pair == ("ADMIN", "standard"):
+        return ComposerResult(route=route, mode=mode, patient_text=None)
+    if pair == ("ADMIN", "medical_terminal"):
+        return ComposerResult(route=route, mode=mode, patient_text=None)
+    if pair == ("CLARIFY", "standard"):
+        return ComposerResult(route=route, mode=mode, patient_text=patient_text)
+    raise ReplayFatalHarnessError("fatal_replay_error", f"unknown_route_mode_pair:{route}+{mode}")
+
+
 def classify_not_replayable(
     structured: dict[str, Any],
     *,
@@ -772,7 +910,7 @@ def classify_not_replayable(
     if route in {"ADMIN", "LOCAL"} or not structured.get("provider_turn"):
         capture_gaps.append("terminal_mode_not_captured")
         field_provenance["terminal_mode"] = "not_captured"
-        field_provenance["execution_kind"] = "not_captured"
+        field_provenance["route_authority_kind"] = "not_captured"
         return "terminal_mode_not_captured"
     return None
 
@@ -909,7 +1047,6 @@ def build_replay_record(
     field_provenance["requested_fact_ids"] = "not_captured"
 
     patient_text = structured.get("patient_text")
-    field_provenance["patient_text"] = "captured_exact" if patient_text else "not_captured"
     price_text = envelope.get("price_text")
     field_provenance["composer.price_text"] = "captured_exact" if price_text else "not_captured"
 
@@ -980,9 +1117,7 @@ def build_replay_record(
                 context_strategy=context_strategy,
                 response_scope="service",
                 selected_service_id=selected_service_id,
-                execution_kind="composer",
-                route="ANSWER",
-                mode="standard",
+                route_authority_kind="composer_selected",
             ),
         )
 
@@ -1008,18 +1143,42 @@ def build_replay_record(
 
     transport_kind = "streaming" if (raw_row.get("outbound_payload") or {}).get("stream") else "blocking"
     field_provenance["transport_kind"] = "captured_exact"
+    captured_route_mode = resolve_captured_composer_route(
+        envelope,
+        capture_gaps=capture_gaps,
+        field_provenance=field_provenance,
+    )
+    if captured_route_mode is None:
+        if legacy_direct_ids and "legacy_direct_fact_explicitness_not_captured" not in capture_gaps:
+            capture_gaps.append("legacy_direct_fact_explicitness_not_captured")
+        return _not_replayable_result(
+            key, source_hashes, structured, legacy, capture_gaps, field_provenance, legacy.visible_answer
+        )
+
+    composer_route, composer_mode = captured_route_mode
+    if not validate_captured_patient_text_for_route_mode(
+        route=composer_route,
+        mode=composer_mode,
+        patient_text=patient_text,
+        capture_gaps=capture_gaps,
+        field_provenance=field_provenance,
+    ):
+        if legacy_direct_ids and "legacy_direct_fact_explicitness_not_captured" not in capture_gaps:
+            capture_gaps.append("legacy_direct_fact_explicitness_not_captured")
+        return _not_replayable_result(
+            key, source_hashes, structured, legacy, capture_gaps, field_provenance, legacy.visible_answer
+        )
+
+    field_provenance["route_authority_kind"] = "target_contract_constant"
     field_provenance["response_scope"] = "derived_from_captured_structure"
-    field_provenance["execution_kind"] = "derived_from_captured_structure"
-    field_provenance["route"] = "derived_from_captured_structure"
-    field_provenance["mode"] = "derived_from_captured_structure"
 
     target_input = TargetInputSummary(
         context_strategy=context_strategy,
         response_scope="service",
         selected_service_id=selected_service_id,
-        execution_kind="composer",
-        route="ANSWER",
-        mode="standard",
+        route_authority_kind="composer_selected",
+        route=composer_route,
+        mode=composer_mode,
         requested_fact_ids=requested_fact_ids,
         promo_candidate_ids=tuple(promo_ids),
         amplifier_candidate_ids=tuple(amplifier_ids),
@@ -1028,8 +1187,7 @@ def build_replay_record(
     precomposer = PreComposerPlan(
         session_key=SessionKey(client_id=client_id, sid=structured["session_id"]),
         context_strategy=context_strategy,
-        execution_kind="composer",
-        route_mode=RouteModePair(route="ANSWER", mode="standard"),
+        route_authority=build_replay_route_authority(client_id),
         response_scope="service",
         selected_service_id=selected_service_id,
         price_plan=price_plan,
@@ -1063,9 +1221,9 @@ def build_replay_record(
             if finding.startswith("client_isolation"):
                 contract_violations.append(finding)
 
-    composer = ComposerResult(
-        route="ANSWER",
-        mode="standard",
+    composer = _build_replay_composer_result(
+        route=composer_route,
+        mode=composer_mode,
         patient_text=structured.get("patient_text"),
         price_text=envelope.get("price_text"),
         requested_fact_ids=requested_fact_ids,
@@ -1541,6 +1699,20 @@ def serialize_result_json(result: ReplayResult) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
+def serialize_artifact_bytes(text: str) -> bytes:
+    logical = text.replace("\r\n", "\n").replace("\r", "\n")
+    return logical.replace("\n", REPLAY_ARTIFACT_NEWLINE).encode("utf-8")
+
+
+def serialize_result_bytes(result: ReplayResult) -> bytes:
+    return serialize_artifact_bytes(serialize_result_json(result))
+
+
+def write_artifact_bytes(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(serialize_artifact_bytes(text))
+
+
 def write_replay_outputs(
     result: ReplayResult,
     *,
@@ -1567,11 +1739,11 @@ def write_replay_outputs(
         ),
         head_sha=head_sha,
     )
-    (output_dir / "manifest.json").write_text(
+    write_artifact_bytes(
+        output_dir / "manifest.json",
         json.dumps(json.loads(manifest.model_dump_json()), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
-    (output_dir / "result.json").write_text(serialize_result_json(result), encoding="utf-8")
+    write_artifact_bytes(output_dir / "result.json", serialize_result_json(result))
 
 
 def render_markdown_report(result: ReplayResult, report_path: Path) -> None:
@@ -1620,8 +1792,7 @@ def render_markdown_report(result: ReplayResult, report_path: Path) -> None:
             f"| {record.source_key.scenario_id} | {record.source_key.turn_id} | {record.source_key.config_id} | "
             f"{record.capture_fidelity} | {deltas} | {gaps} | {target} |"
         )
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_artifact_bytes(report_path, "\n".join(lines) + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:

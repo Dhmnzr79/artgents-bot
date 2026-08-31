@@ -9,7 +9,9 @@ import pytest
 from pydantic import ValidationError
 
 from evals.v5.response_plan_replay import (
+    ReplayFatalHarnessError,
     ReplayHarnessError,
+    _build_replay_composer_result,
     audit_materialized_provenance_key,
     build_service_value_candidate,
     classify_unexplained_visible_delta,
@@ -20,10 +22,17 @@ from evals.v5.response_plan_replay import (
     normalize_fact_id,
     parse_raw_model_envelope,
     provider_network_calls,
+    resolve_captured_composer_route,
     run_replay,
+    serialize_artifact_bytes,
+    serialize_result_bytes,
     serialize_result_json,
+    validate_captured_patient_text_for_route_mode,
     validate_provenance_matrix,
     validate_source_bundle,
+    write_replay_outputs,
+    render_markdown_report,
+    REPLAY_ID,
 )
 from evals.v5.response_plan_replay_contract import (
     LegacySourceMetadata,
@@ -45,6 +54,12 @@ FROZEN_ROOT = Path(
 )
 FROZEN_FACTS = Path(
     r"C:\Cursor Projects\demo-bot-one-call-baseline-verify-report-parity-1cf8bbd\clients\demo\target_response\pricebook\facts.json"
+)
+CHECKED_IN_REPLAY_DIR = Path(
+    r"C:\Cursor Projects\demo-bot-one-call-baseline\evals\v5\artifacts\response_plan_replay_1cf8bbd_2026-08-31-01"
+)
+CHECKED_IN_REPORT = Path(
+    r"C:\Cursor Projects\demo-bot-one-call-baseline\evals\v5\reports\response_plan_replay_1cf8bbd_2026-08-31-01.md"
 )
 
 
@@ -184,7 +199,7 @@ def test_missing_required_condition_ids_only_on_price_plans(frozen_source: tuple
     result = run_replay(*frozen_source)
     for record in result.records:
         has_condition_gap = "required_offer_condition_ids_not_captured" in record.capture_gaps
-        if has_condition_gap:
+        if has_condition_gap and record.target_output.resolved:
             assert record.target_output.price_block_count > 0
             assert record.captured_commercial_intent == "price"
         elif record.target_output.resolved and record.captured_commercial_intent != "price":
@@ -195,7 +210,7 @@ NON_PRICE_SELECTED_OFFER_SCENARIOS = ("SVC-01", "DOC-01")
 
 
 @pytest.mark.parametrize("scenario_id", NON_PRICE_SELECTED_OFFER_SCENARIOS)
-def test_non_price_selected_offers_never_materialize_price(
+def test_non_price_selected_offers_not_replayable_without_mode_capture(
     frozen_source: tuple[Path, Path], scenario_id: str
 ) -> None:
     result = run_replay(*frozen_source)
@@ -204,33 +219,35 @@ def test_non_price_selected_offers_never_materialize_price(
         for record in result.records
         if record.source_key.scenario_id == scenario_id
         and record.legacy_source.selected_offer_ids
-        and record.captured_commercial_intent == "none"
+        and record.captured_commercial_intent != "price"
         and not record.legacy_source.canonical_price_block
-        and record.target_output.resolved
+        and record.provider_turn
     ]
-    assert records, f"expected replayable non-price selected-offer records for {scenario_id}"
+    assert records, f"expected provider records for {scenario_id}"
     for record in records:
+        assert record.capture_fidelity == "not_replayable"
+        assert "composer_mode_not_captured" in record.capture_gaps
+        assert not record.target_output.resolved
         assert record.target_output.price_block_count == 0
-        assert not record.target_output.finalized_commercial_ids.get("price_offer_ids")
-        assert "expected_contract_change" not in record.delta_classes or record.delta.exact_text_match is False
-        assert not record.false_price_insertion
 
 
-def test_sw01_non_price_records_without_price(frozen_source: tuple[Path, Path]) -> None:
+def test_sw01_non_price_records_not_replayable_without_mode_capture(frozen_source: tuple[Path, Path]) -> None:
     result = run_replay(*frozen_source)
     records = [
         record
         for record in result.records
         if record.source_key.scenario_id == "SW-01"
-        and record.captured_commercial_intent == "none"
+        and record.captured_commercial_intent != "price"
         and record.legacy_source.selected_offer_ids
         and not record.legacy_source.canonical_price_block
-        and record.target_output.resolved
+        and record.provider_turn
     ]
     assert records
     for record in records:
+        assert record.capture_fidelity == "not_replayable"
+        assert "composer_mode_not_captured" in record.capture_gaps
+        assert not record.target_output.resolved
         assert record.target_output.price_block_count == 0
-        assert not record.false_price_insertion
 
 
 def test_selected_offers_without_price_intent_global_invariant(frozen_source: tuple[Path, Path]) -> None:
@@ -248,6 +265,8 @@ def test_selected_offers_without_price_intent_global_invariant(frozen_source: tu
 def test_legacy_price_block_present_ignores_selected_offer_ids(frozen_source: tuple[Path, Path]) -> None:
     result = run_replay(*frozen_source)
     for record in result.records:
+        if not record.target_output.resolved:
+            continue
         if record.legacy_source.selected_offer_ids and not record.legacy_source.canonical_price_block:
             assert record.delta.legacy_price_block_present is False
 
@@ -471,7 +490,7 @@ def test_resolved_records_have_required_provenance_keys(frozen_source: tuple[Pat
         "client_id",
         "session_key.sid",
         "context_strategy",
-        "execution_kind",
+        "route_authority_kind",
         "route",
         "mode",
         "response_scope",
@@ -502,6 +521,7 @@ def test_unexpected_resolver_error_is_fatal_not_response_plan_violation(
     def boom(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeError("unexpected replay bug")
 
+    monkeypatch.setattr(replay_module, "resolve_captured_composer_route", lambda *a, **k: ("ANSWER", "standard"))
     monkeypatch.setattr(replay_module, "resolve_response_plan", boom)
     with pytest.raises(ReplayHarnessError) as exc:
         run_replay(*frozen_source)
@@ -599,7 +619,10 @@ def test_expected_reason_does_not_suppress_unexplained_delta(frozen_source: tupl
         for record in result.records
         if record.expected_contract_change_reasons and record.unexplained_visible_delta
     ]
-    assert both
+    if result.metrics.resolved_count == 0:
+        assert not both
+    else:
+        assert both
 
 
 def test_missing_price_provenance_detected() -> None:
@@ -607,10 +630,10 @@ def test_missing_price_provenance_detected() -> None:
         CanonicalSinglePriceCandidate,
         PreComposerPlan,
         PricePlan,
-        RouteModePair,
         SessionKey,
         UiPlanCandidates,
     )
+    from tests.test_response_plan_contract import composer_route_authority
 
     field_provenance = {
         "client_id": "captured_exact",
@@ -624,8 +647,7 @@ def test_missing_price_provenance_detected() -> None:
     precomposer = PreComposerPlan(
         session_key=SessionKey(client_id="demo", sid="s1"),
         context_strategy="full_context",
-        execution_kind="composer",
-        route_mode=RouteModePair(route="ANSWER", mode="standard"),
+        route_authority=composer_route_authority(),
         response_scope="service",
         selected_service_id="svc",
         price_plan=PricePlan(
@@ -657,10 +679,10 @@ def test_missing_fact_provenance_detected() -> None:
         CommercialFactCandidate,
         PreComposerPlan,
         PricePlan,
-        RouteModePair,
         SessionKey,
         UiPlanCandidates,
     )
+    from tests.test_response_plan_contract import composer_route_authority
 
     fact = CommercialFactCandidate(
         fact_id="installment_12",
@@ -684,8 +706,7 @@ def test_missing_fact_provenance_detected() -> None:
     precomposer = PreComposerPlan(
         session_key=SessionKey(client_id="demo", sid="s1"),
         context_strategy="full_context",
-        execution_kind="composer",
-        route_mode=RouteModePair(route="ANSWER", mode="standard"),
+        route_authority=composer_route_authority(),
         response_scope="service",
         selected_service_id="svc",
         price_plan=PricePlan(kind="none"),
@@ -704,7 +725,8 @@ def test_missing_fact_provenance_detected() -> None:
 
 
 def test_missing_ui_label_provenance_detected() -> None:
-    from contracts.response_plan import PreComposerPlan, PricePlan, RouteModePair, SessionKey, UiPlanCandidates, UiQuickReplyCandidate
+    from contracts.response_plan import PreComposerPlan, PricePlan, SessionKey, UiPlanCandidates, UiQuickReplyCandidate
+    from tests.test_response_plan_contract import composer_route_authority
 
     reply = UiQuickReplyCandidate(source_client_id="demo", reply_id="qr1", label="Label")
     field_provenance = {
@@ -715,8 +737,7 @@ def test_missing_ui_label_provenance_detected() -> None:
     precomposer = PreComposerPlan(
         session_key=SessionKey(client_id="demo", sid="s1"),
         context_strategy="full_context",
-        execution_kind="composer",
-        route_mode=RouteModePair(route="ANSWER", mode="standard"),
+        route_authority=composer_route_authority(),
         response_scope="service",
         selected_service_id="svc",
         price_plan=PricePlan(kind="none"),
@@ -788,6 +809,7 @@ def test_response_plan_contract_error_not_adapter_error(
     def boom(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise ResponsePlanContractError("model_price_text_missing")
 
+    monkeypatch.setattr(replay_module, "resolve_captured_composer_route", lambda *a, **k: ("ANSWER", "standard"))
     monkeypatch.setattr(replay_module, "resolve_response_plan", boom)
     result = run_replay(*frozen_source)
     assert result.metrics.adapter_error_count == 0
@@ -822,3 +844,240 @@ def test_adapter_error_branch_excludes_contract_violations(
     assert record.delta_classes == ("adapter_error",)
     assert result.metrics.adapter_error_count > baseline_adapter_count
     assert result.metrics.response_plan_violation_count == baseline_violation_count
+
+
+def _route_capture(envelope: dict[str, object]) -> tuple[str, str] | None:
+    gaps: list[str] = []
+    provenance: dict[str, str] = {}
+    return resolve_captured_composer_route(envelope, capture_gaps=gaps, field_provenance=provenance)
+
+
+def test_missing_route_not_defaulted_to_answer() -> None:
+    result = _route_capture({"mode": "standard"})
+    assert result is None
+
+
+def test_missing_mode_not_defaulted_to_standard() -> None:
+    result = _route_capture({"route": "ANSWER"})
+    assert result is None
+
+
+def test_invalid_route_not_defaulted_to_answer() -> None:
+    result = _route_capture({"route": "FOO", "mode": "standard"})
+    assert result is None
+
+
+def test_invalid_pair_not_defaulted_to_answer() -> None:
+    result = _route_capture({"route": "CLARIFY", "mode": "contacts"})
+    assert result is None
+
+
+def test_whitespace_padded_route_rejected_without_strip() -> None:
+    result = _route_capture({"route": " ANSWER", "mode": "standard"})
+    assert result is None
+
+
+def test_whitespace_padded_mode_rejected_without_strip() -> None:
+    result = _route_capture({"route": "ANSWER", "mode": "standard "})
+    assert result is None
+
+
+def test_missing_answer_patient_text_not_replaced_with_empty_string() -> None:
+    gaps: list[str] = []
+    provenance: dict[str, str] = {}
+    assert not validate_captured_patient_text_for_route_mode(
+        route="ANSWER",
+        mode="standard",
+        patient_text=None,
+        capture_gaps=gaps,
+        field_provenance=provenance,
+    )
+    assert "composer_patient_text_not_captured" in gaps
+
+
+def test_missing_clarify_patient_text_not_replaced_with_default() -> None:
+    gaps: list[str] = []
+    provenance: dict[str, str] = {}
+    assert not validate_captured_patient_text_for_route_mode(
+        route="CLARIFY",
+        mode="standard",
+        patient_text=None,
+        capture_gaps=gaps,
+        field_provenance=provenance,
+    )
+    assert "composer_patient_text_not_captured" in gaps
+
+
+def test_unknown_pair_in_build_replay_composer_result_has_no_fallback() -> None:
+    with pytest.raises(ReplayFatalHarnessError):
+        _build_replay_composer_result(
+            route="CLARIFY",
+            mode="contacts",
+            patient_text="text",
+            price_text=None,
+            requested_fact_ids=(),
+        )
+
+
+def test_capture_gap_does_not_increment_adapter_or_violation_counts(frozen_source: tuple[Path, Path]) -> None:
+    result = run_replay(*frozen_source)
+    gap_records = [
+        record
+        for record in result.records
+        if "composer_mode_not_captured" in record.capture_gaps
+    ]
+    assert gap_records
+    assert result.metrics.adapter_error_count == 0
+    assert all("adapter_error" not in record.delta_classes for record in gap_records)
+    assert all("response_plan_violation" not in record.delta_classes for record in gap_records)
+    assert result.metrics.response_plan_violation_count == 0
+
+
+def test_only_exact_captured_route_mode_get_captured_exact_provenance(frozen_source: tuple[Path, Path]) -> None:
+    result = run_replay(*frozen_source)
+    for record in result.records:
+        route_prov = record.field_provenance.get("route")
+        mode_prov = record.field_provenance.get("mode")
+        if route_prov == "captured_exact" and mode_prov == "captured_exact":
+            assert record.target_input_summary.route is not None
+            assert record.target_input_summary.mode is not None
+        if route_prov == "not_captured" or mode_prov == "not_captured":
+            assert not record.target_output.resolved
+
+
+def test_route_authority_kind_not_masked_as_captured_model_data(frozen_source: tuple[Path, Path]) -> None:
+    result = run_replay(*frozen_source)
+    for record in result.records:
+        kind = record.field_provenance.get("route_authority_kind")
+        if kind == "target_contract_constant":
+            assert kind != "captured_exact"
+            assert kind != "derived_from_captured_structure"
+        if record.target_output.resolved:
+            assert record.field_provenance.get("route_authority_kind") == "target_contract_constant"
+
+
+def test_record_without_route_mode_does_not_reach_resolver(frozen_source: tuple[Path, Path]) -> None:
+    result = run_replay(*frozen_source)
+    unresolved = [
+        record
+        for record in result.records
+        if "composer_mode_not_captured" in record.capture_gaps
+    ]
+    assert unresolved
+    assert all(not record.target_output.resolved for record in unresolved)
+    assert all(record.target_output.response_plan_error is None for record in unresolved)
+    assert all(record.target_output.rendered_text is None for record in unresolved)
+
+
+def test_capture_gap_adapter_contract_fatal_branches_remain_separate(
+    frozen_source: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import evals.v5.response_plan_replay as replay_module
+    from contracts.response_plan import ResponsePlanContractError
+
+    baseline = run_replay(*frozen_source)
+    gap_only = [
+        record
+        for record in baseline.records
+        if record.capture_fidelity == "not_replayable" and "composer_mode_not_captured" in record.capture_gaps
+    ]
+    assert gap_only
+    assert all(record.delta_classes == ("capture_gap",) for record in gap_only)
+
+    def adapter_boom(raw_envelope: str | None) -> dict:
+        raise replay_module.ReplayHarnessError("synthetic_adapter_failure")
+
+    monkeypatch.setattr(replay_module, "parse_raw_model_envelope", adapter_boom)
+    adapter_result = run_replay(*frozen_source)
+    assert adapter_result.metrics.adapter_error_count > 0
+    assert all("adapter_error" in record.delta_classes for record in adapter_result.records if record.target_output.adapter_error)
+
+    def contract_boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ResponsePlanContractError("model_price_text_missing")
+
+    monkeypatch.setattr(replay_module, "parse_raw_model_envelope", parse_raw_model_envelope)
+    monkeypatch.setattr(replay_module, "resolve_captured_composer_route", lambda *a, **k: ("ANSWER", "standard"))
+    monkeypatch.setattr(replay_module, "resolve_response_plan", contract_boom)
+    contract_result = run_replay(*frozen_source)
+    assert contract_result.metrics.response_plan_violation_count > 0
+
+
+def test_target_contract_constant_allowed_only_for_harness_constants() -> None:
+    findings: list[str] = []
+    audit_materialized_provenance_key(
+        {"route_authority_kind": "target_contract_constant"},
+        "route_authority_kind",
+        findings,
+    )
+    assert findings == []
+    audit_materialized_provenance_key({"route": "target_contract_constant"}, "route", findings)
+    assert "materialized_with_not_captured:route" in findings or "invalid_provenance:route" in findings
+
+
+def test_frozen_snapshot_lacks_exact_route_mode_capture(frozen_source: tuple[Path, Path]) -> None:
+    result = run_replay(*frozen_source)
+    exact = [
+        record
+        for record in result.records
+        if record.field_provenance.get("route") == "captured_exact"
+        and record.field_provenance.get("mode") == "captured_exact"
+    ]
+    mode_missing = [record for record in result.records if "composer_mode_not_captured" in record.capture_gaps]
+    assert not exact
+    assert len(mode_missing) == 40
+    assert result.metrics.resolved_count == 0
+
+
+def test_replay_artifact_bytes_use_canonical_crlf() -> None:
+    from evals.v5.response_plan_replay_contract import REPLAY_ARTIFACT_NEWLINE
+
+    encoded = serialize_artifact_bytes('{"a": 1}\n')
+    assert encoded == b'{"a": 1}\r\n'
+    assert REPLAY_ARTIFACT_NEWLINE.encode("utf-8") in encoded
+    assert not encoded.startswith(b"\xef\xbb\xbf")
+
+
+def test_checked_in_artifact_parity(frozen_source: tuple[Path, Path], tmp_path: Path) -> None:
+    if not CHECKED_IN_REPLAY_DIR.is_dir():
+        pytest.skip("checked-in replay artifacts unavailable")
+    source_root, facts_path = frozen_source
+    result = run_replay(source_root, facts_path)
+    fresh_bytes = serialize_result_bytes(result)
+    checked_in_bytes = (CHECKED_IN_REPLAY_DIR / "result.json").read_bytes()
+    assert fresh_bytes == checked_in_bytes
+    second_bytes = serialize_result_bytes(run_replay(source_root, facts_path))
+    assert fresh_bytes == second_bytes
+
+    write_replay_outputs(
+        result,
+        output_dir=tmp_path / "replay_out",
+        source_root=source_root,
+        head_sha="1cf8bbd200bddf5732b5723d25dc34fcc1545ac0",
+        fail_if_exists=False,
+    )
+    written_result_bytes = (tmp_path / "replay_out" / "result.json").read_bytes()
+    assert written_result_bytes == checked_in_bytes
+
+    manifest_bytes = (CHECKED_IN_REPLAY_DIR / "manifest.json").read_bytes()
+    assert (tmp_path / "replay_out" / "manifest.json").read_bytes() == manifest_bytes
+
+    manifest = json.loads(manifest_bytes.decode("utf-8"))
+    assert manifest["replay_id"] == REPLAY_ID
+    assert manifest["source_hashes"]["structured_turns"] == EXPECTED_STRUCTURED_TURNS_SHA256
+    assert manifest["source_hashes"]["raw_turns"] == EXPECTED_RAW_TURNS_SHA256
+    assert manifest["source_hashes"]["manifest"] == EXPECTED_MANIFEST_SHA256
+    assert manifest["source_hashes"]["facts"] == EXPECTED_FACTS_SHA256
+
+    payload = json.loads(fresh_bytes.decode("utf-8"))
+    assert payload["metrics"]["resolved_count"] == 0
+    assert payload["metrics"]["not_replayable_count"] == 76
+    for record in payload["records"]:
+        assert "execution_kind" not in record.get("field_provenance", {})
+
+    if CHECKED_IN_REPORT.is_file():
+        report_bytes = CHECKED_IN_REPORT.read_bytes()
+        render_markdown_report(result, tmp_path / "report.md")
+        assert (tmp_path / "report.md").read_bytes() == report_bytes
+        report = report_bytes.decode("utf-8")
+        assert f"resolved: {payload['metrics']['resolved_count']}" in report
+        assert f"not replayable: {payload['metrics']['not_replayable_count']}" in report

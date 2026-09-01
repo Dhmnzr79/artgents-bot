@@ -36,7 +36,7 @@ def test_price_order_single_block() -> None:
     plan = make_plan()
     resolved = resolve_response_plan(
         plan,
-        compose(patient_text="Пояснение", price_text="120 000 ₽ за имплант"),
+        compose(patient_text="Пояснение"),
     )
     text = render_response_text(resolved)
     assert text.startswith("120 000 ₽ за имплант")
@@ -48,7 +48,7 @@ def test_multi_price_renders_one_section() -> None:
     from tests.test_response_plan_contract import price_multi
 
     plan = make_plan(price_plan=price_multi(), service_value_candidate=None, textual_cta_candidate=None)
-    resolved = resolve_response_plan(plan, compose(patient_text="Ответ", price_text="ignored"))
+    resolved = resolve_response_plan(plan, compose(patient_text="Ответ"))
     text = render_response_text(resolved)
     assert text.count("100 000") == 1
     assert text.count("150 000") == 1
@@ -86,7 +86,7 @@ def test_foreign_amount_in_patient_text_preserved() -> None:
     plan = make_plan()
     resolved = resolve_response_plan(
         plan,
-        compose(patient_text="Слышал, что это стоит 999 999 ₽", price_text="120 000 ₽ за имплант"),
+        compose(patient_text="Слышал, что это стоит 999 999 ₽"),
     )
     assert "999 999 ₽" in render_response_text(resolved)
 
@@ -160,6 +160,6 @@ def test_deterministic_repeated_rendering() -> None:
     plan = make_plan()
     resolved = resolve_response_plan(
         plan,
-        compose(patient_text="Ответ", price_text="120 000 ₽ за имплант"),
+        compose(patient_text="Ответ"),
     )
     assert render_response_text(resolved) == render_response_text(resolved)

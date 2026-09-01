@@ -478,7 +478,7 @@ def test_forbidden_route_mode_pairs_rejected() -> None:
 def test_client_source_mismatch_on_price() -> None:
     plan = make_plan(price_plan=price_single(client_id="nikadent"))
     with pytest.raises(ResponsePlanContractError) as exc:
-        resolve_response_plan(plan, compose(price_text="120 000 ₽ за имплант"))
+        resolve_response_plan(plan, compose())
     assert exc.value.code == "client_source_mismatch"
 
 
@@ -503,7 +503,7 @@ def test_client_source_mismatch_on_required_condition() -> None:
         ),
     )
     with pytest.raises(ResponsePlanContractError) as exc:
-        resolve_response_plan(plan, compose(price_text="120 000 ₽ за имплант"))
+        resolve_response_plan(plan, compose())
     assert exc.value.code == "client_source_mismatch"
 
 
@@ -707,7 +707,7 @@ def test_multi_price_with_single_price_owner_rejected() -> None:
             source_client_id="demo",
             offer_ids=("offer_a", "offer_b"),
             display_text="A\nB",
-            owner="model_price_text",
+            owner="canonical_single",
         )
 
 
@@ -728,7 +728,7 @@ def test_terminal_plan_with_commerce_rejected() -> None:
                 source_client_id="demo",
                 offer_ids=("offer_implant",),
                 display_text="120 000 ₽",
-                owner="canonical_fallback",
+                owner="canonical_single",
                 amount=120_000,
                 currency="RUB",
                 billing_unit="tooth_package",
@@ -904,7 +904,7 @@ def test_cross_client_resolved_price_rejected() -> None:
                 source_client_id="nikadent",
                 offer_ids=("offer_implant",),
                 display_text="120 000 ₽",
-                owner="canonical_fallback",
+                owner="canonical_single",
                 amount=120_000,
                 currency="RUB",
                 billing_unit="tooth_package",

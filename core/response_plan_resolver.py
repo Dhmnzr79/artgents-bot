@@ -343,25 +343,14 @@ def _resolve_price(
     plan: PreComposerPlan,
     composer: ComposerResult,
 ) -> tuple[ResolvedPriceBlock | None, list[PlanDiagnostic]]:
-    diagnostics: list[PlanDiagnostic] = []
+    del composer
     price_plan = plan.price_plan
     if price_plan.kind == "none" or not price_plan.offer_applicable:
-        if composer.price_text and composer.price_text.strip():
-            diagnostics.append(
-                PlanDiagnostic(
-                    code="model_price_text_forbidden_no_offer",
-                    detail="price_without_offer",
-                )
-            )
-        return None, diagnostics
+        return None, []
 
     if price_plan.kind == "multi":
         assert price_plan.multi is not None
         multi = price_plan.multi
-        if composer.price_text and composer.price_text.strip():
-            diagnostics.append(
-                PlanDiagnostic(code="model_price_text_forbidden_multi", detail="model_price_ignored")
-            )
         return (
             ResolvedPriceBlock(
                 source_client_id=multi.source_client_id,
@@ -369,51 +358,22 @@ def _resolve_price(
                 display_text=multi.display_text,
                 owner="canonical_multi",
             ),
-            diagnostics,
+            [],
         )
 
     assert price_plan.single is not None
     single = price_plan.single
-    model_price = (composer.price_text or "").strip()
-    if not model_price:
-        diagnostics.append(PlanDiagnostic(code="model_price_text_missing"))
-        return (
-            ResolvedPriceBlock(
-                source_client_id=single.source_client_id,
-                offer_ids=(single.offer_id,),
-                display_text=single.display_text,
-                owner="canonical_fallback",
-                amount=single.amount,
-                currency=single.currency,
-                billing_unit=single.billing_unit,
-            ),
-            diagnostics,
-        )
-    if model_price == single.display_text.strip():
-        return (
-            ResolvedPriceBlock(
-                source_client_id=single.source_client_id,
-                offer_ids=(single.offer_id,),
-                display_text=single.display_text,
-                owner="model_price_text",
-                amount=single.amount,
-                currency=single.currency,
-                billing_unit=single.billing_unit,
-            ),
-            diagnostics,
-        )
-    diagnostics.append(PlanDiagnostic(code="model_price_text_mismatch"))
     return (
         ResolvedPriceBlock(
             source_client_id=single.source_client_id,
             offer_ids=(single.offer_id,),
             display_text=single.display_text,
-            owner="canonical_fallback",
+            owner="canonical_single",
             amount=single.amount,
             currency=single.currency,
             billing_unit=single.billing_unit,
         ),
-        diagnostics,
+        [],
     )
 
 

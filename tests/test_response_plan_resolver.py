@@ -26,33 +26,27 @@ from tests.test_response_plan_contract import (
 )
 
 
-def test_valid_single_model_price() -> None:
+def test_valid_single_canonical_price() -> None:
     resolved = resolve_response_plan(
         make_plan(),
-        compose(price_text="120 000 ₽ за имплант", patient_text="Ответ"),
+        compose(patient_text="Ответ"),
     )
     assert resolved.price_block is not None
-    assert resolved.price_block.owner == "model_price_text"
+    assert resolved.price_block.owner == "canonical_single"
     assert len(resolved.price_block.offer_ids) == 1
 
 
-def test_missing_single_price_uses_canonical_fallback() -> None:
+def test_single_price_without_composer_price_text_uses_canonical_single() -> None:
     resolved = resolve_response_plan(make_plan(), compose(patient_text="Ответ"))
     assert resolved.price_block is not None
-    assert resolved.price_block.owner == "canonical_fallback"
-    assert any(item.code == "model_price_text_missing" for item in resolved.diagnostics)
-
-
-def test_wrong_single_price_uses_canonical_fallback() -> None:
-    resolved = resolve_response_plan(make_plan(), compose(price_text="999 ₽", patient_text="Ответ"))
-    assert resolved.price_block.owner == "canonical_fallback"
-    assert any(item.code == "model_price_text_mismatch" for item in resolved.diagnostics)
+    assert resolved.price_block.owner == "canonical_single"
+    assert resolved.diagnostics == ()
 
 
 def test_multi_price_one_combined_block() -> None:
     resolved = resolve_response_plan(
         make_plan(price_plan=price_multi()),
-        compose(price_text="ignored", patient_text="Ответ"),
+        compose(patient_text="Ответ"),
     )
     assert resolved.price_block is not None
     assert resolved.price_block.owner == "canonical_multi"
@@ -139,7 +133,7 @@ def test_normal_service_value_max_one() -> None:
 def test_price_answer_has_no_service_value() -> None:
     resolved = resolve_response_plan(
         make_plan(),
-        compose(price_text="120 000 ₽ за имплант", patient_text="Ответ"),
+        compose(patient_text="Ответ"),
     )
     assert resolved.service_value_block is None
 
@@ -386,26 +380,61 @@ def test_generic_warranty_does_not_substitute_implant_warranty() -> None:
     assert resolved.finalized_commercial_ids.requested_fact_ids == ("clinic_warranty",)
 
 
-def test_implant_warranty_only_with_matching_scope_and_request() -> None:
-    resolved = resolve_response_plan(
-        make_plan(price_plan=PricePlan(kind="none"), service_value_candidate=None, textual_cta_candidate=None),
-        compose(requested_fact_ids=("implant_warranty",), patient_text="Гарантия."),
-    )
-    assert resolved.finalized_commercial_ids.requested_fact_ids == ("implant_warranty",)
-    clinic_plan = make_plan(
-        response_scope="clinic",
+def test_topic_scoped_implant_warranty_materialized_with_implantation_topic() -> None:
+    plan = make_plan(
+        response_scope="topic",
         selected_service_id=None,
+        selected_topic_id="implantation",
         price_plan=PricePlan(kind="none"),
+        commercial_facts=(
+            fact(
+                "implant_warranty",
+                explicit_only=True,
+                roles=("requested_fact",),
+                applicability="topic_scoped",
+                allowed_topic_ids=("implantation",),
+                requires_implant_scope=True,
+            ),
+        ),
         promo_candidate_ids=(),
         automatic_amplifier_candidate_ids=(),
         service_value_candidate=None,
         textual_cta_candidate=None,
     )
-    clinic_res = resolve_response_plan(
-        clinic_plan,
+    resolved = resolve_response_plan(
+        plan,
         compose(requested_fact_ids=("implant_warranty",), patient_text="Гарантия?"),
     )
-    assert clinic_res.requested_fact_blocks == ()
+    assert resolved.finalized_commercial_ids.requested_fact_ids == ("implant_warranty",)
+
+
+def test_topic_scoped_implant_warranty_suppressed_for_unrelated_topic() -> None:
+    plan = make_plan(
+        response_scope="topic",
+        selected_service_id=None,
+        selected_topic_id="sterilization",
+        price_plan=PricePlan(kind="none"),
+        commercial_facts=(
+            fact(
+                "implant_warranty",
+                explicit_only=True,
+                roles=("requested_fact",),
+                applicability="topic_scoped",
+                allowed_topic_ids=("implantation",),
+                requires_implant_scope=True,
+            ),
+        ),
+        promo_candidate_ids=(),
+        automatic_amplifier_candidate_ids=(),
+        service_value_candidate=None,
+        textual_cta_candidate=None,
+    )
+    resolved = resolve_response_plan(
+        plan,
+        compose(requested_fact_ids=("implant_warranty",), patient_text="Гарантия?"),
+    )
+    assert resolved.requested_fact_blocks == ()
+    assert any(item.code == "requested_fact_inapplicable" for item in resolved.diagnostics)
 
 
 def test_price_without_service_does_not_create_price_block() -> None:
@@ -414,7 +443,7 @@ def test_price_without_service_does_not_create_price_block() -> None:
         selected_service_id=None,
         price_plan=PricePlan(kind="none"),
     )
-    resolved = resolve_response_plan(plan, compose(patient_text="Сколько стоит?", price_text="120 000 ₽"))
+    resolved = resolve_response_plan(plan, compose(patient_text="Сколько стоит?"))
     assert resolved.price_block is None
 
 
@@ -512,7 +541,7 @@ def test_offer_and_fact_same_string_id_do_not_mix_session_groups() -> None:
     )
     resolved = resolve_response_plan(
         plan,
-        compose(requested_fact_ids=("shared_id",), price_text="120 000 ₽", patient_text="Ответ"),
+        compose(requested_fact_ids=("shared_id",), patient_text="Ответ"),
     )
     assert resolved.finalized_commercial_ids.price_offer_ids == ("shared_id",)
     assert resolved.finalized_commercial_ids.requested_fact_ids == ("shared_id",)
@@ -601,7 +630,7 @@ def test_normal_max_service_value_zero_removes_service_value() -> None:
 def test_finalized_required_condition_ids_match_blocks() -> None:
     resolved = resolve_response_plan(
         make_plan(),
-        compose(price_text="120 000 ₽ за имплант", patient_text="Ответ"),
+        compose(patient_text="Ответ"),
     )
     assert resolved.finalized_commercial_ids.required_offer_condition_ids == ("per_jaw",)
     assert resolved.required_offer_conditions[0].condition_id == "per_jaw"
@@ -610,7 +639,7 @@ def test_finalized_required_condition_ids_match_blocks() -> None:
 def test_session_shown_condition_ids_match_finalized() -> None:
     resolved = resolve_response_plan(
         make_plan(),
-        compose(price_text="120 000 ₽ за имплант", patient_text="Ответ"),
+        compose(patient_text="Ответ"),
     )
     assert (
         resolved.session_delta.shown_required_offer_condition_ids
@@ -662,7 +691,7 @@ def test_same_string_in_offer_fact_condition_typed_groups() -> None:
     )
     resolved = resolve_response_plan(
         plan,
-        compose(requested_fact_ids=(shared,), price_text="120 000 ₽", patient_text="Ответ"),
+        compose(requested_fact_ids=(shared,), patient_text="Ответ"),
     )
     assert shared in resolved.finalized_commercial_ids.price_offer_ids
     assert shared in resolved.finalized_commercial_ids.requested_fact_ids
@@ -678,19 +707,13 @@ def test_unknown_requested_fact_classification_model_contract_violation() -> Non
     assert diag.classification == "model_contract_violation"
 
 
-def test_price_text_without_offer_uses_no_offer_code() -> None:
+def test_none_price_plan_has_no_price_block() -> None:
     resolved = resolve_response_plan(
         make_plan(price_plan=PricePlan(kind="none")),
-        compose(patient_text="Ответ", price_text="999 ₽"),
+        compose(patient_text="Ответ"),
     )
-    assert any(item.code == "model_price_text_forbidden_no_offer" for item in resolved.diagnostics)
-    assert not any(item.code == "model_price_text_forbidden_multi" for item in resolved.diagnostics)
-
-
-def test_missing_single_price_classification_canonical_correction() -> None:
-    resolved = resolve_response_plan(make_plan(), compose(patient_text="Ответ"))
-    diag = next(item for item in resolved.diagnostics if item.code == "model_price_text_missing")
-    assert diag.classification == "canonical_correction"
+    assert resolved.price_block is None
+    assert resolved.diagnostics == ()
 
 
 def test_optional_missing_promo_classification_optional_resolution() -> None:

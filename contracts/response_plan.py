@@ -15,9 +15,7 @@ PricePlanKind = Literal["none", "single", "multi"]
 ExecutionKind = Literal["composer", "code_owned_terminal"]
 CodeOwnedAuthority = Literal["contacts", "governed_ui", "deterministic_policy_terminal"]
 ResolvedPriceOwner = Literal[
-    "none",
-    "model_price_text",
-    "canonical_fallback",
+    "canonical_single",
     "canonical_multi",
 ]
 FactRole = Literal["requested_fact", "promo", "automatic_amplifier"]
@@ -35,10 +33,6 @@ DiagnosticClass = Literal[
     "optional_resolution",
 ]
 PlanDiagnosticCode = Literal[
-    "model_price_text_missing",
-    "model_price_text_mismatch",
-    "model_price_text_forbidden_multi",
-    "model_price_text_forbidden_no_offer",
     "requested_fact_unknown",
     "requested_fact_inapplicable",
     "explicit_only_automatic_suppressed",
@@ -84,10 +78,6 @@ COMPOSER_TERMINAL_OUTCOME_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] =
 DIAGNOSTIC_CLASSIFICATION: dict[PlanDiagnosticCode, DiagnosticClass] = {
     "requested_fact_unknown": "model_contract_violation",
     "requested_fact_inapplicable": "model_contract_violation",
-    "model_price_text_forbidden_multi": "model_contract_violation",
-    "model_price_text_forbidden_no_offer": "model_contract_violation",
-    "model_price_text_missing": "canonical_correction",
-    "model_price_text_mismatch": "canonical_correction",
     "optional_candidate_unavailable": "optional_resolution",
     "explicit_only_automatic_suppressed": "optional_resolution",
     "service_value_out_of_scope": "optional_resolution",
@@ -517,7 +507,6 @@ class ComposerResult(ResponsePlanModel):
     route: ResponseRoute
     mode: ResponseMode = "standard"
     patient_text: str | None = None
-    price_text: str | None = None
     requested_fact_ids: UniqueRequestedFactIds = ()
 
     @model_validator(mode="after")
@@ -531,22 +520,16 @@ class ComposerResult(ResponsePlanModel):
         elif pair == ("ANSWER", "contacts"):
             if self.patient_text is not None:
                 raise ValueError("contacts_requires_null_patient_text")
-            if self.price_text is not None:
-                raise ValueError("contacts_forbids_price_text")
             if self.requested_fact_ids:
                 raise ValueError("contacts_forbids_requested_facts")
         elif self.route == "ADMIN":
             if self.patient_text is not None:
                 raise ValueError("admin_requires_null_patient_text")
-            if self.price_text is not None:
-                raise ValueError("admin_forbids_price_text")
             if self.requested_fact_ids:
                 raise ValueError("admin_forbids_requested_facts")
         elif self.route == "CLARIFY":
             if not (self.patient_text and self.patient_text.strip()):
                 raise ValueError("clarify_requires_patient_text")
-            if self.price_text is not None:
-                raise ValueError("clarify_forbids_price_text")
             if self.requested_fact_ids:
                 raise ValueError("clarify_forbids_requested_facts")
         return self
@@ -565,12 +548,10 @@ class ResolvedPriceBlock(ResponsePlanModel):
     def _validate_offer_ids(self) -> Self:
         if not self.offer_ids:
             raise ValueError("price_block_requires_offer_ids")
-        if self.owner == "none":
-            raise ValueError("price_block_owner_none_forbidden")
         if len(self.offer_ids) != len(set(self.offer_ids)):
             raise ValueError("price_block_duplicate_offer_ids")
         if len(self.offer_ids) == 1:
-            if self.owner not in {"model_price_text", "canonical_fallback"}:
+            if self.owner != "canonical_single":
                 raise ValueError("single_price_invalid_owner")
             if self.amount is None or self.currency is None or self.billing_unit is None:
                 raise ValueError("single_price_requires_amount_metadata")

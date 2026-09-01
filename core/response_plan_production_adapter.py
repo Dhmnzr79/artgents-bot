@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from contracts.response_plan import (
     CanonicalMultiPriceCandidate,
     CanonicalSinglePriceCandidate,
     CodeOwnedTerminalCandidate,
     CommercialFactCandidate,
-    ComposerResult,
     ComposerSelectedRouteAuthority,
     DeterministicBypassRouteAuthority,
     FactApplicability,
@@ -34,18 +35,17 @@ from contracts.response_plan_adapter import (
     ResponsePlanAdapterMaterialAuthority,
     ResponsePlanAdapterSources,
     ResponsePlanAdapterTerminalAuthority,
-    StrictTargetComposerEnvelope,
-    assert_envelope_matches_plan,
-    envelope_to_composer_result,
 )
 from contracts.response_schema import BillingUnit, TargetCommercialFact, TargetFixedPrice, TargetOffer
 from contracts.target_response_spec import TargetResponseSpec
 from contracts.turn_frame import TurnFrame
 from core.target_client_ui_nav import TargetNavigationFollowup
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
-from core.target_response_followup_materializer import TargetContentFollowup, TargetPriceFollowup
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 from core.target_response_materialization_plan import TargetResponseMaterializationPlan
+
+if TYPE_CHECKING:
+    from core.target_response_followup_materializer import TargetContentFollowup, TargetPriceFollowup
 
 _EXPLICIT_ONLY_FACT_IDS: frozenset[str] = frozenset({"implant_warranty", "clinic_warranty"})
 _INVALID_TOPIC_IDS: frozenset[str] = frozenset({"unknown", "none", "null", "n/a", "na"})
@@ -102,14 +102,6 @@ def build_pre_composer_plan(sources: ResponsePlanAdapterSources) -> PreComposerP
         selected_topic_id=selected_topic_id,
         active_session_service_id=active_session_service_id,
     )
-
-
-def adapt_composer_envelope(
-    plan: PreComposerPlan,
-    envelope: StrictTargetComposerEnvelope,
-) -> ComposerResult:
-    assert_envelope_matches_plan(envelope, plan)
-    return envelope_to_composer_result(envelope)
 
 
 def billing_unit_phrase(billing_unit: str) -> str:

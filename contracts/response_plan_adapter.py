@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Self
+from dataclasses import dataclass
+from typing import Annotated, Literal, Protocol, Self, runtime_checkable
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from contracts.response_plan import (
     ALLOWED_ROUTE_MODE_PAIRS,
@@ -12,26 +13,125 @@ from contracts.response_plan import (
     CodeOwnedAuthority,
     CodeOwnedTerminalCandidate,
     ComposerResult,
-    ComposerSelectedRouteAuthority,
     ContextStrategy,
-    DeterministicBypassRouteAuthority,
-    PreComposerPlan,
     RequiredOfferConditionBlock,
     ResponseRoute,
     ResponseMode,
-    RouteModePair,
     SessionKey,
     TransportKind,
-    UniqueRequestedFactIds,
-    all_allowed_route_mode_pairs,
     _require_non_blank,
-    _unique_requested_fact_ids,
+)
+from contracts.response_plan_composer import (
+    AdaptedComposerDecision,
+    ComposerAdapterError,
+    ComposerDecisionAuthority,
+    ComposerParserError,
+    ParsedComposerEnvelope,
+    adapt_composer_envelope_to_decision,
+    adapt_composer_json_to_decision,
+    parse_response_plan_composer_json,
 )
 from contracts.turn_frame import TurnFrame
-from core.target_spec_offline_response_package import TargetSpecBoundOfflineResponsePackage
 
 NonBlankStr = Annotated[str, AfterValidator(_require_non_blank)]
-UniqueRequestedFactIdsEnvelope = Annotated[tuple[str, ...], AfterValidator(_unique_requested_fact_ids)]
+
+
+@runtime_checkable
+class ResponsePlanAdapterMaterialPackageShape(Protocol):
+    materials: object
+    plan: object
+    selected_followups: object
+    navigation_followups: tuple[object, ...]
+
+
+@runtime_checkable
+class ResponsePlanAdapterBoundPackageShape(Protocol):
+    spec: object
+    package: ResponsePlanAdapterMaterialPackageShape
+    selected_cta_key: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ResponsePlanAdapterMaterialPackage:
+    """Contract-owned structural view of nested material package evidence."""
+
+    materials: object
+    plan: object
+    selected_followups: object
+    navigation_followups: tuple[object, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ResponsePlanAdapterBoundPackage:
+    """Contract-owned structural view of a materialized offline bound package."""
+
+    spec: object
+    package: ResponsePlanAdapterMaterialPackage
+    selected_cta_key: str | None = None
+
+
+def material_bound_package_invalid_reason(value: object) -> str | None:
+    """Return a stable reason code when value is not a valid material bound package."""
+
+    if isinstance(value, ResponsePlanAdapterBoundPackage):
+        return None
+    if not isinstance(value, ResponsePlanAdapterBoundPackageShape):
+        return "bound_package_shape_invalid"
+    if value.spec is None:
+        return "missing_spec"
+    package = value.package
+    if package is None:
+        return "missing_package"
+    if not isinstance(package, ResponsePlanAdapterMaterialPackageShape):
+        return "package_shape_invalid"
+    if package.materials is None:
+        return "missing_materials"
+    if package.plan is None:
+        return "missing_plan"
+    if package.selected_followups is None:
+        return "missing_selected_followups"
+    navigation = package.navigation_followups
+    if navigation is None:
+        navigation = ()
+    if not isinstance(navigation, tuple):
+        return "navigation_followups_must_be_tuple"
+    cta_key = value.selected_cta_key
+    if cta_key is not None:
+        if not isinstance(cta_key, str):
+            return "selected_cta_key_invalid_type"
+        if not cta_key or cta_key != cta_key.strip():
+            return "selected_cta_key_invalid"
+    return None
+
+
+def coerce_material_bound_package(value: object) -> ResponsePlanAdapterBoundPackage:
+    """Validate structural shape and return a contract-owned bound-package view."""
+
+    reason = material_bound_package_invalid_reason(value)
+    if reason is not None:
+        raise ValueError(reason)
+    if isinstance(value, ResponsePlanAdapterBoundPackage):
+        return value
+    package = value.package
+    navigation = package.navigation_followups
+    if navigation is None:
+        navigation = ()
+    return ResponsePlanAdapterBoundPackage(
+        spec=value.spec,
+        package=ResponsePlanAdapterMaterialPackage(
+            materials=package.materials,
+            plan=package.plan,
+            selected_followups=package.selected_followups,
+            navigation_followups=navigation,
+        ),
+        selected_cta_key=value.selected_cta_key,
+    )
+
+
+ValidatedMaterialBoundPackage = Annotated[
+    ResponsePlanAdapterBoundPackage,
+    BeforeValidator(coerce_material_bound_package),
+]
 
 ResponsePlanAdapterErrorCode = Literal[
     "adapter_client_mismatch",
@@ -105,7 +205,7 @@ class ResponsePlanAdapterMaterialAuthority(ResponsePlanAdapterModel):
     """Typed ownership for one materialized offline response package."""
 
     source_client_id: NonBlankStr
-    bound_package: TargetSpecBoundOfflineResponsePackage
+    bound_package: ValidatedMaterialBoundPackage
 
 
 class ResponsePlanAdapterComposerRouteAuthority(ResponsePlanAdapterModel):
@@ -206,14 +306,6 @@ class ResponsePlanAdapterSources(ResponsePlanAdapterModel):
     textual_cta_authority: ResponsePlanAdapterTextualCtaAuthority | None = None
 
 
-class StrictTargetComposerEnvelope(ResponsePlanAdapterModel):
-    route: ResponseRoute
-    mode: ResponseMode = "standard"
-    patient_text: str | None = None
-    price_text: str | None = None
-    requested_fact_ids: UniqueRequestedFactIdsEnvelope = ()
-
-
 FORBIDDEN_LEGACY_COMPOSER_TYPE_NAMES: frozenset[str] = frozenset(
     {
         "TargetUnverifiedComposedResponse",
@@ -236,34 +328,37 @@ def assert_not_legacy_composer_output(source: object) -> None:
     raise ResponsePlanAdapterError("adapter_composer_contract_incompatible", type_name)
 
 
-def envelope_to_composer_result(envelope: StrictTargetComposerEnvelope) -> ComposerResult:
-    """Convert strict isolated envelope into target ComposerResult."""
+def adapt_composer_json_to_decision(
+    raw_json: str,
+    authority: ComposerDecisionAuthority,
+) -> AdaptedComposerDecision:
+    """Thin delegation to canonical parser and decision adapter."""
 
     try:
-        return ComposerResult(
-            route=envelope.route,
-            mode=envelope.mode,
-            patient_text=envelope.patient_text,
-            price_text=envelope.price_text,
-            requested_fact_ids=envelope.requested_fact_ids,
-        )
-    except Exception as exc:
+        parsed = parse_response_plan_composer_json(raw_json)
+    except ComposerParserError as exc:
+        raise ResponsePlanAdapterError("adapter_composer_envelope_invalid", exc) from exc
+    try:
+        return adapt_composer_envelope_to_decision(parsed, authority)
+    except ComposerAdapterError as exc:
+        if exc.code == "composer_forbidden_for_bypass":
+            raise ResponsePlanAdapterError("adapter_composer_contract_incompatible", exc.detail) from exc
+        if exc.code == "route_mode_not_allowed":
+            raise ResponsePlanAdapterError("adapter_composer_route_mismatch", exc.detail) from exc
         raise ResponsePlanAdapterError("adapter_composer_envelope_invalid", exc) from exc
 
 
-def assert_envelope_matches_plan(
-    envelope: StrictTargetComposerEnvelope,
-    plan: PreComposerPlan,
-) -> None:
-    authority = plan.route_authority
-    if not isinstance(authority, ComposerSelectedRouteAuthority):
-        raise ResponsePlanAdapterError(
-            "adapter_composer_contract_incompatible",
-            "deterministic_bypass",
-        )
-    allowed = {(item.route, item.mode) for item in authority.allowed_route_modes}
-    if (envelope.route, envelope.mode) not in allowed:
-        raise ResponsePlanAdapterError(
-            "adapter_composer_route_mismatch",
-            (envelope.route, envelope.mode, tuple(sorted(allowed))),
-        )
+def adapt_parsed_composer_envelope_to_decision(
+    parsed: ParsedComposerEnvelope,
+    authority: ComposerDecisionAuthority,
+) -> AdaptedComposerDecision:
+    """Thin delegation for callers that already parsed Composer JSON."""
+
+    try:
+        return adapt_composer_envelope_to_decision(parsed, authority)
+    except ComposerAdapterError as exc:
+        if exc.code == "composer_forbidden_for_bypass":
+            raise ResponsePlanAdapterError("adapter_composer_contract_incompatible", exc.detail) from exc
+        if exc.code == "route_mode_not_allowed":
+            raise ResponsePlanAdapterError("adapter_composer_route_mismatch", exc.detail) from exc
+        raise ResponsePlanAdapterError("adapter_composer_envelope_invalid", exc) from exc

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import ast
-from dataclasses import replace
+import json
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
 
 from contracts.response_plan import (
     CanonicalContactCandidate,
+    ComposerResult,
     RequiredOfferConditionBlock,
     SessionKey,
 )
@@ -23,13 +25,16 @@ from contracts.response_plan_adapter import (
     ResponsePlanAdapterTextualCtaAuthority,
     ResponsePlanAdapterUiAuthority,
     ResponsePlanAdapterUiWidgetAuthority,
-    StrictTargetComposerEnvelope,
 )
+from contracts.response_plan_composer import adapt_composer_json_to_decision
 from contracts.response_plan import DeterministicBypassRouteAuthority, ComposerSelectedRouteAuthority
+from tests.test_response_plan_composer_contract import (
+    _composer_decision_authority_from_plan,
+    _composer_result_from_adapted,
+)
 from contracts.response_schema import TargetCommercialFact, TargetOffer
 from contracts.target_response_spec import TargetResponseSpec
 from core.response_plan_production_adapter import (
-    adapt_composer_envelope,
     billing_unit_phrase,
     build_pre_composer_plan,
     format_multi_price_display,
@@ -38,21 +43,14 @@ from core.response_plan_production_adapter import (
 from core.response_plan_resolver import resolve_response_plan
 from core.response_text_renderer import render_response_text
 from core.response_ui_projection import project_response_ui
-from core.target_client_ui_nav import TargetNavigationFollowup
 from core.target_marketing_selector import TargetMarketingSelection
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
-from core.target_offline_response_package import TargetOfflineResponsePackage
-from core.target_fullcontext_content_package import (
-    assemble_target_fullcontext_content_bound_package,
-    assemble_target_fullcontext_doctors_bound_package,
-)
 from core.target_response_followup_materializer import TargetContentFollowup, TargetPriceFollowup, TargetResponseFollowups
 from core.target_response_followup_policy import TargetResponseFollowupSelection
 from core.target_response_materialization_plan import (
     TargetResponseMaterializationPlan,
     build_target_response_materialization_plan,
 )
-from core.target_spec_offline_response_package import TargetSpecBoundOfflineResponsePackage
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 
 
@@ -77,6 +75,28 @@ CLINIC_FLOW_CASES = (
     ("consultation_overview", {"topic": "unknown", "aspects": ["overview"], "primary_aspect": "overview"}),
     ("new_clinic_theme", {"topic": "brand_new_theme"}),
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _BoundPackageShim:
+    spec: TargetResponseSpec
+    package: _PackageShim
+    selected_cta_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _PackageShim:
+    materials: TargetOfflineResponseMaterials
+    plan: TargetResponseMaterializationPlan
+    selected_followups: TargetResponseFollowupSelection
+    navigation_followups: tuple[object, ...] = ()
+
+
+from tests.test_response_plan_composer_contract import _json as _composer_json_payload
+
+
+def _composer_json(**overrides: object) -> str:
+    return _composer_json_payload(**overrides)
 
 
 def _turn_frame(**overrides: object):
@@ -200,22 +220,21 @@ def _bound_package(
     spec: TargetResponseSpec,
     materials: TargetOfflineResponseMaterials,
     selected_cta_key: str | None = None,
-    navigation: tuple[TargetNavigationFollowup, ...] = (),
+    navigation: tuple[object, ...] = (),
     selected_followups: TargetResponseFollowupSelection | None = None,
-) -> TargetSpecBoundOfflineResponsePackage:
+) -> _BoundPackageShim:
     followups = selected_followups or TargetResponseFollowupSelection(source=None, content=(), price=())
     plan = build_target_response_materialization_plan(
         materials,
         required_components=spec.required_components,
     )
-    package = TargetOfflineResponsePackage(
+    package = _PackageShim(
         materials=materials,
         plan=plan,
-        followup_candidates=TargetResponseFollowups(content=(), price=()),
         selected_followups=followups,
         navigation_followups=navigation,
     )
-    return TargetSpecBoundOfflineResponsePackage(
+    return _BoundPackageShim(
         spec=spec,
         package=package,
         selected_cta_key=selected_cta_key,
@@ -237,7 +256,7 @@ def _spec(**overrides: object) -> TargetResponseSpec:
 def _material_authority(
     *,
     client_id: str = "demo",
-    bound_package: TargetSpecBoundOfflineResponsePackage,
+    bound_package: object,
 ) -> ResponsePlanAdapterMaterialAuthority:
     return ResponsePlanAdapterMaterialAuthority(
         source_client_id=client_id,
@@ -335,20 +354,23 @@ def _clinic_sources(**turn_overrides: object) -> ResponsePlanAdapterSources:
 def _run_flow(
     sources: ResponsePlanAdapterSources,
     *,
-    envelope: StrictTargetComposerEnvelope | None = None,
+    raw_json: str | None = None,
 ) -> tuple[object, object, object, str, object]:
     plan = build_pre_composer_plan(sources)
     if isinstance(plan.route_authority, DeterministicBypassRouteAuthority):
         composer = None
-        env = envelope
     else:
-        env = envelope or StrictTargetComposerEnvelope(
-            route="ANSWER",
-            mode="standard",
-            patient_text="Ответ пациенту",
-            price_text="120 000 ₽ за одну челюсть" if plan.price_plan.kind != "none" else None,
-        )
-        composer = adapt_composer_envelope(plan, env)
+        authority = _composer_decision_authority_from_plan(plan)
+        if raw_json is not None:
+            adapted = adapt_composer_json_to_decision(raw_json, authority)
+        else:
+            adapted = adapt_composer_json_to_decision(
+                _composer_json(
+                    requested_aspect_ids=["price"] if plan.price_plan.kind != "none" else [],
+                ),
+                authority,
+            )
+        composer = _composer_result_from_adapted(adapted)
     resolved = resolve_response_plan(plan, composer)
     text = render_response_text(resolved)
     ui = project_response_ui(resolved)
@@ -435,11 +457,11 @@ def test_clinic_general_questions_do_not_fail_adapter(case_name: str, turn_overr
     sources = _clinic_sources(**turn_overrides)
     plan, _, resolved, text, _ = _run_flow(
         sources,
-        envelope=StrictTargetComposerEnvelope(
+        raw_json=_composer_json(
             route="ANSWER",
             mode="standard",
             patient_text=f"Ответ на {case_name}",
-            requested_fact_ids=("installment_12",) if case_name == "installment" else (),
+            requested_fact_ids=["installment_12"] if case_name == "installment" else [],
         ),
     )
     assert plan.response_scope == "clinic"
@@ -697,11 +719,11 @@ def test_promo_and_amplifier_role_mapping() -> None:
 def test_requested_fact_remains_model_owned_in_flow() -> None:
     _, _, resolved, _, _ = _run_flow(
         _sources(),
-        envelope=StrictTargetComposerEnvelope(
+        raw_json=_composer_json(
             route="ANSWER",
             mode="standard",
             patient_text="Ответ",
-            requested_fact_ids=("installment_12",),
+            requested_fact_ids=["installment_12"],
         ),
     )
     assert resolved.finalized_commercial_ids.requested_fact_ids == ("installment_12",)
@@ -860,12 +882,12 @@ def test_route_mode_end_to_end_matrix(
     plan = build_pre_composer_plan(sources)
     composer = None
     if needs_envelope:
-        envelope = StrictTargetComposerEnvelope(
-            route=route,
-            mode=mode,
-            patient_text="Текст",
+        composer = _composer_result_from_adapted(
+            adapt_composer_json_to_decision(
+                _composer_json(route=route, mode=mode, patient_text="Текст"),
+                _composer_decision_authority_from_plan(plan),
+            )
         )
-        composer = adapt_composer_envelope(plan, envelope)
     resolved = resolve_response_plan(plan, composer)
     text = render_response_text(resolved)
     ui = project_response_ui(resolved)
@@ -903,11 +925,11 @@ def test_full_flow_price_answer() -> None:
     bound = _bound_package(spec=spec, materials=materials)
     _, _, resolved, text, _ = _run_flow(
         _sources(material_authority=_material_authority(bound_package=bound)),
-        envelope=StrictTargetComposerEnvelope(
+        raw_json=_composer_json(
             route="ANSWER",
             mode="standard",
             patient_text="Цена ниже.",
-            price_text="318 000 ₽ за одну челюсть",
+            requested_aspect_ids=["price"],
         ),
     )
     assert resolved.price_block is not None
@@ -935,7 +957,7 @@ def test_production_adapter_has_no_regex_imports() -> None:
     assert "re" not in imported
 
 
-def test_real_service_non_price_package_with_offers() -> None:
+def test_structural_package_non_price_with_offers() -> None:
     spec = _spec(required_components=("content",))
     materials = _materials(offers=(_offer("offer_a"), _offer("offer_b")))
     real_plan = build_target_response_materialization_plan(
@@ -956,7 +978,7 @@ def test_real_service_non_price_package_with_offers() -> None:
     assert text
 
 
-def test_real_service_price_package() -> None:
+def test_structural_package_price() -> None:
     spec = _spec(required_components=("price",))
     offer = _offer("offer_single", amount=318_000, label="All-on-4 Implantium", billing_unit="jaw")
     materials = _materials(offers=(offer,))
@@ -970,11 +992,11 @@ def test_real_service_price_package() -> None:
         _sources(
             material_authority=_material_authority(bound_package=bound),
         ),
-        envelope=StrictTargetComposerEnvelope(
+        raw_json=_composer_json(
             route="ANSWER",
             mode="standard",
             patient_text="Цена.",
-            price_text="318 000 ₽ за одну челюсть",
+            requested_aspect_ids=["price"],
         ),
     )
     assert plan.price_plan.kind == "single"
@@ -983,7 +1005,7 @@ def test_real_service_price_package() -> None:
     assert "за одну челюсть" in text
 
 
-def test_real_fullcontext_content_package_clinic_flow() -> None:
+def test_structural_package_clinic_content_flow() -> None:
     spec = TargetResponseSpec(
         response_mode="answer",
         service_id=None,
@@ -991,7 +1013,8 @@ def test_real_fullcontext_content_package_clinic_flow() -> None:
         allowed_topics=("clinic",),
         required_components=("content",),
     )
-    bound = assemble_target_fullcontext_content_bound_package(spec)
+    materials = replace(_materials(), service_id=None)
+    bound = _bound_package(spec=spec, materials=materials)
     assert bound.package.materials.service_id is None
     assert bound.package.plan.offer_ids == ()
     plan, _, resolved, text, _ = _run_flow(
@@ -999,7 +1022,7 @@ def test_real_fullcontext_content_package_clinic_flow() -> None:
             turn_frame=_turn_frame(service_id=None, topic=None),
             material_authority=_material_authority(bound_package=bound),
         ),
-        envelope=StrictTargetComposerEnvelope(
+        raw_json=_composer_json(
             route="ANSWER",
             mode="standard",
             patient_text="Общий ответ о клинике.",
@@ -1013,7 +1036,7 @@ def test_real_fullcontext_content_package_clinic_flow() -> None:
     assert text
 
 
-def test_real_fullcontext_doctors_package_clinic_flow() -> None:
+def test_structural_package_clinic_doctors_flow() -> None:
     spec = TargetResponseSpec(
         response_mode="answer",
         service_id=None,
@@ -1021,14 +1044,15 @@ def test_real_fullcontext_doctors_package_clinic_flow() -> None:
         allowed_topics=("doctors",),
         required_components=("doctors",),
     )
-    bound = assemble_target_fullcontext_doctors_bound_package(spec)
+    materials = replace(_materials(), service_id=None)
+    bound = _bound_package(spec=spec, materials=materials)
     assert bound.package.materials.service_id is None
     plan, _, resolved, text, _ = _run_flow(
         _sources(
             turn_frame=_turn_frame(service_id=None, topic="general_doctors_inquiry"),
             material_authority=_material_authority(bound_package=bound),
         ),
-        envelope=StrictTargetComposerEnvelope(
+        raw_json=_composer_json(
             route="ANSWER",
             mode="standard",
             patient_text="Ответ о врачах.",
@@ -1078,7 +1102,7 @@ def test_clarify_without_package_end_to_end() -> None:
             turn_frame=_turn_frame(service_id=None, topic=None),
             material_authority=_material_authority(bound_package=bound),
         ),
-        envelope=StrictTargetComposerEnvelope(route="CLARIFY", mode="standard", patient_text="Уточните вопрос."),
+        raw_json=_composer_json(route="CLARIFY", mode="standard", patient_text="Уточните вопрос."),
     )
     assert composer is not None
     assert isinstance(plan.route_authority, ComposerSelectedRouteAuthority)
@@ -1088,3 +1112,31 @@ def test_clarify_without_package_end_to_end() -> None:
     assert resolved.finalized_commercial_ids.price_offer_ids == ()
     assert resolved.finalized_commercial_ids.promo_fact_ids == ()
     assert text == "Уточните вопрос."
+
+
+def test_navigation_followups_missing_attribute_returns_empty_tuple() -> None:
+    from core.response_plan_production_adapter import _navigation_followups
+
+    package_without_attr = type(
+        "PackageWithoutNavigation",
+        (),
+        {"materials": object(), "plan": object(), "selected_followups": object()},
+    )()
+    bound = type("BoundWithoutNavigation", (), {"package": package_without_attr})()
+    assert _navigation_followups(bound) == ()
+
+
+def test_navigation_followups_preserves_existing_order() -> None:
+    from core.response_plan_production_adapter import _navigation_followups
+    from core.target_client_ui_nav import TargetNavigationFollowup
+
+    nav_a = TargetNavigationFollowup(label="Nav A", ref="nav:a")
+    nav_b = TargetNavigationFollowup(label="Nav B", ref="nav:b")
+    package = _PackageShim(
+        materials=object(),
+        plan=object(),
+        selected_followups=object(),
+        navigation_followups=(nav_a, nav_b),
+    )
+    bound = _BoundPackageShim(spec=object(), package=package)
+    assert _navigation_followups(bound) == (nav_a, nav_b)

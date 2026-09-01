@@ -183,7 +183,68 @@ is_background: false
 
 Docs-only contract checkpoint: не требуй уже реализованную будущую архитектуру в production code. Проверяй только allowlist diff и согласованность документов.
 
-## Архитектурные вопросы
+### COMPOSER-CONTRACT-1 (isolated, unwired)
+
+Дополнительно для checkpoint COMPOSER-CONTRACT-1:
+
+- policy sidecar не назван полным model input / complete prompt;
+- six-key published schema; five core fields без silent defaults;
+- fail-open `source_identity`: invalid/missing не уничтожает core answer;
+- `source_identity` — attestation, не context-strategy authority;
+- один structural parser (`parse_response_plan_composer_json`), один plan-aware adapter (`adapt_composer_envelope_to_plan`), resolver получает только `ComposerResult`;
+- duplicate JSON keys fatal на любом уровне;
+- requestable fact descriptors в sidecar, не bare IDs;
+- terminal/contact display text и phone не попадают в model payload;
+- новые untracked allowlist-файлы проверены отдельно от `git diff --check`;
+- конкретные pre/post WIP hashes вне allowlist;
+- production wiring, history/current-message/corpus assembly и provider/LIVE = 0;
+- после checker никаких файловых изменений.
+
+### COMPOSER-CONTRACT-1 correction pass 2
+
+Дополнительно к COMPOSER-CONTRACT-1 (supersedes prior ACCEPT if violated):
+
+- `ResponsePlanAdapterMaterialAuthority.bound_package` is **not** `Any` or unchecked `object`; contract-owned structural validation rejects plain `object()` at authority construction;
+- production adapter does not validate material package by class name;
+- public sidecar types are strict (`extra="forbid"`, `frozen=True`, `strict=True`);
+- `RequestableFactDescriptor` applicability matrix enforced (clinic_wide / topic_scoped / service_scoped);
+- `RoutePolicyEntry` purpose and `code_owned_visible_response` match closed route/mode matrix;
+- `route_policy_entry()` remains canonical builder; contradictory direct construction rejected;
+- tests named `test_real_*` must not describe structural shim fixtures as actual builder integration;
+- authoritative whitespace gate: `git -c core.whitespace=cr-at-eol diff --check` (not plain `git diff --check` on canonical CRLF).
+
+### ONE-CALL-ARCHITECTURE-1 (governance, docs-only)
+
+Дополнительно для checkpoint ONE-CALL-ARCHITECTURE-1 (включая correction pass):
+
+- target flow в `docs/ONE_CALL_ARCHITECTURE.md` непротиворечив и устраняет chicken-and-egg между pre-Composer selection и post-Composer materialization;
+- `ComposerInputContext` до вызова не содержит final semantic scope/service/price/requested facts для free-text;
+- `ComposerDecision` target содержит `service_reference_kind`, nullable `topic_id`, `explicit_service_id`, `requested_aspect_ids` (`AspectKind`), `patient_situation`; нет `price_text` и `recommended_service_ids`;
+- session follow-up («А сколько стоит?») = `active_session`, не fake `explicit_service_id`;
+- `topic_id` key required, value nullable; scope derivation documented;
+- `requested_aspect_ids` exactly reuses closed `AspectKind`; no aliases;
+- code-ranked services → mandatory `ServiceOptionsBlock` lane (max 3); no duplicate with price block; terminal routes forbid service options;
+- `explicit_service_id` = только при `explicit_current` (явно названная услуга в текущем сообщении);
+- service ranking и price — code-owned после Composer;
+- `source_identity` — diagnostic-only;
+- `facts.json` — единый источник с независимыми проекциями;
+- historical six-key COMPOSER-CONTRACT-1 schema явно помечена superseded, not implementation target;
+- implementation gaps явно перечислены; отсутствие реализации не является REJECT;
+- pre/post non-allowlist WIP fingerprint совпадает;
+- runtime/tests/provider/LIVE/staging/commit/push = 0;
+- после checker никаких файловых изменений.
+
+### ONE-CALL-ARCHITECTURE-1 correction pass
+
+Material correction к architecture gate выше. Требует один re-check. После ACCEPT следующий checker — только на complete executor. Не запускать checker на промежуточных Composer micro-steps.
+
+## Checker cadence
+
+- checker **не** запускается после каждого micro-step;
+- обязательные checker gates: final architecture contract, complete executor, cutover, legacy removal;
+- correction re-check требуется только после REJECT или material post-checker changes;
+- ONE-CALL-ARCHITECTURE-1 correction pass = material change → один re-check; после ACCEPT следующий checker только на complete executor;
+- не запускать checker на промежуточных Composer micro-steps.
 
 Ты не придумываешь новую архитектуру и не выбираешь за владельца между новыми вариантами. Но обязан проверять соответствие уже утверждённой архитектуре, acceptance-критериям и продуктовым инвариантам.
 

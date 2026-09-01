@@ -99,6 +99,26 @@
 - [ ] **Blocking/streaming parity:** один plan/render path; различие только transport.
 - [ ] **No semantic regex gates** для медицинского/коммерческого смысла до/после Composer.
 - [ ] **No permanent old/new fallback** между TFC Product Runtime и one-call path после cutover.
+- [ ] **COMPOSER-CONTRACT-1 (unwired):** published six-key Composer schema; five core fields without defaults; fail-open `source_identity`; policy sidecar is not full prompt; parser/adapter/resolver boundary not duplicated; production runtime not wired; `bound_package` is contract-owned structural type (not `Any`); public sidecar types are strict; shim tests are not reported as real builder integration.
+
+### C5. ONE-CALL-ARCHITECTURE-1 (`docs/ONE_CALL_ARCHITECTURE.md`)
+
+Применяется к checkpoint'ам, фиксирующим или реализующим целевой one-call flow:
+
+- [ ] **No semantic planner before Composer:** free-text ход не использует legacy planner, regex/keyword classifier или pre-Composer semantic route/service/situation authority.
+- [ ] **One free-text LLM call:** обычный free-text ход = ровно один provider/Composer call; deterministic typed UI bypass = ноль вызовов.
+- [ ] **ComposerDecision semantic fields:** target output содержит `service_reference_kind`, nullable `topic_id`, `explicit_service_id`, `requested_aspect_ids` (`AspectKind`), `patient_situation`, `requested_fact_ids` — достаточно для post-Composer selection без анализа `patient_text`.
+- [ ] **Session follow-up:** «А сколько стоит?» после обсуждения услуги использует `service_reference_kind=active_session`, а не fake `explicit_service_id` из session.
+- [ ] **Topic nullable:** `topic_id` key required, value nullable; отсутствие topic не ломает clinic-wide flow и не означает CLARIFY само по себе.
+- [ ] **AspectKind closed:** `requested_aspect_ids` exactly reuses `contracts.answer_plan.AspectKind`; `composition` не alias для `included`.
+- [ ] **ServiceOptionsBlock:** code-ranked services материализуются в typed `ServiceOptionsBlock` (max 3); terminal routes запрещают service options.
+- [ ] **No price/service duplicate:** `ServiceOptionsBlock` не дублирует варианты, уже показанные canonical price block.
+- [ ] **No model-owned service recommendation:** Composer не формирует `recommended_service_ids` и не ранжирует услуги в `patient_text`; ranking — code-owned после merge/applicability/strategy.
+- [ ] **Price code-owned:** нет `price_text` в target; price intent через `requested_aspect_ids`; canonical price block только в Resolver/Renderer.
+- [ ] **Requestable facts independent:** inventory из `facts.json` не зависит от automatic marketing selection.
+- [ ] **Post-Composer selection deterministic:** scope merge, applicability, strategy, materialization — код, не модель и не парсинг `patient_text`.
+- [ ] **Session not from text:** session writer получает finalized typed delta; visible text не анализируется для восстановления IDs/ситуации.
+- [ ] **FullContext corpus ≠ legacy runtime:** cached FullContext corpus — target knowledge input; legacy multi-call FullContext runtime — отдельный migration debt, не путать.
 
 ---
 

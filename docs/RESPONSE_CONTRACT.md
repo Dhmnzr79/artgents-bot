@@ -1,8 +1,9 @@
 # Response Contract — one-call architecture
 
-**Status:** owner-approved target contract (CHECKPOINT 2 — RESPONSE-CONTRACT-1)
-**Baseline:** `1cf8bbd200bddf5732b5723d25dc34fcc1545ac0`
+**Status:** owner-approved target contract (RESPONSE-CONTRACT-1 + ONE-CALL-ARCHITECTURE-1)
+**Baseline:** `14de4a9a051dbf625acbdfc35b37392a5919e623`
 **Scope:** target one-call path; does not require immediate runtime cutover.
+**Architecture canon:** `docs/ONE_CALL_ARCHITECTURE.md` (flow order, `ComposerInputContext` / `ComposerDecision`, authority boundaries).
 
 ---
 
@@ -14,15 +15,23 @@
 | **Full Context Strategy (FC)** | Context volume strategy for one-call Composer: full prepared MD corpus passed into a single call. Compared with curated/hybrid variants in experiments. |
 | **Hybrid Strategy** | Future compact-context selection with Full Context fallback. Uses the **same** lower pipeline as FC — no separate renderer. |
 
-**Shared lower path (FC and Hybrid):**
+**Target free-text path (FC and Hybrid share lower pipeline):**
 
 ```text
-PreComposerPlan
-→ Composer
+ComposerInputContext
+→ ONE Composer call (one provider call)
+→ ComposerDecision
+→ deterministic scope/session merge
+→ applicability filter + clinic strategy ranking
+→ response-plan materialization
 → ResolvedResponsePlan
 → TextRenderer
 → UIProjection
 ```
+
+See `docs/ONE_CALL_ARCHITECTURE.md` for full flow and chicken-and-egg resolution.
+
+**Legacy note:** current unwired WIP still names `PreComposerPlan` before Composer; that premature semantic selection is **migration debt** on free-text turns.
 
 Separate Hybrid renderer is **forbidden**. Permanent old/new runtime fallback is **forbidden**.
 
@@ -99,6 +108,110 @@ No semantic regex classification of Russian text before Composer.
 
 ## 4. Composer contract
 
+### 4.1 ONE-CALL-ARCHITECTURE-1 — target `ComposerDecision`
+
+Governance checkpoint ONE-CALL-ARCHITECTURE-1 fixes the authoritative order. Full semantics: `docs/ONE_CALL_ARCHITECTURE.md`.
+
+**Pre-call (`ComposerInputContext`):** current message, history, FullContext corpus, session with provenance, route/mode policy, topic taxonomy, service descriptors, requestable fact descriptors, allowed aspect IDs, static instructions. Must **not** preselect final scope, service, offers, price plan, requested facts, or free-text route.
+
+**Post-call (`ComposerDecision`) — minimum fields:**
+
+| Field | Authority |
+|---|---|
+| `route`, `mode` | Composer (closed pairs) |
+| `patient_text` | Composer natural prose; not price/facts/contacts |
+| `service_reference_kind` | Composer; closed: `none` / `explicit_current` / `active_session` |
+| `topic_id` | Composer; allowed client topic ID or `null` (key required, value nullable) |
+| `explicit_service_id` | Required when `explicit_current`; `null` for `none` / `active_session` |
+| `requested_aspect_ids` | Composer; closed `contracts.answer_plan.AspectKind` values |
+| `patient_situation` | Composer describes axes; code selects treatment/services |
+| `requested_fact_ids` | Composer; explicit requests only |
+| `source_identity` | Diagnostic attestation only; optional/nullable |
+
+**Not in target output:** `price_text`, `recommended_service_ids`.
+
+**`service_reference_kind`:** session follow-up («А сколько стоит?» after service discussion) uses `active_session` with `explicit_service_id=null`; code validates `active_session_service_id`. Topic switch uses `none`. Explicit name in current message uses `explicit_current` with non-null `explicit_service_id`.
+
+**`topic_id`:** nullable; missing topic is not an error and does not alone imply CLARIFY. Scope derivation: valid `explicit_current` → service scope; validated `active_session` → service scope; else non-null `topic_id` → topic scope; else clinic scope.
+
+**`requested_aspect_ids`:** exactly reuses closed `AspectKind` (`price`, `payment`, `warranty`, `pain`, `included`, `duration`, `comparison`, `stages`, `overview`, `contacts`, `contact_phone`, `contact_address`, `contact_parking`, `contact_hours`, `contact_whatsapp`, `service_availability`). No aliases; `composition` ≠ `included`.
+
+**Service recommendations:** code ranks services → typed `ServiceOptionsBlock` in frozen plan (max 3 options). Composer must not list/rank in `patient_text`. Terminal routes forbid service options. No duplicate with price block variants.
+
+**Price:** intent via `requested_aspect_ids` (e.g. `["price"]`); canonical price block is code-owned. `price_text` and `model_price_text` are **migration debt**.
+
+**Facts:** single source `facts.json` with independent projections (requestable inventory, promo, automatic amplifiers). Requestable inventory does not depend on automatic marketing selection.
+
+**Forbidden:** semantic planner before Composer; semantic verifier after Composer; analyzing `patient_text` to recover IDs, topic, service, situation, price, or session delta.
+
+### 4.0 COMPOSER-CONTRACT-1 (historical unwired WIP — superseded, not implementation target)
+
+> **Historical note:** isolated six-key schema from an earlier checkpoint. **Superseded** by §4.1 `ComposerDecision`. Retained for audit of existing unwired Python WIP only. Do not implement new work against this schema.
+
+Historical unwired JSON schema — exactly six top-level keys:
+
+```json
+{
+  "route": "ANSWER",
+  "mode": "standard",
+  "patient_text": "Естественный ответ пациенту.",
+  "price_text": null,
+  "requested_fact_ids": [],
+  "source_identity": {
+    "primary_content_ref": "clinic__info__consultation.md",
+    "used_content_refs": ["clinic__info__consultation.md"]
+  }
+}
+```
+
+Five core response fields (`route`, `mode`, `patient_text`, `price_text`, `requested_fact_ids`) are mandatory without defaults. `source_identity` is mandatory in the published schema but fail-open at runtime: missing/invalid identity becomes `None` with a typed provenance warning; core response continues.
+
+`source_identity` is model-reported provenance attestation only. It does not choose FullContext/Hybrid (`PreComposerPlan.context_strategy` is code-selected), does not prove which corpus was passed, and is not fact authority.
+
+Policy sidecar from `PreComposerPlan` is **not** a complete Composer prompt. Future full input composition:
+
+```text
+static Composer instructions
++ selected model corpus/context
++ current user message
++ recent dialogue history
++ serialized plan-derived policy sidecar
+```
+
+Isolated chain (not production-wired):
+
+```text
+raw JSON
+→ parse_response_plan_composer_json
+→ ParsedComposerEnvelope
+→ adapt_composer_envelope_to_plan
+→ AdaptedComposerOutput
+   ├─ ComposerResult  → resolve_response_plan
+   ├─ TargetComposerSourceIdentity | None  (not passed to resolver)
+   └─ provenance warnings
+```
+
+Parser is plan-agnostic. Adapter enforces route authority and plan `allowed_route_modes`. Resolver receives only `ComposerResult`.
+
+**Material authority boundary (COMPOSER-CONTRACT-1 correction pass 2):** `ResponsePlanAdapterMaterialAuthority.bound_package` is a contract-owned structural view (`ResponsePlanAdapterBoundPackage`), not `Any` or unchecked `object`. Runtime validation requires:
+
+```text
+bound_package
+├── spec
+├── package
+│   ├── materials
+│   ├── plan
+│   ├── selected_followups
+│   └── navigation_followups (tuple; empty when absent)
+└── selected_cta_key (str | None)
+```
+
+`_validate_package_coherence()` in production adapter remains authority for semantic spec/materials/plan coherence. The contract boundary rejects invalid shape before coherence checks.
+
+**Policy sidecar strictness:** public sidecar types use `extra="forbid"`, `frozen=True`, `strict=True`. `RequestableFactDescriptor` enforces applicability matrix (clinic_wide / topic_scoped / service_scoped). `RoutePolicyEntry` purpose and `code_owned_visible_response` must match the closed route/mode matrix. `route_policy_entry()` is the canonical builder for route policy entries.
+
+**Builder integration note:** structural contract fixtures may validate adapter boundaries offline. Actual concrete bound-package builders (`assemble_target_fullcontext_*`, etc.) remain an integration boundary when import chains require `config.py`; shim tests must not be named or reported as real builder integration.
+
 Canonical requested-facts field:
 
 ```text
@@ -107,15 +220,9 @@ requested_fact_ids
 
 (`direct_fact_ids` exists in legacy runtime only; target contract replaces it. No permanent compatibility layer.)
 
-Composer returns at minimum:
+**Target (§4.1)** Composer returns: `route`, `mode`, `patient_text`, `service_reference_kind`, `topic_id` (nullable), `explicit_service_id`, `requested_aspect_ids` (`AspectKind`), `patient_situation`, `requested_fact_ids`, optional `source_identity`. No `price_text`.
 
-- `route`
-- `mode` (if separate closed field)
-- `patient_text`
-- `price_text` (only when allowed)
-- `requested_fact_ids`
-- service reference fields
-- other necessary closed semantic fields
+**Historical WIP (§4.0)** documents superseded six-key schema including `price_text` — not an implementation target.
 
 Rules:
 
@@ -123,7 +230,7 @@ Rules:
 - code-owned exact commercial blocks are **not** duplicated in `patient_text`
 - `requested_fact_ids` = facts the patient **directly asked about**
 - catalog presence alone does **not** make a fact requested
-- `price_text` only on allowed price turn
+- price intent via `requested_aspect_ids` (e.g. `["price"]`); canonical price is code-owned (§4.1). Legacy `price_text` / `model_price_text` — migration debt only
 - ADMIN: no selling `patient_text`
 - CLARIFY: no commercial catalog
 - Composer does **not** choose automatic promo/amplifiers
@@ -163,12 +270,15 @@ PRICE LANE: exact_price — sole owner of amount / currency / unit
 
 At most **one** visible price block per plan.
 
+**Target (ONE-CALL-ARCHITECTURE-1):** Composer does not output price. Price request = `requested_aspect_ids` containing `price`; Resolver/Renderer insert the single canonical block. Multi-price is fully code-owned.
+
 | Situation | Decision |
 |---|---|
-| valid model `price_text` | usable only after exact match with canonical offer data |
-| missing/invalid model `price_text` | canonical fallback |
+| price aspect requested | code selects applicable offer(s); canonical block from code |
 | multiple offers | canonical multi block from code |
 | inactive / inapplicable / unsafe offer | its price not shown; `patient_text` preserved |
+
+**Migration debt:** legacy paths may still accept `price_text` / `model_price_text` with exact-string match — remove in implementation checkpoint.
 
 **Required offer conditions** — closed target-contract enum. Initial approved set (no arbitrary string IDs):
 
@@ -252,7 +362,21 @@ No regex for «гарантия» / «надёжность».
 
 ## 10. Visible order and caps
 
-### Normal answer
+### Normal answer (with service options)
+
+When `ServiceOptionsBlock` is materialized:
+
+```text
+patient_text
+→ ServiceOptionsBlock
+→ requested facts
+→ up to 1 service_value
+→ up to 2 promo
+→ one list, max 2 automatic amplifiers
+→ CTA
+```
+
+### Normal answer (without service options)
 
 ```text
 patient_text + requested facts
@@ -271,6 +395,8 @@ canonical price + required offer conditions
 → one list, max 4 automatic amplifiers
 → CTA
 ```
+
+If canonical price block already shows selected variants, separate `ServiceOptionsBlock` is **forbidden** as duplicate.
 
 No automatic `service_value` on price answer.
 
@@ -365,10 +491,12 @@ Must not: re-select commercial facts; create commercial IDs; recover IDs from vi
 
 ## 15. Blocking / streaming parity
 
+**Target path:**
+
 ```text
 /ask and /ask/stream
-→ one PreComposerPlan
-→ one Composer contract
+→ one ComposerInputContext
+→ one ComposerDecision
 → one ResolvedResponsePlan
 → one TextRenderer
 → one UIProjection
@@ -380,6 +508,8 @@ Transport differs only.
 ```text
 /ask visible text == fully assembled /ask/stream visible text
 ```
+
+**Legacy note:** older diagrams referencing `PreComposerPlan` describe migration-debt wiring, not the target free-text path (see §1).
 
 ---
 
@@ -416,47 +546,64 @@ Missing replay field → `not_captured`. Do not reconstruct provenance from visi
 
 ## 18. Examples
 
-### 1. Single price
+### 1. Single price (explicit service)
 
 **Пациент:** «Сколько стоит имплант Implantium?»
-**Composer:** `route=ANSWER`, `price_text` (if exact match) or empty, `requested_fact_ids=[]`
-**Resolved roles:** one `exact_price` block; optional promo/amplifiers within caps
+**Composer:** `route=ANSWER`, `service_reference_kind=explicit_current`, `explicit_service_id=implantium`, `requested_aspect_ids=["price"]`, `requested_fact_ids=[]`
+**Resolved roles:** one `exact_price` block from code; optional promo/amplifiers within caps
 **Visible:** canonical price + conditions → patient_text → optional commercial blocks → CTA
-**Запрещено:** second price block; warranty without request
+**Запрещено:** second price block; warranty without request; model-owned price text
 
-### 2. Multi price
+### 2. Session follow-up price
+
+**Ранее:** обсуждение All-on-4
+**Пациент:** «А сколько стоит?»
+**Composer:** `service_reference_kind=active_session`, `explicit_service_id=null`, `requested_aspect_ids=["price"]`
+**Resolved:** code validates session service → canonical price block for validated service
+**Visible:** canonical price + conditions → patient_text → …
+**Запрещено:** fake `explicit_service_id` copied from session
+
+### 3. Multi price
 
 **Пациент:** «Какие варианты имплантации по цене?»
-**Composer:** `price_text` ignored for multi
-**Resolved:** canonical multi from code
-**Visible:** multi block → patient_text → promo/amplifiers (no service_value)
+**Composer:** `requested_aspect_ids=["price"]`, `service_reference_kind=none`
+**Resolved:** canonical multi block from code
+**Visible:** multi block → patient_text → promo/amplifiers (no service_value; no duplicate ServiceOptionsBlock)
 **Запрещено:** model multi-price prose as authority
 
-### 3. Direct installment question
+### 4. Direct installment question
 
 **Пациент:** «Есть рассрочка?»
-**Composer:** `requested_fact_ids=["installment_12"]`
+**Composer:** `requested_fact_ids=["installment_12"]`, `requested_aspect_ids=["payment"]`
 **Resolved:** `installment_12` → `requested_fact` only
 **Visible:** patient_text + requested fact paragraph
 **Запрещено:** same fact again as automatic amplifier; cap consumption
 
-### 4. Explicit warranty question
+### 5. Explicit warranty question
 
 **Пациент:** «Какая гарантия на импланты?»
-**Composer:** `requested_fact_ids=["implant_warranty"]`
+**Composer:** `requested_aspect_ids=["warranty"]`, `requested_fact_ids=["implant_warranty"]`
 **Resolved:** `requested_fact` once
 **Visible:** patient_text + warranty text once
 **Запрещено:** automatic warranty; promo duplicate
 
-### 5. Ordinary implant question (no warranty)
+### 6. Ordinary implant question (no warranty)
 
 **Пациент:** «Расскажите про имплантацию»
-**Composer:** `requested_fact_ids=[]`
+**Composer:** `requested_aspect_ids=["overview"]`, `requested_fact_ids=[]`
 **Resolved:** no warranty role
 **Visible:** patient_text + optional promo/amplifiers only
 **Запрещено:** `implant_warranty` in any automatic role
 
-### 6. Promotion optional failure
+### 7. Situation with service options
+
+**Пациент:** «У меня нет всех зубов сверху»
+**Composer:** `service_reference_kind=none`, `explicit_service_id=null`, `patient_situation.extent=full_arch`, `patient_situation.jaw=upper`
+**Resolved:** clinic strategy ranks services → `ServiceOptionsBlock` (max 3)
+**Visible:** patient_text → ServiceOptionsBlock → …
+**Запрещено:** Composer listing/ranking services in `patient_text`
+
+### 8. Promotion optional failure
 
 **Пациент:** «Есть акции на имплантацию?»
 **Composer:** valid `patient_text`, promotion intent
@@ -464,21 +611,32 @@ Missing replay field → `not_captured`. Do not reconstruct provenance from visi
 **Visible:** patient_text preserved; broken promo skipped
 **Запрещено:** fail-closed replacement of entire answer
 
-### 7. ADMIN / current medical problem
+### 9. ADMIN / current medical problem
 
 **Пациент:** «После имплантации стало хуже»
 **Composer:** `route=ADMIN`, `patient_text=null`
-**Resolved:** static admin plan; no commercial blocks
+**Resolved:** static admin plan; no commercial blocks; no ServiceOptionsBlock
 **Visible:** deterministic admin text + clinic phone only
 **Запрещено:** promo, amplifiers, service value, selling CTA, model prose
 
 ---
 
-## 19. Implementation checkpoints (out of scope here)
+## 19. Implementation gaps (ONE-CALL-ARCHITECTURE-1)
+
+Expected migration debt — not grounds for governance REJECT:
+
+- `PreComposerPlan` still carries premature final semantic scope/materials on free-text path
+- unwired Composer WIP (§4.0 historical) lacks `service_reference_kind`, nullable `topic_id`, `AspectKind` aspects, `patient_situation`
+- `ServiceOptionsBlock` target lane defined; Python implementation absent
+- `price_text` / `model_price_text` still in code
+- requestable facts still coupled to `PreComposerPlan.commercial_facts` in places
+- situation → clinic strategy → materialization not wired to new Response Plan
+- target executor absent; `/ask` and `/ask/stream` not cut over
+- legacy multi-call FullContext runtime remains default at flag=0
 
 Deferred to later checkpoints:
 
-- exact schema types for plans
+- exact schema types for plans and corrected `ComposerDecision` parser/adapter
 - renderer module cutover from `one_call_presentation_pass`
 - TFC runtime decommission timing
 - Hybrid context decision

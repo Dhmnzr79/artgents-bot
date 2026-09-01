@@ -20,6 +20,7 @@ from contracts.response_plan import (
 )
 from contracts.response_plan_composer import (
     COMPOSER_DECISION_DIAGNOSTIC_CODES,
+    COMPOSER_PRICE_HANDLING,
     CORE_RESPONSE_FIELDS,
     ComposerDecision,
     ComposerDecisionAuthority,
@@ -30,14 +31,12 @@ from contracts.response_plan_composer import (
     ComposerAdapterError,
     ComposerParserError,
     ComposerPolicySidecar,
-    PricePolicyMulti,
-    PricePolicyNone,
-    PricePolicySingle,
     RequestableFactDescriptor,
     RoutePolicyEntry,
     ServiceDescriptor,
     adapt_composer_envelope_to_decision,
     future_prompt_composition_parts,
+    is_valid_source_ref,
     is_valid_source_ref_basename,
     parse_response_plan_composer_json,
     published_target_schema_example,
@@ -123,25 +122,13 @@ def _service_descriptor(service_id: str) -> ServiceDescriptor:
     )
 
 
-def _price_policy_from_plan(plan: PreComposerPlan) -> PricePolicySingle | PricePolicyMulti | PricePolicyNone:
-    price_plan = plan.price_plan
-    if price_plan.kind == "none":
-        return PricePolicyNone()
-    if price_plan.kind == "single":
-        single = price_plan.single
-        assert single is not None
-        return PricePolicySingle(display_text=single.display_text, offer_id=single.offer_id)
-    multi = price_plan.multi
-    assert multi is not None
-    return PricePolicyMulti(display_text=multi.display_text, offer_ids=multi.offer_ids)
-
-
 def _composer_decision_authority_from_plan(plan: PreComposerPlan) -> ComposerDecisionAuthority:
     """Test-only bridge: build independent authority from an isolated PreComposerPlan."""
 
     route_authority = plan.route_authority
     if isinstance(route_authority, DeterministicBypassRouteAuthority):
         return ComposerDecisionAuthority(
+            source_client_id=plan.session_key.client_id,
             allowed_route_modes=(route_authority.route_mode,),
             allowed_topic_ids=(),
             service_descriptors=(),
@@ -200,6 +187,7 @@ def _composer_decision_authority_from_plan(plan: PreComposerPlan) -> ComposerDec
             )
 
     return ComposerDecisionAuthority(
+        source_client_id=plan.session_key.client_id,
         allowed_route_modes=route_authority.allowed_route_modes,
         allowed_topic_ids=tuple(sorted(topic_ids)),
         service_descriptors=tuple(_service_descriptor(service_id) for service_id in sorted(service_ids)),
@@ -207,7 +195,6 @@ def _composer_decision_authority_from_plan(plan: PreComposerPlan) -> ComposerDec
         active_session_service_id=plan.active_session_service_id,
         context_strategy=plan.context_strategy,
         history_turn_count=plan.history_turn_count,
-        price_policy=_price_policy_from_plan(plan),
         allowed_aspect_ids=tuple(get_args(AspectKind)),
         requestable_facts=tuple(requestable_facts),
     )
@@ -232,6 +219,7 @@ def _authority_with_source_refs(
     *refs: str,
 ) -> ComposerDecisionAuthority:
     return ComposerDecisionAuthority(
+        source_client_id=authority.source_client_id,
         allowed_route_modes=authority.allowed_route_modes,
         allowed_topic_ids=authority.allowed_topic_ids,
         service_descriptors=authority.service_descriptors,
@@ -239,7 +227,6 @@ def _authority_with_source_refs(
         active_session_service_id=authority.active_session_service_id,
         context_strategy=authority.context_strategy,
         history_turn_count=authority.history_turn_count,
-        price_policy=authority.price_policy,
         allowed_aspect_ids=authority.allowed_aspect_ids,
         requestable_facts=authority.requestable_facts,
     )
@@ -366,20 +353,23 @@ def test_static_instructions_require_exact_target_key_json_output() -> None:
     assert "source_identity is model attestation only" in instructions
 
 
-def test_future_prompt_composition_lists_five_parts() -> None:
+def test_future_prompt_composition_lists_seven_parts() -> None:
     parts = future_prompt_composition_parts()
-    assert len(parts) == 5
+    assert len(parts) == 7
     instructions = build_static_composer_instructions()
     for part in parts:
         assert part in instructions
 
 
-def test_sidecar_contains_context_strategy_not_source_identity_output() -> None:
-    plan = _composer_plan(context_strategy="hybrid")
+def test_sidecar_contains_price_handling_not_price_policy() -> None:
+    plan = _composer_plan()
     sidecar = _test_build_composer_policy_sidecar_from_plan(plan)
-    assert sidecar.context_strategy == "hybrid"
+    assert sidecar.price_handling == COMPOSER_PRICE_HANDLING
     serialized = serialize_composer_policy_sidecar(sidecar)
-    assert "source_identity" not in serialized
+    assert '"price_handling": "code_owned_after_decision"' in serialized
+    assert "price_policy" not in serialized
+    assert "offer_id" not in serialized
+    assert "display_text" not in serialized
 
 
 def test_sidecar_requestable_facts_only_for_requested_fact_role() -> None:
@@ -452,14 +442,6 @@ def test_equal_plan_yields_byte_identical_sidecar() -> None:
 
 def test_public_sidecar_types_reject_invalid_direct_construction() -> None:
     with pytest.raises(ValidationError):
-        PricePolicySingle(display_text="", offer_id="offer_a")
-    with pytest.raises(ValidationError):
-        PricePolicySingle(display_text="120 000 ₽", offer_id=" padded ")
-    with pytest.raises(ValidationError):
-        PricePolicyMulti(display_text="multi", offer_ids=("only_one",))
-    with pytest.raises(ValidationError):
-        PricePolicyMulti(display_text="multi", offer_ids=("a", "a"))
-    with pytest.raises(ValidationError):
         RoutePolicyEntry(
             route="ANSWER",
             mode="medical_terminal",
@@ -481,7 +463,6 @@ def test_public_sidecar_types_reject_invalid_direct_construction() -> None:
             service_descriptors=(),
             context_strategy="full_context",
             history_turn_count=0,
-            price_policy=PricePolicySingle(display_text="x", offer_id="y"),
             allowed_aspect_ids=("price",),
         )
     with pytest.raises(ValidationError, match="allowed_aspect_ids_empty"):
@@ -494,7 +475,6 @@ def test_public_sidecar_types_reject_invalid_direct_construction() -> None:
             service_descriptors=(_service_descriptor("svc_a"),),
             context_strategy="full_context",
             history_turn_count=0,
-            price_policy=PricePolicySingle(display_text="x", offer_id="y"),
             allowed_aspect_ids=(),
         )
 
@@ -612,10 +592,11 @@ def test_composer_policy_sidecar_rejects_bool_history_count() -> None:
         ComposerPolicySidecar(
             kind="policy_control",
             allowed_route_modes=(route_policy_entry("ANSWER", "standard"),),
-            response_scope="clinic",
+            allowed_topic_ids=(),
+            service_descriptors=(),
             context_strategy="full_context",
             history_turn_count=True,  # type: ignore[arg-type]
-            price_policy=PricePolicySingle(display_text="x", offer_id="y"),
+            allowed_aspect_ids=("price",),
         )
 
 
@@ -624,10 +605,11 @@ def test_composer_policy_sidecar_rejects_string_history_count() -> None:
         ComposerPolicySidecar(
             kind="policy_control",
             allowed_route_modes=(route_policy_entry("ANSWER", "standard"),),
-            response_scope="clinic",
+            allowed_topic_ids=(),
+            service_descriptors=(),
             context_strategy="full_context",
             history_turn_count="1",  # type: ignore[arg-type]
-            price_policy=PricePolicySingle(display_text="x", offer_id="y"),
+            allowed_aspect_ids=("price",),
         )
 
 
@@ -646,10 +628,11 @@ def test_composer_policy_sidecar_rejects_extra_fields() -> None:
         ComposerPolicySidecar(
             kind="policy_control",
             allowed_route_modes=(route_policy_entry("ANSWER", "standard"),),
-            response_scope="clinic",
+            allowed_topic_ids=(),
+            service_descriptors=(),
             context_strategy="full_context",
             history_turn_count=0,
-            price_policy=PricePolicySingle(display_text="x", offer_id="y"),
+            allowed_aspect_ids=("price",),
             unexpected=True,  # type: ignore[call-arg]
         )
 
@@ -659,10 +642,11 @@ def test_composer_policy_sidecar_rejects_list_for_tuple_field() -> None:
         ComposerPolicySidecar(
             kind="policy_control",
             allowed_route_modes=[route_policy_entry("ANSWER", "standard")],  # type: ignore[list-item]
-            response_scope="clinic",
+            allowed_topic_ids=(),
+            service_descriptors=(),
             context_strategy="full_context",
             history_turn_count=0,
-            price_policy=PricePolicySingle(display_text="x", offer_id="y"),
+            allowed_aspect_ids=("price",),
         )
 
 
@@ -671,15 +655,22 @@ def test_composer_policy_sidecar_rejects_list_for_tuple_field() -> None:
     [
         ("clinic__info__consultation.md", True),
         ("some_source.md", True),
+        ("a_first/service_a.md", True),
+        ("doctors/doctor_a.md", True),
         ("../secret.md", False),
-        ("folder/file.md", False),
-        ("folder\\file.md", False),
+        ("a/../secret.md", False),
+        ("/absolute.md", False),
+        ("C:\\secret.md", False),
+        ("a\\secret.md", False),
+        ("https://host/doc.md", False),
+        ("a//b.md", False),
         ("file.txt", False),
         (" source.md", False),
         ("source.md ", False),
     ],
 )
-def test_source_ref_basename_validation_matrix(ref: str, expected: bool) -> None:
+def test_source_ref_validation_matrix(ref: str, expected: bool) -> None:
+    assert is_valid_source_ref(ref) is expected
     assert is_valid_source_ref_basename(ref) is expected
 
 
@@ -1136,12 +1127,12 @@ def test_composer_decision_authority_rejects_duplicate_service_descriptor_id() -
     duplicate = _service_descriptor("svc_a")
     with pytest.raises(ValueError, match="service_descriptor_id_duplicate"):
         ComposerDecisionAuthority(
+            source_client_id=base.source_client_id,
             allowed_route_modes=base.allowed_route_modes,
             allowed_topic_ids=base.allowed_topic_ids,
             service_descriptors=(duplicate, duplicate),
             context_strategy=base.context_strategy,
             history_turn_count=base.history_turn_count,
-            price_policy=base.price_policy,
             allowed_aspect_ids=base.allowed_aspect_ids,
         )
 
@@ -1150,13 +1141,13 @@ def test_composer_decision_authority_rejects_duplicate_source_ref() -> None:
     base = _composer_decision_authority_from_plan(_composer_plan())
     with pytest.raises(ValueError, match="allowed_source_ref_duplicate"):
         ComposerDecisionAuthority(
+            source_client_id=base.source_client_id,
             allowed_route_modes=base.allowed_route_modes,
             allowed_topic_ids=base.allowed_topic_ids,
             service_descriptors=base.service_descriptors,
             allowed_source_refs=("allowed.md", "allowed.md"),
             context_strategy=base.context_strategy,
             history_turn_count=base.history_turn_count,
-            price_policy=base.price_policy,
             allowed_aspect_ids=base.allowed_aspect_ids,
         )
 
@@ -1173,13 +1164,13 @@ def test_composer_decision_authority_rejects_invalid_source_refs(refs: tuple[str
     base = _composer_decision_authority_from_plan(_composer_plan())
     with pytest.raises(ValueError, match=error):
         ComposerDecisionAuthority(
+            source_client_id=base.source_client_id,
             allowed_route_modes=base.allowed_route_modes,
             allowed_topic_ids=base.allowed_topic_ids,
             service_descriptors=base.service_descriptors,
             allowed_source_refs=refs,
             context_strategy=base.context_strategy,
             history_turn_count=base.history_turn_count,
-            price_policy=base.price_policy,
             allowed_aspect_ids=base.allowed_aspect_ids,
         )
 
@@ -1199,12 +1190,12 @@ def test_composer_decision_authority_rejects_invalid_active_session_service_id(
     base = _composer_decision_authority_from_plan(_composer_plan())
     with pytest.raises(ValueError, match=error):
         ComposerDecisionAuthority(
+            source_client_id=base.source_client_id,
             allowed_route_modes=base.allowed_route_modes,
             allowed_topic_ids=base.allowed_topic_ids,
             service_descriptors=base.service_descriptors,
             active_session_service_id=active_session_service_id,
             context_strategy=base.context_strategy,
             history_turn_count=base.history_turn_count,
-            price_policy=base.price_policy,
             allowed_aspect_ids=base.allowed_aspect_ids,
         )

@@ -257,7 +257,18 @@ def test_source_identity_duplicate_json_key_fatal() -> None:
 
 
 def test_invalid_source_ref_examples_warn_and_drop_identity() -> None:
-    for ref in ("../secret.md", "folder/file.md", "folder\\file.md", "file.txt", " source.md", "source.md "):
+    for ref in (
+        "../secret.md",
+        "a/../secret.md",
+        "/absolute.md",
+        "C:\\secret.md",
+        "a\\secret.md",
+        "https://host/doc.md",
+        "a//b.md",
+        "file.txt",
+        " source.md",
+        "source.md ",
+    ):
         parsed = parse_response_plan_composer_json(
             _json(
                 source_identity={
@@ -270,17 +281,17 @@ def test_invalid_source_ref_examples_warn_and_drop_identity() -> None:
         assert any(item.code == "source_identity_invalid_ref" for item in parsed.warnings)
 
 
-def test_valid_unknown_source_ref_attestation_preserved() -> None:
+def test_valid_nested_source_ref_attestation_preserved() -> None:
     parsed = parse_response_plan_composer_json(
         _json(
             source_identity={
-                "primary_content_ref": "some_source.md",
-                "used_content_refs": ["some_source.md"],
+                "primary_content_ref": "a_first/service_a.md",
+                "used_content_refs": ["a_first/service_a.md"],
             }
         )
     )
     assert parsed.envelope.source_identity is not None
-    assert parsed.envelope.source_identity.used_content_refs == ("some_source.md",)
+    assert parsed.envelope.source_identity.used_content_refs == ("a_first/service_a.md",)
 
 
 def test_terminal_route_with_identity_dropped_by_adapter() -> None:

@@ -632,13 +632,13 @@ def test_stale_active_session_fail_open() -> None:
         )
     )
     authority = ComposerDecisionAuthority(
+        source_client_id=authority.source_client_id,
         allowed_route_modes=authority.allowed_route_modes,
         allowed_topic_ids=authority.allowed_topic_ids,
         service_descriptors=authority.service_descriptors,
         active_session_service_id=None,
         context_strategy=authority.context_strategy,
         history_turn_count=authority.history_turn_count,
-        price_policy=authority.price_policy,
         allowed_aspect_ids=authority.allowed_aspect_ids,
         requestable_facts=authority.requestable_facts,
     )

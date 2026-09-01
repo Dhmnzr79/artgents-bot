@@ -136,7 +136,8 @@ _TERMINAL_CODE_OWNED_PAIRS: frozenset[tuple[ResponseRoute, ResponseMode]] = froz
     }
 )
 _SOURCE_REF_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
-_VALID_SOURCE_REF_BASENAME = re.compile(r"^[^\s/\\][^/\\]*\.md$")
+_URI_SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
+_WINDOWS_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:[/\\]")
 
 
 class ComposerContractModel(BaseModel):
@@ -166,7 +167,6 @@ def _unique_non_blank_ids(values: tuple[str, ...], *, duplicate_error: str) -> t
 
 ExactNonBlankStr = Annotated[str, AfterValidator(_require_exact_non_blank)]
 UniqueFactIds = Annotated[tuple[str, ...], AfterValidator(lambda v: _unique_non_blank_ids(v, duplicate_error="fact_id_duplicate"))]
-UniqueOfferIds = Annotated[tuple[str, ...], AfterValidator(lambda v: _unique_non_blank_ids(v, duplicate_error="offer_id_duplicate"))]
 UniqueServiceIds = Annotated[
     tuple[str, ...],
     AfterValidator(lambda v: _unique_non_blank_ids(v, duplicate_error="allowed_service_id_duplicate")),
@@ -177,26 +177,44 @@ UniqueTopicIds = Annotated[
 ]
 
 
-def source_ref_basename_invalid_reason(ref: str) -> str | None:
+def source_ref_invalid_reason(ref: str) -> str | None:
     if not ref:
         return "blank"
     if ref != ref.strip():
         return "padded"
-    if "/" in ref or "\\" in ref:
-        return "path_separator"
-    if ".." in ref:
-        return "parent_segment"
     if _SOURCE_REF_CONTROL_CHARS.search(ref):
         return "control_character"
+    if ref.startswith("/"):
+        return "absolute"
+    if "\\" in ref:
+        return "backslash"
+    if _WINDOWS_DRIVE_PREFIX.match(ref):
+        return "drive_prefix"
+    if _URI_SCHEME.match(ref):
+        return "uri_scheme"
     if not ref.endswith(".md"):
         return "extension"
-    if not _VALID_SOURCE_REF_BASENAME.fullmatch(ref):
-        return "basename_shape"
+    if "//" in ref:
+        return "empty_segment"
+    segments = ref.split("/")
+    for segment in segments:
+        if not segment:
+            return "empty_segment"
+        if segment in (".", ".."):
+            return "parent_segment"
     return None
 
 
+def is_valid_source_ref(ref: str) -> bool:
+    return source_ref_invalid_reason(ref) is None
+
+
+def source_ref_basename_invalid_reason(ref: str) -> str | None:
+    return source_ref_invalid_reason(ref)
+
+
 def is_valid_source_ref_basename(ref: str) -> bool:
-    return source_ref_basename_invalid_reason(ref) is None
+    return is_valid_source_ref(ref)
 
 
 class ComposerParserError(ValueError):
@@ -280,6 +298,7 @@ AdaptedComposerOutput = AdaptedComposerDecision
 class ComposerDecisionAuthority:
     """Plan-agnostic authority for adapting parsed Composer output."""
 
+    source_client_id: str
     allowed_route_modes: tuple[RouteModePair, ...]
     allowed_topic_ids: tuple[str, ...]
     service_descriptors: tuple["ServiceDescriptor", ...]
@@ -288,11 +307,15 @@ class ComposerDecisionAuthority:
     active_session_service_id: str | None = None
     context_strategy: ContextStrategy = "full_context"
     history_turn_count: int = 0
-    price_policy: PricePolicyDescriptor | None = None
     allowed_aspect_ids: tuple[AspectKind, ...] = ()
     requestable_facts: tuple[RequestableFactDescriptor, ...] = ()
 
     def __post_init__(self) -> None:
+        if not self.source_client_id:
+            raise ValueError("source_client_id_blank")
+        if self.source_client_id != self.source_client_id.strip():
+            raise ValueError("source_client_id_padded")
+
         seen_service_ids: set[str] = set()
         for descriptor in self.service_descriptors:
             if descriptor.service_id in seen_service_ids:
@@ -305,6 +328,9 @@ class ComposerDecisionAuthority:
                 raise ValueError("allowed_source_ref_blank")
             if ref != ref.strip():
                 raise ValueError("allowed_source_ref_padded")
+            invalid_reason = source_ref_invalid_reason(ref)
+            if invalid_reason is not None:
+                raise ValueError(f"allowed_source_ref_invalid:{invalid_reason}")
             if ref in seen_source_refs:
                 raise ValueError("allowed_source_ref_duplicate")
             seen_source_refs.add(ref)
@@ -341,29 +367,7 @@ class RoutePolicyEntry(ComposerContractModel):
         return self
 
 
-class PricePolicyNone(ComposerContractModel):
-    kind: Literal["none"] = "none"
-
-
-class PricePolicySingle(ComposerContractModel):
-    kind: Literal["single"] = "single"
-    display_text: ExactNonBlankStr
-    offer_id: ExactNonBlankStr
-
-
-class PricePolicyMulti(ComposerContractModel):
-    kind: Literal["multi"] = "multi"
-    display_text: ExactNonBlankStr
-    offer_ids: UniqueOfferIds
-
-    @model_validator(mode="after")
-    def _validate_offer_count(self) -> Self:
-        if not (2 <= len(self.offer_ids) <= 3):
-            raise ValueError("multi_price_requires_two_or_three_offers")
-        return self
-
-
-PricePolicyDescriptor = PricePolicySingle | PricePolicyMulti | PricePolicyNone
+COMPOSER_PRICE_HANDLING = "code_owned_after_decision"
 
 
 class RequestableFactDescriptor(ComposerContractModel):
@@ -427,7 +431,7 @@ class ComposerPolicySidecar(ComposerContractModel):
     active_session_service_id: str | None = None
     context_strategy: ContextStrategy
     history_turn_count: int = Field(ge=0)
-    price_policy: PricePolicyDescriptor
+    price_handling: Literal["code_owned_after_decision"] = COMPOSER_PRICE_HANDLING
     allowed_aspect_ids: tuple[AspectKind, ...]
     requestable_facts: tuple[RequestableFactDescriptor, ...] = ()
 
@@ -489,10 +493,12 @@ def published_target_schema_example() -> dict[str, object]:
 def future_prompt_composition_parts() -> tuple[str, ...]:
     return (
         "static Composer instructions",
-        "selected model corpus/context",
-        "current user message",
-        "recent dialogue history",
+        "current-client validated model FullContext corpus",
+        "document index",
         "serialized policy/control sidecar",
+        "normalized session context",
+        "recent dialogue history",
+        "current user message",
     )
 
 
@@ -705,7 +711,7 @@ def _parse_source_identity_value(
             return None, (
                 _warning("source_identity_invalid_type", ("used_content_refs", index, type(item).__name__)),
             )
-        invalid_reason = source_ref_basename_invalid_reason(item)
+        invalid_reason = source_ref_invalid_reason(item)
         if invalid_reason is not None:
             return None, (_warning("source_identity_invalid_ref", ("used_content_refs", index, invalid_reason)),)
         if item in seen:
@@ -715,7 +721,7 @@ def _parse_source_identity_value(
     if primary is not None:
         if not isinstance(primary, str):
             return None, (_warning("source_identity_invalid_type", ("primary_content_ref", type(primary).__name__)),)
-        invalid_reason = source_ref_basename_invalid_reason(primary)
+        invalid_reason = source_ref_invalid_reason(primary)
         if invalid_reason is not None:
             return None, (_warning("source_identity_invalid_ref", ("primary_content_ref", invalid_reason)),)
         if primary not in seen:

@@ -112,7 +112,7 @@ No semantic regex classification of Russian text before Composer.
 
 Governance checkpoint ONE-CALL-ARCHITECTURE-1 fixes the authoritative order. Full semantics: `docs/ONE_CALL_ARCHITECTURE.md`.
 
-**Pre-call (`ComposerInputContext`):** current message, history, FullContext corpus, session with provenance, route/mode policy, topic taxonomy, service descriptors, requestable fact descriptors, allowed aspect IDs, static instructions. Must **not** preselect final scope, service, offers, price plan, requested facts, or free-text route.
+**Pre-call (`ComposerInputContext`):** static instructions + current-client FullContext corpus + policy authority + normalized session context + typed recent history + current question. Must **not** preselect final scope, service, offers, price plan, requested facts, or free-text route. Policy sidecar declares `price_handling: "code_owned_after_decision"` only — no price amounts, currencies, offer IDs, or canonical price display before Composer.
 
 **Post-call (`ComposerDecision`) — minimum fields:**
 

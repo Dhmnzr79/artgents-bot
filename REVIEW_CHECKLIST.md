@@ -120,6 +120,25 @@
 - [ ] **Session not from text:** session writer получает finalized typed delta; visible text не анализируется для восстановления IDs/ситуации.
 - [ ] **FullContext corpus ≠ legacy runtime:** cached FullContext corpus — target knowledge input; legacy multi-call FullContext runtime — отдельный migration debt, не путать.
 
+### C6. COMPOSER-INPUT-EXECUTOR-1 (isolated/unwired)
+
+Baseline: `0f5000792acf164e12d886ff053c7badd8f584e2`. Применяется к checkpoint'у изолированного Composer input + executor:
+
+- [ ] **Full Composer input:** message + history (≤6, ordered, no duplicate current question) + session/provenance + current-client FullContext + policy authority.
+- [ ] **No preselected scope/service/offer/price:** до Composer нет финального scope, offer IDs, price plan или canonical price strings.
+- [ ] **Price policy removed:** sidecar содержит только `price_handling: "code_owned_after_decision"`; нет `price_policy`, amounts, currencies, offer IDs.
+- [ ] **Client/session/corpus isolation:** `source_client_id` согласован между authority, session, corpus; nested safe corpus-relative POSIX `.md` refs.
+- [ ] **Stable/dynamic split:** stable prefix = instructions + corpus + index; dynamic JSON = policy + session + history + current question; `sid` не в model-visible prompt.
+- [ ] **Exactly one backend call:** valid free-text input → ровно один `backend.generate`; invalid/bypass → zero calls; no retry/verifier/planner.
+- [ ] **Returns `AdaptedComposerDecision`:** no early `ComposerResult`; parser/adapter fail-open semantics preserved.
+- [ ] **Real FullContext integration:** `build_target_cached_full_context(clients/demo/md)` covered; fake backend proves wiring only.
+- [ ] **Production unwired:** executor не импортирован production runtime; `/ask` cutover не начат.
+- [ ] **Prompt corpus/hash pair:** `prompt_corpus_text` и `prompt_sha256` только вместе или оба absent; whitespace-only prompt corpus запрещён; неверная пара → typed error до backend.
+- [ ] **Dual hash authorities:** `source_corpus_sha256` = SHA full `corpus_text`; `model_corpus_sha256` = SHA точного model-visible corpus в system prompt; ambiguous `corpus_sha256` отсутствует.
+- [ ] **Runtime session validation:** provenance/freshness/state coherence проверяются в `ComposerSessionContext.__post_init__`, не только через `Literal`.
+- [ ] **Whitespace-only current message:** `""`, `"   "`, `"\r\n"` → `composer_input_blank_current_message` и zero backend calls.
+- [ ] **Invalid input never reaches backend:** invalid corpus/session/current message → zero `backend.generate`.
+
 ---
 
 ### D. Тесты и evals прогнаны честно

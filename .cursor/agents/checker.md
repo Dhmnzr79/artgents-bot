@@ -234,6 +234,37 @@ Docs-only contract checkpoint: не требуй уже реализованну
 - runtime/tests/provider/LIVE/staging/commit/push = 0;
 - после checker никаких файловых изменений.
 
+### COMPOSER-INPUT-EXECUTOR-1
+
+Isolated provider-neutral Composer input + executor gate. Baseline: `0f5000792acf164e12d886ff053c7badd8f584e2`.
+
+Проверь:
+
+- полный input: message/history/session/FullContext/policy authority;
+- нет preselected scope/service/offer/price до Composer;
+- `price_handling=code_owned_after_decision` вместо plan-derived `price_policy`;
+- `source_client_id` и client/session/corpus isolation;
+- stable system prompt byte-identical для одного corpus между turns;
+- dynamic JSON deterministic; current question/history не в system prompt;
+- exactly one `backend.generate` на valid input; zero на invalid/bypass;
+- no retry/fallback/verifier/planner; no `ComposerResult`;
+- nested safe corpus-relative POSIX `.md` refs;
+- real demo FullContext builder integration test;
+- historical six-key COMPOSER-CONTRACT-1 — superseded history only, not checker requirement;
+- production runtime не подключён;
+- pre/post non-allowlist WIP fingerprint совпадает.
+
+### COMPOSER-INPUT-EXECUTOR-1 correction pass
+
+Material correction после architect REJECT. Проверь обязательно:
+
+1. `prompt_corpus_text`/`prompt_sha256` strict pair matrix; whitespace-only prompt corpus rejected;
+2. `source_corpus_sha256` vs `model_corpus_sha256`; ambiguous `corpus_sha256` отсутствует;
+3. runtime validation provenance/freshness/state coherence в `ComposerSessionContext.__post_init__`;
+4. whitespace-only current message (`""`, `"   "`, `"\r\n"`) → zero backend;
+5. invalid corpus/session input не достигает `backend.generate`;
+6. docs не заявляют commit status до фактического commit.
+
 ### ONE-CALL-ARCHITECTURE-1 correction pass
 
 Material correction к architecture gate выше. Требует один re-check. После ACCEPT следующий checker — только на complete executor. Не запускать checker на промежуточных Composer micro-steps.

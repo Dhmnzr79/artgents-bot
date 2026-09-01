@@ -550,8 +550,43 @@ Do not promise automatic semantic safety for arbitrary model prose.
 | **TFC Product Runtime** | Legacy stack; not target path |
 | **Hybrid Strategy** | Future; same lower pipeline, no separate renderer |
 | **COMPOSER-CONTRACT-1 six-key schema** | Historical unwired WIP; **superseded**, not implementation target |
+| **COMPOSER-INPUT-EXECUTOR-1** | Implemented from baseline `0f5000792acf164e12d886ff053c7badd8f584e2` as isolated/unwired provider-neutral input + executor; **not** wired to production `/ask` |
 
 FullContext **corpus strategy** must not be confused with legacy **multi-call runtime**.
+
+### 9.1 COMPOSER-INPUT-EXECUTOR-1 (isolated, unwired)
+
+Implemented from baseline `0f5000792acf164e12d886ff053c7badd8f584e2` as an isolated/unwired checkpoint. Provider-neutral input path:
+
+```text
+current user message
++ recent typed dialogue history (≤6 turns)
++ normalized session context with provenance
++ current-client cached FullContext corpus
++ independent ComposerDecisionAuthority (source_client_id)
++ static Composer instructions
+→ one deterministic Composer invocation
+→ exactly one injected backend call
+→ strict parser
+→ fail-open semantic adapter
+→ AdaptedComposerDecision
+```
+
+**Stable system prompt:** static instructions + current-client validated model FullContext corpus + document index only.
+
+**Dynamic user prompt:** deterministic JSON with `policy_control`, `session_context`, `recent_dialogue`, `current_user_message`.
+
+**No pre-Composer price/offer data:** policy sidecar exposes only `price_handling: "code_owned_after_decision"`; no amounts, currencies, offer IDs, or canonical price display text before Composer.
+
+**Source refs:** safe corpus-relative POSIX `.md` paths (nested paths allowed; traversal/absolute/backslash/URI forbidden).
+
+**Hash authorities:** `source_corpus_sha256` is the SHA-256 of full validated `corpus_text`; `model_corpus_sha256` is the SHA-256 of the exact model-visible corpus text included in the system prompt. They differ when `prompt_corpus_text` is present.
+
+**Prompt corpus pair matrix:** `prompt_corpus_text` and `prompt_sha256` must both be absent or both present; whitespace-only prompt corpus is forbidden; mismatched pair or wrong `prompt_sha256` rejects input before backend.
+
+**Session provenance/freshness:** closed runtime validation in `ComposerSessionContext`; arbitrary values rejected before prompt builder/backend. Invalid input → zero provider calls.
+
+**Not in this checkpoint:** production wiring, `session.py`, post-Composer materialization, `/ask` cutover, LIVE/provider network.
 
 ---
 
@@ -562,16 +597,16 @@ These gaps are **expected** for a governance-only checkpoint and are not grounds
 | Gap | Current state |
 |---|---|
 | `PreComposerPlan` premature semantics | Still carries final scope, service, price plan, commercial materials before Composer on free-text path |
-| Composer schema incomplete | Unwired WIP lacks `service_reference_kind`, nullable `topic_id`, `AspectKind` aspects, `patient_situation` |
-| `ServiceOptionsBlock` | Target lane defined; Python implementation absent |
-| `price_text` / `model_price_text` | Still present in code and COMPOSER-CONTRACT-1 WIP |
+| Composer schema incomplete | **COMPOSER-CONTRACT-1 committed** on `0f5000792acf164e12d886ff053c7badd8f584e2`; parser/adapter for full `ComposerDecision` implemented |
+| Composer input/executor | **COMPOSER-INPUT-EXECUTOR-1** implemented isolated/unwired from baseline `0f5000792acf164e12d886ff053c7badd8f584e2`; production `/ask` not connected |
+| `price_text` / `model_price_text` | Still present in legacy code paths; removed from Composer policy sidecar; price intent via `requested_aspect_ids` only |
 | Requestable facts coupling | Still tied to `PreComposerPlan.commercial_facts` in places |
 | Situation → strategy → materialization | Not yet wired to new Response Plan |
 | Target executor | Absent |
 | `/ask` / `/ask/stream` | Not switched to target path |
 | Legacy runtime | Default at flag=0 |
 
-**Next checkpoint:** implement corrected `ComposerDecision`, parser, and adapter — not started here.
+**Next checkpoint:** facts.json projection, situation continuity, clinic strategy selection, materialization integration — not started here.
 
 ---
 

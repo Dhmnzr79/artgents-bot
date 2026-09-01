@@ -807,7 +807,7 @@ def test_response_plan_contract_error_not_adapter_error(
     from contracts.response_plan import ResponsePlanContractError
 
     def boom(*args, **kwargs):  # type: ignore[no-untyped-def]
-        raise ResponsePlanContractError("model_price_text_missing")
+        raise ResponsePlanContractError("plan_structure_invalid")
 
     monkeypatch.setattr(replay_module, "resolve_captured_composer_route", lambda *a, **k: ("ANSWER", "standard"))
     monkeypatch.setattr(replay_module, "resolve_response_plan", boom)
@@ -914,7 +914,6 @@ def test_unknown_pair_in_build_replay_composer_result_has_no_fallback() -> None:
             route="CLARIFY",
             mode="contacts",
             patient_text="text",
-            price_text=None,
             requested_fact_ids=(),
         )
 
@@ -993,7 +992,7 @@ def test_capture_gap_adapter_contract_fatal_branches_remain_separate(
     assert all("adapter_error" in record.delta_classes for record in adapter_result.records if record.target_output.adapter_error)
 
     def contract_boom(*args, **kwargs):  # type: ignore[no-untyped-def]
-        raise ResponsePlanContractError("model_price_text_missing")
+        raise ResponsePlanContractError("plan_structure_invalid")
 
     monkeypatch.setattr(replay_module, "parse_raw_model_envelope", parse_raw_model_envelope)
     monkeypatch.setattr(replay_module, "resolve_captured_composer_route", lambda *a, **k: ("ANSWER", "standard"))

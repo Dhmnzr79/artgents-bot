@@ -737,7 +737,7 @@ def validate_provenance_matrix(
     if structured.get("patient_text"):
         audit_materialized_provenance_key(field_provenance, "patient_text", findings)
     if envelope.get("price_text"):
-        audit_materialized_provenance_key(field_provenance, "composer.price_text", findings)
+        audit_materialized_provenance_key(field_provenance, "composer.legacy_price_text", findings)
 
     if resolved_output is not None and resolved_output.price_block is not None:
         audit_materialized_provenance_key(field_provenance, "price_plan", findings)
@@ -877,7 +877,6 @@ def _build_replay_composer_result(
     route: str,
     mode: str,
     patient_text: str | None,
-    price_text: str | None,
     requested_fact_ids: tuple[str, ...],
 ) -> ComposerResult:
     pair = (route, mode)
@@ -886,7 +885,6 @@ def _build_replay_composer_result(
             route=route,
             mode=mode,
             patient_text=patient_text,
-            price_text=price_text,
             requested_fact_ids=requested_fact_ids,
         )
     if pair == ("ANSWER", "contacts"):
@@ -1047,8 +1045,10 @@ def build_replay_record(
     field_provenance["requested_fact_ids"] = "not_captured"
 
     patient_text = structured.get("patient_text")
-    price_text = envelope.get("price_text")
-    field_provenance["composer.price_text"] = "captured_exact" if price_text else "not_captured"
+    legacy_price_text = envelope.get("price_text")
+    field_provenance["composer.legacy_price_text"] = (
+        "captured_exact" if legacy_price_text else "not_captured"
+    )
 
     known_fact_ids = set(facts.keys())
     promo_ids: list[str] = []
@@ -1225,7 +1225,6 @@ def build_replay_record(
         route=composer_route,
         mode=composer_mode,
         patient_text=structured.get("patient_text"),
-        price_text=envelope.get("price_text"),
         requested_fact_ids=requested_fact_ids,
     )
 

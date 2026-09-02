@@ -20,6 +20,7 @@ from contracts.response_plan import (
     PlanDiagnostic,
     PreComposerPlan,
     RequiredOfferConditionBlock,
+    RequiredOfferConditionOfferEntry,
     ResolvedFactBlock,
     ResolvedPriceBlock,
     ResolvedResponsePlan,
@@ -146,6 +147,8 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
         items.append(plan.service_value_candidate)
     if plan.textual_cta_candidate is not None:
         items.append(plan.textual_cta_candidate)
+    if plan.service_options_block is not None:
+        items.append(plan.service_options_block)
     items.extend(plan.ui_candidates.quick_replies)
     items.extend(plan.ui_candidates.buttons)
     if plan.ui_candidates.widget is not None:
@@ -277,7 +280,7 @@ def _resolve_composer_answer(
     diagnostics: list[PlanDiagnostic] = []
     price_block, price_diag = _resolve_price(plan, composer)
     diagnostics.extend(price_diag)
-    required_conditions = _resolve_required_conditions(plan, price_block is not None)
+    required_conditions = _resolve_required_conditions(plan, price_block)
     facts_by_id = {fact.fact_id: fact for fact in plan.commercial_facts}
 
     requested_blocks, requested_diag = _resolve_requested_facts(plan, composer, facts_by_id)
@@ -314,6 +317,7 @@ def _resolve_composer_answer(
     diagnostics.extend(amplifier_diag)
     textual_cta_block = _resolve_textual_cta(plan)
     ui_plan = _resolve_commerce_ui(plan)
+    service_options_block = plan.service_options_block
     finalized = _build_finalized_ids(
         price_block,
         required_conditions,
@@ -321,6 +325,7 @@ def _resolve_composer_answer(
         service_value_block,
         promo_blocks,
         amplifier_blocks,
+        service_options_block,
     )
     session_delta = _build_session_delta(plan, finalized, terminal_state="none")
     return ResolvedResponsePlan(
@@ -338,6 +343,7 @@ def _resolve_composer_answer(
         promo_blocks=tuple(promo_blocks),
         automatic_amplifier_blocks=tuple(amplifier_blocks),
         textual_cta_block=textual_cta_block,
+        service_options_block=service_options_block,
         ui_plan=ui_plan,
         diagnostics=tuple(diagnostics),
         finalized_commercial_ids=finalized,
@@ -363,6 +369,7 @@ def _resolve_price(
                 offer_ids=multi.offer_ids,
                 display_text=multi.display_text,
                 owner="canonical_multi",
+                offer_rows=price_plan.offer_rows,
             ),
             [],
         )
@@ -378,6 +385,7 @@ def _resolve_price(
             amount=single.amount,
             currency=single.currency,
             billing_unit=single.billing_unit,
+            offer_rows=price_plan.offer_rows,
         ),
         [],
     )
@@ -385,11 +393,40 @@ def _resolve_price(
 
 def _resolve_required_conditions(
     plan: PreComposerPlan,
-    has_price_block: bool,
+    price_block: ResolvedPriceBlock | None,
 ) -> tuple[RequiredOfferConditionBlock, ...]:
-    if not has_price_block:
+    if price_block is None:
         return ()
-    return plan.required_offer_conditions
+    labels = {row.offer_id: row.offer_label for row in price_block.offer_rows}
+    resolved: list[RequiredOfferConditionBlock] = []
+    for block in plan.required_offer_conditions:
+        if block.entries or block.display_text is None:
+            resolved.append(block)
+            continue
+        if len(price_block.offer_ids) == 1:
+            resolved.append(block)
+            continue
+        if block.applies_to_all_offers:
+            entries = tuple(
+                RequiredOfferConditionOfferEntry(
+                    offer_id=offer_id,
+                    display_text=block.display_text,
+                    offer_label=labels.get(offer_id),
+                )
+                for offer_id in price_block.offer_ids
+            )
+            resolved.append(
+                block.model_copy(
+                    update={
+                        "entries": entries,
+                        "display_text": None,
+                        "applies_to_all_offers": False,
+                    }
+                )
+            )
+            continue
+        resolved.append(block)
+    return tuple(resolved)
 
 
 def _policy_context_from_plan(plan: PreComposerPlan) -> RequestedFactPolicyContext:
@@ -606,6 +643,7 @@ def _build_finalized_ids(
     service_value_block: ResolvedServiceValueBlock | None,
     promo_blocks: list[ResolvedFactBlock],
     amplifier_blocks: list[ResolvedFactBlock],
+    service_options_block,
 ) -> FinalizedCommercialIds:
     return FinalizedCommercialIds(
         requested_fact_ids=tuple(block.fact_id for block in requested_blocks),
@@ -617,6 +655,11 @@ def _build_finalized_ids(
         price_offer_ids=tuple(price_block.offer_ids) if price_block is not None else (),
         required_offer_condition_ids=tuple(
             block.condition_id for block in required_conditions
+        ),
+        shown_service_option_ids=(
+            tuple(option.service_id for option in service_options_block.options)
+            if service_options_block is not None
+            else ()
         ),
     )
 
@@ -639,6 +682,7 @@ def _build_session_delta(
         shown_service_value_ids=finalized.service_value_ids,
         shown_price_offer_ids=finalized.price_offer_ids,
         shown_required_offer_condition_ids=finalized.required_offer_condition_ids,
+        shown_service_option_ids=finalized.shown_service_option_ids,
         terminal_state=terminal_state,
         clarify_pending=clarify_pending,
     )

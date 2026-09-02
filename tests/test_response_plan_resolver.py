@@ -45,7 +45,7 @@ def test_single_price_without_composer_price_text_uses_canonical_single() -> Non
 
 def test_multi_price_one_combined_block() -> None:
     resolved = resolve_response_plan(
-        make_plan(price_plan=price_multi()),
+        make_plan(price_plan=price_multi(), required_offer_conditions=()),
         compose(patient_text="Ответ"),
     )
     assert resolved.price_block is not None
@@ -699,6 +699,103 @@ def test_same_string_in_offer_fact_condition_typed_groups() -> None:
     assert shared in resolved.finalized_commercial_ids.price_offer_ids
     assert shared in resolved.finalized_commercial_ids.requested_fact_ids
     assert "per_jaw" in resolved.finalized_commercial_ids.required_offer_condition_ids
+
+
+def test_legacy_single_display_text_condition_resolves() -> None:
+    resolved = resolve_response_plan(
+        make_plan(
+            required_offer_conditions=(
+                __import__(
+                    "contracts.response_plan",
+                    fromlist=["RequiredOfferConditionBlock"],
+                ).RequiredOfferConditionBlock(
+                    source_client_id="demo",
+                    condition_id="per_jaw",
+                    display_text="cond",
+                ),
+            )
+        ),
+        compose(patient_text="Ответ"),
+    )
+    assert resolved.required_offer_conditions[0].display_text == "cond"
+    assert resolved.required_offer_conditions[0].entries == ()
+
+
+def test_legacy_multi_display_text_without_proof_rejected() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="legacy_multi_condition_ambiguous"):
+        resolve_response_plan(
+            make_plan(
+                price_plan=price_multi(),
+                required_offer_conditions=(
+                    __import__(
+                        "contracts.response_plan",
+                        fromlist=["RequiredOfferConditionBlock"],
+                    ).RequiredOfferConditionBlock(
+                        source_client_id="demo",
+                        condition_id="package_includes",
+                        display_text="shared package",
+                    ),
+                ),
+            ),
+            compose(patient_text="Ответ"),
+        )
+
+
+def test_legacy_multi_applies_to_all_offers_expands_entries() -> None:
+    from contracts.response_plan import (
+        FrozenPriceOfferRow,
+        RequiredOfferConditionBlock,
+    )
+
+    rows = (
+        FrozenPriceOfferRow(
+            source_client_id="demo",
+            offer_id="offer_a",
+            service_id="svc_a",
+            offer_label="Service A Brand",
+            amount=100_000,
+            currency="RUB",
+            billing_unit="jaw",
+        ),
+        FrozenPriceOfferRow(
+            source_client_id="demo",
+            offer_id="offer_b",
+            service_id="svc_b",
+            offer_label="Service B Brand",
+            amount=120_000,
+            currency="RUB",
+            billing_unit="jaw",
+        ),
+    )
+    resolved = resolve_response_plan(
+        make_plan(
+            price_plan=PricePlan(
+                kind="multi",
+                multi=CanonicalMultiPriceCandidate(
+                    source_client_id="demo",
+                    offer_ids=("offer_a", "offer_b"),
+                    display_text="A\nB",
+                ),
+                offer_rows=rows,
+            ),
+            required_offer_conditions=(
+                RequiredOfferConditionBlock(
+                    source_client_id="demo",
+                    condition_id="package_includes",
+                    display_text="Shared package terms",
+                    applies_to_all_offers=True,
+                ),
+            ),
+        ),
+        compose(patient_text="Ответ"),
+    )
+    block = resolved.required_offer_conditions[0]
+    assert block.display_text is None
+    assert len(block.entries) == 2
+    assert {entry.offer_id for entry in block.entries} == {"offer_a", "offer_b"}
+    assert all(entry.display_text == "Shared package terms" for entry in block.entries)
 
 
 def test_unknown_requested_fact_classification_model_contract_violation() -> None:

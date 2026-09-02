@@ -29,6 +29,7 @@ RequiredOfferConditionId = Literal[
     "ct_separate",
     "bone_grafting_separate",
 ]
+RequiredOfferConditionCompleteness = Literal["complete", "unknown", "incomplete"]
 DiagnosticClass = Literal[
     "model_contract_violation",
     "canonical_correction",
@@ -41,6 +42,10 @@ PlanDiagnosticCode = Literal[
     "optional_candidate_unavailable",
     "service_value_out_of_scope",
     "model_contract_violation",
+    "materialization_unsupported_price_mode",
+    "materialization_price_conditions_incomplete",
+    "materialization_price_unit_incompatible",
+    "materialization_optional_unavailable",
 ]
 TransportKind = Literal["blocking", "streaming"]
 TerminalState = Literal["none", "admin", "contacts", "clarify", "medical_terminal"]
@@ -84,6 +89,10 @@ DIAGNOSTIC_CLASSIFICATION: dict[PlanDiagnosticCode, DiagnosticClass] = {
     "explicit_only_automatic_suppressed": "optional_resolution",
     "service_value_out_of_scope": "optional_resolution",
     "model_contract_violation": "model_contract_violation",
+    "materialization_unsupported_price_mode": "optional_resolution",
+    "materialization_price_conditions_incomplete": "optional_resolution",
+    "materialization_price_unit_incompatible": "optional_resolution",
+    "materialization_optional_unavailable": "optional_resolution",
 }
 
 EXPECTED_TERMINAL_STATE: dict[tuple[ResponseRoute, ResponseMode], tuple[TerminalState, bool]] = {
@@ -337,10 +346,23 @@ class CanonicalMultiPriceCandidate(ResponsePlanModel):
         return self
 
 
+class FrozenPriceOfferRow(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    offer_id: NonBlankStr
+    service_id: NonBlankStr
+    offer_label: NonBlankStr
+    amount: int = Field(ge=0)
+    currency: NonBlankStr
+    billing_unit: NonBlankStr
+    option_id: NonBlankStr | None = None
+    brand_id: NonBlankStr | None = None
+
+
 class PricePlan(ResponsePlanModel):
     kind: PricePlanKind
     single: CanonicalSinglePriceCandidate | None = None
     multi: CanonicalMultiPriceCandidate | None = None
+    offer_rows: tuple[FrozenPriceOfferRow, ...] = ()
     offer_applicable: bool = True
 
     @model_validator(mode="after")
@@ -348,22 +370,102 @@ class PricePlan(ResponsePlanModel):
         if self.kind == "none":
             if self.single is not None or self.multi is not None:
                 raise ValueError("none_price_plan_must_be_empty")
+            if self.offer_rows:
+                raise ValueError("none_price_plan_forbids_offer_rows")
             return self
         if self.kind == "single":
             if self.single is None or self.multi is not None:
                 raise ValueError("single_price_plan_requires_one_block")
-            return self
-        if self.kind == "multi":
+        elif self.kind == "multi":
             if self.single is not None or self.multi is None:
                 raise ValueError("multi_price_plan_requires_combined_block")
-            return self
-        raise ValueError("unknown_price_plan_kind")
+        else:
+            raise ValueError("unknown_price_plan_kind")
+        if self.offer_rows:
+            self._validate_offer_rows()
+        return self
+
+    def _validate_offer_rows(self) -> None:
+        row_ids = [row.offer_id for row in self.offer_rows]
+        if len(row_ids) != len(set(row_ids)):
+            raise ValueError("price_plan_offer_rows_duplicate")
+        if self.kind == "single":
+            assert self.single is not None
+            if row_ids != [self.single.offer_id]:
+                raise ValueError("price_plan_single_row_order_mismatch")
+            row = self.offer_rows[0]
+            if row.source_client_id != self.single.source_client_id:
+                raise ValueError("price_plan_single_row_owner_mismatch")
+            if (
+                row.amount != self.single.amount
+                or row.currency != self.single.currency
+                or row.billing_unit != self.single.billing_unit
+            ):
+                raise ValueError("price_plan_single_row_metadata_mismatch")
+        elif self.kind == "multi":
+            assert self.multi is not None
+            if row_ids != list(self.multi.offer_ids):
+                raise ValueError("price_plan_multi_row_order_mismatch")
+            for row in self.offer_rows:
+                if row.source_client_id != self.multi.source_client_id:
+                    raise ValueError("price_plan_multi_row_owner_mismatch")
+
+
+class RequiredOfferConditionOfferEntry(ResponsePlanModel):
+    offer_id: NonBlankStr
+    display_text: NonBlankStr
+    offer_label: NonBlankStr | None = None
 
 
 class RequiredOfferConditionBlock(ResponsePlanModel):
     source_client_id: NonBlankStr
     condition_id: RequiredOfferConditionId
-    display_text: NonBlankStr
+    completeness: RequiredOfferConditionCompleteness = "unknown"
+    display_text: NonBlankStr | None = None
+    entries: tuple[RequiredOfferConditionOfferEntry, ...] = ()
+    applies_to_all_offers: bool = False
+
+    @model_validator(mode="after")
+    def _validate_content(self) -> Self:
+        if self.applies_to_all_offers and self.entries:
+            raise ValueError("applies_to_all_offers_conflicts_with_entries")
+        if self.entries and self.display_text:
+            raise ValueError("condition_display_text_and_entries_conflict")
+        if self.entries:
+            seen: set[str] = set()
+            for entry in self.entries:
+                if entry.offer_id in seen:
+                    raise ValueError("required_condition_offer_entry_duplicate")
+                seen.add(entry.offer_id)
+            return self
+        if self.display_text is None or not self.display_text.strip():
+            raise ValueError("condition_requires_display_or_entries")
+        return self
+
+
+class ServiceOptionEntry(ResponsePlanModel):
+    service_id: NonBlankStr
+    display_name: NonBlankStr
+    short_description: NonBlankStr | None = None
+
+
+class ServiceOptionsBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    strategy_reference: NonBlankStr
+    options: tuple[ServiceOptionEntry, ...]
+
+    @model_validator(mode="after")
+    def _validate_options(self) -> Self:
+        if not self.options:
+            raise ValueError("service_options_block_empty")
+        if len(self.options) > 3:
+            raise ValueError("service_options_block_exceeds_max")
+        seen: set[str] = set()
+        for option in self.options:
+            if option.service_id in seen:
+                raise ValueError("service_options_duplicate_service_id")
+            seen.add(option.service_id)
+        return self
 
 
 class CommercialFactCandidate(ResponsePlanModel):
@@ -456,6 +558,7 @@ class PreComposerPlan(ResponsePlanModel):
     )
     ui_candidates: UiPlanCandidates = Field(default_factory=UiPlanCandidates)
     transport_kind: TransportKind = "blocking"
+    service_options_block: ServiceOptionsBlock | None = None
 
     @model_validator(mode="after")
     def _validate_scope(self) -> Self:
@@ -546,6 +649,7 @@ class ResolvedPriceBlock(ResponsePlanModel):
     amount: int | None = Field(default=None, ge=0)
     currency: NonBlankStr | None = None
     billing_unit: NonBlankStr | None = None
+    offer_rows: tuple[FrozenPriceOfferRow, ...] = ()
 
     @model_validator(mode="after")
     def _validate_offer_ids(self) -> Self:
@@ -553,11 +657,28 @@ class ResolvedPriceBlock(ResponsePlanModel):
             raise ValueError("price_block_requires_offer_ids")
         if len(self.offer_ids) != len(set(self.offer_ids)):
             raise ValueError("price_block_duplicate_offer_ids")
+        if self.offer_rows:
+            row_ids = [row.offer_id for row in self.offer_rows]
+            if len(row_ids) != len(set(row_ids)):
+                raise ValueError("price_block_offer_rows_duplicate")
+            if row_ids != list(self.offer_ids):
+                raise ValueError("price_block_offer_row_order_mismatch")
+            for row in self.offer_rows:
+                if row.source_client_id != self.source_client_id:
+                    raise ValueError("price_block_offer_row_owner_mismatch")
         if len(self.offer_ids) == 1:
             if self.owner != "canonical_single":
                 raise ValueError("single_price_invalid_owner")
             if self.amount is None or self.currency is None or self.billing_unit is None:
                 raise ValueError("single_price_requires_amount_metadata")
+            if self.offer_rows:
+                row = self.offer_rows[0]
+                if (
+                    row.amount != self.amount
+                    or row.currency != self.currency
+                    or row.billing_unit != self.billing_unit
+                ):
+                    raise ValueError("price_block_single_row_metadata_mismatch")
             return self
         if not (2 <= len(self.offer_ids) <= 3):
             raise ValueError("multi_price_requires_two_or_three_offers")
@@ -601,6 +722,7 @@ class FinalizedCommercialIds(ResponsePlanModel):
     service_value_ids: tuple[str, ...] = ()
     price_offer_ids: tuple[str, ...] = ()
     required_offer_condition_ids: tuple[str, ...] = ()
+    shown_service_option_ids: tuple[str, ...] = ()
 
 
 class ResponseSessionDelta(ResponsePlanModel):
@@ -613,6 +735,7 @@ class ResponseSessionDelta(ResponsePlanModel):
     shown_service_value_ids: tuple[str, ...] = ()
     shown_price_offer_ids: tuple[str, ...] = ()
     shown_required_offer_condition_ids: tuple[str, ...] = ()
+    shown_service_option_ids: tuple[str, ...] = ()
     terminal_state: TerminalState = "none"
     clarify_pending: bool = False
 
@@ -632,6 +755,8 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
         raise ValueError("terminal_plan_forbids_amplifiers")
     if plan.textual_cta_block is not None:
         raise ValueError("terminal_plan_forbids_textual_cta")
+    if plan.service_options_block is not None:
+        raise ValueError("terminal_plan_forbids_service_options")
     finalized = plan.finalized_commercial_ids
     if any(
         (
@@ -641,6 +766,7 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
             finalized.service_value_ids,
             finalized.price_offer_ids,
             finalized.required_offer_condition_ids,
+            finalized.shown_service_option_ids,
         )
     ):
         raise ValueError("terminal_plan_forbids_finalized_commercial_ids")
@@ -653,6 +779,7 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
             delta.shown_service_value_ids,
             delta.shown_price_offer_ids,
             delta.shown_required_offer_condition_ids,
+            delta.shown_service_option_ids,
         )
     ):
         raise ValueError("terminal_plan_forbids_session_shown_ids")
@@ -700,6 +827,12 @@ def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
         block.condition_id for block in plan.required_offer_conditions
     ):
         raise ValueError("finalized_required_condition_ids_mismatch")
+    if finalized.shown_service_option_ids != (
+        tuple(option.service_id for option in plan.service_options_block.options)
+        if plan.service_options_block is not None
+        else ()
+    ):
+        raise ValueError("finalized_service_option_ids_mismatch")
     if plan.price_block is None and finalized.required_offer_condition_ids:
         raise ValueError("finalized_condition_ids_without_price_block")
 
@@ -719,6 +852,8 @@ def _validate_session_delta_ids(plan: ResolvedResponsePlan) -> None:
         raise ValueError("session_price_offer_ids_mismatch")
     if delta.shown_required_offer_condition_ids != finalized.required_offer_condition_ids:
         raise ValueError("session_required_condition_ids_mismatch")
+    if delta.shown_service_option_ids != finalized.shown_service_option_ids:
+        raise ValueError("session_service_option_ids_mismatch")
 
 
 def _validate_session_scope(plan: ResolvedResponsePlan) -> None:
@@ -746,6 +881,22 @@ def _validate_terminal_state(plan: ResolvedResponsePlan) -> None:
         raise ValueError("session_terminal_state_mismatch")
     if delta.clarify_pending != expected_clarify:
         raise ValueError("session_clarify_pending_mismatch")
+
+
+def _validate_condition_offer_linkage(plan: ResolvedResponsePlan) -> None:
+    if plan.price_block is None:
+        if plan.required_offer_conditions:
+            raise ValueError("conditions_require_price_block")
+        return
+    allowed_offer_ids = set(plan.price_block.offer_ids)
+    for block in plan.required_offer_conditions:
+        if block.entries:
+            for entry in block.entries:
+                if entry.offer_id not in allowed_offer_ids:
+                    raise ValueError("condition_entry_offer_not_in_price_block")
+        elif block.display_text:
+            if len(allowed_offer_ids) != 1 and not block.applies_to_all_offers:
+                raise ValueError("legacy_multi_condition_ambiguous")
 
 
 def _validate_block_roles(plan: ResolvedResponsePlan) -> None:
@@ -782,6 +933,8 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(block)
     if plan.textual_cta_block is not None:
         _check(plan.textual_cta_block)
+    if plan.service_options_block is not None:
+        _check(plan.service_options_block)
     ui = plan.ui_plan
     for item in ui.quick_replies:
         _check(item)
@@ -810,6 +963,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     promo_blocks: tuple[ResolvedFactBlock, ...] = ()
     automatic_amplifier_blocks: tuple[ResolvedFactBlock, ...] = ()
     textual_cta_block: ResolvedTextualCtaBlock | None = None
+    service_options_block: ServiceOptionsBlock | None = None
     ui_plan: ResolvedUiPlan
     diagnostics: tuple[PlanDiagnostic, ...] = ()
     finalized_commercial_ids: FinalizedCommercialIds
@@ -852,10 +1006,14 @@ class ResolvedResponsePlan(ResponsePlanModel):
         if self.required_offer_conditions and self.price_block is None:
             raise ValueError("conditions_require_price_block")
 
+        if self.service_options_block is not None and self.price_block is not None:
+            raise ValueError("service_options_forbidden_with_price_block")
+
         if self.required_offer_conditions:
             condition_ids = [block.condition_id for block in self.required_offer_conditions]
             if len(condition_ids) != len(set(condition_ids)):
                 raise ValueError("required_condition_ids_not_unique")
+            _validate_condition_offer_linkage(self)
 
         _validate_fact_role_uniqueness(self)
         _validate_block_roles(self)

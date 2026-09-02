@@ -48,7 +48,12 @@ def test_price_order_single_block() -> None:
 def test_multi_price_renders_one_section() -> None:
     from tests.test_response_plan_contract import price_multi
 
-    plan = make_plan(price_plan=price_multi(), service_value_candidate=None, textual_cta_candidate=None)
+    plan = make_plan(
+        price_plan=price_multi(),
+        required_offer_conditions=(),
+        service_value_candidate=None,
+        textual_cta_candidate=None,
+    )
     resolved = resolve_response_plan(plan, compose(patient_text="Ответ"))
     text = render_response_text(resolved)
     assert text.count("100 000") == 1

@@ -160,6 +160,53 @@ def test_known_contradictory_stage_conflict(demo_bundle) -> None:
     assert diag
 
 
+def test_catalog_reference_price_allowed_with_conflict_status(demo_bundle) -> None:
+    result = resolve_service_selection(
+        demo_bundle,
+        effective_scope=_scope(extent="one_tooth", jaw="upper"),
+        resolved_topic_id="implantation",
+        reference_service_id="all_on_4",
+        reference_rejected=False,
+        option_reference_kind="none",
+        validated_shown=None,
+        requested_aspect_ids=("price",),
+    )
+    assert result.price_candidate_service_ids == ("all_on_4",)
+    assert result.selection_basis == "referenced_service"
+    assert result.reference_service_status in {"conflict", "unknown", "compatible"}
+
+
+def test_situation_based_selection_does_not_use_catalog_reference_shortcut(demo_bundle) -> None:
+    result = resolve_service_selection(
+        demo_bundle,
+        effective_scope=_scope(extent="one_tooth", jaw="upper"),
+        resolved_topic_id="implantation",
+        reference_service_id=None,
+        reference_rejected=False,
+        option_reference_kind="none",
+        validated_shown=None,
+        requested_aspect_ids=("price",),
+    )
+    assert result.selection_basis == "current_situation"
+    assert result.price_candidate_service_ids
+    assert "all_on_4" not in result.price_candidate_service_ids or result.price_candidate_service_ids[0] != "all_on_4"
+
+
+def test_catalog_reference_conflict_keeps_only_reference_service(demo_bundle) -> None:
+    result = resolve_service_selection(
+        demo_bundle,
+        effective_scope=_scope(extent="one_tooth", jaw="upper", stage="natural_tooth_present"),
+        resolved_topic_id="implantation",
+        reference_service_id="one_stage",
+        reference_rejected=False,
+        option_reference_kind="none",
+        validated_shown=None,
+        requested_aspect_ids=("price",),
+    )
+    assert result.reference_service_status == "conflict"
+    assert result.price_candidate_service_ids == ("one_stage",)
+
+
 def test_overview_plans_visible_options(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,

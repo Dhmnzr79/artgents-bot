@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from contracts.effective_scope import EffectiveScope
-from contracts.response_plan import CommercialFactCandidate, FactApplicability
+from contracts.response_plan import CommercialFactCandidate, FactApplicability, FactRole
 from contracts.response_plan_composer import RequestableFactDescriptor
 from contracts.response_plan_fact_policy import RequestedFactPolicyContext
 from contracts.response_plan_post_composer import PostComposerDiagnostic
@@ -15,6 +15,36 @@ from core.response_plan_fact_policy import (
     evaluate_requested_fact_display,
     requested_display_policy_from_fact,
 )
+
+
+def fact_explicit_only(fact: TargetCommercialFact) -> bool:
+    return fact.kind == "warranty"
+
+
+def project_commercial_fact_candidate(
+    bundle: ResponseSchemaBundle,
+    fact: TargetCommercialFact,
+    *,
+    source_client_id: str,
+    allowed_roles: tuple[FactRole, ...],
+) -> CommercialFactCandidate:
+    applicability = _fact_applicability(fact)
+    return CommercialFactCandidate(
+        fact_id=fact.id,
+        display_text=fact.text_fact,
+        explicit_only=fact_explicit_only(fact),
+        allowed_roles=allowed_roles,
+        applicability=applicability,
+        allowed_topic_ids=tuple(fact.allowed_topics),
+        allowed_service_ids=tuple(fact.allowed_service_ids),
+        source_client_id=source_client_id,
+        requires_implant_scope=(
+            False
+            if applicability == "clinic_wide"
+            else _requires_implant_scope(bundle, fact)
+        ),
+        requested_display_policy=requested_display_policy_from_fact(fact),
+    )
 
 
 def fact_active_as_of(fact: TargetCommercialFact, as_of: date) -> bool:
@@ -86,7 +116,7 @@ def build_requestable_fact_descriptors(
         common = {
             "fact_id": fact_id,
             "meaning": fact.catalog_label,
-            "explicit_only": fact.kind == "warranty",
+            "explicit_only": fact_explicit_only(fact),
             "applicability": applicability,
             "requires_implant_scope": requires_implant_scope,
             "requested_display_policy": display_policy,
@@ -201,17 +231,11 @@ def resolve_requested_fact_candidates(
             continue
 
         candidates.append(
-            CommercialFactCandidate(
-                fact_id=fact_id,
-                display_text=fact.text_fact,
-                explicit_only=fact.kind == "warranty",
-                allowed_roles=("requested_fact",),
-                applicability=_fact_applicability(fact),
-                allowed_topic_ids=tuple(fact.allowed_topics),
-                allowed_service_ids=tuple(fact.allowed_service_ids),
+            project_commercial_fact_candidate(
+                bundle,
+                fact,
                 source_client_id=source_client_id,
-                requires_implant_scope=_requires_implant_scope(bundle, fact),
-                requested_display_policy=requested_display_policy_from_fact(fact),
+                allowed_roles=("requested_fact",),
             )
         )
         accepted_fact_ids.add(fact_id)

@@ -357,18 +357,6 @@ def resolve_service_selection(
 
     has_reference = reference_service_id is not None
     if has_reference and price:
-        if reference_status != "compatible":
-            diagnostics.append(PostComposerDiagnostic(code="reference_service_rejected"))
-            return ServiceSelectionResult(
-                reference_service_status=reference_status,
-                ranked_service_ids=(),
-                visible_service_option_ids=(),
-                price_candidate_service_ids=(),
-                comparison_service_ids=(),
-                selection_basis="none",
-                selection_intent="none",
-                diagnostics=tuple(diagnostics),
-            )
         price_candidates = (reference_service_id,)
         basis = "referenced_service"
         intent = "price_candidates"

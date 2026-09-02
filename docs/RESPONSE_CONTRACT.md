@@ -634,10 +634,16 @@ Expected migration debt — not grounds for governance REJECT:
 
 - `PreComposerPlan` still carries premature final semantic scope/materials on free-text path
 - unwired Composer WIP (§4.0 historical) lacks `service_reference_kind`, nullable `topic_id`, `AspectKind` aspects, `patient_situation`
-- `ServiceOptionsBlock` target lane defined; Python implementation absent
+- `ServiceOptionsBlock` lane implemented in Response Plan resolver/renderer/materialization (isolated path); not wired to production `/ask`
+- fixed-price materialization supports `TargetFixedPrice` only; `from` / `range` / `no_public_price` emit `materialization_unsupported_price_mode` and omit price block
+- required offer conditions require trusted `OfferConditionEvidence.completeness` (`complete` | `unknown` | `incomplete`); empty conditions with `complete` allow price; `unknown`/`incomplete` exclude offer
+- new materialization path freezes typed `FrozenPriceOfferRow` per shown offer (`offer_id`, `service_id`, distinguishing `offer_label`, amount/currency/billing_unit, optional `option_id`/`brand_id`); `FinalizedOfferTrace` is a projection of frozen rows and does not re-read the catalog bundle
+- legacy condition compatibility: single-offer `display_text`-only blocks remain valid; multi-offer `display_text`-only blocks are rejected unless `applies_to_all_offers=true` (explicit structural proof); ambiguous legacy multi without proof → `legacy_multi_condition_ambiguous`
+- selected promo/amplifier IDs are merged into `commercial_facts` before freeze so Resolver can materialize optional blocks without a second catalog
+- catalog-reference price lookup (`selection_basis=referenced_service`) is separate from situation-based selection; conflict/unknown patient situation does not block reference price candidates
 - `price_text` / `model_price_text` still in code
 - requestable facts still coupled to `PreComposerPlan.commercial_facts` in places
-- situation → clinic strategy → materialization not wired to new Response Plan
+- situation → clinic strategy → materialization wired only on isolated post-Composer path (`resolve_materialized_response`); production `/ask` still uses legacy adapter
 - target executor absent; `/ask` and `/ask/stream` not cut over
 - legacy multi-call FullContext runtime remains default at flag=0
 

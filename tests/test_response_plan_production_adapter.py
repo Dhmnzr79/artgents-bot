@@ -121,11 +121,12 @@ def _fact(
     text: str | None = None,
     service_ids: tuple[str, ...] = (),
     topics: tuple[str, ...] = (),
+    kind: str = "commercial",
 ) -> TargetCommercialFact:
     return TargetCommercialFact.model_validate(
         {
             "id": fact_id,
-            "kind": "commercial",
+            "kind": kind,
             "catalog_label": fact_id,
             "text_fact": text or f"Exact {fact_id}.",
             "render_mode": "strict",
@@ -280,8 +281,8 @@ def _sources(**overrides: object) -> ResponsePlanAdapterSources:
             _fact("installment_12", service_ids=("all_on_4",)),
             _fact("promo_spring"),
             _fact("amp_painless"),
-            _fact("implant_warranty", service_ids=("all_on_4",)),
-            _fact("clinic_warranty", topics=("clinic",)),
+            _fact("implant_warranty", service_ids=("all_on_4",), kind="warranty"),
+            _fact("clinic_warranty", topics=("clinic",), kind="warranty"),
         ),
         marketing=TargetMarketingSelection(
             applied_scenarios=(),
@@ -338,8 +339,8 @@ def _clinic_sources(**turn_overrides: object) -> ResponsePlanAdapterSources:
     materials = _materials(
         facts=(
             _fact("installment_12"),
-            _fact("clinic_warranty", topics=("clinic",)),
-            _fact("implant_warranty", service_ids=("all_on_4",)),
+            _fact("clinic_warranty", topics=("clinic",), kind="warranty"),
+            _fact("implant_warranty", service_ids=("all_on_4",), kind="warranty"),
         ),
     )
     bound = _bound_package(spec=spec, materials=materials)

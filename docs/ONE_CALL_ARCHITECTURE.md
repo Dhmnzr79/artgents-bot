@@ -587,7 +587,7 @@ current user message
 
 **Session provenance/freshness:** closed runtime validation in `ComposerSessionContext`; arbitrary values rejected before prompt builder/backend. Invalid input → zero provider calls.
 
-**Not in this checkpoint:** production wiring, `session.py`, post-Composer materialization, `/ask` cutover, LIVE/provider network.
+**Not in this checkpoint:** production wiring, `session.py`, `/ask` cutover, LIVE/provider network. Post-Composer materialization (`RESPONSE-MATERIALIZATION-1`) is implemented as an isolated unwired path only.
 
 ---
 
@@ -602,12 +602,12 @@ These gaps are **expected** for a governance-only checkpoint and are not grounds
 | Composer input/executor | **COMPOSER-INPUT-EXECUTOR-1** implemented isolated/unwired from baseline `0f5000792acf164e12d886ff053c7badd8f584e2`; production `/ask` not connected |
 | `price_text` / `model_price_text` | Still present in legacy code paths; removed from Composer policy sidecar; price intent via `requested_aspect_ids` only |
 | Requestable facts coupling | Still tied to `PreComposerPlan.commercial_facts` in places |
-| Situation → strategy → materialization | Not yet wired to new Response Plan |
+| Situation → strategy → materialization | **RESPONSE-MATERIALIZATION-1** isolated path: materialization → Resolver/Renderer/UI; frozen `FrozenPriceOfferRow`, marketing fact merge, legacy condition policy — see `RESPONSE_CONTRACT.md` §19; not wired to `/ask` |
 | Target executor | Absent |
 | `/ask` / `/ask/stream` | Not switched to target path |
 | Legacy runtime | Default at flag=0 |
 
-**Next checkpoint:** facts.json projection, situation continuity, clinic strategy selection, materialization integration — not started here.
+**Next checkpoint:** session writer cutover, optional marketing materialization breadth, `/ask` integration — not started here.
 
 ---
 

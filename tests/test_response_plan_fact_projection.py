@@ -197,3 +197,40 @@ def test_projection_candidate_through_resolver_and_renderer(demo_bundle) -> None
     text = render_response_text(resolved)
     assert resolved.finalized_commercial_ids.requested_fact_ids == ("implant_warranty",)
     assert text
+
+
+def test_arbitrary_warranty_id_descriptor_is_explicit_only(demo_bundle) -> None:
+    bundle = demo_bundle.model_copy(deep=True)
+    bundle.facts["custom_warranty_fixture"] = TargetCommercialFact(
+        id="custom_warranty_fixture",
+        kind="warranty",
+        catalog_label="Гарантия",
+        text_fact="Гарантия 1 год по договору.",
+        render_mode="strict",
+        allowed_service_ids=["all_on_4"],
+    )
+    descriptors = build_requestable_fact_descriptors(bundle, as_of=AS_OF)
+    descriptor = next(item for item in descriptors if item.fact_id == "custom_warranty_fixture")
+    assert descriptor.explicit_only is True
+
+
+def test_arbitrary_warranty_projected_candidate_is_explicit_only(demo_bundle) -> None:
+    from core.response_plan_fact_projection import project_commercial_fact_candidate
+
+    bundle = demo_bundle.model_copy(deep=True)
+    bundle.facts["custom_warranty_fixture"] = TargetCommercialFact(
+        id="custom_warranty_fixture",
+        kind="warranty",
+        catalog_label="Гарантия",
+        text_fact="Гарантия 1 год по договору.",
+        render_mode="strict",
+        allowed_service_ids=["all_on_4"],
+    )
+    fact = bundle.facts["custom_warranty_fixture"]
+    candidate = project_commercial_fact_candidate(
+        bundle,
+        fact,
+        source_client_id="demo",
+        allowed_roles=("requested_fact",),
+    )
+    assert candidate.explicit_only is True

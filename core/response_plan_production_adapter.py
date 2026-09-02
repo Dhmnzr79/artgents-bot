@@ -13,6 +13,7 @@ from contracts.response_plan import (
     DeterministicBypassRouteAuthority,
     FactApplicability,
     FactRole,
+    FrozenPriceOfferRow,
     PreComposerPlan,
     PricePlan,
     RequiredOfferConditionBlock,
@@ -117,6 +118,34 @@ def format_single_price_display(offer: TargetOffer) -> str:
     symbol = _currency_symbol(fixed.currency)
     unit_phrase = billing_unit_phrase(fixed.billing_unit)
     return f"{amount} {symbol} {unit_phrase} — {offer.package.label}"
+
+
+def format_frozen_price_row_display(
+    row: FrozenPriceOfferRow,
+    *,
+    package_label: str | None = None,
+) -> str:
+    amount = _format_amount(row.amount)
+    symbol = _currency_symbol(row.currency)
+    unit_phrase = billing_unit_phrase(row.billing_unit)
+    package = (package_label or "").strip()
+    if package:
+        return f"{amount} {symbol} {unit_phrase} — {row.offer_label}: {package}"
+    return f"{amount} {symbol} {unit_phrase} — {row.offer_label}"
+
+
+def format_multi_price_display_from_rows(
+    rows: tuple[FrozenPriceOfferRow, ...],
+    package_labels: tuple[str | None, ...] | None = None,
+) -> str:
+    labels = package_labels if package_labels is not None else (None,) * len(rows)
+    if len(labels) != len(rows):
+        raise ResponsePlanAdapterError("adapter_price_row_label_mismatch", len(labels))
+    lines = [
+        format_frozen_price_row_display(row, package_label=package_label)
+        for row, package_label in zip(rows, labels, strict=True)
+    ]
+    return "\n".join(lines)
 
 
 def format_multi_price_display(offers: tuple[TargetOffer, ...]) -> str:
@@ -554,7 +583,7 @@ def _build_commercial_facts(
             CommercialFactCandidate(
                 fact_id=fact.id,
                 display_text=fact.text_fact,
-                explicit_only=fact.id in _EXPLICIT_ONLY_FACT_IDS,
+                explicit_only=fact.kind == "warranty",
                 allowed_roles=roles,
                 applicability=_fact_applicability(fact),
                 allowed_topic_ids=tuple(fact.allowed_topics),
@@ -584,7 +613,7 @@ def _fact_allowed_roles(
     promo_ids: tuple[str, ...],
     amplifier_ids: tuple[str, ...],
 ) -> tuple[FactRole, ...]:
-    if fact.id in _EXPLICIT_ONLY_FACT_IDS:
+    if fact.kind == "warranty":
         return ("requested_fact",)
     roles: list[FactRole] = ["requested_fact"]
     if fact.id in promo_ids:
@@ -771,3 +800,21 @@ def _format_amount(amount: int) -> str:
 
 def _currency_symbol(currency: str) -> str:
     return _CURRENCY_SYMBOLS.get(currency, currency)
+
+
+def build_pre_composer_plan_from_materialization(
+    selection,
+    adapted,
+    sources,
+    *,
+    as_of,
+):
+    """Post-Composer adapter entrypoint: selection + authorities → PreComposerPlan."""
+
+    from datetime import date as date_type
+
+    from core.response_plan_materialization import materialize_pre_composer_payload
+
+    if not isinstance(as_of, date_type):
+        raise ResponsePlanAdapterError("adapter_materialization_as_of_invalid", as_of)
+    return materialize_pre_composer_payload(selection, adapted, sources, as_of=as_of).plan

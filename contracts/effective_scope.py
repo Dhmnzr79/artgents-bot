@@ -13,6 +13,7 @@ EffectiveScopeSource = Literal[
     "ui_action",
     "ui_stage_action",
     "a9_turn",
+    "composer_decision",
     "session",
     "unknown",
 ]
@@ -21,6 +22,7 @@ ScopeAxisSource = Literal[
     "ui_action",
     "ui_stage_action",
     "a9_turn",
+    "composer_decision",
     "session",
     "unknown",
 ]

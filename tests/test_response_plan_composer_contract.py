@@ -86,6 +86,7 @@ def _base_payload(**overrides: object) -> dict[str, object]:
         "mode": "standard",
         "patient_text": "Ответ пациенту.",
         "service_reference_kind": "none",
+        "option_reference_kind": "none",
         "topic_id": None,
         "explicit_service_id": None,
         "requested_aspect_ids": [],
@@ -555,16 +556,16 @@ def test_requestable_fact_descriptor_rejects_service_scoped_without_services() -
         )
 
 
-def test_requestable_fact_descriptor_rejects_service_scoped_with_topic_ids() -> None:
-    with pytest.raises(ValidationError, match="service_scoped_forbids_topic_ids"):
-        RequestableFactDescriptor(
-            fact_id="fact_a",
-            meaning="meaning",
-            explicit_only=False,
-            applicability="service_scoped",
-            allowed_service_ids=("svc_a",),
-            allowed_topic_ids=("clinic",),
-        )
+def test_requestable_fact_descriptor_allows_service_scoped_with_dual_restrictions() -> None:
+    descriptor = RequestableFactDescriptor(
+        fact_id="fact_a",
+        meaning="meaning",
+        explicit_only=False,
+        applicability="service_scoped",
+        allowed_service_ids=("svc_a",),
+        allowed_topic_ids=("implantation",),
+    )
+    assert descriptor.allowed_topic_ids == ("implantation",)
 
 
 def test_route_policy_entry_rejects_incorrect_purpose() -> None:
@@ -713,6 +714,7 @@ def test_pipeline_explicit_implant_warranty_in_service_scope() -> None:
     plan = make_plan(
         response_scope="service",
         selected_service_id="implantium",
+        selected_topic_id="implantation",
         commercial_facts=(
             fact(
                 "implant_warranty",

@@ -6,17 +6,24 @@ import json
 from dataclasses import dataclass
 
 from contracts.response_plan import SessionKey
+from contracts.response_plan_composer import (
+    authority_known_client_service_ids,
+    authority_known_inactive_service_ids,
+)
 from contracts.response_plan_composer_input import (
     ComposerInputContext,
-    validated_model_corpus_authority,
+    ComposerInputError,
     model_visible_session_context,
     validate_composer_input_context,
+    validated_model_corpus_authority,
 )
+from contracts.response_plan_dialogue_context import ShownOptionsSnapshotError
 from core.response_plan_composer_contract import (
     build_composer_policy_sidecar,
     build_static_composer_instructions,
     serialize_composer_policy_sidecar,
 )
+from core.response_plan_dialogue_context import project_model_visible_shown_options_for_composer
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +69,37 @@ def build_composer_decision_invocation(
         ],
         "session_context": model_visible_session_context(input_context.session_context),
     }
+
+    confirmed = input_context.confirmed_shown_options
+    if confirmed is not None:
+        try:
+            shown = project_model_visible_shown_options_for_composer(
+                confirmed.snapshot,
+                session_key=input_context.session_context.session_key,
+                source_client_id=input_context.session_context.source_client_id,
+                current_turn_index=confirmed.current_turn_index,
+                policy=confirmed.freshness_policy,
+                service_descriptors=input_context.decision_authority.service_descriptors,
+                known_client_service_ids=authority_known_client_service_ids(
+                    input_context.decision_authority
+                ),
+                known_inactive_service_ids=authority_known_inactive_service_ids(
+                    input_context.decision_authority
+                ),
+            )
+        except ShownOptionsSnapshotError as exc:
+            raise ComposerInputError(
+                "composer_input_shown_options_invalid_snapshot", str(exc)
+            ) from exc
+        if shown is not None:
+            dynamic_payload["shown_service_options"] = {
+                "topic_id": shown.topic_id,
+                "services": [
+                    {"service_id": service_id, "label": label}
+                    for service_id, label in shown.services
+                ],
+            }
+
     user_prompt = json.dumps(dynamic_payload, ensure_ascii=False, sort_keys=True)
 
     return ComposerDecisionInvocation(

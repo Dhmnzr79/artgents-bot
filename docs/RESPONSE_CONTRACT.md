@@ -121,6 +121,7 @@ Governance checkpoint ONE-CALL-ARCHITECTURE-1 fixes the authoritative order. Ful
 | `route`, `mode` | Composer (closed pairs) |
 | `patient_text` | Composer natural prose; not price/facts/contacts |
 | `service_reference_kind` | Composer; closed: `none` / `explicit_current` / `active_session` |
+| `option_reference_kind` | Composer; closed: `none` / `shown_options` — semantic reference to previously shown options, not a new shortlist |
 | `topic_id` | Composer; allowed client topic ID or `null` (key required, value nullable) |
 | `explicit_service_id` | Required when `explicit_current`; `null` for `none` / `active_session` |
 | `requested_aspect_ids` | Composer; closed `contracts.answer_plan.AspectKind` values |
@@ -137,6 +138,12 @@ Governance checkpoint ONE-CALL-ARCHITECTURE-1 fixes the authoritative order. Ful
 **`requested_aspect_ids`:** exactly reuses closed `AspectKind` (`price`, `payment`, `warranty`, `pain`, `included`, `duration`, `comparison`, `stages`, `overview`, `contacts`, `contact_phone`, `contact_address`, `contact_parking`, `contact_hours`, `contact_whatsapp`, `service_availability`). No aliases; `composition` ≠ `included`.
 
 **Service recommendations:** code ranks services → typed `ServiceOptionsBlock` in frozen plan (max 3 options). Composer must not list/rank in `patient_text`. Terminal routes forbid service options. No duplicate with price block variants.
+
+**Shown-options reference:** `option_reference_kind=shown_options` refers to a code-confirmed `ShownServiceOptionsSnapshot` (finalized plan only — not ranked shortlist). Comparison/price candidates are limited to that snapshot; without a fresh snapshot the path emits diagnostics and does not invent alternatives.
+
+**Reference vs applicability:** `reference_service_id` is conversational subject, not recommendation. `compatible` / `unknown` / `conflict` describe catalog-axis fit; `false` from applicability filter alone is not `conflict`.
+
+**Requested fact display permission:** optional `requested_display_policy` on facts authorizes informational display without a concrete service. Resolver and post-Composer projection share `evaluate_requested_fact_display()`. Real `clients/**` metadata is not yet authored in this checkpoint.
 
 **Price:** intent via `requested_aspect_ids` (e.g. `["price"]`); canonical price block is code-owned. `price_text` and `model_price_text` are **migration debt**.
 

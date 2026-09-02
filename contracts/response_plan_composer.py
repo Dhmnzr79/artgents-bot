@@ -18,6 +18,7 @@ from contracts.response_plan import (
     ResponseMode,
     RouteModePair,
 )
+from contracts.response_schema import RequestedDisplayPolicy
 from contracts.target_composer_source_identity import TargetComposerSourceIdentity
 
 PUBLISHED_TARGET_KEYS: frozenset[str] = frozenset(
@@ -26,6 +27,7 @@ PUBLISHED_TARGET_KEYS: frozenset[str] = frozenset(
         "mode",
         "patient_text",
         "service_reference_kind",
+        "option_reference_kind",
         "topic_id",
         "explicit_service_id",
         "requested_aspect_ids",
@@ -40,6 +42,7 @@ CORE_RESPONSE_FIELDS: frozenset[str] = frozenset(
         "mode",
         "patient_text",
         "service_reference_kind",
+        "option_reference_kind",
         "topic_id",
         "explicit_service_id",
         "requested_aspect_ids",
@@ -61,6 +64,7 @@ FORBIDDEN_LEGACY_TOP_LEVEL_KEYS: frozenset[str] = frozenset(
 )
 
 ServiceReferenceKind = Literal["none", "explicit_current", "active_session"]
+OptionReferenceKind = Literal["none", "shown_options"]
 SituationExtent = Literal["unknown", "one_tooth", "few_teeth", "full_arch"]
 SituationJaw = Literal["unknown", "upper", "lower", "both"]
 SituationStage = Literal[
@@ -88,6 +92,7 @@ ComposerParserErrorCode = Literal[
     "route_mode_invalid",
     "output_shape_invalid",
     "service_reference_invalid",
+    "option_reference_invalid",
     "aspect_invalid",
     "situation_invalid",
 ]
@@ -269,6 +274,7 @@ class ComposerDecision:
     mode: ResponseMode
     patient_text: str | None
     service_reference_kind: ServiceReferenceKind
+    option_reference_kind: OptionReferenceKind
     topic_id: str | None
     explicit_service_id: str | None
     requested_aspect_ids: tuple[AspectKind, ...]
@@ -309,6 +315,7 @@ class ComposerDecisionAuthority:
     history_turn_count: int = 0
     allowed_aspect_ids: tuple[AspectKind, ...] = ()
     requestable_facts: tuple[RequestableFactDescriptor, ...] = ()
+    known_inactive_service_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.source_client_id:
@@ -342,9 +349,28 @@ class ComposerDecisionAuthority:
             if session_service_id != session_service_id.strip():
                 raise ValueError("active_session_service_id_padded")
 
+        inactive_seen: set[str] = set()
+        active_ids = authority_allowed_service_ids(self)
+        for service_id in self.known_inactive_service_ids:
+            if not service_id or service_id != service_id.strip():
+                raise ValueError("known_inactive_service_id_invalid")
+            if service_id in inactive_seen:
+                raise ValueError("known_inactive_service_id_duplicate")
+            if service_id in active_ids:
+                raise ValueError("known_inactive_service_id_conflicts_with_active_descriptor")
+            inactive_seen.add(service_id)
+
 
 def authority_allowed_service_ids(authority: ComposerDecisionAuthority) -> frozenset[str]:
     return frozenset(descriptor.service_id for descriptor in authority.service_descriptors)
+
+
+def authority_known_inactive_service_ids(authority: ComposerDecisionAuthority) -> frozenset[str]:
+    return frozenset(authority.known_inactive_service_ids)
+
+
+def authority_known_client_service_ids(authority: ComposerDecisionAuthority) -> frozenset[str]:
+    return authority_allowed_service_ids(authority) | authority_known_inactive_service_ids(authority)
 
 
 class RoutePolicyEntry(ComposerContractModel):
@@ -378,6 +404,7 @@ class RequestableFactDescriptor(ComposerContractModel):
     allowed_service_ids: UniqueServiceIds = ()
     allowed_topic_ids: UniqueTopicIds = ()
     requires_implant_scope: bool = False
+    requested_display_policy: RequestedDisplayPolicy | None = None
 
     @model_validator(mode="after")
     def _validate_applicability(self) -> Self:
@@ -396,8 +423,6 @@ class RequestableFactDescriptor(ComposerContractModel):
         if self.applicability == "service_scoped":
             if not self.allowed_service_ids:
                 raise ValueError("service_scoped_requires_service_ids")
-            if self.allowed_topic_ids:
-                raise ValueError("service_scoped_forbids_topic_ids")
             if self.requires_implant_scope and not self.allowed_service_ids:
                 raise ValueError("requires_implant_scope_requires_service_scope")
             return self
@@ -473,6 +498,7 @@ def published_target_schema_example() -> dict[str, object]:
         "mode": "standard",
         "patient_text": "Естественный ответ пациенту.",
         "service_reference_kind": "none",
+        "option_reference_kind": "none",
         "topic_id": None,
         "explicit_service_id": None,
         "requested_aspect_ids": [],
@@ -570,6 +596,16 @@ def _require_nullable_string(value: object, field: str) -> str | None:
     if not isinstance(value, str):
         raise ComposerParserError("field_type_invalid", (field, type(value).__name__))
     return value
+
+
+def _require_option_reference_kind(value: object) -> OptionReferenceKind:
+    if not isinstance(value, str):
+        raise ComposerParserError("field_type_invalid", ("option_reference_kind", type(value).__name__))
+    if value != value.strip():
+        raise ComposerParserError("option_reference_invalid", ("option_reference_kind", "padded"))
+    if value not in {"none", "shown_options"}:
+        raise ComposerParserError("option_reference_invalid", ("option_reference_kind", value))
+    return value  # type: ignore[return-value]
 
 
 def _require_service_reference_kind(value: object) -> ServiceReferenceKind:
@@ -789,6 +825,7 @@ def parse_response_plan_composer_json(raw_text: str) -> ParsedComposerEnvelope:
     mode = _require_exact_mode(payload["mode"])
     patient_text = _require_nullable_string(payload["patient_text"], "patient_text")
     service_reference_kind = _require_service_reference_kind(payload["service_reference_kind"])
+    option_reference_kind = _require_option_reference_kind(payload["option_reference_kind"])
     topic_id = _require_nullable_string(payload["topic_id"], "topic_id")
     explicit_service_id = _require_nullable_string(payload["explicit_service_id"], "explicit_service_id")
     requested_aspect_ids = _require_requested_aspect_ids(payload["requested_aspect_ids"])
@@ -813,6 +850,7 @@ def parse_response_plan_composer_json(raw_text: str) -> ParsedComposerEnvelope:
         mode=mode,
         patient_text=patient_text,
         service_reference_kind=service_reference_kind,
+        option_reference_kind=option_reference_kind,
         topic_id=topic_id,
         explicit_service_id=explicit_service_id,
         requested_aspect_ids=requested_aspect_ids,
@@ -856,6 +894,7 @@ def _decision_with_source_identity(
         mode=decision.mode,
         patient_text=decision.patient_text,
         service_reference_kind=decision.service_reference_kind,
+        option_reference_kind=decision.option_reference_kind,
         topic_id=decision.topic_id,
         explicit_service_id=decision.explicit_service_id,
         requested_aspect_ids=decision.requested_aspect_ids,
@@ -932,6 +971,8 @@ def _normalize_terminal_decision(
     normalized_fields: list[str] = []
     if decision.service_reference_kind != "none":
         normalized_fields.append("service_reference_kind")
+    if decision.option_reference_kind != "none":
+        normalized_fields.append("option_reference_kind")
     if decision.topic_id is not None:
         normalized_fields.append("topic_id")
     if decision.explicit_service_id is not None:
@@ -950,6 +991,7 @@ def _normalize_terminal_decision(
         mode=decision.mode,
         patient_text=decision.patient_text,
         service_reference_kind="none",
+        option_reference_kind="none",
         topic_id=None,
         explicit_service_id=None,
         requested_aspect_ids=(),
@@ -1018,6 +1060,7 @@ def _apply_semantic_authority(
             mode=decision.mode,
             patient_text=decision.patient_text,
             service_reference_kind=service_reference_kind,
+            option_reference_kind=decision.option_reference_kind,
             topic_id=topic_id,
             explicit_service_id=explicit_service_id,
             requested_aspect_ids=decision.requested_aspect_ids,

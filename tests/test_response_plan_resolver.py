@@ -75,7 +75,10 @@ def test_installment_requested_once_not_in_amplifiers() -> None:
 
 def test_warranty_requested_once() -> None:
     resolved = resolve_response_plan(
-        make_plan(price_plan=PricePlan(kind="none")),
+        make_plan(
+            price_plan=PricePlan(kind="none"),
+            selected_topic_id="implantation",
+        ),
         compose(requested_fact_ids=("implant_warranty",), patient_text="Гарантия."),
     )
     assert resolved.finalized_commercial_ids.requested_fact_ids == ("implant_warranty",)

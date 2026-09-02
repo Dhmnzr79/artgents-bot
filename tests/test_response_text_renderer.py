@@ -18,6 +18,7 @@ def _normal_overrides() -> dict[str, object]:
         "price_plan": PricePlan(kind="none"),
         "textual_cta_candidate": None,
         "service_value_candidate": None,
+        "selected_topic_id": "implantation",
     }
 
 

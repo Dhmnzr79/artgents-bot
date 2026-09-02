@@ -9,7 +9,15 @@ from typing import Literal
 from contracts.response_plan import SessionKey
 from contracts.response_plan_composer import (
     ComposerDecisionAuthority,
+    authority_allowed_service_ids,
+    authority_known_client_service_ids,
+    authority_known_inactive_service_ids,
     source_ref_invalid_reason,
+)
+from contracts.response_plan_dialogue_context import (
+    ShownOptionsFreshnessPolicy,
+    ShownServiceOptionsSnapshot,
+    require_non_negative_int,
 )
 from contracts.target_cached_full_context import TargetCachedFullContext
 
@@ -48,6 +56,11 @@ ComposerInputErrorCode = Literal[
     "composer_input_session_provenance_invalid",
     "composer_input_session_freshness_invalid",
     "composer_input_session_state_incoherent",
+    "composer_input_shown_options_session_mismatch",
+    "composer_input_shown_options_client_mismatch",
+    "composer_input_shown_options_future_turn",
+    "composer_input_shown_options_catalog_mismatch",
+    "composer_input_shown_options_invalid_snapshot",
 ]
 
 
@@ -161,12 +174,23 @@ class ComposerFullContextCorpus:
 
 
 @dataclass(frozen=True, slots=True)
+class ComposerConfirmedShownOptions:
+    snapshot: ShownServiceOptionsSnapshot
+    freshness_policy: ShownOptionsFreshnessPolicy
+    current_turn_index: int
+
+    def __post_init__(self) -> None:
+        require_non_negative_int("current_turn_index", self.current_turn_index)
+
+
+@dataclass(frozen=True, slots=True)
 class ComposerInputContext:
     current_user_message: str
     recent_dialogue: tuple[ComposerDialogueTurn, ...]
     session_context: ComposerSessionContext
     full_context_corpus: ComposerFullContextCorpus
     decision_authority: ComposerDecisionAuthority
+    confirmed_shown_options: ComposerConfirmedShownOptions | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +295,58 @@ def validate_composer_input_context(context: ComposerInputContext) -> None:
             "composer_input_active_service_mismatch",
             (authority.active_session_service_id, session.active_service_id),
         )
+
+    if context.confirmed_shown_options is not None:
+        _validate_confirmed_shown_options(context)
+
+
+def _validate_confirmed_shown_options(context: ComposerInputContext) -> None:
+    confirmed = context.confirmed_shown_options
+    if confirmed is None:
+        return
+    session = context.session_context
+    snapshot = confirmed.snapshot
+
+    require_non_negative_int("current_turn_index", confirmed.current_turn_index)
+    require_non_negative_int("shown_at_turn", snapshot.shown_at_turn)
+    require_non_negative_int("max_age_turns", confirmed.freshness_policy.max_age_turns)
+
+    if snapshot.session_key != session.session_key:
+        raise ComposerInputError(
+            "composer_input_shown_options_session_mismatch",
+            (snapshot.session_key, session.session_key),
+        )
+    if snapshot.session_key.client_id != session.source_client_id:
+        raise ComposerInputError(
+            "composer_input_shown_options_client_mismatch",
+            (snapshot.session_key.client_id, session.source_client_id),
+        )
+    if snapshot.shown_at_turn > confirmed.current_turn_index:
+        raise ComposerInputError(
+            "composer_input_shown_options_future_turn",
+            (snapshot.shown_at_turn, confirmed.current_turn_index),
+        )
+
+    age_turns = confirmed.current_turn_index - snapshot.shown_at_turn
+    if age_turns > confirmed.freshness_policy.max_age_turns:
+        return
+
+    active_ids = authority_allowed_service_ids(context.decision_authority)
+    known_client_ids = authority_known_client_service_ids(context.decision_authority)
+    known_inactive_ids = authority_known_inactive_service_ids(context.decision_authority)
+    for service_id in snapshot.service_ids:
+        if service_id not in known_client_ids:
+            raise ComposerInputError(
+                "composer_input_shown_options_catalog_mismatch",
+                service_id,
+            )
+        if service_id in known_inactive_ids:
+            continue
+        if service_id not in active_ids:
+            raise ComposerInputError(
+                "composer_input_shown_options_catalog_mismatch",
+                service_id,
+            )
 
 
 def _validate_prompt_corpus_pair(corpus: TargetCachedFullContext) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from contracts.response_schema import RequestedDisplayPolicy
 from contracts.response_plan import (
     ALLOWED_ROUTE_MODE_PAIRS,
     CanonicalContactCandidate,
@@ -165,6 +166,7 @@ def fact(
     allowed_topic_ids: tuple[str, ...] = (),
     allowed_service_ids: tuple[str, ...] = (),
     requires_implant_scope: bool = False,
+    requested_display_policy: RequestedDisplayPolicy | None = None,
 ) -> CommercialFactCandidate:
     return CommercialFactCandidate(
         fact_id=fact_id,
@@ -176,6 +178,7 @@ def fact(
         allowed_service_ids=allowed_service_ids,
         requires_implant_scope=requires_implant_scope,
         source_client_id=client_id,
+        requested_display_policy=requested_display_policy,
     )
 
 

@@ -144,6 +144,7 @@ Minimum target output from the **single** Composer call.
 | `mode` | yes | Closed pair with `route` |
 | `patient_text` | yes* | Natural prose; `null` on ADMIN/contacts per route matrix |
 | `service_reference_kind` | yes | Closed: `none` / `explicit_current` / `active_session` |
+| `option_reference_kind` | yes | Closed: `none` / `shown_options` |
 | `topic_id` | yes** | Allowed current-client topic ID or `null` |
 | `explicit_service_id` | yes | Named-by-patient service ID or `null` |
 | `requested_aspect_ids` | yes | Closed `AspectKind` values (see §4.5) |

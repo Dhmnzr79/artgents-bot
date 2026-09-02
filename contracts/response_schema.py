@@ -334,6 +334,24 @@ class TargetOffer(TargetSchemaModel):
         return self
 
 
+
+class RequestedDisplayPolicy(BaseModel):
+    """Owner-approved metadata for informational display without a concrete service."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    allow_clinic: bool = False
+    allowed_topic_ids: tuple[NonBlankStr, ...] = ()
+    canonical_text_is_scope_qualified: bool = False
+
+    @model_validator(mode="after")
+    def _qualified_when_extended(self) -> "RequestedDisplayPolicy":
+        extended = self.allow_clinic or bool(self.allowed_topic_ids)
+        if extended and not self.canonical_text_is_scope_qualified:
+            raise ValueError("requested_display_requires_scope_qualification")
+        return self
+
+
 class TargetCommercialFact(TargetSchemaModel):
     id: NonBlankStr
     kind: NonBlankStr
@@ -347,6 +365,7 @@ class TargetCommercialFact(TargetSchemaModel):
     allowed_topics: list[NonBlankStr] = Field(default_factory=list)
     detail_ref: NonBlankStr | None = None
     incompatible_with: list[NonBlankStr] = Field(default_factory=list)
+    requested_display_policy: RequestedDisplayPolicy | None = None
 
     @model_validator(mode="after")
     def _fact_invariants(self) -> "TargetCommercialFact":
@@ -790,6 +809,7 @@ S1_MODEL_TYPES = (
     TargetPaymentStage,
     TargetPriceFollowup,
     TargetOffer,
+    RequestedDisplayPolicy,
     TargetCommercialFact,
     TargetStrategyMatch,
     TargetStrategyRule,

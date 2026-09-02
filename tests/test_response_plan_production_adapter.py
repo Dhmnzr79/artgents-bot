@@ -277,7 +277,7 @@ def _sources(**overrides: object) -> ResponsePlanAdapterSources:
     materials = _materials(
         offers=(_offer("offer_a"),),
         facts=(
-            _fact("installment_12", service_ids=("all_on_4",), topics=("clinic",)),
+            _fact("installment_12", service_ids=("all_on_4",)),
             _fact("promo_spring"),
             _fact("amp_painless"),
             _fact("implant_warranty", service_ids=("all_on_4",)),

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from contracts.response_plan_fact_policy import RequestedFactPolicyContext
+from core.response_plan_fact_policy import (
+    evaluate_automatic_fact_display,
+    evaluate_requested_fact_display,
+)
+
 from contracts.response_plan import (
     ALLOWED_ROUTE_MODE_PAIRS,
     CODE_OWNED_ROUTE_MODE_PAIRS,
@@ -386,38 +392,36 @@ def _resolve_required_conditions(
     return plan.required_offer_conditions
 
 
-def _fact_applicable(plan: PreComposerPlan, fact: CommercialFactCandidate) -> bool:
-    if fact.applicability == "clinic_wide":
-        return True
-    if fact.applicability == "topic_scoped":
-        return (
-            plan.response_scope == "topic"
-            and plan.selected_topic_id is not None
-            and plan.selected_topic_id in fact.allowed_topic_ids
-        )
-    if fact.applicability == "service_scoped":
-        return (
-            plan.response_scope == "service"
-            and plan.selected_service_id is not None
-            and plan.selected_service_id in fact.allowed_service_ids
-        )
-    return False
+def _policy_context_from_plan(plan: PreComposerPlan) -> RequestedFactPolicyContext:
+    implant_confirmed = plan.selected_topic_id == "implantation"
+    return RequestedFactPolicyContext(
+        response_scope=plan.response_scope,
+        resolved_topic_id=plan.selected_topic_id,
+        reference_service_id=plan.selected_service_id,
+        implant_context_confirmed=implant_confirmed,
+    )
 
 
-def _implant_scope_ok(plan: PreComposerPlan, fact: CommercialFactCandidate) -> bool:
-    if not fact.requires_implant_scope and fact.fact_id != "implant_warranty":
-        return True
-    if plan.response_scope == "service":
-        return (
-            plan.selected_service_id is not None
-            and plan.selected_service_id in fact.allowed_service_ids
+def _requested_fact_applicable(plan: PreComposerPlan, fact: CommercialFactCandidate) -> bool:
+    return (
+        evaluate_requested_fact_display(
+            fact=fact,
+            context=_policy_context_from_plan(plan),
+            bundle=None,
+            evaluation_purpose="requested",
         )
-    if plan.response_scope == "topic":
-        return (
-            plan.selected_topic_id is not None
-            and plan.selected_topic_id in fact.allowed_topic_ids
+        == "allowed"
+    )
+
+
+def _automatic_fact_applicable(plan: PreComposerPlan, fact: CommercialFactCandidate) -> bool:
+    return (
+        evaluate_automatic_fact_display(
+            fact=fact,
+            context=_policy_context_from_plan(plan),
         )
-    return False
+        == "allowed"
+    )
 
 
 def _resolve_requested_facts(
@@ -432,10 +436,7 @@ def _resolve_requested_facts(
         if fact is None or "requested_fact" not in fact.allowed_roles:
             diagnostics.append(PlanDiagnostic(code="requested_fact_unknown", detail=fact_id))
             continue
-        if not _fact_applicable(plan, fact):
-            diagnostics.append(PlanDiagnostic(code="requested_fact_inapplicable", detail=fact_id))
-            continue
-        if not _implant_scope_ok(plan, fact):
+        if not _requested_fact_applicable(plan, fact):
             diagnostics.append(PlanDiagnostic(code="requested_fact_inapplicable", detail=fact_id))
             continue
         blocks.append(
@@ -502,7 +503,7 @@ def _resolve_promo_blocks(
                 PlanDiagnostic(code="explicit_only_automatic_suppressed", detail=fact_id)
             )
             continue
-        if not _fact_applicable(plan, fact):
+        if not _automatic_fact_applicable(plan, fact):
             diagnostics.append(PlanDiagnostic(code="optional_candidate_unavailable", detail=fact_id))
             continue
         blocks.append(
@@ -536,7 +537,7 @@ def _resolve_amplifier_blocks(
         if fact is None:
             diagnostics.append(PlanDiagnostic(code="optional_candidate_unavailable", detail=fact_id))
             continue
-        if fact.explicit_only or fact.fact_id == "implant_warranty":
+        if fact.explicit_only:
             diagnostics.append(
                 PlanDiagnostic(code="explicit_only_automatic_suppressed", detail=fact_id)
             )
@@ -544,7 +545,7 @@ def _resolve_amplifier_blocks(
         if "automatic_amplifier" not in fact.allowed_roles:
             diagnostics.append(PlanDiagnostic(code="optional_candidate_unavailable", detail=fact_id))
             continue
-        if not _fact_applicable(plan, fact):
+        if not _automatic_fact_applicable(plan, fact):
             diagnostics.append(PlanDiagnostic(code="optional_candidate_unavailable", detail=fact_id))
             continue
         blocks.append(

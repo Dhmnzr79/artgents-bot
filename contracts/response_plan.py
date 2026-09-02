@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Self, Union
 
+from contracts.response_schema import RequestedDisplayPolicy
+
 from pydantic import AfterValidator, BaseModel, ConfigDict, Discriminator, Field, Tag, model_validator
 
 ResponseRoute = Literal["ANSWER", "ADMIN", "CLARIFY"]
@@ -374,6 +376,7 @@ class CommercialFactCandidate(ResponsePlanModel):
     allowed_service_ids: tuple[str, ...] = ()
     source_client_id: NonBlankStr
     requires_implant_scope: bool = False
+    requested_display_policy: RequestedDisplayPolicy | None = None
 
     @model_validator(mode="after")
     def _validate_roles(self) -> Self:

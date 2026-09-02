@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date
 from pathlib import Path
 from typing import get_args
 
@@ -17,6 +18,7 @@ from contracts.response_plan_composer import (
 )
 from contracts.response_plan_composer_input import (
     MAX_COMPOSER_HISTORY_TURNS,
+    ComposerConfirmedShownOptions,
     ComposerDialogueTurn,
     ComposerFullContextCorpus,
     ComposerInputContext,
@@ -26,10 +28,22 @@ from contracts.response_plan_composer_input import (
     validate_composer_input_context,
     validated_model_corpus_authority,
 )
+from contracts.response_plan_dialogue_context import (
+    ShownOptionsFreshnessPolicy,
+    ShownServiceOptionsSnapshot,
+)
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.response_plan_composer_input import build_composer_decision_invocation
+from core.response_schema_loader import load_response_schema_bundle
 from core.target_cached_full_context import build_target_cached_full_context
 from tests.test_response_plan_contract import session
+
+TARGET_ROOT = Path("clients/demo/target_response")
+
+
+@pytest.fixture
+def demo_bundle():
+    return load_response_schema_bundle(TARGET_ROOT)
 
 _CORPUS_MARKER = "Current-client validated FullContext corpus:\n"
 _INDEX_MARKER = "\n\nDocument index (corpus-relative POSIX paths):"
@@ -143,6 +157,7 @@ def _input_context(
     active_session_service_id: str | None = None,
     context_strategy: str = "full_context",
     bypass: bool = False,
+    confirmed_shown_options: ComposerConfirmedShownOptions | None = None,
 ) -> ComposerInputContext:
     corpus = _demo_corpus(client_id)
     return ComposerInputContext(
@@ -164,6 +179,7 @@ def _input_context(
             context_strategy=context_strategy,
             bypass=bypass,
         ),
+        confirmed_shown_options=confirmed_shown_options,
     )
 
 
@@ -627,3 +643,157 @@ def test_code_inferred_service_hidden_from_model_visible_payload() -> None:
 
 def test_max_history_constant() -> None:
     assert MAX_COMPOSER_HISTORY_TURNS == 6
+
+
+def test_confirmed_shown_options_foreign_service_rejected() -> None:
+    corpus = _demo_corpus()
+    context = ComposerInputContext(
+        current_user_message="Сколько стоит?",
+        recent_dialogue=(),
+        session_context=_session_context(),
+        full_context_corpus=corpus,
+        decision_authority=_authority(
+            allowed_source_refs=corpus.cached_full_context.document_paths,
+        ),
+        confirmed_shown_options=ComposerConfirmedShownOptions(
+            snapshot=ShownServiceOptionsSnapshot(
+                session_key=session(),
+                topic_id="implantation",
+                service_ids=("foreign_service",),
+                shown_at_turn=1,
+            ),
+            freshness_policy=ShownOptionsFreshnessPolicy(max_age_turns=3),
+            current_turn_index=2,
+        ),
+    )
+    with pytest.raises(ComposerInputError) as exc:
+        validate_composer_input_context(context)
+    assert exc.value.code == "composer_input_shown_options_catalog_mismatch"
+
+
+def test_stale_snapshot_removed_catalog_id_skips_catalog_validation() -> None:
+    corpus = _demo_corpus()
+    context = ComposerInputContext(
+        current_user_message="Сколько стоит?",
+        recent_dialogue=(),
+        session_context=_session_context(),
+        full_context_corpus=corpus,
+        decision_authority=_authority(
+            allowed_source_refs=corpus.cached_full_context.document_paths,
+        ),
+        confirmed_shown_options=ComposerConfirmedShownOptions(
+            snapshot=ShownServiceOptionsSnapshot(
+                session_key=session(),
+                topic_id="implantation",
+                service_ids=("removed_from_catalog",),
+                shown_at_turn=1,
+            ),
+            freshness_policy=ShownOptionsFreshnessPolicy(max_age_turns=1),
+            current_turn_index=5,
+        ),
+    )
+    validate_composer_input_context(context)
+    payload = json.loads(build_composer_decision_invocation(context).user_prompt)
+    assert "shown_service_options" not in payload
+
+
+def test_stale_confirmed_shown_options_omitted_from_prompt() -> None:
+    corpus = _demo_corpus()
+    context = ComposerInputContext(
+        current_user_message="Сколько стоит?",
+        recent_dialogue=(),
+        session_context=_session_context(),
+        full_context_corpus=corpus,
+        decision_authority=_authority(
+            allowed_source_refs=corpus.cached_full_context.document_paths,
+        ),
+        confirmed_shown_options=ComposerConfirmedShownOptions(
+            snapshot=ShownServiceOptionsSnapshot(
+                session_key=session(),
+                topic_id="implantation",
+                service_ids=("all_on_4",),
+                shown_at_turn=1,
+            ),
+            freshness_policy=ShownOptionsFreshnessPolicy(max_age_turns=1),
+            current_turn_index=5,
+        ),
+    )
+    invocation = build_composer_decision_invocation(context)
+    payload = json.loads(invocation.user_prompt)
+    assert "shown_service_options" not in payload
+
+
+def test_known_inactive_snapshot_service_excluded_before_composer(demo_bundle) -> None:
+    from contracts.response_plan_post_composer import PostComposerMaterialAuthority
+    from core.response_plan_composer_authority import build_composer_decision_authority
+
+    bundle = demo_bundle.model_copy(deep=True)
+    bundle.services["all_on_6"] = bundle.services["all_on_6"].model_copy(update={"active": False})
+    corpus = _demo_corpus()
+    material = PostComposerMaterialAuthority(source_client_id="demo", bundle=bundle)
+    authority = build_composer_decision_authority(
+        material,
+        allowed_source_refs=corpus.cached_full_context.document_paths,
+        history_turn_count=0,
+        active_session_service_id=None,
+        as_of=date(2026, 8, 15),
+    )
+    assert "all_on_6" in authority.known_inactive_service_ids
+    context = ComposerInputContext(
+        current_user_message="Сколько стоит All-on-4?",
+        recent_dialogue=(),
+        session_context=_session_context(),
+        full_context_corpus=corpus,
+        decision_authority=authority,
+        confirmed_shown_options=ComposerConfirmedShownOptions(
+            snapshot=ShownServiceOptionsSnapshot(
+                session_key=session(),
+                topic_id="implantation",
+                service_ids=("all_on_4", "all_on_6"),
+                shown_at_turn=1,
+            ),
+            freshness_policy=ShownOptionsFreshnessPolicy(max_age_turns=3),
+            current_turn_index=2,
+        ),
+    )
+    validate_composer_input_context(context)
+    payload = json.loads(build_composer_decision_invocation(context).user_prompt)
+    shown = payload["shown_service_options"]
+    assert [item["service_id"] for item in shown["services"]] == ["all_on_4"]
+
+
+def test_stale_snapshot_with_inactive_service_does_not_block_request(demo_bundle) -> None:
+    from contracts.response_plan_post_composer import PostComposerMaterialAuthority
+    from core.response_plan_composer_authority import build_composer_decision_authority
+
+    bundle = demo_bundle.model_copy(deep=True)
+    bundle.services["all_on_6"] = bundle.services["all_on_6"].model_copy(update={"active": False})
+    corpus = _demo_corpus()
+    material = PostComposerMaterialAuthority(source_client_id="demo", bundle=bundle)
+    authority = build_composer_decision_authority(
+        material,
+        allowed_source_refs=corpus.cached_full_context.document_paths,
+        history_turn_count=0,
+        active_session_service_id=None,
+        as_of=date(2026, 8, 15),
+    )
+    context = ComposerInputContext(
+        current_user_message="Сколько стоит All-on-4?",
+        recent_dialogue=(),
+        session_context=_session_context(),
+        full_context_corpus=corpus,
+        decision_authority=authority,
+        confirmed_shown_options=ComposerConfirmedShownOptions(
+            snapshot=ShownServiceOptionsSnapshot(
+                session_key=session(),
+                topic_id="implantation",
+                service_ids=("all_on_4", "all_on_6"),
+                shown_at_turn=1,
+            ),
+            freshness_policy=ShownOptionsFreshnessPolicy(max_age_turns=1),
+            current_turn_index=5,
+        ),
+    )
+    validate_composer_input_context(context)
+    payload = json.loads(build_composer_decision_invocation(context).user_prompt)
+    assert "shown_service_options" not in payload

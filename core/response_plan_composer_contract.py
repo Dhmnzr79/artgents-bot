@@ -56,6 +56,8 @@ def build_static_composer_instructions() -> str:
             "",
             "Service reference:",
             "- service_reference_kind is closed: none / explicit_current / active_session.",
+            "- option_reference_kind is closed: none / shown_options.",
+            "- shown_options means the patient refers to previously shown service options, not a new shortlist.",
             "- explicit_current requires non-null explicit_service_id from the current-client service descriptor catalog.",
             "- active_session continues the active session service without copying session service id into explicit_service_id.",
             "",
@@ -149,6 +151,11 @@ def _sidecar_to_payload(sidecar: ComposerPolicySidecar) -> dict[str, object]:
                 "fact_id": descriptor.fact_id,
                 "meaning": descriptor.meaning,
                 "requires_implant_scope": descriptor.requires_implant_scope,
+                "requested_display_policy": (
+                    None
+                    if descriptor.requested_display_policy is None
+                    else descriptor.requested_display_policy.model_dump(mode="json")
+                ),
             }
             for descriptor in sidecar.requestable_facts
         ],

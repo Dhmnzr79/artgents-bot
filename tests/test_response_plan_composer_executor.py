@@ -7,7 +7,17 @@ from pathlib import Path
 import pytest
 
 from contracts.response_plan_composer import ComposerDecision
-from contracts.response_plan_composer_input import ComposerFullContextCorpus, ComposerInputContext, ComposerInputError, ComposerSessionContext
+from contracts.response_plan_composer_input import (
+    ComposerConfirmedShownOptions,
+    ComposerFullContextCorpus,
+    ComposerInputContext,
+    ComposerInputError,
+    ComposerSessionContext,
+)
+from contracts.response_plan_dialogue_context import (
+    ShownOptionsFreshnessPolicy,
+    ShownServiceOptionsSnapshot,
+)
 from contracts.target_cached_full_context import TargetCachedFullContext
 from core.response_plan_composer_executor import (
     ComposerExecutorError,
@@ -16,6 +26,32 @@ from core.response_plan_composer_executor import (
 )
 from tests.test_response_plan_composer_input import _authority, _demo_corpus, _input_context, _session_context
 from tests.test_response_plan_contract import session
+
+
+def _confirmed_shown_options(
+    *,
+    service_ids: tuple[str, ...] = ("all_on_4",),
+    shown_at_turn: int = 1,
+    max_age_turns: int = 3,
+    current_turn_index: int = 2,
+    client_id: str = "demo",
+    sid: str = "s1",
+) -> ComposerConfirmedShownOptions:
+    return ComposerConfirmedShownOptions(
+        snapshot=ShownServiceOptionsSnapshot(
+            session_key=session(client_id=client_id, sid=sid),
+            topic_id="implantation",
+            service_ids=service_ids,
+            shown_at_turn=shown_at_turn,
+        ),
+        freshness_policy=ShownOptionsFreshnessPolicy(max_age_turns=max_age_turns),
+        current_turn_index=current_turn_index,
+    )
+
+
+def _dynamic_payload_from_backend_call(backend: RecordingBackend) -> dict[str, object]:
+    invocation = backend.calls[0]
+    return json.loads(invocation.user_prompt)  # type: ignore[union-attr]
 
 
 class RecordingBackend:
@@ -39,6 +75,7 @@ def _answer_json(**overrides: object) -> str:
         "mode": "standard",
         "patient_text": "Ответ пациенту.",
         "service_reference_kind": "none",
+        "option_reference_kind": "none",
         "topic_id": None,
         "explicit_service_id": None,
         "requested_aspect_ids": [],
@@ -118,7 +155,7 @@ def test_malformed_json_one_call_typed_error() -> None:
 def test_duplicate_json_key_one_call_typed_error() -> None:
     raw = (
         '{"route":"ANSWER","route":"ADMIN","mode":"standard","patient_text":"x",'
-        '"service_reference_kind":"none","topic_id":null,"explicit_service_id":null,'
+        '"service_reference_kind":"none","option_reference_kind":"none","topic_id":null,"explicit_service_id":null,'
         '"requested_aspect_ids":[],"patient_situation":{"extent":"unknown","jaw":"unknown",'
         '"stage":"unknown","modifiers":[]},"requested_fact_ids":[],"source_identity":null}'
     )
@@ -275,4 +312,70 @@ def test_invalid_corpus_pair_zero_backend_calls() -> None:
     with pytest.raises(ComposerInputError) as exc:
         ComposerFullContextCorpus(source_client_id="demo", cached_full_context=broken)
     assert exc.value.code == "composer_input_prompt_hash_pair_mismatch"
+    assert backend.calls == []
+
+
+def test_stale_snapshot_removed_catalog_id_one_backend_call_no_shown_options() -> None:
+    backend = RecordingBackend(_answer_json())
+    context = _input_context(
+        confirmed_shown_options=_confirmed_shown_options(
+            service_ids=("removed_from_catalog",),
+            shown_at_turn=1,
+            max_age_turns=1,
+            current_turn_index=5,
+        ),
+    )
+    result = execute_composer_decision(context, backend)
+    assert result.provider_call_count == 1
+    assert len(backend.calls) == 1
+    assert "shown_service_options" not in _dynamic_payload_from_backend_call(backend)
+
+
+def test_fresh_snapshot_unknown_catalog_id_zero_backend_calls() -> None:
+    backend = RecordingBackend(_answer_json())
+    context = _input_context(
+        confirmed_shown_options=_confirmed_shown_options(
+            service_ids=("removed_from_catalog",),
+            shown_at_turn=1,
+            max_age_turns=3,
+            current_turn_index=2,
+        ),
+    )
+    with pytest.raises(ComposerInputError) as exc:
+        execute_composer_decision(context, backend)
+    assert exc.value.code == "composer_input_shown_options_catalog_mismatch"
+    assert backend.calls == []
+
+
+def test_stale_snapshot_foreign_session_zero_backend_calls() -> None:
+    backend = RecordingBackend(_answer_json())
+    context = _input_context(
+        sid="s1",
+        confirmed_shown_options=_confirmed_shown_options(
+            service_ids=("all_on_4",),
+            shown_at_turn=1,
+            max_age_turns=1,
+            current_turn_index=5,
+            sid="foreign_sid",
+        ),
+    )
+    with pytest.raises(ComposerInputError) as exc:
+        execute_composer_decision(context, backend)
+    assert exc.value.code == "composer_input_shown_options_session_mismatch"
+    assert backend.calls == []
+
+
+def test_snapshot_future_turn_zero_backend_calls() -> None:
+    backend = RecordingBackend(_answer_json())
+    context = _input_context(
+        confirmed_shown_options=_confirmed_shown_options(
+            service_ids=("all_on_4",),
+            shown_at_turn=5,
+            max_age_turns=3,
+            current_turn_index=2,
+        ),
+    )
+    with pytest.raises(ComposerInputError) as exc:
+        execute_composer_decision(context, backend)
+    assert exc.value.code == "composer_input_shown_options_future_turn"
     assert backend.calls == []

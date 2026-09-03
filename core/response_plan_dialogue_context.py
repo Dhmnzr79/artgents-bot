@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from contracts.response_plan import SessionKey
+from contracts.response_plan import FrozenPriceOfferRow, SessionKey
 from contracts.response_plan_composer import ServiceDescriptor
 from contracts.response_plan_dialogue_context import (
     ModelVisibleShownOptions,
@@ -166,6 +166,23 @@ def snapshot_topic_allowed_for_decision(
             False,
         )
     return decision_topic_id, (), True
+
+
+def build_price_offer_shown_snapshot(
+    session_key: SessionKey,
+    *,
+    topic_id: str,
+    rows: tuple[FrozenPriceOfferRow, ...],
+    shown_at_turn: int,
+) -> ShownServiceOptionsSnapshot:
+    service_ids = tuple(dict.fromkeys(row.service_id for row in rows))
+    return ShownServiceOptionsSnapshot(
+        session_key=session_key,
+        topic_id=topic_id,
+        service_ids=service_ids,
+        shown_at_turn=shown_at_turn,
+        provenance="finalized_plan_price_offers",
+    )
 
 
 def project_model_visible_shown_options_for_composer(

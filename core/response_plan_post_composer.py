@@ -108,6 +108,7 @@ def resolve_post_composer_selection(
     prior_situation_state: ResponseSituationState | None,
     current_turn_index: int,
     policy: SituationContinuityPolicy,
+    shown_options_policy: ShownOptionsFreshnessPolicy | None = None,
     as_of: date,
     shown_options_snapshot: ShownServiceOptionsSnapshot | None = None,
 ) -> PostComposerSelectionPlan:
@@ -116,7 +117,9 @@ def resolve_post_composer_selection(
 
     require_non_negative_int("current_turn_index", current_turn_index)
 
-    shown_policy = ShownOptionsFreshnessPolicy(max_age_turns=policy.max_age_turns)
+    shown_policy = shown_options_policy or ShownOptionsFreshnessPolicy(
+        max_age_turns=policy.max_age_turns
+    )
     validated_shown, shown_diag = validate_shown_options_snapshot(
         shown_options_snapshot,
         session_key=session_key,

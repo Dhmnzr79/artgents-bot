@@ -476,6 +476,24 @@ New session:
 - optional failure does not erase useful state; failed optional IDs are not written
 - blocking and streaming share one plan/session path
 
+### 13.1 Opt-in typed session continuity (RESPONSE-SESSION-CONTINUITY-1)
+
+Separate from legacy `session.py` and `/ask` wiring:
+
+- **Read:** `ResponsePlanSessionStore.read(SessionKey)` → immutable snapshot; missing row returns empty state without INSERT.
+- **Bridge:** `build_turn_read_bundle()` → `ComposerSessionContext`, `recent_dialogue`, `confirmed_shown_options`, `active_session_service_id`, typed `prior_situation_state`, `current_turn_index`, `expected_revision`.
+- **Write boundary:** `prepare_session_update()` after Resolver/Renderer; `commit_session_update()` only after explicit `SessionCompletionReceipt` matching full prepared fingerprint (not rendered text alone).
+- **Committed-turn numbering:** `current_turn_index = last_committed_turn_index + 1`; history pair count ≠ turn index; Composer receives ≤ `MAX_COMPOSER_HISTORY_TURNS` messages.
+- **Freshness:** explicit `SessionContinuityPolicy` (`active_service_max_age_turns`, `active_topic_max_age_turns`, `situation_max_age_turns`, `shown_options_max_age_turns`, `history_pair_limit`); stale values are not model-visible; future `set_at_turn` is a typed error.
+- **Distinction:** active service (one focus link) ≠ shown service options snapshot ≠ historical frozen price rows (`finalized_plan_price_offers` provenance).
+- **Idempotency:** `(client_id, sid, request_id)` checked before `expected_revision`; same fingerprint → no-op; different fingerprint → conflict.
+- **SQLite:** injected connection/factory only; no import-time DB open; no legacy migration.
+- **Request binding (correction pass):** `create_turn_request_binding()` / `begin_bound_session_turn()` freeze `SessionKey`, `request_id`, `expected_revision`, `current_turn_index`, `patient_message`, and `SessionSnapshotIdentity` **before** Composer. `TurnPipelineOutcome` carries the same binding through post-Composer selection, materialization, Renderer, and UIProjection; `prepare_session_update()` rejects cross-request or mismatched render/UI mixes.
+- **Prepared response coherence:** `validate_prepared_response_coherence()` is the single pure check that selection, frozen `resolved_plan`, rendered text, UI projection, and situation delta agree (including price-row `service_id` ⊆ `price_candidate_service_ids`) before delivery at prepare and again at commit intrinsic validation.
+- **Fingerprint v3:** SHA-256 over `format_version`, full `request_binding`, `snapshot_identity`, `patient_message`, full typed `resolved_plan` dump, full `ui_projection`, `selection` decision metadata, and `proposed_state`. Store recomputes before commit; receipt must match recalculated hash; intrinsic validation also checks `render_response_text()` / `project_response_ui()` against prepared fields. State-dependent transition validation runs only for new `request_id` commits inside the transaction.
+- **Freshness split:** read bridge and post-Composer each take explicit limits — `situation_max_age_turns` via `SituationContinuityPolicy`, `shown_options_max_age_turns` via `ShownOptionsFreshnessPolicy` (optional on legacy post-Composer callers; session bridge always passes both). Restored snapshot topics/services keep source `set_at_turn`; read/replay/idempotent keep do not re-age context. Snapshot-only topic restoration requires a **catalog-eligible** shown-options snapshot for the current request (`validate_shown_options_snapshot()` via read bridge → `validated_shown_options` / `topic_restoration_shown_snapshot` on prepare/commit); stale, catalog-rejected, or incompatible raw `prior.shown_options_snapshot` is not used. Partial eligibility keeps the validated eligible subset per existing post-Composer policy; an empty eligible set is not a restoration basis. Non-null `topic_restoration_shown_snapshot` must equal the source session's stored `shown_options_snapshot` (`validate_topic_restoration_shown_snapshot_binding()` at prepare and on new commit after idempotency).
+- **Shown memory → materialization:** `materialization_sources_for_bound_turn()` copies typed `accumulated_shown_ids` from the read bundle into `shown_*_fact_ids` on `ResponsePlanMaterializationSources` for the same request.
+
 Old session: may be reset; no migration; no compatibility schema; no permanent fallback; old fields removed after cutover.
 
 ---

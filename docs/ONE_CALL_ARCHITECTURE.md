@@ -603,6 +603,7 @@ These gaps are **expected** for a governance-only checkpoint and are not grounds
 | `price_text` / `model_price_text` | Still present in legacy code paths; removed from Composer policy sidecar; price intent via `requested_aspect_ids` only |
 | Requestable facts coupling | Still tied to `PreComposerPlan.commercial_facts` in places |
 | Situation → strategy → materialization | **RESPONSE-MATERIALIZATION-1** isolated path: materialization → Resolver/Renderer/UI; frozen `FrozenPriceOfferRow`, marketing fact merge, legacy condition policy — see `RESPONSE_CONTRACT.md` §19; not wired to `/ask` |
+| Typed session continuity | **RESPONSE-SESSION-CONTINUITY-1** opt-in SQLite store + read/prepare/commit bridge; offline multi-turn integration; not wired to legacy `session.py` or `/ask` — see `RESPONSE_CONTRACT.md` §13.1 |
 | Target executor | Absent |
 | `/ask` / `/ask/stream` | Not switched to target path |
 | Legacy runtime | Default at flag=0 |

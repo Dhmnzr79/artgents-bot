@@ -8,7 +8,13 @@ from typing import Literal
 
 from contracts.response_plan import SessionKey
 
-ShownOptionsProvenance = Literal["finalized_plan_service_options"]
+ShownOptionsProvenance = Literal[
+    "finalized_plan_service_options",
+    "finalized_plan_price_offers",
+]
+_VALID_SHOWN_PROVENANCES = frozenset(
+    {"finalized_plan_service_options", "finalized_plan_price_offers"}
+)
 
 
 class ShownOptionsSnapshotError(ValueError):
@@ -38,7 +44,7 @@ class ShownServiceOptionsSnapshot:
     provenance: ShownOptionsProvenance = "finalized_plan_service_options"
 
     def __post_init__(self) -> None:
-        if self.provenance != "finalized_plan_service_options":
+        if self.provenance not in _VALID_SHOWN_PROVENANCES:
             raise ShownOptionsSnapshotError("shown_provenance_invalid")
         require_non_negative_int("shown_at_turn", self.shown_at_turn)
         if not self.topic_id or not self.topic_id.strip():

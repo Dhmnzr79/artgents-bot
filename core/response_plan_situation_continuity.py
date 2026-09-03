@@ -24,6 +24,7 @@ from contracts.response_plan_post_composer import (
 )
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.target_service_content_topic import parse_service_catalog_content_topic
+from core.response_plan_authored_alternative_policy import resolve_authored_alternative_policy
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +34,7 @@ class ReferenceTopicResolution:
     response_scope: ResponseScopeKind
     diagnostics: tuple[PostComposerDiagnostic, ...]
     active_session_reference_rejected: bool = False
+    reference_is_known_inactive: bool = False
 
 
 def post_composer_reference_resolution_rejected(ref_topic: ReferenceTopicResolution) -> bool:
@@ -100,10 +102,27 @@ def _validate_prior_state(
         raise PostComposerSituationError("situation_client_mismatch")
 
 
+def _topic_from_authored_alternative(
+    *,
+    source_client_id: str,
+    requested_service_id: str,
+    bundle: ResponseSchemaBundle,
+) -> str | None:
+    policy = resolve_authored_alternative_policy(
+        source_client_id=source_client_id,
+        requested_service_id=requested_service_id,
+        bundle=bundle,
+    )
+    if policy is None:
+        return None
+    return policy.unambiguous_topic_id
+
+
 def resolve_reference_service_and_topic(
     adapted: AdaptedComposerDecision,
     bundle: ResponseSchemaBundle,
     *,
+    source_client_id: str,
     active_session_service_id: str | None,
     allowed_topic_ids: frozenset[str],
 ) -> ReferenceTopicResolution:
@@ -125,14 +144,22 @@ def resolve_reference_service_and_topic(
             )
 
     service_topic: str | None = None
+    reference_is_known_inactive = False
     if reference_service_id is not None:
         service = bundle.services.get(reference_service_id)
-        if service is None or not service.active:
+        if service is None:
             diagnostics.append(
                 PostComposerDiagnostic(
                     code="post_composer_active_service_unavailable",
                     detail=reference_service_id,
                 )
+            )
+        elif not service.active:
+            reference_is_known_inactive = True
+            service_topic = _topic_from_authored_alternative(
+                source_client_id=source_client_id,
+                requested_service_id=reference_service_id,
+                bundle=bundle,
             )
         else:
             service_topic = parse_service_catalog_content_topic(service.content_ref)
@@ -169,7 +196,12 @@ def resolve_reference_service_and_topic(
         )
         resolved_topic_id = service_topic
 
-    if reference_service_id is not None and resolved_topic_id is not None:
+    if reference_is_known_inactive:
+        if resolved_topic_id is not None:
+            response_scope = "topic"
+        else:
+            response_scope = "clinic"
+    elif reference_service_id is not None and resolved_topic_id is not None:
         response_scope: ResponseScopeKind = "service"
     elif resolved_topic_id is not None:
         response_scope = "topic"
@@ -182,6 +214,7 @@ def resolve_reference_service_and_topic(
         response_scope=response_scope,
         diagnostics=tuple(diagnostics),
         active_session_reference_rejected=active_session_reference_rejected,
+        reference_is_known_inactive=reference_is_known_inactive,
     )
 
 

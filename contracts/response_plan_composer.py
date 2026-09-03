@@ -316,6 +316,7 @@ class ComposerDecisionAuthority:
     allowed_aspect_ids: tuple[AspectKind, ...] = ()
     requestable_facts: tuple[RequestableFactDescriptor, ...] = ()
     known_inactive_service_ids: tuple[str, ...] = ()
+    known_inactive_service_descriptors: tuple["ServiceDescriptor", ...] = ()
 
     def __post_init__(self) -> None:
         if not self.source_client_id:
@@ -359,6 +360,17 @@ class ComposerDecisionAuthority:
             if service_id in active_ids:
                 raise ValueError("known_inactive_service_id_conflicts_with_active_descriptor")
             inactive_seen.add(service_id)
+
+        inactive_descriptor_ids = {
+            descriptor.service_id for descriptor in self.known_inactive_service_descriptors
+        }
+        if inactive_descriptor_ids != inactive_seen:
+            raise ValueError("known_inactive_service_descriptors_mismatch")
+        seen_inactive_descriptor_ids: set[str] = set()
+        for descriptor in self.known_inactive_service_descriptors:
+            if descriptor.service_id in seen_inactive_descriptor_ids:
+                raise ValueError("known_inactive_service_descriptor_duplicate")
+            seen_inactive_descriptor_ids.add(descriptor.service_id)
 
 
 def authority_allowed_service_ids(authority: ComposerDecisionAuthority) -> frozenset[str]:
@@ -405,9 +417,13 @@ class RequestableFactDescriptor(ComposerContractModel):
     allowed_topic_ids: UniqueTopicIds = ()
     requires_implant_scope: bool = False
     requested_display_policy: RequestedDisplayPolicy | None = None
+    excluded_service_ids: UniqueServiceIds = ()
+    excluded_scope_text: str | None = None
 
     @model_validator(mode="after")
     def _validate_applicability(self) -> Self:
+        if self.excluded_service_ids and not self.excluded_scope_text:
+            raise ValueError("excluded_scope_text_required")
         if self.applicability == "clinic_wide":
             if self.allowed_service_ids or self.allowed_topic_ids:
                 raise ValueError("clinic_wide_forbids_scope_allowlists")
@@ -459,6 +475,7 @@ class ComposerPolicySidecar(ComposerContractModel):
     price_handling: Literal["code_owned_after_decision"] = COMPOSER_PRICE_HANDLING
     allowed_aspect_ids: tuple[AspectKind, ...]
     requestable_facts: tuple[RequestableFactDescriptor, ...] = ()
+    known_inactive_service_descriptors: tuple[ServiceDescriptor, ...] = ()
 
     @model_validator(mode="after")
     def _validate_sidecar(self) -> Self:
@@ -1043,6 +1060,7 @@ def _apply_semantic_authority(
 ) -> tuple[ComposerDecision, list[ComposerDecisionDiagnostic]]:
     diagnostics: list[ComposerDecisionDiagnostic] = []
     allowed_services = authority_allowed_service_ids(authority)
+    known_inactive = authority_known_inactive_service_ids(authority)
 
     topic_id = decision.topic_id
     if topic_id is not None:
@@ -1055,9 +1073,12 @@ def _apply_semantic_authority(
 
     if service_reference_kind == "explicit_current":
         if explicit_service_id not in allowed_services:
-            diagnostics.append(_diagnostic("service_id_not_allowed", explicit_service_id))
-            service_reference_kind = "none"
-            explicit_service_id = None
+            if explicit_service_id in known_inactive:
+                pass
+            else:
+                diagnostics.append(_diagnostic("service_id_not_allowed", explicit_service_id))
+                service_reference_kind = "none"
+                explicit_service_id = None
     elif service_reference_kind == "active_session":
         active_id = authority.active_session_service_id
         if active_id is None or active_id not in allowed_services:

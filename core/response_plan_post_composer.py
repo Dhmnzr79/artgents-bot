@@ -55,7 +55,12 @@ def _response_scope_for_resolution(
     *,
     reference_service_id: str | None,
     resolved_topic_id: str | None,
+    reference_is_known_inactive: bool = False,
 ) -> ResponseScopeKind:
+    if reference_is_known_inactive:
+        if resolved_topic_id is not None:
+            return "topic"
+        return "clinic"
     if reference_service_id is not None:
         return "service"
     if resolved_topic_id is not None:
@@ -135,6 +140,7 @@ def resolve_post_composer_selection(
     ref_topic = resolve_reference_service_and_topic(
         adapted,
         material.bundle,
+        source_client_id=material.source_client_id,
         active_session_service_id=active_session_service_id,
         allowed_topic_ids=allowed_topics,
     )
@@ -161,6 +167,7 @@ def resolve_post_composer_selection(
     response_scope = _response_scope_for_resolution(
         reference_service_id=ref_topic.reference_service_id,
         resolved_topic_id=resolved_topic_id,
+        reference_is_known_inactive=ref_topic.reference_is_known_inactive,
     )
 
     selection_validated_shown = validated_shown if snapshot_selection_usable else None
@@ -197,6 +204,7 @@ def resolve_post_composer_selection(
 
     service_selection = resolve_service_selection(
         material.bundle,
+        source_client_id=material.source_client_id,
         effective_scope=situation.effective_scope,
         resolved_topic_id=resolved_topic_id,
         reference_service_id=ref_topic.reference_service_id,
@@ -238,4 +246,6 @@ def resolve_post_composer_selection(
         situation_delta=situation.situation_delta,
         adapter_diagnostics=adapted.diagnostics,
         diagnostics=tuple(diagnostics),
+        authored_alternative_approved_text=service_selection.authored_alternative_approved_text,
+        authored_alternative_unavailable_text=service_selection.authored_alternative_unavailable_text,
     )

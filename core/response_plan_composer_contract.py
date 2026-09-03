@@ -117,6 +117,9 @@ def build_static_composer_instructions() -> str:
             "- Price intent uses requested_aspect_ids containing price; do not output price_text.",
             "- requested_fact_ids may contain only fact_id values from model-visible requestable fact descriptors in the policy sidecar.",
             "- Put fact ids only when the patient directly asked; explicit-only facts cannot be chosen automatically.",
+            "- When a requestable fact descriptor includes excluded_service_ids and excluded_scope_text, that negative scope applies only to that fact and those listed services; do not treat it as a universal clinic rule.",
+            "- If installment_12 or another payment fact is inapplicable to the resolved service scope, do not request it; answer the refusal in patient_text using excluded_scope_text from the sidecar when the current service is listed there.",
+            "- Code adds the positive canonical fact block only when the fact is applicable; patient_text owns the negative refusal and must not duplicate the positive fact text.",
             "- Do not choose promo or automatic amplifiers; do not copy controlled wording into patient_text.",
             "",
             "Patient text boundary:",
@@ -165,6 +168,7 @@ def build_composer_policy_sidecar(authority: ComposerDecisionAuthority) -> Compo
         price_handling=COMPOSER_PRICE_HANDLING,
         allowed_aspect_ids=authority.allowed_aspect_ids,
         requestable_facts=authority.requestable_facts,
+        known_inactive_service_descriptors=authority.known_inactive_service_descriptors,
     )
 
 
@@ -208,6 +212,8 @@ def _sidecar_to_payload(sidecar: ComposerPolicySidecar) -> dict[str, object]:
                     if descriptor.requested_display_policy is None
                     else descriptor.requested_display_policy.model_dump(mode="json")
                 ),
+                "excluded_service_ids": list(descriptor.excluded_service_ids),
+                "excluded_scope_text": descriptor.excluded_scope_text,
             }
             for descriptor in sidecar.requestable_facts
         ],
@@ -219,5 +225,14 @@ def _sidecar_to_payload(sidecar: ComposerPolicySidecar) -> dict[str, object]:
                 "short_meaning": descriptor.short_meaning,
             }
             for descriptor in sidecar.service_descriptors
+        ],
+        "known_inactive_service_descriptors": [
+            {
+                "aliases": list(descriptor.aliases),
+                "label": descriptor.label,
+                "service_id": descriptor.service_id,
+                "short_meaning": descriptor.short_meaning,
+            }
+            for descriptor in sidecar.known_inactive_service_descriptors
         ],
     }

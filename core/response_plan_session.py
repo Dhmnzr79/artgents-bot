@@ -500,6 +500,19 @@ def _shown_options_from_resolved(
     route = selection.decision.route
     if route in _TERMINAL_ROUTES:
         return None
+    if resolved.authored_service_alternative_block is not None and resolved.authored_service_alternative_block.options:
+        block = resolved.authored_service_alternative_block
+        service_ids = tuple(item.service_id for item in block.options)
+        topic_id = block.options_unambiguous_topic_id
+        if topic_id is None:
+            return None
+        return PersistedShownOptionsSnapshot(
+            session_key=session_key,
+            topic_id=topic_id,
+            service_ids=service_ids,
+            shown_at_turn=current_turn_index,
+            provenance="finalized_plan_service_options",
+        )
     if resolved.service_options_block is not None:
         service_ids = tuple(item.service_id for item in resolved.service_options_block.options)
         topic_id = selection.resolved_topic_id

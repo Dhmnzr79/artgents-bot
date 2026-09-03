@@ -29,7 +29,7 @@ from contracts.response_plan_post_composer import (
     PostComposerSelectionPlan,
     ResponseSituationDelta,
 )
-from contracts.response_schema import ResponseSchemaBundle
+from contracts.response_schema import ResponseSchemaBundle, TargetService
 from core.response_plan_materialization import materialize_pre_composer_payload, resolve_materialized_response
 from core.response_schema_loader import load_response_schema_bundle
 
@@ -1162,6 +1162,144 @@ def test_explicit_warranty_request_shown_as_requested_fact(demo_material) -> Non
     assert outcome.resolved.finalized_commercial_ids.requested_fact_ids == (
         "custom_warranty_fixture",
     )
+
+
+_AUTHORED_GROUP_TEXT = "Доступны варианты A и B."
+_INACTIVE_SERVICE_ID = "fixture_inactive_authored"
+
+
+def _authored_material_bundle(demo_bundle: ResponseSchemaBundle) -> PostComposerMaterialAuthority:
+    services = dict(demo_bundle.services)
+    services[_INACTIVE_SERVICE_ID] = TargetService(
+        name="Fixture inactive authored",
+        aliases=[],
+        family="orthodontics",
+        roles=[],
+        active=False,
+        selection={"mode": "context"},
+        options=[],
+    )
+    bundle = demo_bundle.model_copy(update={"services": services})
+    return PostComposerMaterialAuthority(source_client_id="demo", bundle=bundle)
+
+
+def _authored_selection(
+    *,
+    visible_ids: tuple[str, ...],
+    approved_text: str = _AUTHORED_GROUP_TEXT,
+    unavailable_text: str | None = None,
+) -> PostComposerSelectionPlan:
+    adapted = _adapted(
+        service_reference_kind="explicit_current",
+        explicit_service_id=_INACTIVE_SERVICE_ID,
+        requested_aspect_ids=("service_availability",),
+    )
+    return PostComposerSelectionPlan(
+        session_key=SESSION,
+        source_client_id="demo",
+        decision=adapted.decision,
+        resolved_topic_id="orthodontics",
+        response_scope="topic",
+        reference_service_id=_INACTIVE_SERVICE_ID,
+        reference_service_status="known_not_offered",
+        effective_scope=EffectiveScope(topic="orthodontics"),
+        ranked_service_ids=visible_ids,
+        visible_service_option_ids=visible_ids,
+        price_candidate_service_ids=(),
+        comparison_service_ids=(),
+        selection_basis="authored_alternative",
+        selection_intent="service_options" if visible_ids else "none",
+        requested_fact_candidates=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        adapter_diagnostics=(),
+        diagnostics=(),
+        authored_alternative_approved_text=approved_text if unavailable_text is None else None,
+        authored_alternative_unavailable_text=unavailable_text,
+    )
+
+
+def test_authored_materialization_consistent_bundle_materializes_all_options(demo_bundle) -> None:
+    material = _authored_material_bundle(demo_bundle)
+    selection = _authored_selection(visible_ids=("aligners", "all_on_4"))
+    adapted = _adapted(
+        service_reference_kind="explicit_current",
+        explicit_service_id=_INACTIVE_SERVICE_ID,
+        requested_aspect_ids=("service_availability",),
+    )
+    payload = materialize_pre_composer_payload(
+        selection,
+        adapted,
+        _sources(material),
+        as_of=AS_OF,
+    )
+    block = payload.plan.authored_service_alternative_block
+    assert block is not None
+    assert block.approved_text == _AUTHORED_GROUP_TEXT
+    assert tuple(option.service_id for option in block.options) == ("aligners", "all_on_4")
+    assert block.options_unambiguous_topic_id is None
+
+
+def test_authored_materialization_missing_option_rejected_before_freeze(demo_bundle) -> None:
+    material = _authored_material_bundle(demo_bundle)
+    selection = _authored_selection(visible_ids=("aligners", "missing_alt_fixture"))
+    adapted = _adapted(
+        service_reference_kind="explicit_current",
+        explicit_service_id=_INACTIVE_SERVICE_ID,
+        requested_aspect_ids=("service_availability",),
+    )
+    with pytest.raises(MaterializationContractError, match="authored_alternative_bundle_inconsistent"):
+        materialize_pre_composer_payload(
+            selection,
+            adapted,
+            _sources(material),
+            as_of=AS_OF,
+        )
+
+
+def test_authored_materialization_inactive_option_rejected_before_freeze(demo_bundle) -> None:
+    services = dict(demo_bundle.services)
+    services["inactive_alt_fixture"] = services["all_on_4"].model_copy(update={"active": False})
+    bundle = demo_bundle.model_copy(update={"services": services})
+    material = PostComposerMaterialAuthority(source_client_id="demo", bundle=bundle)
+    selection = _authored_selection(visible_ids=("aligners", "inactive_alt_fixture"))
+    adapted = _adapted(
+        service_reference_kind="explicit_current",
+        explicit_service_id=_INACTIVE_SERVICE_ID,
+        requested_aspect_ids=("service_availability",),
+    )
+    with pytest.raises(MaterializationContractError, match="authored_alternative_bundle_inconsistent"):
+        materialize_pre_composer_payload(
+            selection,
+            adapted,
+            _sources(material),
+            as_of=AS_OF,
+        )
+
+
+def test_authored_materialization_policy_filtered_single_option_succeeds(demo_bundle) -> None:
+    material = _authored_material_bundle(demo_bundle)
+    neutral_text = "Сейчас услуга «Fixture inactive authored» в клинике не оказывается."
+    selection = _authored_selection(
+        visible_ids=("aligners",),
+        unavailable_text=neutral_text,
+    )
+    adapted = _adapted(
+        service_reference_kind="explicit_current",
+        explicit_service_id=_INACTIVE_SERVICE_ID,
+        requested_aspect_ids=("service_availability",),
+    )
+    payload = materialize_pre_composer_payload(
+        selection,
+        adapted,
+        _sources(material),
+        as_of=AS_OF,
+    )
+    block = payload.plan.authored_service_alternative_block
+    assert block is not None
+    assert block.approved_text == neutral_text
+    assert tuple(option.service_id for option in block.options) == ("aligners",)
+    assert block.options_unambiguous_topic_id == "orthodontics"
+    assert _AUTHORED_GROUP_TEXT not in block.approved_text
 
 
 def test_invalid_materialization_trace_rejected() -> None:

@@ -16,6 +16,8 @@ from contracts.response_schema import ResponseSchemaBundle, TargetService
 from contracts.target_service_applicability import SelectionPatientContext
 from core.response_plan_dialogue_context import ValidatedShownOptionsSnapshot
 from core.response_strategy import resolve_target_strategy
+from core.response_plan_authored_alternative_policy import resolve_authored_alternative_policy
+from core.service_availability_presentation import build_availability_overlay
 from core.target_service_applicability import (
     exclusion_codes_for_service,
     filter_applicable_services,
@@ -40,6 +42,83 @@ class ServiceSelectionResult:
     selection_basis: SelectionBasis
     selection_intent: SelectionPresentationIntent
     diagnostics: tuple[PostComposerDiagnostic, ...]
+    authored_alternative_approved_text: str | None = None
+    authored_alternative_unavailable_text: str | None = None
+
+
+def _inactive_service_display_name(
+    bundle: ResponseSchemaBundle,
+    service_id: str,
+) -> str:
+    service = bundle.services.get(service_id)
+    if service is None:
+        return service_id
+    return str(service.name or service_id).strip() or service_id
+
+
+def resolve_known_inactive_service_selection(
+    bundle: ResponseSchemaBundle,
+    *,
+    source_client_id: str,
+    reference_service_id: str,
+) -> ServiceSelectionResult:
+    policy = resolve_authored_alternative_policy(
+        source_client_id=source_client_id,
+        requested_service_id=reference_service_id,
+        bundle=bundle,
+    )
+    if policy is not None:
+        validated_ids = policy.validated_alternative_service_ids
+        if not validated_ids:
+            return ServiceSelectionResult(
+                reference_service_status="known_not_offered",
+                ranked_service_ids=(),
+                visible_service_option_ids=(),
+                price_candidate_service_ids=(),
+                comparison_service_ids=(),
+                selection_basis="authored_alternative",
+                selection_intent="none",
+                diagnostics=(),
+                authored_alternative_unavailable_text=policy.unavailable_text,
+            )
+        block_text = policy.group_approved_text or policy.unavailable_text
+        return ServiceSelectionResult(
+            reference_service_status="known_not_offered",
+            ranked_service_ids=validated_ids,
+            visible_service_option_ids=validated_ids,
+            price_candidate_service_ids=(),
+            comparison_service_ids=(),
+            selection_basis="authored_alternative",
+            selection_intent="service_options",
+            diagnostics=(),
+            authored_alternative_approved_text=block_text,
+        )
+
+    overlay = build_availability_overlay(
+        client_id=source_client_id,
+        availability_status="known_not_offered",
+        requested_service_id=reference_service_id,
+        bundle=bundle,
+    )
+    unavailable_text = (
+        overlay.not_offered_text
+        if overlay is not None and overlay.not_offered_text
+        else (
+            f"Сейчас услуга «{_inactive_service_display_name(bundle, reference_service_id)}» "
+            "в клинике не оказывается."
+        )
+    )
+    return ServiceSelectionResult(
+        reference_service_status="known_not_offered",
+        ranked_service_ids=(),
+        visible_service_option_ids=(),
+        price_candidate_service_ids=(),
+        comparison_service_ids=(),
+        selection_basis="authored_alternative",
+        selection_intent="none",
+        diagnostics=(),
+        authored_alternative_unavailable_text=unavailable_text,
+    )
 
 
 def adapter_reference_rejection(
@@ -86,13 +165,15 @@ def resolve_reference_service_status(
     patient: SelectionPatientContext,
 ) -> tuple[ReferenceServiceStatus, tuple[PostComposerDiagnostic, ...]]:
     service = bundle.services.get(reference_service_id)
-    if service is None or not service.active:
+    if service is None:
         return "unknown", (
             PostComposerDiagnostic(
                 code="reference_service_unavailable",
                 detail=reference_service_id,
             ),
         )
+    if not service.active:
+        return "known_not_offered", ()
 
     if resolved_topic_id is not None:
         applicable = filter_applicable_services(
@@ -209,6 +290,8 @@ def post_composer_reference_blocked(
 ) -> bool:
     if reference_rejected:
         return True
+    if reference_status == "known_not_offered":
+        return False
     if reference_service_id is None:
         return False
     if any(
@@ -231,6 +314,7 @@ def post_composer_reference_blocked(
 def resolve_service_selection(
     bundle: ResponseSchemaBundle,
     *,
+    source_client_id: str,
     effective_scope: EffectiveScope,
     resolved_topic_id: str | None,
     reference_service_id: str | None,
@@ -241,6 +325,19 @@ def resolve_service_selection(
 ) -> ServiceSelectionResult:
     diagnostics: list[PostComposerDiagnostic] = []
     patient = selection_patient_context_from_inputs(effective_scope)
+
+    if (
+        not reference_rejected
+        and reference_service_id is not None
+        and option_reference_kind != "shown_options"
+    ):
+        service = bundle.services.get(reference_service_id)
+        if service is not None and not service.active:
+            return resolve_known_inactive_service_selection(
+                bundle,
+                source_client_id=source_client_id,
+                reference_service_id=reference_service_id,
+            )
 
     reference_status: ReferenceServiceStatus = "none"
     if reference_service_id is not None:

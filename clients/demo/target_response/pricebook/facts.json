@@ -55,6 +55,19 @@
       "clasp_dentures",
       "removable_dentures"
     ],
+    "requested_display_policy": {
+      "allow_clinic": true,
+      "allowed_topic_ids": [
+        "implantation",
+        "prosthetics"
+      ],
+      "canonical_text_is_scope_qualified": true
+    },
+    "excluded_service_ids": [
+      "caries",
+      "tooth_extraction"
+    ],
+    "excluded_scope_text": "На лечение кариеса и удаление зуба рассрочка не предоставляется.",
     "incompatible_with": []
   },
   "free_implant_consult": {
@@ -104,6 +117,13 @@
       "pterygoid_implants"
     ],
     "incompatible_with": [],
+    "requested_display_policy": {
+      "allow_clinic": false,
+      "allowed_topic_ids": [
+        "implantation"
+      ],
+      "canonical_text_is_scope_qualified": true
+    },
     "detail_ref": "clinic__info__warranty.md#korotko"
   },
   "implant_same_day_discount": {

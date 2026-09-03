@@ -606,13 +606,45 @@ def test_d_synthetic_installment_clinic_wide_requested(tmp_path: Path) -> None:
     assert installment_text in outcome.prepared.rendered_text
 
 
-def test_d_real_installment_clinic_without_display_policy_is_not_shown(tmp_path: Path) -> None:
+def test_d_real_installment_clinic_with_display_policy_is_shown(tmp_path: Path) -> None:
     ctx = _demo_context()
     runner = DialogueRunner(store=_store(tmp_path), ctx=ctx, policy=_policy())
     outcome = runner.run_turn(
         TurnSpec(
             patient_message="Есть рассрочка?",
-            request_id="d-real-gap",
+            request_id="d-real-installment",
+            composer_json=_composer_dict(
+                patient_text="Про рассрочку.",
+                topic_id=None,
+                requested_fact_ids=["installment_12"],
+            ),
+        )
+    )
+    resolved = outcome.pipeline.materialized.resolved
+    assert "installment_12" in resolved.finalized_commercial_ids.requested_fact_ids
+    installment_text = ctx.material.bundle.facts["installment_12"].text_fact
+    assert installment_text in outcome.prepared.rendered_text
+
+
+def test_d_synthetic_installment_without_display_policy_is_not_shown(tmp_path: Path) -> None:
+    base = load_response_schema_bundle(TARGET_ROOT)
+    facts = dict(base.facts)
+    facts["installment_12"] = facts["installment_12"].model_copy(update={"requested_display_policy": None})
+    bundle = base.model_copy(update={"facts": facts})
+    ctx = DialogueContext(
+        label="demo_installment_no_policy",
+        data_kind="SYNTHETIC_FIXTURE",
+        session_key=SESSION,
+        material=PostComposerMaterialAuthority(source_client_id="demo", bundle=bundle),
+        corpus=_demo_corpus("demo"),
+        condition_evidence={},
+        condition_evidence_note="requested_display_policy removed on installment_12",
+    )
+    runner = DialogueRunner(store=_store(tmp_path), ctx=ctx, policy=_policy())
+    outcome = runner.run_turn(
+        TurnSpec(
+            patient_message="Есть рассрочка?",
+            request_id="d-synthetic-gap",
             composer_json=_composer_dict(
                 patient_text="Про рассрочку.",
                 topic_id=None,

@@ -23,6 +23,7 @@ from contracts.response_plan import (
     ResponseCaps,
     ServiceOptionEntry,
     ServiceOptionsBlock,
+    AuthoredServiceAlternativeBlock,
     ServiceValueCandidate,
     TextualCtaCandidate,
     UiButtonCandidate,
@@ -48,6 +49,7 @@ from contracts.response_plan_materialization import (
 from contracts.response_plan_post_composer import PostComposerSelectionPlan
 from contracts.response_schema import ResponseSchemaBundle, TargetCommercialFact, TargetFixedPrice, TargetOffer, TargetService
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
+from core.response_plan_authored_alternative_policy import unambiguous_topic_for_service_ids
 from core.response_plan_fact_projection import (
     fact_active_as_of,
     fact_explicit_only,
@@ -131,9 +133,14 @@ def materialize_pre_composer_payload(
     )
     diagnostics.extend(price_diag)
 
-    service_options = _materialize_service_options(selection, bundle, client_id)
+    authored_block = _materialize_authored_service_alternative(selection, bundle, client_id)
+    service_options = None if authored_block is not None else _materialize_service_options(
+        selection, bundle, client_id
+    )
     if price_plan.kind != "none" and service_options is not None:
         raise MaterializationContractError("service_options_forbidden_with_price")
+    if price_plan.kind != "none" and authored_block is not None:
+        raise MaterializationContractError("authored_alternative_forbidden_with_price")
 
     required_conditions = _materialize_required_conditions(
         price_plan,
@@ -193,6 +200,7 @@ def materialize_pre_composer_payload(
         ui_candidates=ui_candidates,
         transport_kind=sources.transport_kind,
         service_options_block=service_options,
+        authored_service_alternative_block=authored_block,
     )
 
     trace = MaterializationTrace(
@@ -723,6 +731,38 @@ def _materialize_required_conditions(
             )
         )
     return tuple(blocks)
+
+
+def _materialize_authored_service_alternative(
+    selection: PostComposerSelectionPlan,
+    bundle: ResponseSchemaBundle,
+    client_id: str,
+) -> AuthoredServiceAlternativeBlock | None:
+    approved_text = selection.authored_alternative_approved_text
+    unavailable_text = selection.authored_alternative_unavailable_text
+    if not approved_text and not unavailable_text:
+        return None
+    if selection.reference_service_id is None:
+        raise MaterializationContractError("authored_alternative_requires_reference_service")
+    option_ids = selection.visible_service_option_ids
+    options: list[ServiceOptionEntry] = []
+    for service_id in option_ids:
+        service = bundle.services.get(service_id)
+        if service is None or not service.active:
+            raise MaterializationContractError("authored_alternative_bundle_inconsistent")
+        options.append(
+            ServiceOptionEntry(
+                service_id=service_id,
+                display_name=service.name,
+            )
+        )
+    return AuthoredServiceAlternativeBlock(
+        source_client_id=client_id,
+        requested_service_id=selection.reference_service_id,
+        approved_text=(approved_text or unavailable_text or "").strip(),
+        options=tuple(options),
+        options_unambiguous_topic_id=unambiguous_topic_for_service_ids(bundle, option_ids),
+    )
 
 
 def _materialize_service_options(

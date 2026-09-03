@@ -403,3 +403,101 @@ def test_stale_shown_options_snapshot_does_not_restore_active_topic() -> None:
         topic_restoration_shown_snapshot=None,
     )
     assert result.active_topic is None or result.active_topic.provenance != "shown_options"
+
+
+def test_authored_mixed_topic_block_does_not_write_conversation_topic_snapshot() -> None:
+    from contracts.response_plan import (
+        AuthoredServiceAlternativeBlock,
+        FinalizedCommercialIds,
+        ResponseSessionDelta,
+        ServiceOptionEntry,
+    )
+    from contracts.response_plan_post_composer import PostComposerSelectionPlan, ResponseSituationDelta
+    from contracts.response_plan_composer import ComposerDecision, ComposerPatientSituation
+    from contracts.effective_scope import EffectiveScope
+    from contracts.response_plan_session import TurnRequestBinding
+    from core.response_plan_session import apply_session_state_transition, create_turn_request_binding
+    from tests.test_response_plan_contract import _minimal_answer_resolved
+
+    session_key = SessionKey(client_id="demo", sid="s1")
+    prior = ResponsePlanSessionState(
+        schema_version=SESSION_SCHEMA_VERSION,
+        session_key=session_key,
+        revision=0,
+        last_committed_turn_index=0,
+    )
+    snapshot = empty_session_snapshot(session_key).model_copy(update={"state": prior, "exists_in_store": True})
+    binding = create_turn_request_binding(
+        snapshot,
+        request_id="t1",
+        patient_message="Нужна услуга",
+    )
+    decision = ComposerDecision(
+        route="ANSWER",
+        mode="standard",
+        patient_text="Ответ.",
+        service_reference_kind="explicit_current",
+        option_reference_kind="none",
+        topic_id="orthodontics",
+        explicit_service_id="fixture_inactive",
+        requested_aspect_ids=("service_availability",),
+        patient_situation=ComposerPatientSituation(
+            extent="unknown",
+            jaw="unknown",
+            stage="unknown",
+            modifiers=(),
+        ),
+        requested_fact_ids=(),
+        source_identity=None,
+    )
+    selection = PostComposerSelectionPlan(
+        session_key=session_key,
+        source_client_id="demo",
+        decision=decision,
+        resolved_topic_id="orthodontics",
+        response_scope="topic",
+        reference_service_id="fixture_inactive",
+        reference_service_status="known_not_offered",
+        effective_scope=EffectiveScope(topic="orthodontics"),
+        ranked_service_ids=("aligners", "all_on_4"),
+        visible_service_option_ids=("aligners", "all_on_4"),
+        price_candidate_service_ids=(),
+        comparison_service_ids=(),
+        selection_basis="authored_alternative",
+        selection_intent="service_options",
+        requested_fact_candidates=(),
+        situation_delta=ResponseSituationDelta(action="keep"),
+        adapter_diagnostics=(),
+        diagnostics=(),
+        authored_alternative_approved_text="Нейтральный текст.",
+    )
+    resolved = _minimal_answer_resolved(
+        response_scope="topic",
+        session_delta=ResponseSessionDelta(
+            session_key=session_key,
+            active_topic_id="orthodontics",
+            shown_service_option_ids=("aligners", "all_on_4"),
+        ),
+        authored_service_alternative_block=AuthoredServiceAlternativeBlock(
+            source_client_id="demo",
+            requested_service_id="fixture_inactive",
+            approved_text="Нейтральный текст.",
+            options=(
+                ServiceOptionEntry(service_id="aligners", display_name="Элайнеры"),
+                ServiceOptionEntry(service_id="all_on_4", display_name="All-on-4"),
+            ),
+            options_unambiguous_topic_id=None,
+        ),
+        finalized_commercial_ids=FinalizedCommercialIds(shown_service_option_ids=("aligners", "all_on_4")),
+    )
+    result = apply_session_state_transition(
+        prior,
+        policy=_policy(),
+        binding=binding,
+        rendered_text="Ответ.",
+        selection=selection,
+        resolved=resolved,
+        topic_restoration_shown_snapshot=None,
+    )
+    assert result.shown_options_snapshot is None
+    assert result.active_service is None

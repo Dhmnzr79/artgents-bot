@@ -149,6 +149,8 @@ def _collect_owned_candidates(plan: PreComposerPlan) -> list[object]:
         items.append(plan.textual_cta_candidate)
     if plan.service_options_block is not None:
         items.append(plan.service_options_block)
+    if plan.authored_service_alternative_block is not None:
+        items.append(plan.authored_service_alternative_block)
     items.extend(plan.ui_candidates.quick_replies)
     items.extend(plan.ui_candidates.buttons)
     if plan.ui_candidates.widget is not None:
@@ -318,6 +320,7 @@ def _resolve_composer_answer(
     textual_cta_block = _resolve_textual_cta(plan)
     ui_plan = _resolve_commerce_ui(plan)
     service_options_block = plan.service_options_block
+    authored_service_alternative_block = plan.authored_service_alternative_block
     finalized = _build_finalized_ids(
         price_block,
         required_conditions,
@@ -326,6 +329,7 @@ def _resolve_composer_answer(
         promo_blocks,
         amplifier_blocks,
         service_options_block,
+        authored_service_alternative_block,
     )
     session_delta = _build_session_delta(plan, finalized, terminal_state="none")
     return ResolvedResponsePlan(
@@ -344,6 +348,7 @@ def _resolve_composer_answer(
         automatic_amplifier_blocks=tuple(amplifier_blocks),
         textual_cta_block=textual_cta_block,
         service_options_block=service_options_block,
+        authored_service_alternative_block=authored_service_alternative_block,
         ui_plan=ui_plan,
         diagnostics=tuple(diagnostics),
         finalized_commercial_ids=finalized,
@@ -644,7 +649,15 @@ def _build_finalized_ids(
     promo_blocks: list[ResolvedFactBlock],
     amplifier_blocks: list[ResolvedFactBlock],
     service_options_block,
+    authored_service_alternative_block,
 ) -> FinalizedCommercialIds:
+    shown_service_option_ids: tuple[str, ...] = ()
+    if authored_service_alternative_block is not None:
+        shown_service_option_ids = tuple(
+            option.service_id for option in authored_service_alternative_block.options
+        )
+    elif service_options_block is not None:
+        shown_service_option_ids = tuple(option.service_id for option in service_options_block.options)
     return FinalizedCommercialIds(
         requested_fact_ids=tuple(block.fact_id for block in requested_blocks),
         promo_fact_ids=tuple(block.fact_id for block in promo_blocks),
@@ -656,11 +669,7 @@ def _build_finalized_ids(
         required_offer_condition_ids=tuple(
             block.condition_id for block in required_conditions
         ),
-        shown_service_option_ids=(
-            tuple(option.service_id for option in service_options_block.options)
-            if service_options_block is not None
-            else ()
-        ),
+        shown_service_option_ids=shown_service_option_ids,
     )
 
 

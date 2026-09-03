@@ -366,6 +366,8 @@ class TargetCommercialFact(TargetSchemaModel):
     detail_ref: NonBlankStr | None = None
     incompatible_with: list[NonBlankStr] = Field(default_factory=list)
     requested_display_policy: RequestedDisplayPolicy | None = None
+    excluded_service_ids: list[NonBlankStr] = Field(default_factory=list)
+    excluded_scope_text: NonBlankStr | None = None
 
     @model_validator(mode="after")
     def _fact_invariants(self) -> "TargetCommercialFact":
@@ -375,8 +377,12 @@ class TargetCommercialFact(TargetSchemaModel):
             raise ValueError("fact_allowed_topic_duplicate")
         if _duplicates(self.incompatible_with):
             raise ValueError("fact_incompatible_ref_duplicate")
+        if _duplicates(self.excluded_service_ids):
+            raise ValueError("fact_excluded_service_duplicate")
         if self.id in self.incompatible_with:
             raise ValueError("fact_incompatible_self_reference")
+        if self.excluded_service_ids and self.excluded_scope_text is None:
+            raise ValueError("fact_excluded_scope_text_required")
         if self.active_from is not None and self.active_until is not None:
             if self.active_from > self.active_until:
                 raise ValueError("fact_active_from_after_active_until")

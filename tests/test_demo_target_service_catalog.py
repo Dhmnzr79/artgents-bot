@@ -43,6 +43,14 @@ SERVICE_IDS = (
     "removable_dentures",
 )
 
+KNOWN_INACTIVE_SERVICE_IDS = ("braces",)
+
+ALL_CATALOG_SERVICE_IDS = SERVICE_IDS + KNOWN_INACTIVE_SERVICE_IDS
+
+INACTIVE_SERVICE_INVENTORY: dict[str, tuple[str, list[str], dict[str, object]]] = {
+    "braces": ("orthodontics", [], {"mode": "context"}),
+}
+
 INVENTORY: dict[str, tuple[str, list[str], dict[str, object]]] = {
     "tomography": ("diagnostics", ["supporting"], {"mode": "direct"}),
     "professional_whitening": ("aesthetics", [], {"mode": "context"}),
@@ -206,21 +214,39 @@ def _sha256(path: Path) -> str:
 def test_real_target_catalog_is_strict_complete_s1_wire_data() -> None:
     raw, models = _load_target()
 
-    assert tuple(raw) == SERVICE_IDS
+    assert set(raw) == set(ALL_CATALOG_SERVICE_IDS)
     assert tuple(INVENTORY) == SERVICE_IDS
-    assert len(raw) == 22
+    assert tuple(INACTIVE_SERVICE_INVENTORY) == KNOWN_INACTIVE_SERVICE_IDS
+    assert len(raw) == len(ALL_CATALOG_SERVICE_IDS)
+    active_fields = {
+        "name",
+        "aliases",
+        "family",
+        "roles",
+        "active",
+        "selection",
+        "options",
+        "content_ref",
+    }
+    active_optional_fields = {"service_value_ref"}
+    inactive_fields = {
+        "name",
+        "aliases",
+        "family",
+        "roles",
+        "active",
+        "selection",
+        "options",
+    }
     for service_id, record in raw.items():
-        expected_fields = {
-            "name",
-            "aliases",
-            "family",
-            "roles",
-            "active",
-            "selection",
-            "options",
-            "content_ref",
-        }
-        assert set(record) == expected_fields
+        if service_id in KNOWN_INACTIVE_SERVICE_IDS:
+            assert set(record) == inactive_fields
+            assert record["active"] is False
+        else:
+            record_fields = set(record)
+            assert active_fields <= record_fields
+            assert record_fields <= active_fields | active_optional_fields
+            assert record["active"] is True
         assert models[service_id].model_dump(exclude_none=True) == record
 
 
@@ -237,8 +263,15 @@ def test_family_roles_and_selection_match_normative_inventory() -> None:
     actual = {
         service_id: (record["family"], record["roles"], record["selection"])
         for service_id, record in raw.items()
+        if service_id not in KNOWN_INACTIVE_SERVICE_IDS
     }
     assert actual == INVENTORY
+    inactive_actual = {
+        service_id: (record["family"], record["roles"], record["selection"])
+        for service_id, record in raw.items()
+        if service_id in KNOWN_INACTIVE_SERVICE_IDS
+    }
+    assert inactive_actual == INACTIVE_SERVICE_INVENTORY
 
 
 def test_only_semantic_options_exist_and_match_authored_source_labels() -> None:
@@ -278,6 +311,8 @@ def test_content_refs_and_doctor_service_links_are_complete() -> None:
     kb_refs = set(build_response_schema_kb_refs(MD_ROOT))
     without_content: list[str] = []
     for service_id, service in services.items():
+        if service_id in KNOWN_INACTIVE_SERVICE_IDS:
+            continue
         if service.content_ref is None:
             without_content.append(service_id)
             continue
@@ -291,8 +326,8 @@ def test_content_refs_and_doctor_service_links_are_complete() -> None:
         for service_id in doctor.service_ids
     }
     assert without_content == []
-    assert doctor_service_ids <= set(services)
-    assert doctor_service_ids == set(services) - {"tomography"}
+    assert doctor_service_ids <= set(SERVICE_IDS)
+    assert doctor_service_ids == set(SERVICE_IDS) - {"tomography"}
 
 
 def test_real_sources_are_read_only_and_test_has_no_product_wiring() -> None:

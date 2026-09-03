@@ -120,6 +120,8 @@ def build_requestable_fact_descriptors(
             "applicability": applicability,
             "requires_implant_scope": requires_implant_scope,
             "requested_display_policy": display_policy,
+            "excluded_service_ids": tuple(fact.excluded_service_ids),
+            "excluded_scope_text": fact.excluded_scope_text,
         }
         if applicability == "topic_scoped":
             descriptors.append(

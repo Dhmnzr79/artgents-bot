@@ -48,10 +48,15 @@ ReferenceServiceStatus = Literal[
     "compatible",
     "conflict",
     "unknown",
+    "known_not_offered",
 ]
 
-_VALID_REFERENCE_SERVICE_STATUSES = frozenset({"none", "compatible", "conflict", "unknown"})
-_VALID_SELECTION_BASES = frozenset({"referenced_service", "current_situation", "shown_options", "none"})
+_VALID_REFERENCE_SERVICE_STATUSES = frozenset(
+    {"none", "compatible", "conflict", "unknown", "known_not_offered"}
+)
+_VALID_SELECTION_BASES = frozenset(
+    {"referenced_service", "current_situation", "shown_options", "authored_alternative", "none"}
+)
 _VALID_SELECTION_INTENTS = frozenset(
     {"none", "service_options", "price_candidates", "comparison_candidates"}
 )
@@ -68,6 +73,7 @@ SelectionBasis = Literal[
     "referenced_service",
     "current_situation",
     "shown_options",
+    "authored_alternative",
     "none",
 ]
 
@@ -186,6 +192,8 @@ class PostComposerSelectionPlan:
     situation_delta: ResponseSituationDelta
     adapter_diagnostics: tuple[ComposerDecisionDiagnostic, ...]
     diagnostics: tuple[PostComposerDiagnostic, ...]
+    authored_alternative_approved_text: str | None = None
+    authored_alternative_unavailable_text: str | None = None
 
     def __post_init__(self) -> None:
         if not self.source_client_id or not self.source_client_id.strip():
@@ -234,13 +242,16 @@ class PostComposerSelectionPlan:
             raise PostComposerSelectionError("price_candidate_service_ids_exceeds_max")
         ranked = self.ranked_service_ids
         visible = self.visible_service_option_ids
-        if visible and any(service_id not in ranked for service_id in visible):
-            raise PostComposerSelectionError("visible_options_not_subset_of_ranked")
-        if visible:
-            visible_index = {service_id: index for index, service_id in enumerate(visible)}
-            ranked_visible = [sid for sid in ranked if sid in visible_index]
-            if tuple(ranked_visible) != visible:
-                raise PostComposerSelectionError("visible_options_order_mismatch")
+        if self.selection_basis != "authored_alternative":
+            if visible and any(service_id not in ranked for service_id in visible):
+                raise PostComposerSelectionError("visible_options_not_subset_of_ranked")
+            if visible:
+                visible_index = {service_id: index for index, service_id in enumerate(visible)}
+                ranked_visible = [sid for sid in ranked if sid in visible_index]
+                if tuple(ranked_visible) != visible:
+                    raise PostComposerSelectionError("visible_options_order_mismatch")
+        elif self.reference_service_id is None:
+            raise PostComposerSelectionError("authored_alternative_requires_reference_service")
         if self.comparison_service_ids and self.selection_basis != "shown_options":
             raise PostComposerSelectionError("comparison_requires_shown_options_basis")
         if self.selection_basis == "shown_options" and self.decision.option_reference_kind != "shown_options":

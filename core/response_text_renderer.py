@@ -30,7 +30,9 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
 
     if plan.patient_text:
         parts.append(plan.patient_text.strip())
-    if plan.service_options_block is not None:
+    if plan.authored_service_alternative_block is not None:
+        parts.extend(_render_authored_service_alternative(plan))
+    elif plan.service_options_block is not None:
         parts.extend(_render_service_options(plan))
     parts.extend(block.display_text.strip() for block in plan.requested_fact_blocks)
     if plan.service_value_block is not None:
@@ -39,6 +41,17 @@ def render_response_text(plan: ResolvedResponsePlan) -> str:
     parts.extend(_render_amplifier_list(plan))
     parts.extend(_render_textual_cta(plan))
     return _join_parts(parts)
+
+
+def _render_authored_service_alternative(plan: ResolvedResponsePlan) -> list[str]:
+    block = plan.authored_service_alternative_block
+    if block is None:
+        return []
+    parts = [block.approved_text.strip()]
+    if block.options:
+        lines = [option.display_name.strip() for option in block.options]
+        parts.append("\n".join(f"- {line}" for line in lines if line))
+    return parts
 
 
 def _render_service_options(plan: ResolvedResponsePlan) -> list[str]:

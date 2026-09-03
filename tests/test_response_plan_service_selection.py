@@ -50,6 +50,7 @@ def _shown_snapshot(service_ids: tuple[str, ...]) -> ValidatedShownOptionsSnapsh
 def test_exact_price_all_on_6_only_candidate(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="full_arch", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id="all_on_6",
@@ -72,6 +73,7 @@ def test_rejected_explicit_service_blocks_generic_price(demo_bundle) -> None:
     assert rejected == (True, "all_on_6")
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="full_arch", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id=None,
@@ -87,6 +89,7 @@ def test_rejected_explicit_service_blocks_generic_price(demo_bundle) -> None:
 def test_generic_full_arch_price_candidates(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="full_arch", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id=None,
@@ -102,6 +105,7 @@ def test_generic_full_arch_price_candidates(demo_bundle) -> None:
 def test_shown_options_price_uses_snapshot_only(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="full_arch", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id=None,
@@ -119,6 +123,7 @@ def test_shown_options_price_uses_snapshot_only(demo_bundle) -> None:
 def test_shown_options_comparison_without_price(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="full_arch", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id=None,
@@ -163,6 +168,7 @@ def test_known_contradictory_stage_conflict(demo_bundle) -> None:
 def test_catalog_reference_price_allowed_with_conflict_status(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="one_tooth", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id="all_on_4",
@@ -179,6 +185,7 @@ def test_catalog_reference_price_allowed_with_conflict_status(demo_bundle) -> No
 def test_situation_based_selection_does_not_use_catalog_reference_shortcut(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="one_tooth", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id=None,
@@ -195,6 +202,7 @@ def test_situation_based_selection_does_not_use_catalog_reference_shortcut(demo_
 def test_catalog_reference_conflict_keeps_only_reference_service(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="one_tooth", jaw="upper", stage="natural_tooth_present"),
         resolved_topic_id="implantation",
         reference_service_id="one_stage",
@@ -210,6 +218,7 @@ def test_catalog_reference_conflict_keeps_only_reference_service(demo_bundle) ->
 def test_overview_plans_visible_options(demo_bundle) -> None:
     result = resolve_service_selection(
         demo_bundle,
+        source_client_id="demo",
         effective_scope=_scope(extent="full_arch", jaw="upper"),
         resolved_topic_id="implantation",
         reference_service_id=None,

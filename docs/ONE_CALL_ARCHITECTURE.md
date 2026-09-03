@@ -657,3 +657,22 @@ Mandatory independent checker runs:
 4. legacy removal
 
 Checker is **not** required after every micro-step. Re-check only after REJECT or material post-checker changes.
+
+---
+
+## 12. Demo policy parity on response-plan (DEMO-POLICY-PARITY-1)
+
+Demo client data are owner-approved fiction for local evaluation only.
+
+| Policy | Source | Response-plan behavior |
+|---|---|---|
+| Known inactive service + authored alternative | `clients/demo/clinic_policies.yaml` → `service_alternatives` | Adapter preserves `explicit_service_id` for catalog-known inactive IDs. Post-Composer uses `authored_alternative` selection; frozen `AuthoredServiceAlternativeBlock` owns `approved_text` + optional options. No legacy `one_call_presentation_pass` post-edit. |
+| Unknown vs inactive service | Catalog `active=false` vs missing ID | Missing ID stays unknown/rejected; inactive catalog ID is `known_not_offered`, not auto-selected as active service. |
+| Price on inactive requested service | Composer `requested_aspect_ids=["price"]` | No price block; authored alternative options may still render without price. |
+| Installment scope | `facts.json` `installment_12.allowed_service_ids` + optional `requested_display_policy` + demo-only `excluded_service_ids` / `excluded_scope_text` | Positive fact only when scope allows. Demo negative scope is projected into Composer requestable-fact sidecar; Composer owns refusal `patient_text` when the resolved service is listed — code does not inject a universal negative fact. |
+| Authored alternative text | `clinic_policies.yaml` `approved_text` vs catalog-validated alternatives | Policy resolver uses `group_approved_text` only when validated IDs equal authored original set; otherwise neutral unavailable message + remaining options. Materialization rejects inconsistent selection/bundle (`authored_alternative_bundle_inconsistent`). |
+| Alternative topic binding | Catalog `content_ref` topics of frozen options | `AuthoredServiceAlternativeBlock.options_unambiguous_topic_id` computed at materialization from options only; session snapshot for authored alternatives uses this field, not Composer/selection topic. |
+
+| Warranty scope | `implant_warranty` + `requested_display_policy` | Explicit-only; topic scope without forced service when policy allows; no automatic warranty amplification. |
+
+Composer policy sidecar exposes active `service_descriptors` and separate `known_inactive_service_descriptors` (not merged lists). Requestable facts may include client-specific negative scope metadata (`excluded_service_ids`, `excluded_scope_text`) for demo installment only; absence of such fields on other facts is not a negative proof.

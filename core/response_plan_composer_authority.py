@@ -55,6 +55,24 @@ def _collect_known_inactive_service_ids(
     )
 
 
+def _build_known_inactive_service_descriptors(
+    material: PostComposerMaterialAuthority,
+) -> tuple[ServiceDescriptor, ...]:
+    descriptors: list[ServiceDescriptor] = []
+    for service_id, service in sorted(material.bundle.services.items()):
+        if service.active:
+            continue
+        descriptors.append(
+            ServiceDescriptor(
+                service_id=service_id,
+                label=service.name,
+                aliases=tuple(service.aliases),
+                short_meaning=service.family,
+            )
+        )
+    return tuple(descriptors)
+
+
 def _build_service_descriptors(
     material: PostComposerMaterialAuthority,
 ) -> tuple[ServiceDescriptor, ...]:
@@ -121,6 +139,7 @@ def build_composer_decision_authority(
         allowed_aspect_ids=allowed_aspect_ids,
         requestable_facts=requestable_facts,
         known_inactive_service_ids=_collect_known_inactive_service_ids(material),
+        known_inactive_service_descriptors=_build_known_inactive_service_descriptors(material),
     )
 
 

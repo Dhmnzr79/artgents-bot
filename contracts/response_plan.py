@@ -468,6 +468,25 @@ class ServiceOptionsBlock(ResponsePlanModel):
         return self
 
 
+class AuthoredServiceAlternativeBlock(ResponsePlanModel):
+    source_client_id: NonBlankStr
+    requested_service_id: NonBlankStr
+    approved_text: NonBlankStr
+    options: tuple[ServiceOptionEntry, ...] = ()
+    options_unambiguous_topic_id: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_block(self) -> Self:
+        if len(self.options) > 3:
+            raise ValueError("authored_alternative_options_exceeds_max")
+        seen: set[str] = set()
+        for option in self.options:
+            if option.service_id in seen:
+                raise ValueError("authored_alternative_duplicate_service_id")
+            seen.add(option.service_id)
+        return self
+
+
 class CommercialFactCandidate(ResponsePlanModel):
     fact_id: NonBlankStr
     display_text: NonBlankStr
@@ -559,6 +578,7 @@ class PreComposerPlan(ResponsePlanModel):
     ui_candidates: UiPlanCandidates = Field(default_factory=UiPlanCandidates)
     transport_kind: TransportKind = "blocking"
     service_options_block: ServiceOptionsBlock | None = None
+    authored_service_alternative_block: AuthoredServiceAlternativeBlock | None = None
 
     @model_validator(mode="after")
     def _validate_scope(self) -> Self:
@@ -602,6 +622,8 @@ class PreComposerPlan(ResponsePlanModel):
             raise ValueError("price_caps_max_promo_exceeded")
         if price.max_automatic_amplifiers > 4:
             raise ValueError("price_caps_max_amplifiers_exceeded")
+        if self.service_options_block is not None and self.authored_service_alternative_block is not None:
+            raise ValueError("service_options_and_authored_alternative_conflict")
         return self
 
     @property
@@ -757,6 +779,8 @@ def _assert_no_commerce(plan: ResolvedResponsePlan) -> None:
         raise ValueError("terminal_plan_forbids_textual_cta")
     if plan.service_options_block is not None:
         raise ValueError("terminal_plan_forbids_service_options")
+    if plan.authored_service_alternative_block is not None:
+        raise ValueError("terminal_plan_forbids_authored_alternative")
     finalized = plan.finalized_commercial_ids
     if any(
         (
@@ -805,6 +829,14 @@ def _validate_fact_role_uniqueness(plan: ResolvedResponsePlan) -> None:
             seen.add(fact_id)
 
 
+def _finalized_shown_service_option_ids(plan: ResolvedResponsePlan) -> tuple[str, ...]:
+    if plan.authored_service_alternative_block is not None:
+        return tuple(option.service_id for option in plan.authored_service_alternative_block.options)
+    if plan.service_options_block is not None:
+        return tuple(option.service_id for option in plan.service_options_block.options)
+    return ()
+
+
 def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
     finalized = plan.finalized_commercial_ids
     if finalized.requested_fact_ids != tuple(block.fact_id for block in plan.requested_fact_blocks):
@@ -827,11 +859,7 @@ def _validate_finalized_ids(plan: ResolvedResponsePlan) -> None:
         block.condition_id for block in plan.required_offer_conditions
     ):
         raise ValueError("finalized_required_condition_ids_mismatch")
-    if finalized.shown_service_option_ids != (
-        tuple(option.service_id for option in plan.service_options_block.options)
-        if plan.service_options_block is not None
-        else ()
-    ):
+    if finalized.shown_service_option_ids != _finalized_shown_service_option_ids(plan):
         raise ValueError("finalized_service_option_ids_mismatch")
     if plan.price_block is None and finalized.required_offer_condition_ids:
         raise ValueError("finalized_condition_ids_without_price_block")
@@ -935,6 +963,8 @@ def _validate_resolved_client_ownership(plan: ResolvedResponsePlan) -> None:
         _check(plan.textual_cta_block)
     if plan.service_options_block is not None:
         _check(plan.service_options_block)
+    if plan.authored_service_alternative_block is not None:
+        _check(plan.authored_service_alternative_block)
     ui = plan.ui_plan
     for item in ui.quick_replies:
         _check(item)
@@ -964,6 +994,7 @@ class ResolvedResponsePlan(ResponsePlanModel):
     automatic_amplifier_blocks: tuple[ResolvedFactBlock, ...] = ()
     textual_cta_block: ResolvedTextualCtaBlock | None = None
     service_options_block: ServiceOptionsBlock | None = None
+    authored_service_alternative_block: AuthoredServiceAlternativeBlock | None = None
     ui_plan: ResolvedUiPlan
     diagnostics: tuple[PlanDiagnostic, ...] = ()
     finalized_commercial_ids: FinalizedCommercialIds
@@ -1008,6 +1039,11 @@ class ResolvedResponsePlan(ResponsePlanModel):
 
         if self.service_options_block is not None and self.price_block is not None:
             raise ValueError("service_options_forbidden_with_price_block")
+        if self.authored_service_alternative_block is not None:
+            if self.service_options_block is not None:
+                raise ValueError("authored_alternative_and_service_options_conflict")
+            if self.price_block is not None:
+                raise ValueError("authored_alternative_forbidden_with_price_block")
 
         if self.required_offer_conditions:
             condition_ids = [block.condition_id for block in self.required_offer_conditions]

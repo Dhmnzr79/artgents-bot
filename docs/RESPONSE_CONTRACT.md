@@ -143,7 +143,15 @@ Governance checkpoint ONE-CALL-ARCHITECTURE-1 fixes the authoritative order. Ful
 
 **Reference vs applicability:** `reference_service_id` is conversational subject, not recommendation. `compatible` / `unknown` / `conflict` describe catalog-axis fit; `false` from applicability filter alone is not `conflict`.
 
-**Requested fact display permission:** optional `requested_display_policy` on facts authorizes informational display without a concrete service. Resolver and post-Composer projection share `evaluate_requested_fact_display()`. Real `clients/**` metadata is not yet authored in this checkpoint.
+**Requested fact display permission:** optional `requested_display_policy` on facts authorizes informational display without a concrete service. Resolver and post-Composer projection share `evaluate_requested_fact_display()`. Demo `installment_12` and `implant_warranty` carry owner-approved scope metadata; other facts may still lack it.
+
+**Known inactive services:** catalog `active=false` entries appear separately in Composer policy sidecar (`known_inactive_service_descriptors`). Adapter preserves explicit references to them; post-Composer may materialize `AuthoredServiceAlternativeBlock` from `clinic_policies.yaml` (`approved_text` + governed active alternatives). This block is mutually exclusive with price blocks and generic `ServiceOptionsBlock`.
+
+**Installment negative answers:** demo `installment_12` carries `excluded_service_ids` and `excluded_scope_text` in `facts.json`, projected into Composer requestable-fact sidecar. When the fact is inapplicable to resolved scope (e.g. caries, tooth_extraction), code does not inject the positive fact; Composer owns the patient-visible refusal in `patient_text` using that sidecar text. Offline tests prove sidecar projection and pipeline preservation of Composer-authored refusal text — not live model NLU.
+
+**Authored alternative approved_text:** group `approved_text` from `clinic_policies.yaml` applies only when every authored alternative ID survives catalog availability validation. If the validated set differs, materialization uses a neutral unavailable-service message and lists only validated options with canonical names — never the original group copy advertising excluded IDs. Materialization rejects inconsistent selection/bundle pairs (`authored_alternative_bundle_inconsistent`) instead of silently dropping options while keeping group copy.
+
+**Alternative topic snapshot:** `AuthoredServiceAlternativeBlock.options_unambiguous_topic_id` is code-derived from catalog topics of frozen options only; Composer `topic_id` and `selection.resolved_topic_id` do not substitute for it. Session writer creates topic-bound `shown_options_snapshot` for authored alternatives only when this field is non-null. Mixed-topic or partially unknown sets leave conversation topic intact but skip snapshot binding.
 
 **Price:** intent via `requested_aspect_ids` (e.g. `["price"]`); canonical price block is code-owned. `price_text` and `model_price_text` are **migration debt**.
 
@@ -642,9 +650,17 @@ Missing replay field → `not_captured`. Do not reconstruct provenance from visi
 
 **Пациент:** «Есть рассрочка?»
 **Composer:** `requested_fact_ids=["installment_12"]`, `requested_aspect_ids=["payment"]`
-**Resolved:** `installment_12` → `requested_fact` only
+**Resolved:** `installment_12` → `requested_fact` only when `requested_display_policy` / service scope allows (demo: clinic-wide qualified text)
 **Visible:** patient_text + requested fact paragraph
-**Запрещено:** same fact again as automatic amplifier; cap consumption
+**Запрещено:** same fact again as automatic amplifier; cap consumption; positive fact on excluded services (caries, extraction)
+
+### 4b. Known inactive service with authored alternative (demo)
+
+**Пациент:** «Можно поставить брекеты?»
+**Composer:** `service_reference_kind=explicit_current`, `explicit_service_id=braces`
+**Resolved:** `AuthoredServiceAlternativeBlock` with policy `approved_text` + active `aligners` option; `response_scope=topic`; no active service delta for `braces`
+**Visible:** patient_text + approved_text + option labels (no price on inactive-service price ask)
+**Запрещено:** legacy presentation overlay after freeze; invented alternatives; price block for `braces`
 
 ### 5. Explicit warranty question
 
@@ -720,7 +736,7 @@ Missing replay field → `not_captured`. Do not reconstruct provenance from visi
 - provider/transport wiring and deployment env for feature activation
 - legacy multi-call FullContext runtime decommission (still default at flag=0)
 - requestable facts still coupled to `PreComposerPlan.commercial_facts` in some legacy bridges
-- real `clients/**` requested-display metadata not fully authored for every fact
+- demo requested-display metadata added for `installment_12` and `implant_warranty`; other facts may still lack policy
 
 ### 19.3 Superseded historical notes
 

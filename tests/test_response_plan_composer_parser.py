@@ -60,6 +60,7 @@ def test_non_object_root_rejected(raw: str) -> None:
         "mode",
         "patient_text",
         "service_reference_kind",
+        "option_reference_kind",
         "topic_id",
         "explicit_service_id",
         "requested_aspect_ids",
@@ -79,7 +80,7 @@ def test_missing_core_field_parametric(field: str) -> None:
 def test_duplicate_top_level_key_fatal() -> None:
     raw = (
         '{"route":"ANSWER","route":"ADMIN","mode":"standard","patient_text":"x",'
-        '"service_reference_kind":"none","topic_id":null,"explicit_service_id":null,'
+        '"service_reference_kind":"none","option_reference_kind":"none","topic_id":null,"explicit_service_id":null,'
         '"requested_aspect_ids":[],"patient_situation":{"extent":"unknown","jaw":"unknown",'
         '"stage":"unknown","modifiers":[]},"requested_fact_ids":[],"source_identity":null}'
     )
@@ -246,7 +247,7 @@ def test_source_identity_empty_object_warning() -> None:
 def test_source_identity_duplicate_json_key_fatal() -> None:
     raw = (
         '{"route":"ANSWER","mode":"standard","patient_text":"x","service_reference_kind":"none",'
-        '"topic_id":null,"explicit_service_id":null,"requested_aspect_ids":[],'
+        '"option_reference_kind":"none","topic_id":null,"explicit_service_id":null,"requested_aspect_ids":[],'
         '"patient_situation":{"extent":"unknown","jaw":"unknown","stage":"unknown","modifiers":[]},'
         '"requested_fact_ids":[],"source_identity":{"primary_content_ref":null,'
         '"used_content_refs":[],"used_content_refs":[]}}'

@@ -591,24 +591,59 @@ current user message
 
 ---
 
-## 10. Implementation gaps (expected)
+## 10. Implementation status
 
-These gaps are **expected** for a governance-only checkpoint and are not grounds for REJECT:
+### 10.1 Implemented in the isolated new path (unwired from production `/ask`)
+
+| Component | Status |
+|---|---|
+| `ComposerDecision` + strict parser + fail-open semantic adapter | Implemented |
+| Full `ComposerInputContext` + deterministic prompt builder + executor | Implemented |
+| Post-Composer situation merge, applicability filter, clinic strategy ranking | Implemented |
+| Response-plan materialization → Resolver → TextRenderer / UIProjection | Implemented |
+| Typed session continuity store + read/prepare/commit bridge (opt-in) | Implemented |
+
+**Order note:** `PreComposerPlan` in the new chain is created **after** Composer from materialization output. The historical name alone does not imply the legacy pre-Composer call order.
+
+**Price note:** absence of `price_text` in the target Composer contract does not remove `price_text` / `model_price_text` from legacy runtime files.
+
+**FullContext note:** FullContext as validated MD corpus input is not the same as the legacy multi-call FullContext product runtime.
+
+**Hybrid note:** Hybrid remains a future context-volume strategy for the same lower pipeline, not a separate response renderer.
+
+**Flag note:** `SALES_ONE_PLUS_ON` is not a switch to this response-plan core.
+
+### 10.2 Not yet complete
 
 | Gap | Current state |
 |---|---|
-| `PreComposerPlan` premature semantics | Still carries final scope, service, price plan, commercial materials before Composer on free-text path |
-| Composer schema incomplete | **COMPOSER-CONTRACT-1 committed** on `0f5000792acf164e12d886ff053c7badd8f584e2`; parser/adapter for full `ComposerDecision` implemented |
-| Composer input/executor | **COMPOSER-INPUT-EXECUTOR-1** implemented isolated/unwired from baseline `0f5000792acf164e12d886ff053c7badd8f584e2`; production `/ask` not connected |
-| `price_text` / `model_price_text` | Still present in legacy code paths; removed from Composer policy sidecar; price intent via `requested_aspect_ids` only |
-| Requestable facts coupling | Still tied to `PreComposerPlan.commercial_facts` in places |
-| Situation → strategy → materialization | **RESPONSE-MATERIALIZATION-1** isolated path: materialization → Resolver/Renderer/UI; frozen `FrozenPriceOfferRow`, marketing fact merge, legacy condition policy — see `RESPONSE_CONTRACT.md` §19; not wired to `/ask` |
-| Typed session continuity | **RESPONSE-SESSION-CONTINUITY-1** opt-in SQLite store + read/prepare/commit bridge; offline multi-turn integration; not wired to legacy `session.py` or `/ask` — see `RESPONSE_CONTRACT.md` §13.1 |
-| Target executor | Absent |
-| `/ask` / `/ask/stream` | Not switched to target path |
-| Legacy runtime | Default at flag=0 |
+| End-to-end acceptance on the target path | Not run |
+| Real provider/model behavior verification | Not run |
+| Production data preparation/validation for target behavior | Ongoing |
+| Provider/transport wiring to `/ask` and `/ask/stream` | Not cut over |
+| Legacy multi-call runtime decommission | Default at flag=0; removal deferred |
 
-**Next checkpoint:** session writer cutover, optional marketing materialization breadth, `/ask` integration — not started here.
+### 10.3 Superseded historical gaps (governance checkpoint ONE-CALL-ARCHITECTURE-1)
+
+These items described migration debt at baseline `14de4a9a051dbf625acbdfc35b37392a5919e623` and are **superseded** by §10.1 where noted:
+
+| Historical gap | Superseded by |
+|---|---|
+| Composer schema incomplete (`COMPOSER-CONTRACT-1` six-key WIP) | Full `ComposerDecision` parser/adapter (§10.1) |
+| Composer input/executor absent | COMPOSER-INPUT-EXECUTOR-1 isolated path (§10.1) |
+| Situation → strategy → materialization unwired | RESPONSE-MATERIALIZATION-1 isolated path (§10.1) |
+| Typed session continuity absent | RESPONSE-SESSION-CONTINUITY-1 opt-in store (§10.1) |
+| Target executor absent | Executor exists isolated; production wiring remains §10.2 |
+
+**Next checkpoints (not started here):**
+
+1. End-to-end offline acceptance of the new path.
+2. Limited verification with a real provider/model on prepared data.
+3. Wire the new path to local `/ask` and `/ask/stream`, including provider/transport and new session continuity.
+4. Disable legacy runtime on switchover; remove it after the new path is verified.
+5. Hybrid — after the main one-call FullContext path is stable.
+
+Specific fixes may follow from acceptance results. The bot remains local; VPS/deployment is not assumed. FullContext corpus strategy must not be confused with the legacy multi-call runtime. The new path is not yet connected to endpoints. One shared lower response pipeline applies to FC and future Hybrid. `SALES_ONE_PLUS_ON` is not a switch to this response-plan core.
 
 ---
 

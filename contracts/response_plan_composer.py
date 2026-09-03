@@ -516,6 +516,23 @@ def published_target_schema_example() -> dict[str, object]:
     }
 
 
+def published_patient_situation_axis_values() -> dict[str, tuple[str, ...]]:
+    """Deterministic projection of closed patient_situation axis Literals."""
+
+    return {
+        "extent": tuple(get_args(SituationExtent)),
+        "jaw": tuple(get_args(SituationJaw)),
+        "stage": tuple(get_args(SituationStage)),
+        "modifiers": tuple(get_args(SituationModifier)),
+    }
+
+
+def build_published_composer_output_example_json() -> str:
+    """Serialize the published parseable Composer output example object."""
+
+    return json.dumps(published_target_schema_example(), ensure_ascii=False, indent=2)
+
+
 def future_prompt_composition_parts() -> tuple[str, ...]:
     return (
         "static Composer instructions",
@@ -1135,20 +1152,4 @@ def route_policy_entry(route: ResponseRoute, mode: ResponseMode) -> RoutePolicyE
     )
 
 
-PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON = """{
-  "route": "...",
-  "mode": "...",
-  "patient_text": null,
-  "service_reference_kind": "none",
-  "topic_id": null,
-  "explicit_service_id": null,
-  "requested_aspect_ids": [],
-  "patient_situation": {
-    "extent": "unknown",
-    "jaw": "unknown",
-    "stage": "unknown",
-    "modifiers": []
-  },
-  "requested_fact_ids": [],
-  "source_identity": null
-}"""
+PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON = build_published_composer_output_example_json()

@@ -33,6 +33,7 @@ from contracts.response_plan_dialogue_context import (
     ShownServiceOptionsSnapshot,
 )
 from contracts.target_cached_full_context import TargetCachedFullContext
+from core.response_plan_composer_contract import build_static_composer_instructions
 from core.response_plan_composer_input import build_composer_decision_invocation
 from core.response_schema_loader import load_response_schema_bundle
 from core.target_cached_full_context import build_target_cached_full_context
@@ -181,6 +182,24 @@ def _input_context(
         ),
         confirmed_shown_options=confirmed_shown_options,
     )
+
+
+def test_static_instructions_in_system_prompt_with_stable_dynamic_split() -> None:
+    instructions = build_static_composer_instructions()
+    invocation = build_composer_decision_invocation(_input_context(current_user_message="вопрос"))
+    assert invocation.system_prompt.startswith(instructions.splitlines()[0])
+    assert "Patient situation (structured extraction, not diagnosis):" in invocation.system_prompt
+    assert "code selects the recommended service set and its order" in invocation.system_prompt
+    assert "Future prompt composition (not implemented in this checkpoint)" not in invocation.system_prompt
+    payload = json.loads(invocation.user_prompt)
+    assert set(payload.keys()) == {
+        "current_user_message",
+        "policy_control",
+        "recent_dialogue",
+        "session_context",
+    }
+    assert payload["current_user_message"] == "вопрос"
+    assert "Patient situation (structured extraction, not diagnosis):" not in invocation.user_prompt
 
 
 def test_six_ordered_history_turns_accepted() -> None:

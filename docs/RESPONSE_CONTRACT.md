@@ -303,6 +303,48 @@ Rules:
 - each plan item contains a condition ID plus canonical text/data from the selected offer
 - required conditions must **not** carry warranty, installment, tax deduction, discount, or optional benefit
 
+### 6.1 Response-plan materialization rules (isolated path)
+
+The isolated post-Composer materialization path applies the following **current** rules. These describe present behavior and limits, not a permanent ban on future price modes.
+
+#### Supported price modes
+
+- Current materialization supports **`TargetFixedPrice`** offers only.
+- `from`, `range`, and `no_public_price` price modes:
+  - are **not** converted to a fixed amount;
+  - emit diagnostic `materialization_unsupported_price_mode`;
+  - exclude the corresponding offer from the price block;
+  - preserve independent valid parts of the response (`patient_text`, unrelated materials).
+
+#### Required condition completeness (`OfferConditionEvidence`)
+
+Trusted `OfferConditionEvidence.completeness` governs whether an offer may enter the price block:
+
+| `completeness` | Condition set | Effect |
+|---|---|---|
+| `complete` | empty | source attests there are no additional required conditions; price may be shown |
+| `complete` | non-empty | price is shown together with **all** required conditions |
+| `unknown` | any | offer excluded from price block with diagnostic; useful `patient_text` and independent materials preserved |
+| `incomplete` | any | offer excluded from price block with diagnostic; useful `patient_text` and independent materials preserved |
+
+Empty conditions with `complete` mean **confirmed absence** of required conditions — not the same as unknown completeness.
+
+#### Legacy condition compatibility (Resolver)
+
+- Single-offer `display_text`-only condition blocks remain valid.
+- Multi-offer condition blocks with explicit offer-linked `entries` remain valid.
+- Multi-offer `display_text`-only blocks **without** proven linkage are rejected: `legacy_multi_condition_ambiguous`.
+- `applies_to_all_offers=true` is an **explicit source attestation** that the condition applies to all selected offers — not an inference from free text.
+- When a shared form is valid, Resolver expands it per existing linkage rules.
+
+Do not extend compatibility or relax source requirements.
+
+#### Frozen price provenance
+
+The new path freezes typed **`FrozenPriceOfferRow`** for each finally shown offer (`offer_id`, `service_id`, distinguishing `offer_label`, amount/currency/billing_unit, optional `option_id`/`brand_id`).
+
+**`FinalizedOfferTrace`** is a projection of these frozen rows. After freeze, the trace does **not** re-read the catalog bundle for amount, currency, unit, offer/service identity, or offer label.
+
 ---
 
 ## 7. Foreign amount / code-owned value in `patient_text`
@@ -646,30 +688,49 @@ Missing replay field → `not_captured`. Do not reconstruct provenance from visi
 
 ---
 
-## 19. Implementation gaps (ONE-CALL-ARCHITECTURE-1)
+## 19. Implementation status (ONE-CALL-ARCHITECTURE-1)
 
-Expected migration debt — not grounds for governance REJECT:
+### 19.1 Implemented in the isolated new path (unwired from production `/ask`)
 
-- `PreComposerPlan` still carries premature final semantic scope/materials on free-text path
-- unwired Composer WIP (§4.0 historical) lacks `service_reference_kind`, nullable `topic_id`, `AspectKind` aspects, `patient_situation`
-- `ServiceOptionsBlock` lane implemented in Response Plan resolver/renderer/materialization (isolated path); not wired to production `/ask`
-- fixed-price materialization supports `TargetFixedPrice` only; `from` / `range` / `no_public_price` emit `materialization_unsupported_price_mode` and omit price block
-- required offer conditions require trusted `OfferConditionEvidence.completeness` (`complete` | `unknown` | `incomplete`); empty conditions with `complete` allow price; `unknown`/`incomplete` exclude offer
-- new materialization path freezes typed `FrozenPriceOfferRow` per shown offer (`offer_id`, `service_id`, distinguishing `offer_label`, amount/currency/billing_unit, optional `option_id`/`brand_id`); `FinalizedOfferTrace` is a projection of frozen rows and does not re-read the catalog bundle
-- legacy condition compatibility: single-offer `display_text`-only blocks remain valid; multi-offer `display_text`-only blocks are rejected unless `applies_to_all_offers=true` (explicit structural proof); ambiguous legacy multi without proof → `legacy_multi_condition_ambiguous`
-- selected promo/amplifier IDs are merged into `commercial_facts` before freeze so Resolver can materialize optional blocks without a second catalog
-- catalog-reference price lookup (`selection_basis=referenced_service`) is separate from situation-based selection; conflict/unknown patient situation does not block reference price candidates
-- `price_text` / `model_price_text` still in code
-- requestable facts still coupled to `PreComposerPlan.commercial_facts` in places
-- situation → clinic strategy → materialization wired only on isolated post-Composer path (`resolve_materialized_response`); production `/ask` still uses legacy adapter
-- target executor absent; `/ask` and `/ask/stream` not cut over
-- legacy multi-call FullContext runtime remains default at flag=0
+- `ComposerDecision` strict parser + fail-open semantic adapter with full published field set (`service_reference_kind`, `option_reference_kind`, nullable `topic_id`, closed `AspectKind` aspects, `patient_situation`)
+- deterministic `ComposerInputContext` assembly, static instructions, policy sidecar, cached FullContext corpus, session/history/current message
+- provider-neutral executor with one injected backend call per free-text turn
+- post-Composer situation continuity merge, applicability filter, clinic strategy ranking, service/offer selection
+- `ServiceOptionsBlock` lane in Response Plan resolver/renderer/materialization (isolated path)
+- response-plan price materialization per §6.1 (supported modes, condition completeness, legacy compatibility, frozen provenance)
+- selected promo/amplifier IDs merged into `commercial_facts` before freeze
+- catalog-reference price lookup separate from situation-based selection
+- typed session continuity store + read/prepare/commit bridge (opt-in; offline multi-turn integration)
 
-Deferred to later checkpoints:
+**Order note:** `PreComposerPlan` in the new chain is materialized **after** Composer. The name is historical; it does not restore legacy pre-Composer semantic selection on free-text turns.
 
-- exact schema types for plans and corrected `ComposerDecision` parser/adapter
-- renderer module cutover from `one_call_presentation_pass`
+**Price note:** target Composer output has no `price_text`; legacy paths may still accept `price_text` / `model_price_text`.
+
+**FullContext vs runtime:** FullContext corpus strategy for Composer input is not the legacy multi-call FullContext product runtime (TFC).
+
+**Hybrid:** future compact-context strategy shares the same lower pipeline; no separate Hybrid renderer.
+
+**Flag note:** `SALES_ONE_PLUS_ON=0` selects legacy TFC runtime, not this isolated response-plan core.
+
+### 19.2 Not yet complete
+
+- end-to-end acceptance on the target path
+- verification against a real provider/model
+- production `/ask` and `/ask/stream` cutover
+- provider/transport wiring and deployment env for feature activation
+- legacy multi-call FullContext runtime decommission (still default at flag=0)
+- requestable facts still coupled to `PreComposerPlan.commercial_facts` in some legacy bridges
+- real `clients/**` requested-display metadata not fully authored for every fact
+
+### 19.3 Superseded historical notes
+
+§4.0 COMPOSER-CONTRACT-1 six-key schema — **superseded** by §4.1 `ComposerDecision`; retained for audit only.
+
+Historical gap list items that claimed unwired Composer WIP lacked `patient_situation`, aspects, or `service_reference_kind` — **superseded** by §19.1 parser/adapter implementation.
+
+Deferred items that remain open:
+
+- renderer module cutover from `one_call_presentation_pass` in production wiring
 - TFC runtime decommission timing
 - Hybrid context decision
 - replay field capture completeness
-- deployment env for feature activation

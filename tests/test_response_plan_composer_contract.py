@@ -39,6 +39,7 @@ from contracts.response_plan_composer import (
     is_valid_source_ref,
     is_valid_source_ref_basename,
     parse_response_plan_composer_json,
+    published_patient_situation_axis_values,
     published_target_schema_example,
     route_policy_entry,
 )
@@ -244,6 +245,18 @@ def _adapted_source_identity_equal(adapted) -> None:
     assert decision_identity.used_content_refs == adapted_identity.used_content_refs
 
 
+def test_published_example_json_is_valid_and_matches_target_keys() -> None:
+    example = published_target_schema_example()
+    assert set(example.keys()) == PUBLISHED_TARGET_KEYS
+    parsed = json.loads(PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON)
+    assert set(parsed.keys()) == PUBLISHED_TARGET_KEYS
+    assert PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON == json.dumps(example, ensure_ascii=False, indent=2)
+    envelope = parse_response_plan_composer_json(PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON)
+    assert envelope.envelope.option_reference_kind == "none"
+    for field in CORE_RESPONSE_FIELDS:
+        assert field in parsed
+
+
 def test_published_schema_has_exact_target_keys() -> None:
     example = published_target_schema_example()
     assert set(example.keys()) == PUBLISHED_TARGET_KEYS
@@ -346,7 +359,9 @@ def test_static_instructions_require_exact_target_key_json_output() -> None:
     assert "exactly one JSON object" in instructions
     assert "Do not wrap JSON in Markdown or code fences" in instructions
     assert "Do not include any text before or after the JSON object" in instructions
+    assert "Published output example object (not a JSON Schema" in instructions
     assert PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON in instructions
+    assert '"option_reference_kind": "none"' in instructions
     for key in PUBLISHED_TARGET_KEYS:
         assert key in instructions
     assert "requested_fact_ids may contain only fact_id values from model-visible requestable fact descriptors" in instructions
@@ -354,12 +369,40 @@ def test_static_instructions_require_exact_target_key_json_output() -> None:
     assert "source_identity is model attestation only" in instructions
 
 
-def test_future_prompt_composition_lists_seven_parts() -> None:
+def test_static_instructions_publish_full_patient_situation_dictionary() -> None:
+    instructions = build_static_composer_instructions()
+    axes = published_patient_situation_axis_values()
+    for axis, values in axes.items():
+        assert f"- {axis}:" in instructions
+        for value in values:
+            assert value in instructions
+    assert "not a diagnosis" in instructions
+    assert "unknown on any axis" in instructions
+    assert "historical assumption as a new explicit confirmation" in instructions
+
+
+def test_static_instructions_define_code_owned_service_selection_boundary() -> None:
+    instructions = build_static_composer_instructions()
+    assert "code selects the recommended service set and its order" in instructions
+    assert "does not form an independent alternative recommendation list" in instructions
+    assert "Allowed in patient_text: explaining an explicitly named service" in instructions
+    assert "factual comparison of options the dialogue already discusses" in instructions
+    assert "Not allowed: independently choosing or ranking a new recommendation shortlist" in instructions
+
+
+def test_static_instructions_do_not_claim_full_prompt_unimplemented() -> None:
+    instructions = build_static_composer_instructions()
+    assert "Future prompt composition (not implemented in this checkpoint)" not in instructions
+    assert "Composer input assembly (implemented by code before your call)" in instructions
+
+
+def test_future_prompt_composition_helper_lists_seven_parts() -> None:
     parts = future_prompt_composition_parts()
     assert len(parts) == 7
     instructions = build_static_composer_instructions()
-    for part in parts:
-        assert part in instructions
+    assert "static Composer instructions" in instructions
+    assert "current user message" in instructions
+    assert "not implemented in this checkpoint" not in instructions
 
 
 def test_sidecar_contains_price_handling_not_price_policy() -> None:

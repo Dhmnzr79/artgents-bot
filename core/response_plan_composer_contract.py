@@ -10,9 +10,9 @@ from contracts.response_plan_composer import (
     COMPOSER_PRICE_HANDLING,
     ComposerDecisionAuthority,
     ComposerPolicySidecar,
-    PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON,
     PUBLISHED_TARGET_KEYS,
-    future_prompt_composition_parts,
+    build_published_composer_output_example_json,
+    published_patient_situation_axis_values,
     route_policy_entry,
 )
 
@@ -30,10 +30,57 @@ class ComposerPolicySidecarError(ValueError):
         super().__init__(message)
 
 
+def _patient_situation_dictionary_lines() -> list[str]:
+    axes = published_patient_situation_axis_values()
+    stage_notes = {
+        "unknown": "circumstance not established",
+        "natural_tooth_present": "natural tooth still present",
+        "extraction_context": "tooth missing or extraction context before implant",
+        "implant_placed": "implant already placed",
+    }
+    lines = [
+        "Patient situation (structured extraction, not diagnosis):",
+        "- patient_situation records circumstances the patient reported; it is not a diagnosis or treatment choice.",
+        "- Use unknown on any axis that is not established from the current message or approved session continuity.",
+        "- Do not invent medical circumstances that the patient did not report.",
+        "- Prefer evidence from the current user message; session prior_patient_situation is continuity only.",
+        "- Do not treat a historical assumption as a new explicit confirmation in the current turn.",
+        "- Closed axis values (derived from the contract, not an independent allowlist):",
+        f"  - extent: {', '.join(axes['extent'])}",
+        "    (volume: one tooth, several teeth, full arch, or unknown)",
+        f"  - jaw: {', '.join(axes['jaw'])}",
+        f"  - stage: {', '.join(axes['stage'])}",
+    ]
+    for stage_value in axes["stage"]:
+        if stage_value != "unknown":
+            lines.append(f"    - {stage_value}: {stage_notes[stage_value]}")
+    lines.extend(
+        [
+            f"  - modifiers: {', '.join(axes['modifiers']) or '(empty list when none)'}",
+            "    (reported bone deficit and other approved modifiers only when explicitly stated)",
+        ]
+    )
+    return lines
+
+
+def _service_recommendation_boundary_lines() -> list[str]:
+    return [
+        "Service reference vs code-owned recommendations:",
+        "- Composer determines query meaning, explicit service reference, shown-options reference, and patient_situation.",
+        "- After Composer, code selects the recommended service set and its order from applicability and clinic strategy.",
+        "- Composer does not form an independent alternative recommendation list in patient_text.",
+        "- Composer does not declare a catalog service as personally suitable treatment for this patient.",
+        "- Canonical prices and final service option blocks are added by code after Composer.",
+        "- Allowed in patient_text: explaining an explicitly named service; factual comparison of options the dialogue already discusses; natural connective prose that answers the question.",
+        "- Not allowed: independently choosing or ranking a new recommendation shortlist; inventing post-Composer selection results; naming the cheapest option from a price block you have not seen; presenting catalog copy as a personal medical prescription.",
+    ]
+
+
 def build_static_composer_instructions() -> str:
     """Return provider-neutral static Composer contract instructions."""
 
     exact_keys = ", ".join(sorted(PUBLISHED_TARGET_KEYS))
+    example_json = build_published_composer_output_example_json()
     return "\n".join(
         [
             "Composer contract instructions (static, provider-neutral).",
@@ -43,8 +90,8 @@ def build_static_composer_instructions() -> str:
             "- Do not wrap JSON in Markdown or code fences.",
             "- Do not include any text before or after the JSON object.",
             f"- Use exactly these top-level keys and no others: {exact_keys}.",
-            "- Published output schema:",
-            PUBLISHED_COMPOSER_OUTPUT_SCHEMA_JSON,
+            "- Published output example object (not a JSON Schema; illustrative parseable shape):",
+            example_json,
             "",
             "Route and mode:",
             "- Choose route/mode only from allowed pairs in the serialized policy/control sidecar.",
@@ -60,6 +107,10 @@ def build_static_composer_instructions() -> str:
             "- shown_options means the patient refers to previously shown service options, not a new shortlist.",
             "- explicit_current requires non-null explicit_service_id from the current-client service descriptor catalog.",
             "- active_session continues the active session service without copying session service id into explicit_service_id.",
+            "",
+            *_service_recommendation_boundary_lines(),
+            "",
+            *_patient_situation_dictionary_lines(),
             "",
             "Requested aspects and facts:",
             "- requested_aspect_ids may contain only allowed AspectKind values from the policy sidecar.",
@@ -86,8 +137,9 @@ def build_static_composer_instructions() -> str:
             "Policy sidecar boundary:",
             "- The serialized policy/control sidecar is not the complete Composer input or prompt.",
             "",
-            "Future prompt composition (not implemented in this checkpoint):",
-            *[f"- {part}" for part in future_prompt_composition_parts()],
+            "Composer input assembly (implemented by code before your call):",
+            "- static Composer instructions, current-client validated model FullContext corpus, document index,",
+            "- serialized policy/control sidecar, normalized session context, recent dialogue history, current user message.",
         ]
     )
 

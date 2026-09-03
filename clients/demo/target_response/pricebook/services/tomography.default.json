@@ -13,5 +13,9 @@
     "includes": []
   },
   "fact_refs": [],
-  "followups": []
+  "followups": [],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
 }

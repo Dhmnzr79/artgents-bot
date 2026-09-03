@@ -52,5 +52,14 @@
   "brand_id": "impro",
   "applies_to_extents": [
     "full_arch"
-  ]
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "КТ и костная пластика по показаниям — отдельно"
+      }
+    ]
+  }
 }

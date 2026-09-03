@@ -16,7 +16,8 @@
       "хирургия и местная анестезия",
       "постоянная коронка на импланте",
       "контрольные осмотры и куратор"
-    ]
+    ],
+    "price_scope_label": "имплант в день удаления + постоянная коронка"
   },
   "payment_stages": [
     {
@@ -51,5 +52,14 @@
   "brand_id": "impro",
   "applies_to_extents": [
     "one_tooth"
-  ]
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "КТ, лечение воспаления и временная коронка — по показаниям, отдельно"
+      }
+    ]
+  }
 }

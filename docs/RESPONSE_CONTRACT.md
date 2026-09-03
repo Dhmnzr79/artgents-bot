@@ -337,6 +337,20 @@ Trusted `OfferConditionEvidence.completeness` governs whether an offer may enter
 
 Empty conditions with `complete` mean **confirmed absence** of required conditions — not the same as unknown completeness.
 
+#### Catalog-backed condition metadata (data prep)
+
+For catalog-backed response-plan turns, required conditions are **authored in offer JSON**, not inferred at runtime:
+
+- `TargetOffer.required_conditions_metadata` attests `completeness: complete` and lists structural `conditions` using the closed enum above.
+- `TargetPricePackage.price_scope_label` is an optional **additional package-composition label** for the new path. The base billing unit phrase comes from `billing_unit`. If no additional label is authored, the new price block does **not** fall back to legacy `package.label`.
+- Public preparation: `build_response_plan_materialization_sources()` → `build_condition_evidence_by_offer()` builds trusted `OfferConditionEvidence` from the same loaded bundle passed to materialization.
+- Missing metadata → `completeness: unknown` (offer excluded); this is **not** a runtime default of `complete`.
+- Demo fixed offers carry explicit owner attestation in metadata; other clients/offers without metadata do not inherit demo completeness.
+
+New-path price display uses `price_scope_label` only when it adds information beyond `billing_unit`; mandatory exclusions render once in the condition block, not duplicated in the price line.
+
+Required conditions are rendered automatically together with the corresponding price block, including when multiple prices are shown. Mentioning a service without a price block does not add those conditions. A separate patient question about conditions is an independent content request and is outside this catalog-metadata path.
+
 #### Legacy condition compatibility (Resolver)
 
 - Single-offer `display_text`-only condition blocks remain valid.

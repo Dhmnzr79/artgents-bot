@@ -24,5 +24,14 @@
   "option_id": "partial",
   "applies_to_extents": [
     "few_teeth"
-  ]
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "имплантация — отдельно"
+      }
+    ]
+  }
 }

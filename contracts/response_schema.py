@@ -259,8 +259,29 @@ FamilyLevelPrice: TypeAlias = Annotated[
 ]
 
 
+
+TargetRequiredOfferConditionId = Literal[
+    "per_jaw",
+    "per_tooth",
+    "package_includes",
+    "mandatory_exclusion",
+    "ct_separate",
+    "bone_grafting_separate",
+]
+
+
+class TargetRequiredConditionEntry(TargetSchemaModel):
+    condition_id: TargetRequiredOfferConditionId
+    display_text: NonBlankStr
+
+
+class TargetOfferRequiredConditionsMetadata(TargetSchemaModel):
+    completeness: Literal["complete"]
+    conditions: list[TargetRequiredConditionEntry] = Field(default_factory=list)
+
 class TargetPricePackage(TargetSchemaModel):
     label: NonBlankStr
+    price_scope_label: NonBlankStr | None = None
     includes: list[NonBlankStr] = Field(default_factory=list)
 
     @field_validator("includes", mode="after")
@@ -295,6 +316,7 @@ class TargetOffer(TargetSchemaModel):
     payment_stages: list[TargetPaymentStage] | None = None
     fact_refs: list[NonBlankStr] = Field(default_factory=list)
     followups: list[TargetPriceFollowup] = Field(default_factory=list)
+    required_conditions_metadata: TargetOfferRequiredConditionsMetadata | None = None
 
     @field_validator("applies_to_extents", mode="after")
     @classmethod

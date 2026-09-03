@@ -20,7 +20,8 @@ from contracts.response_plan_session import (
     SessionContinuityPolicy,
 )
 from contracts.response_schema import RequestedDisplayPolicy, ResponseSchemaBundle, TargetFixedPrice
-from core.response_plan_materialization import materialize_pre_composer_payload
+from core.response_plan_materialization import materialize_pre_composer_payload, resolve_materialized_response
+from core.response_plan_materialization_sources import build_response_plan_materialization_sources
 from core.response_plan_session import commit_session_update
 from core.response_plan_session_store import ResponsePlanSessionStore
 from core.response_plan_session_turn import (
@@ -246,12 +247,14 @@ def _terminal_authorities_for(client_id: str) -> tuple[ResponsePlanAdapterTermin
 
 
 def _materialization_sources(ctx: DialogueContext) -> ResponsePlanMaterializationSources:
-    return _sources(
-        ctx.material,
+    base = build_response_plan_materialization_sources(
         session_key=ctx.session_key,
-        condition_evidence_by_offer=ctx.condition_evidence,
+        material=ctx.material,
         terminal_authorities=_terminal_authorities_for(ctx.material.source_client_id),
     )
+    if ctx.condition_evidence:
+        return base.model_copy(update={"condition_evidence_by_offer": ctx.condition_evidence})
+    return base
 
 
 class DialogueRunner:

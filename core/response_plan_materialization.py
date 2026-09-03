@@ -50,6 +50,7 @@ from contracts.response_plan_post_composer import PostComposerSelectionPlan
 from contracts.response_schema import ResponseSchemaBundle, TargetCommercialFact, TargetFixedPrice, TargetOffer, TargetService
 from contracts.response_schema_refs import ResponseSchemaExternalIndex
 from core.response_plan_authored_alternative_policy import unambiguous_topic_for_service_ids
+from core.response_plan_condition_evidence import materialization_price_scope_label
 from core.response_plan_fact_projection import (
     fact_active_as_of,
     fact_explicit_only,
@@ -425,7 +426,7 @@ def _materialize_price_plan(
                     offer_id=offer.offer_id,
                     display_text=format_frozen_price_row_display(
                     offer_rows[0],
-                    package_label=offer.package.label,
+                    package_label=materialization_price_scope_label(offer),
                 ),
                     amount=fixed.amount,
                     currency=fixed.currency,
@@ -457,7 +458,7 @@ def _materialize_price_plan(
                 offer_ids=tuple(offer.offer_id for offer in selected_offers),
                 display_text=format_multi_price_display_from_rows(
                     offer_rows,
-                    tuple(offer.package.label for offer in selected_offers),
+                    tuple(materialization_price_scope_label(offer) for offer in selected_offers),
                 ),
             ),
             offer_rows=offer_rows,

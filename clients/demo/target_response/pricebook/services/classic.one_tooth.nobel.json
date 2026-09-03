@@ -15,7 +15,8 @@
       "хирургия и местная анестезия",
       "постоянная коронка на импланте",
       "контрольные осмотры и куратор"
-    ]
+    ],
+    "price_scope_label": "имплант + постоянная коронка"
   },
   "payment_stages": [
     {
@@ -50,5 +51,14 @@
   "brand_id": "nobel_biocare",
   "applies_to_extents": [
     "one_tooth"
-  ]
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "КТ при необходимости и временная коронка — отдельно"
+      }
+    ]
+  }
 }

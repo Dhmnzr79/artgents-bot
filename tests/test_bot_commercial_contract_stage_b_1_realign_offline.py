@@ -172,7 +172,7 @@ def test_pure_exact_price_suppresses_model_prose(
     answer = str(payload.get("answer") or "")
     assert "76200" in _norm_digits(answer)
     assert "восстанавливает один зуб" not in answer.casefold()
-    assert "рассроч" not in answer.casefold()
+    assert "Рассрочка до 12 месяцев, оформление на консультации." in answer
     assert "КТ при необходимости" in answer or "отдельно" in answer.casefold()
 
 

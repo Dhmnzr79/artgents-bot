@@ -54,6 +54,13 @@ from core.sales_one_plus_semantic_authority import (
     presentation_promotion_scope,
 )
 from core.sales_fast_strict_evidence import effective_scope_from_semantic_frame
+from core.one_call_installment_auto_policy import (
+    INSTALLMENT_12_FACT_ID,
+    installment_auto_append_allowed_on_price_turn,
+    payment_installment_context_materialization_allowed,
+    resolve_contextual_payment_installment_text,
+    resolve_shared_installment_suffix_for_price_turn,
+)
 from core.one_call_payment_stages_policy import (
     governed_payment_stages_ui_ref,
     payment_stages_materialization_allowed,
@@ -524,6 +531,66 @@ def _append_payment_stages_if_requested(
         return text
     separator = "\n\n" if text.strip() else ""
     return f"{text.rstrip()}{separator}{block}"
+
+
+def _append_installment_12_if_eligible(
+    text: str,
+    *,
+    semantic: SalesOnePlusSemanticFrame,
+    displayed_offers: tuple,
+    bundle: TargetRuntimeClientContext,
+    authoritative_service_id: str | None,
+    materialized_public_price: bool,
+    today: date,
+) -> tuple[str, tuple[str, ...]]:
+    from contracts.response_schema import TargetOffer
+
+    offers = tuple(
+        offer for offer in displayed_offers if isinstance(offer, TargetOffer)
+    )
+    context_service_id = authoritative_service_id
+    if not context_service_id and offers:
+        service_ids = {
+            str(offer.service_id).strip()
+            for offer in offers
+            if str(getattr(offer, "service_id", "") or "").strip()
+        }
+        if len(service_ids) == 1:
+            context_service_id = next(iter(service_ids))
+    if not context_service_id and payment_installment_context_materialization_allowed(semantic):
+        session_state = _presentation_session_state()
+        session_service_id = str(getattr(session_state, "last_service_id", "") or "").strip()
+        if session_service_id:
+            context_service_id = session_service_id
+
+    if installment_auto_append_allowed_on_price_turn(
+        semantic=semantic,
+        materialized_public_price=materialized_public_price,
+    ):
+        installment_text = resolve_shared_installment_suffix_for_price_turn(
+            bundle=bundle.bundle,
+            displayed_offers=offers,
+            today=today,
+        )
+        if not installment_text:
+            return text, ()
+        if installment_text in text:
+            return text, (INSTALLMENT_12_FACT_ID,)
+        separator = "\n\n" if text.strip() else ""
+        return f"{text.rstrip()}{separator}{installment_text}", (INSTALLMENT_12_FACT_ID,)
+
+    if payment_installment_context_materialization_allowed(semantic):
+        installment_text = resolve_contextual_payment_installment_text(
+            bundle=bundle.bundle,
+            displayed_offers=offers,
+            service_id=context_service_id,
+            today=today,
+        )
+        if not installment_text:
+            return text, ()
+        return installment_text, (INSTALLMENT_12_FACT_ID,)
+
+    return text, ()
 
 
 def _materialized_public_price_turn(
@@ -1159,6 +1226,7 @@ def build_one_call_presentation_result(
             overlay=availability_overlay,
             alternative_price_lines=alternative_price_lines,
         )
+        installment_rendered_fact_ids: tuple[str, ...] = ()
     else:
         price_line: str | None = None
         if scoped_family_code_price_turn:
@@ -1211,6 +1279,16 @@ def build_one_call_presentation_result(
             bundle=context,
             nav_ref=nav_ref,
         )
+        authoritative_service_id = presentation_active_service_id(semantic)
+        final_patient_text, installment_rendered_fact_ids = _append_installment_12_if_eligible(
+            final_patient_text,
+            semantic=semantic,
+            displayed_offers=displayed_offers,
+            bundle=context,
+            authoritative_service_id=authoritative_service_id,
+            materialized_public_price=materialized_public_price,
+            today=today,
+        )
         final_patient_text = _merge_availability_patient_text(
             availability_status=availability_status,
             overlay=None,
@@ -1248,7 +1326,7 @@ def build_one_call_presentation_result(
         alternative_secondary_override=alternative_secondary_slots or None,
     )
 
-    code_owned_rendered_fact_ids: tuple[str, ...] = ()
+    code_owned_rendered_fact_ids = installment_rendered_fact_ids
     rendered_fact_ids = code_owned_rendered_fact_ids
     rendered_promo_ids = _promo_fact_ids(
         bound_package=bound_with_marketing,

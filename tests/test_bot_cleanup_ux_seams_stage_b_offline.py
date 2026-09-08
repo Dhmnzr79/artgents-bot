@@ -185,7 +185,7 @@ def test_classic_multi_price_turn_code_owned_without_model_prose(
     assert "оплата по этапам" not in answer.casefold()
     assert "стоимость зависит" not in answer.casefold()
     assert "Хирургический этап" not in answer
-    assert "Рассрочка до 12 месяцев" not in answer
+    assert "Рассрочка до 12 месяцев, оформление на консультации." in answer
     assert "Скидка до 15%" not in answer
 
 
@@ -220,7 +220,7 @@ def test_mixed_price_installment_keeps_requested_prose(
     answer = str(payload.get("answer") or "")
     assert "318000" in _norm_digits(answer)
     assert installment_explanation in answer
-    assert answer.count("Рассрочка до 12 месяцев") == 0
+    assert answer.count("Рассрочка до 12 месяцев, оформление на консультации.") == 1
 
 
 def test_payment_stages_explicit_request_still_shows_table(

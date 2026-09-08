@@ -58,8 +58,10 @@ def _authority_for_provenance(provenance: SemanticFieldProvenance) -> ExactSales
         return ExactSalesFieldAuthority(authority="exact_turn", provenance="exact_turn")
     if provenance == "valid_session":
         return ExactSalesFieldAuthority(authority="valid_session", provenance="valid_session")
+    if provenance == "clinic_strategy":
+        return ExactSalesFieldAuthority(authority="envelope", provenance="clinic_strategy")
     if provenance == "envelope":
-        return ExactSalesFieldAuthority(authority="unknown", provenance="envelope")
+        return ExactSalesFieldAuthority(authority="envelope", provenance="envelope")
     return ExactSalesFieldAuthority(authority="unknown", provenance="null")
 
 
@@ -71,7 +73,7 @@ def exact_sales_resolution_from_semantic_frame(
     aspect = None
     if semantic.commercial_intent == "price":
         aspect = "price"
-    elif semantic.commercial_intent == "payment":
+    elif semantic.commercial_intent in {"payment", "payment_stages"}:
         aspect = "payment"
     elif semantic.commercial_intent == "included":
         aspect = "included"
@@ -353,6 +355,25 @@ def resolve_sales_fast_bound_package(
         isinstance(bound, TargetTurnFrameBoundTerminalResponse)
         and semantic.route == "ANSWER"
         and semantic.direct_fact_ids
+    ):
+        return assemble_stage51b_availability_bound_package(
+            turn_frame=turn_frame,
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            external_index=external_index,
+            consultation_values=consultation_values,
+            strategy_context=strategy_context,
+            effective_scope=effective_scope,
+            allowed_topics=allowed_topics,
+            today=today,
+            md_root=md_root,
+            client_id=client_id,
+        )
+    if (
+        isinstance(bound, TargetTurnFrameBoundTerminalResponse)
+        and bound.dispatch.terminal_mode == "defer"
+        and semantic.route == "ANSWER"
+        and semantic.commercial_intent not in {"price", "payment_stages"}
     ):
         return assemble_stage51b_availability_bound_package(
             turn_frame=turn_frame,

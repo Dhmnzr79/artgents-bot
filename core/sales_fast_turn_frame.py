@@ -29,8 +29,16 @@ _FULL_ARCH_RE = re.compile(
 _JAW_BOTH_RE = re.compile(r"обе\s+челюст", re.I | re.U)
 _JAW_LOWER_RE = re.compile(r"нижн\w*", re.I | re.U)
 _JAW_UPPER_RE = re.compile(r"верхн\w*", re.I | re.U)
+_IMPLANTATION_TOPIC_RE = re.compile(r"имплант", re.I | re.U)
+_CROWN_OR_PROSTHETICS_ON_IMPLANT_RE = re.compile(
+    r"коронк|протез|уже\s+установлен",
+    re.I | re.U,
+)
+_IMPLANTOLOGIST_INFO_RE = re.compile(
+    r"имплантолог|врач.{0,24}имплант",
+    re.I | re.U,
+)
 _SCOPE_PROVENANCE = "sales_fast.message_scope"
-
 _SALES_FAST_PROVENANCE = "sales_fast.exact_turn"
 _SEMANTIC_PROVENANCE = "sales_fast.semantic_authority"
 _ASPECT_TO_SCENARIO: dict[AspectKind, str] = {
@@ -48,6 +56,26 @@ _SCENARIO_TO_ASPECT: dict[str, AspectKind] = {
     "result_reliability": "overview",
     "none": "overview",
 }
+
+
+def _infer_non_authoritative_broad_implantation_price_hint(user_message: str) -> str | None:
+    """Presentation-only hint for broad implantation price overview; not service authority."""
+
+    text = (user_message or "").strip()
+    if not text:
+        return None
+    aspects = tuple(detect_aspects_regex(text))
+    if not any(aspect in aspects for aspect in ("price", "payment", "included")):
+        return None
+    if _CLINIC_INFO_RE.search(text):
+        return None
+    if _CROWN_OR_PROSTHETICS_ON_IMPLANT_RE.search(text):
+        return None
+    if _IMPLANTOLOGIST_INFO_RE.search(text):
+        return None
+    if not _IMPLANTATION_TOPIC_RE.search(text):
+        return None
+    return "implantation"
 
 
 def _valid_meta(*, provenance: str = _SALES_FAST_PROVENANCE) -> FieldMeta:
@@ -107,6 +135,8 @@ def build_provisional_turn_frame(
         bundle=bundle,
         user_message=user_message,
     )
+    if topic is None and primary_aspect in {"price", "payment", "included"}:
+        topic = _infer_non_authoritative_broad_implantation_price_hint(user_message)
     intent = "price_lookup" if primary_aspect in {"price", "payment", "included"} else "content"
     scenario = _ASPECT_TO_SCENARIO.get(primary_aspect)
     marketing_scenarios = (scenario,) if scenario else ()
@@ -141,6 +171,37 @@ def build_provisional_turn_frame(
     )
 
 
+def build_effective_provisional_turn_frame(
+    *,
+    resolution: ExactSalesResolution,
+    user_message: str,
+    client_id: str,
+    bundle: ResponseSchemaBundle,
+    scope_action: object | None = None,
+    stage_action: object | None = None,
+) -> TurnFrame:
+    """Governed typed UI commercial seed, else lexical provisional frame."""
+
+    if scope_action is not None:
+        from contracts.ui_scope_action import UiScopeAction
+        from core.target_typed_ui_turn_frame import build_typed_ui_turn_frame_from_scope_action
+
+        if isinstance(scope_action, UiScopeAction):
+            return build_typed_ui_turn_frame_from_scope_action(scope_action)
+    if stage_action is not None:
+        from contracts.ui_stage_action import UiStageAction
+        from core.target_typed_ui_turn_frame import build_typed_ui_turn_frame_from_stage_action
+
+        if isinstance(stage_action, UiStageAction):
+            return build_typed_ui_turn_frame_from_stage_action(stage_action)
+    return build_provisional_turn_frame(
+        resolution=resolution,
+        user_message=user_message,
+        client_id=client_id,
+        bundle=bundle,
+    )
+
+
 def build_turn_frame_from_semantic_frame(
     *,
     semantic: SalesOnePlusSemanticFrame,
@@ -156,10 +217,16 @@ def build_turn_frame_from_semantic_frame(
     primary_aspect = scenario_aspect if semantic.scenario != "none" else (aspects[0] if aspects else "overview")
     if semantic.commercial_intent == "price":
         primary_aspect = "price"
-    elif semantic.commercial_intent == "payment":
+    elif semantic.commercial_intent in {"payment", "payment_stages"}:
         primary_aspect = "payment"
     elif semantic.commercial_intent == "included":
         primary_aspect = "included"
+    elif semantic.route == "CLARIFY":
+        message_aspects = tuple(detect_aspects_regex(user_message))
+        if "price" in message_aspects:
+            primary_aspect = "price"
+            if "price" not in aspects:
+                aspects = ["price", *aspects]
     if primary_aspect not in aspects:
         aspects = [primary_aspect, *aspects]
     topic = _topic_for_confirmed_service(
@@ -167,8 +234,26 @@ def build_turn_frame_from_semantic_frame(
         bundle=bundle,
         user_message=user_message,
     )
-    intent = "price_lookup" if semantic.commercial_intent in {"price", "payment", "included"} else "content"
-    if semantic.route == "CLARIFY":
+    if topic is None:
+        from core.sales_fast_broad_family_price import infer_broad_implantation_topic_for_turn
+
+        topic = infer_broad_implantation_topic_for_turn(
+            semantic=semantic,
+            user_message=user_message,
+            bundle=bundle,
+            service_id=semantic.service_id,
+        )
+    intent = (
+        "price_lookup"
+        if semantic.commercial_intent in {"price", "payment", "payment_stages", "included"}
+        else "content"
+    )
+    if semantic.route == "CLARIFY" and semantic.commercial_intent not in {
+        "price",
+        "payment",
+        "payment_stages",
+        "included",
+    }:
         intent = "content"
     marketing_scenarios = (semantic.scenario,) if semantic.scenario != "none" else ()
     valid = _valid_meta(provenance=_SEMANTIC_PROVENANCE)

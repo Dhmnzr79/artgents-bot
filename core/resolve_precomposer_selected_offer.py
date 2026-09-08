@@ -24,7 +24,9 @@ from core.target_runtime_session import TargetRuntimeSessionState
 from core.target_strategy_context import strategy_match_from_effective_scope
 from core.sales_fast_service_identity import SalesFastServiceIdentity
 
-_AUTHORITATIVE_FIELD_AUTHORITIES = frozenset({"governed_ui", "exact_turn", "valid_session"})
+_AUTHORITATIVE_FIELD_AUTHORITIES = frozenset(
+    {"governed_ui", "exact_turn", "valid_session", "envelope"}
+)
 
 
 def _axis_authoritative(authority: str) -> bool:
@@ -59,6 +61,33 @@ def _fixed_offer_valid(offer: TargetOffer) -> bool:
     if not str(offer.package.label or "").strip():
         return False
     return True
+
+
+def _from_offer_valid(offer: TargetOffer) -> bool:
+    price = offer.price
+    if price.mode != "from":
+        return False
+    if price.min_amount is None or int(price.min_amount) < 0:
+        return False
+    if not str(price.currency or "").strip():
+        return False
+    if not str(price.billing_unit or "").strip():
+        return False
+    if not str(offer.package.label or "").strip():
+        return False
+    return True
+
+
+def _no_public_price_offer_valid(offer: TargetOffer) -> bool:
+    return offer.price.mode == "no_public_price"
+
+
+def _offer_valid(offer: TargetOffer) -> bool:
+    return (
+        _fixed_offer_valid(offer)
+        or _from_offer_valid(offer)
+        or _no_public_price_offer_valid(offer)
+    )
 
 
 def _effective_scope_from_resolution(resolution: ExactSalesResolution) -> EffectiveScope:
@@ -154,48 +183,48 @@ def _resolve_eligible_offers(
     bundle: ResponseSchemaBundle,
 ) -> PrecomposerSelectedOfferResult:
     if not eligible:
-        return PrecomposerSelectedOfferResult(availability="none")
+        return PrecomposerSelectedOfferResult(
+            availability="none",
+            diagnostic="no_published_price",
+        )
 
     if len(eligible) == 1:
         offer = eligible[0]
-        if _fixed_offer_valid(offer):
+        if _offer_valid(offer):
             return PrecomposerSelectedOfferResult(
                 availability="selected",
                 offer=offer,
                 service_id=service_id,
             )
-        return PrecomposerSelectedOfferResult(availability="none")
+        return PrecomposerSelectedOfferResult(
+            availability="none",
+            diagnostic="offer_malformed",
+        )
 
     price_modes = {offer.price.mode for offer in eligible}
-    has_fixed = "fixed" in price_modes
-    has_non_fixed = any(mode != "fixed" for mode in price_modes)
-    if has_fixed and has_non_fixed:
+    if len(price_modes) != 1:
         return PrecomposerSelectedOfferResult(
             availability="none",
             diagnostic="multi_offer_mixed_price_modes",
         )
 
-    if not all(_fixed_offer_valid(offer) for offer in eligible):
+    if not all(_offer_valid(offer) for offer in eligible):
         return PrecomposerSelectedOfferResult(
             availability="none",
             diagnostic="multi_offer_malformed",
         )
 
-    billing_units = {
-        str(offer.price.billing_unit or "").strip() for offer in eligible
-    }
-    if len(billing_units) > 1:
+    if price_modes == {"no_public_price"} and len(eligible) >= 2:
         return PrecomposerSelectedOfferResult(
             availability="none",
-            diagnostic="multi_offer_unsafe_scope",
+            diagnostic="ambiguous_no_public_price",
+            service_id=service_id,
         )
-    if billing_units != {"jaw"}:
-        return PrecomposerSelectedOfferResult(availability="none")
 
     if len(eligible) > 3:
         return PrecomposerSelectedOfferResult(
             availability="none",
-            diagnostic="multi_offer_too_many",
+            diagnostic="insufficient_context",
         )
 
     ordered = order_precomposer_offers_neutral(
@@ -352,3 +381,172 @@ def resolve_precomposer_selected_offer(
         eligible=eligible,
         bundle=bundle,
     )
+
+
+def _offer_by_id(bundle: ResponseSchemaBundle) -> dict[str, TargetOffer]:
+    return {offer.offer_id: offer for offer in bundle.offers}
+
+
+def _offer_still_applicable(
+    offer: TargetOffer,
+    *,
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    commerce_resolution: ExactSalesResolution,
+) -> bool:
+    if not offer.active:
+        return False
+    service_id = commerce_resolution.service_id
+    if service_id is None or offer.service_id != service_id:
+        return False
+    service = bundle.services.get(service_id)
+    if service is None or not service.active:
+        return False
+    effective_scope = _effective_scope_from_resolution(commerce_resolution)
+    strategy_context = strategy_match_from_effective_scope(
+        effective_scope,
+        stage=commerce_resolution.stage,  # type: ignore[arg-type]
+        jaw=commerce_resolution.jaw,  # type: ignore[arg-type]
+    )
+    eligible = _eligible_scope_offers(
+        bundle=bundle,
+        doctor_catalog=doctor_catalog,
+        service_id=service_id,
+        strategy_context=strategy_context,
+        selected_option_id=None,
+    )
+    return any(item.offer_id == offer.offer_id for item in eligible)
+
+
+def _selection_from_session_offers(
+    *,
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    commerce_resolution: ExactSalesResolution,
+    session_state: TargetRuntimeSessionState,
+) -> PrecomposerSelectedOfferResult:
+    if not session_state.is_service_focus_fresh():
+        return PrecomposerSelectedOfferResult(availability="none")
+    if session_state.last_service_id != commerce_resolution.service_id:
+        return PrecomposerSelectedOfferResult(availability="none")
+
+    offers_by_id = _offer_by_id(bundle)
+    selected_id = str(session_state.last_selected_offer_id or "").strip() or None
+    if selected_id:
+        offer = offers_by_id.get(selected_id)
+        if offer is not None and _offer_still_applicable(
+            offer,
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            commerce_resolution=commerce_resolution,
+        ):
+            return PrecomposerSelectedOfferResult(
+                availability="selected",
+                offer=offer,
+                service_id=commerce_resolution.service_id,
+            )
+        return PrecomposerSelectedOfferResult(availability="none")
+
+    displayed_ids = tuple(
+        str(offer_id).strip()
+        for offer_id in session_state.last_displayed_offer_ids
+        if str(offer_id).strip()
+    )
+    if not displayed_ids:
+        return PrecomposerSelectedOfferResult(availability="none")
+    displayed_offers = tuple(
+        offers_by_id[offer_id]
+        for offer_id in displayed_ids
+        if offer_id in offers_by_id
+        and _offer_still_applicable(
+            offers_by_id[offer_id],
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            commerce_resolution=commerce_resolution,
+        )
+    )
+    if not displayed_offers:
+        return PrecomposerSelectedOfferResult(availability="none")
+    if len(displayed_offers) == 1:
+        offer = displayed_offers[0]
+        return PrecomposerSelectedOfferResult(
+            availability="selected",
+            offer=offer,
+            service_id=commerce_resolution.service_id,
+        )
+    return _resolve_eligible_offers(
+        service_id=str(commerce_resolution.service_id),
+        eligible=displayed_offers,
+        bundle=bundle,
+    )
+
+
+def resolve_authoritative_selected_offer_for_turn(
+    *,
+    bundle: ResponseSchemaBundle,
+    doctor_catalog: TargetDoctorCatalog,
+    commerce_resolution: ExactSalesResolution,
+    user_message: str,
+    session_state: TargetRuntimeSessionState,
+    commercial_intent: str | None,
+) -> PrecomposerSelectedOfferResult:
+    """Single post-semantic-bind offer selection for sales-fast materialization."""
+
+    if commercial_intent not in {"price", "payment", "payment_stages", "included"}:
+        return PrecomposerSelectedOfferResult(availability="none")
+    if not _service_id_authoritative(commerce_resolution):
+        return PrecomposerSelectedOfferResult(availability="none")
+
+    try:
+        brand_mentions = extract_brand_mentions_from_message(bundle.brands, user_message)
+    except TargetBrandResolutionError:
+        brand_mentions = ()
+
+    if brand_mentions:
+        if len(brand_mentions) == 1:
+            return resolve_precomposer_selected_offer(
+                bundle=bundle,
+                doctor_catalog=doctor_catalog,
+                resolution=commerce_resolution,
+                selected_brand_id=brand_mentions[0],
+                brand_id_authoritative=True,
+            )
+        return resolve_precomposer_selected_offer(
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            resolution=commerce_resolution,
+            selected_brand_ids=brand_mentions,
+            brand_ids_authoritative=True,
+        )
+
+    if commercial_intent in {"payment", "payment_stages", "included"}:
+        continued = _selection_from_session_offers(
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            commerce_resolution=commerce_resolution,
+            session_state=session_state,
+        )
+        if continued.availability != "none":
+            return continued
+
+    fresh = resolve_precomposer_selected_offer(
+        bundle=bundle,
+        doctor_catalog=doctor_catalog,
+        resolution=commerce_resolution,
+    )
+
+    if commercial_intent == "price":
+        if fresh.availability in {"selected", "multiple"}:
+            return fresh
+        if fresh.diagnostic is not None:
+            return fresh
+        continued = _selection_from_session_offers(
+            bundle=bundle,
+            doctor_catalog=doctor_catalog,
+            commerce_resolution=commerce_resolution,
+            session_state=session_state,
+        )
+        if continued.availability == "selected":
+            return continued
+
+    return fresh

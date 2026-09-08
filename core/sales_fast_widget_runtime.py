@@ -6,25 +6,33 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from config import SALES_ONE_PLUS_FLASH_MODEL
+from config import SALES_ONE_PLUS_MODEL
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
-from contracts.sales_one_plus import SalesOnePlusResult
+from contracts.sales_one_plus_semantic import SalesOnePlusSemanticFrame
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.turn_frame import TurnFrame
 from contracts.ui_scope_action import UiScopeAction
+from contracts.ui_service_action import UiServiceAction
 from contracts.ui_stage_action import UiStageAction
 from core import turn_timing
 from core.exact_sales_resolver import ExactSalesResolverInputs, resolve_exact_sales_inputs
 from core.local_problem_gate import decide_local_problem_gate
 from core.provider_call_budget import current_provider_call_budget
+from core.pending_price_clarify import (
+    clear_pending_price_clarify,
+    is_pending_price_clarify_fresh,
+    read_pending_price_clarify,
+    resolve_service_id_from_pending_price_text,
+)
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
 from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_fast_observability import collect_sales_fast_timings_ms, record_sales_fast_observability
 from core.sales_fast_presentation import (
+    materialize_dialogue_price_clarify_payload,
     materialize_sales_fast_admin_payload,
     materialize_sales_fast_answer_payload,
     materialize_sales_fast_error_payload,
@@ -40,7 +48,10 @@ from core.one_call_price_text import (
     patient_text_contains_monetary_amount,
     resolve_price_text_for_turn,
 )
-from core.resolve_precomposer_selected_offer import resolve_precomposer_selected_offer_for_turn
+from core.resolve_precomposer_selected_offer import (
+    resolve_authoritative_selected_offer_for_turn,
+    resolve_precomposer_selected_offer_for_turn,
+)
 from core.sales_fast_strict_evidence import (
     assemble_sales_fast_bound_package,
     build_pre_flash_prompt_hints,
@@ -49,12 +60,14 @@ from core.sales_fast_strict_evidence import (
     resolve_sales_fast_bound_package,
 )
 from core.sales_fast_turn_frame import (
+    build_effective_provisional_turn_frame,
     build_provisional_turn_frame,
     build_turn_frame_from_semantic_frame,
     project_sales_fast_scope_from_message,
 )
 from core.sales_one_plus_semantic_authority import (
     SalesOnePlusSemanticConflictError,
+    apply_clinic_strategy_service_selection,
     bind_semantic_frame,
     governed_ui_authority_from_resolution,
 )
@@ -110,10 +123,41 @@ _SCOPE_CLARIFY_CONFLICT_CODES = frozenset(
         "semantic_ui_envelope_conflict_extent",
         "semantic_ui_envelope_conflict_jaw",
         "semantic_ui_envelope_conflict_stage",
-        "semantic_catalog_envelope_conflict_service_id",
-        "semantic_session_envelope_conflict_service_id",
     }
 )
+
+
+def _session_offer_context_from_widget(
+    widget: object,
+) -> tuple[tuple[str, ...], str | None]:
+    payload = getattr(widget, "payload", None)
+    if not isinstance(payload, dict):
+        return (), None
+    offer = payload.get("offer")
+    if not isinstance(offer, dict):
+        return (), None
+    mode = str(offer.get("mode") or "")
+    if mode == "exact_offer":
+        offer_id = str(offer.get("offer_id") or "").strip()
+        if offer_id:
+            return (offer_id,), offer_id
+        return (), None
+    rows = offer.get("offers")
+    if not isinstance(rows, list):
+        return (), None
+    displayed_ids = tuple(
+        str(row.get("offer_id") or "").strip()
+        for row in rows
+        if isinstance(row, dict) and str(row.get("offer_id") or "").strip()
+    )
+    if not displayed_ids:
+        return (), None
+    featured = str(offer.get("featured_offer_id") or "").strip() or None
+    if len(displayed_ids) == 1:
+        return displayed_ids, displayed_ids[0]
+    if featured and featured in displayed_ids:
+        return displayed_ids, None
+    return displayed_ids, None
 
 
 class SalesFastOneCallBackend(Protocol):
@@ -167,8 +211,67 @@ def _current_ui_stage_action() -> UiStageAction | None:
         return None
 
 
+def _current_ui_service_action() -> UiServiceAction | None:
+    try:
+        from flask import request
+
+        raw = request.ctx.get("current_ui_service_action")
+    except Exception:
+        return None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return UiServiceAction.model_validate(raw)
+    except Exception:
+        return None
+
+
 def _is_governed_typed_ui_turn() -> bool:
-    return _current_ui_scope_action() is not None or _current_ui_stage_action() is not None
+    return (
+        _current_ui_scope_action() is not None
+        or _current_ui_stage_action() is not None
+        or _current_ui_service_action() is not None
+    )
+
+
+def _apply_governed_scope_stage_commercial_intent(
+    semantic: SalesOnePlusSemanticFrame,
+) -> SalesOnePlusSemanticFrame:
+    """Scope/stage clicks continue a price lookup; envelope prose must not drop it."""
+
+    if _current_ui_scope_action() is None and _current_ui_stage_action() is None:
+        return semantic
+    if semantic.route != "ANSWER":
+        return semantic
+    updates: dict[str, object] = {}
+    if semantic.commercial_intent != "price":
+        updates["commercial_intent"] = "price"
+    if semantic.scenario == "none":
+        updates["scenario"] = "cost"
+    if not updates:
+        return semantic
+    return semantic.model_copy(update=updates)
+
+
+def _effective_provisional_turn_frame(
+    *,
+    resolution: ExactSalesResolution,
+    user_message: str,
+    client_id: str,
+    bundle: object,
+) -> TurnFrame:
+    from contracts.response_schema import ResponseSchemaBundle
+
+    if not isinstance(bundle, ResponseSchemaBundle):
+        raise TypeError("bundle must be ResponseSchemaBundle")
+    return build_effective_provisional_turn_frame(
+        resolution=resolution,
+        user_message=user_message,
+        client_id=client_id,
+        bundle=bundle,
+        scope_action=_current_ui_scope_action(),
+        stage_action=_current_ui_stage_action(),
+    )
 
 
 def _run_local_problem_gate_first(user_message: str) -> LocalProblemGateResult | None:
@@ -261,6 +364,26 @@ def _resolve_sales_context(
     session_state = read_target_runtime_session(sid)
     current_ui_scope_action = _current_ui_scope_action()
     current_ui_stage_action = _current_ui_stage_action()
+    current_ui_service_action = _current_ui_service_action()
+    pending_text_service_candidate_id: str | None = None
+    if current_ui_service_action is None:
+        from core.pending_price_clarify import (
+            is_pending_price_clarify_fresh,
+            read_pending_price_clarify,
+            resolve_service_id_from_pending_price_text,
+        )
+        from session import mem_get
+
+        pending = read_pending_price_clarify(mem_get(sid))
+        if pending is not None and is_pending_price_clarify_fresh(
+            pending,
+            session_turn_count=session_state.session_turn_count,
+        ):
+            pending_text_service_candidate_id = resolve_service_id_from_pending_price_text(
+                user_message,
+                bundle=context.bundle,
+                pending=pending,
+            )
     projected_turn_scope = project_sales_fast_scope_from_message(user_message)
     from contracts.answer_plan import AspectKind
     from core.answer_planner import detect_aspects_regex
@@ -275,6 +398,8 @@ def _resolve_sales_context(
             session_turn_count=session_state.session_turn_count,
             current_ui_scope_action=current_ui_scope_action,
             current_ui_stage_action=current_ui_stage_action,
+            current_ui_service_action=current_ui_service_action,
+            pending_text_service_candidate_id=pending_text_service_candidate_id,
             exact_service_term=service_identity.explicit_service_term,
             exact_aspect=exact_aspect,
             projected_turn_scope=projected_turn_scope,
@@ -354,32 +479,72 @@ def _rebuild_authoritative_context(
         raise ValueError("authoritative_rebuild_requires_envelope")
     governed_ui = governed_ui_authority_from_resolution(resolution)
     session_service_id = resolve_session_service_for_followup(
-        turn_frame=build_provisional_turn_frame(
+        turn_frame=build_effective_provisional_turn_frame(
             resolution=resolution,
             user_message=user_message,
             client_id=client_id,
             bundle=context.bundle,
+            scope_action=_current_ui_scope_action(),
+            stage_action=_current_ui_stage_action(),
         ),
         user_message=user_message,
         session_state=session_state,  # type: ignore[arg-type]
         allowed_service_ids=active_service_catalog.active_service_ids,
-        explicit_service_id=service_identity.explicit_service_id,
+        explicit_service_id=None,
         commercial_intent=result.envelope.commercial_intent,
+        envelope_service_id=result.envelope.service_id,
+        envelope_requested_service_id=result.envelope.requested_service_id,
+        service_reference_status=result.envelope.service_reference_status,
     )
     bound_identity = service_identity.with_session_service(session_service_id)
+    pending_text_candidate_id = None
+    if (
+        resolution.service_id is not None
+        and resolution.service_id_authority.provenance == "pending_price_clarify_catalog"
+    ):
+        pending_text_candidate_id = resolution.service_id
     semantic = bind_semantic_frame(
         envelope=result.envelope,
         governed_ui=governed_ui,
         active_service_catalog=active_service_catalog,
         service_reference_catalog=service_reference_catalog,
-        explicit_catalog_service_id=bound_identity.explicit_service_id,
+        explicit_catalog_service_id=pending_text_candidate_id,
         session_service_id=bound_identity.session_service_id,
     )
-    turn_frame = build_turn_frame_from_semantic_frame(
-        semantic=semantic,
-        user_message=user_message,
-        bundle=context.bundle,
+    semantic = _apply_governed_scope_stage_commercial_intent(semantic)
+    effective_scope = effective_scope_from_semantic_frame(
+        semantic,
+        current_ui_action=_current_ui_scope_action(),
+        current_ui_stage_action=_current_ui_stage_action(),
     )
+    scope_action = _current_ui_scope_action()
+    stage_action = _current_ui_stage_action()
+    if not (
+        _current_ui_service_action() is None
+        and (scope_action is not None or stage_action is not None)
+    ):
+        semantic = apply_clinic_strategy_service_selection(
+            semantic,
+            bundle=context.bundle,
+            effective_scope=effective_scope,
+            allowed_topics=context.allowed_topics,
+            governed_ui_service_id=governed_ui.service_id,
+        )
+    if scope_action is not None or stage_action is not None:
+        turn_frame = build_effective_provisional_turn_frame(
+            resolution=resolution,
+            user_message=user_message,
+            client_id=client_id,
+            bundle=context.bundle,
+            scope_action=scope_action,
+            stage_action=stage_action,
+        )
+    else:
+        turn_frame = build_turn_frame_from_semantic_frame(
+            semantic=semantic,
+            user_message=user_message,
+            bundle=context.bundle,
+        )
     effective_scope = effective_scope_from_semantic_frame(
         semantic,
         current_ui_action=_current_ui_scope_action(),
@@ -498,7 +663,7 @@ def run_sales_fast_widget_turn(
             provider_calls=0,
         )
     projected_turn_scope = project_sales_fast_scope_from_message(user_message)
-    turn_frame = build_provisional_turn_frame(
+    turn_frame = _effective_provisional_turn_frame(
         resolution=resolution,
         user_message=user_message,
         client_id=client_id,
@@ -556,7 +721,7 @@ def run_sales_fast_widget_turn(
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)
     exact_commercial_catalog = ExactCommercialCatalogSnapshot.from_bundle(context.bundle)
     today = runtime_today()
-    precomposer_selected_offer = resolve_precomposer_selected_offer_for_turn(
+    precomposer_hint_offer = resolve_precomposer_selected_offer_for_turn(
         bundle=context.bundle,
         doctor_catalog=context.doctor_catalog,
         resolution=resolution,
@@ -592,7 +757,7 @@ def run_sales_fast_widget_turn(
                 exact_commercial_catalog=exact_commercial_catalog,
                 dialog_history=dialog_history,
                 as_of_date=today,
-                precomposer_selected_offer=precomposer_selected_offer,
+                precomposer_selected_offer=precomposer_hint_offer,
                 response_schema_bundle=context.bundle,
             )
         else:
@@ -612,7 +777,7 @@ def run_sales_fast_widget_turn(
                 exact_commercial_catalog=exact_commercial_catalog,
                 dialog_history=dialog_history,
                 as_of_date=today,
-                precomposer_selected_offer=precomposer_selected_offer,
+                precomposer_selected_offer=precomposer_hint_offer,
                 response_schema_bundle=context.bundle,
             )
     except SalesOnePlusBackendFailure as exc:
@@ -630,7 +795,7 @@ def run_sales_fast_widget_turn(
             architecture="new",
             route="error",
             provider_calls=provider_calls,
-            model=SALES_ONE_PLUS_FLASH_MODEL if provider_calls else None,
+            model=SALES_ONE_PLUS_MODEL if provider_calls else None,
             failure_kind=exc.reason,
             timings=collect_sales_fast_timings_ms(),
             backend_invocations=backend_invocations,
@@ -656,7 +821,7 @@ def run_sales_fast_widget_turn(
             architecture="new",
             route="error",
             provider_calls=provider_calls,
-            model=SALES_ONE_PLUS_FLASH_MODEL if provider_calls else None,
+            model=SALES_ONE_PLUS_MODEL if provider_calls else None,
             failure_kind=exc.code,
             timings=collect_sales_fast_timings_ms(),
             backend_invocations=backend_invocations,
@@ -695,14 +860,14 @@ def run_sales_fast_widget_turn(
         service_reference_catalog=service_reference_catalog,
         service_identity=service_identity,
         on_patient_delta=on_delta,
-        precomposer_selected_offer=precomposer_selected_offer,
+        precomposer_hint_offer=precomposer_hint_offer,
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
         architecture="new",
         route=outcome.model_route,
         provider_calls=provider_calls,
-        model=SALES_ONE_PLUS_FLASH_MODEL if provider_calls else None,
+        model=SALES_ONE_PLUS_MODEL if provider_calls else None,
         failure_kind=outcome.failure_kind,
         timings=collect_sales_fast_timings_ms(),
         backend_invocations=backend_invocations,
@@ -727,7 +892,7 @@ def _materialize_result(
     service_reference_catalog: ServiceReferenceCatalogSnapshot,
     service_identity: SalesFastServiceIdentity,
     on_patient_delta: PatientDeltaCallback | None = None,
-    precomposer_selected_offer: object | None = None,
+    precomposer_hint_offer: object | None = None,
 ) -> SalesFastWidgetOutcome:
     if result.decision == "spam":
         return SalesFastWidgetOutcome(
@@ -801,7 +966,45 @@ def _materialize_result(
                 provider_calls=provider_calls,
             )
         raise
+    precomposer_selected_offer = resolve_authoritative_selected_offer_for_turn(
+        bundle=context.bundle,
+        doctor_catalog=context.doctor_catalog,
+        commerce_resolution=commerce_resolution,
+        user_message=user_message,
+        session_state=session_state,  # type: ignore[arg-type]
+        commercial_intent=semantic.commercial_intent,
+    )
     if isinstance(bound, TargetTurnFrameBoundTerminalResponse):
+        if (
+            bound.dispatch.terminal_mode == "defer"
+            and semantic.commercial_intent == "price"
+            and result.decision == "answer"
+        ):
+            return SalesFastWidgetOutcome(
+                widget=materialize_dialogue_price_clarify_payload(
+                    client_id=client_id,
+                    sid=sid,
+                    clarify_service_options=semantic.clarify_service_options,
+                    bundle=context.bundle,
+                ),
+                provider_calls=provider_calls,
+                model_route="clarify",
+                failure_kind="dialogue_price_scope_unresolved",
+            )
+        if result.decision == "clarify":
+            return SalesFastWidgetOutcome(
+                widget=materialize_dialogue_price_clarify_payload(
+                    client_id=client_id,
+                    sid=sid,
+                    clarify_service_options=semantic.clarify_service_options
+                    if semantic.clarify_axis == "service"
+                    else None,
+                    bundle=context.bundle,
+                ),
+                provider_calls=provider_calls,
+                model_route="clarify",
+                failure_kind=result.reason,
+            )
         terminal_route = "clarify" if result.decision == "clarify" else "local"
         return SalesFastWidgetOutcome(
             widget=materialize_sales_fast_terminal_from_dispatch(
@@ -935,6 +1138,16 @@ def _materialize_result(
                 patient_text=final_patient_text,
                 used_content_refs=verified.used_content_refs,
             )
+        displayed_offer_ids, selected_offer_id = _session_offer_context_from_widget(widget)
+        if (
+            selected_offer_id is None
+            and isinstance(precomposer_selected_offer, PrecomposerSelectedOfferResult)
+            and precomposer_selected_offer.availability == "selected"
+            and precomposer_selected_offer.offer is not None
+        ):
+            selected_offer_id = precomposer_selected_offer.offer.offer_id
+            if not displayed_offer_ids:
+                displayed_offer_ids = (selected_offer_id,)
         write_target_runtime_session_after_materialized(
             sid,
             turn_frame=authoritative_turn_frame,
@@ -945,7 +1158,12 @@ def _materialize_result(
             effective_scope=effective_scope,  # type: ignore[arg-type]
             presentation_cadence_update=widget.presentation_cadence_update,
             availability_status=semantic.availability_status,
+            displayed_offer_ids=displayed_offer_ids,
+            selected_offer_id=selected_offer_id,
+            user_message=user_message,
         )
+        if displayed_offer_ids or selected_offer_id or commerce_resolution.service_id:
+            clear_pending_price_clarify(sid)
     model_route = "clarify" if result.decision == "clarify" else "model"
     outcome = SalesFastWidgetOutcome(
         widget=widget,

@@ -103,6 +103,19 @@ def resolve_catalog_service_identity(
     )
 
 
+def _envelope_specifies_service_focus(
+    *,
+    envelope_service_id: str | None,
+    envelope_requested_service_id: str | None,
+    service_reference_status: str | None,
+) -> bool:
+    if envelope_service_id:
+        return True
+    if service_reference_status == "resolved" and envelope_requested_service_id:
+        return True
+    return False
+
+
 def resolve_session_service_for_followup(
     *,
     turn_frame: TurnFrame,
@@ -111,12 +124,34 @@ def resolve_session_service_for_followup(
     allowed_service_ids: frozenset[str],
     explicit_service_id: str | None,
     commercial_intent: str | None = None,
+    envelope_service_id: str | None = None,
+    envelope_requested_service_id: str | None = None,
+    service_reference_status: str | None = None,
 ) -> str | None:
     """Fresh session service for vague price/payment/included follow-up only."""
 
     if explicit_service_id:
         return None
-    if commercial_intent not in {"price", "payment", "included"}:
+    if service_reference_status == "unresolved":
+        return None
+    if _envelope_specifies_service_focus(
+        envelope_service_id=envelope_service_id,
+        envelope_requested_service_id=envelope_requested_service_id,
+        service_reference_status=service_reference_status,
+    ):
+        return None
+    if commercial_intent not in {"price", "payment", "payment_stages", "included"}:
+        return None
+    if commercial_intent in {"included", "payment", "payment_stages"}:
+        has_offer_context = bool(session_state.last_selected_offer_id) or bool(
+            session_state.last_displayed_offer_ids
+        )
+        if not session_state.is_service_focus_fresh():
+            if not has_offer_context:
+                return None
+        last_service_id = str(session_state.last_service_id or "").strip()
+        if last_service_id and last_service_id in allowed_service_ids:
+            return last_service_id
         return None
     probe = turn_frame.model_copy(
         update={
@@ -128,6 +163,7 @@ def resolve_session_service_for_followup(
     aspect_map = {
         "price": "price",
         "payment": "payment",
+        "payment_stages": "payment",
         "included": "included",
     }
     aspect = aspect_map[str(commercial_intent)]
@@ -138,6 +174,9 @@ def resolve_session_service_for_followup(
                 "aspects": [aspect, *probe.aspects],
             }
         )
+    if commercial_intent == "price":
+        if not session_state.is_immediate_service_focus_for_price():
+            return None
     if not should_skip_session_service_hydration(probe, user_message=user_message):
         hydrated = hydrate_target_runtime_turn_frame_from_session(
             probe,
@@ -151,7 +190,10 @@ def resolve_session_service_for_followup(
     followup_kind = aspect if aspect in {"price", "payment", "included"} else None
     if query_has_explicit_service_object(user_message, kind=followup_kind):
         return None
-    if not session_state.is_service_focus_fresh():
+    if commercial_intent == "price":
+        if not session_state.is_immediate_service_focus_for_price():
+            return None
+    elif not session_state.is_service_focus_fresh():
         return None
     last_service_id = str(session_state.last_service_id or "").strip()
     if not last_service_id or last_service_id not in allowed_service_ids:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -136,6 +137,8 @@ class TargetRuntimeSessionState:
     last_turn_rendered_promo_fact_ids: tuple[str, ...]
     followups: tuple[TargetRuntimeFollowupItem, ...]
     patient_facts: SessionPatientFacts | None = None
+    last_displayed_offer_ids: tuple[str, ...] = ()
+    last_selected_offer_id: str | None = None
 
     def service_focus_age(self) -> int | None:
         return compute_service_focus_age(
@@ -148,6 +151,14 @@ class TargetRuntimeSessionState:
         if age is None or not self.last_service_id:
             return False
         return age <= max_service_focus_turn_age()
+
+    def is_immediate_service_focus_for_price(self) -> bool:
+        """Bare price may use focus established or refreshed on the preceding turn."""
+
+        age = self.service_focus_age()
+        if age is None or not self.last_service_id:
+            return False
+        return age == 1
 
 
 def _merge_unique(*groups: tuple[str, ...]) -> tuple[str, ...]:
@@ -199,6 +210,8 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             last_rendered_promo_fact_id=None,
             rendered_promo_fact_ids=(),
             last_turn_rendered_promo_fact_ids=(),
+            last_displayed_offer_ids=(),
+            last_selected_offer_id=None,
             followups=followups,
             patient_facts=patient_facts,
         )
@@ -253,6 +266,12 @@ def read_target_runtime_session(sid: str) -> TargetRuntimeSessionState:
             for x in raw.get("last_turn_rendered_promo_fact_ids") or []
             if str(x).strip()
         ),
+        last_displayed_offer_ids=tuple(
+            str(x).strip()
+            for x in raw.get("last_displayed_offer_ids") or []
+            if str(x).strip()
+        ),
+        last_selected_offer_id=str(raw.get("last_selected_offer_id") or "").strip() or None,
         followups=followups,
         patient_facts=patient_facts,
     )
@@ -364,6 +383,78 @@ def _apply_a9_patient_facts_to_state(
     st[_PATIENT_FACTS_KEY] = patient_facts_payload(facts)
 
 
+def _should_preserve_prior_service_focus(
+    *,
+    prior: TargetRuntimeSessionState,
+    availability_status: str | None,
+) -> bool:
+    if not prior.last_service_id:
+        return False
+    if availability_status in {"known_not_offered", "unresolved"}:
+        return False
+    return True
+
+
+_JAW_APPLICABILITY_RE = re.compile(
+    r"\b(?:челюст\w*|верхн\w*|нижн\w*)\b",
+    re.I | re.U,
+)
+
+
+def _is_related_service_continuation_turn(
+    *,
+    user_message: str | None,
+    turn_frame: TurnFrame,
+    prior: TargetRuntimeSessionState,
+) -> bool:
+    """Intermediate turn that continues the current service without naming a new one."""
+
+    from core.attribute_followup import is_vague_attribute_followup_any
+    from policy import continuation_only_phrase
+
+    if not prior.is_service_focus_fresh():
+        return False
+    prior_topic = str(prior.last_topic or "").strip()
+    frame_topic = str(turn_frame.topic or "").strip()
+    if prior_topic and frame_topic and prior_topic != frame_topic:
+        return False
+    if len(prior.last_displayed_offer_ids) >= 2:
+        return False
+    msg = (user_message or "").strip()
+    if msg and continuation_only_phrase(msg):
+        return False
+    if msg and is_vague_attribute_followup_any(msg):
+        return True
+    if turn_frame.service_id is not None:
+        return False
+    if msg and _JAW_APPLICABILITY_RE.search(msg):
+        return True
+    return False
+
+
+def write_target_runtime_clarify_followups(
+    sid: str,
+    *,
+    followups: tuple[TargetRuntimeFollowupItem, ...],
+) -> None:
+    """Persist governed quick-reply refs for terminal clarify without materialized turn."""
+
+    from session import _lock, _persist_unlocked, mem_get
+
+    with _lock:
+        st = mem_get(sid)
+        st[_TARGET_FOLLOWUPS_KEY] = [
+            {
+                "ref": item.ref,
+                "label": item.label,
+                **({"client_id": item.client_id} if item.client_id else {}),
+            }
+            for item in followups
+            if item.ref
+        ]
+        _persist_unlocked(sid, st)
+
+
 def write_session_patient_facts_from_a9_materialized(
     sid: str,
     *,
@@ -397,6 +488,9 @@ def write_target_runtime_session_after_materialized(
     effective_scope: EffectiveScope | None = None,
     presentation_cadence_update: TargetPresentationCadenceUpdate | None = None,
     availability_status: str | None = None,
+    displayed_offer_ids: tuple[str, ...] = (),
+    selected_offer_id: str | None = None,
+    user_message: str | None = None,
 ) -> None:
     """Persist target continuity only after a successful materialized response."""
 
@@ -467,6 +561,38 @@ def write_target_runtime_session_after_materialized(
         service_id = str(turn_frame.service_id or "").strip() or None
         if availability_status in {"known_not_offered", "unresolved"}:
             service_id = None
+        if displayed_offer_ids:
+            payload["last_displayed_offer_ids"] = list(displayed_offer_ids)
+            if selected_offer_id:
+                payload["last_selected_offer_id"] = selected_offer_id
+            elif len(displayed_offer_ids) == 1:
+                payload["last_selected_offer_id"] = displayed_offer_ids[0]
+            else:
+                payload.pop("last_selected_offer_id", None)
+        elif service_id and service_id == prior.last_service_id:
+            if prior.last_displayed_offer_ids:
+                payload["last_displayed_offer_ids"] = list(prior.last_displayed_offer_ids)
+            else:
+                payload.pop("last_displayed_offer_ids", None)
+            if prior.last_selected_offer_id:
+                payload["last_selected_offer_id"] = prior.last_selected_offer_id
+            else:
+                payload.pop("last_selected_offer_id", None)
+        elif _should_preserve_prior_service_focus(
+            prior=prior,
+            availability_status=availability_status,
+        ):
+            if prior.last_displayed_offer_ids:
+                payload["last_displayed_offer_ids"] = list(prior.last_displayed_offer_ids)
+            else:
+                payload.pop("last_displayed_offer_ids", None)
+            if prior.last_selected_offer_id:
+                payload["last_selected_offer_id"] = prior.last_selected_offer_id
+            else:
+                payload.pop("last_selected_offer_id", None)
+        else:
+            payload.pop("last_displayed_offer_ids", None)
+            payload.pop("last_selected_offer_id", None)
         if service_id:
             payload.update(
                 {
@@ -476,13 +602,23 @@ def write_target_runtime_session_after_materialized(
                     "service_focus_set_at_turn": turn_count,
                 }
             )
-        elif prior.last_service_id:
+        elif _should_preserve_prior_service_focus(
+            prior=prior,
+            availability_status=availability_status,
+        ):
+            focus_set_at_turn = prior.service_focus_set_at_turn
+            if _is_related_service_continuation_turn(
+                user_message=user_message,
+                turn_frame=turn_frame,
+                prior=prior,
+            ):
+                focus_set_at_turn = turn_count
             payload.update(
                 {
                     "last_service_id": prior.last_service_id,
                     "last_topic": prior.last_topic,
                     "last_primary_aspect": prior.last_primary_aspect,
-                    "service_focus_set_at_turn": prior.service_focus_set_at_turn,
+                    "service_focus_set_at_turn": focus_set_at_turn,
                 }
             )
         st[_TARGET_SESSION_KEY] = payload

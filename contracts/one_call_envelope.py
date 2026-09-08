@@ -19,7 +19,14 @@ OneCallScenario = Literal[
     "result_reliability",
     "none",
 ]
-OneCallCommercialIntent = Literal["none", "price", "payment", "included", "promotion"]
+OneCallCommercialIntent = Literal[
+    "none",
+    "price",
+    "payment",
+    "payment_stages",
+    "included",
+    "promotion",
+]
 OneCallPromotionScope = Literal["none", "general", "service", "shown"]
 OneCallClarifyAxis = Literal["service", "extent", "jaw", "stage"]
 
@@ -52,6 +59,12 @@ ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED = (
     "envelope_normalized_direct_fact_id_deduped"
 )
 ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT = "envelope_normalized_missing_price_text"
+ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED = (
+    "envelope_normalized_answer_clarify_fields_cleared"
+)
+ENVELOPE_NORMALIZED_TERMINAL_DIRECT_FACT_IDS_CLEARED = (
+    "envelope_normalized_terminal_direct_fact_ids_cleared"
+)
 
 
 def _require_nonblank(value: str, *, code: str) -> str:

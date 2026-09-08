@@ -6,8 +6,10 @@ import json
 from typing import Any
 
 from contracts.one_call_envelope import (
+    ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED,
     ENVELOPE_NORMALIZED_DIRECT_FACT_ID_DEDUPED,
     ENVELOPE_NORMALIZED_MISSING_PRICE_TEXT,
+    ENVELOPE_NORMALIZED_TERMINAL_DIRECT_FACT_IDS_CLEARED,
     ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS,
     OneCallClarifyAxis,
     OneCallCommercialIntent,
@@ -33,7 +35,9 @@ _ALLOWED_JAW = frozenset({"upper", "lower", "both"})
 _ALLOWED_SCENARIO = frozenset(
     {"pain_fear", "cost", "time", "doctor_trust", "result_reliability", "none"}
 )
-_ALLOWED_COMMERCIAL_INTENT = frozenset({"none", "price", "payment", "included", "promotion"})
+_ALLOWED_COMMERCIAL_INTENT = frozenset(
+    {"none", "price", "payment", "payment_stages", "included", "promotion"}
+)
 _ALLOWED_PROMOTION_SCOPE = frozenset({"none", "general", "service", "shown"})
 _ALLOWED_CLARIFY_AXIS = frozenset({"service", "extent", "jaw", "stage"})
 _ALLOWED_SERVICE_REFERENCE_STATUS = frozenset({"none", "resolved", "unresolved"})
@@ -106,13 +110,36 @@ def _normalize_production_payload(
     if extra:
         payload = {key: payload[key] for key in required if key in payload}
         codes.append(ENVELOPE_NORMALIZED_UNKNOWN_TOP_LEVEL_FIELDS)
+    route = payload.get("route")
+    patient_text_raw = payload.get("patient_text")
+    has_answer_text = (
+        route == "ANSWER"
+        and isinstance(patient_text_raw, str)
+        and bool(patient_text_raw.strip())
+    )
+    if has_answer_text and (
+        payload.get("clarify_axis") is not None
+        or payload.get("clarify_service_options") is not None
+    ):
+        payload = dict(payload)
+        payload["clarify_axis"] = None
+        payload["clarify_service_options"] = None
+        codes.append(ENVELOPE_NORMALIZED_ANSWER_CLARIFY_FIELDS_CLEARED)
     references = payload.get("references")
     if isinstance(references, dict):
         direct_fact_ids = references.get("direct_fact_ids")
+        route = payload.get("route")
         if isinstance(direct_fact_ids, list):
             deduped, dedupe_codes = _normalize_direct_fact_ids_list(direct_fact_ids)
             codes.extend(dedupe_codes)
-            if deduped != direct_fact_ids:
+            if route in {"CLARIFY", "ADMIN"} and deduped:
+                payload = dict(payload)
+                payload["references"] = {
+                    **references,
+                    "direct_fact_ids": [],
+                }
+                codes.append(ENVELOPE_NORMALIZED_TERMINAL_DIRECT_FACT_IDS_CLEARED)
+            elif deduped != direct_fact_ids:
                 payload = dict(payload)
                 payload["references"] = {
                     **references,
@@ -187,10 +214,7 @@ def _validate_direct_fact_ids(
         if token in normalized:
             continue
         normalized.append(token)
-    direct_fact_ids = tuple(normalized)
-    if route in {"CLARIFY", "ADMIN"} and direct_fact_ids:
-        raise OneCallEnvelopeProtocolError("direct_fact_ids_forbidden_for_route")
-    return direct_fact_ids
+    return tuple(normalized)
 
 
 def _validate_references(

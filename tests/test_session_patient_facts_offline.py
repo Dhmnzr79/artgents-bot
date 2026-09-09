@@ -5,7 +5,6 @@ import uuid
 import pytest
 from flask import Flask, request
 
-from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.ui_scope_action import UiScopeAction, build_ui_scope_ref
 from core.target_response_verifier import TargetSemanticAssessment, TargetSemanticIssue
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
@@ -15,8 +14,6 @@ from core.target_runtime_session import (
     write_session_patient_facts_from_ui_action,
 )
 from core.target_runtime_turn import run_target_fullcontext_runtime_turn
-from orchestration.context import AskTurnContext
-from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from session import mem_reset
 from tests.target_runtime_test_support import (
     BackendPayload,
@@ -26,7 +23,6 @@ from tests.target_runtime_test_support import (
     _seed_target_runtime_state,
     _turn_frame,
 )
-from tests.test_s61_correction_target_runtime import _pre_resolver
 from tests.test_target_boundary_enforced_fullcontext_response import (
     RecordingComposerBackend,
     RecordingSemanticBackend,
@@ -98,18 +94,39 @@ def test_reset_clears_patient_facts() -> None:
     assert after.patient_facts is None
 
 
-def test_pre_resolver_ui_scope_click_persists_session_facts(flask_ctx) -> None:
+def test_one_call_ui_scope_click_persists_session_facts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app as app_module
+
+    from tests.test_sales_fast_widget_integration import (
+        _CountingBackend,
+        _install_sales_fast_transport,
+    )
+    from tests.test_sales_one_plus_turn import answer_envelope
+
     sid = f"s-click-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=UI_REF, label="Один зуб"),
     )
-    result = _pre_resolver({"q": "", "ref": UI_REF, "sid": sid})
-    assert isinstance(result, AskTurnContext)  # type: ignore[name-defined]
+    backend = _CountingBackend(answer_envelope("Цена для одного зуба."))
+    _install_sales_fast_transport(monkeypatch, backend)
+
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={"q": "", "ref": UI_REF, "sid": sid, "client_id": "demo"},
+    )
+    assert resp.status_code == 200
+    assert backend.call_count == 1
+    payload = resp.get_json()
+    assert payload.get("answer")
     after = read_target_runtime_session(sid)
     assert after.patient_facts is not None
     assert after.patient_facts.extent == "one_tooth"
+    assert after.patient_facts.ref == UI_REF
 
 
 def test_a9_session_facts_persist_after_materialized_turn(flask_ctx, monkeypatch: pytest.MonkeyPatch) -> None:

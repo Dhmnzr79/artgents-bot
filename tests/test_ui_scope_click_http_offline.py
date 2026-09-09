@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import re
 import uuid
 from pathlib import Path
@@ -11,70 +12,14 @@ from flask import Flask, request
 
 from contracts.ui_scope_action import build_ui_scope_ref
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
-from orchestration.planner_turn import PlannerTurnOutcome
-from session import mem_get, mem_reset
-from tests.target_runtime_test_support import (
-    _fake_backends,
-    _seed_followups,
-)
-from tests.test_s61_correction_target_runtime import (
-    _fake_target_turn_factory,
-    _pre_resolver,
-)
+from core.target_runtime_session import read_target_runtime_session
+from session import mem_reset
+from tests.target_runtime_test_support import _seed_followups
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _ARTIFACT_DIR = _REPO_ROOT / "docs" / "artifacts" / "w1b_wip_checkpoint_2026-07-24"
 
 UI_REF = build_ui_scope_ref(topic="implantation", extent="one_tooth")
-
-
-def _patch_locked_runtime_to_target_path(
-    monkeypatch: pytest.MonkeyPatch,
-    app_module,
-    *,
-    target_turn,
-) -> None:
-    import config
-    from contracts.ask_orchestration import AskOrchestrationResult
-    from orchestration.pre_resolver_turn import run_pre_resolver_turn
-    from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn
-
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", False)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", False)
-    def _ask_inner(data: dict):
-        pre = run_pre_resolver_turn(
-            data,
-            resolve_client_id=app_module.resolve_request_client_id,
-            bind_chat_ctx=app_module._bind_chat_ctx,
-            resolve_ip=app_module._resolve_request_ip,
-            client_txt=app_module._client_txt,
-            service_payload=app_module.build_service_payload,
-            get_last_content_ui_payload=app_module.get_last_content_ui_payload_compat,
-        )
-        if isinstance(pre, AskOrchestrationResult):
-            return pre
-        typed_outcome = try_run_typed_ui_planner_turn(
-            sid=pre.sid,
-            client_id=pre.client_id,
-            enqueue_resolver_trace=app_module._enqueue_v5_resolver_trace,
-        )
-        if typed_outcome is None:
-            app_module.run_planner_turn(
-                q=pre.q,
-                sid=pre.sid,
-                client_id=pre.client_id,
-                st=pre.st,
-                enqueue_resolver_trace=app_module._enqueue_v5_resolver_trace,
-                speculative_handle=pre.planner_speculation,
-            )
-        return target_turn(
-            q=pre.q,
-            sid=pre.sid,
-            client_id=pre.client_id,
-            data=pre.data,
-        )
-
-    monkeypatch.setattr(app_module, "_orchestrate_ask_turn_inner", _ask_inner)
 
 
 @pytest.fixture
@@ -85,30 +30,73 @@ def flask_ctx():
         yield
 
 
-def test_malformed_ui_scope_ref_fail_closed(flask_ctx) -> None:
+def test_malformed_ui_scope_ref_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app as app_module
+
+    from tests.test_sales_fast_widget_integration import (
+        _CountingBackend,
+        _install_sales_fast_transport,
+    )
+    from tests.test_sales_one_plus_turn import answer_envelope
+
     sid = f"s-bad-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    result = _pre_resolver(
-        {"q": "", "ref": "target:ui_scope/implantation/not_an_extent", "sid": sid},
+    backend = _CountingBackend(answer_envelope("ignored"))
+    _install_sales_fast_transport(monkeypatch, backend)
+
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={
+            "q": "",
+            "ref": "target:ui_scope/implantation/not_an_extent",
+            "sid": sid,
+            "client_id": "demo",
+        },
     )
-    from contracts.ask_orchestration import AskOrchestrationResult
+    assert resp.status_code == 200
+    assert backend.call_count == 0
+    payload = resp.get_json()
+    assert payload["meta"]["service_route"] == "sales_fast_followup_unknown"
+    after = read_target_runtime_session(sid)
+    assert after.patient_facts is None
 
-    assert isinstance(result, AskOrchestrationResult)
-    assert result.service_route == "target_fullcontext_followup_unknown"
 
+def test_unshown_ui_scope_ref_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app as app_module
 
-def test_unshown_ui_scope_ref_fail_closed(flask_ctx) -> None:
+    from tests.test_sales_fast_widget_integration import (
+        _CountingBackend,
+        _install_sales_fast_transport,
+    )
+    from tests.test_sales_one_plus_turn import answer_envelope
+
     sid = f"s-unshown-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
-    result = _pre_resolver({"q": "", "ref": UI_REF, "sid": sid})
-    from contracts.ask_orchestration import AskOrchestrationResult
+    backend = _CountingBackend(answer_envelope("ignored"))
+    _install_sales_fast_transport(monkeypatch, backend)
 
-    assert isinstance(result, AskOrchestrationResult)
-    assert result.service_route == "target_fullcontext_followup_unknown"
+    client = app_module.app.test_client()
+    resp = client.post(
+        "/ask",
+        json={"q": "", "ref": UI_REF, "sid": sid, "client_id": "demo"},
+    )
+    assert resp.status_code == 200
+    assert backend.call_count == 0
+    payload = resp.get_json()
+    assert payload["meta"]["service_route"] == "sales_fast_followup_unknown"
+    after = read_target_runtime_session(sid)
+    assert after.patient_facts is None
 
 
 def test_http_ask_ref_only_ui_scope_click(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
+
+    from tests.test_sales_fast_widget_integration import (
+        _CountingBackend,
+        _install_sales_fast_transport,
+    )
+    from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-http-ui-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
@@ -116,69 +104,81 @@ def test_http_ask_ref_only_ui_scope_click(monkeypatch: pytest.MonkeyPatch) -> No
         sid,
         TargetRuntimeFollowupItem(ref=UI_REF, label="Один зуб"),
     )
-    captured: dict[str, object] = {}
-    composer, semantic, boundary = _fake_backends()
+    backend = _CountingBackend(answer_envelope("Цена для одного зуба."))
+    _install_sales_fast_transport(monkeypatch, backend)
 
-    def target_turn(**kwargs):
-        captured["q"] = kwargs["q"]
-        from flask import request
-
-        captured["ui_scope"] = request.ctx.get("current_ui_scope_action")
-        return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
-
-    _patch_locked_runtime_to_target_path(monkeypatch, app_module, target_turn=target_turn)
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(
-        app_module,
-        "run_planner_turn",
-        lambda **k: PlannerTurnOutcome("content", None),
-    )
     client = app_module.app.test_client()
     resp = client.post(
         "/ask",
         json={"q": "", "ref": UI_REF, "sid": sid, "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert captured["q"] == "Один зуб"
-    assert captured["ui_scope"]["extent"] == "one_tooth"
+    assert backend.call_count == 1
+    payload = resp.get_json()
+    assert payload.get("answer")
+    after = read_target_runtime_session(sid)
+    assert after.patient_facts is not None
+    assert after.patient_facts.extent == "one_tooth"
+    assert after.patient_facts.ref == UI_REF
 
 
 def test_http_ask_stream_ref_only_ui_scope_click(monkeypatch: pytest.MonkeyPatch) -> None:
     import app as app_module
 
-    sid = f"s-stream-ui-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    from evals.v5.run_bot_cleanup_live import compare_ask_stream_payloads
+    from tests.test_sales_fast_widget_integration import (
+        _CountingBackend,
+        _install_sales_fast_transport,
+    )
+    from tests.test_sales_one_plus_turn import answer_envelope
+
+    envelope = answer_envelope("Цена для одного зуба.")
+
+    sid_ask = f"s-http-ui-ask-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid_ask)
     _seed_followups(
-        sid,
+        sid_ask,
         TargetRuntimeFollowupItem(ref=UI_REF, label="Один зуб"),
     )
-    captured: dict[str, object] = {}
-    composer, semantic, boundary = _fake_backends()
-
-    def target_turn(**kwargs):
-        captured["q"] = kwargs["q"]
-        from flask import request
-
-        captured["ui_scope"] = request.ctx.get("current_ui_scope_action")
-        return _fake_target_turn_factory(composer, semantic, boundary)(**kwargs)
-
-    _patch_locked_runtime_to_target_path(monkeypatch, app_module, target_turn=target_turn)
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", target_turn)
-    monkeypatch.setattr(
-        app_module,
-        "run_planner_turn",
-        lambda **k: PlannerTurnOutcome("content", None),
-    )
+    backend_ask = _CountingBackend(envelope)
+    _install_sales_fast_transport(monkeypatch, backend_ask)
     client = app_module.app.test_client()
-    resp = client.post(
-        "/ask/stream",
-        json={"q": "", "ref": UI_REF, "sid": sid, "client_id": "demo"},
+    ask_resp = client.post(
+        "/ask",
+        json={"q": "", "ref": UI_REF, "sid": sid_ask, "client_id": "demo"},
     )
-    assert resp.status_code == 200
-    text = resp.data.decode("utf-8")
+    assert ask_resp.status_code == 200
+    assert backend_ask.call_count == 1
+    ask_payload = ask_resp.get_json()
+    ask_session = read_target_runtime_session(sid_ask)
+
+    sid_stream = f"s-stream-ui-{uuid.uuid4().hex[:8]}"
+    mem_reset(sid_stream)
+    _seed_followups(
+        sid_stream,
+        TargetRuntimeFollowupItem(ref=UI_REF, label="Один зуб"),
+    )
+    backend_stream = _CountingBackend(envelope)
+    _install_sales_fast_transport(monkeypatch, backend_stream)
+    stream_resp = client.post(
+        "/ask/stream",
+        json={"q": "", "ref": UI_REF, "sid": sid_stream, "client_id": "demo"},
+    )
+    assert stream_resp.status_code == 200
+    text = stream_resp.get_data(as_text=True)
     assert "event: ui" in text
     assert "event: done" in text
-    assert captured.get("ui_scope", {}).get("extent") == "one_tooth"
+    match = re.search(r"event: ui\ndata: (.+?)\n\n", text)
+    assert match is not None
+    stream_payload = json.loads(match.group(1))
+    assert backend_stream.call_count == 1
+    stream_session = read_target_runtime_session(sid_stream)
+
+    assert compare_ask_stream_payloads(ask_payload, stream_payload) == []
+    assert ask_session.patient_facts is not None
+    assert stream_session.patient_facts is not None
+    assert ask_session.patient_facts.extent == stream_session.patient_facts.extent == "one_tooth"
+    assert ask_session.patient_facts.ref == stream_session.patient_facts.ref == UI_REF
 
 
 def test_ac1_modules_do_not_read_patient_scope() -> None:

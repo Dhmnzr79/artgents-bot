@@ -189,7 +189,6 @@ def test_ac1_modules_do_not_read_patient_scope() -> None:
         _REPO_ROOT / "core/target_ui_scope_action.py",
         _REPO_ROOT / "core/target_runtime_session.py",
         _REPO_ROOT / "core/target_runtime_turn.py",
-        _REPO_ROOT / "orchestration/pre_resolver_turn.py",
     ]
     offenders: list[str] = []
     for path in modules:

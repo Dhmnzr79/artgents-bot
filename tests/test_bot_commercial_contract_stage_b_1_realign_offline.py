@@ -116,8 +116,6 @@ def _run_turn(
     ref: str | None = None,
 ) -> tuple[dict, _Backend]:
     backend = _Backend(envelope_json)
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         lambda: backend,

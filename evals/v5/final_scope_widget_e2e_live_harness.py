@@ -82,12 +82,6 @@ S69_FORBIDDEN_APP_SYMBOLS = frozenset(
 )
 
 _LEGACY_GUARD_TARGETS = {
-    "orchestration.pre_resolver_turn": (
-        "get_chunk_by_ref",
-        "orchestrate_price_widget_ref",
-        "orchestrate_consult_symptom_ref",
-        "build_promo_overview_payload",
-    ),
     "core.md_chunks": "get_chunk_by_ref",
     "core.price_ref_routing": "orchestrate_price_widget_ref",
     "core.price_symptom_consult": "orchestrate_consult_symptom_ref",

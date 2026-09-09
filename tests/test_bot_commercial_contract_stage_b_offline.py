@@ -37,6 +37,11 @@ _LIVE_ARTIFACT = (
     _REPO
     / "evals/v5/artifacts/bot_cleanup_live_1/bot_cleanup_live_1_2026-09-04-live-01"
 )
+_LIVE_SNAPSHOT_PRC_06_T1 = _LIVE_ARTIFACT / "session_snapshots" / "PRC-06-T1.json"
+_SKIP_LIVE_SNAPSHOT_PRC_06_T1 = pytest.mark.skipif(
+    not _LIVE_SNAPSHOT_PRC_06_T1.is_file(),
+    reason="requires local LIVE snapshot PRC-06-T1 (not committed to git)",
+)
 
 
 def _offer(offer_id: str):
@@ -70,9 +75,9 @@ def _semantic(**kwargs) -> SalesOnePlusSemanticFrame:
 
 def _turn_frame(**kwargs) -> TurnFrame:
     del kwargs  # turn_frame is not used by topic resolver in Stage B unit tests
-    from tests.test_planner_attempt_contract import _frame
+    from tests.target_runtime_test_support import _turn_frame as _support_turn_frame
 
-    return _frame(topic="implantation", aspects=["price"], primary_aspect="price")
+    return _support_turn_frame(topic="implantation", aspects=["price"], primary_aspect="price")
 
 
 @pytest.fixture
@@ -129,8 +134,6 @@ def _run_turn(
     reset_session: bool = True,
 ) -> tuple[dict, _Backend]:
     backend = _Backend(envelope_json)
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         lambda: backend,
@@ -315,6 +318,7 @@ def test_price_microfacts_yaml_is_dormant_for_active_resolver(tmp_path: Path) ->
     assert tuple(item.fact_id for item in baseline) == tuple(item.fact_id for item in changed)
 
 
+@_SKIP_LIVE_SNAPSHOT_PRC_06_T1
 def test_included_turn_preserves_model_owned_prose(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
@@ -482,11 +486,11 @@ def test_payment_stages_explicit_e2e(
 
 def test_free_explanation_topic_from_pochemu() -> None:
     semantic = _semantic(service_id="all_on_4", requested_service_id="all_on_4")
-    from tests.test_planner_attempt_contract import _frame
+    from tests.target_runtime_test_support import _turn_frame as _support_turn_frame
 
     topics = resolve_requested_commercial_topics(
         semantic=semantic,
-        turn_frame=_frame(topic="implantation", aspects=["price"], primary_aspect="price"),
+        turn_frame=_support_turn_frame(topic="implantation", aspects=["price"], primary_aspect="price"),
         user_message="Сколько стоит All-on-4 и почему используются четыре импланта?",
         payment_stages_allowed=False,
     ).topics

@@ -76,10 +76,6 @@ _IMPLANTIUM_PACKAGE_SCOPE = "КТ и костная пластика по пок
 _FREE_IMPLANT_CONSULT_SNIPPET = "бесплатная консультация по имплантации"
 
 
-def _enable_sales_fast(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
-
 
 def _reset_demo_session(sid: str) -> None:
     bind_session_client("demo")
@@ -337,7 +333,6 @@ def test_streaming_buffers_until_validation_no_price_in_delta(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    _enable_sales_fast(monkeypatch)
     selection = _tomography_selection()
     envelope = answer_envelope(
         "КТ нужна для планирования.",
@@ -529,7 +524,6 @@ def test_widget_precomposer_hostile_patient_text_preserved_with_canonical_price(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    _enable_sales_fast(monkeypatch)
     hostile = "999999"
     backend = _Backend(
         answer_envelope(
@@ -567,7 +561,6 @@ def test_widget_non_price_all_on_4_implantium_has_no_auto_price(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    _enable_sales_fast(monkeypatch)
     patient = "Да, делаем All-on-4 на Implantium."
     backend = _Backend(
         answer_envelope(
@@ -611,7 +604,6 @@ def test_widget_two_turn_all_on_4_then_nobel_price(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    _enable_sales_fast(monkeypatch)
     sid = "cp-exact-1b-two-turn"
     _reset_demo_session(sid)
     first_backend = _Backend(
@@ -671,7 +663,6 @@ def test_widget_all_on_4_implantium_price_turn_full_path(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    _enable_sales_fast(monkeypatch)
     monkeypatch.setattr(
         "core.target_runtime_client_context.runtime_today",
         lambda: date(2026, 8, 10),
@@ -733,7 +724,6 @@ def test_demo_nikadent_session_isolation_same_sid(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    _enable_sales_fast(monkeypatch)
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     sid = "cp-exact-1b-client-isolation"
 

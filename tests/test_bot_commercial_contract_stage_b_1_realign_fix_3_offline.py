@@ -37,10 +37,6 @@ def _seed_followups(sid: str, *items: TargetRuntimeFollowupItem) -> None:
         _persist_unlocked(sid, st)
 
 
-def _enable_sales_fast(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
-
 
 def test_label_only_click_helper() -> None:
     sid = f"fix3-helper-{uuid.uuid4().hex[:8]}"
@@ -91,7 +87,6 @@ def test_label_q_skips_local_problem_gate(monkeypatch: pytest.MonkeyPatch) -> No
         "orchestration.sales_one_plus_ask_turn.orchestrate_sales_fast_widget_turn",
         _orchestrate_sales_fast,
     )
-    _enable_sales_fast(monkeypatch)
     sid = f"fix3-gate-label-{uuid.uuid4().hex[:8]}"
     ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
     mem_reset(sid)
@@ -143,7 +138,6 @@ def test_label_plus_extra_text_runs_local_problem_gate(
             service_route="sales_fast",
         ),
     )
-    _enable_sales_fast(monkeypatch)
     sid = f"fix3-gate-mixed-{uuid.uuid4().hex[:8]}"
     ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
     mem_reset(sid)
@@ -210,7 +204,6 @@ def test_scope_label_click_http_end_to_end(
             on_raw_delta(self.output)
             return None
 
-    _enable_sales_fast(monkeypatch)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         lambda: _Backend(

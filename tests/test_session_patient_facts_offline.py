@@ -129,51 +129,6 @@ def test_one_call_ui_scope_click_persists_session_facts(
     assert after.patient_facts.ref == UI_REF
 
 
-def test_a9_session_facts_persist_after_materialized_turn(flask_ctx, monkeypatch: pytest.MonkeyPatch) -> None:
-    import importlib
-    import config
-
-    importlib.reload(config)
-
-    sid = f"s-a9-persist-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    from core.turn_frame_from_raw import build_turn_frame_from_raw
-    from tests.target_runtime_test_support import _install_turn_frame
-
-    frame = build_turn_frame_from_raw(
-        {
-            "route": "content",
-            "aspects": ["price"],
-            "primary_aspect": "price",
-            "topic": "implantation",
-            "topic_confidence": 0.9,
-            "patient_scope": {
-                "extent": "full_arch",
-                "jaw": "unknown",
-                "stage": "unknown",
-                "modifiers": [],
-            },
-        },
-        allowed_topics=frozenset({"implantation"}),
-        allowed_service_ids=frozenset({"all_on_4"}),
-    )
-    _install_turn_frame(frame)
-    run_target_fullcontext_runtime_turn(
-        client_id="demo",
-        sid=sid,
-        user_message="Сколько стоит имплантация всей челюсти?",
-        composer_backend=RecordingComposerBackend(
-            "All-on-4 в клинике стоит от 318 000 рублей за одну челюсть."
-        ),
-        semantic_backend=RecordingSemanticBackend(),
-        boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
-    )
-    after = read_target_runtime_session(sid)
-    assert after.patient_facts is not None
-    assert after.patient_facts.extent == "full_arch"
-    assert after.patient_facts.reported_context is None
-
-
 def test_terminal_error_does_not_mutate_patient_facts(flask_ctx, monkeypatch: pytest.MonkeyPatch) -> None:
     sid = f"s-term-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)

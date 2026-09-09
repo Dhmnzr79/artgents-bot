@@ -21,7 +21,7 @@ from flask import (
 )
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
-from config import DEBUG_TOKEN, PORT, SALES_ONE_PLUS_ON
+from config import DEBUG_TOKEN, PORT
 from core import turn_timing
 from core.client_host import resolve_request_client_id
 from core.provider_call_budget import http_provider_budget_scope
@@ -53,14 +53,10 @@ from session import (
     record_last_bot_payload,
     sid_from_body,
 )
-from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn  # Stage 3B: dormant; tests monkeypatch app.*
 from orchestration.helpers import get_last_content_ui_payload_compat
 from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
-from orchestration.pre_resolver_turn import run_pre_resolver_turn  # Stage 3B: dormant; tests monkeypatch app.*
-from orchestration.planner_turn import run_planner_turn  # Stage 3B: dormant; tests monkeypatch app.*
 from orchestration.sales_one_plus_ask_turn import orchestrate_sales_one_plus_ask_turn
-from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn  # Stage 3B: dormant; tests monkeypatch app.*
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
 from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response

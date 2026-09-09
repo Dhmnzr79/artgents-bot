@@ -112,8 +112,6 @@ def _patch_demo_bundle(monkeypatch: pytest.MonkeyPatch, bundle) -> None:
 
 
 def _run_widget(monkeypatch: pytest.MonkeyPatch, flask_app, *, sid: str, message: str, backend: _Backend):
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     mem_reset(sid)
     with flask_app.test_request_context(
         "/ask",
@@ -578,8 +576,6 @@ def test_microfact_memory_followup_uses_shown_fact_context(
         "core.target_runtime_client_context.runtime_today",
         lambda: date(2026, 8, 10),
     )
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     sid = "cleanup-microfact-memory"
     mem_reset(sid)
     discount_microfact = str(

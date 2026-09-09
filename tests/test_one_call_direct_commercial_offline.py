@@ -89,8 +89,6 @@ def _run_widget_with_backend(
     on_delta=None,
     client_id: str = "demo",
 ):
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     if client_id != "demo":
         monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
         from session import bind_session_client

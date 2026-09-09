@@ -48,7 +48,6 @@ from tests.test_one_call_exact_1b_single_offline import (
     _DEMO_REF_CATALOG,
     _PACK_IDENTITY,
     _count_amount_token,
-    _enable_sales_fast,
     _fresh_empty_session,
     _governed_resolution,
     _normalize_visible_text,
@@ -451,7 +450,6 @@ class TestDemoResolver:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         sid = "cp-exact-1b-multi-session"
         _reset_demo_session(sid)
         first = _Backend(
@@ -499,7 +497,6 @@ class TestDemoResolver:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         sid = "cp-exact-1b-multi-topic"
         _reset_demo_session(sid)
         first = _Backend(
@@ -772,7 +769,6 @@ class TestWidgetPresentation:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -827,7 +823,6 @@ class TestWidgetPresentation:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         backend = _Backend(
             answer_envelope(
                 "All-on-4 — протокол полного восстановления челюсти.",
@@ -862,7 +857,6 @@ class TestWidgetPresentation:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         sid = "cp-exact-1b-multi-two-brand"
         _reset_demo_session(sid)
         first = _Backend(
@@ -935,7 +929,6 @@ class TestWidgetPresentation:
             offers.append(offer)
         bundle = _DEMO_BUNDLE.model_copy(update={"offers": tuple(offers)})
         _patch_demo_bundle(monkeypatch, bundle)
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -1111,7 +1104,6 @@ class TestJawScenarioWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -1160,7 +1152,6 @@ class TestJawScenarioWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         backend = _Backend(
             answer_envelope(
                 "All-on-6 — протокол на шести имплантах.",
@@ -1195,7 +1186,6 @@ class TestJawScenarioWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -1248,7 +1238,6 @@ class TestJawScenarioWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         backend = _Backend(
             answer_envelope(
                 "Съёмное протезирование подбирается по объёму дефекта.",
@@ -1303,7 +1292,6 @@ class TestUnsafeIntegrationWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         _patch_demo_bundle(monkeypatch, _broken_all_on_4_malformed_one())
         patient = "All-on-4 — протокол полного восстановления."
         user_message = "Сколько стоит All-on-4?"
@@ -1351,7 +1339,6 @@ class TestUnsafeIntegrationWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         _patch_demo_bundle(monkeypatch, _broken_all_on_4_one_fixed_one_from())
         patient = "All-on-4 можно обсудить на консультации."
         user_message = "Сколько стоит All-on-4?"
@@ -1397,7 +1384,6 @@ class TestUnsafeIntegrationWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         _patch_demo_bundle(monkeypatch, _broken_all_on_4_too_many())
         patient = "All-on-4 — популярный протокол."
         user_message = "Сколько стоит All-on-4?"
@@ -1442,7 +1428,6 @@ class TestUnsafeIntegrationWidget:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         _patch_demo_bundle(monkeypatch, _broken_all_on_4_two_unlabeled_offers())
         patient = "All-on-4 обсуждается индивидуально."
         user_message = "Сколько стоит All-on-4?"
@@ -1492,7 +1477,6 @@ class TestFailOpenIntegration:
     ) -> None:
         from core.target_marketing_selector import OptionalMarketingApplicationError
 
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -1549,7 +1533,6 @@ class TestFailOpenIntegration:
     ) -> None:
         from core.target_scoped_response_evidence import TargetScopedResponseEvidenceError
 
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -1608,7 +1591,6 @@ class TestFailOpenIntegration:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         monkeypatch.setattr(
             "core.target_runtime_client_context.runtime_today",
             lambda: date(2026, 8, 10),
@@ -1684,7 +1666,6 @@ class TestFailOpenIntegration:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
 
         def _raise_type_error(*_args: object, **_kwargs: object) -> object:
             raise TypeError("multi_unexpected_programming_error")
@@ -1727,7 +1708,6 @@ class TestRobustness:
         monkeypatch: pytest.MonkeyPatch,
         flask_app,
     ) -> None:
-        _enable_sales_fast(monkeypatch)
         hostile = "999999"
         backend = _Backend(
             answer_envelope(

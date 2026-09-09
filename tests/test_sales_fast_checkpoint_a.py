@@ -50,8 +50,6 @@ class _CountingBackend:
 
 
 def _install_sales_fast(monkeypatch: pytest.MonkeyPatch, backend: _CountingBackend) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         lambda: backend,

@@ -362,8 +362,6 @@ def test_sse_service_reply_emits_single_diagnostic(
 def test_orchestrate_emits_runtime_diagnostic_on_zero_call_contacts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     diagnostics: list[dict] = []
 
     def _capture(_logger, msg, **fields):
@@ -432,8 +430,6 @@ from types import SimpleNamespace
 from logging_setup import LOG_FILE, _shutdown_logging
 from session import mem_reset
 
-config.SALES_ONE_PLUS_ON = True
-app_module.SALES_ONE_PLUS_ON = True
 
 def fake_orch(*args, **kwargs):
     return SimpleNamespace(
@@ -488,8 +484,6 @@ def test_runtime_diagnostic_jsonl_excludes_request_context_pii(tmp_path) -> None
 
 
 def _fake_service_orch(monkeypatch: pytest.MonkeyPatch, *, answer: str = "Телефон") -> str:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         app_module,
         "orchestrate_sales_one_plus_ask_turn",

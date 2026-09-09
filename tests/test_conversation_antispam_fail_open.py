@@ -8,9 +8,6 @@ import pytest
 
 import app as app_module
 import config
-from contracts.ingress_route import IngressRouteResult
-from orchestration.context import AskTurnContext
-from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from orchestration.route_guards import is_obvious_noise
 from orchestration.sales_one_plus_ask_turn import _post_gate_flows
 from session import _fresh_defaults, _lock, _persist_unlocked, mem_add_user, mem_get, mem_reset
@@ -71,8 +68,6 @@ def _bypass_technical_rate_limit_for_conversation_tests(monkeypatch: pytest.Monk
 
 
 def _install_candidate_transport(monkeypatch: pytest.MonkeyPatch, backend: _CountingBackend) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         lambda: backend,
@@ -151,55 +146,6 @@ def test_legacy_session_payload_with_old_antispam_fields_does_not_redirect() -> 
         get_last_content_ui_payload=lambda *_a, **_k: None,
     )
     assert outcome is None
-
-
-def test_pre_resolver_legacy_path_ignores_old_burst_and_no_intent_state(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    sid = f"g2-pre-{uuid.uuid4().hex[:8]}"
-    now = time.time()
-    with _lock:
-        st = _fresh_defaults()
-        st["user_turn_timestamps"] = [now] * 10
-        st["anti_spam_redirect_shown"] = False
-        st["session_turn_count"] = 25
-        _persist_unlocked(sid, st)
-
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", False)
-    monkeypatch.setattr(
-        "orchestration.pre_resolver_turn.classify_ingress",
-        lambda *_a, **_k: IngressRouteResult(
-            route="normal",
-            confidence=0.9,
-            reason="offline_fake",
-            policy_key=None,
-            requested_service=None,
-            source="rule",
-            is_urgent=False,
-        ),
-    )
-    monkeypatch.setattr("orchestration.pre_resolver_turn.handle_flows", lambda *_a, **_k: None)
-
-    with app_module.app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": "Какие виды имплантации есть?", "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
-
-        request.ctx = {}
-        outcome = run_pre_resolver_turn(
-            {"q": "Какие виды имплантации есть?", "sid": sid, "client_id": "demo"},
-            resolve_client_id=lambda *_a, **_k: "demo",
-            bind_chat_ctx=lambda *_a, **_k: None,
-            resolve_ip=lambda: "127.0.0.1",
-            client_txt=lambda *_a, **_k: {},
-            service_payload=lambda **_k: {},
-            get_last_content_ui_payload=lambda *_a, **_k: None,
-        )
-
-    assert isinstance(outcome, AskTurnContext)
-    assert outcome.q == "Какие виды имплантации есть?"
 
 
 def test_candidate_legacy_session_fields_do_not_block_ask_path(

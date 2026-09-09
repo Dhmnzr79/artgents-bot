@@ -49,27 +49,6 @@ def _install_one_call_backend(monkeypatch: pytest.MonkeyPatch, backend: _Countin
     )
 
 
-def _legacy_spies(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
-    counts = {"pre_resolver": 0, "planner": 0, "target": 0}
-
-    def _pre_resolver(*_a, **_k):
-        counts["pre_resolver"] += 1
-        raise AssertionError("legacy pre_resolver must not run")
-
-    def _planner(**_k):
-        counts["planner"] += 1
-        raise AssertionError("legacy planner must not run")
-
-    def _target(**_k):
-        counts["target"] += 1
-        raise AssertionError("legacy target_fullcontext must not run")
-
-    monkeypatch.setattr(app_module, "run_pre_resolver_turn", _pre_resolver)
-    monkeypatch.setattr(app_module, "run_planner_turn", _planner)
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", _target)
-    return counts
-
-
 def _parse_sse_ui_payload(resp) -> dict:
     buffer = ""
     ui_payload: dict | None = None
@@ -97,7 +76,6 @@ def test_ask_default_without_sales_one_plus_env_uses_one_call(
 ) -> None:
     backend = _CountingBackend(answer_envelope("Стерильность по протоколу клиники."))
     _install_one_call_backend(monkeypatch, backend)
-    legacy = _legacy_spies(monkeypatch)
     monkeypatch.delenv("SALES_ONE_PLUS_ON", raising=False)
 
     resp = flask_app.test_client().post(
@@ -105,7 +83,6 @@ def test_ask_default_without_sales_one_plus_env_uses_one_call(
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-default", "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert legacy == {"pre_resolver": 0, "planner": 0, "target": 0}
     assert backend.call_count == 1
 
 
@@ -115,7 +92,6 @@ def test_ask_sales_one_plus_zero_does_not_enable_legacy(
 ) -> None:
     backend = _CountingBackend(answer_envelope("Стерильность по протоколу клиники."))
     _install_one_call_backend(monkeypatch, backend)
-    legacy = _legacy_spies(monkeypatch)
     monkeypatch.setenv("SALES_ONE_PLUS_ON", "0")
     monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", False)
 
@@ -124,7 +100,6 @@ def test_ask_sales_one_plus_zero_does_not_enable_legacy(
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-zero", "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert legacy == {"pre_resolver": 0, "planner": 0, "target": 0}
     assert backend.call_count == 1
 
 
@@ -134,7 +109,6 @@ def test_ask_stream_without_flag_uses_one_call(
 ) -> None:
     backend = _CountingBackend(answer_envelope("Стерильность по протоколу клиники."))
     _install_one_call_backend(monkeypatch, backend)
-    legacy = _legacy_spies(monkeypatch)
     monkeypatch.delenv("SALES_ONE_PLUS_ON", raising=False)
 
     resp = flask_app.test_client().post(
@@ -143,7 +117,6 @@ def test_ask_stream_without_flag_uses_one_call(
     )
     assert resp.status_code == 200
     _parse_sse_ui_payload(resp)
-    assert legacy == {"pre_resolver": 0, "planner": 0, "target": 0}
     assert backend.call_count == 1
 
 
@@ -153,8 +126,6 @@ def test_model_turn_makes_single_provider_call(
 ) -> None:
     backend = _CountingBackend(answer_envelope("Стерильность по протоколу клиники."))
     _install_one_call_backend(monkeypatch, backend)
-    _legacy_spies(monkeypatch)
-
     flask_app.test_client().post(
         "/ask",
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-single", "client_id": "demo"},
@@ -168,8 +139,6 @@ def test_deterministic_parking_route_makes_zero_provider_calls(
 ) -> None:
     backend = _CountingBackend(answer_envelope("unused"))
     _install_one_call_backend(monkeypatch, backend)
-    _legacy_spies(monkeypatch)
-
     resp = flask_app.test_client().post(
         "/ask",
         json={"q": "Есть ли парковка?", "sid": "s2-parking", "client_id": "demo"},
@@ -185,14 +154,11 @@ def test_provider_exception_does_not_invoke_legacy(
 ) -> None:
     backend = _CountingBackend(SalesOnePlusBackendFailure("provider_error"))
     _install_one_call_backend(monkeypatch, backend)
-    legacy = _legacy_spies(monkeypatch)
-
     resp = flask_app.test_client().post(
         "/ask",
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-exc", "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert legacy == {"pre_resolver": 0, "planner": 0, "target": 0}
     assert backend.call_count == 1
 
 
@@ -202,14 +168,11 @@ def test_provider_timeout_does_not_invoke_legacy(
 ) -> None:
     backend = _CountingBackend(TimeoutError("provider timeout"))
     _install_one_call_backend(monkeypatch, backend)
-    legacy = _legacy_spies(monkeypatch)
-
     resp = flask_app.test_client().post(
         "/ask",
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-timeout", "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert legacy == {"pre_resolver": 0, "planner": 0, "target": 0}
     assert backend.call_count == 1
 
 
@@ -219,14 +182,11 @@ def test_invalid_envelope_does_not_invoke_legacy(
 ) -> None:
     backend = _CountingBackend("{not-json")
     _install_one_call_backend(monkeypatch, backend)
-    legacy = _legacy_spies(monkeypatch)
-
     resp = flask_app.test_client().post(
         "/ask",
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-invalid", "client_id": "demo"},
     )
     assert resp.status_code == 200
-    assert legacy == {"pre_resolver": 0, "planner": 0, "target": 0}
     assert backend.call_count == 1
 
 
@@ -238,8 +198,6 @@ def test_ask_and_stream_share_authoritative_payload(
     ask_backend = _CountingBackend(envelope)
     stream_backend = _CountingBackend(envelope)
     _install_one_call_backend(monkeypatch, ask_backend)
-    _legacy_spies(monkeypatch)
-
     ask_resp = flask_app.test_client().post(
         "/ask",
         json={"q": "Как обеспечивается стерильность?", "sid": "s2-parity-ask", "client_id": "demo"},
@@ -280,7 +238,6 @@ def test_provider_invocation_uses_configured_model_id(
         record_sales_fast_observability(**kwargs)
 
     _install_one_call_backend(monkeypatch, backend)
-    _legacy_spies(monkeypatch)
     monkeypatch.setenv("SALES_ONE_PLUS_MODEL", "qwen3.7-plus-stage2-test")
     monkeypatch.setattr(config, "SALES_ONE_PLUS_MODEL", "qwen3.7-plus-stage2-test")
     import core.sales_fast_widget_runtime as runtime_module
@@ -309,7 +266,6 @@ def test_runtime_provenance_is_safe_and_complete(monkeypatch: pytest.MonkeyPatch
             captured.append(fields)
 
     _install_one_call_backend(monkeypatch, backend)
-    _legacy_spies(monkeypatch)
     monkeypatch.setattr(app_module, "log_json_no_context", _capture)
 
     question = "Как обеспечивается стерильность?"
@@ -339,7 +295,6 @@ def test_demo_and_nikadent_provenance_do_not_mix(
     demo_backend = _CountingBackend(answer_envelope("Ответ demo."))
     nika_backend = _CountingBackend(answer_envelope("Ответ nikadent."))
     _install_one_call_backend(monkeypatch, demo_backend)
-    _legacy_spies(monkeypatch)
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
 
     demo_hash = build_client_pack_identity("demo").client_pack_hash

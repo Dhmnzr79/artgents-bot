@@ -25,7 +25,6 @@ from tests.target_runtime_test_support import (
     _install_turn_frame,
     _seed_followups,
 )
-from tests.test_s61_correction_target_runtime import _pre_resolver
 from tests.test_target_boundary_enforced_fullcontext_response import (
     PRICE_TEXT,
     RecordingComposerBackend,
@@ -342,39 +341,6 @@ def test_ac3_8_terminal_turn_does_not_persist_a9_facts(flask_ctx) -> None:
     )
     after = read_target_runtime_session(sid)
     assert after.patient_facts is None
-
-
-def test_ac3_9_pre_resolver_and_runtime_ui_scope_parity(flask_ctx) -> None:
-    """`/ask` and `/ask/stream` share pre_resolver ingress; parity on EffectiveScope."""
-    from orchestration.context import AskTurnContext
-
-    ui_ref = build_ui_scope_ref(topic="implantation", extent="one_tooth")
-    from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
-
-    for label in ("ask", "ask_stream"):
-        sid = f"s-parity-{label}-{uuid.uuid4().hex[:8]}"
-        mem_reset(sid)
-        _seed_followups(sid, TargetRuntimeFollowupItem(ref=ui_ref, label="Один зуб"))
-        result = _pre_resolver({"q": "", "ref": ui_ref, "sid": sid})
-        assert isinstance(result, AskTurnContext)
-        frame = _native_frame(
-            {
-                "extent": "full_arch",
-                "jaw": "unknown",
-                "stage": "unknown",
-                "modifiers": [],
-            }
-        )
-        outcome = _run_materialized(
-            sid,
-            frame,
-            user_message="Один зуб",
-            composer_text="Краткий обзор цен.",
-        )
-        assert outcome.widget.kind == "materialized"
-        scope = _effective_scope_from_ctx()
-        assert scope["extent"] == "one_tooth"
-        assert scope["source"] == "ui_action"
 
 
 def test_ac3_10_price_evidence_from_pricebook_not_invented(flask_ctx) -> None:

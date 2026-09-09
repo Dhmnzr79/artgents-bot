@@ -180,8 +180,6 @@ def test_speculative_planner_not_submitted_when_one_call_locked(monkeypatch: pyt
 def test_flag_on_free_text_routes_sales_fast_without_legacy_llm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     provider_calls: list[str] = []
 
     def _fake_create(**kwargs):
@@ -189,26 +187,6 @@ def test_flag_on_free_text_routes_sales_fast_without_legacy_llm(
         return _FakeCompletion()
 
     monkeypatch.setattr(llm_module.chat_client.chat.completions, "create", _fake_create)
-    monkeypatch.setattr(
-        app_module,
-        "run_pre_resolver_turn",
-        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("pre_resolver must not run")),
-    )
-    monkeypatch.setattr(
-        ingress_gate,
-        "classify_ingress",
-        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("ingress must not run")),
-    )
-
-    def _planner(**_k):
-        raise AssertionError("planner must not run when flag ON")
-
-    monkeypatch.setattr(app_module, "run_planner_turn", _planner)
-    monkeypatch.setattr(
-        app_module,
-        "orchestrate_target_fullcontext_turn",
-        lambda **_k: (_ for _ in ()).throw(AssertionError("legacy target must not run")),
-    )
 
     backend = type(
         "B",
@@ -238,8 +216,6 @@ def test_flag_on_free_text_routes_sales_fast_without_legacy_llm(
 
 
 def test_production_orchestrate_wraps_http_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     seen: dict[str, object] = {}
 
     def _inner(data):
@@ -255,7 +231,6 @@ def test_production_orchestrate_wraps_http_budget(monkeypatch: pytest.MonkeyPatc
         )()
 
     monkeypatch.setattr(app_module, "_orchestrate_ask_turn_inner", _inner)
-    monkeypatch.setattr(app_module, "run_pre_resolver_turn", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError()))
 
     with app_module.app.test_request_context("/ask", method="POST", json={"q": "x"}):
         app_module.request.ctx = app_module.make_request_context()

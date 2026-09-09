@@ -408,8 +408,6 @@ def _install_sales_fast_transport(
     *,
     factory: object | None = None,
 ) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         factory or (lambda: backend),
@@ -472,24 +470,6 @@ def _orchestrate_ask(
     _install_sales_fast_transport(monkeypatch, backend, factory=factory)
     bind_session_client("demo")
     mem_reset(sid)
-    planner_called = {"value": False}
-    target_called = {"value": False}
-    pre_resolver_called = {"value": False}
-
-    def _planner(**_kwargs):
-        planner_called["value"] = True
-
-    def _target(**_kwargs):
-        target_called["value"] = True
-        raise AssertionError("target_fullcontext must not run when sales-fast flag is ON")
-
-    def _pre_resolver(*_a, **_k):
-        pre_resolver_called["value"] = True
-        raise AssertionError("pre_resolver must not run when sales-fast flag is ON")
-
-    monkeypatch.setattr(app_module, "run_pre_resolver_turn", _pre_resolver)
-    monkeypatch.setattr(app_module, "run_planner_turn", _planner)
-    monkeypatch.setattr(app_module, "orchestrate_target_fullcontext_turn", _target)
     with app_module.app.test_request_context(
         "/ask",
         method="POST",
@@ -499,9 +479,6 @@ def _orchestrate_ask(
 
         request.ctx = {"turn_t0_monotonic": 0.0}
         orch = app_module._orchestrate_ask_turn({"q": q, "sid": sid, "client_id": "demo"})
-        assert planner_called["value"] is False
-        assert target_called["value"] is False
-        assert pre_resolver_called["value"] is False
         assert orch.kind == "service_reply"
         return dict(orch.service_payload or {})
 
@@ -517,8 +494,6 @@ def test_widget_path_model_admin_uses_one_provider_call(
         factory_invoked["value"] = True
         return backend
 
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         _factory,
@@ -555,8 +530,6 @@ def test_widget_path_general_medical_faq_uses_one_provider_call(
         factory_invoked["value"] = True
         return backend
 
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         _factory,
@@ -1367,8 +1340,6 @@ def test_http_ask_internal_error_uses_resolved_client_not_demo(
 
     demo_phone = canonical_contact_phone("demo")
     nika_phone = canonical_contact_phone("nikadent")
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     monkeypatch.setattr(
         app_module,
@@ -1415,8 +1386,6 @@ def test_http_ask_stream_worker_error_uses_explicit_client_id(
 
     demo_phone = canonical_contact_phone("demo")
     nika_phone = canonical_contact_phone("nikadent")
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
 
     def _boom(*_a, **_k):
@@ -1578,8 +1547,6 @@ def test_http_ask_error_with_corrupt_contact_source_returns_neutral_answer(
         "core.target_contact_authority.load_clinic_contact_facts_from_policies_path",
         _yaml_fail,
     )
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     monkeypatch.setattr(
         app_module,
@@ -1613,8 +1580,6 @@ def test_http_ask_stream_corrupt_contacts_single_ui_and_done(
         "core.target_contact_authority.load_clinic_contact_facts_from_policies_path",
         _yaml_fail,
     )
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", True)
     monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     monkeypatch.setattr(
         app_module,

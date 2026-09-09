@@ -33,9 +33,7 @@ def test_chat_completions_create_reserves_before_transport() -> None:
 
 def test_planner_speculation_disabled_when_sales_one_plus_on() -> None:
     planner_text = Path("core/planner_compute_executor.py").read_text(encoding="utf-8")
-    pre_text = Path("orchestration/pre_resolver_turn.py").read_text(encoding="utf-8")
     assert "SALES_ONE_PLUS_ON" in planner_text
-    assert "SALES_ONE_PLUS_ON" in pre_text
 
 
 def test_normative_answer_admin_boundary_is_documented() -> None:

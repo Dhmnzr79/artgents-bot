@@ -164,8 +164,8 @@ def test_ingress_llm_blocked_under_one_call_locked(monkeypatch: pytest.MonkeyPat
     assert result.source == "fallback"
 
 
-def test_speculative_planner_not_submitted_when_flag_on(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", True)
+def test_speculative_planner_not_submitted_when_one_call_locked(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", False)
     from core.planner_compute_executor import try_submit_planner_speculation
 
     handle = try_submit_planner_speculation(
@@ -179,8 +179,7 @@ def test_speculative_planner_not_submitted_when_flag_on(monkeypatch: pytest.Monk
 
 
 def test_flag_off_preserves_planner_target_sequence(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", False)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", False)
+    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", True)
     pre = SimpleNamespace(
         q="ordinary",
         sid="s-off",
@@ -466,7 +465,7 @@ def test_live_backend_uses_budget_not_local_retry(monkeypatch: pytest.MonkeyPatc
         with app_module.app.test_request_context("/ask", method="POST", json={"q": "x"}):
             app_module.request.ctx = {}
             record_sales_fast_observability(
-                architecture="new",
+                architecture="fullcontext_one_call",
                 route="model",
                 provider_calls=999,
                 model=None,

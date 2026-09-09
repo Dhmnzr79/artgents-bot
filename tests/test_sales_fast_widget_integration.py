@@ -98,8 +98,7 @@ def _case(case_id: str) -> Stage2Case:
 
 
 def test_flag_off_preserves_planner_target_sequence(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", False)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", False)
+    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", True)
     pre = SimpleNamespace(
         q="ordinary",
         sid="s-off",

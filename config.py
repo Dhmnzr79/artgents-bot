@@ -73,13 +73,24 @@ ASPECT_PLANNER_LLM_MODEL = (
     (os.getenv("ASPECT_PLANNER_LLM_MODEL") or "").strip() or QWEN_FLASH_MODEL
 )
 
-# --- Sales-fast one-call widget path (Stage 8; default OFF — old FullContext chain preserved) ---
+# --- Sales-fast one-call widget path (Stage 2: default runtime invariant) ---
+# SALES_ONE_PLUS_ON is deprecated for architecture selection; kept for eval/LIVE harness only.
 SALES_ONE_PLUS_ON = os.getenv("SALES_ONE_PLUS_ON", "0").lower() in (
     "1",
     "true",
     "yes",
 )
-# Pinned provider snapshot for the sales-fast path (not an alias).
+# Explicit manual legacy emergency escape hatch (default OFF). Never auto-enabled.
+LEGACY_EMERGENCY_RUNTIME_ON = os.getenv("LEGACY_EMERGENCY_RUNTIME_ON", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+
+def is_one_call_runtime_locked() -> bool:
+    """True when normal HTTP runtime must use FullContext One Call (default)."""
+    return not LEGACY_EMERGENCY_RUNTIME_ON
 # Active sales-fast / One Call provider snapshot (override via env).
 SALES_ONE_PLUS_MODEL = (
     (os.getenv("SALES_ONE_PLUS_MODEL") or "").strip() or "qwen3.7-plus-2026-05-26"

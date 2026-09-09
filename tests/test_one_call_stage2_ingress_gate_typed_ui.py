@@ -25,7 +25,45 @@ from orchestration.sales_one_plus_ask_turn import GOVERNED_TYPED_UI_GATE
 from session import mem_reset
 from tests.test_s61_correction_target_runtime import _seed_followups
 from tests.test_sales_fast_widget_integration import _CountingBackend, _install_sales_fast_transport
-from tests.test_sales_one_plus_turn import answer_envelope
+from tests.test_sales_one_plus_turn import admin_envelope, answer_envelope
+
+
+_ADMIN_SYMPTOM_QUESTION = (
+    "После операции появилось воспаление, подскажите порядок действий"
+)
+_FORBIDDEN_ADMIN_PROSE_MARKERS = (
+    "₽",
+    "скидк",
+    "акци",
+    "принимайте антибиотик",
+    "полоскайте",
+    "@admin",
+    "ignored",
+)
+
+
+def _assert_semantic_admin_one_call(
+    *,
+    resp,
+    backend: _CountingBackend,
+    spies: dict[str, MagicMock],
+) -> dict:
+    assert resp.status_code == 200
+    spies["ingress"].assert_not_called()
+    spies["pre_resolver"].assert_not_called()
+    spies["planner"].assert_not_called()
+    spies["target"].assert_not_called()
+    assert backend.call_count == 1
+    payload = resp.get_json()
+    assert payload["meta"]["service_route"] == "sales_fast_admin"
+    answer = str(payload.get("answer") or "").lower()
+    assert "администратор" in answer
+    for marker in _FORBIDDEN_ADMIN_PROSE_MARKERS:
+        assert marker not in answer
+    assert payload.get("offer") is None
+    assert payload.get("cta") is None
+    assert payload.get("video") is None
+    return payload
 
 
 class _FakeCompletion:
@@ -129,14 +167,14 @@ def test_on_http_gate_before_corpus_resolver_and_factory(
     assert backend.call_count == 1
 
 
-def test_on_http_ingress_non_normal_cannot_short_circuit_before_gate(
+def test_on_http_symptom_admin_uses_one_call_without_legacy_ingress(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Legacy ingress manual_contact must not run on flag ON even if invoked directly."""
+    """Semantic ADMIN is decided by Composer in the single One Call provider turn."""
 
     _enable_flag_on(monkeypatch)
     spies = _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ADMIN\nignored")
+    backend = _CountingBackend(admin_envelope())
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-symptom-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
@@ -145,31 +183,28 @@ def test_on_http_ingress_non_normal_cannot_short_circuit_before_gate(
     resp = client.post(
         "/ask",
         json={
-            "q": "После операции появилось воспаление, подскажите порядок действий",
+            "q": _ADMIN_SYMPTOM_QUESTION,
             "sid": sid,
             "client_id": "demo",
         },
     )
-    assert resp.status_code == 200
-    spies["ingress"].assert_not_called()
-    assert backend.call_count == 0
-    payload = resp.get_json()
-    assert payload["meta"]["service_route"] == "sales_fast_admin"
+    _assert_semantic_admin_one_call(resp=resp, backend=backend, spies=spies)
 
 
 @pytest.mark.parametrize("case_id", ("a02",))
-def test_on_http_admin_matrix_zero_transport(
+def test_on_http_admin_matrix_one_call_typed_admin(
     monkeypatch: pytest.MonkeyPatch,
     case_id: str,
 ) -> None:
-    from tests.one_call_stage2_fixture import case_by_id, load_stage2_cases
+    from tests.one_call_stage2_fixture import load_stage2_cases
 
     fixture = Path(__file__).resolve().parent / "fixtures" / "one_call_stage2_cases.json"
     cases = load_stage2_cases(fixture)
     case = next(c for c in cases if c.case_id == case_id)
+    assert case.expected_decision == "admin"
     _enable_flag_on(monkeypatch)
     spies = _spy_legacy_wiring(monkeypatch)
-    backend = _CountingBackend("@ADMIN\nignored")
+    backend = _CountingBackend(admin_envelope())
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"admin-{case_id}"
     mem_reset(sid)
@@ -179,10 +214,7 @@ def test_on_http_admin_matrix_zero_transport(
         "/ask",
         json={"q": case.user_message, "sid": sid, "client_id": "demo"},
     )
-    assert resp.status_code == 200
-    spies["ingress"].assert_not_called()
-    spies["pre_resolver"].assert_not_called()
-    assert backend.call_count == 0
+    _assert_semantic_admin_one_call(resp=resp, backend=backend, spies=spies)
 
 
 @pytest.mark.parametrize("case_id", ("a01", "a03"))
@@ -349,6 +381,17 @@ def test_typed_ui_passes_governed_gate_result_without_re_gate(
             enqueue_resolver_trace=lambda **_k: None,
         )
 
+        orchestrate_sales_one_plus_ask_turn(
+            {"q": "Вся челюсть", "ref": ref, "sid": sid, "client_id": "demo"},
+            resolve_client_id=lambda *_a, **_k: "demo",
+            bind_chat_ctx=lambda *_a, **_k: None,
+            resolve_ip=lambda: "127.0.0.1",
+            client_txt=lambda *_a, **_k: {},
+            service_payload=lambda answer, _sid, _cid, **_: {"answer": answer, "meta": {}},
+            get_last_content_ui_payload=lambda *_a, **_k: None,
+            enqueue_resolver_trace=lambda **_k: None,
+        )
+
     assert gate_calls == []
     result = captured.get("local_gate_result")
     assert isinstance(result, LocalProblemGateResult)
@@ -379,8 +422,7 @@ def test_invalid_typed_ref_fail_safe_without_legacy(monkeypatch: pytest.MonkeyPa
 def test_off_path_preserves_legacy_order_without_boundary_speculation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(config, "SALES_ONE_PLUS_ON", False)
-    monkeypatch.setattr(app_module, "SALES_ONE_PLUS_ON", False)
+    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", True)
     pre = SimpleNamespace(
         q="ordinary",
         sid="s-off",

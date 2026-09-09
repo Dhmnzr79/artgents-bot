@@ -21,7 +21,7 @@ from flask import (
 )
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
-from config import DEBUG_TOKEN, PORT, SALES_ONE_PLUS_ON
+from config import DEBUG_TOKEN, PORT, SALES_ONE_PLUS_ON, is_one_call_runtime_locked
 from core import turn_timing
 from core.client_host import resolve_request_client_id
 from core.provider_call_budget import http_provider_budget_scope
@@ -495,7 +495,7 @@ def _orchestrate_ask_turn(data: dict):
         pass
     with http_provider_budget_scope(
         request_id=request_id,
-        sales_one_plus_on=bool(SALES_ONE_PLUS_ON),
+        sales_one_plus_on=is_one_call_runtime_locked(),
     ) as budget:
         try:
             return _orchestrate_ask_turn_inner(data)
@@ -504,7 +504,7 @@ def _orchestrate_ask_turn(data: dict):
 
 
 def _orchestrate_ask_turn_inner(data: dict):
-    if SALES_ONE_PLUS_ON:
+    if is_one_call_runtime_locked():
         return orchestrate_sales_one_plus_ask_turn(
             data,
             resolve_client_id=resolve_request_client_id,

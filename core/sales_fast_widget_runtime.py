@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from config import SALES_ONE_PLUS_MODEL
+import config
 from contracts.exact_sales_resolution import ExactSalesResolution
 from contracts.local_problem_gate import LocalProblemGateResult
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
@@ -28,6 +28,7 @@ from core.pending_price_clarify import (
 )
 from core.one_call_active_service_catalog import ActiveServiceCatalogSnapshot
 from core.one_call_exact_commercial_catalog import ExactCommercialCatalogSnapshot
+from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.one_call_envelope_protocol import OneCallEnvelopeProtocolError
 from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
 from core.sales_fast_observability import collect_sales_fast_timings_ms, record_sales_fast_observability
@@ -578,6 +579,26 @@ def _rebuild_authoritative_context(
     return turn_frame, bound, effective_scope, commerce_resolution, strategy_context, semantic
 
 
+ONE_CALL_RUNTIME_ARCHITECTURE = "fullcontext_one_call"
+
+
+def _runtime_provenance_fields(
+    *,
+    client_id: str,
+    pack_identity: object | None = None,
+) -> dict[str, object]:
+    fields: dict[str, object] = {
+        "architecture": ONE_CALL_RUNTIME_ARCHITECTURE,
+        "client_id": client_id,
+        "prompt_contract": ONE_CALL_PROMPT_CONTRACT_VERSION,
+    }
+    if pack_identity is not None:
+        pack_hash = getattr(pack_identity, "client_pack_hash", None)
+        if pack_hash:
+            fields["client_pack_hash"] = pack_hash
+    return fields
+
+
 def run_sales_fast_widget_turn(
     *,
     client_id: str,
@@ -610,11 +631,11 @@ def run_sales_fast_widget_turn(
         if early is not None:
             turn_timing.stage_end("sales_fast", status="completed", reason=local_gate.reason_code)
             record_sales_fast_observability(
-                architecture="new",
                 route="local",
                 provider_calls=0,
                 model=None,
                 timings=collect_sales_fast_timings_ms(),
+                **_runtime_provenance_fields(client_id=client_id),
             )
             return early
     try:
@@ -622,11 +643,11 @@ def run_sales_fast_widget_turn(
     except Exception as exc:
         turn_timing.stage_end("sales_fast", status="exception", reason=type(exc).__name__)
         record_sales_fast_observability(
-            architecture="new",
             route="error",
             provider_calls=0,
             model=None,
             failure_kind="bootstrap_failed",
+            **_runtime_provenance_fields(client_id=client_id),
         )
         return SalesFastWidgetOutcome(
             widget=materialize_target_error_payload(
@@ -650,11 +671,11 @@ def run_sales_fast_widget_turn(
         turn_timing.stage_end("sales_fast_resolver", status="exception", reason=exc.code)
         turn_timing.stage_end("sales_fast", status="exception", reason=exc.code)
         record_sales_fast_observability(
-            architecture="new",
             route="error",
             provider_calls=0,
             model=None,
             failure_kind=exc.code,
+            **_runtime_provenance_fields(client_id=client_id),
         )
         return _technical_error_outcome(
             client_id=client_id,
@@ -697,10 +718,13 @@ def run_sales_fast_widget_turn(
         turn_timing.stage_end("sales_fast_resolver", status="completed", reason="terminal_dispatch")
         turn_timing.stage_end("sales_fast", status="completed", reason="terminal_dispatch")
         record_sales_fast_observability(
-            architecture="new",
             route="terminal",
             provider_calls=0,
             model=None,
+            **_runtime_provenance_fields(
+                client_id=client_id,
+                pack_identity=context.pack_identity,
+            ),
         )
         return pre_flash_terminal
     turn_timing.stage_end("sales_fast_resolver", status="completed")
@@ -792,13 +816,16 @@ def run_sales_fast_widget_turn(
         )
         turn_timing.stage_end("sales_fast", status="exception", reason=exc.reason)
         record_sales_fast_observability(
-            architecture="new",
             route="error",
             provider_calls=provider_calls,
-            model=SALES_ONE_PLUS_MODEL if provider_calls else None,
+            model=config.SALES_ONE_PLUS_MODEL if provider_calls else None,
             failure_kind=exc.reason,
             timings=collect_sales_fast_timings_ms(),
             backend_invocations=backend_invocations,
+            **_runtime_provenance_fields(
+                client_id=client_id,
+                pack_identity=context.pack_identity,
+            ),
         )
         return _technical_error_outcome(
             client_id=client_id,
@@ -818,13 +845,16 @@ def run_sales_fast_widget_turn(
         )
         turn_timing.stage_end("sales_fast", status="exception", reason=exc.code)
         record_sales_fast_observability(
-            architecture="new",
             route="error",
             provider_calls=provider_calls,
-            model=SALES_ONE_PLUS_MODEL if provider_calls else None,
+            model=config.SALES_ONE_PLUS_MODEL if provider_calls else None,
             failure_kind=exc.code,
             timings=collect_sales_fast_timings_ms(),
             backend_invocations=backend_invocations,
+            **_runtime_provenance_fields(
+                client_id=client_id,
+                pack_identity=context.pack_identity,
+            ),
         )
         return _technical_error_outcome(
             client_id=client_id,
@@ -864,14 +894,17 @@ def run_sales_fast_widget_turn(
     )
     turn_timing.stage_end("sales_fast", status="completed")
     record_sales_fast_observability(
-        architecture="new",
         route=outcome.model_route,
         provider_calls=provider_calls,
-        model=SALES_ONE_PLUS_MODEL if provider_calls else None,
+        model=config.SALES_ONE_PLUS_MODEL if backend_invocations else None,
         failure_kind=outcome.failure_kind,
         timings=collect_sales_fast_timings_ms(),
         backend_invocations=backend_invocations,
         cache_observability=cache_obs,
+        **_runtime_provenance_fields(
+            client_id=client_id,
+            pack_identity=context.pack_identity,
+        ),
     )
     return outcome
 

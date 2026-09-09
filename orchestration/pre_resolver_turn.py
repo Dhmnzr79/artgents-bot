@@ -7,7 +7,7 @@ from flask import request
 
 from config import (
     INPUT_MAX_CHARS,
-    SALES_ONE_PLUS_ON,
+    is_one_call_runtime_locked,
 )
 from contracts.ask_orchestration import AskOrchestrationResult
 from core import turn_timing
@@ -133,7 +133,7 @@ def run_pre_resolver_turn(
     if q and not ingress_skip:
 
         def _fork_planner_speculation() -> None:
-            if SALES_ONE_PLUS_ON:
+            if is_one_call_runtime_locked():
                 return
             # PERF-4 (Variant C): classify_ingress calls this exactly once,
             # immediately before its own real LLM call -- i.e. only after its own

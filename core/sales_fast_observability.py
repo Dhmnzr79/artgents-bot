@@ -41,16 +41,21 @@ def record_sales_fast_observability(
     timings: dict[str, int] | None = None,
     backend_invocations: int | None = None,
     cache_observability: OneCallCacheObservability | None = None,
+    client_id: str | None = None,
+    prompt_contract: int | None = None,
+    client_pack_hash: str | None = None,
 ) -> None:
+    backend_count = int(backend_invocations or 0)
+    reported_calls = int(provider_calls)
     budget = current_provider_call_budget()
-    if budget is not None:
-        provider_calls = int(budget.call_count)
+    if budget is not None and budget.call_count > 0:
+        reported_calls = int(budget.call_count)
     else:
-        provider_calls = 0
+        reported_calls = max(reported_calls, backend_count)
     payload: dict[str, Any] = {
         "architecture": architecture,
         "route": route,
-        "provider_calls": int(provider_calls),
+        "provider_calls": reported_calls,
         "model": model,
         "failure_kind": failure_kind,
     }
@@ -60,4 +65,10 @@ def record_sales_fast_observability(
         payload["timings_ms"] = dict(timings)
     if cache_observability is not None:
         payload.update(cache_observability.as_dict())
+    if client_id:
+        payload["client_id"] = client_id
+    if prompt_contract is not None:
+        payload["prompt_contract"] = int(prompt_contract)
+    if client_pack_hash:
+        payload["client_pack_hash"] = client_pack_hash
     turn_timing.set_flag("sales_fast_observability", payload)

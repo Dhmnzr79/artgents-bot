@@ -41,6 +41,8 @@ _SALES_FAST_OBS_SCALAR_KEYS = frozenset(
         "provider_cache_hit",
         "client_pack_hash",
         "prompt_contract_version",
+        "prompt_contract",
+        "client_id",
         "requested_model",
         "observed_model",
         "provider_model_verified",
@@ -127,6 +129,10 @@ def extract_safe_sales_fast_observability(flag_value: object) -> dict[str, Any]:
             out[key] = bool(value)
         elif key in {"local_prefix_cache_hit", "provider_cache_hit", "provider_model_verified"}:
             out[key] = bool(value)
+        elif key == "prompt_contract":
+            parsed = _safe_int(value)
+            if parsed is not None:
+                out[key] = parsed
         elif isinstance(value, str):
             out[key] = value
     timings = flag_value.get("timings_ms")

@@ -40,9 +40,6 @@ class _CountingBackend:
 
 
 def _install_one_call_backend(monkeypatch: pytest.MonkeyPatch, backend: _CountingBackend) -> None:
-    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", False)
-    monkeypatch.delenv("SALES_ONE_PLUS_ON", raising=False)
-
     def _factory() -> _CountingBackend:
         return backend
 
@@ -382,7 +379,7 @@ def test_demo_and_nikadent_provenance_do_not_mix(
     assert demo_obs.get("model") == nika_obs.get("model") == config.SALES_ONE_PLUS_MODEL
 
 
-def test_one_call_locked_budget_without_legacy_emergency_flag() -> None:
+def test_one_call_locked_budget_is_default_http_policy() -> None:
     with http_provider_budget_scope(request_id="stage2-default", sales_one_plus_on=True):
         budget = current_provider_call_budget()
         assert budget is not None

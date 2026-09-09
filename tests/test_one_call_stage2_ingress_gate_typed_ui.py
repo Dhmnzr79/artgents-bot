@@ -419,46 +419,6 @@ def test_invalid_typed_ref_fail_safe_without_legacy(monkeypatch: pytest.MonkeyPa
     assert resp.get_json()["meta"]["service_route"] == "sales_fast_followup_unknown"
 
 
-def test_off_path_preserves_legacy_order_without_boundary_speculation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", True)
-    pre = SimpleNamespace(
-        q="ordinary",
-        sid="s-off",
-        client_id="demo",
-        st={},
-        data={},
-        planner_speculation=None,
-    )
-    order: list[str] = []
-    monkeypatch.setattr(app_module, "run_pre_resolver_turn", lambda *_a, **_k: pre)
-    monkeypatch.setattr(app_module, "try_run_typed_ui_planner_turn", lambda **_k: None)
-    monkeypatch.setattr(app_module, "run_planner_turn", lambda **_k: order.append("planner"))
-    monkeypatch.setattr(
-        app_module,
-        "orchestrate_target_fullcontext_turn",
-        lambda **_k: order.append("target") or SimpleNamespace(
-            kind="service_reply", q=pre.q, sid=pre.sid, client_id=pre.client_id
-        ),
-    )
-    monkeypatch.setattr(
-        "orchestration.sales_one_plus_ask_turn.orchestrate_sales_one_plus_ask_turn",
-        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("sales_one_plus must not run when flag OFF")),
-    )
-
-    with app_module.app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": pre.q, "sid": pre.sid, "client_id": pre.client_id},
-    ):
-        app_module.request.ctx = app_module.make_request_context()
-        app_module._orchestrate_ask_turn(
-            {"q": pre.q, "sid": pre.sid, "client_id": pre.client_id}
-        )
-    assert order == ["planner", "target"]
-
-
 def test_parallel_requests_independent_stage1_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         llm_module.chat_client.chat.completions,

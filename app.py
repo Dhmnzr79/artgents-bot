@@ -21,7 +21,7 @@ from flask import (
 )
 from pg_sink import enqueue_v5_turn_trace, init_pg_sink
 
-from config import DEBUG_TOKEN, PORT, SALES_ONE_PLUS_ON, is_one_call_runtime_locked
+from config import DEBUG_TOKEN, PORT, SALES_ONE_PLUS_ON
 from core import turn_timing
 from core.client_host import resolve_request_client_id
 from core.provider_call_budget import http_provider_budget_scope
@@ -53,14 +53,14 @@ from session import (
     record_last_bot_payload,
     sid_from_body,
 )
-from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn
+from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn  # Stage 3B: dormant; tests monkeypatch app.*
 from orchestration.helpers import get_last_content_ui_payload_compat
 from orchestration.lead_flow import build_service_payload
 from orchestration.finalize_turn import finalize_ask
-from orchestration.pre_resolver_turn import run_pre_resolver_turn
-from orchestration.planner_turn import run_planner_turn
+from orchestration.pre_resolver_turn import run_pre_resolver_turn  # Stage 3B: dormant; tests monkeypatch app.*
+from orchestration.planner_turn import run_planner_turn  # Stage 3B: dormant; tests monkeypatch app.*
 from orchestration.sales_one_plus_ask_turn import orchestrate_sales_one_plus_ask_turn
-from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn
+from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn  # Stage 3B: dormant; tests monkeypatch app.*
 from orchestration.route_guards import resolve_client_ip
 from policy import apply_ui_source_policy
 from ux_builder import internal_error_response, normalize_policy_payload, reset_session_response
@@ -495,7 +495,7 @@ def _orchestrate_ask_turn(data: dict):
         pass
     with http_provider_budget_scope(
         request_id=request_id,
-        sales_one_plus_on=is_one_call_runtime_locked(),
+        sales_one_plus_on=True,
     ) as budget:
         try:
             return _orchestrate_ask_turn_inner(data)
@@ -504,19 +504,8 @@ def _orchestrate_ask_turn(data: dict):
 
 
 def _orchestrate_ask_turn_inner(data: dict):
-    if is_one_call_runtime_locked():
-        return orchestrate_sales_one_plus_ask_turn(
-            data,
-            resolve_client_id=resolve_request_client_id,
-            bind_chat_ctx=_bind_chat_ctx,
-            resolve_ip=_resolve_request_ip,
-            client_txt=_client_txt,
-            service_payload=build_service_payload,
-            get_last_content_ui_payload=get_last_content_ui_payload_compat,
-            enqueue_resolver_trace=_enqueue_v5_resolver_trace,
-        )
-
-    pre = run_pre_resolver_turn(
+    # Stage 3A: unconditional One Call HTTP routing; legacy branch removed (Stage 3B: delete dormant modules).
+    return orchestrate_sales_one_plus_ask_turn(
         data,
         resolve_client_id=resolve_request_client_id,
         bind_chat_ctx=_bind_chat_ctx,
@@ -524,37 +513,7 @@ def _orchestrate_ask_turn_inner(data: dict):
         client_txt=_client_txt,
         service_payload=build_service_payload,
         get_last_content_ui_payload=get_last_content_ui_payload_compat,
-    )
-    if isinstance(pre, AskOrchestrationResult):
-        return pre
-
-    typed_outcome = try_run_typed_ui_planner_turn(
-        sid=pre.sid,
-        client_id=pre.client_id,
         enqueue_resolver_trace=_enqueue_v5_resolver_trace,
-    )
-    if typed_outcome is None:
-        run_planner_turn(
-            q=pre.q,
-            sid=pre.sid,
-            client_id=pre.client_id,
-            st=pre.st,
-            enqueue_resolver_trace=_enqueue_v5_resolver_trace,
-            speculative_handle=pre.planner_speculation,
-        )
-    else:
-        # Typed UI clicks bypass free-text Planner entirely (PERF-2 precedent) -- if a
-        # speculative Planner compute was somehow started anyway, it must never be
-        # published. In practice this is always a no-op here: a ref click forces
-        # ingress_skip=True in pre_resolver_turn.py, so the speculative fork never
-        # triggers in the first place for a typed-UI turn.
-        discard_planner_speculation(pre.planner_speculation)
-
-    return orchestrate_target_fullcontext_turn(
-        q=pre.q,
-        sid=pre.sid,
-        client_id=pre.client_id,
-        data=pre.data,
     )
 
 

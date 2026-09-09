@@ -165,7 +165,6 @@ def test_ingress_llm_blocked_under_one_call_locked(monkeypatch: pytest.MonkeyPat
 
 
 def test_speculative_planner_not_submitted_when_one_call_locked(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", False)
     from core.planner_compute_executor import try_submit_planner_speculation
 
     handle = try_submit_planner_speculation(
@@ -176,47 +175,6 @@ def test_speculative_planner_not_submitted_when_one_call_locked(monkeypatch: pyt
         request_id="r1",
     )
     assert handle is None
-
-
-def test_flag_off_preserves_planner_target_sequence(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(config, "LEGACY_EMERGENCY_RUNTIME_ON", True)
-    pre = SimpleNamespace(
-        q="ordinary",
-        sid="s-off",
-        client_id="demo",
-        st={},
-        data={},
-        planner_speculation=None,
-    )
-    order: list[str] = []
-
-    monkeypatch.setattr(app_module, "run_pre_resolver_turn", lambda *_a, **_k: pre)
-    monkeypatch.setattr(app_module, "try_run_typed_ui_planner_turn", lambda **_k: None)
-    monkeypatch.setattr(app_module, "run_planner_turn", lambda **_k: order.append("planner"))
-    monkeypatch.setattr(
-        app_module,
-        "orchestrate_target_fullcontext_turn",
-        lambda **kwargs: order.append("target") or type(
-            "AskOrchestrationResult",
-            (),
-            {"kind": "service_reply", "q": pre.q, "sid": pre.sid, "client_id": pre.client_id},
-        )(),
-    )
-    monkeypatch.setattr(
-        "orchestration.sales_one_plus_ask_turn.orchestrate_sales_one_plus_ask_turn",
-        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("sales_one_plus must not run when flag OFF")),
-    )
-
-    with app_module.app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": pre.q, "sid": pre.sid, "client_id": pre.client_id},
-    ):
-        app_module.request.ctx = app_module.make_request_context()
-        app_module._orchestrate_ask_turn(
-            {"q": pre.q, "sid": pre.sid, "client_id": pre.client_id}
-        )
-    assert order == ["planner", "target"]
 
 
 def test_flag_on_free_text_routes_sales_fast_without_legacy_llm(

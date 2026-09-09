@@ -80,17 +80,13 @@ SALES_ONE_PLUS_ON = os.getenv("SALES_ONE_PLUS_ON", "0").lower() in (
     "true",
     "yes",
 )
-# Explicit manual legacy emergency escape hatch (default OFF). Never auto-enabled.
-LEGACY_EMERGENCY_RUNTIME_ON = os.getenv("LEGACY_EMERGENCY_RUNTIME_ON", "0").lower() in (
-    "1",
-    "true",
-    "yes",
-)
+# Stage 3A: dormant compatibility constant; env no longer selects HTTP runtime (Stage 3B: remove).
+LEGACY_EMERGENCY_RUNTIME_ON = False
 
 
 def is_one_call_runtime_locked() -> bool:
-    """True when normal HTTP runtime must use FullContext One Call (default)."""
-    return not LEGACY_EMERGENCY_RUNTIME_ON
+    """HTTP runtime is permanently One Call (Stage 3A). Stage 3B: remove after legacy deletion."""
+    return True
 # Active sales-fast / One Call provider snapshot (override via env).
 SALES_ONE_PLUS_MODEL = (
     (os.getenv("SALES_ONE_PLUS_MODEL") or "").strip() or "qwen3.7-plus-2026-05-26"

@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 
-from config import LEGACY_EMERGENCY_RUNTIME_ON, SALES_ONE_PLUS_MODEL, is_one_call_runtime_locked
+from config import SALES_ONE_PLUS_MODEL
 from core.client_runtime import client_md_dir, list_buildable_client_ids
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.target_client_data import load_target_client_data
@@ -59,8 +59,7 @@ def run_startup_check(logger: logging.Logger) -> None:
     log_json(
         logger,
         "runtime_provenance_startup",
-        architecture="fullcontext_one_call" if is_one_call_runtime_locked() else "legacy_emergency",
+        architecture="fullcontext_one_call",
         model=SALES_ONE_PLUS_MODEL,
         prompt_contract=ONE_CALL_PROMPT_CONTRACT_VERSION,
-        legacy_emergency_runtime_on=bool(LEGACY_EMERGENCY_RUNTIME_ON),
     )

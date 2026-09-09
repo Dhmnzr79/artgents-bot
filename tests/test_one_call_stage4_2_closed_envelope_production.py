@@ -190,7 +190,17 @@ def test_missing_and_extra_keys_rejected(mutator, code: str) -> None:
     ),
 )
 def test_invalid_enums_rejected(field: str, value: object, code: str) -> None:
-    payload = production_envelope_template(**{field: value})
+    overrides: dict[str, object] = {field: value}
+    if field == "clarify_axis":
+        overrides.update(
+            {
+                "route": "CLARIFY",
+                "commercial_intent": "none",
+                "promotion_scope": "none",
+                "patient_text": "Уточните, пожалуйста.",
+            }
+        )
+    payload = production_envelope_template(**overrides)
     with pytest.raises(OneCallEnvelopeProtocolError, match=code):
         parse_production_envelope_json(
             json.dumps(payload),
@@ -404,7 +414,7 @@ def test_invalid_envelope_does_not_retry() -> None:
 
 
 def test_prompt_contract_version_is_five() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
     assert "commercial_intent" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "@ANSWER" not in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
@@ -601,7 +611,19 @@ def test_unencodable_unicode_rejected_blocking_and_streaming() -> None:
         _run_stream((bad,))
 
 
-def test_prompt_policy_forbids_exact_commercial_values_in_patient_text() -> None:
-    assert "Marketing promotions" not in SALES_ONE_PLUS_SYSTEM_POLICY
-    assert "A price for several teeth" not in SALES_ONE_PLUS_SYSTEM_POLICY
-    assert "deterministic code renders those values" in SALES_ONE_PLUS_SYSTEM_POLICY
+def test_prompt_policy_separates_code_owned_prices_from_md_commercial_answers() -> None:
+    policy = SALES_ONE_PLUS_SYSTEM_POLICY
+    assert "Marketing promotions" not in policy
+    assert "A price for several teeth" not in policy
+    assert "must not contain exact offer prices or payment-stage amounts" in policy
+    assert "code renders visible offer prices" in policy
+    assert "Exact offer prices and payment-stage amounts are code-owned" in policy
+    assert (
+        "For direct questions about payment, installment, promotions, warranty, or tax deduction"
+        in policy
+    )
+    assert (
+        "You may include percentages, conditions, and other details stated in those documents when the patient asked about them"
+        in policy
+    )
+    assert "Do not spontaneously insert service_value blocks" in policy

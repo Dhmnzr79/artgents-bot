@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from contracts.precomposer_selected_offer import PrecomposerSelectedOfferResult
 from contracts.response_schema import ResponseSchemaBundle, TargetOffer, TargetService
 from core.resolve_precomposer_selected_offer import order_precomposer_offers_neutral
-from core.sales_fast_authoritative_commerce import _offer_amount_only
+from core.sales_fast_authoritative_commerce import _offer_amount_only, offer_row_label
 
 
 class MultiOfferPriceBlockError(ValueError):
@@ -45,22 +45,6 @@ def _patient_facing_cost_label(service: TargetService) -> str:
     return name
 
 
-def _offer_row_label(bundle: ResponseSchemaBundle, offer: TargetOffer) -> str | None:
-    if offer.brand_id:
-        brand = bundle.brands.brands.get(offer.brand_id)
-        if brand is not None and str(brand.canonical_name).strip():
-            return str(brand.canonical_name).strip()
-    if offer.option_id:
-        service = bundle.services.get(offer.service_id)
-        if service is not None:
-            for option in service.options:
-                if option.option_id == offer.option_id:
-                    label = str(option.name).strip()
-                    if label:
-                        return label
-    return None
-
-
 def _shared_package_footer(offers: tuple[TargetOffer, ...]) -> str | None:
     if not offers:
         return None
@@ -75,7 +59,7 @@ def _shared_package_footer(offers: tuple[TargetOffer, ...]) -> str | None:
 
 
 def _offer_line(bundle: ResponseSchemaBundle, offer: TargetOffer, *, shared_footer: bool) -> str:
-    label = _offer_row_label(bundle, offer)
+    label = offer_row_label(bundle, offer)
     if not label:
         raise MultiOfferPriceBlockError("multi_offer_malformed")
     amount_text = _offer_amount_only(offer)

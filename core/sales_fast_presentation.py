@@ -6,6 +6,7 @@ from datetime import date
 
 from contracts.response_schema import ResponseSchemaBundle
 from contracts.one_call_envelope import OneCallCommercialIntent
+from contracts.ui_service_action import build_ui_service_ref
 from contracts.target_turn_frame_dispatch import TargetTurnFrameBoundTerminalResponse
 from contracts.turn_frame import TurnFrame
 from contracts.response_schema import TargetStrategyMatch
@@ -14,6 +15,7 @@ from core.sales_fast_authoritative_commerce import (
     build_authoritative_commerce_result,
     gate_commerce_result_by_intent,
 )
+from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_contact_authority import canonical_contact_phone, fallback_answer_with_phone
 from core.target_presentation_decision import TargetPresentationCadenceState
 from core.target_response_verifier import TargetVerifiedComposedResponse
@@ -231,6 +233,103 @@ def materialize_sales_fast_error_payload(
 _SCOPE_CLARIFY_TEXT = (
     "Чтобы ответить точнее, уточните, пожалуйста, о какой услуге или ситуации идёт речь."
 )
+_DIALOGUE_PRICE_CLARIFY_GENERIC = (
+    "Уточните, пожалуйста, какой вариант восстановления вас интересует."
+)
+_DIALOGUE_PRICE_CLARIFY_ALL_ON_PAIR = (
+    "Вас интересует стоимость All-on-4 или All-on-6?"
+)
+
+
+def build_dialogue_service_clarify_quick_replies(
+    bundle: ResponseSchemaBundle,
+    *,
+    client_id: str,
+    clarify_service_options: tuple[str, ...],
+) -> tuple[list[dict[str, str]], tuple[TargetRuntimeFollowupItem, ...]]:
+    quick_replies: list[dict[str, str]] = []
+    followups: list[TargetRuntimeFollowupItem] = []
+    for service_id in clarify_service_options:
+        token = str(service_id).strip()
+        if not token:
+            continue
+        service = bundle.services.get(token)
+        if service is None or not service.active:
+            continue
+        label = str(service.name or token).strip() or token
+        ref = build_ui_service_ref(service_id=token)
+        quick_replies.append({"label": label, "ref": ref})
+        followups.append(
+            TargetRuntimeFollowupItem(ref=ref, label=label, client_id=client_id)
+        )
+    return quick_replies, tuple(followups)
+
+
+def resolve_dialogue_price_clarify_text(
+    *,
+    clarify_service_options: tuple[str, ...] | None,
+) -> str:
+    """Short price-scope clarify without parsing patient_text."""
+
+    if clarify_service_options:
+        options = tuple(str(item).strip() for item in clarify_service_options if str(item).strip())
+        if set(options) == {"all_on_4", "all_on_6"}:
+            return _DIALOGUE_PRICE_CLARIFY_ALL_ON_PAIR
+    return _DIALOGUE_PRICE_CLARIFY_GENERIC
+
+
+def materialize_dialogue_price_clarify_payload(
+    *,
+    client_id: str,
+    sid: str,
+    clarify_service_options: tuple[str, ...] | None = None,
+    bundle: ResponseSchemaBundle | None = None,
+) -> TargetRuntimeTerminalPayload:
+    quick_replies: list[dict[str, str]] = []
+    followups: tuple[TargetRuntimeFollowupItem, ...] = ()
+    if bundle is not None and clarify_service_options:
+        quick_replies, followups = build_dialogue_service_clarify_quick_replies(
+            bundle,
+            client_id=client_id,
+            clarify_service_options=clarify_service_options,
+        )
+    if followups:
+        from core.pending_price_clarify import write_pending_price_clarify
+        from session import mem_get
+
+        session_turn_count = int(mem_get(sid).get("session_turn_count") or 0) + 1
+        write_pending_price_clarify(
+            sid,
+            allowed_service_ids=tuple(item.ref.split("/")[-1] for item in followups if item.ref),
+            session_turn_count=session_turn_count,
+        )
+        from core.target_runtime_session import write_target_runtime_clarify_followups
+
+        write_target_runtime_clarify_followups(sid, followups=followups)
+    return TargetRuntimeTerminalPayload(
+        kind="terminal",
+        payload={
+            "answer": resolve_dialogue_price_clarify_text(
+                clarify_service_options=clarify_service_options,
+            ),
+            "quick_replies": quick_replies,
+            "cta": None,
+            "video": None,
+            "situation": {"show": False, "mode": "normal"},
+            "offer": None,
+            "meta": {
+                "client_id": client_id,
+                "sid": sid,
+                "intent": "content",
+                "answer_path": "sales_fast",
+                "service_route": "sales_fast_dialogue_price_clarify",
+                "ui_source_family": "guided_fallback",
+                "attribution_kind": "plain",
+                "terminal_mode": "clarify",
+            },
+        },
+        terminal_mode="clarify",
+    )
 
 
 def materialize_sales_fast_scope_clarify_payload(

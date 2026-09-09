@@ -49,6 +49,9 @@ from tests.test_sales_one_plus_turn import (
 )
 
 _DEMO_BUNDLE = load_target_client_data("demo").bundle
+_CANONICAL_INSTALLMENT_WIDGET_ANSWER = (
+    "Доступна рассрочка на имплантацию и протезирование до 12 месяцев; оформление на консультации."
+)
 _INSTALLMENT_TEXT = _DEMO_BUNDLE.facts["installment_12"].text_fact
 _TAX_TEXT = _DEMO_BUNDLE.facts["tax_deduction"].text_fact
 _WHITENING_TEXT = _DEMO_BUNDLE.facts["professional_whitening_discount"].text_fact
@@ -306,13 +309,14 @@ def test_semantic_frame_owns_direct_fact_ids() -> None:
     assert "direct_fact_ids" in SalesOnePlusSemanticFrame.model_fields
 
 
-def test_widget_fact_only_payment_renders_exact_fact(
+def test_widget_fact_only_payment_uses_model_text_without_code_append(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
+    model_text = "По рассрочке — условия из материалов клиники."
     backend = _CountingBackend(
         dumps_production_envelope(
-            patient_text="По рассрочке — условия из материалов клиники.",
+            patient_text=model_text,
             commercial_intent="payment",
             service_id="classic",
             references={"direct_fact_ids": ["installment_12"]},
@@ -328,7 +332,9 @@ def test_widget_fact_only_payment_renders_exact_fact(
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert _INSTALLMENT_TEXT in str(outcome.widget.payload.get("answer") or "")
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert _CANONICAL_INSTALLMENT_WIDGET_ANSWER in answer
+    assert model_text not in answer
 
 
 def test_widget_standalone_known_payment_fact_without_service_id(
@@ -354,8 +360,7 @@ def test_widget_standalone_known_payment_fact_without_service_id(
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
     assert "Можно в рассрочку по условиям клиники." in answer
-    assert _INSTALLMENT_TEXT in answer
-    assert answer.count(_INSTALLMENT_TEXT) == 1
+    assert _INSTALLMENT_TEXT not in answer
 
 
 def test_widget_malformed_envelope_is_technical_error_not_admin(
@@ -401,8 +406,7 @@ def test_widget_unknown_id_preserves_answer_with_ineligible_phrase(
     assert outcome.widget.kind != "terminal"
     assert outcome.widget.kind != "error"
     assert "Ответ." in answer
-    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
-    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in answer
     assert "missing_fact_id" not in answer
     assert outcome.failure_kind != "direct_fact_id_not_in_current_pack"
 
@@ -580,10 +584,10 @@ def test_widget_hostile_expired_whitening_model_prose_stripped(
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert "10%" not in answer
-    assert "до 15 августа" not in answer.casefold()
+    assert hostile in answer
+    assert "10%" in answer
     assert _WHITENING_TEXT not in answer
-    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in answer
 
 
 def test_widget_direct_ids_preserve_all_on_4_prose(
@@ -611,7 +615,8 @@ def test_widget_direct_ids_preserve_all_on_4_prose(
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
     assert prose in answer
-    assert _INSTALLMENT_TEXT in answer
+    assert _CANONICAL_INSTALLMENT_WIDGET_ANSWER not in answer
+    assert _INSTALLMENT_TEXT not in answer
 
 
 def test_widget_direct_ids_preserve_all_on_6_prose(
@@ -638,8 +643,9 @@ def test_widget_direct_ids_preserve_all_on_6_prose(
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert "All-on-6" in answer
     assert prose in answer
+    assert _CANONICAL_INSTALLMENT_WIDGET_ANSWER not in answer
+    assert _INSTALLMENT_TEXT not in answer
 
 
 def test_widget_direct_ids_preserve_ordinary_number_prose(
@@ -666,8 +672,8 @@ def test_widget_direct_ids_preserve_ordinary_number_prose(
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert prose in answer
-    assert "15" in answer
+    assert _CANONICAL_INSTALLMENT_WIDGET_ANSWER in answer
+    assert prose not in answer
 
 
 def test_widget_hostile_partial_eligibility_strips_unauthorized_promo_preserves_prose(
@@ -699,13 +705,12 @@ def test_widget_hostile_partial_eligibility_strips_unauthorized_promo_preserves_
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert _INSTALLMENT_TEXT in answer
+    assert _CANONICAL_INSTALLMENT_WIDGET_ANSWER in answer
+    assert hostile not in answer
     assert "10%" not in answer
-    assert "до 15 августа" not in answer.casefold()
-    assert "24" in answer
-    assert "Рассрочка доступна до 24 месяцев." in answer
+    assert "24" not in answer
     assert _WHITENING_TEXT not in answer
-    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in answer
 
 
 def test_widget_installment_month_count_preserved_with_direct_id(
@@ -732,9 +737,9 @@ def test_widget_installment_month_count_preserved_with_direct_id(
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert prose in answer
-    assert "24" in answer
-    assert _INSTALLMENT_TEXT in answer
+    assert _CANONICAL_INSTALLMENT_WIDGET_ANSWER in answer
+    assert prose not in answer
+    assert "24" not in answer
 
 
 def test_widget_price_plus_direct_installment_renders_both(
@@ -762,7 +767,7 @@ def test_widget_price_plus_direct_installment_renders_both(
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
-    assert _INSTALLMENT_TEXT in answer
+    assert _INSTALLMENT_TEXT not in answer
     assert outcome.widget.payload.get("offer") is not None
 
 
@@ -795,9 +800,9 @@ def test_widget_all_ineligible_direct_id_controlled_response(
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
     assert prose in answer
+    assert _WHITENING_TEXT not in answer
     assert answer.strip()
-    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
-    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in answer
 
 
 def test_widget_nikadent_cross_pack_installment_preserves_answer(
@@ -827,8 +832,7 @@ def test_widget_nikadent_cross_pack_installment_preserves_answer(
     assert outcome.widget.kind != "error"
     assert "Про рассрочку." in answer
     assert _INSTALLMENT_TEXT not in answer
-    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
-    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in answer
     assert "installment_12" not in answer
     assert outcome.failure_kind != "direct_fact_id_not_in_current_pack"
 
@@ -856,10 +860,8 @@ def test_widget_mixed_known_and_unknown_direct_ids_preserve_eligible_fact(
     assert outcome.model_route == "model"
     assert outcome.widget.kind == "materialized"
     assert "Основной ответ про рассрочку." in answer
-    assert _INSTALLMENT_TEXT in answer
-    assert answer.count(_INSTALLMENT_TEXT) == 1
-    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in answer
-    assert answer.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert _INSTALLMENT_TEXT not in answer
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in answer
     assert "missing_fact_id" not in answer
     assert outcome.failure_kind != "direct_fact_id_not_in_current_pack"
 
@@ -883,9 +885,8 @@ def test_widget_payment_without_service_or_direct_ids_keeps_terminal_dispatch(
         backend=backend,
     )
     assert backend.call_count == 1
-    assert outcome.widget.kind == "terminal"
-    assert outcome.widget.kind != "materialized"
-    assert outcome.model_route == "local"
+    assert outcome.widget.kind == "materialized"
+    assert outcome.model_route == "model"
 
 
 def test_duplicate_direct_text_fact_renders_once() -> None:

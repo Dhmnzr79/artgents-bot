@@ -13,6 +13,10 @@
     "includes": [
       "необходимый абатмент/основание",
       "изготовление и фиксация постоянной коронки"
+    ],
+    "excludes": [
+      "хирургическая установка импланта",
+      "КТ"
     ]
   },
   "fact_refs": [
@@ -24,5 +28,14 @@
     "one_tooth",
     "few_teeth",
     "full_arch"
-  ]
+  ],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": [
+      {
+        "condition_id": "mandatory_exclusion",
+        "display_text": "Хирургическая установка импланта и КТ — отдельно"
+      }
+    ]
+  }
 }

@@ -182,6 +182,7 @@ def materialize_verified_widget_payload(
         navigation_followups=verified.navigation_followups,
         selected_followups=followups,
         primary_content_ref=verified.primary_content_ref,
+        used_content_refs=verified.used_content_refs,
         cadence=cadence or TargetPresentationCadenceState(),
         allow_situation=allow_situation,
     )

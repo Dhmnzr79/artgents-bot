@@ -259,7 +259,6 @@ FamilyLevelPrice: TypeAlias = Annotated[
 ]
 
 
-
 TargetRequiredOfferConditionId = Literal[
     "per_jaw",
     "per_tooth",
@@ -279,23 +278,57 @@ class TargetOfferRequiredConditionsMetadata(TargetSchemaModel):
     completeness: Literal["complete"]
     conditions: list[TargetRequiredConditionEntry] = Field(default_factory=list)
 
+
+def _normalize_package_item(value: str) -> str:
+    return value.strip().casefold()
+
+
 class TargetPricePackage(TargetSchemaModel):
     label: NonBlankStr
     price_scope_label: NonBlankStr | None = None
     includes: list[NonBlankStr] = Field(default_factory=list)
+    excludes: list[NonBlankStr] = Field(default_factory=list)
 
     @field_validator("includes", mode="after")
     @classmethod
     def _includes_unique(cls, value: list[str]) -> list[str]:
-        if _duplicates(value):
+        normalized = [_normalize_package_item(item) for item in value]
+        if len(normalized) != len(set(normalized)):
             raise ValueError("package_include_duplicate")
         return value
+
+    @field_validator("excludes", mode="after")
+    @classmethod
+    def _excludes_unique(cls, value: list[str]) -> list[str]:
+        normalized = [_normalize_package_item(item) for item in value]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("package_exclude_duplicate")
+        return value
+
+    @model_validator(mode="after")
+    def _includes_excludes_disjoint(self) -> "TargetPricePackage":
+        include_keys = {_normalize_package_item(item) for item in self.includes}
+        exclude_keys = {_normalize_package_item(item) for item in self.excludes}
+        if include_keys & exclude_keys:
+            raise ValueError("package_include_exclude_overlap")
+        return self
 
 
 class TargetPaymentStage(TargetSchemaModel):
     label: NonBlankStr
     amount: MoneyAmount
     currency: NonBlankStr
+    timing_text: str | None = None
+
+    @field_validator("timing_text", mode="after")
+    @classmethod
+    def _timing_text_non_blank_when_present(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            raise ValueError("payment_stage_timing_text_blank")
+        return text
 
 
 class TargetPriceFollowup(TargetSchemaModel):
@@ -356,7 +389,6 @@ class TargetOffer(TargetSchemaModel):
         return self
 
 
-
 class RequestedDisplayPolicy(BaseModel):
     """Owner-approved metadata for informational display without a concrete service."""
 
@@ -379,6 +411,7 @@ class TargetCommercialFact(TargetSchemaModel):
     kind: NonBlankStr
     catalog_label: NonBlankStr
     text_fact: NonBlankStr
+    microfact_text: NonBlankStr | None = None
     render_mode: NonBlankStr
     active: bool = True
     active_from: IsoDate | None = None
@@ -834,6 +867,8 @@ S1_MODEL_TYPES = (
     TargetFamilyPrice,
     TargetFamilyPriceCatalog,
     TargetPricePackage,
+    TargetRequiredConditionEntry,
+    TargetOfferRequiredConditionsMetadata,
     TargetPaymentStage,
     TargetPriceFollowup,
     TargetOffer,

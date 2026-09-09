@@ -66,6 +66,11 @@ def _serialize_payment_stages(
             "label": str(stage.label),
             "amount": int(stage.amount),
             "currency": str(stage.currency),
+            **(
+                {"timing_text": str(stage.timing_text).strip()}
+                if stage.timing_text and str(stage.timing_text).strip()
+                else {}
+            ),
         }
         for stage in stages
     ]

@@ -256,7 +256,16 @@ def test_demo_only_id_under_nikadent_parses_without_rewriting() -> None:
 
 
 @pytest.mark.parametrize("route", ("CLARIFY", "ADMIN"))
-def test_non_answer_routes_forbid_non_empty_direct_ids(route: str) -> None:
+def test_non_answer_routes_clear_non_empty_direct_ids(route: str) -> None:
+    """Terminal routes normalize stray direct_fact_ids instead of rejecting safe output.
+
+    The previous test enforced hard rejection (`direct_fact_ids_forbidden_for_route`),
+    which destroyed otherwise valid CLARIFY/ADMIN envelopes when the model attached
+    optional commercial fact IDs. Production now clears them and continues.
+    """
+    from contracts.one_call_envelope import ENVELOPE_NORMALIZED_TERMINAL_DIRECT_FACT_IDS_CLEARED
+    from core import turn_timing
+
     overrides: dict[str, object] = {
         "route": route,
         "references": {"direct_fact_ids": ["installment_12"]},
@@ -270,13 +279,13 @@ def test_non_answer_routes_forbid_non_empty_direct_ids(route: str) -> None:
     else:
         overrides.update(patient_text=None, clarify_axis=None, clarify_service_options=None)
     payload = production_envelope_template(**overrides)
-    with pytest.raises(OneCallEnvelopeProtocolError, match="direct_fact_ids_forbidden_for_route"):
-        parse_production_envelope_json(
-            json.dumps(payload),
-            active_service_catalog=_DEMO_CATALOG,
-            service_reference_catalog=_DEMO_REF_CATALOG,
-            commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
-        )
+    envelope = parse_production_envelope_json(
+        json.dumps(payload),
+        active_service_catalog=_DEMO_CATALOG,
+        service_reference_catalog=_DEMO_REF_CATALOG,
+        commercial_fact_catalog=_DEMO_COMMERCIAL_CATALOG,
+    )
+    assert envelope.references.direct_fact_ids == ()
 
 
 def test_envelope_size_limit_unchanged() -> None:
@@ -292,7 +301,7 @@ def test_envelope_size_limit_unchanged() -> None:
 
 
 def test_prompt_contract_version_is_six() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
 
 
 def test_prefix_contains_exact_commercial_catalog_with_full_fields() -> None:

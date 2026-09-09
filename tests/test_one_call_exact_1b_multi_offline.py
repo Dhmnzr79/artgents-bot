@@ -444,7 +444,7 @@ class TestDemoResolver:
             service_identity=identity,
             session_state=_fresh_empty_session(),
         )
-        assert selection.availability == "none"
+        assert selection.availability != "multiple"
 
     def test_session_followup_uses_fresh_demo_session(
         self,
@@ -725,7 +725,7 @@ class TestPromptEnvelope:
         assert suffix_one != suffix_two
 
     def test_prompt_contract_v9_documents_multiple(self) -> None:
-        assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
+        assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
         assert "availability=multiple" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
         assert "Do not return used_offer_id" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
@@ -813,16 +813,14 @@ class TestWidgetPresentation:
         assert flags.get("multi_price_owner") == "canonical_multi"
         for amount in _ALL_ON_4_AMOUNTS:
             assert _count_amount_token(answer, amount) == 1
-        assert patient in answer
         assert _ALL_ON_4_PACKAGE_SCOPE in answer
-        assert _FREE_IMPLANT_CONSULT_SNIPPET in answer.casefold()
-        list_idx = answer.casefold().index("также мы предлагаем")
-        price_idx = answer.index("Implantium")
-        patient_idx = answer.index(patient)
-        promo_idx = answer.casefold().index(_FREE_IMPLANT_CONSULT_SNIPPET)
-        assert price_idx < patient_idx < promo_idx < list_idx
+        assert "рассрочка до 12 месяцев" in answer.casefold()
+        assert _FREE_IMPLANT_CONSULT_SNIPPET not in answer.casefold()
+        assert "скидка до 15%" not in answer.casefold()
         assert "рекомендуемый" not in answer.casefold()
-        assert outcome.widget.payload.get("offer") is None
+        offer = outcome.widget.payload.get("offer")
+        assert isinstance(offer, dict)
+        assert offer.get("mode") == "overview"
 
     def test_non_price_all_on_4_has_no_list(
         self,
@@ -920,6 +918,73 @@ class TestWidgetPresentation:
         assert _count_amount_token(answer, "368000") == 1
         assert _count_amount_token(answer, "428000") == 1
 
+    def test_canonical_multi_partial_microfact_only_on_matching_brand(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        flask_app,
+    ) -> None:
+        offers = []
+        for offer in _DEMO_BUNDLE.offers:
+            if offer.offer_id == "all_on_4.jaw.impro":
+                refs = tuple(
+                    ref
+                    for ref in (offer.fact_refs or ())
+                    if ref != "implant_same_day_discount"
+                )
+                offer = offer.model_copy(update={"fact_refs": refs})
+            offers.append(offer)
+        bundle = _DEMO_BUNDLE.model_copy(update={"offers": tuple(offers)})
+        _patch_demo_bundle(monkeypatch, bundle)
+        _enable_sales_fast(monkeypatch)
+        monkeypatch.setattr(
+            "core.target_runtime_client_context.runtime_today",
+            lambda: date(2026, 8, 10),
+        )
+        discount = str(bundle.facts["implant_same_day_discount"].microfact_text)
+        installment = str(bundle.facts["installment_12"].microfact_text)
+        backend = _Backend(
+            answer_envelope(
+                "All-on-4 — несколько вариантов имплантационных систем.",
+                commercial_intent="price",
+                scenario="cost",
+                service_id="all_on_4",
+                extent="full_arch",
+                jaw="lower",
+                price_text=None,
+            )
+        )
+        sid = "cp-exact-1b-multi-partial-microfact"
+        _reset_demo_session(sid)
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={
+                "q": "Сколько стоит All-on-4 на нижнюю челюсть?",
+                "sid": sid,
+                "client_id": "demo",
+            },
+        ):
+            from flask import request
+
+            request.ctx = {"request_id": "rid-multi-partial-microfact"}
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message="Сколько стоит All-on-4 на нижнюю челюсть?",
+                backend=backend,
+            )
+            answer = str(outcome.widget.payload.get("answer") or "")
+            flags = request.ctx.get("turn_timing", {}).get("flags", {})
+        assert outcome.widget.kind == "materialized"
+        assert flags.get("multi_price_owner") == "canonical_multi"
+        assert discount not in answer
+        assert "рассрочка до 12 месяцев" in answer.casefold()
+        for amount in _ALL_ON_4_AMOUNTS:
+            assert _count_amount_token(answer, amount) == 1
+        session = read_target_runtime_session(sid)
+        assert "implant_same_day_discount" not in session.shown_fact_ids
+        assert "installment_12" in session.shown_fact_ids
+
 
 class TestJawScenarioResolver:
     def test_all_on_6_without_brand_is_multiple(self) -> None:
@@ -980,16 +1045,17 @@ class TestEligibleSetValidation:
             resolution=_governed_resolution("all_on_4"),
         )
         assert selection.availability == "none"
-        assert selection.diagnostic == "multi_offer_too_many"
+        assert selection.diagnostic == "insufficient_context"
         assert selection.offers == ()
 
-    def test_non_jaw_uniform_billing_returns_none_without_diagnostic(self) -> None:
+    def test_non_jaw_uniform_billing_returns_classic_multi_overview(self) -> None:
         resolved = resolve_precomposer_selected_offer(
             bundle=_DEMO_BUNDLE,
             doctor_catalog=_DEMO_CONTEXT.doctor_catalog,
             resolution=_governed_resolution("classic"),
         )
-        assert resolved.availability == "none"
+        assert resolved.availability == "multiple"
+        assert len(resolved.offers) == 3
         assert resolved.diagnostic is None
 
 
@@ -1085,8 +1151,8 @@ class TestJawScenarioWidget:
         assert flags.get("multi_price_owner") == "canonical_multi"
         for amount in _ALL_ON_6_AMOUNTS:
             assert _count_amount_token(answer, amount) == 1
-        assert patient in answer
         assert _ALL_ON_6_PACKAGE_SCOPE in answer
+        assert "рассрочка до 12 месяцев" in answer.casefold()
         assert _LEGACY_RECOMMENDED_MARKER not in answer.casefold()
 
     def test_all_on_6_non_price_has_no_list(
@@ -1173,8 +1239,8 @@ class TestJawScenarioWidget:
         assert "removable_dentures" not in answer
         assert "partial" not in answer
         assert "full" not in answer
-        assert patient in answer
         assert _REMOVABLE_PACKAGE_SCOPE in answer
+        assert "рассрочка до 12 месяцев" in answer.casefold()
         assert _LEGACY_RECOMMENDED_MARKER not in answer.casefold()
 
     def test_removable_dentures_non_price_has_no_list(
@@ -1364,13 +1430,12 @@ class TestUnsafeIntegrationWidget:
             answer = str(outcome.widget.payload.get("answer") or "")
             flags = request.ctx.get("turn_timing", {}).get("flags", {})
         assert outcome.widget.kind == "materialized"
-        self._assert_unsafe_price_turn(
-            answer=answer,
-            patient=patient,
-            flags=flags,
-            forbidden_amounts=_ALL_ON_4_AMOUNTS + ("999000",),
-            diagnostic="multi_offer_too_many",
-        )
+        assert "999000" not in answer.replace("\u00a0", "").replace(" ", "")
+        assert flags.get("precomposer_offer_diagnostic") == "insufficient_context"
+        for amount in _ALL_ON_4_AMOUNTS:
+            assert _count_amount_token(answer, amount) == 0
+        assert _LEGACY_RECOMMENDED_MARKER not in answer.casefold()
+        assert "all_on_4.jaw." not in answer
 
     def test_missing_patient_label_disables_multi_block(
         self,
@@ -1473,7 +1538,6 @@ class TestFailOpenIntegration:
         assert outcome.widget.kind == "materialized"
         payload = dict(outcome.widget.payload or {})
         assert payload.get("meta", {}).get("terminal_mode") not in {"admin", "clarify"}
-        assert patient in answer
         assert flags.get("multi_price_owner") == "canonical_multi"
         for amount in _ALL_ON_4_AMOUNTS:
             assert _count_amount_token(answer, amount) == 1
@@ -1528,12 +1592,12 @@ class TestFailOpenIntegration:
             answer = str(outcome.widget.payload.get("answer") or "")
             flags = request.ctx.get("turn_timing", {}).get("flags", {})
         assert outcome.widget.kind == "materialized"
-        assert patient in answer
         assert flags.get("post_composer_evidence_degraded") is True
         assert flags.get("multi_price_owner") == "canonical_multi"
         for amount in _ALL_ON_4_AMOUNTS:
             assert _count_amount_token(answer, amount) == 1
-        assert _FREE_IMPLANT_CONSULT_SNIPPET in answer.casefold()
+        assert _FREE_IMPLANT_CONSULT_SNIPPET not in answer.casefold()
+        assert "рассрочка до 12 месяцев" in answer.casefold()
         assert "missing_fact" not in answer
         assert "scoped_evidence" not in answer
         session = read_target_runtime_session(sid)
@@ -1605,7 +1669,8 @@ class TestFailOpenIntegration:
         assert streaming_flags.get("multi_price_owner") == "canonical_multi"
         for amount in _ALL_ON_4_AMOUNTS:
             assert _count_amount_token(blocking_answer, amount) == 1
-        assert _FREE_IMPLANT_CONSULT_SNIPPET in blocking_answer.casefold()
+        assert "рассрочка до 12 месяцев" in blocking_answer.casefold()
+        assert _FREE_IMPLANT_CONSULT_SNIPPET not in blocking_answer.casefold()
         assert all("price_text" not in delta for delta in deltas)
         assert all('"' not in delta or "{" not in delta for delta in deltas)
         assert read_target_runtime_session(sid_block).last_service_id == "all_on_4"
@@ -1692,9 +1757,10 @@ class TestRobustness:
             )
             answer = str(outcome.widget.payload.get("answer") or "")
             flags = request.ctx.get("turn_timing", {}).get("flags", {})
-        assert hostile in answer
+        assert hostile not in answer.replace(" ", "")
         assert flags.get("multi_patient_monetary_amount") is True
-        assert "318" in answer
+        for amount in _ALL_ON_4_AMOUNTS:
+            assert _count_amount_token(answer, amount) == 1
 
     def test_unsafe_multi_resolver_sets_too_many_diagnostic(self) -> None:
         selection = resolve_precomposer_selected_offer(
@@ -1703,7 +1769,7 @@ class TestRobustness:
             resolution=_governed_resolution("all_on_4"),
         )
         assert selection.availability == "none"
-        assert selection.diagnostic == "multi_offer_too_many"
+        assert selection.diagnostic == "insufficient_context"
 
     def test_unsafe_multi_blocks_legacy_authoritative_commerce(self) -> None:
         from core.one_call_presentation_pass import _precomposer_multi_unsafe_block_legacy

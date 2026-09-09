@@ -14,5 +14,9 @@
     "free_implant_consult",
     "installment_12"
   ],
-  "followups": []
+  "followups": [],
+  "required_conditions_metadata": {
+    "completeness": "complete",
+    "conditions": []
+  }
 }

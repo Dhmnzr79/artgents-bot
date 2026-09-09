@@ -285,7 +285,23 @@ def run_pre_resolver_turn(
                 except Exception:
                     pass
                 if not q:
-                    q = "продолжить"
+                    label = str(ui_resolution.planner_message or "").strip()
+                    if not label:
+                        discard_planner_speculation(speculative_handle)
+                        payload = build_target_unknown_ref_clarify_payload(
+                            client_id=client_id,
+                            sid=sid,
+                        )
+                        return AskOrchestrationResult(
+                            kind="service_reply",
+                            q=q,
+                            sid=sid,
+                            client_id=client_id,
+                            service_payload=payload,
+                            service_route="target_fullcontext_followup_unknown",
+                            decision_frame=decision_frame,
+                        )
+                    q = label
             elif is_ui_stage_ref(ref_eff):
                 ui_resolution = resolve_ui_stage_ref_click(
                     ref=ref_eff,
@@ -316,7 +332,23 @@ def run_pre_resolver_turn(
                 except Exception:
                     pass
                 if not q:
-                    q = "продолжить"
+                    label = str(ui_resolution.planner_message or "").strip()
+                    if not label:
+                        discard_planner_speculation(speculative_handle)
+                        payload = build_target_unknown_ref_clarify_payload(
+                            client_id=client_id,
+                            sid=sid,
+                        )
+                        return AskOrchestrationResult(
+                            kind="service_reply",
+                            q=q,
+                            sid=sid,
+                            client_id=client_id,
+                            service_payload=payload,
+                            service_route="target_fullcontext_followup_unknown",
+                            decision_frame=decision_frame,
+                        )
+                    q = label
             else:
                 nav = resolve_target_followup_navigation(
                     ref=ref_eff,

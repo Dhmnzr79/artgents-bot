@@ -59,15 +59,17 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_payment_terms_document_removed() -> None:
-    assert not _PAYMENT_TERMS_DOC.exists()
+def test_payment_terms_document_present_for_cleanup() -> None:
+    assert _PAYMENT_TERMS_DOC.exists()
 
 
-def test_facts_have_no_payment_terms_detail_refs() -> None:
+def test_facts_have_payment_terms_detail_refs() -> None:
     facts = json.loads(_FACTS_PATH.read_text(encoding="utf-8"))
-    for fact_id in ("tax_deduction", "installment_12", "payment_stages", "fixed_price"):
-        assert "detail_ref" not in facts[fact_id]
-    assert facts["free_implant_consult"]["detail_ref"] == "clinic__info__consultation.md#korotko"
+    assert facts["installment_12"]["detail_ref"] == "clinic__info__payment_terms.md#rassrochka"
+    assert facts["payment_stages"]["detail_ref"] == "clinic__info__payment_terms.md#oplata-po-etapam"
+    assert facts["tax_deduction"]["detail_ref"] == "clinic__info__payment_terms.md#nalogovyj-vychet"
+    assert facts["fixed_price"]["detail_ref"] == "clinic__info__payment_terms.md#fiksatsiya-stoimosti"
+    assert facts["free_implant_consult"]["detail_ref"].startswith("clinic__info__promo__")
 
 
 def test_free_implant_consult_fact_unchanged() -> None:
@@ -143,8 +145,8 @@ def test_marketing_cost_scenario_has_no_payment_terms_kb_ref() -> None:
     assert all("payment_terms" not in ref for ref in refs)
 
 
-def test_prompt_contract_v7_documents_cost_objection_semantics() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
+def test_prompt_contract_v10_documents_cleanup_semantics() -> None:
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
     contract = ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
     assert "Cost scenario and general cost objection (v7)" in contract
     assert "Я боюсь, что имплантация — это дорого" in contract
@@ -169,4 +171,4 @@ def test_demo_bundle_and_prefix_still_build_after_md_cleanup() -> None:
         exact_commercial_catalog=exact,
     )
     assert "=== EXACT_COMMERCIAL_CATALOG ===" in prefix
-    assert "payment_terms" not in prefix
+    assert "clinic__info__payment_terms" in prefix

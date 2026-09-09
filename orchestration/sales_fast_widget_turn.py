@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from config import SALES_ONE_PLUS_FLASH_MODEL
+from config import SALES_ONE_PLUS_MODEL
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.local_problem_gate import LocalProblemGateResult
 from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
@@ -14,7 +14,7 @@ from core.target_sse_worker_context import current_text_sink
 
 
 def _default_sales_fast_backend() -> SalesOnePlusLiveBackend:
-    return SalesOnePlusLiveBackend(model=SALES_ONE_PLUS_FLASH_MODEL)
+    return SalesOnePlusLiveBackend(model=SALES_ONE_PLUS_MODEL)
 
 
 class _LazySalesFastBackend:

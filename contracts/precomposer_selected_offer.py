@@ -11,6 +11,7 @@ PrecomposerSelectedOfferAvailability = Literal["none", "selected", "multiple"]
 PriceTextOwner = Literal[
     "model_price_text",
     "canonical_fallback",
+    "canonical_code",
     "canonical_multi",
     "legacy_authoritative",
     "none",
@@ -24,6 +25,8 @@ PriceTextDiagnostic = Literal[
     "unexpected_nonprice",
     "unexpected_multi_price_text",
     "canonical_fallback_used",
+    "canonical_code_owned",
+    "model_price_text_ignored",
     "patient_text_duplicate_amount",
 ]
 PrecomposerOfferDiagnostic = Literal[
@@ -31,6 +34,10 @@ PrecomposerOfferDiagnostic = Literal[
     "multi_offer_malformed",
     "multi_offer_mixed_price_modes",
     "multi_offer_unsafe_scope",
+    "no_published_price",
+    "insufficient_context",
+    "ambiguous_no_public_price",
+    "offer_malformed",
 ]
 
 
@@ -44,7 +51,7 @@ class PrecomposerSelectedOfferContractError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class PrecomposerSelectedOfferResult:
-    """Zero, one, or 2–3 active fixed offers chosen before Composer."""
+    """Zero, one, or 2–3 active offers chosen after semantic bind."""
 
     availability: PrecomposerSelectedOfferAvailability
     offer: TargetOffer | None = None
@@ -79,14 +86,26 @@ def validate_precomposer_selected_offer_result(
         service_ids = {offer.service_id for offer in offers}
         if len(service_ids) != 1:
             raise PrecomposerSelectedOfferContractError("multiple_mixed_services")
+        price_modes = {offer.price.mode for offer in offers}
+        if len(price_modes) != 1:
+            raise PrecomposerSelectedOfferContractError("multiple_mixed_price_modes")
+        price_mode = next(iter(price_modes))
         for offer in offers:
             if not offer.active:
                 raise PrecomposerSelectedOfferContractError("multiple_inactive_offer")
             price = offer.price
-            if price.mode != "fixed":
+            if price_mode == "fixed":
+                if price.mode != "fixed":
+                    raise PrecomposerSelectedOfferContractError("multiple_non_fixed_offer")
+                if price.amount is None or int(price.amount) < 0:
+                    raise PrecomposerSelectedOfferContractError("multiple_malformed_amount")
+            elif price_mode == "from":
+                if price.mode != "from":
+                    raise PrecomposerSelectedOfferContractError("multiple_non_fixed_offer")
+                if price.min_amount is None or int(price.min_amount) < 0:
+                    raise PrecomposerSelectedOfferContractError("multiple_malformed_amount")
+            else:
                 raise PrecomposerSelectedOfferContractError("multiple_non_fixed_offer")
-            if price.amount is None or int(price.amount) < 0:
-                raise PrecomposerSelectedOfferContractError("multiple_malformed_amount")
             if not str(price.currency or "").strip():
                 raise PrecomposerSelectedOfferContractError("multiple_malformed_currency")
             if not str(price.billing_unit or "").strip():

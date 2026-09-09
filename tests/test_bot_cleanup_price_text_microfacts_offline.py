@@ -33,6 +33,12 @@ _LIVE_ARTIFACT = (
     _REPO
     / "evals/v5/artifacts/bot_cleanup_live_1/bot_cleanup_live_1_2026-09-04-live-01"
 )
+
+_LIVE_ARTIFACT_AVAILABLE = _LIVE_ARTIFACT.is_dir()
+_SKIP_LIVE_ARTIFACT = pytest.mark.skipif(
+    not _LIVE_ARTIFACT_AVAILABLE,
+    reason="requires local LIVE artifact tree (not committed to git)",
+)
 _TARGET_ROOT = _REPO / "clients/demo/target_response"
 _DEMO_BUNDLE = load_target_client_data("demo").bundle
 _REPO_DEMO_DB = _REPO / "data" / "demo" / "bot.db"
@@ -426,6 +432,7 @@ def test_microfact_not_excluded_by_direct_fact_id_without_prose() -> None:
     ]
 
 
+@_SKIP_LIVE_ARTIFACT
 def test_live_replay_prc_01_ct_single_code_price(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
@@ -448,6 +455,7 @@ def test_live_replay_prc_01_ct_single_code_price(
     assert "3D-снимок" not in answer
 
 
+@_SKIP_LIVE_ARTIFACT
 def test_live_replay_prc_02_implantium_keeps_package_not_duplicate_price(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
@@ -480,6 +488,7 @@ def test_live_replay_prc_02_implantium_keeps_package_not_duplicate_price(
     assert "31000" not in digits
 
 
+@_SKIP_LIVE_ARTIFACT
 def test_live_replay_prc_03_pure_price_without_auto_microfacts(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,

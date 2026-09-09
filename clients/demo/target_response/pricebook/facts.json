@@ -6,6 +6,7 @@
     "text_fact": "Поможем подготовить документы для оформления налогового вычета за лечение.",
     "render_mode": "strict",
     "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#nalogovyj-vychet",
     "allowed_service_ids": [
       "aligners",
       "all_on_4",
@@ -37,8 +38,10 @@
     "kind": "payment",
     "catalog_label": "Рассрочка на лечение",
     "text_fact": "Доступна рассрочка на имплантацию и протезирование до 12 месяцев; оформление на консультации.",
+    "microfact_text": "Рассрочка до 12 месяцев, оформление на консультации.",
     "render_mode": "strict",
     "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#rassrochka",
     "allowed_service_ids": [
       "classic",
       "one_stage",
@@ -75,8 +78,10 @@
     "kind": "promo",
     "catalog_label": "Условия консультации по имплантации и протезированию",
     "text_fact": "До 31 декабря 2026 — бесплатная консультация по имплантации и протезированию. На консультации подготовим три варианта плана лечения по стоимости, чтобы вы могли выбрать подходящий под свой бюджет. Врач подскажет, какой протокол или конструкция подойдут именно вам. КТ при необходимости оплачивается отдельно.",
+    "microfact_text": "Бесплатная консультация до 31.12.2026.",
     "render_mode": "natural",
     "active": true,
+    "detail_ref": "clinic__info__promo__free_implant_consult.md#korotko",
     "allowed_service_ids": [
       "classic",
       "one_stage",
@@ -98,8 +103,7 @@
       "prosthetics"
     ],
     "incompatible_with": [],
-    "active_until": "2026-12-31",
-    "detail_ref": "clinic__info__consultation.md#korotko"
+    "active_until": "2026-12-31"
   },
   "implant_warranty": {
     "id": "implant_warranty",
@@ -131,8 +135,10 @@
     "kind": "promo",
     "catalog_label": "Скидка при оплате в день обращения",
     "text_fact": "При оплате в день обращения — скидка до 15% на имплантацию.",
+    "microfact_text": "Скидка до 15% при оплате в день обращения.",
     "render_mode": "strict",
     "active": true,
+    "detail_ref": "clinic__info__promo__implant_same_day_discount.md#korotko",
     "allowed_service_ids": [
       "classic",
       "one_stage",
@@ -151,8 +157,10 @@
     "kind": "promo",
     "catalog_label": "Скидка на профессиональное отбеливание",
     "text_fact": "Сейчас на профессиональное отбеливание действует скидка 10% до 30 ноября 2026 года.",
+    "microfact_text": "Скидка 10% до 30.11.2026.",
     "render_mode": "strict",
     "active": true,
+    "detail_ref": "clinic__info__promo__professional_whitening_discount.md#korotko",
     "allowed_service_ids": [
       "professional_whitening"
     ],
@@ -164,8 +172,10 @@
     "kind": "payment",
     "catalog_label": "Оплата по этапам",
     "text_fact": "Доступна оплата лечения по этапам.",
+    "microfact_text": "Оплата по этапам лечения.",
     "render_mode": "strict",
     "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#oplata-po-etapam",
     "allowed_service_ids": [
       "classic",
       "one_stage",
@@ -189,8 +199,10 @@
     "kind": "benefit",
     "catalog_label": "Фиксация стоимости в договоре",
     "text_fact": "Стоимость согласованного плана лечения фиксируется в договоре до начала лечения.",
+    "microfact_text": "Стоимость фиксируется в договоре.",
     "render_mode": "strict",
     "active": true,
+    "detail_ref": "clinic__info__payment_terms.md#fiksatsiya-stoimosti",
     "allowed_service_ids": [
       "aligners",
       "all_on_4",

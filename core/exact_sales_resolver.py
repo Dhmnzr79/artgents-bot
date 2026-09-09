@@ -14,6 +14,7 @@ from contracts.exact_sales_resolution import (
 from contracts.patient_scope_projection import ProjectedPatientScope
 from contracts.response_schema import TargetService
 from contracts.ui_scope_action import UiScopeAction
+from contracts.ui_service_action import UiServiceAction
 from contracts.ui_stage_action import UiStageAction
 from core.target_effective_scope import SessionPatientFacts
 from core.target_effective_scope_merge import (
@@ -51,6 +52,8 @@ class ExactSalesResolverInputs:
     session_turn_count: int
     current_ui_scope_action: UiScopeAction | None = None
     current_ui_stage_action: UiStageAction | None = None
+    current_ui_service_action: UiServiceAction | None = None
+    pending_text_service_candidate_id: str | None = None
     exact_service_term: str | None = None
     exact_aspect: AspectKind | None = None
     projected_turn_scope: ProjectedPatientScope | None = None
@@ -228,15 +231,30 @@ def resolve_exact_sales_inputs(inputs: ExactSalesResolverInputs) -> ExactSalesRe
     )
 
     service_id: str | None = None
-    if inputs.exact_service_term is not None:
+    service_authority = ExactSalesFieldAuthority(
+        authority="unknown",
+        provenance="unknown",
+    )
+    if inputs.current_ui_service_action is not None:
+        service_id = inputs.current_ui_service_action.service_id
+        service_authority = ExactSalesFieldAuthority(
+            authority="governed_ui",
+            provenance=inputs.current_ui_service_action.ref,
+        )
+    elif inputs.pending_text_service_candidate_id is not None:
+        service_id = inputs.pending_text_service_candidate_id
+        service_authority = ExactSalesFieldAuthority(
+            authority="exact_turn",
+            provenance="pending_price_clarify_catalog",
+        )
+    elif inputs.exact_service_term is not None:
         resolution = resolve_target_service_term(inputs.services, inputs.exact_service_term)
         if resolution is not None:
             service_id = resolution.service_id
-
-    service_authority = ExactSalesFieldAuthority(
-        authority="exact_turn" if service_id is not None else "unknown",
-        provenance="exact_service_term" if service_id is not None else "unknown",
-    )
+            service_authority = ExactSalesFieldAuthority(
+                authority="exact_turn",
+                provenance="exact_service_term",
+            )
     aspect_authority = ExactSalesFieldAuthority(
         authority="exact_turn" if inputs.exact_aspect is not None else "unknown",
         provenance="exact_aspect" if inputs.exact_aspect is not None else "unknown",

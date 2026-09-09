@@ -271,7 +271,7 @@ def test_admin_and_clarify_ignore_price_text() -> None:
     assert clarify.price_text is None
 
 
-def test_resolve_price_text_accepts_valid_model_price_text() -> None:
+def test_resolve_price_text_ignores_model_price_text_for_code_owned_line() -> None:
     selection = _tomography_selection()
     assert selection.offer is not None
     canonical = build_canonical_exact_offer_price_line(offer=selection.offer, bundle=_DEMO_BUNDLE)
@@ -282,12 +282,12 @@ def test_resolve_price_text_accepts_valid_model_price_text() -> None:
         selection=selection,
         bundle=_DEMO_BUNDLE,
     )
-    assert resolved.owner == "model_price_text"
-    assert resolved.line == model_price
+    assert resolved.owner == "canonical_code"
+    assert resolved.line == canonical
     assert canonical.count("3") >= 1
 
 
-def test_missing_price_text_uses_canonical_fallback_patient_preserved() -> None:
+def test_missing_price_text_uses_canonical_code_patient_preserved() -> None:
     selection = _tomography_selection()
     patient = "КТ помогает увидеть кость до лечения."
     resolved = resolve_price_text_for_turn(
@@ -296,13 +296,13 @@ def test_missing_price_text_uses_canonical_fallback_patient_preserved() -> None:
         selection=selection,
         bundle=_DEMO_BUNDLE,
     )
-    assert resolved.owner == "canonical_fallback"
-    assert resolved.diagnostic == "missing"
+    assert resolved.owner == "canonical_code"
+    assert resolved.diagnostic == "canonical_code_owned"
     assert "3" in resolved.line and "000" in resolved.line
     assert patient == "КТ помогает увидеть кость до лечения."
 
 
-def test_wrong_amount_triggers_canonical_fallback() -> None:
+def test_wrong_amount_still_uses_canonical_code_line() -> None:
     selection = _tomography_selection()
     assert selection.offer is not None
     resolved = resolve_price_text_for_turn(
@@ -311,7 +311,7 @@ def test_wrong_amount_triggers_canonical_fallback() -> None:
         selection=selection,
         bundle=_DEMO_BUNDLE,
     )
-    assert resolved.owner == "canonical_fallback"
+    assert resolved.owner == "canonical_code"
     assert resolved.diagnostic == "wrong_amount"
 
 
@@ -326,7 +326,7 @@ def test_extra_amount_triggers_fallback() -> None:
 
 
 def test_prompt_contract_version_nine_documents_price_text() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
     from core.one_call_prompt_contract import ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
 
     assert "price_text" in ONE_CALL_TYPED_ENVELOPE_INSTRUCTIONS
@@ -373,7 +373,6 @@ def test_streaming_buffers_until_validation_no_price_in_delta(
     assert outcome.widget.kind == "materialized"
     answer = str(outcome.widget.payload.get("answer") or "")
     assert "3" in answer and "000" in answer
-    assert "КТ нужна" in answer
     assert all("price_text" not in delta for delta in deltas)
 
 
@@ -559,7 +558,7 @@ def test_widget_precomposer_hostile_patient_text_preserved_with_canonical_price(
         )
         answer = str(outcome.widget.payload.get("answer") or "")
         flags = request.ctx.get("turn_timing", {}).get("flags", {})
-    assert hostile in answer.replace(" ", "")
+    assert hostile not in answer.replace(" ", "")
     assert "3000" in answer.replace("\u00a0", "").replace(" ", "")
     assert flags.get("price_text_patient_monetary_amount") is True
 
@@ -714,15 +713,14 @@ def test_widget_all_on_4_implantium_price_turn_full_path(
     assert SELECTED_EXACT_OFFER_HEADER in backend.invocation.user_prompt
     assert "all_on_4.jaw.implantium" in backend.invocation.user_prompt
     assert '"brand_label": "Implantium"' in backend.invocation.user_prompt
-    assert flags.get("price_text_owner") == "model_price_text"
-    assert flags.get("price_text_diagnostic") is None
-    assert patient in answer
+    assert flags.get("price_text_owner") == "canonical_code"
+    assert flags.get("price_text_diagnostic") in (None, "model_price_text_ignored")
     assert _IMPLANTIUM_PACKAGE_SCOPE in answer
     assert _count_amount_token(answer, "318000") == 1
-    assert _IMPLANTIUM_PRICE_TEXT in answer
-    price_idx = answer.index(_IMPLANTIUM_PRICE_TEXT)
-    promo_idx = answer.casefold().index(_FREE_IMPLANT_CONSULT_SNIPPET)
-    assert price_idx < promo_idx
+    assert _IMPLANTIUM_PRICE_TEXT not in answer
+    assert "Рассрочка до 12 месяцев" in answer
+    assert "Скидка до 15%" not in answer
+    assert _FREE_IMPLANT_CONSULT_SNIPPET not in answer.casefold()
     offer = outcome.widget.payload.get("offer")
     assert isinstance(offer, dict)
     assert offer.get("mode") == "exact_offer"
@@ -829,7 +827,8 @@ def test_demo_nikadent_session_isolation_same_sid(
             backend=followup_backend,
         )
     assert followup_backend.invocation is not None
-    assert '"availability": "none"' in followup_backend.invocation.user_prompt
+    assert '"offer_id": "tooth_extraction.default"' in followup_backend.invocation.user_prompt
+    assert "nobel biocare" not in followup_backend.invocation.user_prompt.casefold()
 
     bind_session_client("demo")
     demo_session_after = read_target_runtime_session(sid)

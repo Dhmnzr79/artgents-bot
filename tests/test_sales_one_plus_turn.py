@@ -71,7 +71,7 @@ _PACK_IDENTITY = ClientPackIdentityKey(
     client_id="unit-test-isolated",
     client_pack_hash=hashlib.sha256(b"unit-test-isolated-pack").hexdigest(),
     prompt_contract_version=ONE_CALL_PROMPT_CONTRACT_VERSION,
-    model_snapshot=config.SALES_ONE_PLUS_FLASH_MODEL,
+    model_snapshot=config.SALES_ONE_PLUS_MODEL,
 )
 _DEMO_PACK_IDENTITY = build_client_pack_identity("demo")
 _EMPTY_CATALOG = ActiveServiceCatalogSnapshot(
@@ -220,8 +220,8 @@ def test_live_adapter_is_one_shot_and_requests_json_mode(monkeypatch) -> None:
     assert len(calls) == 1
 
 
-def test_live_adapter_defaults_to_flash_snapshot_model() -> None:
-    assert live_module.sales_one_plus_model() == config.SALES_ONE_PLUS_FLASH_MODEL
+def test_live_adapter_defaults_to_plus_snapshot_model() -> None:
+    assert live_module.sales_one_plus_model() == config.SALES_ONE_PLUS_MODEL
 
 
 def test_live_demo_model_corpus_and_every_numeric_line_reach_invocation() -> None:

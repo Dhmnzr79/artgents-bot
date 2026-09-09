@@ -80,6 +80,12 @@ SALES_ONE_PLUS_ON = os.getenv("SALES_ONE_PLUS_ON", "0").lower() in (
     "yes",
 )
 # Pinned provider snapshot for the sales-fast path (not an alias).
+# Active sales-fast / One Call provider snapshot (override via env).
+SALES_ONE_PLUS_MODEL = (
+    (os.getenv("SALES_ONE_PLUS_MODEL") or "").strip() or "qwen3.7-plus-2026-05-26"
+)
+SALES_ONE_PLUS_TIMEOUT_SEC = float(os.getenv("SALES_ONE_PLUS_TIMEOUT_SEC", "40"))
+# Legacy Flash snapshot — deprecated; does not control active sales-fast runtime.
 SALES_ONE_PLUS_FLASH_MODEL = "qwen3.7-flash-2026-07-15"
 
 # --- Lead booking date defer (no slot confirmation without schedule; default on, env "0" = kill-switch) ---

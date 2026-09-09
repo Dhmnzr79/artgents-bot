@@ -30,7 +30,7 @@
     "conditions": [
       {
         "condition_id": "mandatory_exclusion",
-        "display_text": "имплантация — отдельно"
+        "display_text": "Имплантация — отдельно."
       }
     ]
   }

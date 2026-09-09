@@ -28,14 +28,36 @@ def _lint_pricing_md(md_dir: Path) -> list[str]:
     return errors
 
 
+def _normalize_package_item(value: str) -> str:
+    return value.strip().casefold()
+
+
+_DEMO_STAGE_A_EXCLUDES: dict[str, tuple[str, ...]] = {
+    "classic": ("КТ при необходимости", "временная коронка"),
+    "one_stage": ("КТ", "лечение воспаления по показаниям", "временная коронка"),
+    "all_on_4": ("КТ", "костная пластика по показаниям"),
+    "all_on_6": ("КТ", "костная пластика по показаниям"),
+    "implant_supported_prosthetics": (
+        "хирургическая установка импланта",
+        "КТ",
+    ),
+    "sinus_lift": ("имплант", "коронка", "КТ"),
+}
+
+
 def _lint_offer_payment_stages(bundle) -> list[str]:
     errors: list[str] = []
     for offer in bundle.offers:
-        price = offer.price
-        stages = price.payment_stages or []
+        stages = offer.payment_stages or []
         if not stages:
             continue
-        total = price.amount or price.min_amount
+        price = offer.price
+        if price.mode == "fixed":
+            total = price.amount
+        elif price.mode == "from":
+            total = price.min_amount
+        else:
+            continue
         if total is None:
             continue
         stage_sum = sum(stage.amount for stage in stages)
@@ -44,6 +66,54 @@ def _lint_offer_payment_stages(bundle) -> list[str]:
                 f"target_response/pricebook/services/{offer.offer_id}.json: "
                 f"payment_stages sum {stage_sum} != price {total}"
             )
+        for index, stage in enumerate(stages, start=1):
+            timing = str(stage.timing_text or "").strip()
+            if not timing:
+                errors.append(
+                    f"target_response/pricebook/services/{offer.offer_id}.json: "
+                    f"payment_stages[{index}] missing timing_text"
+                )
+    return errors
+
+
+def _lint_demo_stage_a_excludes(bundle, client_id: str) -> list[str]:
+    if client_id != "demo":
+        return []
+    errors: list[str] = []
+    for offer in bundle.offers:
+        expected = _DEMO_STAGE_A_EXCLUDES.get(offer.service_id)
+        if expected is None:
+            continue
+        actual = tuple(offer.package.excludes)
+        if actual != expected:
+            errors.append(
+                f"target_response/pricebook/services/{offer.offer_id}.json: "
+                f"expected excludes {expected!r}, got {actual!r}"
+            )
+    return errors
+
+
+def _lint_mandatory_exclusion_compat(bundle) -> list[str]:
+    """Stage A migration: mandatory_exclusion must cover every package.excludes item."""
+
+    errors: list[str] = []
+    for offer in bundle.offers:
+        metadata = offer.required_conditions_metadata
+        if metadata is None:
+            continue
+        excludes = offer.package.excludes
+        if not excludes:
+            continue
+        for cond in metadata.conditions:
+            if cond.condition_id != "mandatory_exclusion":
+                continue
+            display = _normalize_package_item(cond.display_text)
+            for item in excludes:
+                if _normalize_package_item(item) not in display:
+                    errors.append(
+                        f"target_response/pricebook/services/{offer.offer_id}.json: "
+                        f"mandatory_exclusion missing exclude item {item!r}"
+                    )
     return errors
 
 
@@ -64,6 +134,8 @@ def lint_client(client_dir: Path) -> tuple[list[str], list[str]]:
     if not bundle.offers:
         errors.append(f"{target_root}/pricebook/services: no offers")
     errors.extend(_lint_offer_payment_stages(bundle))
+    errors.extend(_lint_demo_stage_a_excludes(bundle, client_dir.name))
+    errors.extend(_lint_mandatory_exclusion_compat(bundle))
     errors.extend(_lint_pricing_md(client_dir / "md"))
     return errors, warnings
 

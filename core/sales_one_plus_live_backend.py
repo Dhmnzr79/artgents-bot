@@ -6,11 +6,15 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from config import SALES_ONE_PLUS_FLASH_MODEL
+from config import SALES_ONE_PLUS_MODEL, SALES_ONE_PLUS_TIMEOUT_SEC
 from contracts.sales_one_plus import SalesOnePlusInvocation
 from core.one_call_cache_observability import OneCallCacheObservability
 from core.turn_timing import cached_tokens_from_usage
-from llm import LLM_REQUEST_TIMEOUT_SEC, chat_completions_create
+from llm import chat_completions_create
+from core.sales_one_plus_provider_diagnostics import (
+    log_sales_one_plus_provider_error,
+    monotonic_elapsed_ms,
+)
 
 
 class SalesOnePlusLiveBackendError(RuntimeError):
@@ -18,7 +22,7 @@ class SalesOnePlusLiveBackendError(RuntimeError):
 
 
 def sales_one_plus_model() -> str:
-    return SALES_ONE_PLUS_FLASH_MODEL
+    return SALES_ONE_PLUS_MODEL
 
 
 def _messages(invocation: SalesOnePlusInvocation) -> tuple[dict[str, str], ...]:
@@ -89,15 +93,27 @@ class SalesOnePlusLiveBackend:
     def generate(self, invocation: SalesOnePlusInvocation, /) -> object:
         self._claim_call()
         provider_started = time.monotonic()
-        response = chat_completions_create(
-            model=self.model,
-            temperature=0,
-            max_completion_tokens=1024,
-            timeout=LLM_REQUEST_TIMEOUT_SEC,
-            messages=_messages(invocation),
-            response_format={"type": "json_object"},
-            provider_call_source="sales_fast",
-        )
+        received_first_stream_chunk = False
+        try:
+            response = chat_completions_create(
+                model=self.model,
+                temperature=0,
+                max_completion_tokens=1024,
+                timeout=SALES_ONE_PLUS_TIMEOUT_SEC,
+                messages=_messages(invocation),
+                response_format={"type": "json_object"},
+                provider_call_source="sales_fast",
+            )
+        except Exception as exc:
+            log_sales_one_plus_provider_error(
+                exc=exc,
+                requested_model=self.model,
+                configured_timeout_sec=SALES_ONE_PLUS_TIMEOUT_SEC,
+                elapsed_ms=monotonic_elapsed_ms(provider_started),
+                stream=False,
+                received_first_stream_chunk=received_first_stream_chunk,
+            )
+            raise
         self.last_observability = _build_observability(
             invocation=invocation,
             response=response,
@@ -116,26 +132,40 @@ class SalesOnePlusLiveBackend:
     ) -> None:
         self._claim_call()
         provider_started = time.monotonic()
-        stream = chat_completions_create(
-            model=self.model,
-            temperature=0,
-            max_completion_tokens=1024,
-            timeout=LLM_REQUEST_TIMEOUT_SEC,
-            messages=_messages(invocation),
-            response_format={"type": "json_object"},
-            stream=True,
-            stream_options={"include_usage": True},
-            provider_call_source="sales_fast",
-        )
-        last_chunk: Any = None
-        for chunk in stream:
-            last_chunk = chunk
-            choices = getattr(chunk, "choices", None) or ()
-            if not choices:
-                continue
-            text = getattr(getattr(choices[0], "delta", None), "content", None)
-            if text:
-                on_raw_delta(str(text))
+        received_first_stream_chunk = False
+        try:
+            stream = chat_completions_create(
+                model=self.model,
+                temperature=0,
+                max_completion_tokens=1024,
+                timeout=SALES_ONE_PLUS_TIMEOUT_SEC,
+                messages=_messages(invocation),
+                response_format={"type": "json_object"},
+                stream=True,
+                stream_options={"include_usage": True},
+                provider_call_source="sales_fast",
+            )
+            last_chunk: Any = None
+            for chunk in stream:
+                last_chunk = chunk
+                choices = getattr(chunk, "choices", None) or ()
+                if not choices:
+                    continue
+                text = getattr(getattr(choices[0], "delta", None), "content", None)
+                if text:
+                    received_first_stream_chunk = True
+                    on_raw_delta(str(text))
+        except Exception as exc:
+            log_sales_one_plus_provider_error(
+                exc=exc,
+                requested_model=self.model,
+                configured_timeout_sec=SALES_ONE_PLUS_TIMEOUT_SEC,
+                elapsed_ms=monotonic_elapsed_ms(provider_started),
+                stream=True,
+                received_first_stream_chunk=received_first_stream_chunk,
+                stream_interrupted=received_first_stream_chunk,
+            )
+            raise
         if last_chunk is not None:
             self.last_observability = _build_observability(
                 invocation=invocation,

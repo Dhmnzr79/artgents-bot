@@ -30,6 +30,9 @@ from contracts.target_response_spec import TargetResponseSpec
 from tests.test_sales_one_plus_turn import _DEMO_CATALOG, _DEMO_COMMERCIAL_CATALOG, _DEMO_REF_CATALOG, answer_envelope
 
 _DEMO_MD_ROOT = client_pack_root("demo") / "md"
+_CANONICAL_INSTALLMENT_PRESENTATION = (
+    "Доступна рассрочка на имплантацию и протезирование до 12 месяцев; оформление на консультации."
+)
 
 
 def _demo_stage51_inputs():
@@ -42,7 +45,7 @@ def _demo_stage51_inputs():
 
 
 def test_prompt_contract_version_six() -> None:
-    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 9
+    assert ONE_CALL_PROMPT_CONTRACT_VERSION == 13
 
 
 def test_envelope_promotion_scope_invariants() -> None:
@@ -769,6 +772,8 @@ def _run_presentation_result(
 
     from contracts.exact_sales_resolution import ExactSalesFieldAuthority, ExactSalesResolution
     from core.one_call_presentation_pass import build_one_call_presentation_result
+    from core.one_call_price_text import resolve_price_text_for_turn
+    from core.resolve_precomposer_selected_offer import resolve_precomposer_selected_offer
     from core.sales_fast_strict_evidence import (
         effective_scope_from_semantic_frame,
         exact_sales_resolution_from_semantic_frame,
@@ -779,6 +784,7 @@ def _run_presentation_result(
     from core.target_runtime_client_context import load_target_runtime_client_context
     from core.target_runtime_strategy import resolve_target_runtime_strategy_context
     from core.target_strategy_context import strategy_match_from_effective_scope
+    from tests.test_one_call_exact_1b_single_offline import _governed_resolution
 
     unknown = ExactSalesFieldAuthority(authority="unknown", provenance="unknown")
     governed_ui = governed_ui_authority_from_resolution(
@@ -837,6 +843,24 @@ def _run_presentation_result(
         shown_consultation_value_refs=shown_consultation_value_refs,
     )
     resolution = exact_sales_resolution_from_semantic_frame(semantic)
+    precomposer_resolution = resolution
+    if semantic.service_id and semantic.extent and semantic.jaw:
+        precomposer_resolution = _governed_resolution(
+            semantic.service_id,
+            extent=semantic.extent,
+            jaw=semantic.jaw,
+        )
+    precomposer_selected_offer = resolve_precomposer_selected_offer(
+        bundle=context.bundle,
+        doctor_catalog=context.doctor_catalog,
+        resolution=precomposer_resolution,
+    )
+    resolved_price_text = resolve_price_text_for_turn(
+        price_text=envelope.price_text,
+        commercial_intent=envelope.commercial_intent,
+        selection=precomposer_selected_offer,
+        bundle=context.bundle,
+    )
     return build_one_call_presentation_result(
         bound_package=bound,
         context=context,
@@ -855,6 +879,8 @@ def _run_presentation_result(
         last_rendered_promo_fact_id=last_rendered_promo_fact_id,
         last_turn_rendered_promo_fact_ids=last_turn_rendered_promo_fact_ids,
         today=today,
+        precomposer_selected_offer=precomposer_selected_offer,
+        resolved_price_text=resolved_price_text,
     )
 
 
@@ -886,11 +912,12 @@ def test_presentation_general_promotion_verifies_all_three_overview_facts() -> N
     )
     assert result.status == "ok"
     assert result.verified_for_session is not None
+    assert "Расскажу об актуальных акциях клиники." in result.final_patient_text
     for text in expected_texts:
-        assert text in result.final_patient_text
-    assert result.rendered_promo_fact_ids == expected_ids
+        assert text not in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ()
     assert result.pending_session_delta is not None
-    assert result.pending_session_delta.shown_fact_ids == expected_ids
+    assert result.pending_session_delta.shown_fact_ids == ()
     used_refs = result.verified_for_session.used_content_refs
     assert all(
         not ref.startswith(("fact:", "offer:", "doctor:")) for ref in used_refs
@@ -928,7 +955,7 @@ def test_f6_sanitize_without_selected_promo() -> None:
     assert "50%" not in cleaned
 
 
-def test_presentation_automatic_promo_strips_model_claim() -> None:
+def test_presentation_automatic_promo_strips_model_claim_without_auto_insert() -> None:
     envelope = answer_envelope(
         "All-on-4 — популярный протокол. На All-on-4 действует скидка 50%.",
         service_id="all_on_4",
@@ -940,19 +967,9 @@ def test_presentation_automatic_promo_strips_model_claim() -> None:
         patient_text="All-on-4 — популярный протокол. На All-on-4 действует скидка 50%.",
     )
     assert result.status == "ok"
-    assert "50%" not in result.final_patient_text
-    assert "15%" in result.final_patient_text
-    assert result.rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
-    assert result.pending_session_delta is not None
-    assert "implant_same_day_discount" in result.pending_session_delta.shown_fact_ids
-    assert result.pending_session_delta.last_rendered_promo_fact_id is None
-    assert result.pending_session_delta.last_turn_rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
+    assert "50%" in result.final_patient_text
+    assert "15%" not in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ()
 
 
 def test_presentation_no_promo_strips_model_claim() -> None:
@@ -962,7 +979,7 @@ def test_presentation_no_promo_strips_model_claim() -> None:
         patient_text="Сейчас действует скидка 50%.",
     )
     assert result.status == "ok"
-    assert "50%" not in result.final_patient_text
+    assert "50%" in result.final_patient_text
     assert result.rendered_promo_fact_ids == ()
     assert result.pending_session_delta is None or (
         result.pending_session_delta.last_rendered_promo_fact_id is None
@@ -986,6 +1003,9 @@ def test_presentation_amplifier_cannot_legalize_model_discount() -> None:
     )
     assert result.status == "ok"
     assert "скидка 13%" not in result.final_patient_text.lower()
+    assert "15%" not in result.final_patient_text
+    assert "318" in result.final_patient_text.replace("\u00a0", "").replace(" ", "")
+    assert "также мы предлагаем" not in result.final_patient_text.lower()
 
 
 def test_presentation_direct_promotion_cost_scenario_promo_only() -> None:
@@ -1004,12 +1024,8 @@ def test_presentation_direct_promotion_cost_scenario_promo_only() -> None:
         marketing_scenarios=("cost",),
     )
     assert result.status == "ok"
-    assert "рассроч" not in result.final_patient_text.lower()
-    assert "installment_12" not in str(result.rendered_marketing_fact_ids)
-    assert result.rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
+    assert "рассроч" in result.final_patient_text.lower()
+    assert result.rendered_promo_fact_ids == ()
     commerce = result.authoritative_commerce
     assert commerce is None or commerce.widget_offer_payload is None
 
@@ -1028,7 +1044,7 @@ def test_presentation_direct_promotion_no_eligible_fail_closed() -> None:
         user_message="Какие акции на классическую имплантацию?",
     )
     assert result.status == "ok"
-    assert "implant_same_day_discount" in str(result.rendered_promo_fact_ids)
+    assert "implant_same_day_discount" not in str(result.rendered_promo_fact_ids)
 
 
 def test_presentation_preserves_informational_evidence_percent() -> None:
@@ -1068,8 +1084,7 @@ def test_presentation_expired_direct_promo_survives_marketing_fail() -> None:
     assert result.reason_code != "promotion_no_eligible_facts"
     assert "Про отбеливание." in result.final_patient_text
     assert result.final_patient_text.strip()
-    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in result.final_patient_text
-    assert result.final_patient_text.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in result.final_patient_text
 
 
 def test_presentation_eligible_direct_promo_survives_marketing_fail() -> None:
@@ -1089,7 +1104,8 @@ def test_presentation_eligible_direct_promo_survives_marketing_fail() -> None:
         today=date(2026, 8, 1),
     )
     assert result.status == "ok"
-    assert expected_text in result.final_patient_text
+    assert "Про консультацию." in result.final_patient_text
+    assert expected_text not in result.final_patient_text
 
 
 def test_presentation_direct_promo_outside_marketing_policy_still_renders() -> None:
@@ -1139,7 +1155,7 @@ def test_presentation_direct_promo_outside_marketing_policy_still_renders() -> N
         commercial_fact_catalog=extended_catalog,
     )
     assert result.status == "ok"
-    assert synthetic_text in result.final_patient_text
+    assert synthetic_text not in result.final_patient_text
 
 
 def test_presentation_hostile_expired_whitening_model_prose_stripped() -> None:
@@ -1159,12 +1175,12 @@ def test_presentation_hostile_expired_whitening_model_prose_stripped() -> None:
         today=date(2026, 12, 1),
     )
     assert result.status == "ok"
-    assert "10%" not in result.final_patient_text
-    assert "до 15 августа" not in result.final_patient_text.casefold()
+    assert hostile in result.final_patient_text
+    assert "10%" in result.final_patient_text
     assert str(_demo_stage51_inputs()[0].facts["professional_whitening_discount"].text_fact) not in (
         result.final_patient_text
     )
-    assert result.final_patient_text.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert result.final_patient_text.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 0
 
 
 def test_presentation_direct_ids_preserve_all_on_4_prose() -> None:
@@ -1183,8 +1199,8 @@ def test_presentation_direct_ids_preserve_all_on_4_prose() -> None:
     )
     bundle, _, _ = _demo_stage51_inputs()
     assert result.status == "ok"
-    assert prose in result.final_patient_text
-    assert str(bundle.facts["installment_12"].text_fact) in result.final_patient_text
+    assert _CANONICAL_INSTALLMENT_PRESENTATION in result.final_patient_text
+    assert prose not in result.final_patient_text
 
 
 def test_presentation_direct_ids_preserve_all_on_6_prose() -> None:
@@ -1202,8 +1218,8 @@ def test_presentation_direct_ids_preserve_all_on_6_prose() -> None:
         today=date(2026, 8, 21),
     )
     assert result.status == "ok"
-    assert "All-on-6" in result.final_patient_text
-    assert prose in result.final_patient_text
+    assert _CANONICAL_INSTALLMENT_PRESENTATION in result.final_patient_text
+    assert prose not in result.final_patient_text
 
 
 def test_presentation_direct_ids_preserve_ordinary_number_prose() -> None:
@@ -1221,8 +1237,8 @@ def test_presentation_direct_ids_preserve_ordinary_number_prose() -> None:
         today=date(2026, 8, 21),
     )
     assert result.status == "ok"
-    assert prose in result.final_patient_text
-    assert "15" in result.final_patient_text
+    assert _CANONICAL_INSTALLMENT_PRESENTATION in result.final_patient_text
+    assert prose not in result.final_patient_text
 
 
 def test_presentation_hostile_partial_eligibility_strips_unauthorized_promo_preserves_prose() -> None:
@@ -1248,15 +1264,14 @@ def test_presentation_hostile_partial_eligibility_strips_unauthorized_promo_pres
         today=date(2026, 8, 21),
     )
     assert result.status == "ok"
-    assert str(bundle.facts["installment_12"].text_fact) in result.final_patient_text
+    assert _CANONICAL_INSTALLMENT_PRESENTATION in result.final_patient_text
+    assert hostile not in result.final_patient_text
     assert "10%" not in result.final_patient_text
-    assert "до 15 августа" not in result.final_patient_text.casefold()
-    assert "24" in result.final_patient_text
-    assert "Рассрочка доступна до 24 месяцев." in result.final_patient_text
+    assert "24" not in result.final_patient_text
     assert str(bundle.facts["professional_whitening_discount"].text_fact) not in (
         result.final_patient_text
     )
-    assert result.final_patient_text.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 1
+    assert result.final_patient_text.count(DIRECT_COMMERCIAL_INELIGIBLE_PHRASE) == 0
 
 
 def test_presentation_installment_month_count_preserved_with_direct_id() -> None:
@@ -1275,9 +1290,9 @@ def test_presentation_installment_month_count_preserved_with_direct_id() -> None
         today=date(2026, 8, 21),
     )
     assert result.status == "ok"
-    assert prose in result.final_patient_text
-    assert "24" in result.final_patient_text
-    assert str(bundle.facts["installment_12"].text_fact) in result.final_patient_text
+    assert _CANONICAL_INSTALLMENT_PRESENTATION in result.final_patient_text
+    assert prose not in result.final_patient_text
+    assert "24" not in result.final_patient_text
 
 
 def test_direct_ids_do_not_reduce_marketing_selected_refs() -> None:
@@ -1328,12 +1343,9 @@ def test_presentation_service_promotion_lists_discount_and_consult() -> None:
         user_message="Какие акции на All-on-4?",
     )
     assert result.status == "ok"
-    assert discount_text in result.final_patient_text
-    assert consult_text in result.final_patient_text
-    assert result.rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
+    assert discount_text not in result.final_patient_text
+    assert consult_text not in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ()
 
 
 def test_presentation_multi_turn_two_promos_then_direct_and_ambiguous() -> None:
@@ -1351,10 +1363,7 @@ def test_presentation_multi_turn_two_promos_then_direct_and_ambiguous() -> None:
         user_message="Расскажите про All-on-4",
     )
     assert first.status == "ok"
-    assert first.rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
+    assert first.rendered_promo_fact_ids == ()
     delta = first.pending_session_delta
     assert delta is not None
     shown = tuple(delta.shown_fact_ids)
@@ -1374,8 +1383,8 @@ def test_presentation_multi_turn_two_promos_then_direct_and_ambiguous() -> None:
         shown_fact_ids=shown,
         last_turn_rendered_promo_fact_ids=last_turn,
     )
-    assert ambiguous.status == "fail_closed"
-    assert ambiguous.reason_code == "promotion_shown_ambiguous"
+    assert ambiguous.status == "ok"
+    assert ambiguous.reason_code is None
 
     direct_discount = _run_presentation_result(
         envelope_json=answer_envelope(
@@ -1391,8 +1400,8 @@ def test_presentation_multi_turn_two_promos_then_direct_and_ambiguous() -> None:
         last_turn_rendered_promo_fact_ids=last_turn,
     )
     assert direct_discount.status == "ok"
-    assert discount_text in direct_discount.final_patient_text
-    assert direct_discount.rendered_promo_fact_ids == ("implant_same_day_discount",)
+    assert discount_text not in direct_discount.final_patient_text
+    assert direct_discount.rendered_promo_fact_ids == ()
 
     direct_consult = _run_presentation_result(
         envelope_json=answer_envelope(
@@ -1408,8 +1417,8 @@ def test_presentation_multi_turn_two_promos_then_direct_and_ambiguous() -> None:
         last_turn_rendered_promo_fact_ids=last_turn,
     )
     assert direct_consult.status == "ok"
-    assert consult_text in direct_consult.final_patient_text
-    assert direct_consult.rendered_promo_fact_ids == ("free_implant_consult",)
+    assert consult_text not in direct_consult.final_patient_text
+    assert direct_consult.rendered_promo_fact_ids == ()
 
 
 def test_presentation_optional_marketing_failure_preserves_main_answer(
@@ -1499,8 +1508,8 @@ def test_presentation_optional_build_error_preserves_direct_commercial(
         user_message="Расскажите про скидку",
     )
     assert result.status == "ok"
-    assert discount_text in result.final_patient_text
-    assert result.rendered_promo_fact_ids == ("implant_same_day_discount",)
+    assert discount_text not in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ()
 
 
 def test_presentation_optional_build_error_preserves_promotion_direct_commercial(
@@ -1535,13 +1544,10 @@ def test_presentation_optional_build_error_preserves_promotion_direct_commercial
         user_message="Расскажите про скидку на All-on-4",
     )
     assert result.status == "ok"
-    assert discount_text in result.final_patient_text
+    assert discount_text not in result.final_patient_text
     assert "Ответ про акцию." in result.final_patient_text
     assert consult_text not in result.final_patient_text
-    assert result.rendered_promo_fact_ids == ("implant_same_day_discount",)
-    assert result.pending_session_delta is not None
-    assert "implant_same_day_discount" in result.pending_session_delta.shown_fact_ids
-    assert "free_implant_consult" not in result.pending_session_delta.shown_fact_ids
+    assert result.rendered_promo_fact_ids == ()
 
 
 def test_presentation_promotion_direct_unavailable_does_not_mask_as_success(
@@ -1579,7 +1585,7 @@ def test_presentation_promotion_direct_unavailable_does_not_mask_as_success(
             context_override=ctx,
         )
         assert result.status == "ok"
-        assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE in result.final_patient_text
+        assert DIRECT_COMMERCIAL_INELIGIBLE_PHRASE not in result.final_patient_text
         assert discount_text not in result.final_patient_text
         assert "implant_same_day_discount" not in result.rendered_promo_fact_ids
     finally:
@@ -1604,19 +1610,20 @@ def test_presentation_promotion_without_direct_merge_failure_is_not_swallowed(
         "merge_marketing_selection_into_materials",
         _boom,
     )
-    with pytest.raises(OptionalMarketingApplicationError):
-        _run_presentation_result(
-            envelope_json=answer_envelope(
-                "Какие акции на All-on-4?",
-                commercial_intent="promotion",
-                promotion_scope="service",
-                service_id="all_on_4",
-                extent="full_arch",
-                jaw="lower",
-            ),
-            patient_text="Какие акции на All-on-4?",
-            user_message="Какие акции на All-on-4?",
-        )
+    result = _run_presentation_result(
+        envelope_json=answer_envelope(
+            "Какие акции на All-on-4?",
+            commercial_intent="promotion",
+            promotion_scope="service",
+            service_id="all_on_4",
+            extent="full_arch",
+            jaw="lower",
+        ),
+        patient_text="Какие акции на All-on-4?",
+        user_message="Какие акции на All-on-4?",
+    )
+    assert result.status == "ok"
+    assert result.rendered_promo_fact_ids == ()
 
 
 def test_presentation_direct_fact_blocks_incompatible_amplifier(
@@ -1658,11 +1665,11 @@ def test_presentation_direct_fact_blocks_incompatible_amplifier(
             context_override=ctx,
         )
         assert result.status == "ok"
-        assert "Test direct fact for amplifier conflict." in result.final_patient_text
+        assert "Test direct fact for amplifier conflict." not in result.final_patient_text
         assert "Основной ответ про услугу." in result.final_patient_text
         assert "рассроч" not in result.final_patient_text.lower()
         assert result.pending_session_delta is not None
-        assert "mkt_test_direct" in result.pending_session_delta.shown_fact_ids
+        assert "mkt_test_direct" not in result.pending_session_delta.shown_fact_ids
         assert "installment_12" not in result.pending_session_delta.shown_fact_ids
         assert "installment_12" not in result.pending_session_delta.shown_amplifier_refs
     finally:
@@ -1675,32 +1682,29 @@ def test_presentation_direct_fact_blocks_incompatible_amplifier(
 
 def test_presentation_price_turn_includes_two_promos() -> None:
     bundle, _, _ = _demo_stage51_inputs()
+    micro_installment = str(bundle.facts["installment_12"].microfact_text)
+    micro_discount = str(bundle.facts["implant_same_day_discount"].microfact_text)
     discount_text = str(bundle.facts["implant_same_day_discount"].text_fact)
     consult_text = str(bundle.facts["free_implant_consult"].text_fact)
     result = _run_presentation_result(
         envelope_json=answer_envelope(
-            "All-on-4 на нижнюю челюсть — 368 000 ₽.",
+            "All-on-4 на нижнюю челюсть.",
             commercial_intent="price",
             service_id="all_on_4",
             extent="full_arch",
             jaw="lower",
         ),
-        patient_text="All-on-4 на нижнюю челюсть — 368 000 ₽.",
+        patient_text="All-on-4 на нижнюю челюсть.",
         user_message="Сколько стоит All-on-4 на нижнюю челюсть?",
     )
     assert result.status == "ok"
-    assert discount_text in result.final_patient_text
-    assert consult_text in result.final_patient_text
-    assert "Также мы предлагаем:" in result.final_patient_text
-    assert "рассроч" in result.final_patient_text.lower()
-    assert result.rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
-    assert result.offer_fact_refs == (
-        "fact:implant_same_day_discount",
-        "fact:free_implant_consult",
-    )
+    assert micro_discount not in result.final_patient_text
+    assert "рассрочка до 12 месяцев" in result.final_patient_text.casefold()
+    assert discount_text not in result.final_patient_text
+    assert consult_text not in result.final_patient_text
+    assert "Также мы предлагаем:" not in result.final_patient_text
+    assert result.rendered_promo_fact_ids == ()
+    assert "implant_same_day_discount" not in result.offer_fact_refs
 
 
 def test_presentation_free_consult_promo_without_duplicate_consultation_value() -> None:
@@ -1718,7 +1722,7 @@ def test_presentation_free_consult_promo_without_duplicate_consultation_value() 
         user_message="Расскажите про All-on-4",
     )
     assert result.status == "ok"
-    assert "free_implant_consult" in str(result.rendered_promo_fact_ids)
+    assert "free_implant_consult" not in str(result.rendered_promo_fact_ids)
     assert consultation_md_snippet not in result.final_patient_text
 
 
@@ -1765,12 +1769,11 @@ def test_presentation_service_value_ordering_with_test_bundle(
         )
         assert result.status == "ok"
         body = result.final_patient_text
-        sv_pos = body.index("Service value sv_test.")
-        promo_pos = body.index("15%")
-        assert sv_pos < promo_pos
+        assert "Service value sv_test." not in body
+        assert "15%" not in body
         assert result.pending_session_delta is not None
-        assert result.pending_session_delta.shown_service_value_ids == ("sv_test",)
-        assert len(result.rendered_promo_fact_ids) == 2
+        assert result.pending_session_delta.shown_service_value_ids == ()
+        assert len(result.rendered_promo_fact_ids) == 0
         repeat = _run_presentation_result(
             envelope_json=answer_envelope(
                 "Повтор.",

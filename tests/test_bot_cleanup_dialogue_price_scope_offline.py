@@ -20,6 +20,12 @@ _CONTEXT_COMPARE_ARTIFACT = (
     _REPO
     / "evals/v5/artifacts/bot_context_compare_live_1/bot_context_compare_live_1_2026-09-06-01"
 )
+
+_CONTEXT_COMPARE_ARTIFACT_AVAILABLE = _CONTEXT_COMPARE_ARTIFACT.is_dir()
+_SKIP_CONTEXT_COMPARE_ARTIFACT = pytest.mark.skipif(
+    not _CONTEXT_COMPARE_ARTIFACT_AVAILABLE,
+    reason="requires local context-compare LIVE artifact tree (not committed to git)",
+)
 _REPO_DEMO_DB = _REPO / "data" / "demo" / "bot.db"
 
 
@@ -236,6 +242,7 @@ def flask_app():
     return app_module.app
 
 
+@_SKIP_CONTEXT_COMPARE_ARTIFACT
 def test_dia_02_plus_full_chain_t4_dialogue_price_clarify_not_admin(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
@@ -248,6 +255,7 @@ def test_dia_02_plus_full_chain_t4_dialogue_price_clarify_not_admin(
     _assert_dialogue_price_clarify(final_payload)
 
 
+@_SKIP_CONTEXT_COMPARE_ARTIFACT
 def test_dia_02_plus_curated_chain_t4_dialogue_price_clarify_not_admin(
     monkeypatch: pytest.MonkeyPatch,
     flask_app,

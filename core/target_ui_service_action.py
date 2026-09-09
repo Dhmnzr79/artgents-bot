@@ -33,6 +33,7 @@ def resolve_ui_service_ref_click(
     followups: tuple[TargetRuntimeFollowupItem, ...],
     active_service_ids: frozenset[str] | None = None,
     expected_client_id: str | None = None,
+    pending_allowed_service_ids: frozenset[str] | None = None,
 ) -> UiServiceRefResolution:
     """Session-bound typed ref resolution; fail-closed on malformed, unshown or inactive refs."""
 
@@ -52,6 +53,11 @@ def resolve_ui_service_ref_click(
         if not stored_client_id or stored_client_id != str(expected_client_id).strip():
             return UiServiceRefResolution(kind="clarify")
     if active_service_ids is not None and action.service_id not in active_service_ids:
+        return UiServiceRefResolution(kind="clarify")
+    if (
+        pending_allowed_service_ids is not None
+        and action.service_id not in pending_allowed_service_ids
+    ):
         return UiServiceRefResolution(kind="clarify")
     planner_message = shown.label.strip() or None
     return UiServiceRefResolution(

@@ -19,6 +19,7 @@ from core.target_response_followup_materializer import (
 from core.target_response_materialization_plan import TargetResponseMaterializationPlan
 from core.target_offline_response_assembly import TargetOfflineResponseMaterials
 from core.target_response_followup_policy import TargetResponseFollowupSelection
+from contracts.one_call_envelope import OneCallScenario
 from core.video_catalog_loader import resolve_video_payload
 from core.target_marketing_selector import TargetMarketingSelection
 
@@ -178,9 +179,12 @@ def _cap_secondary_content(
     md_root: Path | None,
     client_id: str,
     primary_content_ref: str | None,
+    used_content_refs: tuple[str, ...],
     content_followups: tuple[TargetContentFollowup, ...],
     cadence: TargetPresentationCadenceState,
     allow_situation: bool,
+    scenario: OneCallScenario | None = None,
+    topic: str | None = None,
 ) -> tuple[tuple[dict[str, str], ...], dict[str, str] | None, dict[str, bool | str], TargetPresentationCadenceUpdate, tuple[str, ...]]:
     dropped: list[str] = []
     selected: list[dict[str, str]] = []
@@ -194,13 +198,13 @@ def _cap_secondary_content(
 
     meta = (
         read_doc_presentation_meta(md_root, primary_content_ref or "")
-        if md_root is not None
+        if md_root is not None and primary_content_ref
         else {}
     )
-    video_key = str(meta.get("video_key") or "").strip() or None
     situation_allowed = bool(meta.get("situation_allowed"))
 
     slots = SECONDARY_CONTENT_MAX
+    video_key = str(meta.get("video_key") or "").strip() or None
     if video_key and video_key not in shown_video:
         resolved = resolve_video_payload(client_id=client_id, video_key=video_key)
         if resolved is not None:
@@ -252,8 +256,11 @@ def decide_target_presentation(
     navigation_followups: tuple[TargetNavigationFollowup, ...],
     selected_followups: TargetResponseFollowupSelection,
     primary_content_ref: str | None,
+    used_content_refs: tuple[str, ...] = (),
     cadence: TargetPresentationCadenceState,
     allow_situation: bool,
+    scenario: OneCallScenario | None = None,
+    topic: str | None = None,
     alternative_secondary_override: tuple[object, ...] | None = None,
 ) -> TargetPresentationDecision:
     """Apply governed slot limits with exactly one navigation channel per response."""
@@ -322,9 +329,12 @@ def decide_target_presentation(
             md_root=md_root,
             client_id=client_id,
             primary_content_ref=primary_content_ref,
+            used_content_refs=used_content_refs,
             content_followups=selected_followups.content,
             cadence=cadence,
             allow_situation=allow_situation,
+            scenario=scenario,
+            topic=topic,
         )
         all_dropped.extend(secondary_dropped)
         if secondary_qr or video is not None or situation.get("show"):

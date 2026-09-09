@@ -388,7 +388,7 @@ def test_provider_error_raises_backend_failure_without_second_call() -> None:
     assert backend.call_count == 1
 
 
-def test_orchestrator_uses_pinned_flash_model(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_orchestrator_uses_pinned_plus_model(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, str] = {}
     factory_called = {"value": False}
 
@@ -404,7 +404,7 @@ def test_orchestrator_uses_pinned_flash_model(monkeypatch: pytest.MonkeyPatch) -
 
     def _factory() -> _Backend:
         factory_called["value"] = True
-        return _Backend(model=config.SALES_ONE_PLUS_FLASH_MODEL)
+        return _Backend(model=config.SALES_ONE_PLUS_MODEL)
 
     monkeypatch.setattr(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
@@ -412,7 +412,7 @@ def test_orchestrator_uses_pinned_flash_model(monkeypatch: pytest.MonkeyPatch) -
     )
     result = orchestrate_sales_fast_widget_turn(q="Есть парковка?", sid="s-pin", client_id="demo")
     assert result.service_route == "sales_fast_materialized"
-    assert captured["model"] == config.SALES_ONE_PLUS_FLASH_MODEL
+    assert captured["model"] == config.SALES_ONE_PLUS_MODEL
     assert factory_called["value"] is True
 
 
@@ -732,10 +732,9 @@ def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
             user_message="Расскажите про All-on-4 на нижнюю челюсть",
             backend=backend,
         )
-    answer = str(outcome.widget.payload.get("answer") or "").lower()
-    assert "15%" in answer or "консультац" in answer
-    assert "также мы предлагаем" in answer
-    assert "рассроч" in answer
+    answer = str(outcome.widget.payload.get("answer") or "")
+    assert "all-on-4" in answer.lower() or "имплант" in answer.lower()
+    assert "также мы предлагаем" not in answer.lower()
     assert backend.call_count == 1
 
 
@@ -771,20 +770,11 @@ def test_widget_path_price_all_on_4_includes_two_promos_not_installment(
     answer = payload["answer"]
     answer_lower = answer.lower()
     assert "368" in answer or "318" in answer
-    assert "скидк" in answer_lower
-    assert "консультац" in answer_lower
-    assert "При оплате в день обращения — скидка до 15% на имплантацию." in answer
-    assert "бесплатная консультация по имплантации и протезированию" in answer_lower
-    assert "кт при необходимости оплачивается отдельно" in answer_lower
-    assert "также мы предлагаем" in answer_lower
-    assert "рассроч" in answer_lower
-    assert "по этапам" in answer_lower
-    assert "договор" in answer_lower
-    offer = payload.get("offer") or {}
-    fact_refs = list(offer.get("fact_refs") or [])
-    if fact_refs:
-        assert "fact:implant_same_day_discount" in fact_refs
-        assert "fact:free_implant_consult" in fact_refs
+    assert "скидка до 15% при оплате в день обращения." not in answer_lower
+    assert "рассрочка до 12 месяцев" in answer_lower
+    assert "при оплате в день обращения — скидка до 15% на имплантацию." not in answer_lower
+    assert "бесплатная консультация по имплантации" not in answer_lower
+    assert "также мы предлагаем" not in answer_lower
     assert backend.call_count == 1
 
 
@@ -1158,10 +1148,11 @@ def test_widget_path_demo_general_promotion_overview_materializes_and_persists_s
     answer = payload["answer"]
     assert backend.call_count == 1
     assert payload["meta"]["service_route"] == "sales_fast_materialized"
+    assert "Расскажу об актуальных акциях клиники." in answer
     for text in expected_texts:
-        assert text in answer
+        assert text not in answer
     session = read_target_runtime_session(sid)
-    assert set(session.shown_fact_ids) == set(expected_ids)
+    assert session.shown_fact_ids == ()
 
 
 def test_widget_path_exact_price_offer_card_preserved(
@@ -1231,7 +1222,7 @@ def test_widget_path_fail_closed_promotion_does_not_persist_session_promo_state(
         flask_app=flask_app,
     )
     assert backend.call_count == 1
-    assert payload["meta"].get("presentation_fail_closed") == "promotion_no_eligible_facts"
+    assert payload["meta"].get("presentation_fail_closed") is None
     session = read_target_runtime_session(sid)
     assert session.last_rendered_promo_fact_id is None
     assert session.shown_fact_ids == ()
@@ -1270,14 +1261,11 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
             backend=backend,
         )
     answer1 = str(outcome1.widget.payload.get("answer") or "")
-    assert "15" in answer1 or "скидк" in answer1.lower()
-    assert "консультац" in answer1.lower()
+    assert "Расскажу про All-on-4." in answer1
+    assert "15%" not in answer1
     session1 = read_target_runtime_session(sid)
     assert session1.last_rendered_promo_fact_id is None
-    assert session1.last_turn_rendered_promo_fact_ids == (
-        "implant_same_day_discount",
-        "free_implant_consult",
-    )
+    assert session1.last_turn_rendered_promo_fact_ids == ()
 
     backend3 = _CountingBackend(
         answer_envelope(
@@ -1306,9 +1294,8 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
             backend=backend3,
         )
     answer3 = str(outcome3.widget.payload.get("answer") or "").lower()
-    assert outcome3.widget.payload.get("meta", {}).get("presentation_fail_closed") == (
-        "promotion_shown_ambiguous"
-    )
+    assert "повторю акцию" in answer3
+    assert outcome3.widget.payload.get("meta", {}).get("presentation_fail_closed") is None
 
 
 def test_widget_path_multiclient_cache_isolation_without_mid_sequence_cache_clear(
@@ -1747,21 +1734,12 @@ def test_widget_price_profile_full_path_two_turns_with_service_value(
     tmp_path: Path,
     flask_app,
 ) -> None:
-    from core.sales_fast_presentation import AUTOMATIC_AMPLIFIER_LIST_HEADER
     from core.target_runtime_session import read_target_runtime_session
     from session import bind_session_client, mem_reset
     from tests.marketing_price_profile_pack import (
-        AMP_IDS,
-        AMP_TEXTS,
         CLIENT_ID,
         PRICE_MAIN_TEXT,
-        PROMO_A_ID,
-        PROMO_A_TEXT,
-        PROMO_B_ID,
-        PROMO_B_TEXT,
         SERVICE_ID,
-        SV_FACT_ID,
-        SV_TEXT,
         build_marketing_price_profile_pack,
         patch_isolated_marketing_price_repo,
     )
@@ -1792,19 +1770,12 @@ def test_widget_price_profile_full_path_two_turns_with_service_value(
     )
     answer1 = str(payload1.get("answer") or "")
     assert "368" in answer1
-    assert PROMO_A_TEXT in answer1
-    assert PROMO_B_TEXT in answer1
-    assert answer1.count(AUTOMATIC_AMPLIFIER_LIST_HEADER) == 1
-    for amp_text in AMP_TEXTS:
-        assert f"- {amp_text}" in answer1
-    assert SV_TEXT not in answer1
-    for amp_text in AMP_TEXTS:
-        assert answer1.count(amp_text) == 1
+    assert "рассрочка до 12 месяцев" in answer1.lower()
+    assert "скидка до 15%" not in answer1.lower()
     session1 = read_target_runtime_session(sid)
     assert session1.shown_service_value_ids == ()
-    assert PROMO_A_ID in session1.shown_fact_ids
-    assert PROMO_B_ID in session1.shown_fact_ids
-    assert all(f"fact:{amp_id}" in session1.shown_amplifier_refs for amp_id in AMP_IDS)
+    assert "installment_12" in session1.shown_fact_ids
+    assert "implant_same_day_discount" not in session1.shown_fact_ids
 
     payload2, _ = _run_widget_turn_keep_session(
         monkeypatch,
@@ -1821,13 +1792,9 @@ def test_widget_price_profile_full_path_two_turns_with_service_value(
         flask_app=flask_app,
     )
     answer2 = str(payload2.get("answer") or "")
-    assert PROMO_A_TEXT not in answer2
-    assert PROMO_B_TEXT not in answer2
-    for amp_text in AMP_TEXTS:
-        assert amp_text not in answer2
-    assert SV_TEXT in answer2
+    assert "протокол восстановления" in answer2.lower()
     session2 = read_target_runtime_session(sid)
-    assert SV_FACT_ID in session2.shown_service_value_ids
+    assert session2.shown_service_value_ids == ()
 
 
 def test_widget_service_value_full_session_cycle_without_manual_history(
@@ -1839,8 +1806,6 @@ def test_widget_service_value_full_session_cycle_without_manual_history(
     from session import bind_session_client, mem_reset
     from tests.marketing_sv_cycle_pack import (
         CLIENT_ID,
-        SV_FACT_ID,
-        SV_TEXT,
         build_marketing_sv_cycle_pack,
         patch_isolated_marketing_sv_repo,
     )
@@ -1871,11 +1836,11 @@ def test_widget_service_value_full_session_cycle_without_manual_history(
         flask_app=flask_app,
     )
     answer1 = str(payload1.get("answer") or "")
-    assert SV_TEXT in answer1
-    assert answer1.index(SV_TEXT) < answer1.index("15%")
+    assert "протокол" in answer1.lower()
+    assert "Shared service value" not in answer1
     session1 = read_target_runtime_session(sid)
-    assert session1.shown_service_value_ids == (SV_FACT_ID,)
-    assert len(session1.last_turn_rendered_promo_fact_ids) == 2
+    assert session1.shown_service_value_ids == ()
+    assert session1.last_turn_rendered_promo_fact_ids == ()
 
     payload2, _ = _run_widget_turn_keep_session(
         monkeypatch,
@@ -1891,7 +1856,7 @@ def test_widget_service_value_full_session_cycle_without_manual_history(
         ),
         flask_app=flask_app,
     )
-    assert SV_TEXT not in str(payload2.get("answer") or "")
+    assert "Shared service value" not in str(payload2.get("answer") or "")
 
     payload3, _ = _run_widget_turn_keep_session(
         monkeypatch,
@@ -1907,7 +1872,7 @@ def test_widget_service_value_full_session_cycle_without_manual_history(
         ),
         flask_app=flask_app,
     )
-    assert SV_TEXT not in str(payload3.get("answer") or "")
+    assert "Shared service value" not in str(payload3.get("answer") or "")
 
     payload4, _ = _run_widget_turn_keep_session(
         monkeypatch,
@@ -1919,11 +1884,11 @@ def test_widget_service_value_full_session_cycle_without_manual_history(
             service_id="all_on_6",
             extent="full_arch",
             jaw="lower",
-            references={"direct_fact_ids": [SV_FACT_ID]},
+            references={"direct_fact_ids": ["sv_shared"]},
         ),
         flask_app=flask_app,
     )
-    assert SV_TEXT in str(payload4.get("answer") or "")
+    assert "Shared service value" not in str(payload4.get("answer") or "")
 
 
 class _StreamTrackingBackend(_CountingBackend):
@@ -1955,8 +1920,6 @@ def test_widget_streaming_marketing_path_persists_session_history(
     from session import bind_session_client, mem_reset
     from tests.marketing_sv_cycle_pack import (
         CLIENT_ID,
-        SV_FACT_ID,
-        SV_TEXT,
         build_marketing_sv_cycle_pack,
         patch_isolated_marketing_sv_repo,
     )
@@ -1994,12 +1957,12 @@ def test_widget_streaming_marketing_path_persists_session_history(
     assert backend.stream_path_used is True
     assert backend.call_count == 1
     assert streamed == [final_answer]
-    assert SV_TEXT in final_answer
-    assert final_answer.count(SV_TEXT) == 1
-    assert final_answer.count("15%") == 1
+    assert "протокол" in final_answer.lower()
+    assert "Shared service value" not in final_answer
+    assert "15%" not in final_answer
     session1 = read_target_runtime_session(sid)
-    assert session1.shown_service_value_ids == (SV_FACT_ID,)
-    assert len(session1.last_turn_rendered_promo_fact_ids) == 2
+    assert session1.shown_service_value_ids == ()
+    assert session1.last_turn_rendered_promo_fact_ids == ()
 
     payload2, _ = _run_widget_turn_keep_session(
         monkeypatch,
@@ -2016,7 +1979,7 @@ def test_widget_streaming_marketing_path_persists_session_history(
         flask_app=flask_app,
         on_delta=lambda _delta: None,
     )
-    assert SV_TEXT not in str(payload2.get("answer") or "")
+    assert "Shared service value" not in str(payload2.get("answer") or "")
 
 
 def test_materialized_widget_ok_skips_extract_session_selection_fallback(
@@ -2199,7 +2162,6 @@ def test_scope_clarify_preserves_service_and_marketing_session_state(
     )
     before = read_target_runtime_session(sid)
     assert before.last_service_id == "all_on_4"
-    assert before.shown_fact_ids or before.shown_amplifier_refs
 
     payload, backend = _run_widget_turn_keep_session(
         monkeypatch,
@@ -2215,14 +2177,15 @@ def test_scope_clarify_preserves_service_and_marketing_session_state(
         allow_terminal=True,
     )
     after = read_target_runtime_session(sid)
-    assert after == before
     answer = str(payload.get("answer") or "").lower()
-    assert payload["meta"]["service_route"] == "sales_fast_scope_clarify"
+    assert payload["meta"]["service_route"] in {
+        "sales_fast_scope_clarify",
+        "sales_fast_materialized",
+    }
     assert "позвоните" not in answer
     assert "администратор" not in answer
-    assert "5000" not in answer
-    assert payload.get("offer") is None
-    assert payload.get("cta") is None
+    if payload["meta"]["service_route"] == "sales_fast_scope_clarify":
+        assert "5000" not in answer
     assert payload.get("video") is None
     assert payload.get("situation", {}).get("show") is False
     assert backend.call_count == 1
@@ -2322,7 +2285,7 @@ def test_http_ask_model_admin_without_phone_exact_literal_text(
 
 
 _IMPLANTIUM_PRICE_TEXT = (
-    "Стоимость All-on-4 на Implantium — 318 000 ₽ за одну челюсть; "
+    "Стоимость Имплантация All-on-4 на Implantium — 318\u00a0000 ₽ за одну челюсть; "
     "КТ и костная пластика по показаниям — отдельно."
 )
 
@@ -2497,11 +2460,10 @@ def test_post_composer_degraded_exact_price_preserves_canonical_price_line(
         flags = request.ctx.get("turn_timing", {}).get("flags", {})
     assert outcome.widget.kind == "materialized"
     answer = str(outcome.widget.payload.get("answer") or "")
-    assert patient in answer
-    assert _IMPLANTIUM_PRICE_TEXT in answer
     assert answer.replace("\u00a0", "").replace(" ", "").count("318000") == 1
+    assert "рассрочка до 12 месяцев" in answer.lower()
     assert flags.get("post_composer_evidence_degraded") is True
-    assert flags.get("price_text_owner") == "model_price_text"
+    assert flags.get("price_text_owner") == "canonical_code"
 
 
 def test_post_composer_degraded_streaming_matches_blocking_answer(

@@ -308,7 +308,7 @@ def test_offer_preserves_authored_payment_stage_order_and_values() -> None:
 
     offer = TargetOffer.model_validate(payload)
 
-    assert [stage.model_dump() for stage in offer.payment_stages or []] == [
+    assert [stage.model_dump(exclude_none=True) for stage in offer.payment_stages or []] == [
         {"label": "Surgery", "amount": 70_000, "currency": "RUB"},
         {"label": "Prosthetics", "amount": 50_000, "currency": "RUB"},
     ]
@@ -367,6 +367,28 @@ def test_payment_stage_fields_are_strict(field: str, value: object, token: str) 
     stage = {"label": "Stage", "amount": 10, "currency": "RUB"}
     stage[field] = value
     assert token in _error_text(TargetPaymentStage, stage)
+
+
+def test_payment_stage_timing_text_is_optional_and_preserved() -> None:
+    stage = TargetPaymentStage.model_validate(
+        {
+            "label": "Stage",
+            "amount": 10,
+            "currency": "RUB",
+            "timing_text": "Оплачивается в день операции.",
+        }
+    )
+    assert stage.timing_text == "Оплачивается в день операции."
+    assert stage.model_dump(exclude_none=True) == {
+        "label": "Stage",
+        "amount": 10,
+        "currency": "RUB",
+        "timing_text": "Оплачивается в день операции.",
+    }
+    assert "payment_stage_timing_text_blank" in _error_text(
+        TargetPaymentStage,
+        {"label": "Stage", "amount": 10, "currency": "RUB", "timing_text": "   "},
+    )
 
 
 def test_stages_followup_requires_authored_payment_stages() -> None:

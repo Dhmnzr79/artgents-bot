@@ -12,6 +12,7 @@ from config import (
 )
 from contracts.ask_orchestration import AskOrchestrationResult
 from contracts.local_problem_gate import LocalProblemGateResult
+from contracts.ui_service_action import is_ui_service_ref
 from core import turn_timing
 from core.local_problem_gate import decide_local_problem_gate
 from core.sales_fast_widget_runtime import (
@@ -43,6 +44,30 @@ GOVERNED_TYPED_UI_GATE = LocalProblemGateResult(
     decision="pass",
     reason_code="governed_typed_ui",
 )
+
+
+def _maybe_clear_unrelated_pending_price_clarify_for_turn(
+    *,
+    sid: str,
+    client_id: str,
+    user_message: str,
+    ref: str | None,
+) -> None:
+    if ref and is_ui_service_ref(ref):
+        return
+    from core.pending_price_clarify import maybe_clear_unrelated_pending_price_clarify
+    from core.target_runtime_client_context import load_target_runtime_client_context
+
+    try:
+        bundle = load_target_runtime_client_context(client_id).bundle
+    except Exception:
+        return
+    maybe_clear_unrelated_pending_price_clarify(
+        sid,
+        user_message=user_message,
+        bundle=bundle,
+        is_governed_service_click=False,
+    )
 
 
 def _service_reply_from_gate(
@@ -147,6 +172,32 @@ def _try_deterministic_contacts_terminal(
     )
 
 
+def _session_bound_label_for_ref(*, ref: str, sid: str) -> str | None:
+    from core.target_runtime_session import read_target_runtime_session
+
+    ref_eff = str(ref or "").strip()
+    if not ref_eff:
+        return None
+    session_state = read_target_runtime_session(sid)
+    for item in session_state.followups:
+        if str(item.ref or "").strip() == ref_eff:
+            label = str(item.label or "").strip()
+            return label or None
+    return None
+
+
+def _is_governed_ref_label_only_click(*, ref: str, q: str, sid: str) -> bool:
+    """True for ref-only clicks or ref+q where q equals the session-bound label."""
+
+    q_eff = str(q or "").strip()
+    if not q_eff:
+        return True
+    label = _session_bound_label_for_ref(ref=ref, sid=sid)
+    if not label:
+        return False
+    return q_eff.casefold() == label.casefold()
+
+
 def _resolve_governed_typed_ui_ref(
     *,
     ref: str,
@@ -163,9 +214,27 @@ def _resolve_governed_typed_ui_ref(
         pass
     mark_nav_ref_used(sid, ref_eff)
 
-    if q:
+    from contracts.ui_scope_action import is_ui_scope_ref
+    from contracts.ui_service_action import is_ui_service_ref
+    from contracts.ui_stage_action import is_ui_stage_ref
+    from core.target_runtime_followup_nav import build_target_unknown_ref_clarify_payload
+    from core.target_runtime_session import (
+        read_target_runtime_session,
+        write_session_patient_facts_from_ui_action,
+        write_session_patient_facts_from_ui_stage_action,
+    )
+    from core.target_ui_scope_action import resolve_ui_scope_ref_click
+    from core.target_ui_service_action import resolve_ui_service_ref_click
+    from core.target_ui_stage_action import resolve_ui_stage_ref_click
+
+    governed_typed_ref = (
+        is_ui_scope_ref(ref_eff)
+        or is_ui_service_ref(ref_eff)
+        or is_ui_stage_ref(ref_eff)
+    )
+
+    if q and not governed_typed_ref:
         from core.target_runtime_followup_nav import resolve_target_followup_navigation
-        from core.target_runtime_session import read_target_runtime_session
 
         session_state = read_target_runtime_session(sid)
         nav = resolve_target_followup_navigation(
@@ -174,8 +243,6 @@ def _resolve_governed_typed_ui_ref(
             followups=session_state.followups,
         )
         if nav is not None and nav.matched_ref is None:
-            from core.target_runtime_followup_nav import build_target_unknown_ref_clarify_payload
-
             payload = build_target_unknown_ref_clarify_payload(
                 client_id=client_id,
                 sid=sid,
@@ -191,19 +258,6 @@ def _resolve_governed_typed_ui_ref(
         if nav is not None and nav.user_message:
             return nav.user_message
         return q
-
-    from contracts.ui_scope_action import is_ui_scope_ref
-    from contracts.ui_service_action import is_ui_service_ref
-    from contracts.ui_stage_action import is_ui_stage_ref
-    from core.target_runtime_followup_nav import build_target_unknown_ref_clarify_payload
-    from core.target_runtime_session import (
-        read_target_runtime_session,
-        write_session_patient_facts_from_ui_action,
-        write_session_patient_facts_from_ui_stage_action,
-    )
-    from core.target_ui_scope_action import resolve_ui_scope_ref_click
-    from core.target_ui_service_action import resolve_ui_service_ref_click
-    from core.target_ui_stage_action import resolve_ui_stage_ref_click
 
     session_state = read_target_runtime_session(sid)
     if is_ui_scope_ref(ref_eff):
@@ -229,10 +283,29 @@ def _resolve_governed_typed_ui_ref(
             request.ctx["current_ui_scope_action"] = ui_resolution.action.model_dump()
         except Exception:
             pass
-        return "продолжить"
+        label = str(ui_resolution.planner_message or "").strip()
+        if not label:
+            payload = build_target_unknown_ref_clarify_payload(
+                client_id=client_id,
+                sid=sid,
+            )
+            return AskOrchestrationResult(
+                kind="service_reply",
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                service_payload=payload,
+                service_route="sales_fast_followup_unknown",
+            )
+        return (q or label).strip() or label
     if is_ui_service_ref(ref_eff):
+        from core.pending_price_clarify import (
+            is_pending_price_clarify_fresh,
+            read_pending_price_clarify,
+        )
         from core.target_runtime_client_context import load_target_runtime_client_context
         from core.service_reference_catalog import ServiceReferenceCatalogSnapshot
+        from session import mem_get
 
         try:
             runtime_context = load_target_runtime_client_context(client_id)
@@ -241,11 +314,19 @@ def _resolve_governed_typed_ui_ref(
             ).active_service_ids
         except Exception:
             active_ids = frozenset()
+        pending_allowed: frozenset[str] | None = None
+        pending = read_pending_price_clarify(mem_get(sid))
+        if pending is not None and is_pending_price_clarify_fresh(
+            pending,
+            session_turn_count=session_state.session_turn_count,
+        ):
+            pending_allowed = frozenset(pending.allowed_service_ids)
         ui_resolution = resolve_ui_service_ref_click(
             ref=ref_eff,
             followups=session_state.followups,
             active_service_ids=active_ids,
             expected_client_id=client_id,
+            pending_allowed_service_ids=pending_allowed,
         )
         if ui_resolution.kind != "ok" or ui_resolution.action is None:
             payload = build_target_unknown_ref_clarify_payload(
@@ -264,16 +345,17 @@ def _resolve_governed_typed_ui_ref(
             request.ctx["current_ui_service_action"] = ui_resolution.action.model_dump()
         except Exception:
             pass
-        try:
-            request.ctx["current_ui_scope_action"] = {
-                "service_id": ui_resolution.action.service_id,
-                "extent": None,
-                "jaw": None,
-                "provenance": ui_resolution.action.ref,
-            }
-        except Exception:
-            pass
-        return "продолжить"
+        label = str(ui_resolution.planner_message or "").strip()
+        if not label:
+            service = None
+            try:
+                runtime_context = load_target_runtime_client_context(client_id)
+                service = runtime_context.bundle.services.get(ui_resolution.action.service_id)
+            except Exception:
+                service = None
+            if service is not None:
+                label = str(service.name or ui_resolution.action.service_id).strip()
+        return (q or label or ui_resolution.action.service_id).strip()
     if is_ui_stage_ref(ref_eff):
         ui_resolution = resolve_ui_stage_ref_click(
             ref=ref_eff,
@@ -301,8 +383,21 @@ def _resolve_governed_typed_ui_ref(
             request.ctx["current_ui_stage_action"] = ui_resolution.action.model_dump()
         except Exception:
             pass
-        return "продолжить"
-
+        label = str(ui_resolution.planner_message or "").strip()
+        if not label:
+            payload = build_target_unknown_ref_clarify_payload(
+                client_id=client_id,
+                sid=sid,
+            )
+            return AskOrchestrationResult(
+                kind="service_reply",
+                q=q,
+                sid=sid,
+                client_id=client_id,
+                service_payload=payload,
+                service_route="sales_fast_followup_unknown",
+            )
+        return (q or label).strip() or label
     from core.target_runtime_followup_nav import resolve_target_followup_navigation
 
     nav = resolve_target_followup_navigation(
@@ -435,8 +530,13 @@ def orchestrate_sales_one_plus_ask_turn(
     from contracts.ui_service_action import is_ui_service_ref
     from contracts.ui_stage_action import is_ui_stage_ref
 
-    governed_typed_ui = bool(ref) and not q and (
+    governed_ui_ref = bool(ref) and (
         is_ui_scope_ref(ref) or is_ui_stage_ref(ref) or is_ui_service_ref(ref)
+    )
+    governed_typed_ui = bool(
+        ref
+        and governed_ui_ref
+        and _is_governed_ref_label_only_click(ref=ref, q=q, sid=sid)
     )
 
     if governed_typed_ui:
@@ -448,7 +548,8 @@ def orchestrate_sales_one_plus_ask_turn(
         )
         if isinstance(ref_outcome, AskOrchestrationResult):
             return ref_outcome
-        q = ref_outcome
+        if not q:
+            q = ref_outcome
         local_gate_result = GOVERNED_TYPED_UI_GATE
         try_run_typed_ui_planner_turn(
             sid=sid,
@@ -465,6 +566,26 @@ def orchestrate_sales_one_plus_ask_turn(
         if isinstance(ref_outcome, AskOrchestrationResult):
             return ref_outcome
         q = ref_outcome
+
+    flow_reply = _post_gate_flows(
+        data=data,
+        q=q,
+        sid=sid,
+        client_id=client_id,
+        client_txt=client_txt,
+        service_payload=service_payload,
+        get_last_content_ui_payload=get_last_content_ui_payload,
+    )
+    if flow_reply is not None:
+        return flow_reply
+
+    if q:
+        _maybe_clear_unrelated_pending_price_clarify_for_turn(
+            sid=sid,
+            client_id=client_id,
+            user_message=q,
+            ref=ref,
+        )
 
     if not governed_typed_ui:
         if not q:
@@ -496,18 +617,6 @@ def orchestrate_sales_one_plus_ask_turn(
         )
         if contacts is not None:
             return contacts
-
-        flow_reply = _post_gate_flows(
-            data=data,
-            q=q,
-            sid=sid,
-            client_id=client_id,
-            client_txt=client_txt,
-            service_payload=service_payload,
-            get_last_content_ui_payload=get_last_content_ui_payload,
-        )
-        if flow_reply is not None:
-            return flow_reply
 
     if not q:
         return AskOrchestrationResult(

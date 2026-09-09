@@ -37,6 +37,7 @@ _AUTHORITATIVE_STATIC_RELATIVE = (
     "target_response/marketing.yaml",
     "target_response/clinic_strategy.yaml",
     "target_response/pricebook/facts.json",
+    "target_response/price_microfacts.yaml",
 )
 
 

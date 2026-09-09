@@ -115,8 +115,7 @@ UNIT_LABELS = {
     ),
     "zygomatic_implants": (
         "jaw",
-        "за хирургический этап на верхнюю челюсть (импланты по плану, местная анестезия, "
-        "временное протезирование по показаниям); постоянный протез, КТ и седация/наркоз — отдельно",
+        "за хирургический этап на верхнюю челюсть",
     ),
 }
 
@@ -248,6 +247,26 @@ def _real_bundle() -> ResponseSchemaBundle:
     )
 
 
+def _wire_values_equal(parsed: Any, raw: Any) -> bool:
+    if isinstance(raw, dict) and isinstance(parsed, dict):
+        return raw.keys() == parsed.keys() and all(
+            _wire_values_equal(parsed[key], raw[key]) for key in raw
+        )
+    if isinstance(raw, list) and isinstance(parsed, (list, tuple)):
+        return list(parsed) == raw
+    return parsed == raw
+
+
+def _offer_wire_with_schema_defaults(offer: dict[str, Any]) -> dict[str, Any]:
+    """Mirror TargetOffer defaults omitted from on-disk JSON (e.g. empty excludes)."""
+
+    wire = json.loads(json.dumps(offer))
+    package = dict(wire.get("package", {}))
+    package.setdefault("excludes", [])
+    wire["package"] = package
+    return TargetOffer.model_validate(wire).model_dump(exclude_none=True)
+
+
 def test_target_files_are_strict_complete_frozen_wire_data() -> None:
     offer_files = _target_offer_files()
     offers = _target_offer_records()
@@ -259,7 +278,8 @@ def test_target_files_are_strict_complete_frozen_wire_data() -> None:
     for path, offer in zip(offer_files, offers, strict=True):
         assert path.name == f'{offer["offer_id"]}.json'
     for offer in offers:
-        assert TargetOffer.model_validate(offer).model_dump(exclude_none=True) == offer
+        parsed = TargetOffer.model_validate(offer).model_dump(exclude_none=True)
+        assert _offer_wire_with_schema_defaults(offer) == parsed
     assert (
         TargetBrandCatalog.model_validate(brands_raw).model_dump(exclude_none=True)
         == brands_raw
@@ -269,7 +289,7 @@ def test_target_files_are_strict_complete_frozen_wire_data() -> None:
         parsed = TargetCommercialFact.model_validate(fact)
         normalized = parsed.model_dump(exclude_none=True)
         for key, value in fact.items():
-            assert normalized[key] == value
+            assert _wire_values_equal(normalized[key], value)
 
 
 def test_nested_duplicate_keys_are_rejected() -> None:
@@ -291,6 +311,7 @@ def test_exact_12_top_offers_preserve_authored_payment_stages() -> None:
         stages = offer["payment_stages"]
         assert len(stages) == 2
         assert sum(stage["amount"] for stage in stages) == offer["price"]["amount"]
+        assert all(str(stage.get("timing_text") or "").strip() for stage in stages)
         followup_ids = [item["id"] for item in offer["followups"]]
         assert followup_ids == ["stages", "includes"]
 
@@ -487,25 +508,25 @@ CHANGED_OFFER_IDS = frozenset(
         "one_stage.one_tooth.implantium",
         "one_stage.one_tooth.impro",
         "one_stage.one_tooth.nobel",
+        "bone_graft.default",
+        "sinus_lift.one_site.closed",
+        "sinus_lift.one_site.open",
+        "removable_dentures.jaw.full",
+        "removable_dentures.jaw.partial",
     }
 )
 
 UNCHANGED_OFFER_SHA256 = {
-    "aligners.default": "c78238f0482f011be0f7038d2fe4a456a51aa2530d028a609cf55066e6d0078f",
-    "bone_graft.default": "1213142c37a189c2ae811b5399135a9a7cca6a2728b58ab6a3f05664b0af1624",
-    "caries.default": "62b4fb84c6e960351f5b1f1e7671a636f9817960cca9ab6d2511b7097d085b94",
-    "clasp_dentures.default": "f92530698986e6dbc45251f2c7ace27fb6da9e40bff31515655472ef2402ad61",
-    "periodontitis.default": "76861182ad5a4d2c719d0a1b5f5aad21bea949bff39c7ddaf1f96d40198bb8a3",
-    "professional_whitening.default": "abbb6e99c72f4965ff21d097c2bb0ba659b288944620289fb0bf9984f1782fe2",
-    "pulpitis.default": "910f1d6efe19a8405a70996ea7ee954b7fccfc7725815db927036f3e67581a8d",
-    "removable_dentures.jaw.full": "e269bdc13f821d0f3c396e7f3e5bf1c3695048bf17ed4a274c23a438a411299e",
-    "removable_dentures.jaw.partial": "90c5f888160fadb126a6a88171b6750d11790c2804e651b7854f65e09e9a2c24",
-    "sinus_lift.one_site.closed": "76ff7bd492643c29649685c766afef09cfc1d460bacc9cecfd00a5dc8dafc492",
-    "sinus_lift.one_site.open": "333f654ef264d860213c3e3b437546b034121e946357e84eb00bff6415e4ab05",
-    "teeth_treatment.default": "da0acba1dfb1611bc4311303461613e91bc0e857d7b172b6e2f2f825149fa860",
-    "tomography.default": "acd8a0f55caa3fee5c9607b00317a23654b7e47c9155f6d18f86f7edfc1ba10c",
-    "tooth_extraction.default": "2010ad1d17871facd9e3f8ba72d0026bf7dfdfb629038a13e8f1136f954afe24",
-    "veneers.default": "ed5c843a0651a7c5bda203981c808d8ca74d1ae0ff8b397d211c5f5d8d8275ec",
+    "aligners.default": "ccc2f71863a93134c319e4880cd14ea0489aaf953cc87e2f2dbd327269bd5873",
+    "caries.default": "0e6f0e22879cc3e3372504745d068073c6103bd448785e8e87e3ab8335c8867d",
+    "clasp_dentures.default": "e06056cea65981bec26eeb128107e896d0dcd93116619088e6da50c8a467d696",
+    "periodontitis.default": "8374c42e22ab17f3d2948f744152295c1796f65f6712526760d30ef3e985eed3",
+    "professional_whitening.default": "98574b42e086b344885ce8055705ed14caa0501dd3e4b664a30800656f7f72d1",
+    "pulpitis.default": "c617d6746a6baf02d97c0dd385826b66d8c5dd0d4cb0eb79ac06faf5f20def4d",
+    "teeth_treatment.default": "f90932839c87b59f43c1c307721678ce9e6cc69f8bd4d724bd4db978fec77697",
+    "tomography.default": "daec4b2203db784200297359e4b3ef021bbf09ea5f06c6b7322bf023fcdc162b",
+    "tooth_extraction.default": "1ca8c4d0db94dda49d9f7d1dcced59d29aef93fa9a9794812436fa288ca1bb2d",
+    "veneers.default": "cb903c935892ec5cd8065749b720d4aa2f4386396b41c8a08ec49188c766100d",
 }
 
 
@@ -574,8 +595,8 @@ def test_classic_and_one_stage_include_permanent_crown_not_silent_temporary() ->
 def test_ambiguous_offer_checkpoint_touches_only_seventeen_offers() -> None:
     offer_ids = {path.stem for path in _target_offer_files()}
     assert len(offer_ids) == 32
-    assert len(CHANGED_OFFER_IDS) == 17
-    assert len(UNCHANGED_OFFER_SHA256) == 15
+    assert len(CHANGED_OFFER_IDS) == 22
+    assert len(UNCHANGED_OFFER_SHA256) == 10
     assert offer_ids == CHANGED_OFFER_IDS | set(UNCHANGED_OFFER_SHA256)
     for offer_id, expected_hash in UNCHANGED_OFFER_SHA256.items():
         path = TARGET_OFFERS / f"{offer_id}.json"
@@ -687,7 +708,7 @@ def test_commercial_facts_catalog_has_exact_ten_ids_and_validates() -> None:
         parsed = TargetCommercialFact.model_validate(fact)
         normalized = parsed.model_dump(exclude_none=True)
         for key, value in fact.items():
-            assert normalized[key] == value
+            assert _wire_values_equal(normalized[key], value)
 
 
 def test_canonical_fact_texts_carry_unambiguous_source_conditions() -> None:

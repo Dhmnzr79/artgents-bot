@@ -24,6 +24,7 @@ SemanticFieldProvenance = Literal[
     "exact_turn",
     "valid_session",
     "envelope",
+    "clinic_strategy",
     "null",
 ]
 SemanticRebindKind = Literal["full_rebuild"]

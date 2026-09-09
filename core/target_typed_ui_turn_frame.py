@@ -10,6 +10,7 @@ from contracts.turn_frame import (
     TurnFrameMeta,
 )
 from contracts.ui_scope_action import UiScopeAction
+from contracts.ui_service_action import UiServiceAction
 from contracts.ui_stage_action import UiStageAction
 
 _GOVERNED_UI_PROVENANCE_KIND = "governed_ui_action"
@@ -91,3 +92,53 @@ def build_typed_ui_turn_frame_from_scope_action(action: UiScopeAction) -> TurnFr
 
 def build_typed_ui_turn_frame_from_stage_action(action: UiStageAction) -> TurnFrame:
     return build_typed_ui_turn_frame(topic=action.topic, provenance_ref=action.ref)
+
+
+def build_typed_ui_turn_frame_from_service_action(
+    action: UiServiceAction,
+    *,
+    topic: str,
+) -> TurnFrame:
+    """Build authoritative commercial TurnFrame for a governed service ref click."""
+
+    topic_eff = str(topic).strip().lower()
+    if not topic_eff:
+        raise ValueError("typed_ui_topic_required")
+    service_id = str(action.service_id).strip().lower()
+    if not service_id:
+        raise ValueError("typed_ui_service_id_required")
+    ref = str(action.ref).strip()
+    if not ref:
+        raise ValueError("typed_ui_provenance_ref_required")
+
+    commercial_meta, provenance = _commercial_field_meta(provenance_ref=ref)
+    patient_scope_meta = _default_patient_scope_meta(provenance=provenance)
+    service_meta = _valid_meta(provenance=provenance)
+
+    return TurnFrame(
+        intent="price_lookup",
+        topic=topic_eff,
+        aspects=["price"],
+        primary_aspect="price",
+        emotion="none",
+        specificity="unknown",
+        patient_scope=PatientScopeFrame(),
+        service_id=service_id,
+        follow_up=False,
+        followup_of=None,
+        needs_clarification=False,
+        field_meta=TurnFrameMeta(
+            intent=commercial_meta,
+            topic=commercial_meta,
+            aspects=commercial_meta,
+            primary_aspect=commercial_meta,
+            emotion=_valid_meta(provenance=provenance),
+            specificity=_valid_meta(provenance=provenance),
+            patient_scope=patient_scope_meta,
+            service_id=service_meta,
+            follow_up=_valid_meta(provenance=provenance),
+            followup_of=FieldMeta(confidence=0.0, provenance=provenance, status="defaulted"),
+            needs_clarification=commercial_meta,
+            marketing_scenarios=_valid_meta(provenance=provenance),
+        ),
+    )

@@ -18,16 +18,16 @@ from evals.v5.s63_target_runtime_live_contract import assert_frozen_s62_live_art
 from orchestration.context import AskTurnContext
 from orchestration.planner_turn import PlannerTurnOutcome
 from session import mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
     _fake_backends,
-    _fake_target_turn_factory,
     _install_turn_frame,
     _run_materialized_turn,
     _seed_followups,
     _turn_frame,
 )
+from tests.test_s61_correction_target_runtime import _fake_target_turn_factory
 from tests.test_target_boundary_enforced_fullcontext_response import (
     PRICE_TEXT,
     RecordingComposerBackend,

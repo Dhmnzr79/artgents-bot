@@ -19,14 +19,16 @@ from evals.v5.s66_default_authority_live_contract import assert_frozen_s63_live_
 from orchestration.planner_turn import PlannerTurnOutcome
 from orchestration.route_guards import check_rate_limit
 from session import mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     _fake_backends,
-    _fake_target_turn_factory,
     _install_turn_frame,
-    _pre_resolver,
     _run_materialized_turn,
     _seed_followups,
     _turn_frame,
+)
+from tests.test_s61_correction_target_runtime import (
+    _fake_target_turn_factory,
+    _pre_resolver,
 )
 from tests.test_s65_authority_switch_offline import (
     _ask_context,

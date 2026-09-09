@@ -18,16 +18,18 @@ from core.target_runtime_turn import run_target_fullcontext_runtime_turn
 from orchestration.context import AskTurnContext
 from orchestration.pre_resolver_turn import run_pre_resolver_turn
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
-    RecordingComposerBackend,
-    RecordingSemanticBackend,
     _install_turn_frame,
-    _pre_resolver,
     _seed_followups,
     _seed_target_runtime_state,
     _turn_frame,
+)
+from tests.test_s61_correction_target_runtime import _pre_resolver
+from tests.test_target_boundary_enforced_fullcontext_response import (
+    RecordingComposerBackend,
+    RecordingSemanticBackend,
 )
 
 
@@ -119,7 +121,7 @@ def test_a9_session_facts_persist_after_materialized_turn(flask_ctx, monkeypatch
     sid = f"s-a9-persist-{uuid.uuid4().hex[:8]}"
     mem_reset(sid)
     from core.turn_frame_from_raw import build_turn_frame_from_raw
-    from tests.test_s61_correction_target_runtime import _install_turn_frame
+    from tests.target_runtime_test_support import _install_turn_frame
 
     frame = build_turn_frame_from_raw(
         {

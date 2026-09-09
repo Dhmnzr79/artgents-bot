@@ -41,7 +41,7 @@ from core.target_typed_ui_turn_frame import (
 )
 from orchestration.planner_turn import PlannerTurnOutcome
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
     _seed_followups,

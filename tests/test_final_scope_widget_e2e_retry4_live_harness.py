@@ -134,11 +134,11 @@ def _install_retry4_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, obj
     )
     import app as app_module
     from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn as real_orchestrate
-    from tests.test_s61_correction_target_runtime import (
+    from tests.target_runtime_test_support import (
         BackendPayload,
         RecordingBoundaryBackend,
-        RecordingSemanticBackend,
     )
+    from tests.test_target_boundary_enforced_fullcontext_response import RecordingSemanticBackend
 
     monkeypatch.setattr(
         "evals.v5.final_scope_widget_e2e_live_provider_audit.record_fullcontext_build",

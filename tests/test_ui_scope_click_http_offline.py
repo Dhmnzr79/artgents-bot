@@ -13,11 +13,13 @@ from contracts.ui_scope_action import build_ui_scope_ref
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from orchestration.planner_turn import PlannerTurnOutcome
 from session import mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     _fake_backends,
+    _seed_followups,
+)
+from tests.test_s61_correction_target_runtime import (
     _fake_target_turn_factory,
     _pre_resolver,
-    _seed_followups,
 )
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]

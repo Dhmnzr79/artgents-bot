@@ -22,11 +22,13 @@ from core.target_typed_ui_turn_frame import (
 )
 from orchestration.typed_ui_planner_turn import try_run_typed_ui_planner_turn
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     _fake_backends,
+    _seed_followups,
+)
+from tests.test_s61_correction_target_runtime import (
     _fake_target_turn_factory,
     _pre_resolver,
-    _seed_followups,
 )
 
 UI_SCOPE_REF = build_ui_scope_ref(topic="implantation", extent="full_arch")

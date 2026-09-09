@@ -72,11 +72,11 @@ from tests.test_final_price_scope_coverage_nav_implementation import (
 from tests.test_final_scope_widget_e2e_closeout_implementation import (
     test_frozen_retry4_artifacts_unchanged_after_closeout,
 )
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     _fake_backends,
-    _fake_target_turn_factory,
     _seed_target_runtime_state,
 )
+from tests.test_s61_correction_target_runtime import _fake_target_turn_factory
 from tests.test_target_boundary_enforced_fullcontext_response import (
     PAIN_GROUNDED_TEXT,
     PRICE_TEXT,

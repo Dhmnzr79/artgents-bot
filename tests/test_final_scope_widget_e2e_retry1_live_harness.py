@@ -213,11 +213,11 @@ def _install_retry1_http_fakes(monkeypatch: pytest.MonkeyPatch) -> dict[str, obj
     from ingress_gate import IngressRouteResult
     from core.target_runtime_client_context import clear_target_runtime_client_context_cache
     from orchestration.target_fullcontext_turn import orchestrate_target_fullcontext_turn as real_orchestrate
-    from tests.test_s61_correction_target_runtime import (
+    from tests.target_runtime_test_support import (
         BackendPayload,
         RecordingBoundaryBackend,
-        RecordingSemanticBackend,
     )
+    from tests.test_target_boundary_enforced_fullcontext_response import RecordingSemanticBackend
 
     cached_module = importlib.reload(cached_module)
     runtime_context_module = importlib.reload(runtime_context_module)

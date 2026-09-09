@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from core.target_runtime_session import read_age_guarded_service_focus
 from session import mem_add_user, mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 
 
 def test_seed_service_focus_starts_at_age_zero():

@@ -19,16 +19,18 @@ from core.target_runtime_turn import run_target_fullcontext_runtime_turn
 from core.target_strategy_context import strategy_match_from_effective_scope
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from session import mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
-    RecordingComposerBackend,
-    RecordingSemanticBackend,
     _install_turn_frame,
-    _pre_resolver,
     _seed_followups,
 )
-from tests.test_target_boundary_enforced_fullcontext_response import PRICE_TEXT
+from tests.test_s61_correction_target_runtime import _pre_resolver
+from tests.test_target_boundary_enforced_fullcontext_response import (
+    PRICE_TEXT,
+    RecordingComposerBackend,
+    RecordingSemanticBackend,
+)
 from tests.test_w1_family_price_overview_offline import _family_overview_frame
 
 _ALLOWED_TOPICS = frozenset({"implantation", "prosthetics", "doctors"})

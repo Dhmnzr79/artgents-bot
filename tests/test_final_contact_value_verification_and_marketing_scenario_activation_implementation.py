@@ -45,7 +45,7 @@ from tests.test_final_contact_value_verification_and_marketing_scenario_activati
 from tests.test_final_fullcontext_dialogue_runtime_convergence_implementation import (
     _assert_materialized,
 )
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 from tests.test_final_price_scope_coverage_nav_implementation import (
     test_frozen_pins_unchanged as test_pscn_frozen_pins_unchanged,
 )

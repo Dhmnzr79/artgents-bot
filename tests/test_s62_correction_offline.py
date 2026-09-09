@@ -29,15 +29,15 @@ from evals.v5.s62_target_runtime_live_harness import (
 from evals.v5.s62_target_runtime_live_provider_audit import ProviderAuditState
 from evals.v5.s62_target_runtime_live_recompute import recompute_frozen_live_verdict
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
     _fake_backends,
-    _fake_target_turn_factory,
     _install_turn_frame,
     _seed_followups,
     _seed_target_runtime_state,
 )
+from tests.test_s61_correction_target_runtime import _fake_target_turn_factory
 from tests.test_demo_target_turn_frame_bound_response import DOCTORS_TEXT
 from orchestration.planner_turn import PlannerTurnOutcome
 from contracts.ask_orchestration import AskOrchestrationResult

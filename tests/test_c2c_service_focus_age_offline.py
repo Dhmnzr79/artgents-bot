@@ -19,7 +19,7 @@ from core.target_runtime_turn_frame_hydration import hydrate_target_runtime_turn
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.target_runtime_session import TargetRuntimeSessionState
 from session import mem_add_user, mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
     _install_turn_frame,

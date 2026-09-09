@@ -8,7 +8,7 @@ from contracts.dialog_focus import DialogFocusGrayOutput
 from core.dialog_focus import build_dialog_focus_decision, dialog_focus_for_turn
 from core.routing_loader import THRESHOLDS
 from session import mem_add_user, mem_reset
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 
 
 def _set_focus(sid: str, service_id: str = "classic") -> None:

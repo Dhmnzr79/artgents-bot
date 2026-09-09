@@ -19,15 +19,15 @@ from evals.v5.s63_target_runtime_live_harness import evaluate_summary, pick_disp
 from evals.v5.s63_target_runtime_live_provider_audit import ProviderAuditState
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import (
+from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
     _fake_backends,
-    _fake_target_turn_factory,
     _install_turn_frame,
     _seed_followups,
     _seed_target_runtime_state,
 )
+from tests.test_s61_correction_target_runtime import _fake_target_turn_factory
 from tests.test_demo_target_turn_frame_bound_response import DOCTORS_TEXT
 from tests.test_target_boundary_enforced_fullcontext_response import (
     PRICE_TEXT,

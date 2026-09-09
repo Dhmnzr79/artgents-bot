@@ -6,7 +6,7 @@ import uuid
 
 from doctors_lookup import build_doctors_list_llm_question, doctors_lookup
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 from core.target_runtime_session import TargetRuntimeSessionState
 from core.target_runtime_turn_frame_hydration import hydrate_target_runtime_turn_frame_from_session
 from core.turn_frame_from_raw import build_turn_frame_from_raw

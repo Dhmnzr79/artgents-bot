@@ -23,7 +23,7 @@ from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from orchestration.sales_one_plus_ask_turn import GOVERNED_TYPED_UI_GATE
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import _seed_followups
+from tests.target_runtime_test_support import _seed_followups
 from tests.test_sales_fast_widget_integration import _CountingBackend, _install_sales_fast_transport
 from tests.test_sales_one_plus_turn import admin_envelope, answer_envelope
 

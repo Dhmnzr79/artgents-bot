@@ -12,7 +12,7 @@ from core.follow_up_rewrite import (
     resolve_focus_from_turn,
 )
 from session import mem_get, mem_reset
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 
 
 def test_rewrite_warranty_from_focus_label():

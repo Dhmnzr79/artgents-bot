@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from session import clear_focus_context, get_last_aspect, mem_reset, set_last_aspect
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 
 
 def test_clear_focus_context_clears_target_service_focus_and_aspect():

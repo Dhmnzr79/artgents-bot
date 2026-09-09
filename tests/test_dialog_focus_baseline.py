@@ -6,7 +6,7 @@ from core.attribute_followup import detect_vague_attribute_kinds
 from core.dialog_focus import build_dialog_focus_decision
 from core.target_client_data import load_target_client_data, match_service_from_target_catalog
 from session import mem_reset
-from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+from tests.target_runtime_test_support import _seed_target_runtime_state
 
 
 def _set_focus(

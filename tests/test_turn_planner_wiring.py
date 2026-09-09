@@ -31,7 +31,7 @@ def _publish_turn_plan_ctx(plan: TurnPlan) -> None:
 def test_dialog_focus_from_turn_plan_skips_gray_llm(monkeypatch: pytest.MonkeyPatch):
     from core.dialog_focus import record_dialog_focus_ctx
     from session import mem_reset
-    from tests.test_s61_correction_target_runtime import _seed_target_runtime_state
+    from tests.target_runtime_test_support import _seed_target_runtime_state
 
     app = pytest.importorskip("flask").Flask(__name__)
     sid = "turn-plan-focus"

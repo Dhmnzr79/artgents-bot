@@ -269,7 +269,7 @@ def test_implantation_stages_http_chain_includes_formatted_answer(
         lambda: date(2026, 8, 10),
     )
     sid = f"pst-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     client = app_module.app.test_client()
     hostile = "Первый платёж составит 99 999 ₽."
 
@@ -362,7 +362,7 @@ def test_stages_http_chain_ask_stream_parity(
 
         _install_sales_fast(monkeypatch, _Backend(env))
         if reset:
-            mem_reset(sid)
+            mem_reset(sid, client_id="demo")
         payload = {"q": q, "sid": sid, "client_id": "demo"}
         if ref:
             payload["ref"] = ref
@@ -373,7 +373,7 @@ def test_stages_http_chain_ask_stream_parity(
 
         _install_sales_fast(monkeypatch, _Backend(env))
         if reset:
-            mem_reset(sid)
+            mem_reset(sid, client_id="demo")
         payload = {"q": q, "sid": sid, "client_id": "demo"}
         if ref:
             payload["ref"] = ref

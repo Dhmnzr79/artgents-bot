@@ -91,11 +91,10 @@ def purge_session_observability(
             )
             stats["leads_deleted"] = int(cur.rowcount or 0)
 
-    from session import bind_session_client, mem_reset
+    from session import mem_reset
 
     try:
-        bind_session_client(cid)
-        mem_reset(sid_clean)
+        mem_reset(sid_clean, client_id=cid)
         stats["sqlite_cleared"] = True
     except Exception as e:
         _log("warning", "observability_purge_sqlite_failed", sid=sid_clean, err=str(e)[:200])

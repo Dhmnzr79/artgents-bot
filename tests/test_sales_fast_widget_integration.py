@@ -23,13 +23,19 @@ from core.target_client_data import load_target_client_data
 from tests.one_call_stage2_fixture import Stage2Case, case_by_id, load_stage2_cases
 from tests.test_sales_one_plus_turn import answer_envelope, admin_envelope, _DEMO_COMMERCIAL_CATALOG, _DEMO_EXACT_CATALOG
 from orchestration.sales_fast_widget_turn import orchestrate_sales_fast_widget_turn
-from session import mem_reset
+from session import mem_reset, session_client_scope
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _FIXTURE_PATH = _REPO_ROOT / "tests" / "fixtures" / "one_call_stage2_cases.json"
 _PACK_IDENTITY = build_client_pack_identity("demo")
 _DEMO_CATALOG = ActiveServiceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
 _DEMO_REF_CATALOG = ServiceReferenceCatalogSnapshot.from_bundle(load_target_client_data("demo").bundle)
+
+
+def _offline_widget_request_ctx(**extra: object) -> dict[str, object]:
+    ctx: dict[str, object] = {"turn_t0_monotonic": 0.0}
+    ctx.update(extra)
+    return ctx
 
 
 class _CountingBackend:
@@ -106,25 +112,26 @@ def test_widget_future_fear_faq_reaches_fake_backend(
         answer_envelope(model_text, commercial_intent="none", service_id=None)
     )
     _install_sales_fast_transport(monkeypatch, backend)
-    mem_reset("widget-future-fear")
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={
-            "q": "Будет ли отёк после имплантации?",
-            "sid": "widget-future-fear",
-            "client_id": "demo",
-        },
-    ):
-        from flask import request
+    mem_reset("widget-future-fear", client_id="demo")
+    with session_client_scope("demo"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={
+                "q": "Будет ли отёк после имплантации?",
+                "sid": "widget-future-fear",
+                "client_id": "demo",
+            },
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid="widget-future-fear",
-            user_message="Будет ли отёк после имплантации?",
-            backend=backend,
-        )
+            request.ctx = _offline_widget_request_ctx()
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid="widget-future-fear",
+                user_message="Будет ли отёк после имплантации?",
+                backend=backend,
+            )
     assert backend.call_count == 1
     assert outcome.model_route == "model"
     assert model_text in str(outcome.widget.payload.get("answer") or "")
@@ -368,7 +375,8 @@ def test_orchestrator_uses_pinned_plus_model(monkeypatch: pytest.MonkeyPatch) ->
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         _factory,
     )
-    result = orchestrate_sales_fast_widget_turn(q="Есть парковка?", sid="s-pin", client_id="demo")
+    with session_client_scope("demo"):
+        result = orchestrate_sales_fast_widget_turn(q="Есть парковка?", sid="s-pin", client_id="demo")
     assert result.service_route == "sales_fast_materialized"
     assert captured["model"] == config.SALES_ONE_PLUS_MODEL
     assert factory_called["value"] is True
@@ -376,21 +384,22 @@ def test_orchestrator_uses_pinned_plus_model(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_widget_runtime_preserves_followup_cta_shape(monkeypatch: pytest.MonkeyPatch, flask_app) -> None:
     backend = _CountingBackend(answer_envelope("Есть парковка у здания."))
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": "Есть ли парковка?", "sid": "s1", "client_id": "demo"},
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": "Есть ли парковка?", "sid": "s1", "client_id": "demo"},
+        ):
+            from flask import request
 
-        request.ctx = {"request_id": "rid"}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid="s1",
-            user_message="Есть ли парковка?",
-            backend=backend,
-        )
-    payload = outcome.widget.payload
+            request.ctx = _offline_widget_request_ctx(request_id="rid")
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid="s1",
+                user_message="Есть ли парковка?",
+                backend=backend,
+            )
+        payload = outcome.widget.payload
     assert "quick_replies" in payload
     assert "cta" in payload
     assert "video" in payload
@@ -469,7 +478,7 @@ def _orchestrate_ask(
 
     _install_sales_fast_transport(monkeypatch, backend, factory=factory)
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     with app_module.app.test_request_context(
         "/ask",
         method="POST",
@@ -477,7 +486,7 @@ def _orchestrate_ask(
     ):
         from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
+        request.ctx = _offline_widget_request_ctx()
         orch = app_module._orchestrate_ask_turn({"q": q, "sid": sid, "client_id": "demo"})
         assert orch.kind == "service_reply"
         return dict(orch.service_payload or {})
@@ -638,7 +647,7 @@ def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
     clear_target_runtime_client_context_cache()
     sid = "widget-marketing-service-two-promos"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(
         answer_envelope(
             "All-on-4 — это полное восстановление зубного ряда на четырёх имплантах.",
@@ -656,7 +665,7 @@ def test_widget_path_marketing_fact_is_in_answer_not_metadata_only(
     ):
         from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
+        request.ctx = _offline_widget_request_ctx()
         outcome = run_sales_fast_widget_turn(
             client_id="demo",
             sid=sid,
@@ -757,39 +766,40 @@ def test_widget_two_turn_history_reaches_composer_prompt(
     from session import bind_session_client, mem_add_bot, mem_add_user, mem_reset
 
     sid = "widget-history-cycle"
-    bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     first_q = "Делаете all-on-4?"
     first_answer = "Да, выполняем All-on-4."
     backend1 = _CountingBackend(answer_envelope(first_answer))
     _install_sales_fast_transport(monkeypatch, backend1)
-    with flask_app.test_request_context("/ask", method="POST"):
-        from flask import request
+    with session_client_scope("demo"):
+        with flask_app.test_request_context("/ask", method="POST"):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message=first_q,
-            backend=backend1,
-        )
-    mem_add_user(sid, first_q)
-    mem_add_bot(sid, first_answer)
+            request.ctx = _offline_widget_request_ctx()
+            run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message=first_q,
+                backend=backend1,
+            )
+    with session_client_scope("demo"):
+        mem_add_user(sid, first_q)
+        mem_add_bot(sid, first_answer)
+    with session_client_scope("demo"):
+        second_q = "а сколько стоит?"
+        backend2 = _CountingBackend(answer_envelope("Стоимость зависит от случая."))
+        _install_sales_fast_transport(monkeypatch, backend2)
+        with flask_app.test_request_context("/ask", method="POST"):
+            from flask import request
 
-    second_q = "а сколько стоит?"
-    backend2 = _CountingBackend(answer_envelope("Стоимость зависит от случая."))
-    _install_sales_fast_transport(monkeypatch, backend2)
-    with flask_app.test_request_context("/ask", method="POST"):
-        from flask import request
-
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message=second_q,
-            backend=backend2,
-        )
-    prompt = str(backend2.invocation.user_prompt)
+            request.ctx = _offline_widget_request_ctx()
+            run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message=second_q,
+                backend=backend2,
+            )
+        prompt = str(backend2.invocation.user_prompt)
     assert "не источник фактов" in prompt
     assert first_q.lower() in prompt.lower()
     assert first_answer.lower() in prompt.lower()
@@ -812,7 +822,7 @@ def test_widget_path_observability_timings_without_pii(monkeypatch: pytest.Monke
         _capture_obs,
     )
     _install_sales_fast_transport(monkeypatch, backend)
-    mem_reset("widget-obs")
+    mem_reset("widget-obs", client_id="demo")
     client = app_module.app.test_client()
     client.post(
         "/ask",
@@ -866,9 +876,11 @@ def test_governed_ui_envelope_conflict_is_scope_clarify_without_model_text(
     )
     cadence = TargetPresentationCadenceState()
 
+    from tests.session_binding_test_support import read_target_runtime_session_for
+
     def _resolve(**kwargs: object):
         sid = str(kwargs.get("sid") or "ui-conflict")
-        session_state = read_target_runtime_session(sid)
+        session_state = read_target_runtime_session_for(sid, client_id="demo")
         identity = SalesFastServiceIdentity(
             explicit_service_id=None,
             explicit_service_term=None,
@@ -882,21 +894,22 @@ def test_governed_ui_envelope_conflict_is_scope_clarify_without_model_text(
         decision="pass",
         reason_code="governed_typed_ui",
     )
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": "Сколько стоит?", "sid": "ui-conflict", "client_id": "demo"},
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": "Сколько стоит?", "sid": "ui-conflict", "client_id": "demo"},
+        ):
+            from flask import request
 
-        request.ctx = {"request_id": "rid"}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid="ui-conflict",
-            user_message="Сколько стоит?",
-            backend=backend,
-            local_gate_result=governed_gate,
-        )
+            request.ctx = _offline_widget_request_ctx(request_id="rid")
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid="ui-conflict",
+                user_message="Сколько стоит?",
+                backend=backend,
+                local_gate_result=governed_gate,
+            )
     assert outcome.model_route == "clarify"
     assert outcome.failure_kind == "semantic_ui_envelope_conflict_service_id"
     assert model_text not in str(outcome.widget.payload.get("answer") or "")
@@ -920,23 +933,24 @@ def _run_widget_turn_with_envelope(
     if client_id != "demo":
         monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     bind_session_client(client_id)
-    mem_reset(sid)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": user_message, "sid": sid, "client_id": client_id},
-    ):
-        from flask import request
+    mem_reset(sid, client_id=client_id)
+    with session_client_scope(client_id):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": user_message, "sid": sid, "client_id": client_id},
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id=client_id,
-            sid=sid,
-            user_message=user_message,
-            backend=backend,
-        )
-    assert outcome.widget.kind == "materialized"
-    return dict(outcome.widget.payload or {}), backend
+            request.ctx = _offline_widget_request_ctx()
+            outcome = run_sales_fast_widget_turn(
+                client_id=client_id,
+                sid=sid,
+                user_message=user_message,
+                backend=backend,
+            )
+        assert outcome.widget.kind == "materialized"
+        return dict(outcome.widget.payload or {}), backend
 
 
 def _run_widget_turn_keep_session(
@@ -958,24 +972,25 @@ def _run_widget_turn_keep_session(
     if client_id != "demo":
         monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
     bind_session_client(client_id)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": user_message, "sid": sid, "client_id": client_id},
-    ):
-        from flask import request
+    with session_client_scope(client_id):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": user_message, "sid": sid, "client_id": client_id},
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id=client_id,
-            sid=sid,
-            user_message=user_message,
-            backend=active_backend,
-            on_delta=on_delta,
-        )
-    if not allow_terminal:
-        assert outcome.widget.kind == "materialized"
-    return dict(outcome.widget.payload or {}), active_backend
+            request.ctx = _offline_widget_request_ctx()
+            outcome = run_sales_fast_widget_turn(
+                client_id=client_id,
+                sid=sid,
+                user_message=user_message,
+                backend=active_backend,
+                on_delta=on_delta,
+            )
+        if not allow_terminal:
+            assert outcome.widget.kind == "materialized"
+        return dict(outcome.widget.payload or {}), active_backend
 
 
 def test_widget_path_nikadent_all_on_4_family_price_materializes_and_persists_session(
@@ -1163,12 +1178,11 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
     monkeypatch: pytest.MonkeyPatch,
     flask_app,
 ) -> None:
-    from core.target_runtime_session import read_target_runtime_session
-    from session import bind_session_client
+    from tests.session_binding_test_support import read_target_runtime_session_for
 
     sid = "widget-promo-cadence"
-    bind_session_client("demo")
-    mem_reset(sid)
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
     backend = _CountingBackend(
         answer_envelope(
             "Расскажу про All-on-4.",
@@ -1177,26 +1191,27 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
         )
     )
     _install_sales_fast_transport(monkeypatch, backend)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": "Расскажите про All-on-4", "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": "Расскажите про All-on-4", "sid": sid, "client_id": "demo"},
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome1 = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message="Расскажите про All-on-4",
-            backend=backend,
-        )
-    answer1 = str(outcome1.widget.payload.get("answer") or "")
-    assert "Расскажу про All-on-4." in answer1
-    assert "15%" not in answer1
-    session1 = read_target_runtime_session(sid)
-    assert session1.last_rendered_promo_fact_id is None
-    assert session1.last_turn_rendered_promo_fact_ids == ()
+            request.ctx = _offline_widget_request_ctx()
+            outcome1 = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message="Расскажите про All-on-4",
+                backend=backend,
+            )
+        answer1 = str(outcome1.widget.payload.get("answer") or "")
+        assert "Расскажу про All-on-4." in answer1
+        assert "15%" not in answer1
+        session1 = read_target_runtime_session_for(sid)
+        assert session1.last_rendered_promo_fact_id is None
+        assert session1.last_turn_rendered_promo_fact_ids == ()
 
     backend3 = _CountingBackend(
         answer_envelope(
@@ -1206,25 +1221,26 @@ def test_widget_path_promo_cadence_suppresses_repeat_and_shown_scope_repeats_las
             promotion_scope="shown",
         )
     )
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={
-            "q": "Повторите акцию, которую только что показывали",
-            "sid": sid,
-            "client_id": "demo",
-        },
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={
+                "q": "Повторите акцию, которую только что показывали",
+                "sid": sid,
+                "client_id": "demo",
+            },
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome3 = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message="Повторите акцию, которую только что показывали",
-            backend=backend3,
-        )
-    answer3 = str(outcome3.widget.payload.get("answer") or "").lower()
+            request.ctx = _offline_widget_request_ctx()
+            outcome3 = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message="Повторите акцию, которую только что показывали",
+                backend=backend3,
+            )
+        answer3 = str(outcome3.widget.payload.get("answer") or "").lower()
     assert "повторю акцию" in answer3
     assert outcome3.widget.payload.get("meta", {}).get("presentation_fail_closed") is None
 
@@ -1272,7 +1288,7 @@ def test_widget_path_multiclient_cache_isolation_without_mid_sequence_cache_clea
     assert "318" not in payload_nika["answer"]
 
     bind_session_client("demo")
-    mem_reset(sid_demo)
+    mem_reset(sid_demo, client_id="demo")
     payload_demo_2, _ = _run_widget_turn_with_envelope(
         monkeypatch,
         client_id="demo",
@@ -1416,7 +1432,7 @@ def test_contact_isolation_demo_nikadent_demo_with_preserved_session(
     nika_branch_phone = "+7 (900) 444-69-97"
     sid = "contact-isolation-preserved-session"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _install_sales_fast_transport(monkeypatch, _CountingBackend(answer_envelope("placeholder")))
 
     payload_demo, backend_demo = _run_widget_turn_keep_session(
@@ -1627,24 +1643,25 @@ def test_nikadent_model_admin_without_contacts_has_no_demo_phone_or_extra_provid
         )
     )
     _install_sales_fast_transport(monkeypatch, backend)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={
-            "q": "После операции появилось воспаление, подскажите порядок действий",
-            "sid": "admin-nika-no-contacts",
-            "client_id": "nikadent",
-        },
-    ):
-        from flask import request
+    with session_client_scope("nikadent"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={
+                "q": "После операции появилось воспаление, подскажите порядок действий",
+                "sid": "admin-nika-no-contacts",
+                "client_id": "nikadent",
+            },
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="nikadent",
-            sid="admin-nika-no-contacts",
-            user_message="После операции появилось воспаление, подскажите порядок действий",
-            backend=backend,
-        )
+            request.ctx = _offline_widget_request_ctx()
+            outcome = run_sales_fast_widget_turn(
+                client_id="nikadent",
+                sid="admin-nika-no-contacts",
+                user_message="После операции появилось воспаление, подскажите порядок действий",
+                backend=backend,
+            )
     answer = str(outcome.widget.payload.get("answer") or "")
     assert outcome.model_route == "model_admin"
     assert backend.call_count == 1
@@ -1676,7 +1693,7 @@ def test_widget_price_profile_full_path_two_turns_with_service_value(
     )
     sid = "widget-price-profile-full"
     bind_session_client(CLIENT_ID)
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     payload1, _ = _run_widget_turn_keep_session(
         monkeypatch,
         client_id=CLIENT_ID,
@@ -1742,7 +1759,7 @@ def test_widget_service_value_full_session_cycle_without_manual_history(
     )
     sid = "widget-sv-cycle"
     bind_session_client(CLIENT_ID)
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     turn1_envelope = answer_envelope(
         "All-on-4 на нижнюю челюсть — протокол.",
         service_id="all_on_4",
@@ -1856,7 +1873,7 @@ def test_widget_streaming_marketing_path_persists_session_history(
     )
     sid = "widget-stream-marketing"
     bind_session_client(CLIENT_ID)
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     turn_envelope = answer_envelope(
         "All-on-4 на нижнюю челюсть — протокол.",
         service_id="all_on_4",
@@ -1950,7 +1967,7 @@ def test_http_ask_two_turn_history_reaches_composer_without_manual_mem_seed(
     ]
     _install_rotating_backend_factory(monkeypatch, backends)
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     client = app_module.app.test_client()
     resp1 = client.post(
         "/ask",
@@ -1989,7 +2006,7 @@ def test_http_ask_stream_two_turn_history_reaches_composer_without_manual_mem_se
     ]
     _install_rotating_backend_factory(monkeypatch, backends)
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     client = flask_app.test_client()
     resp1 = client.post(
         "/ask/stream",
@@ -2036,9 +2053,9 @@ def test_http_ask_history_does_not_cross_clients_with_same_sid(
     ]
     _install_rotating_backend_factory(monkeypatch, backends)
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     bind_session_client("nikadent")
-    mem_reset(sid)
+    mem_reset(sid, client_id="nikadent")
     bind_session_client("demo")
     client = app_module.app.test_client()
     resp_demo = client.post("/ask", json={"q": demo_q, "sid": sid, "client_id": "demo"})
@@ -2177,24 +2194,25 @@ def test_http_ask_model_admin_without_phone_exact_literal_text(
         )
     )
     _install_sales_fast_transport(monkeypatch, backend)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={
-            "q": "После операции появилось воспаление",
-            "sid": "admin-no-phone-literal",
-            "client_id": "nikadent",
-        },
-    ):
-        from flask import request
+    with session_client_scope("nikadent"):
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={
+                "q": "После операции появилось воспаление",
+                "sid": "admin-no-phone-literal",
+                "client_id": "nikadent",
+            },
+        ):
+            from flask import request
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="nikadent",
-            sid="admin-no-phone-literal",
-            user_message="После операции появилось воспаление",
-            backend=backend,
-        )
+            request.ctx = _offline_widget_request_ctx()
+            outcome = run_sales_fast_widget_turn(
+                client_id="nikadent",
+                sid="admin-no-phone-literal",
+                user_message="После операции появилось воспаление",
+                backend=backend,
+            )
     payload = dict(outcome.widget.payload or {})
     answer = str(payload.get("answer") or "")
     assert answer == _ADMIN_HANDOFF_BASE_LITERAL
@@ -2214,10 +2232,9 @@ _IMPLANTIUM_PRICE_TEXT = (
 
 
 def _timing_request_ctx() -> dict[str, object]:
-    return {
-        "turn_t0_monotonic": 0.0,
-        "turn_timing": {"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}},
-    }
+    return _offline_widget_request_ctx(
+        turn_timing={"durations_ms": {}, "flags": {}, "marks": {}, "stages": {}},
+    )
 
 
 def _patch_post_composer_audit_failure(
@@ -2243,7 +2260,7 @@ def test_post_composer_scoped_evidence_degraded_preserves_materialized_answer(
     patient = "All-on-4 — протокол полного восстановления челюсти."
     sid = "post-composer-scoped-degraded"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _patch_post_composer_audit_failure(
         monkeypatch,
         TargetScopedResponseEvidenceError(
@@ -2300,7 +2317,7 @@ def test_post_composer_composer_request_degraded_preserves_materialized_answer(
     patient = "Имплантация проходит под местной анестезией."
     sid = "post-composer-composer-degraded"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _patch_post_composer_audit_failure(
         monkeypatch,
         TargetComposerRequestError("composer_request_material_invalid", "kb:clinic.md#one"),
@@ -2349,7 +2366,7 @@ def test_post_composer_degraded_exact_price_preserves_canonical_price_line(
     )
     sid = "post-composer-price-degraded"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _patch_post_composer_audit_failure(
         monkeypatch,
         TargetScopedResponseEvidenceError("scoped_evidence_package_inconsistent", "plan"),
@@ -2399,7 +2416,7 @@ def test_post_composer_degraded_streaming_matches_blocking_answer(
     patient = "All-on-4 на нижнюю челюсть — протокол."
     sid = "post-composer-stream-degraded"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _patch_post_composer_audit_failure(
         monkeypatch,
         TargetScopedResponseEvidenceError("scoped_evidence_md_root_invalid", "bad"),
@@ -2445,7 +2462,7 @@ def test_post_composer_unexpected_error_is_not_suppressed(
 
     sid = "post-composer-unexpected-error"
     bind_session_client("demo")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     def _raise_type_error(*_args: object, **_kwargs: object) -> object:
         raise TypeError("post_composer_unexpected_programming_error")

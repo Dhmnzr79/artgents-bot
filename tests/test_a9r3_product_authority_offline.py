@@ -14,11 +14,11 @@ from contracts.ui_scope_action import UiScopeAction, build_ui_scope_ref, is_ui_s
 from core.target_effective_scope import resolve_effective_scope, strip_reported_context_for_product
 from core.target_effective_scope_merge import merge_effective_scope_axes, EffectiveScopeMergeInputs
 from core.target_patient_scope_projection import project_patient_scope_from_turn_frame
-from core.target_runtime_session import read_target_runtime_session
 from core.target_runtime_turn import run_target_fullcontext_runtime_turn
 from core.target_strategy_context import strategy_match_from_effective_scope
 from core.turn_frame_from_raw import build_turn_frame_from_raw
-from session import mem_get, mem_reset
+from session import mem_get, mem_reset, session_client_scope
+from tests.session_binding_test_support import read_target_runtime_session_for
 from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
@@ -74,14 +74,15 @@ def _run_materialized(
     composer_text: str = PRICE_TEXT,
 ):
     _install_turn_frame(frame)
-    return run_target_fullcontext_runtime_turn(
-        client_id="demo",
-        sid=sid,
-        user_message=user_message,
-        composer_backend=RecordingComposerBackend(composer_text),
-        semantic_backend=RecordingSemanticBackend(),
-        boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
-    )
+    with session_client_scope("demo"):
+        return run_target_fullcontext_runtime_turn(
+            client_id="demo",
+            sid=sid,
+            user_message=user_message,
+            composer_backend=RecordingComposerBackend(composer_text),
+            semantic_backend=RecordingSemanticBackend(),
+            boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
+        )
 
 
 def _quick_refs(outcome) -> list[str]:
@@ -103,15 +104,16 @@ def _effective_scope_from_ctx() -> dict[str, Any]:
 def _bump_session_turn(sid: str) -> None:
     from session import _lock, _persist_unlocked
 
-    with _lock:
-        st = mem_get(sid)
-        st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
-        _persist_unlocked(sid, st)
+    with session_client_scope("demo"):
+        with _lock:
+            st = mem_get(sid)
+            st["session_turn_count"] = int(st.get("session_turn_count") or 0) + 1
+            _persist_unlocked(sid, st)
 
 
 def test_ac3_1_full_arch_scoped_price_without_scope_nav(flask_ctx) -> None:
     sid = f"s-a9r3-1-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _native_frame(
         {"extent": "full_arch", "jaw": "unknown", "stage": "unknown", "modifiers": []}
     )
@@ -129,7 +131,7 @@ def test_ac3_1_full_arch_scoped_price_without_scope_nav(flask_ctx) -> None:
 
 def test_ac3_2_broad_price_has_three_scope_buttons(flask_ctx) -> None:
     sid = f"s-a9r3-2-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _family_overview_frame(
         patient_scope={
             "extent": "unknown",
@@ -157,7 +159,7 @@ def test_ac3_2_broad_price_has_three_scope_buttons(flask_ctx) -> None:
 
 def test_ac3_3_all_on_4_does_not_invent_patient_scope(flask_ctx) -> None:
     sid = f"s-a9r3-3-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _native_frame(
         {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
         service_id="all_on_4",
@@ -174,7 +176,7 @@ def test_ac3_3_all_on_4_does_not_invent_patient_scope(flask_ctx) -> None:
 
 def test_ac3_4_implant_placed_prosthetics_scoped_path(flask_ctx) -> None:
     sid = f"s-a9r3-4-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _native_frame(
         {
             "extent": "one_tooth",
@@ -199,7 +201,7 @@ def test_ac3_4_implant_placed_prosthetics_scoped_path(flask_ctx) -> None:
 
 def test_ac3_5_correction_replaces_session_full_arch(flask_ctx) -> None:
     sid = f"s-a9r3-5-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     turn1 = _native_frame(
         {"extent": "full_arch", "jaw": "unknown", "stage": "unknown", "modifiers": []}
     )
@@ -209,7 +211,7 @@ def test_ac3_5_correction_replaces_session_full_arch(flask_ctx) -> None:
         user_message="Сколько стоит имплантация всей челюсти?",
     )
     assert outcome1.widget.kind == "materialized"
-    after1 = read_target_runtime_session(sid)
+    after1 = read_target_runtime_session_for(sid)
     assert after1.patient_facts is not None
     assert after1.patient_facts.extent == "full_arch"
 
@@ -224,14 +226,14 @@ def test_ac3_5_correction_replaces_session_full_arch(flask_ctx) -> None:
         composer_text="Краткий обзор цен.",
     )
     assert outcome2.widget.kind == "materialized"
-    after2 = read_target_runtime_session(sid)
+    after2 = read_target_runtime_session_for(sid)
     assert after2.patient_facts is not None
     assert after2.patient_facts.extent == "one_tooth"
 
 
 def test_ac3_6_ui_scope_click_beats_planner_extent(flask_ctx) -> None:
     sid = f"s-a9r3-6-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     ui_ref = build_ui_scope_ref(topic="implantation", extent="one_tooth")
     from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 
@@ -253,7 +255,7 @@ def test_ac3_6_ui_scope_click_beats_planner_extent(flask_ctx) -> None:
 
 def test_ui_scope_full_arch_beats_medical_handoff_and_needs_clarify(flask_ctx) -> None:
     sid = f"s-a9r3-ui-handoff-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     ui_ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
     request.ctx["current_ui_scope_action"] = UiScopeAction(
         extent="full_arch",
@@ -280,14 +282,15 @@ def test_ui_scope_full_arch_beats_medical_handoff_and_needs_clarify(flask_ctx) -
         allowed_service_ids=_ALLOWED_SERVICES,
     )
     _install_turn_frame(frame)
-    outcome = run_target_fullcontext_runtime_turn(
-        client_id="demo",
-        sid=sid,
-        user_message="продолжить",
-        composer_backend=RecordingComposerBackend("318 000 ₽ за All-on-4."),
-        semantic_backend=RecordingSemanticBackend(),
-        boundary_backend=RecordingBoundaryBackend(BackendPayload("medical_handoff", 0.9)),
-    )
+    with session_client_scope("demo"):
+        outcome = run_target_fullcontext_runtime_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="продолжить",
+            composer_backend=RecordingComposerBackend("318 000 ₽ за All-on-4."),
+            semantic_backend=RecordingSemanticBackend(),
+            boundary_backend=RecordingBoundaryBackend(BackendPayload("medical_handoff", 0.9)),
+        )
     assert outcome.widget.kind == "materialized"
     route = str((outcome.widget.payload.get("meta") or {}).get("service_route") or "")
     assert "terminal" not in route
@@ -295,7 +298,7 @@ def test_ui_scope_full_arch_beats_medical_handoff_and_needs_clarify(flask_ctx) -
 
 def test_ac3_7_ambiguous_turn_does_not_overwrite_session(flask_ctx) -> None:
     sid = f"s-a9r3-7-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     turn1 = _native_frame(
         {"extent": "few_teeth", "jaw": "unknown", "stage": "unknown", "modifiers": []}
     )
@@ -305,7 +308,7 @@ def test_ac3_7_ambiguous_turn_does_not_overwrite_session(flask_ctx) -> None:
         user_message="Несколько зубов под имплантацию",
         composer_text="Краткий обзор цен.",
     )
-    before = read_target_runtime_session(sid)
+    before = read_target_runtime_session_for(sid)
     assert before.patient_facts is not None
     assert before.patient_facts.extent == "few_teeth"
 
@@ -314,7 +317,7 @@ def test_ac3_7_ambiguous_turn_does_not_overwrite_session(flask_ctx) -> None:
         {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []}
     )
     _run_materialized(sid, turn2, user_message="ну примерно")
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is not None
     assert after.patient_facts.extent == "few_teeth"
 
@@ -323,7 +326,7 @@ def test_ac3_8_terminal_turn_does_not_persist_a9_facts(flask_ctx) -> None:
     from core.target_response_verifier import TargetSemanticAssessment, TargetSemanticIssue
 
     sid = f"s-a9r3-8-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _native_frame(
         {"extent": "full_arch", "jaw": "unknown", "stage": "unknown", "modifiers": []}
     )
@@ -331,35 +334,37 @@ def test_ac3_8_terminal_turn_does_not_persist_a9_facts(flask_ctx) -> None:
     assessment = TargetSemanticAssessment(
         issues=(TargetSemanticIssue(kind="personal_medical_conclusion", offending_span="x"),),
     )
-    run_target_fullcontext_runtime_turn(
-        client_id="demo",
-        sid=sid,
-        user_message="Сколько стоит имплантация всей челюсти?",
-        composer_backend=RecordingComposerBackend("x"),
-        semantic_backend=RecordingSemanticBackend(assessment=assessment),
-        boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
-    )
-    after = read_target_runtime_session(sid)
+    with session_client_scope("demo"):
+        run_target_fullcontext_runtime_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Сколько стоит имплантация всей челюсти?",
+            composer_backend=RecordingComposerBackend("x"),
+            semantic_backend=RecordingSemanticBackend(assessment=assessment),
+            boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
+        )
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is None
 
 
 def test_ac3_10_price_evidence_from_pricebook_not_invented(flask_ctx) -> None:
     sid = f"s-a9r3-10-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _native_frame(
         {"extent": "unknown", "jaw": "unknown", "stage": "unknown", "modifiers": []},
         service_id="all_on_4",
     )
     composer = RecordingComposerBackend(PRICE_TEXT)
     _install_turn_frame(frame)
-    run_target_fullcontext_runtime_turn(
-        client_id="demo",
-        sid=sid,
-        user_message="Сколько стоит All-on-4?",
-        composer_backend=composer,
-        semantic_backend=RecordingSemanticBackend(),
-        boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
-    )
+    with session_client_scope("demo"):
+        run_target_fullcontext_runtime_turn(
+            client_id="demo",
+            sid=sid,
+            user_message="Сколько стоит All-on-4?",
+            composer_backend=composer,
+            semantic_backend=RecordingSemanticBackend(),
+            boundary_backend=RecordingBoundaryBackend(BackendPayload("none", 0.95)),
+        )
     assert composer.invocations
     evidence = json.loads(composer.invocations[0].primary_evidence_json)
     offer_blocks = [block for block in evidence if block.get("kind") == "offer"]
@@ -370,7 +375,7 @@ def test_ac3_10_price_evidence_from_pricebook_not_invented(flask_ctx) -> None:
 
 def test_ac3_11_no_legacy_w1_routes(flask_ctx) -> None:
     sid = f"s-a9r3-11-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     frame = _family_overview_frame(
         patient_scope={
             "extent": "unknown",

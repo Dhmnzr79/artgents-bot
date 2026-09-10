@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from orchestration import route_guards
+from session import clear_session_client_binding, clear_session_store_cache
 
 
 @pytest.fixture(autouse=True)
@@ -16,6 +17,14 @@ def _reset_ip_rate_limit_buckets() -> None:
     yield
     with route_guards._IP_RATE_LOCK:
         route_guards._IP_RATE_BUCKETS.clear()
+
+
+@pytest.fixture(autouse=True)
+def _clear_session_client_binding_after_test() -> None:
+    """Prevent thread-local session pack bindings leaking across tests."""
+    yield
+    clear_session_client_binding()
+    clear_session_store_cache()
 
 
 class RealProviderTransportBlockedError(RuntimeError):

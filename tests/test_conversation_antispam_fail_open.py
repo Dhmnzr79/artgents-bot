@@ -10,7 +10,7 @@ import app as app_module
 import config
 from orchestration.route_guards import is_obvious_noise
 from orchestration.sales_one_plus_ask_turn import _post_gate_flows
-from session import _fresh_defaults, _lock, _persist_unlocked, mem_add_user, mem_get, mem_reset
+from session import _fresh_defaults, _lock, _persist_unlocked, mem_add_user, mem_get, mem_reset, session_client_scope
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +42,12 @@ _SEVEN_TURN_QUESTIONS = (
     "Есть ли рассрочка?",
     "Как проходит консультация?",
 )
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 class _CountingBackend:
@@ -165,8 +171,9 @@ def test_candidate_legacy_session_fields_do_not_block_ask_path(
         _persist_unlocked(sid, st)
 
     client = app_module.app.test_client()
-    payload = _post_ask(client, sid=sid, q="Какие виды имплантации есть?")
-    _assert_normal_answer_payload(payload)
+    with session_client_scope("demo"):
+        payload = _post_ask(client, sid=sid, q="Какие виды имплантации есть?")
+        _assert_normal_answer_payload(payload)
     assert backend.call_count == 1
 
 
@@ -182,8 +189,9 @@ def test_candidate_seven_fast_normal_messages_each_reach_backend(
     client = app_module.app.test_client()
 
     for question in _SEVEN_TURN_QUESTIONS:
-        payload = _post_ask(client, sid=sid, q=question)
-        _assert_normal_answer_payload(payload)
+        with session_client_scope("demo"):
+            payload = _post_ask(client, sid=sid, q=question)
+            _assert_normal_answer_payload(payload)
 
     assert backend.call_count == len(_SEVEN_TURN_QUESTIONS)
 
@@ -207,8 +215,9 @@ def test_candidate_twenty_one_normal_turns_without_booking_intent_reach_backend(
         for turn in range(1, 22)
     ]
     for question in questions:
-        payload = _post_ask(client, sid=sid, q=question)
-        _assert_normal_answer_payload(payload)
+        with session_client_scope("demo"):
+            payload = _post_ask(client, sid=sid, q=question)
+            _assert_normal_answer_payload(payload)
 
     assert backend.call_count == 21
 

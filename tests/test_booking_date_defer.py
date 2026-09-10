@@ -15,7 +15,13 @@ from core.booking_date_defer import (
 from core.lead_turn_classifier import classify_lead_active_turn
 from flow_handlers import handle_flows
 from lead_interrupt import detect_lead_interrupt
-from session import get_lead_preferred_datetime, mem_get, mem_reset, set_lead_intent
+from session import get_lead_preferred_datetime, mem_get, mem_reset, session_client_scope, set_lead_intent
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 @pytest.fixture

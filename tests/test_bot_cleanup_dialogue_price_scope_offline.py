@@ -11,8 +11,8 @@ import pytest
 import app as app_module
 from contracts.ui_service_action import build_ui_service_ref
 from core.sales_fast_authoritative_commerce import PAYMENT_STAGES_UNAVAILABLE_TEXT
-from core.target_runtime_session import read_target_runtime_session
-from session import bind_session_client, mem_add_user, mem_reset
+from session import bind_session_client, mem_add_user, mem_reset, session_client_scope
+from tests.session_binding_test_support import read_target_runtime_session_for
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -89,39 +89,40 @@ def _run_turn(
 ) -> dict:
     backend = _CountingBackend(envelope_json)
     _install_sales_fast(monkeypatch, backend)
-    if reset_session:
-        mem_reset(sid)
-    if ref:
-        client = flask_app.test_client()
-        response = client.post(
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
+        if ref:
+            client = flask_app.test_client()
+            response = client.post(
+                "/ask",
+                json={"q": user_message, "sid": sid, "client_id": "demo", "ref": ref},
+            )
+            payload = response.get_json()
+            assert isinstance(payload, dict)
+            payload["_outcome_model_route"] = "ref_click"
+            return payload
+        if user_message.strip():
+            mem_add_user(sid, user_message)
+        with flask_app.test_request_context(
             "/ask",
-            json={"q": user_message, "sid": sid, "client_id": "demo", "ref": ref},
-        )
-        payload = response.get_json()
-        assert isinstance(payload, dict)
-        payload["_outcome_model_route"] = "ref_click"
+            method="POST",
+            json={"q": user_message, "sid": sid, "client_id": "demo"},
+        ):
+            from flask import request
+
+            from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
+
+            request.ctx = {"turn_t0_monotonic": 0.0}
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message=user_message,
+                backend=backend,
+            )
+        payload = dict(outcome.widget.payload or {})
+        payload["_outcome_model_route"] = outcome.model_route
         return payload
-    if user_message.strip():
-        mem_add_user(sid, user_message)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": user_message, "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
-
-        from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
-
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message=user_message,
-            backend=backend,
-        )
-    payload = dict(outcome.widget.payload or {})
-    payload["_outcome_model_route"] = outcome.model_route
-    return payload
 
 
 def _norm_digits(text: str) -> str:
@@ -161,7 +162,7 @@ def _offer_ids(payload: dict) -> tuple[str, ...]:
 
 
 def _session_fields(sid: str) -> dict[str, object]:
-    session = read_target_runtime_session(sid)
+    session = read_target_runtime_session_for(sid)
     return {
         "last_service_id": session.last_service_id,
         "last_displayed_offer_ids": tuple(session.last_displayed_offer_ids),
@@ -537,7 +538,7 @@ def test_brand_included_followup_keeps_selected_offer(
             requested_service_id="classic",
         ),
     )
-    session = read_target_runtime_session(sid)
+    session = read_target_runtime_session_for(sid)
     assert session.last_selected_offer_id == "classic.one_tooth.implantium"
 
     payload = _run_turn(
@@ -554,7 +555,7 @@ def test_brand_included_followup_keeps_selected_offer(
         ),
         reset_session=False,
     )
-    session = read_target_runtime_session(sid)
+    session = read_target_runtime_session_for(sid)
     assert session.last_selected_offer_id == "classic.one_tooth.implantium"
     assert (payload.get("meta") or {}).get("matched_service_id") == "classic"
 
@@ -603,7 +604,7 @@ def test_payment_stages_followup_keeps_context(
         reset_session=False,
     )
     answer = _norm_digits(str(payload.get("answer") or ""))
-    assert read_target_runtime_session(sid).last_service_id == "all_on_4"
+    assert read_target_runtime_session_for(sid).last_service_id == "all_on_4"
     assert (payload.get("meta") or {}).get("matched_service_id") == "all_on_4"
     assert "190800" in answer or "127200" in answer
 
@@ -638,23 +639,24 @@ def test_payment_stages_unavailable_when_selected_offer_has_no_authored_stages(
         )
     )
     _install_sales_fast(monkeypatch, backend)
-    mem_add_user(sid, "Как оплачивается по этапам?")
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": "Как оплачивается по этапам?", "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        mem_add_user(sid, "Как оплачивается по этапам?")
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": "Как оплачивается по этапам?", "sid": sid, "client_id": "demo"},
+        ):
+            from flask import request
 
-        from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
+            from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message="Как оплачивается по этапам?",
-            backend=backend,
-        )
+            request.ctx = {"turn_t0_monotonic": 0.0}
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message="Как оплачивается по этапам?",
+                backend=backend,
+            )
     payload = dict(outcome.widget.payload or {})
     answer = str(payload.get("answer") or "")
     norm = _norm_digits(answer)
@@ -665,7 +667,7 @@ def test_payment_stages_unavailable_when_selected_offer_has_no_authored_stages(
     assert "127200" not in norm
     assert "76200" not in norm
     assert "45200" not in norm
-    assert read_target_runtime_session(sid).last_service_id == "removable_dentures"
+    assert read_target_runtime_session_for(sid).last_service_id == "removable_dentures"
     assert (payload.get("meta") or {}).get("matched_service_id") == "removable_dentures"
 
 
@@ -769,10 +771,11 @@ def test_stale_service_focus_not_rejuvenated_on_related_followup(
             requested_service_id="all_on_4",
         ),
     )
-    with _lock:
-        st = mem_get(sid)
-        st["session_turn_count"] = int(THRESHOLDS.follow_up.max_service_focus_turn_age) + 2
-        _persist_unlocked(sid, st)
+    with session_client_scope("demo"):
+        with _lock:
+            st = mem_get(sid)
+            st["session_turn_count"] = int(THRESHOLDS.follow_up.max_service_focus_turn_age) + 2
+            _persist_unlocked(sid, st)
 
     _run_turn(
         monkeypatch,

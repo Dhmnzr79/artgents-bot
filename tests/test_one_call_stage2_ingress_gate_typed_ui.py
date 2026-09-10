@@ -72,7 +72,7 @@ def test_on_http_free_text_never_calls_pre_resolver_or_classify_ingress(
     backend = _CountingBackend(answer_envelope("ответ по базе"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-http-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -121,7 +121,7 @@ def test_on_http_gate_before_corpus_resolver_and_factory(
     monkeypatch.setattr("core.sales_fast_widget_runtime._resolve_sales_context", _resolve)
     _install_sales_fast_transport(monkeypatch, backend, factory=_factory)
     sid = f"s-order-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -143,7 +143,7 @@ def test_on_http_symptom_admin_uses_one_call_without_legacy_ingress(
     backend = _CountingBackend(admin_envelope())
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-symptom-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -171,7 +171,7 @@ def test_on_http_admin_matrix_one_call_typed_admin(
     backend = _CountingBackend(admin_envelope())
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"admin-{case_id}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -194,7 +194,7 @@ def test_on_http_general_medical_faq_pass_with_one_call(
     backend = _CountingBackend(answer_envelope("Ответ по материалам клиники о безопасности имплантации."))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"faq-{case_id}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -221,7 +221,7 @@ def test_on_http_sales_fears_pass_with_one_call(
     backend = _CountingBackend(answer_envelope("ответ по базе клиники"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"fear-{case_id}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -236,7 +236,7 @@ def test_on_http_contacts_after_gate_zero_calls(monkeypatch: pytest.MonkeyPatch)
     backend = _CountingBackend(answer_envelope("ignored"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-contacts-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -252,7 +252,7 @@ def test_on_http_booking_after_gate_zero_calls(monkeypatch: pytest.MonkeyPatch) 
     backend = _CountingBackend(answer_envelope("ignored"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-booking-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -270,7 +270,7 @@ def test_on_typed_ui_candidate_without_legacy(monkeypatch: pytest.MonkeyPatch) -
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-typed-{uuid.uuid4().hex[:8]}"
     ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(sid, TargetRuntimeFollowupItem(ref=ref, label="Вся челюсть"))
 
     client = app_module.app.test_client()
@@ -312,7 +312,7 @@ def test_typed_ui_passes_governed_gate_result_without_re_gate(
     )
     sid = f"s-gate-{uuid.uuid4().hex[:8]}"
     ref = build_ui_scope_ref(topic="implantation", extent="full_arch")
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(sid, TargetRuntimeFollowupItem(ref=ref, label="Вся челюсть"))
 
     with app_module.app.test_request_context():
@@ -324,7 +324,7 @@ def test_typed_ui_passes_governed_gate_result_without_re_gate(
         orchestrate_sales_one_plus_ask_turn(
             {"q": "", "ref": ref, "sid": sid, "client_id": "demo"},
             resolve_client_id=lambda *_a, **_k: "demo",
-            bind_chat_ctx=lambda *_a, **_k: None,
+            bind_chat_ctx=app_module._bind_chat_ctx,
             resolve_ip=lambda: "127.0.0.1",
             client_txt=lambda *_a, **_k: {},
             service_payload=lambda answer, _sid, _cid, **_: {"answer": answer, "meta": {}},
@@ -335,7 +335,7 @@ def test_typed_ui_passes_governed_gate_result_without_re_gate(
         orchestrate_sales_one_plus_ask_turn(
             {"q": "Вся челюсть", "ref": ref, "sid": sid, "client_id": "demo"},
             resolve_client_id=lambda *_a, **_k: "demo",
-            bind_chat_ctx=lambda *_a, **_k: None,
+            bind_chat_ctx=app_module._bind_chat_ctx,
             resolve_ip=lambda: "127.0.0.1",
             client_txt=lambda *_a, **_k: {},
             service_payload=lambda answer, _sid, _cid, **_: {"answer": answer, "meta": {}},
@@ -351,7 +351,7 @@ def test_typed_ui_passes_governed_gate_result_without_re_gate(
 
 def test_invalid_typed_ref_fail_safe_without_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
     sid = f"s-bad-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     resp = client.post(
@@ -403,7 +403,7 @@ def test_observability_excludes_patient_text_and_corpus(
     backend = _CountingBackend(answer_envelope("ответ"))
     _install_sales_fast_transport(monkeypatch, backend)
     sid = f"s-obs-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
 
     client = app_module.app.test_client()
     client.post(

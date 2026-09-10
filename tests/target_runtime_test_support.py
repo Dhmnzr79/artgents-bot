@@ -78,26 +78,28 @@ def _fake_classify_ingress_normal(*_a, **_k) -> IngressRouteResult:
 
 
 def _seed_followups(sid: str, *items: TargetRuntimeFollowupItem) -> None:
-    from session import _lock, _persist_unlocked, mem_get
+    from session import _lock, _persist_unlocked, mem_get, session_client_scope
 
-    with _lock:
-        st = mem_get(sid)
-        st["target_runtime_followups"] = [
-            {"ref": item.ref, "label": item.label} for item in items
-        ]
-        _persist_unlocked(sid, st)
+    with session_client_scope("demo"):
+        with _lock:
+            st = mem_get(sid)
+            st["target_runtime_followups"] = [
+                {"ref": item.ref, "label": item.label} for item in items
+            ]
+            _persist_unlocked(sid, st)
 
 
 def _seed_target_runtime_state(sid: str, **fields: object) -> None:
-    from session import _lock, _persist_unlocked, mem_get
+    from session import _lock, _persist_unlocked, mem_get, session_client_scope
 
-    with _lock:
-        st = mem_get(sid)
-        if fields.get("last_service_id") and "service_focus_set_at_turn" not in fields:
-            fields = dict(fields)
-            fields.setdefault("service_focus_set_at_turn", int(st.get("session_turn_count") or 0))
-        st["target_runtime_state"] = fields
-        _persist_unlocked(sid, st)
+    with session_client_scope("demo"):
+        with _lock:
+            st = mem_get(sid)
+            if fields.get("last_service_id") and "service_focus_set_at_turn" not in fields:
+                fields = dict(fields)
+                fields.setdefault("service_focus_set_at_turn", int(st.get("session_turn_count") or 0))
+            st["target_runtime_state"] = fields
+            _persist_unlocked(sid, st)
 
 
 def _price_turn_frame():
@@ -111,14 +113,17 @@ def _run_materialized_turn(
     composer_text: str = PRICE_TEXT,
     frame=None,
 ):
+    from session import session_client_scope
+
     _install_turn_frame(frame or _price_turn_frame())
-    return run_target_fullcontext_runtime_turn(
-        client_id="demo",
-        sid=sid,
-        user_message=user_message,
-        composer_backend=RecordingComposerBackend(composer_text),
-        semantic_backend=RecordingSemanticBackend(),
-        boundary_backend=RecordingBoundaryBackend(
-            BackendPayload(decision="none", confidence=0.95)
-        ),
-    )
+    with session_client_scope("demo"):
+        return run_target_fullcontext_runtime_turn(
+            client_id="demo",
+            sid=sid,
+            user_message=user_message,
+            composer_backend=RecordingComposerBackend(composer_text),
+            semantic_backend=RecordingSemanticBackend(),
+            boundary_backend=RecordingBoundaryBackend(
+                BackendPayload(decision="none", confidence=0.95)
+            ),
+        )

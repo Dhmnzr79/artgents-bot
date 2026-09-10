@@ -22,9 +22,9 @@ from core.one_call_installment_auto_policy import (
     resolve_shared_installment_suffix_for_price_turn,
 )
 from core.target_client_data import load_target_client_data
-from core.target_runtime_session import read_target_runtime_session
 from evals.v5.run_bot_cleanup_live import compare_ask_stream_payloads
-from session import bind_session_client, mem_reset
+from session import bind_session_client, mem_reset, session_client_scope
+from tests.session_binding_test_support import read_target_runtime_session_for
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _DEMO_BUNDLE = load_target_client_data("demo").bundle
@@ -99,27 +99,28 @@ def _run_turn(
 ) -> dict:
     backend = _Backend(envelope_json)
     _install_sales_fast(monkeypatch, backend)
-    if reset_session:
-        mem_reset(sid)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": user_message, "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": user_message, "sid": sid, "client_id": "demo"},
+        ):
+            from flask import request
 
-        from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
+            from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message=user_message,
-            backend=backend,
-        )
-    payload = dict(outcome.widget.payload or {})
-    payload["_backend_calls"] = backend.call_count
-    return payload
+            request.ctx = {"turn_t0_monotonic": 0.0}
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message=user_message,
+                backend=backend,
+            )
+        payload = dict(outcome.widget.payload or {})
+        payload["_backend_calls"] = backend.call_count
+        return payload
 
 
 @pytest.fixture
@@ -186,7 +187,7 @@ def test_eligible_all_on_4_price_auto_appends_installment(
     assert "318000" in _norm_digits(answer)
     assert _INSTALLMENT_MICROFACT in answer
     assert answer.count(_INSTALLMENT_MICROFACT) == 1
-    assert INSTALLMENT_12_FACT_ID in read_target_runtime_session("inst-price-a4").shown_fact_ids
+    assert INSTALLMENT_12_FACT_ID in read_target_runtime_session_for("inst-price-a4").shown_fact_ids
 
 
 def test_ineligible_caries_price_has_no_installment_suffix(
@@ -214,7 +215,7 @@ def test_ineligible_caries_price_has_no_installment_suffix(
     answer = str(payload.get("answer") or "")
     assert "6500" in _norm_digits(answer)
     assert _INSTALLMENT_MICROFACT not in answer
-    assert INSTALLMENT_12_FACT_ID not in read_target_runtime_session("inst-price-caries").shown_fact_ids
+    assert INSTALLMENT_12_FACT_ID not in read_target_runtime_session_for("inst-price-caries").shown_fact_ids
 
 
 def test_follow_up_after_eligible_price_confirms_installment(
@@ -508,7 +509,7 @@ def test_installment_price_ask_stream_parity(
 
     def _ask(sid: str) -> dict:
         _install_sales_fast(monkeypatch, _Backend(env))
-        mem_reset(sid)
+        mem_reset(sid, client_id="demo")
         return app_module.app.test_client().post(
             "/ask",
             json={
@@ -520,7 +521,7 @@ def test_installment_price_ask_stream_parity(
 
     def _stream(sid: str) -> dict:
         _install_sales_fast(monkeypatch, _Backend(env))
-        mem_reset(sid)
+        mem_reset(sid, client_id="demo")
         text = app_module.app.test_client().post(
             "/ask/stream",
             json={

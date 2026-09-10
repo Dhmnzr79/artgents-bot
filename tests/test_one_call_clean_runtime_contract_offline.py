@@ -19,13 +19,13 @@ from core.sales_one_plus_turn import SalesOnePlusBackendFailure
 from core.target_contact_authority import canonical_contact_phone
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
 from core.target_runtime_session import (
-    read_target_runtime_session,
     sync_session_patient_facts_topic,
     write_session_patient_facts_from_ui_action,
 )
+from tests.session_binding_test_support import read_target_runtime_session_for
 from contracts.ui_scope_action import UiScopeAction
 from evals.v5.run_bot_cleanup_live import compare_ask_stream_payloads
-from session import mem_get, mem_reset
+from session import mem_get, mem_reset, session_client_scope
 from tests.target_runtime_test_support import _seed_followups
 from tests.test_sales_fast_widget_integration import _CountingBackend, _install_sales_fast_transport
 from tests.test_sales_one_plus_turn import admin_envelope, answer_envelope
@@ -57,15 +57,16 @@ def _norm_digits(text: str) -> str:
     return re.sub(r"[^\d]", "", text or "")
 
 
-def _hist_messages(sid: str, role: str) -> list[str]:
+def _hist_messages(sid: str, role: str, *, client_id: str = "demo") -> list[str]:
     roles = {role}
     if role == "bot":
         roles.add("assistant")
-    return [
-        str(item.get("content") or "")
-        for item in mem_get(sid).get("hist") or []
-        if item.get("role") in roles
-    ]
+    with session_client_scope(client_id):
+        return [
+            str(item.get("content") or "")
+            for item in mem_get(sid).get("hist") or []
+            if item.get("role") in roles
+        ]
 
 
 def _parse_sse_ui_payload(resp) -> dict:
@@ -257,7 +258,7 @@ def test_valid_ui_scope_click_persists_patient_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sid = f"s-b9-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(sid, TargetRuntimeFollowupItem(ref=_UI_SCOPE_REF, label="Один зуб"))
     backend = _CountingBackend(answer_envelope("Цена для одного зуба."))
     _install_sales_fast_transport(monkeypatch, backend)
@@ -267,7 +268,7 @@ def test_valid_ui_scope_click_persists_patient_facts(
     )
     assert resp.status_code == 200
     assert backend.call_count == 1
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is not None
     assert after.patient_facts.extent == "one_tooth"
     assert after.patient_facts.ref == _UI_SCOPE_REF
@@ -277,7 +278,7 @@ def test_valid_ui_stage_click_persists_stage_topic_and_ref(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sid = f"s-b10-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(sid, TargetRuntimeFollowupItem(ref=_UI_STAGE_REF, label="Имплант установлен"))
     backend = _CountingBackend(answer_envelope("На консультации подберём вариант протезирования."))
     _install_sales_fast_transport(monkeypatch, backend)
@@ -287,7 +288,7 @@ def test_valid_ui_stage_click_persists_stage_topic_and_ref(
     )
     assert resp.status_code == 200
     assert backend.call_count == 1
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is not None
     assert after.patient_facts.stage == "implant_placed"
     assert after.patient_facts.topic == "prosthetics"
@@ -298,7 +299,7 @@ def test_malformed_ui_ref_is_fail_closed_without_session_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sid = f"s-b11-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(answer_envelope("ignored hostile price 1 ₽"))
     _install_sales_fast_transport(monkeypatch, backend)
     resp = app_module.app.test_client().post(
@@ -309,7 +310,7 @@ def test_malformed_ui_ref_is_fail_closed_without_session_facts(
     assert resp.status_code == 200
     assert backend.call_count == 0
     assert payload["meta"]["service_route"] == "sales_fast_followup_unknown"
-    assert read_target_runtime_session(sid).patient_facts is None
+    assert read_target_runtime_session_for(sid).patient_facts is None
     assert "1" not in _norm_digits(str(payload.get("answer") or ""))
 
 
@@ -317,7 +318,7 @@ def test_unshown_ui_ref_is_fail_closed_without_session_facts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sid = f"s-b12-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(answer_envelope("ignored hostile price 1 ₽"))
     _install_sales_fast_transport(monkeypatch, backend)
     resp = app_module.app.test_client().post(
@@ -328,7 +329,7 @@ def test_unshown_ui_ref_is_fail_closed_without_session_facts(
     assert resp.status_code == 200
     assert backend.call_count == 0
     assert payload["meta"]["service_route"] == "sales_fast_followup_unknown"
-    assert read_target_runtime_session(sid).patient_facts is None
+    assert read_target_runtime_session_for(sid).patient_facts is None
 
 
 def test_ask_and_stream_terminal_payloads_are_equivalent(
@@ -338,7 +339,7 @@ def test_ask_and_stream_terminal_payloads_are_equivalent(
     client = app_module.app.test_client()
 
     sid_ask = f"s-b13-ask-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid_ask)
+    mem_reset(sid_ask, client_id="demo")
     _seed_followups(sid_ask, TargetRuntimeFollowupItem(ref=_UI_SCOPE_REF, label="Один зуб"))
     ask_backend = _CountingBackend(envelope)
     _install_sales_fast_transport(monkeypatch, ask_backend)
@@ -348,7 +349,7 @@ def test_ask_and_stream_terminal_payloads_are_equivalent(
     ).get_json()
 
     sid_stream = f"s-b13-stream-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid_stream)
+    mem_reset(sid_stream, client_id="demo")
     _seed_followups(sid_stream, TargetRuntimeFollowupItem(ref=_UI_SCOPE_REF, label="Один зуб"))
     stream_backend = _CountingBackend(envelope)
     _install_sales_fast_transport(monkeypatch, stream_backend)
@@ -364,7 +365,7 @@ def test_ask_and_stream_terminal_payloads_are_equivalent(
     )
     assert ask_payload.get("offer") == stream_payload.get("offer")
     assert ask_payload.get("cta") == stream_payload.get("cta")
-    assert read_target_runtime_session(sid_ask).patient_facts == read_target_runtime_session(
+    assert read_target_runtime_session_for(sid_ask).patient_facts == read_target_runtime_session_for(
         sid_stream
     ).patient_facts
     assert ask_backend.call_count == 1
@@ -388,7 +389,7 @@ def test_stream_does_not_double_write_session_history(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sid = f"s-b15-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(answer_envelope("Ответ по материалам клиники."))
     _install_sales_fast_transport(monkeypatch, backend)
     question = "Как обеспечивается стерильность?"
@@ -415,8 +416,8 @@ def test_sid_isolation_for_ui_scope_patient_facts(
 ) -> None:
     sid_a = f"s-b16-a-{uuid.uuid4().hex[:8]}"
     sid_b = f"s-b16-b-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid_a)
-    mem_reset(sid_b)
+    mem_reset(sid_a, client_id="demo")
+    mem_reset(sid_b, client_id="demo")
     _seed_followups(sid_a, TargetRuntimeFollowupItem(ref=_UI_SCOPE_REF, label="Один зуб"))
     backend = _CountingBackend(answer_envelope("Цена для одного зуба."))
     _install_sales_fast_transport(monkeypatch, backend)
@@ -424,31 +425,33 @@ def test_sid_isolation_for_ui_scope_patient_facts(
         "/ask",
         json={"q": "", "ref": _UI_SCOPE_REF, "sid": sid_a, "client_id": "demo"},
     )
-    assert read_target_runtime_session(sid_a).patient_facts is not None
-    assert read_target_runtime_session(sid_b).patient_facts is None
+    assert read_target_runtime_session_for(sid_a).patient_facts is not None
+    assert read_target_runtime_session_for(sid_b).patient_facts is None
 
 
 def test_reset_clears_patient_facts() -> None:
     sid = f"s-b17-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    write_session_patient_facts_from_ui_action(
-        sid,
-        UiScopeAction(extent="one_tooth", topic="implantation", ref=_UI_SCOPE_REF),
-    )
-    assert read_target_runtime_session(sid).patient_facts is not None
-    mem_reset(sid)
-    assert read_target_runtime_session(sid).patient_facts is None
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+        write_session_patient_facts_from_ui_action(
+            sid,
+            UiScopeAction(extent="one_tooth", topic="implantation", ref=_UI_SCOPE_REF),
+        )
+        assert read_target_runtime_session_for(sid).patient_facts is not None
+        mem_reset(sid, client_id="demo")
+        assert read_target_runtime_session_for(sid).patient_facts is None
 
 
 def test_topic_change_clears_incompatible_patient_scope() -> None:
     sid = f"s-b18-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    write_session_patient_facts_from_ui_action(
-        sid,
-        UiScopeAction(extent="one_tooth", topic="implantation", ref=_UI_SCOPE_REF),
-    )
-    sync_session_patient_facts_topic(sid, current_topic="prosthetics")
-    assert read_target_runtime_session(sid).patient_facts is None
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+        write_session_patient_facts_from_ui_action(
+            sid,
+            UiScopeAction(extent="one_tooth", topic="implantation", ref=_UI_SCOPE_REF),
+        )
+        sync_session_patient_facts_topic(sid, current_topic="prosthetics")
+        assert read_target_runtime_session_for(sid).patient_facts is None
 
 
 def test_http_budget_is_one_call_locked() -> None:

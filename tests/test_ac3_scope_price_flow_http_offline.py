@@ -9,9 +9,9 @@ from flask import Flask, request
 
 from contracts.ui_scope_action import build_ui_scope_ref
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
-from core.target_runtime_session import read_target_runtime_session
+from tests.session_binding_test_support import read_target_runtime_session_for
 from evals.v5.run_bot_cleanup_live import compare_ask_stream_payloads
-from session import mem_get, mem_reset
+from session import mem_get, mem_reset, session_client_scope
 from tests.target_runtime_test_support import _seed_followups
 
 UI_REF = build_ui_scope_ref(topic="implantation", extent="one_tooth")
@@ -38,7 +38,7 @@ def test_http_ask_and_stream_scope_click_parity(monkeypatch: pytest.MonkeyPatch)
     envelope = answer_envelope("Цена для одного зуба.")
 
     sid_ask = f"s-parity-ask-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid_ask)
+    mem_reset(sid_ask, client_id="demo")
     _seed_followups(
         sid_ask,
         TargetRuntimeFollowupItem(ref=UI_REF, label="Один зуб"),
@@ -53,10 +53,10 @@ def test_http_ask_and_stream_scope_click_parity(monkeypatch: pytest.MonkeyPatch)
     assert ask_resp.status_code == 200
     assert backend_ask.call_count == 1
     ask_payload = ask_resp.get_json()
-    ask_session = read_target_runtime_session(sid_ask)
+    ask_session = read_target_runtime_session_for(sid_ask)
 
     sid_stream = f"s-parity-stream-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid_stream)
+    mem_reset(sid_stream, client_id="demo")
     _seed_followups(
         sid_stream,
         TargetRuntimeFollowupItem(ref=UI_REF, label="Один зуб"),
@@ -73,7 +73,7 @@ def test_http_ask_and_stream_scope_click_parity(monkeypatch: pytest.MonkeyPatch)
     assert match is not None
     stream_payload = json.loads(match.group(1))
     assert backend_stream.call_count == 1
-    stream_session = read_target_runtime_session(sid_stream)
+    stream_session = read_target_runtime_session_for(sid_stream)
 
     assert compare_ask_stream_payloads(ask_payload, stream_payload) == []
     assert ask_session.patient_facts is not None
@@ -105,7 +105,7 @@ def _assert_http_unshown_ui_scope_ref_fail_closed(
     from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-ac3-unshown-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(answer_envelope("ignored"))
     _install_sales_fast_transport(monkeypatch, backend)
 
@@ -118,7 +118,7 @@ def _assert_http_unshown_ui_scope_ref_fail_closed(
     assert backend.call_count == 0
     payload = resp.get_json()
     assert payload["meta"]["service_route"] == "sales_fast_followup_unknown"
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is None
 
 
@@ -132,7 +132,7 @@ def test_http_finance_followup_ref_click(monkeypatch: pytest.MonkeyPatch) -> Non
     from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-ac3-pay-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=PAYMENT_REF, label="Оплата по этапам"),
@@ -157,9 +157,10 @@ def test_http_finance_followup_ref_click(monkeypatch: pytest.MonkeyPatch) -> Non
     assert backend.call_count == 1
     payload = resp.get_json()
     assert payload.get("answer")
-    user_history = [
-        str(item.get("content") or "")
-        for item in mem_get(sid).get("hist") or []
-        if item.get("role") == "user"
-    ]
+    with session_client_scope("demo"):
+        user_history = [
+            str(item.get("content") or "")
+            for item in mem_get(sid).get("hist") or []
+            if item.get("role") == "user"
+        ]
     assert "Оплата по этапам" in user_history

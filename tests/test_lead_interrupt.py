@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
 from core.observability_pii import observability_user_texts
 from core.lead_paused_overlay import finish_lead_paused_payload
 from flow_handlers import (
@@ -28,8 +30,15 @@ from session import (
     mem_reset,
     pause_lead_flow,
     resume_lead_from_pause,
+    session_client_scope,
     set_lead_intent,
 )
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 def test_detect_lead_interrupt_contacts_price_generic() -> None:

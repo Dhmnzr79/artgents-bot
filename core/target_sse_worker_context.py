@@ -27,7 +27,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from typing import Callable, Iterator
 
-from session import bind_client_id
+from session import bind_client_id, session_client_scope
 
 StatusEmitter = Callable[[str, str], None]
 TextEmitter = Callable[[str], None]
@@ -100,44 +100,44 @@ def worker_execution_context(
 ) -> Iterator[None]:
     """Independent request context + explicit bindings for one PERF-1 worker turn.
 
-    Never shares `request.ctx` with the request-handling (generator) thread. Binds
-    and resets, in one `finally` that runs on every exit path: the `client_id`
-    ContextVar, `session.py`'s thread-local client-pack binding, and the
-    status-event-sink ContextVar. PERF-0 stage marks land in this context's own
-    fresh `turn_timing` bucket (via the normal `request.ctx["turn_timing"]` path),
-    scoped only to this worker's run.
+    Nesting order: ``session_client_scope(worker tenant)`` → push request context →
+    work → pop request context (Flask teardown clears worker TLS binding) → exit scope
+    (restore outer tenant if any).
     """
 
     from flask import request as flask_request
 
     req_ctx = app.request_context(_minimal_environ(path=path))
-    req_ctx.push()
-    client_token = _client_id_var.set(client_id)
-    sink_token = _status_sink_var.set(status_emit)
-    text_sink_token = bind_text_sink(text_emit)
-    try:
-        flask_request.ctx = {
-            "request_id": request_id,
-            "sid": sid,
-            "session_id": sid,
-            "client_id": client_id,
-            "app_version": os.getenv("APP_VERSION", "dev"),
-            "env": os.getenv("APP_ENV", "local"),
-            "path": path,
-            "method": "POST",
-            "turn_t0_monotonic": turn_t0_monotonic,
-        }
-        # Explicit, not relied upon implicitly from deep inside unmodified pipeline
-        # code — matches session.py's existing thread-local contract exactly (this
-        # call is idempotent: bind_client_id no-ops if the sid's stored client_id
-        # already matches, so it never double-writes).
-        bind_client_id(sid, client_id)
-        yield
-    finally:
-        reset_text_sink(text_sink_token)
-        _status_sink_var.reset(sink_token)
-        _client_id_var.reset(client_token)
-        req_ctx.pop()
+    client_token: Token | None = None
+    sink_token: Token | None = None
+    text_sink_token: Token | None = None
+    with session_client_scope(client_id):
+        client_token = _client_id_var.set(client_id)
+        sink_token = _status_sink_var.set(status_emit)
+        text_sink_token = bind_text_sink(text_emit)
+        req_ctx.push()
+        try:
+            flask_request.ctx = {
+                "request_id": request_id,
+                "sid": sid,
+                "session_id": sid,
+                "client_id": client_id,
+                "app_version": os.getenv("APP_VERSION", "dev"),
+                "env": os.getenv("APP_ENV", "local"),
+                "path": path,
+                "method": "POST",
+                "turn_t0_monotonic": turn_t0_monotonic,
+            }
+            bind_client_id(sid, client_id)
+            yield
+        finally:
+            req_ctx.pop()
+            if text_sink_token is not None:
+                reset_text_sink(text_sink_token)
+            if sink_token is not None:
+                _status_sink_var.reset(sink_token)
+            if client_token is not None:
+                _client_id_var.reset(client_token)
 
 
 def new_request_id() -> str:

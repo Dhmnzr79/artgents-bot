@@ -23,7 +23,7 @@ from core.sales_fast_authoritative_commerce import PAYMENT_STAGES_UNAVAILABLE_TE
 from core.sales_fast_presentation import AUTOMATIC_AMPLIFIER_LIST_HEADER
 from core.target_client_data import load_target_client_data
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
-from core.target_runtime_session import read_target_runtime_session
+from tests.session_binding_test_support import read_target_runtime_session_for
 from session import mem_reset
 from tests.target_runtime_test_support import _seed_followups
 from tests.test_sales_fast_widget_integration import _CountingBackend, _install_sales_fast_transport
@@ -155,7 +155,7 @@ def test_payment_stages_ref_returns_exact_authored_amounts(
 ) -> None:
     payment_ref = "price:all_on_4/stages"
     sid = f"s-clean-stages-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=payment_ref, label="Оплата по этапам"),
@@ -186,7 +186,7 @@ def test_model_cannot_replace_authored_payment_stage_amounts(
 ) -> None:
     payment_ref = "price:all_on_4/stages"
     sid = f"s-clean-false-stages-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=payment_ref, label="Оплата по этапам"),
@@ -217,7 +217,7 @@ def test_service_without_payment_stages_uses_canonical_unavailable_contract(
 ) -> None:
     payment_ref = "price:tomography/stages"
     sid = f"s-clean-no-stages-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(sid, TargetRuntimeFollowupItem(ref=payment_ref, label="Этапы"))
     payload, backend = _post_ask(
         monkeypatch,
@@ -245,7 +245,7 @@ def test_payment_intent_after_non_stage_service_does_not_materialize_all_on_4_am
     isolated_demo_sqlite,
 ) -> None:
     sid = f"s-clean-payment-intent-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _post_ask(
         monkeypatch,
         sid=sid,
@@ -303,7 +303,7 @@ def test_eligible_all_on_4_price_appends_installment_once(
     assert "318000" in _norm_digits(answer)
     assert _INSTALLMENT_MICROFACT in answer
     assert answer.count(_INSTALLMENT_MICROFACT) == 1
-    assert INSTALLMENT_12_FACT_ID in read_target_runtime_session(sid).shown_fact_ids
+    assert INSTALLMENT_12_FACT_ID in read_target_runtime_session_for(sid).shown_fact_ids
 
 
 def test_ineligible_caries_price_has_no_installment_suffix(
@@ -337,7 +337,7 @@ def test_contextual_installment_follow_up_after_eligible_price(
         lambda: date(2026, 8, 10),
     )
     sid = f"s-clean-inst-follow-eligible-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _post_ask(
         monkeypatch,
         sid=sid,
@@ -373,7 +373,7 @@ def test_contextual_installment_follow_up_after_ineligible_price_uses_neutral_te
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sid = f"s-clean-inst-follow-ineligible-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _post_ask(
         monkeypatch,
         sid=sid,

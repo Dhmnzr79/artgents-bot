@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from session import (
     format_dialog_context_for_understanding,
     mem_add_bot,
@@ -7,7 +9,14 @@ from session import (
     mem_get,
     mem_reset,
     recent_dialog_history,
+    session_client_scope,
 )
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 def test_recent_dialog_history_last_six_messages():

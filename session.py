@@ -1,4 +1,6 @@
 """Состояние сессии: история, профиль, эмпатия, поля для policy — в SQLite."""
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -7,7 +9,9 @@ import threading
 import time
 import uuid
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Iterator
 
 from config import MAX_IDLE_SEC, MAX_TURNS
 from core.client_config_loader import resolve_pack_client_id
@@ -25,15 +29,73 @@ YES_RX = re.compile(
 _lock = threading.RLock()
 _conns: dict[str, sqlite3.Connection] = {}
 _tls = threading.local()
+_UNSET = object()
+
+
+class SessionClientNotBoundError(RuntimeError):
+    """Session storage accessed without an explicit thread-local client binding."""
+
+
+def current_session_client_id() -> str | None:
+    """Return the active thread-local pack id, or None when unbound."""
+    return getattr(_tls, "client_id", None)
+
+
+def clear_session_store_cache() -> None:
+    """Close and drop cached per-pack SQLite connections."""
+    with _lock:
+        for conn in _conns.values():
+            try:
+                conn.close()
+            except Exception:
+                pass
+        _conns.clear()
+
+
+def clear_session_client_binding() -> None:
+    """Drop thread-local client binding (request/worker cleanup)."""
+    if hasattr(_tls, "client_id"):
+        delattr(_tls, "client_id")
+
+
+def _canonical_pack_id(client_id: str) -> str:
+    raw = (client_id or "").strip()
+    if not raw:
+        raise SessionClientNotBoundError(
+            "session client binding requires explicit client_id; "
+            "choose DEFAULT_CLIENT_ID at ingress instead of silent demo fallback"
+        )
+    return resolve_pack_client_id(raw)
 
 
 def bind_session_client(client_id: str | None) -> None:
     """Thread-local client pack for SQLite path (set before mem_get)."""
-    _tls.client_id = resolve_pack_client_id(client_id)
+    _tls.client_id = _canonical_pack_id(str(client_id or ""))
+
+
+@contextmanager
+def session_client_scope(client_id: str) -> Iterator[str]:
+    """Bind client pack for a scope; restore or clear previous binding in finally."""
+    pack = _canonical_pack_id(client_id)
+    prev = getattr(_tls, "client_id", _UNSET)
+    _tls.client_id = pack
+    try:
+        yield pack
+    finally:
+        if prev is _UNSET:
+            clear_session_client_binding()
+        else:
+            _tls.client_id = prev
 
 
 def _session_pack_id() -> str:
-    return getattr(_tls, "client_id", None) or "demo"
+    pack = getattr(_tls, "client_id", None)
+    if not pack:
+        raise SessionClientNotBoundError(
+            "session operation requires explicit client binding via bind_session_client "
+            "or session_client_scope"
+        )
+    return str(pack)
 
 
 def _connect() -> sqlite3.Connection:
@@ -235,7 +297,15 @@ def format_dialog_context_for_understanding(dialog_history: str) -> str:
     )
 
 
-def mem_reset(session_id: str) -> None:
+def mem_reset(session_id: str, *, client_id: str | None = None) -> None:
+    if client_id is not None:
+        with session_client_scope(client_id):
+            _mem_reset_unlocked(session_id)
+        return
+    _mem_reset_unlocked(session_id)
+
+
+def _mem_reset_unlocked(session_id: str) -> None:
     with _lock:
         conn = _connect()
         conn.execute("DELETE FROM sessions WHERE sid = ?", (session_id,))

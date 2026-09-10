@@ -23,9 +23,9 @@ from core.one_call_price_text import (
 )
 from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 from core.target_client_data import load_target_client_data
-from core.target_runtime_session import read_target_runtime_session
 from evals.v5.run_bot_cleanup_live import restore_session_snapshot
-from session import bind_session_client, mem_reset
+from session import bind_session_client, mem_reset, session_client_scope
+from tests.session_binding_test_support import read_target_runtime_session_for
 from tests.test_sales_one_plus_turn import answer_envelope
 
 _REPO = Path(__file__).resolve().parents[1]
@@ -118,27 +118,28 @@ def _run_turn(
         "orchestration.sales_fast_widget_turn._default_sales_fast_backend",
         lambda: backend,
     )
-    if reset_session:
-        mem_reset(sid)
-    with flask_app.test_request_context(
-        "/ask",
-        method="POST",
-        json={"q": user_message, "sid": sid, "client_id": "demo"},
-    ):
-        from flask import request
+    with session_client_scope("demo"):
+        if reset_session:
+            mem_reset(sid, client_id="demo")
+        with flask_app.test_request_context(
+            "/ask",
+            method="POST",
+            json={"q": user_message, "sid": sid, "client_id": "demo"},
+        ):
+            from flask import request
 
-        from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
+            from core.sales_fast_widget_runtime import run_sales_fast_widget_turn
 
-        request.ctx = {"turn_t0_monotonic": 0.0}
-        outcome = run_sales_fast_widget_turn(
-            client_id="demo",
-            sid=sid,
-            user_message=user_message,
-            backend=backend,
-        )
-    payload = dict(outcome.widget.payload or {})
-    payload["_backend_calls"] = backend.call_count
-    return payload
+            request.ctx = {"turn_t0_monotonic": 0.0}
+            outcome = run_sales_fast_widget_turn(
+                client_id="demo",
+                sid=sid,
+                user_message=user_message,
+                backend=backend,
+            )
+        payload = dict(outcome.widget.payload or {})
+        payload["_backend_calls"] = backend.call_count
+        return payload
 
 
 @pytest.fixture
@@ -696,7 +697,7 @@ def test_rendered_microfact_ids_not_auto_added_on_pure_price(
     installment = str(_DEMO_BUNDLE.facts["installment_12"].microfact_text)
     assert discount not in answer
     assert installment in answer
-    session = read_target_runtime_session("microfact-memory")
+    session = read_target_runtime_session_for("microfact-memory")
     shown = tuple(session.shown_fact_ids or ())
     assert "implant_same_day_discount" not in shown
     assert "installment_12" in shown

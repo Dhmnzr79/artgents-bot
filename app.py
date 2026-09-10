@@ -45,6 +45,7 @@ from core.observability_pii import observability_turn_preview, observability_use
 from logging_setup import LOG_FILE, emit_bot_event, get_logger, log_json, log_json_no_context, make_request_context, redact_text
 from session import (
     bind_client_id,
+    clear_session_client_binding,
     get_topic_state,
     mem_add_bot,
     mem_add_user,
@@ -387,6 +388,11 @@ def _before():
 @app.before_request
 def _widget_cors_preflight():
     return widget_cors_preflight_response()
+
+
+@app.teardown_request
+def _clear_session_client_binding_teardown(exc):
+    clear_session_client_binding()
 
 
 @app.after_request

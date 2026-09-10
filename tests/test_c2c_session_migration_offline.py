@@ -17,7 +17,7 @@ from core.target_runtime_turn_frame_hydration import (
 from core.target_response_verifier import TargetSemanticAssessment, TargetSemanticIssue
 from core.turn_frame_from_raw import build_turn_frame_from_raw
 from core.target_runtime_session import TargetRuntimeSessionState
-from session import mem_get, mem_reset
+from session import mem_get, mem_reset, session_client_scope
 from tests.target_runtime_test_support import (
     BackendPayload,
     RecordingBoundaryBackend,
@@ -32,6 +32,13 @@ from tests.test_target_boundary_enforced_fullcontext_response import (
     RecordingComposerBackend,
     RecordingSemanticBackend,
 )
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
+
 
 def _frame(**overrides: object):
     payload: dict[str, object] = {

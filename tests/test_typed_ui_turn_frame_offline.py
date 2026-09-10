@@ -17,7 +17,7 @@ from core.runtime_turn_frame import (
     publish_typed_ui_turn_frame,
 )
 from core.target_runtime_followup_nav import TargetRuntimeFollowupItem
-from core.target_runtime_session import read_target_runtime_session
+from tests.session_binding_test_support import read_target_runtime_session_for
 from core.target_typed_ui_turn_frame import (
     build_typed_ui_turn_frame,
     build_typed_ui_turn_frame_from_scope_action,
@@ -121,7 +121,7 @@ def test_ui_scope_click_skips_planner_and_materializes(
     from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-typed-ui-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=UI_SCOPE_REF, label="Вся челюсть"),
@@ -145,7 +145,7 @@ def test_ui_scope_click_skips_planner_and_materializes(
         payload = resp.get_json()
     assert backend.call_count == 1
     assert payload.get("answer")
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is not None
     assert after.patient_facts.extent == "full_arch"
     assert after.patient_facts.ref == UI_SCOPE_REF
@@ -165,7 +165,7 @@ def test_ui_stage_click_skips_planner(
     from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-typed-stage-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     _seed_followups(
         sid,
         TargetRuntimeFollowupItem(ref=UI_STAGE_REF, label="Имплант установлен"),
@@ -182,7 +182,7 @@ def test_ui_stage_click_skips_planner(
     if endpoint == "/ask/stream":
         assert "event: done" in resp.get_data(as_text=True)
     assert backend.call_count == 1
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is not None
     assert after.patient_facts.stage == "implant_placed"
     assert after.patient_facts.topic == "prosthetics"
@@ -201,7 +201,7 @@ def test_free_text_uses_one_call_without_legacy_planner(
     from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-free-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(answer_envelope("Имплантация стоит от 45 200 рублей за один зуб."))
     _install_sales_fast_transport(monkeypatch, backend)
 
@@ -226,7 +226,7 @@ def test_invalid_ui_scope_ref_still_fail_closed(monkeypatch: pytest.MonkeyPatch)
     from tests.test_sales_one_plus_turn import answer_envelope
 
     sid = f"s-bad-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    mem_reset(sid, client_id="demo")
     backend = _CountingBackend(answer_envelope("ignored"))
     _install_sales_fast_transport(monkeypatch, backend)
 
@@ -244,5 +244,5 @@ def test_invalid_ui_scope_ref_still_fail_closed(monkeypatch: pytest.MonkeyPatch)
     assert backend.call_count == 0
     payload = resp.get_json()
     assert payload["meta"]["service_route"] == "sales_fast_followup_unknown"
-    after = read_target_runtime_session(sid)
+    after = read_target_runtime_session_for(sid)
     assert after.patient_facts is None

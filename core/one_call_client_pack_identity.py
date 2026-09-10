@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 
 from contracts.one_call_client_pack_identity import ClientPackIdentityKey
+from core.client_config_loader import explicit_pack_clients_root, require_explicit_pack_client_id
 from core.one_call_prompt_contract import (
     ONE_CALL_MODEL_SNAPSHOT,
     ONE_CALL_PROMPT_CONTRACT_VERSION,
@@ -87,11 +88,17 @@ def compute_client_pack_hash(pack_root: Path) -> str:
 
 
 def build_client_pack_identity(client_id: str, pack_root: Path | None = None) -> ClientPackIdentityKey:
-    root = pack_root or (_REPO_ROOT / "clients" / client_id)
+    tenant = require_explicit_pack_client_id(client_id)
+    if pack_root is None:
+        root = (explicit_pack_clients_root() / tenant).resolve()
+        if root.parent != explicit_pack_clients_root().resolve():
+            raise FileNotFoundError(f"client_pack_containment_failed:{tenant}")
+    else:
+        root = pack_root.resolve()
     if not root.is_dir():
         raise FileNotFoundError(f"client_pack_not_found:{root}")
     return ClientPackIdentityKey(
-        client_id=client_id,
+        client_id=tenant,
         client_pack_hash=compute_client_pack_hash(root),
         prompt_contract_version=ONE_CALL_PROMPT_CONTRACT_VERSION,
         model_snapshot=ONE_CALL_MODEL_SNAPSHOT,

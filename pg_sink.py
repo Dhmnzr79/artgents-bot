@@ -18,6 +18,68 @@ _DROP_WARN_EVERY = int(os.getenv("BOT_PG_DROP_WARN_EVERY", "100"))
 _DROP_COUNT = 0
 _MAX_RETRY = int(os.getenv("BOT_PG_MAX_RETRY", "3"))
 
+_TENANT_OWNED_ENQUEUE_KINDS = frozenset(
+    {"bot_event", "lead", "v5_turn_trace", "v5_verifier_shadow"}
+)
+
+
+def tenant_client_id_for_pg_write(payload: dict) -> str | None:
+    """Return explicit tenant id for tenant-owned PG rows; reject NULL/blank/whitespace."""
+
+    raw = payload.get("client_id")
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        return None
+    if not raw or raw.strip() != raw:
+        return None
+    return raw
+
+
+def _enqueue(kind: str, payload: dict) -> None:
+    global _DROP_COUNT
+    if _SINK_DISABLED:
+        return
+    q = _Q
+    if q is None:
+        return
+    if kind in _TENANT_OWNED_ENQUEUE_KINDS:
+        tenant = tenant_client_id_for_pg_write(payload)
+        if not tenant:
+            _log(
+                "warning",
+                "pg_sink_enqueue_rejected_missing_client_id",
+                kind=kind,
+                event_type=str(payload.get("event_type") or payload.get("turn_id") or "")[:80],
+            )
+            return
+        payload = dict(payload)
+        payload["client_id"] = tenant
+    try:
+        q.put_nowait((kind, payload, 0))
+    except queue.Full:
+        _DROP_COUNT += 1
+        if _DROP_COUNT % max(1, _DROP_WARN_EVERY) == 0:
+            _log("warning", "pg_sink_queue_full_drop", drops=_DROP_COUNT, kind=kind)
+
+
+def enqueue_bot_event(row: dict) -> None:
+    _enqueue("bot_event", row)
+
+
+def enqueue_lead(row: dict) -> None:
+    _enqueue("lead", row)
+
+
+def enqueue_v5_turn_trace(row: dict) -> None:
+    """Append/update one row in v5_turn_traces (Resolver slice for PR #1.2)."""
+    _enqueue("v5_turn_trace", row)
+
+
+def enqueue_v5_verifier_shadow(row: dict) -> None:
+    """PR #1.9: merge shadow Verifier payload into v5_turn_traces.verifier_verdict (ON CONFLICT UPDATE)."""
+    _enqueue("v5_verifier_shadow", row)
+
 
 def _log(level: str, msg: str, **fields) -> None:
     logger = _LOGGER
@@ -411,37 +473,4 @@ def init_pg_sink(logger) -> bool:
         except Exception as e:
             _log("warning", "observability_retention_start_failed", err=str(e)[:200])
         return True
-
-
-def _enqueue(kind: str, payload: dict) -> None:
-    global _DROP_COUNT
-    if _SINK_DISABLED:
-        return
-    q = _Q
-    if q is None:
-        return
-    try:
-        q.put_nowait((kind, payload, 0))
-    except queue.Full:
-        _DROP_COUNT += 1
-        if _DROP_COUNT % max(1, _DROP_WARN_EVERY) == 0:
-            _log("warning", "pg_sink_queue_full_drop", drops=_DROP_COUNT, kind=kind)
-
-
-def enqueue_bot_event(row: dict) -> None:
-    _enqueue("bot_event", row)
-
-
-def enqueue_lead(row: dict) -> None:
-    _enqueue("lead", row)
-
-
-def enqueue_v5_turn_trace(row: dict) -> None:
-    """Append/update one row in v5_turn_traces (Resolver slice for PR #1.2)."""
-    _enqueue("v5_turn_trace", row)
-
-
-def enqueue_v5_verifier_shadow(row: dict) -> None:
-    """PR #1.9: merge shadow Verifier payload into v5_turn_traces.verifier_verdict (ON CONFLICT UPDATE)."""
-    _enqueue("v5_verifier_shadow", row)
 

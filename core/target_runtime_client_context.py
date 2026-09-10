@@ -36,6 +36,10 @@ from core.target_cached_full_context import (
 )
 from core.target_composer_executor import TargetComposerTone
 from core.one_call_client_pack_identity import build_client_pack_identity
+from core.client_config_loader import (
+    explicit_pack_clients_root,
+    require_explicit_pack_client_id,
+)
 from core.topic_taxonomy import evict_topic_taxonomy_cache_for_client, load_client_topic_taxonomy
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -88,9 +92,8 @@ class TargetRuntimeClientContext:
 
 
 def _client_paths(client_id: str) -> tuple[Path, Path]:
-    if not client_id or client_id.strip() != client_id:
-        _fail("target_runtime_client_id_invalid", client_id)
-    demo_root = _REPO_ROOT / "clients" / client_id
+    tenant = require_explicit_pack_client_id(client_id)
+    demo_root = explicit_pack_clients_root() / tenant
     md_root = demo_root / "md"
     target_root = demo_root / "target_response"
     if not md_root.is_dir():
@@ -112,7 +115,7 @@ def _build_context(
     except Exception as exc:
         _fail("target_runtime_bundle_invalid", target_root, exc)
     try:
-        doctors = load_doctor_catalog(_REPO_ROOT / "clients" / client_id / "doctor_catalog.json")
+        doctors = load_doctor_catalog(explicit_pack_clients_root() / client_id / "doctor_catalog.json")
     except Exception as exc:
         _fail("target_runtime_doctor_catalog_invalid", client_id, exc)
     kb_refs = build_response_schema_kb_refs(md_root)
@@ -193,13 +196,14 @@ def _store_context_cache(context: TargetRuntimeClientContext) -> None:
     _evict_nested_pack_scoped_caches(client_id, keep_pack_hash=keep_hash)
 
 
-def load_target_runtime_client_context(client_id: str) -> TargetRuntimeClientContext:
+def load_target_runtime_client_context(client_id: str | None) -> TargetRuntimeClientContext:
     """Load and cache validated target runtime context once per exact pack identity."""
 
-    pack_root = _REPO_ROOT / "clients" / client_id
+    tenant = require_explicit_pack_client_id(client_id)
+    pack_root = explicit_pack_clients_root() / tenant
 
     for attempt in range(2):
-        identity_before = build_client_pack_identity(client_id, pack_root)
+        identity_before = build_client_pack_identity(tenant, pack_root)
         cache_key_before = _context_cache_key(identity_before)
         with _CACHE_LOCK:
             cached = _CONTEXT_CACHE.get(cache_key_before)
@@ -207,8 +211,8 @@ def load_target_runtime_client_context(client_id: str) -> TargetRuntimeClientCon
                 _CONTEXT_CACHE.move_to_end(cache_key_before)
                 return cached
 
-        context = _build_context(client_id, pack_identity=identity_before)
-        identity_after = build_client_pack_identity(client_id, pack_root)
+        context = _build_context(tenant, pack_identity=identity_before)
+        identity_after = build_client_pack_identity(tenant, pack_root)
 
         if identity_before.cache_key() != identity_after.cache_key():
             if attempt == 0:
@@ -216,14 +220,14 @@ def load_target_runtime_client_context(client_id: str) -> TargetRuntimeClientCon
             _fail(
                 "client_pack_changed_during_load",
                 {
-                    "client_id": client_id,
+                    "client_id": tenant,
                     "before": identity_before.cache_key(),
                     "after": identity_after.cache_key(),
                 },
             )
 
         if context.pack_identity.cache_key() != identity_after.cache_key():
-            _fail("client_pack_changed_during_load", client_id)
+            _fail("client_pack_changed_during_load", tenant)
 
         final_context = TargetRuntimeClientContext(
             client_id=context.client_id,
@@ -245,7 +249,7 @@ def load_target_runtime_client_context(client_id: str) -> TargetRuntimeClientCon
         _store_context_cache(final_context)
         return final_context
 
-    _fail("client_pack_changed_during_load", client_id)
+    _fail("client_pack_changed_during_load", tenant)
 
 
 def clear_target_runtime_client_context_cache() -> None:

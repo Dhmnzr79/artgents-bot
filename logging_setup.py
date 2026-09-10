@@ -347,10 +347,10 @@ def emit_bot_event(
     safe_row = _sanitize(row)
     try:
         from core.client_config_loader import postgres_events_enabled
-        from pg_sink import enqueue_bot_event
+        from pg_sink import enqueue_bot_event, tenant_client_id_for_pg_write
 
-        cid = safe_row.get("client_id")
-        if postgres_events_enabled(cid):
+        tenant = tenant_client_id_for_pg_write(safe_row)
+        if tenant and postgres_events_enabled(tenant):
             enqueue_bot_event(safe_row)
     except Exception:
         pass

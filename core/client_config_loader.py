@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -122,6 +124,48 @@ def resolve_pack_client_id(client_id: str | None) -> str:
     if raw == "default":
         return "demo"
     return raw
+
+
+_EXPLICIT_PACK_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+
+
+class ExplicitPackClientIdError(ValueError):
+    """Fail-closed tenant id for active pack-owned resource boundaries."""
+
+    def __init__(self, code: str, value: object) -> None:
+        self.code = code
+        self.value = value
+        super().__init__(f"{code}: {value!r}")
+
+
+def explicit_pack_clients_root() -> Path:
+    return Path(_REPO_ROOT).resolve() / "clients"
+
+
+def require_explicit_pack_client_id(client_id: str | None) -> str:
+    """Strict tenant key for active One Call resource loaders (no Demo fallback)."""
+
+    if client_id is None:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_missing", client_id)
+    if not isinstance(client_id, str):
+        raise ExplicitPackClientIdError("explicit_pack_client_id_invalid_type", client_id)
+    if client_id != client_id.strip():
+        raise ExplicitPackClientIdError("explicit_pack_client_id_whitespace", client_id)
+    if not client_id:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_empty", client_id)
+    if client_id == "default":
+        raise ExplicitPackClientIdError("explicit_pack_client_id_default_alias", client_id)
+    if ".." in client_id or "/" in client_id or "\\" in client_id:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_path_escape", client_id)
+    if client_id.startswith((".", "-")):
+        raise ExplicitPackClientIdError("explicit_pack_client_id_unsafe_segment", client_id)
+    if not _EXPLICIT_PACK_SEGMENT_RE.fullmatch(client_id):
+        raise ExplicitPackClientIdError("explicit_pack_client_id_unsafe_segment", client_id)
+    clients_root = explicit_pack_clients_root()
+    pack_root = (clients_root / client_id).resolve()
+    if pack_root.parent != clients_root:
+        raise ExplicitPackClientIdError("explicit_pack_client_id_containment_failed", client_id)
+    return client_id
 
 
 def _pack_path(client_id: str | None, file_name: str) -> str:

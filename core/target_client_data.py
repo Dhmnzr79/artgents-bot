@@ -20,7 +20,11 @@ from contracts.response_schema_refs import (
     validate_response_schema_external_refs,
 )
 from core.catalog_match import resolve_catalog_match
-from core.client_config_loader import resolve_pack_client_id
+from core.client_config_loader import (
+    explicit_pack_clients_root,
+    require_explicit_pack_client_id,
+    resolve_pack_client_id,
+)
 from core.doctor_schema_loader import load_doctor_catalog
 from core.response_schema_kb_index import build_response_schema_kb_refs
 from core.response_schema_loader import load_response_schema_bundle
@@ -99,7 +103,7 @@ def evict_target_client_data_cache_for_client(
 ) -> None:
     """Drop stale pack-scoped target bundles; keep current identity when provided."""
 
-    resolved = resolve_pack_client_id(client_id)
+    resolved = require_explicit_pack_client_id(client_id)
     keep_key = _data_cache_key(resolved, keep_pack_hash) if keep_pack_hash else None
     with _CACHE_LOCK:
         for key in list(_DATA_CACHE.keys()):
@@ -111,7 +115,8 @@ def evict_target_client_data_cache_for_client(
 
 
 def _build_target_client_data(client_id: str) -> TargetClientData:
-    pack_root = client_pack_root(client_id)
+    tenant = require_explicit_pack_client_id(client_id)
+    pack_root = explicit_pack_clients_root() / tenant
     target_root = pack_root / "target_response"
     md_root = pack_root / "md"
     if not md_root.is_dir():
@@ -119,9 +124,9 @@ def _build_target_client_data(client_id: str) -> TargetClientData:
     if not target_root.is_dir():
         raise FileNotFoundError(f"target_root_missing:{target_root}")
     bundle = load_response_schema_bundle(target_root)
-    _validate_external_refs(client_id=client_id, bundle=bundle, md_root=md_root)
+    _validate_external_refs(client_id=tenant, bundle=bundle, md_root=md_root)
     return TargetClientData(
-        client_id=client_id,
+        client_id=tenant,
         pack_root=pack_root,
         target_root=target_root,
         bundle=bundle,
@@ -135,7 +140,7 @@ def load_target_client_data(
 ) -> TargetClientData:
     """Load and cache validated canonical target bundle for one client pack."""
 
-    resolved = resolve_pack_client_id(client_id)
+    resolved = require_explicit_pack_client_id(client_id)
     key = _data_cache_key(resolved, pack_hash)
     with _CACHE_LOCK:
         cached = _DATA_CACHE.get(key)

@@ -40,7 +40,7 @@ from core.one_call_prefix_cache import clear_one_call_prefix_cache
 from core.one_call_prefix_cache import get_or_build_stable_prefix
 from core.one_call_prefix_input_fingerprint import prefix_cache_lookup_key
 from core.sales_fast_service_identity import resolve_catalog_service_identity
-from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
+from core.one_call_prompt_contract import ONE_CALL_MODEL_SNAPSHOT, ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.sales_one_plus_live_backend import sales_one_plus_model
 from core.sales_one_plus_turn import run_sales_one_plus_candidate
 from core.target_cached_full_context import build_target_cached_full_context
@@ -112,11 +112,12 @@ def _shared_test_identity() -> ClientPackIdentityKey:
         client_id="collision-test",
         client_pack_hash=_valid_pack_hash("collision-test-pack"),
         prompt_contract_version=ONE_CALL_PROMPT_CONTRACT_VERSION,
-        model_snapshot=config.SALES_ONE_PLUS_FLASH_MODEL,
+        model_snapshot=ONE_CALL_MODEL_SNAPSHOT,
     )
 
 
 def _patch_isolated_repo(monkeypatch: pytest.MonkeyPatch, repo: Path) -> None:
+    monkeypatch.setattr("core.client_config_loader._REPO_ROOT", str(repo))
     monkeypatch.setattr("core.target_runtime_client_context._REPO_ROOT", repo)
     monkeypatch.setattr("core.one_call_client_pack_identity._REPO_ROOT", repo)
     monkeypatch.setattr("core.target_client_data._REPO_ROOT", repo)
@@ -137,17 +138,16 @@ class _Backend:
         return self.output
 
 
-def test_model_pin_is_flash_snapshot_only() -> None:
-    assert config.SALES_ONE_PLUS_FLASH_MODEL == "qwen3.7-flash-2026-07-15"
-    assert sales_one_plus_model() == config.SALES_ONE_PLUS_FLASH_MODEL
+def test_model_pin_matches_one_call_contract_snapshot() -> None:
+    assert ONE_CALL_MODEL_SNAPSHOT == config.SALES_ONE_PLUS_MODEL
+    assert sales_one_plus_model() == ONE_CALL_MODEL_SNAPSHOT
+    assert _identity().model_snapshot == ONE_CALL_MODEL_SNAPSHOT
 
 
-def test_production_stack_has_no_plus_fallback_in_sales_fast_path() -> None:
+def test_sales_fast_path_uses_configured_one_call_model() -> None:
     text = (_REPO / "core" / "sales_one_plus_live_backend.py").read_text(encoding="utf-8")
-    orchestration = (_REPO / "orchestration" / "sales_fast_widget_turn.py").read_text(encoding="utf-8")
-    assert "qwen3.7-plus" not in text
-    assert "SALES_ONE_PLUS_FLASH_MODEL" in text
-    assert "qwen3.7-plus" not in orchestration
+    assert "SALES_ONE_PLUS_MODEL" in text
+    assert sales_one_plus_model() == config.SALES_ONE_PLUS_MODEL
 
 
 def test_same_identity_different_corpus_is_prefix_cache_miss() -> None:
@@ -234,8 +234,8 @@ def test_pack_hash_changes_when_md_changes(tmp_path: Path) -> None:
 
 def test_no_cross_client_cache_leakage() -> None:
     demo = build_client_pack_identity("demo")
-    template = build_client_pack_identity("_template")
-    assert demo.cache_key() != template.cache_key()
+    nika = build_client_pack_identity("nikadent")
+    assert demo.cache_key() != nika.cache_key()
 
 
 def test_client_pack_identity_rejects_invalid_hash() -> None:
@@ -576,15 +576,24 @@ def test_runtime_context_lru_evicts_across_clients(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr("core.target_runtime_client_context._MAX_CONTEXT_ENTRIES", 1)
     demo_ctx = load_target_runtime_client_context("demo")
     demo_key = demo_ctx.cache_key
-    template_ctx = load_target_runtime_client_context("_template")
+    nika_ctx = load_target_runtime_client_context("nikadent")
     assert len(_CONTEXT_CACHE) == 1
     assert demo_key not in _CONTEXT_CACHE
-    assert template_ctx.cache_key in _CONTEXT_CACHE
+    assert nika_ctx.cache_key in _CONTEXT_CACHE
+
+
+def test_runtime_context_rejects_template_scaffold_as_tenant() -> None:
+    from core.client_config_loader import ExplicitPackClientIdError
+
+    with pytest.raises(ExplicitPackClientIdError):
+        load_target_runtime_client_context("_template")
+    with pytest.raises(ExplicitPackClientIdError):
+        build_client_pack_identity("_template")
 
 
 def test_runtime_context_bounded_max_entries() -> None:
     clear_target_runtime_client_context_cache()
-    clients = ["demo", "_template"]
+    clients = ["demo", "nikadent"]
     for client_id in clients:
         load_target_runtime_client_context(client_id)
     assert len(_CONTEXT_CACHE) <= _MAX_CONTEXT_ENTRIES
@@ -959,7 +968,7 @@ def test_authoritative_file_set_includes_ui_and_video() -> None:
 def test_cache_key_format() -> None:
     identity = _identity()
     pattern = re.compile(
-        rf"^{identity.client_id}:[a-f0-9]{{64}}:p{ONE_CALL_PROMPT_CONTRACT_VERSION}:m{config.SALES_ONE_PLUS_FLASH_MODEL}$"
+        rf"^{identity.client_id}:[a-f0-9]{{64}}:p{ONE_CALL_PROMPT_CONTRACT_VERSION}:m{ONE_CALL_MODEL_SNAPSHOT}$"
     )
     assert pattern.match(identity.cache_key())
 

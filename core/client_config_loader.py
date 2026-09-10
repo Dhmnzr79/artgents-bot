@@ -168,6 +168,15 @@ def require_explicit_pack_client_id(client_id: str | None) -> str:
     return client_id
 
 
+def require_existing_explicit_pack_client_id(client_id: str | None) -> str:
+    """Strict tenant key plus on-disk client pack directory (no implicit demo fallback)."""
+    tenant = require_explicit_pack_client_id(client_id)
+    pack_root = explicit_pack_clients_root() / tenant
+    if not pack_root.is_dir():
+        raise ExplicitPackClientIdError("explicit_pack_client_not_found", client_id)
+    return tenant
+
+
 def _pack_path(client_id: str | None, file_name: str) -> str:
     pack = resolve_pack_client_id(client_id)
     return os.path.join(_REPO_ROOT, "clients", pack, file_name)

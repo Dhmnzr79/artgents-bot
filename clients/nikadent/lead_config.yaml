@@ -1,3 +1,7 @@
-delivery:
-  mode: email_stub
-  to: "nikadent-leads@example.local"
+# Canonical lead delivery config (recipients from server pack only).
+# Owner must set a real clinic inbox before enabling live email delivery.
+delivery: email
+recipients: []
+subject_template: "Заявка с бота Nikadent"
+store_in_postgres: false
+success_message_key: lead_submit_ok

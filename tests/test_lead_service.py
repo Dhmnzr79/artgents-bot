@@ -16,11 +16,11 @@ def test_normalize_recipients_skips_placeholders() -> None:
 def test_handle_lead_demo_stub() -> None:
     payload, status = handle_lead(
         {
-            "client_id": "demo",
             "name": "Мария",
             "phone": "+79001234567",
             "intent": "lead",
-        }
+        },
+        client_id="demo",
     )
     assert status == 200
     assert payload["delivery"] == "demo_stub"
@@ -131,13 +131,13 @@ def test_handle_lead_demo_email_no_pii_in_pg(
 ) -> None:
     payload, status = handle_lead(
         {
-            "client_id": "demo",
             "name": "Анна",
             "phone": "+79007654321",
             "intent": "lead",
             "sid": "sid-1",
             "request_id": "req-1",
-        }
+        },
+        client_id="demo",
     )
     assert status == 200
     assert payload["delivery"] == "email"
@@ -156,13 +156,13 @@ def test_handle_lead_pg_row_has_no_pii_when_store_enabled(
 ) -> None:
     payload, status = handle_lead(
         {
-            "client_id": "demo",
             "name": "Анна",
             "phone": "+79007654321",
             "intent": "lead",
             "sid": "sid-1",
             "request_id": "req-1",
-        }
+        },
+        client_id="demo",
     )
     assert status == 200
     mock_pg_enqueue.assert_called_once()

@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from core.client_runtime import client_pack_dir
+from core.lead_dialog_excerpt import sanitize_dialog_excerpt_for_email
 from logging_setup import get_logger
 
 logger = get_logger("bot")
@@ -70,6 +71,7 @@ def _build_body(
     phone: str,
     intent: str,
     situation_note: str,
+    dialog_excerpt: str,
     sid: str,
     request_id: str,
     captured_at: str,
@@ -82,6 +84,9 @@ def _build_body(
         f"Телефон: {phone}",
         f"Тема: {intent or '—'}",
         f"Ситуация: {situation_note or '—'}",
+        "",
+        "Краткий контекст диалога:",
+        dialog_excerpt or "—",
         "",
         f"client_id: {client_id or '—'}",
         f"sid: {sid or '—'}",
@@ -117,6 +122,7 @@ def send_lead_email(
     phone: str,
     intent: str,
     situation_note: str,
+    dialog_excerpt: str = "",
     sid: str,
     request_id: str,
     captured_at: str,
@@ -148,6 +154,7 @@ def send_lead_email(
             phone=phone,
             intent=intent,
             situation_note=situation_note,
+            dialog_excerpt=sanitize_dialog_excerpt_for_email(dialog_excerpt),
             sid=sid,
             request_id=request_id,
             captured_at=captured_at,

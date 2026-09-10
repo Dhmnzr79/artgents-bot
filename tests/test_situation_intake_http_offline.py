@@ -134,11 +134,11 @@ def test_lead_submit_demo_stub_no_external_send() -> None:
 
     payload, status = handle_lead(
         {
-            "client_id": "demo",
             "name": "Иван",
             "phone": "+79001234567",
             "intent": "lead",
-        }
+        },
+        client_id="demo",
     )
     assert status == 200
     assert payload["delivery"] == "demo_stub"

@@ -1259,7 +1259,7 @@ def create_lead():
     data["sid"] = sid
     data["request_id"] = request.ctx.get("request_id")
     _bind_chat_ctx(sid, client_id)
-    payload, status = handle_lead(data)
+    payload, status = handle_lead(data, client_id=client_id)
     return jsonify(payload), status
 
 

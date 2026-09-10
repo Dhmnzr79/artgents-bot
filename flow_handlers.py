@@ -692,9 +692,9 @@ def _lead_flow_payload(
                 "phone": (prof.get("phone") or "").strip(),
                 "intent": "lead",
                 "sid": sid,
-                "client_id": client_id,
                 "situation_note": situation_note,
-            }
+            },
+            client_id=str(client_id or ""),
         )
         if lead_status != 200:
             return service_payload(

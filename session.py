@@ -146,6 +146,8 @@ def _fresh_defaults() -> dict:
         "lead_preferred_datetime": "",
         "booking_intent_ever": False,
         "lead_pending_name": "",
+        "lead_pending_interruption_text": "",
+        "lead_pending_interruption_step": "",
         "shown_cta_topics": [],
         "topic_state": {},
         "last_content_ui_payload": None,
@@ -748,6 +750,10 @@ def exit_lead_flow(session_id: str) -> None:
         st["lead_paused_answer_count"] = 0
         _persist_unlocked(session_id, st)
     clear_lead_pii(session_id)
+    clear_lead_pending_interruption(session_id)
+    from core.lead_context import clear_lead_provider_question_turn
+
+    clear_lead_provider_question_turn()
     clear_focus_context(session_id)
 
 
@@ -910,8 +916,34 @@ def clear_lead_pii(session_id: str) -> None:
         st["situation_note"] = ""
         st["lead_preferred_datetime"] = ""
         st["lead_pending_name"] = ""
+        st["lead_pending_interruption_text"] = ""
+        st["lead_pending_interruption_step"] = ""
         st["lead_resume_step"] = ""
         st["lead_return_doc_id"] = ""
         st["lead_interrupt_kind"] = ""
         st["lead_paused_answer_count"] = 0
+        _persist_unlocked(session_id, st)
+
+
+def set_lead_pending_interruption(session_id: str, *, text: str, step: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_pending_interruption_text"] = (text or "").strip()[:2000]
+        st["lead_pending_interruption_step"] = (step or "").strip()
+        _persist_unlocked(session_id, st)
+
+
+def get_lead_pending_interruption(session_id: str) -> tuple[str, str]:
+    st = mem_get(session_id)
+    return (
+        (st.get("lead_pending_interruption_text") or "").strip(),
+        (st.get("lead_pending_interruption_step") or "").strip(),
+    )
+
+
+def clear_lead_pending_interruption(session_id: str) -> None:
+    with _lock:
+        st = mem_get(session_id)
+        st["lead_pending_interruption_text"] = ""
+        st["lead_pending_interruption_step"] = ""
         _persist_unlocked(session_id, st)

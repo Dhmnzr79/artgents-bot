@@ -131,6 +131,9 @@ def worker_execution_context(
             bind_client_id(sid, client_id)
             yield
         finally:
+            from core.lead_context import clear_lead_provider_question_turn
+
+            clear_lead_provider_question_turn()
             req_ctx.pop()
             if text_sink_token is not None:
                 reset_text_sink(text_sink_token)

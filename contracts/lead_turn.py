@@ -14,6 +14,7 @@ LeadTurnKind = Literal[
     "booking_date",
     "defer",
     "unclear",
+    "pending_interrupt",
 ]
 
 LeadContentHint = Literal["price", "contacts", "pain", "generic"]

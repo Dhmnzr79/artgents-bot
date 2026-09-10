@@ -10,6 +10,9 @@ from session import extract_phone, normalize_phone
 LEAD_RESUME_REF = "lead:resume"
 LEAD_CANCEL_REF = "lead:cancel"
 LEAD_PAUSE_REF = "lead:pause"
+LEAD_PENDING_ANSWER_REF = "lead:pending:answer"
+LEAD_PENDING_CONTINUE_NAME_REF = "lead:pending:continue_name"
+LEAD_PENDING_RETRY_PHONE_REF = "lead:pending:retry_phone"
 
 _LEAD_CANCEL_RX = re.compile(
     r"^(?:"

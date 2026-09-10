@@ -18,7 +18,16 @@ from core.local_problem_gate import decide_local_problem_gate
 from core.sales_fast_widget_runtime import (
     sales_fast_widget_outcome_from_local_gate,
 )
+from core.lead_context import take_lead_provider_question
 from flow_handlers import handle_flows
+from lead_interrupt import (
+    LEAD_CANCEL_REF,
+    LEAD_PENDING_ANSWER_REF,
+    LEAD_PENDING_CONTINUE_NAME_REF,
+    LEAD_PENDING_RETRY_PHONE_REF,
+    LEAD_PAUSE_REF,
+    LEAD_RESUME_REF,
+)
 from logging_setup import get_logger, log_json
 from orchestration.lead_flow import lead_flow_orchestration_result
 from orchestration.route_guards import (
@@ -39,6 +48,17 @@ from session import (
 from ux_builder import empty_question_response
 
 logger = get_logger("bot")
+
+_LEAD_FLOW_GOVERNED_REFS = frozenset(
+    {
+        LEAD_PAUSE_REF,
+        LEAD_RESUME_REF,
+        LEAD_CANCEL_REF,
+        LEAD_PENDING_ANSWER_REF,
+        LEAD_PENDING_CONTINUE_NAME_REF,
+        LEAD_PENDING_RETRY_PHONE_REF,
+    }
+)
 
 GOVERNED_TYPED_UI_GATE = LocalProblemGateResult(
     decision="pass",
@@ -556,7 +576,7 @@ def orchestrate_sales_one_plus_ask_turn(
             client_id=client_id,
             enqueue_resolver_trace=enqueue_resolver_trace,
         )
-    elif ref:
+    elif ref and ref not in _LEAD_FLOW_GOVERNED_REFS:
         ref_outcome = _resolve_governed_typed_ui_ref(
             ref=ref,
             q=q,
@@ -578,6 +598,10 @@ def orchestrate_sales_one_plus_ask_turn(
     )
     if flow_reply is not None:
         return flow_reply
+
+    provider_q = take_lead_provider_question()
+    if provider_q:
+        q = provider_q
 
     if q:
         _maybe_clear_unrelated_pending_price_clarify_for_turn(

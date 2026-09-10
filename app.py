@@ -285,6 +285,11 @@ def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
     return bool(pmeta.get("lead_flow") or pmeta.get("situation_collect"))
 
 
+def _skip_lead_pending_quote_in_session_hist(meta: dict | None) -> bool:
+    step = str((meta or {}).get("lead_step") or "").strip().lower()
+    return step in {"pending_name", "pending_phone"}
+
+
 def _service_reply(
     payload: dict,
     sid: str,
@@ -311,7 +316,7 @@ def _service_reply(
             "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
-    if answer:
+    if answer and not _skip_lead_pending_quote_in_session_hist(out.get("meta")):
         mem_add_bot(sid, answer)
     # PERF-0: /ask returns one JSON body — "first server event" and "request
     # complete" are the same instant today (no progressive delivery yet).
@@ -747,7 +752,7 @@ def _build_sse_payload(orch_r: AskOrchestrationResult) -> tuple[dict, int]:
                 "preview": observability_turn_preview(qs, route=route, meta=pmeta),
             }
         out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
-        if answer:
+        if answer and not _skip_lead_pending_quote_in_session_hist(out.get("meta")):
             mem_add_bot(sid, answer)
         http_status = orch_r.http_status if orch_r.http_status != 200 else 200
         return out, http_status
@@ -1005,7 +1010,7 @@ def _sse_service_reply(
             "preview": observability_turn_preview(qs, route=route, meta=pmeta),
         }
     out = finalize_ask(payload, sid, q, doc_id=doc_id, turn_meta=turn_meta, route=route)
-    if answer:
+    if answer and not _skip_lead_pending_quote_in_session_hist(out.get("meta")):
         mem_add_bot(sid, answer)
 
     # PERF-0: the full turn (incl. Composer/Verifier) is already computed by

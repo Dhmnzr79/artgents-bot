@@ -3,16 +3,28 @@
 import os
 
 from core.booking_date_defer import try_booking_date_defer_at_entry, try_booking_date_defer_flow_result
-from core.lead_context import bind_lead_context_turn
+from core.lead_context import bind_lead_context_turn, bind_lead_provider_question
+from core.lead_provider_input_privacy import prepare_lead_pending_provider_question
 from core.lead_turn_classifier import classify_lead_active_turn, interrupt_kind_for_content_hint
-from lead_interrupt import LEAD_CANCEL_REF, LEAD_PAUSE_REF, LEAD_RESUME_REF, parse_lead_cancel
+from core.lead_phone_input import parse_unambiguous_lead_phone
+from lead_interrupt import (
+    LEAD_CANCEL_REF,
+    LEAD_PAUSE_REF,
+    LEAD_PENDING_ANSWER_REF,
+    LEAD_PENDING_CONTINUE_NAME_REF,
+    LEAD_PENDING_RETRY_PHONE_REF,
+    LEAD_RESUME_REF,
+    parse_lead_cancel,
+)
 from lead_service import handle_lead, resolve_lead_submit_message
 from name_gate import accept_lead_name
 from policy import explicit_booking_intent
 from session import (
     clear_lead_pii,
+    clear_lead_pending_interruption,
     exit_lead_flow,
     extract_phone,
+    get_lead_pending_interruption,
     get_lead_paused_answer_count,
     get_lead_pending_name,
     get_lead_preferred_datetime,
@@ -28,6 +40,7 @@ from session import (
     pause_lead_flow,
     resume_lead_from_pause,
     set_lead_intent,
+    set_lead_pending_interruption,
     set_lead_pending_name,
     set_lead_preferred_datetime,
     set_situation_note,
@@ -68,6 +81,14 @@ def _name_confirm_quick_replies() -> list[dict]:
         {"label": "Да", "ref": _LEAD_NAME_CONFIRM_YES},
         {"label": "Нет, введу по-другому", "ref": _LEAD_NAME_CONFIRM_NO},
     ]
+
+
+def _lead_phone_prompt_after_name(txt: dict) -> str:
+    return (
+        txt.get("lead_phone_prompt_neutral")
+        or "Оставьте, пожалуйста, номер телефона — администратор свяжется с вами, "
+        "чтобы подтвердить запись."
+    )
 
 
 def _merge_lead_slot_qrs(quick_replies: list | None, txt: dict) -> list[dict]:
@@ -117,19 +138,12 @@ def _resume_step_payload(
     service_payload,
 ) -> dict:
     if step == "collecting_phone":
-        prof = mem_get(sid).get("profile") or {}
-        name = (prof.get("name") or "").strip()
-        prompt = (
-            txt["lead_phone_prompt_tpl"].format(name=name)
-            if name
-            else txt.get("lead_name_prompt", "Как к вам можно обращаться?")
-        )
         return service_payload(
-            prompt,
+            _lead_phone_prompt_after_name(txt),
             sid,
             client_id,
             lead_flow=True,
-            lead_step="phone" if name else "name",
+            lead_step="phone",
             quick_replies=[],
         )
     if step == "confirming_name":
@@ -280,6 +294,237 @@ def _lead_unclear_reply(
     )
 
 
+def _display_pending_quote(text: str) -> str:
+    return f"«{(text or '').strip()}»"
+
+
+def _pending_name_choice_payload(
+    sid: str,
+    client_id: str | None,
+    *,
+    pending_text: str,
+    txt: dict,
+    service_payload,
+):
+    message = (
+        "Не получилось распознать это как имя. Если вы хотели задать вопрос, могу ответить.\n\n"
+        f"{_display_pending_quote(pending_text)}"
+    )
+    return service_payload(
+        message,
+        sid,
+        client_id,
+        lead_flow=True,
+        lead_step="pending_name",
+        quick_replies=[
+            {"label": "Ответить", "ref": LEAD_PENDING_ANSWER_REF},
+            {"label": "Продолжить запись", "ref": LEAD_PENDING_CONTINUE_NAME_REF},
+        ],
+    )
+
+
+def _pending_phone_choice_payload(
+    sid: str,
+    client_id: str | None,
+    *,
+    pending_text: str,
+    txt: dict,
+    service_payload,
+):
+    message = (
+        "Не получилось распознать номер телефона. Если это вопрос, могу ответить на него.\n\n"
+        f"{_display_pending_quote(pending_text)}"
+    )
+    return service_payload(
+        message,
+        sid,
+        client_id,
+        lead_flow=True,
+        lead_step="pending_phone",
+        quick_replies=[
+            {"label": "Ответить", "ref": LEAD_PENDING_ANSWER_REF},
+            {"label": "Ввести номер заново", "ref": LEAD_PENDING_RETRY_PHONE_REF},
+        ],
+    )
+
+
+def _lead_privacy_fail_payload(
+    sid: str,
+    client_id: str | None,
+    *,
+    txt: dict,
+    service_payload,
+    pending_step: str,
+    st: dict,
+):
+    clear_lead_pending_interruption(sid)
+    if pending_step == "collecting_phone":
+        name = ((st.get("profile") or {}).get("name") or "").strip()
+        set_lead_intent(sid, "collecting_phone")
+        prompt = _lead_phone_prompt_after_name(txt)
+        return service_payload(
+            txt.get(
+                "lead_pending_privacy_retry",
+                "Пожалуйста, сформулируйте вопрос без телефона, email и контактных данных — "
+                "или введите номер заново.",
+            ),
+            sid,
+            client_id,
+            lead_flow=True,
+            lead_step="phone",
+            quick_replies=[
+                {"label": "Ввести номер заново", "ref": LEAD_PENDING_RETRY_PHONE_REF},
+            ],
+        )
+    set_lead_intent(sid, "collecting_name")
+    return service_payload(
+        txt.get(
+            "lead_pending_privacy_retry",
+            "Пожалуйста, сформулируйте вопрос без телефона, email и контактных данных — "
+            "или продолжите запись.",
+        ),
+        sid,
+        client_id,
+        lead_flow=True,
+        lead_step="name",
+        quick_replies=[
+            {"label": "Продолжить запись", "ref": LEAD_PENDING_CONTINUE_NAME_REF},
+        ],
+    )
+
+
+def _pending_ref_fail_closed(
+    *,
+    sid: str,
+    client_id: str | None,
+    txt: dict,
+    service_payload,
+    st: dict,
+) -> dict:
+    clear_lead_pending_interruption(sid)
+    intent = (st.get("lead_intent") or "collecting_name").strip()
+    if intent == "collecting_phone":
+        lead_step = "phone"
+        answer = txt.get("lead_pending_stale", "Продолжим запись — оставьте, пожалуйста, номер телефона.")
+    else:
+        lead_step = "name"
+        answer = txt.get("lead_pending_stale", "Продолжим запись — как к вам можно обращаться?")
+    return {
+        "payload": service_payload(
+            answer,
+            sid,
+            client_id,
+            lead_flow=True,
+            lead_step=lead_step,
+        ),
+        "doc_id": None,
+    }
+
+
+def _store_pending_interrupt(sid: str, *, text: str, step: str) -> None:
+    set_lead_pending_interruption(sid, text=(text or "").strip(), step=step)
+
+
+def _handle_pending_choice_ref(
+    *,
+    ref: str,
+    sid: str,
+    client_id: str | None,
+    txt: dict,
+    service_payload,
+    st: dict,
+) -> dict | None:
+    pending_text, pending_step = get_lead_pending_interruption(sid)
+    intent = (st.get("lead_intent") or "collecting_name").strip()
+
+    if ref == LEAD_PENDING_CONTINUE_NAME_REF:
+        if pending_text:
+            if pending_step != "collecting_name":
+                return _pending_ref_fail_closed(
+                    sid=sid, client_id=client_id, txt=txt, service_payload=service_payload, st=st
+                )
+            clear_lead_pending_interruption(sid)
+        elif intent != "collecting_name":
+            return _pending_ref_fail_closed(
+                sid=sid, client_id=client_id, txt=txt, service_payload=service_payload, st=st
+            )
+        set_lead_intent(sid, "collecting_name")
+        return {
+            "payload": service_payload(
+                txt["lead_name_prompt"],
+                sid,
+                client_id,
+                lead_flow=True,
+                lead_step="name",
+            ),
+            "doc_id": None,
+        }
+
+    if ref == LEAD_PENDING_RETRY_PHONE_REF:
+        if pending_text:
+            if pending_step != "collecting_phone":
+                return _pending_ref_fail_closed(
+                    sid=sid, client_id=client_id, txt=txt, service_payload=service_payload, st=st
+                )
+            clear_lead_pending_interruption(sid)
+        elif intent != "collecting_phone":
+            return _pending_ref_fail_closed(
+                sid=sid, client_id=client_id, txt=txt, service_payload=service_payload, st=st
+            )
+        prof = (st.get("profile") or {})
+        name = (prof.get("name") or "").strip()
+        if not name:
+            return _pending_ref_fail_closed(
+                sid=sid, client_id=client_id, txt=txt, service_payload=service_payload, st=st
+            )
+        set_lead_intent(sid, "collecting_phone")
+        prompt = _lead_phone_prompt_after_name(txt)
+        return {
+            "payload": service_payload(
+                prompt,
+                sid,
+                client_id,
+                lead_flow=True,
+                lead_step="phone",
+            ),
+            "doc_id": None,
+        }
+
+    if ref == LEAD_PENDING_ANSWER_REF:
+        if not pending_text or pending_step not in {"collecting_name", "collecting_phone"}:
+            return _pending_ref_fail_closed(
+                sid=sid, client_id=client_id, txt=txt, service_payload=service_payload, st=st
+            )
+        prof = (st.get("profile") or {})
+        safe_q = prepare_lead_pending_provider_question(
+            pending_text,
+            profile_name=(prof.get("name") or "").strip(),
+        )
+        clear_lead_pending_interruption(sid)
+        if not safe_q:
+            return {
+                "payload": _lead_privacy_fail_payload(
+                    sid,
+                    client_id,
+                    txt=txt,
+                    service_payload=service_payload,
+                    pending_step=pending_step,
+                    st=st,
+                ),
+                "doc_id": None,
+            }
+        pause_lead_flow(
+            sid,
+            resume_step=pending_step,
+            return_doc_id=(st.get("current_doc_id") or "").strip() or None,
+            interrupt_kind="generic",
+        )
+        bind_lead_context_turn(interrupt_no_topic=True, interrupt_kind="generic")
+        bind_lead_provider_question(safe_q)
+        return None
+    return None
+
+
 def _pause_for_content(
     *,
     sid: str,
@@ -312,6 +557,7 @@ def _try_lead_step_controls(
     Returns (action, flow_result).
     action: proceed | cancelled | paused_pipeline | paused_prompt | defer | booking_date | unclear
     """
+    s = (q or "").strip()
     decision = classify_lead_active_turn(q, ref=ref, st=st, sid=sid, client_id=client_id)
     if decision.kind == "meta_cancel":
         return "cancelled", _exit_lead_flow_result(
@@ -345,6 +591,30 @@ def _try_lead_step_controls(
             service_payload=service_payload,
             resume_step=step,
         )
+    if decision.kind == "pending_interrupt":
+        step = (st.get("lead_intent") or "collecting_name").strip()
+        _store_pending_interrupt(sid, text=s, step=step)
+        if step == "collecting_phone":
+            return "pending_interrupt", {
+                "payload": _pending_phone_choice_payload(
+                    sid,
+                    client_id,
+                    pending_text=s,
+                    txt=txt,
+                    service_payload=service_payload,
+                ),
+                "doc_id": None,
+            }
+        return "pending_interrupt", {
+            "payload": _pending_name_choice_payload(
+                sid,
+                client_id,
+                pending_text=s,
+                txt=txt,
+                service_payload=service_payload,
+            ),
+            "doc_id": None,
+        }
     if decision.kind == "unclear":
         step = (st.get("lead_intent") or "collecting_name").strip()
         lead_step = "phone" if step == "collecting_phone" else "name"
@@ -400,7 +670,7 @@ def _handle_paused_lead_turn(
             set_lead_intent(sid, "collecting_phone")
             return {
                 "payload": service_payload(
-                    txt["lead_phone_prompt_tpl"].format(name=pending),
+                    _lead_phone_prompt_after_name(txt),
                     sid,
                     client_id,
                     lead_flow=True,
@@ -448,7 +718,7 @@ def _handle_paused_lead_turn(
             set_lead_intent(sid, "collecting_phone")
             return {
                 "payload": service_payload(
-                    txt["lead_phone_prompt_tpl"].format(name=name),
+                    _lead_phone_prompt_after_name(txt),
                     sid,
                     client_id,
                     lead_flow=True,
@@ -496,6 +766,24 @@ def _handle_active_lead_turn(
 ) -> dict | None:
     ref = (data.get("ref") or "").strip()
 
+    if ref in {
+        LEAD_PENDING_ANSWER_REF,
+        LEAD_PENDING_CONTINUE_NAME_REF,
+        LEAD_PENDING_RETRY_PHONE_REF,
+    }:
+        pending_out = _handle_pending_choice_ref(
+            ref=ref,
+            sid=sid,
+            client_id=client_id,
+            txt=txt,
+            service_payload=service_payload,
+            st=st,
+        )
+        if pending_out is not None:
+            return pending_out
+        if ref == LEAD_PENDING_ANSWER_REF:
+            return None
+
     action, result = _try_lead_step_controls(
         ref=ref,
         q=q,
@@ -505,7 +793,7 @@ def _handle_active_lead_turn(
         txt=txt,
         service_payload=service_payload,
     )
-    if action in {"cancelled", "paused_prompt", "defer", "booking_date", "unclear"}:
+    if action in {"cancelled", "paused_prompt", "defer", "booking_date", "unclear", "pending_interrupt"}:
         return result
     if action == "paused_pipeline":
         return None
@@ -538,6 +826,15 @@ def _collecting_name_reply(
 ) -> dict | None:
     name = accept_lead_name(q)
     if not name:
+        if (q or "").strip():
+            _store_pending_interrupt(sid, text=q, step="collecting_name")
+            return _pending_name_choice_payload(
+                sid,
+                client_id,
+                pending_text=q,
+                txt=txt,
+                service_payload=service_payload,
+            )
         return _lead_unclear_reply(
             sid,
             client_id,
@@ -548,7 +845,7 @@ def _collecting_name_reply(
     update_profile(sid, name=name)
     set_lead_intent(sid, "collecting_phone")
     return service_payload(
-        txt["lead_phone_prompt_tpl"].format(name=name),
+        _lead_phone_prompt_after_name(txt),
         sid,
         client_id,
         lead_flow=True,
@@ -578,7 +875,7 @@ def _handle_lead_name_confirm(
         txt=txt,
         service_payload=service_payload,
     )
-    if action in {"cancelled", "paused_prompt", "defer", "booking_date", "unclear"}:
+    if action in {"cancelled", "paused_prompt", "defer", "booking_date", "unclear", "pending_interrupt"}:
         return result
     if action == "paused_pipeline":
         return None
@@ -592,7 +889,7 @@ def _handle_lead_name_confirm(
         set_lead_intent(sid, "collecting_phone")
         return {
             "payload": service_payload(
-                txt["lead_phone_prompt_tpl"].format(name=pending),
+                _lead_phone_prompt_after_name(txt),
                 sid,
                 client_id,
                 lead_flow=True,
@@ -666,8 +963,17 @@ def _lead_flow_payload(
         return _collecting_name_reply(sid, q, client_id, txt=txt, service_payload=service_payload)
 
     if intent == "collecting_phone":
-        phone = extract_phone(q)
+        phone = parse_unambiguous_lead_phone(q)
         if not phone:
+            if (q or "").strip():
+                _store_pending_interrupt(sid, text=q, step="collecting_phone")
+                return _pending_phone_choice_payload(
+                    sid,
+                    client_id,
+                    pending_text=q,
+                    txt=txt,
+                    service_payload=service_payload,
+                )
             return service_payload(
                 txt["lead_phone_retry"],
                 sid,

@@ -153,12 +153,15 @@ def test_entry_with_date_neutral_stub(gate_on):
 
 
 def test_classifier_bare_day_before_gray_zone(gate_on):
-    decision = classify_lead_active_turn(
-        "а на 11 можно?",
-        st={"lead_intent": "collecting_name"},
-        client_id="demo",
-        sid="s-bare-11",
-    )
+    from session import session_client_scope
+
+    with session_client_scope("demo"):
+        decision = classify_lead_active_turn(
+            "а на 11 можно?",
+            st={"lead_intent": "collecting_name"},
+            client_id="demo",
+            sid="s-bare-11",
+        )
     assert decision.kind == "booking_date"
     assert detect_lead_interrupt("а на 11 можно?", resume_step="collecting_name") == "generic"
 
@@ -226,18 +229,19 @@ def test_classifier_gate_off_preserves_content_interrupt(gate_off):
         st={"lead_intent": "collecting_name"},
         client_id="demo",
     )
-    assert decision.kind == "content"
-    assert decision.content_hint == "generic"
+    assert decision.kind == "pending_interrupt"
 
 
 def test_mid_lead_date_question_gate_off_old_interrupt(gate_off):
     sid = f"bdd-off-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    set_lead_intent(sid, "collecting_name")
+    with session_client_scope("demo"):
+        mem_reset(sid)
+        set_lead_intent(sid, "collecting_name")
+        st = mem_get(sid)
 
     result = handle_flows(
         data={},
-        st=mem_get(sid),
+        st=st,
         sid=sid,
         q="а можно на 24 июля?",
         client_id="demo",
@@ -247,4 +251,8 @@ def test_mid_lead_date_question_gate_off_old_interrupt(gate_off):
         get_topic_state=lambda _sid, _doc: {},
     )
 
-    assert result is None
+    assert result is not None
+    qrs = (result.get("payload") or {}).get("quick_replies") or []
+    from lead_interrupt import LEAD_PENDING_ANSWER_REF
+
+    assert any(q.get("ref") == LEAD_PENDING_ANSWER_REF for q in qrs)

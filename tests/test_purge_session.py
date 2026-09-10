@@ -1,6 +1,7 @@
 """Tests for manual session purge."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,10 @@ def test_purge_session_traces_sql_includes_client_id(monkeypatch: pytest.MonkeyP
             return 1
 
     class _Conn:
+        @contextmanager
+        def transaction(self):
+            yield
+
         def cursor(self):
             return _Cursor()
 
@@ -49,6 +54,7 @@ def test_purge_session_traces_sql_includes_client_id(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr("psycopg.connect", lambda *_a, **_k: _Conn())
     monkeypatch.setattr("session.mem_reset", lambda *_a, **_k: None)
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
 
     purge_session_observability(
         "postgresql://example",
@@ -151,6 +157,10 @@ def test_purge_shared_sid_only_removes_target_tenant(
             return 0
 
     class _Conn:
+        @contextmanager
+        def transaction(self):
+            yield
+
         def cursor(self):
             return _Cursor()
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import json
 import re
 import sqlite3
@@ -385,6 +387,10 @@ def test_purge_session_observability_does_not_leave_nikadent_binding(
             return 1
 
     class _Conn:
+        @contextmanager
+        def transaction(self):
+            yield
+
         def cursor(self):
             return _Cursor()
 
@@ -438,6 +444,10 @@ def test_purge_session_observability_sqlite_failure_does_not_leave_nikadent_bind
             return 1
 
     class _Conn:
+        @contextmanager
+        def transaction(self):
+            yield
+
         def cursor(self):
             return _Cursor()
 

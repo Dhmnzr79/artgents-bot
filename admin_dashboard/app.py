@@ -16,6 +16,8 @@ load_dotenv(os.path.join(_ROOT, ".env"))
 from flask import Flask, jsonify, render_template, request
 
 from core.client_config_loader import admin_client_options, list_admin_client_ids
+from core.pg_schema_readiness import check_pg_schema_ready
+from core.pg_tenant_context import InvalidPgTenantError, tenant_transaction, validate_trusted_pg_tenant
 from admin_dashboard.dialog_segments import (
     TurnRow,
     build_visit_item,
@@ -46,7 +48,6 @@ app = Flask(
 )
 if APP_ENV == "local":
     app.config["TEMPLATES_AUTO_RELOAD"] = True
-_SCHEMA_ENSURED = False
 
 
 def _utc_day_bounds(days_back: int = 0) -> tuple[datetime, datetime]:
@@ -90,21 +91,38 @@ def _guard():
 
 
 def _require_db():
-    global _SCHEMA_ENSURED
     if not BOT_PG_DSN:
         return None, (jsonify({"error": "BOT_PG_DSN_not_set"}), 503)
     if psycopg is None:
         return None, (jsonify({"error": "psycopg_not_installed"}), 503)
     try:
         conn = psycopg.connect(BOT_PG_DSN, autocommit=True, connect_timeout=max(1, DB_CONNECT_TIMEOUT_SEC))
-        if not _SCHEMA_ENSURED:
-            from pg_sink import ensure_pg_schema_conn
-
-            ensure_pg_schema_conn(conn)
-            _SCHEMA_ENSURED = True
     except Exception as e:
         return None, (jsonify({"error": "db_connect_failed", "details": str(e)[:200]}), 503)
     return conn, None
+
+
+def _schema_unavailable_response(exc: Exception):
+    msg = str(exc).lower()
+    if "does not exist" in msg or type(exc).__name__ == "UndefinedTable":
+        return jsonify({"error": "db_schema_unavailable"}), 503
+    return None
+
+
+def _dashboard_tenant_or_error() -> tuple[str | None, tuple | None]:
+    """Trusted tenant for PG reads; explicit unknown client_id is fail-closed."""
+    if "client_id" in request.args:
+        explicit = (request.args.get("client_id") or "").strip()
+        if explicit:
+            try:
+                return validate_trusted_pg_tenant(explicit), None
+            except InvalidPgTenantError:
+                return None, (jsonify({"error": "unknown_client"}), 400)
+    default = _default_client_id()
+    try:
+        return validate_trusted_pg_tenant(default), None
+    except InvalidPgTenantError:
+        return None, (jsonify({"error": "dashboard_client_unavailable"}), 503)
 
 
 def _default_client_id() -> str:
@@ -113,17 +131,10 @@ def _default_client_id() -> str:
 
 
 def _client_id() -> str:
-    raw = (request.args.get("client_id") or "").strip()
-    return _resolve_client_id(raw if raw else None)
-
-
-def _resolve_client_id(raw: str | None) -> str:
-    cid = (raw or "").strip()
-    if cid:
-        allowed = {item["client_id"] for item in admin_client_options()}
-        if cid in allowed:
-            return cid
-    return _default_client_id()
+    cid, err = _dashboard_tenant_or_error()
+    if err:
+        return _default_client_id()
+    return cid or _default_client_id()
 
 
 def _to_int(value: str | None, default: int, min_v: int, max_v: int) -> int:
@@ -277,7 +288,19 @@ def api_health():
     if err:
         body = err[0].get_json(silent=True) or {}
         return jsonify({"ok": False, "postgres": body.get("error", "db_connect_failed"), "app_env": APP_ENV}), 503
-    conn.close()
+    try:
+        ready, reason = check_pg_schema_ready(conn)
+        if not ready:
+            return jsonify(
+                {
+                    "ok": False,
+                    "postgres": "db_schema_unavailable",
+                    "schema_reason": reason,
+                    "app_env": APP_ENV,
+                }
+            ), 503
+    finally:
+        conn.close()
     return jsonify({"ok": True, "postgres": "connected", "app_env": APP_ENV})
 
 
@@ -295,15 +318,18 @@ def api_overview():
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     d0, d1, period_key, period_label = _overview_period()
-    with conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
                 SELECT
                   count(*) FILTER (WHERE event_type='user_turn_completed') AS user_turns,
                   count(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS sessions,
@@ -319,14 +345,14 @@ def api_overview():
                 FROM bot_events
                 WHERE client_id = %s AND occurred_at >= %s AND occurred_at < %s
                 """,
-                (cid, d0, d1),
-            )
-            row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0, 0)
-            turns_today = _fetch_turn_rows(cur, cid, d0=d0, d1=d1)
-            leads_today = _fetch_lead_times(cur, cid, d0=d0, d1=d1)
-            visits_today = _build_visit_list(turns_today, leads_today, client_id=cid, limit=10_000)
-            cur.execute(
-                """
+                    (cid, d0, d1),
+                )
+                row = cur.fetchone() or (0, 0, 0, 0, 0, 0, 0, 0, 0)
+                turns_today = _fetch_turn_rows(cur, cid, d0=d0, d1=d1)
+                leads_today = _fetch_lead_times(cur, cid, d0=d0, d1=d1)
+                visits_today = _build_visit_list(turns_today, leads_today, client_id=cid, limit=10_000)
+                cur.execute(
+                    """
                 SELECT
                   COALESCE(sum((details->>'estimated_usd')::numeric), 0)::float
                 FROM bot_events
@@ -334,9 +360,16 @@ def api_overview():
                   AND event_type='llm_usage'
                   AND occurred_at >= %s AND occurred_at < %s
                 """,
-                (cid, d0, d1),
-            )
-            usd = float((cur.fetchone() or [0.0])[0] or 0.0)
+                    (cid, d0, d1),
+                )
+                usd = float((cur.fetchone() or [0.0])[0] or 0.0)
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     sessions = int(row[1] or 0)
     sessions_with_lead = int(row[2] or 0)
     leads = int(row[3] or 0)
@@ -372,15 +405,25 @@ def api_dialogs():
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     limit = _to_int(request.args.get("limit"), 30, 1, 200)
-    with conn:
-        with conn.cursor() as cur:
-            turns_by_sid = _fetch_turn_rows(cur, cid)
-            leads_by_sid = _fetch_lead_times(cur, cid)
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                turns_by_sid = _fetch_turn_rows(cur, cid)
+                leads_by_sid = _fetch_lead_times(cur, cid)
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     out = _build_visit_list(turns_by_sid, leads_by_sid, client_id=cid, limit=limit)
     return jsonify({"client_id": cid, "items": out})
 
@@ -390,18 +433,29 @@ def api_dialog_thread(sid: str):
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     sid_clean = (sid or "").strip()
     if not sid_clean:
+        conn.close()
         return jsonify({"error": "sid_required"}), 400
     visit_index = _to_int(request.args.get("visit_index"), 0, 0, 999)
-    with conn:
-        with conn.cursor() as cur:
-            turns_by_sid = _fetch_turn_rows(cur, cid, sid=sid_clean)
-            leads_by_sid = _fetch_lead_times(cur, cid)
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                turns_by_sid = _fetch_turn_rows(cur, cid, sid=sid_clean)
+                leads_by_sid = _fetch_lead_times(cur, cid)
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     turns = turns_by_sid.get(sid_clean, [])
     if not turns:
         return jsonify({"error": "not_found", "sid": sid_clean, "client_id": cid}), 404
@@ -438,7 +492,9 @@ def api_dialog_delete(sid: str):
         return denied
     if not BOT_PG_DSN:
         return jsonify({"error": "BOT_PG_DSN_not_set"}), 503
-    cid = _client_id()
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     sid_clean = (sid or "").strip()
     if not sid_clean:
         return jsonify({"error": "sid_required"}), 400
@@ -474,14 +530,17 @@ def api_problems():
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     limit = _to_int(request.args.get("limit"), 50, 1, 300)
-    with conn:
-        with conn.cursor() as cur:
-            cur.execute(
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                cur.execute(
                 """
                 WITH bad_events AS (
                   SELECT
@@ -531,7 +590,14 @@ def api_problems():
                 """,
                 (cid, cid, limit),
             )
-            rows = cur.fetchall()
+                rows = cur.fetchall()
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     items = []
     for ts, sid, event_type, user_text, route, reason, doc_id, priority in rows:
         items.append(
@@ -566,18 +632,21 @@ def api_leads():
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     limit = min(max(int(request.args.get("limit", 50)), 1), 300)
     after_hours_sql = _json_bool("after_hours")
     has_name_sql = _json_bool("has_name")
     has_situation_sql = _json_bool("has_situation_note")
     ok_sql = _json_bool("ok")
-    with conn:
-        with conn.cursor() as cur:
-            cur.execute(
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                cur.execute(
                 f"""
                 SELECT
                   occurred_at,
@@ -599,7 +668,14 @@ def api_leads():
                 """,
                 (cid, limit),
             )
-            rows = cur.fetchall()
+                rows = cur.fetchall()
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     items = []
     for (
         ts,
@@ -634,14 +710,17 @@ def api_costs():
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     d0, d1, period_key, period_label = _overview_period()
-    with conn:
-        with conn.cursor() as cur:
-            cur.execute(
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                cur.execute(
                 """
                 SELECT
                   details->>'call_type' AS call_type,
@@ -657,7 +736,14 @@ def api_costs():
                 """,
                 (cid, d0, d1),
             )
-            rows = cur.fetchall()
+                rows = cur.fetchall()
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     items = []
     total = 0.0
     for call_type, calls, pt, ct, usd in rows:
@@ -691,37 +777,47 @@ def api_events():
     denied = _guard()
     if denied:
         return denied
+    cid, terr = _dashboard_tenant_or_error()
+    if terr:
+        return terr
     conn, err = _require_db()
     if err:
         return err
-    cid = _client_id()
     limit = _to_int(request.args.get("limit"), 200, 1, 1000)
     event_type = (request.args.get("event_type") or "").strip()
     sid = (request.args.get("sid") or "").strip()
     request_id = (request.args.get("request_id") or "").strip()
-    with conn:
-        with conn.cursor() as cur:
-            where_parts = ["client_id=%s"]
-            params: list[object] = [cid]
-            if event_type:
-                where_parts.append("event_type=%s")
-                params.append(event_type)
-            if sid:
-                where_parts.append("sid=%s")
-                params.append(sid)
-            if request_id:
-                where_parts.append("request_id=%s")
-                params.append(request_id)
-            params.append(limit)
-            query = f"""
+    try:
+        with tenant_transaction(conn, cid):
+            with conn.cursor() as cur:
+                where_parts = ["client_id=%s"]
+                params: list[object] = [cid]
+                if event_type:
+                    where_parts.append("event_type=%s")
+                    params.append(event_type)
+                if sid:
+                    where_parts.append("sid=%s")
+                    params.append(sid)
+                if request_id:
+                    where_parts.append("request_id=%s")
+                    params.append(request_id)
+                params.append(limit)
+                query = f"""
                 SELECT occurred_at, event_type, request_id, sid, status, details
                 FROM bot_events
                 WHERE {' AND '.join(where_parts)}
                 ORDER BY occurred_at DESC
                 LIMIT %s
             """
-            cur.execute(query, tuple(params))
-            rows = cur.fetchall()
+                cur.execute(query, tuple(params))
+                rows = cur.fetchall()
+    except Exception as e:
+        schema_err = _schema_unavailable_response(e)
+        if schema_err:
+            return schema_err
+        raise
+    finally:
+        conn.close()
     items = []
     for ts, event_type, request_id, sid, status, details in rows:
         items.append(

@@ -7,6 +7,8 @@ import threading
 import time
 from datetime import datetime, timezone
 
+from core.pg_tenant_context import InvalidPgTenantError, tenant_transaction
+
 _Q: queue.Queue[tuple[str, dict, int]] | None = None
 _WORKER_STARTED = False
 _WORKER_LOCK = threading.Lock()
@@ -24,7 +26,7 @@ _TENANT_OWNED_ENQUEUE_KINDS = frozenset(
 
 
 def tenant_client_id_for_pg_write(payload: dict) -> str | None:
-    """Return explicit tenant id for tenant-owned PG rows; reject NULL/blank/whitespace."""
+    """Early enqueue filter only (not a trusted validator for DB transactions)."""
 
     raw = payload.get("client_id")
     if raw is None:
@@ -86,7 +88,6 @@ def _log(level: str, msg: str, **fields) -> None:
     if logger is None:
         return
     try:
-        # Reuse structured logger when available.
         from logging_setup import log_json
 
         log_json(logger, msg, **fields)
@@ -110,6 +111,7 @@ def _parse_ts(ts: str | None):
 
 
 def _ensure_tables(conn) -> None:
+    """Legacy DDL helper — for migrations/tests only; not called from runtime workers."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -187,9 +189,6 @@ def _ensure_tables(conn) -> None:
             ON leads (client_id, captured_at DESC);
             """
         )
-
-        # v5 trace-level logging schema (see pg_sink tables / docs/DASHBOARD.md).
-        # Phase 0: schema only (no runtime writes yet).
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS v5_turn_traces (
@@ -245,12 +244,12 @@ def _ensure_tables(conn) -> None:
 
 
 def ensure_pg_schema_conn(conn) -> None:
-    """Create dashboard tables if missing (shared by bot sink and admin)."""
+    """Apply legacy bootstrap DDL (migrations/tests only — not runtime)."""
     _ensure_tables(conn)
 
 
 def ensure_pg_schema(dsn: str, *, connect_timeout: int = 3) -> None:
-    """Connect once and ensure dashboard tables exist."""
+    """Connect once and apply legacy bootstrap DDL (migrations/tests only)."""
     target = (dsn or "").strip()
     if not target:
         return
@@ -263,6 +262,10 @@ def ensure_pg_schema(dsn: str, *, connect_timeout: int = 3) -> None:
 def _insert_v5_turn_trace(conn, row: dict) -> None:
     from psycopg.types.json import Json
 
+    turn_id = str(row.get("turn_id") or "").strip()
+    client_id = row.get("client_id")
+    if not turn_id:
+        raise ValueError("turn_id_required")
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -276,10 +279,9 @@ def _insert_v5_turn_trace(conn, row: dict) -> None:
                 resolver_bypassed_env
             )
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (turn_id) DO UPDATE SET
+            ON CONFLICT (client_id, turn_id) DO UPDATE SET
                 ts = EXCLUDED.ts,
                 sid = EXCLUDED.sid,
-                client_id = EXCLUDED.client_id,
                 request_id = EXCLUDED.request_id,
                 decision_frame = EXCLUDED.decision_frame,
                 safety_net_used = EXCLUDED.safety_net_used,
@@ -287,10 +289,10 @@ def _insert_v5_turn_trace(conn, row: dict) -> None:
             ;
             """,
             (
-                str(row.get("turn_id") or ""),
+                turn_id,
                 _parse_ts(row.get("ts")),
                 row.get("sid"),
-                row.get("client_id"),
+                client_id,
                 row.get("request_id"),
                 Json(list(row.get("gate_traces") or [])),
                 Json(dict(row["decision_frame"])) if isinstance(row.get("decision_frame"), dict) else None,
@@ -312,6 +314,7 @@ def _upsert_v5_verifier_shadow(conn, row: dict) -> None:
     vj = row.get("verifier_verdict")
     if not isinstance(vj, dict):
         return
+    client_id = row.get("client_id")
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -321,7 +324,7 @@ def _upsert_v5_verifier_shadow(conn, row: dict) -> None:
                 verifier_verdict
             )
             VALUES (%s, %s, %s, %s, %s, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, %s)
-            ON CONFLICT (turn_id) DO UPDATE SET
+            ON CONFLICT (client_id, turn_id) DO UPDATE SET
                 verifier_verdict = EXCLUDED.verifier_verdict,
                 ts = EXCLUDED.ts
             ;
@@ -330,7 +333,7 @@ def _upsert_v5_verifier_shadow(conn, row: dict) -> None:
                 tid,
                 _parse_ts(row.get("ts")),
                 row.get("sid"),
-                row.get("client_id"),
+                client_id,
                 row.get("request_id") or tid,
                 Json(vj),
             ),
@@ -389,6 +392,29 @@ def _insert_lead(conn, lead: dict) -> None:
         )
 
 
+def _schema_unavailable_error(exc: Exception) -> bool:
+    name = type(exc).__name__
+    msg = str(exc).lower()
+    return name == "UndefinedTable" or "does not exist" in msg or "undefinedtable" in msg
+
+
+def _process_queue_item(conn, kind: str, payload: dict) -> None:
+    client_id = payload.get("client_id")
+    with tenant_transaction(conn, client_id) as tenant:
+        row = dict(payload)
+        row["client_id"] = tenant
+        if kind == "bot_event":
+            _insert_bot_event(conn, row)
+        elif kind == "lead":
+            _insert_lead(conn, row)
+        elif kind == "v5_turn_trace":
+            _insert_v5_turn_trace(conn, row)
+        elif kind == "v5_verifier_shadow":
+            _upsert_v5_verifier_shadow(conn, row)
+        else:
+            raise ValueError(f"unknown_pg_sink_kind:{kind}")
+
+
 def _worker() -> None:
     global _Q, _SINK_DISABLED
     assert _Q is not None
@@ -403,7 +429,6 @@ def _worker() -> None:
     while True:
         try:
             with psycopg.connect(_DSN, autocommit=True) as conn:
-                _ensure_tables(conn)
                 _log("info", "pg_sink_ready")
                 while True:
                     item = _Q.get()
@@ -411,23 +436,26 @@ def _worker() -> None:
                         continue
                     kind, payload, retries = item
                     try:
-                        if kind == "bot_event":
-                            _insert_bot_event(conn, payload)
-                        elif kind == "lead":
-                            _insert_lead(conn, payload)
-                        elif kind == "v5_turn_trace":
-                            _insert_v5_turn_trace(conn, payload)
-                        elif kind == "v5_verifier_shadow":
-                            _upsert_v5_verifier_shadow(conn, payload)
-                    except Exception as e:
+                        _process_queue_item(conn, kind, payload)
+                    except InvalidPgTenantError as e:
                         _log(
                             "warning",
-                            "pg_sink_insert_failed",
+                            "pg_sink_rejected_invalid_tenant",
                             kind=kind,
-                            retry=retries,
-                            err=str(e)[:300],
+                            code=e.code,
                         )
-                        if retries < _MAX_RETRY and _Q is not None:
+                    except Exception as e:
+                        if _schema_unavailable_error(e):
+                            _log("warning", "pg_sink_schema_unavailable", kind=kind)
+                        else:
+                            _log(
+                                "warning",
+                                "pg_sink_insert_failed",
+                                kind=kind,
+                                retry=retries,
+                                err=str(e)[:300],
+                            )
+                        if retries < _MAX_RETRY and _Q is not None and not _schema_unavailable_error(e):
                             try:
                                 _Q.put_nowait((kind, payload, retries + 1))
                             except queue.Full:
@@ -473,4 +501,3 @@ def init_pg_sink(logger) -> bool:
         except Exception as e:
             _log("warning", "observability_retention_start_failed", err=str(e)[:200])
         return True
-

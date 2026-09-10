@@ -496,6 +496,19 @@ def load_brand(client_id: str | None) -> dict[str, Any]:
     return _cached_load(_BRAND_CACHE, pack, "brand.yaml")
 
 
+def list_trusted_tenant_ids() -> list[str]:
+    """Server-owned registry: ALLOWED_CLIENTS with an on-disk pack (ignores admin flag)."""
+    from config import ALLOWED_CLIENTS
+
+    out: list[str] = []
+    for name in sorted(ALLOWED_CLIENTS):
+        try:
+            out.append(require_existing_explicit_pack_client_id(name))
+        except ExplicitPackClientIdError:
+            continue
+    return out
+
+
 def list_admin_client_ids() -> list[str]:
     from config import ALLOWED_CLIENTS
 

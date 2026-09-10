@@ -6,6 +6,13 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
+from core.client_config_loader import list_trusted_tenant_ids
+from core.pg_tenant_context import (
+    InvalidPgTenantError,
+    tenant_transaction,
+    validate_trusted_pg_tenant,
+)
+
 _RETENTION_HOURS = int(os.getenv("BOT_OBSERVABILITY_RETENTION_HOURS", "24"))
 _INTERVAL_SEC = int(os.getenv("BOT_OBSERVABILITY_RETENTION_INTERVAL_SEC", "3600"))
 _WORKER_STARTED = False
@@ -32,6 +39,60 @@ def _log(level: str, msg: str, **fields) -> None:
             pass
 
 
+def _purge_session_pg(
+    conn,
+    *,
+    tenant: str,
+    sid_clean: str,
+    keep_llm_usage: bool,
+) -> dict[str, int | bool]:
+    stats: dict[str, int | bool] = {
+        "found": False,
+        "bot_events_deleted": 0,
+        "traces_deleted": 0,
+        "leads_deleted": 0,
+    }
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM bot_events WHERE sid=%s AND client_id=%s LIMIT 1",
+            (sid_clean, tenant),
+        )
+        if not cur.fetchone():
+            cur.execute(
+                "SELECT 1 FROM leads WHERE sid=%s AND client_id=%s LIMIT 1",
+                (sid_clean, tenant),
+            )
+            if not cur.fetchone():
+                return stats
+        stats["found"] = True
+
+        if keep_llm_usage:
+            cur.execute(
+                """
+                DELETE FROM bot_events
+                WHERE sid=%s AND client_id=%s AND event_type <> 'llm_usage'
+                """,
+                (sid_clean, tenant),
+            )
+        else:
+            cur.execute(
+                "DELETE FROM bot_events WHERE sid=%s AND client_id=%s",
+                (sid_clean, tenant),
+            )
+        stats["bot_events_deleted"] = int(cur.rowcount or 0)
+        cur.execute(
+            "DELETE FROM v5_turn_traces WHERE sid=%s AND client_id=%s",
+            (sid_clean, tenant),
+        )
+        stats["traces_deleted"] = int(cur.rowcount or 0)
+        cur.execute(
+            "DELETE FROM leads WHERE sid=%s AND client_id=%s",
+            (sid_clean, tenant),
+        )
+        stats["leads_deleted"] = int(cur.rowcount or 0)
+    return stats
+
+
 def purge_session_observability(
     dsn: str,
     *,
@@ -41,7 +102,6 @@ def purge_session_observability(
 ) -> dict[str, int | bool]:
     """Delete one sid from PG (+ SQLite). Keeps llm_usage rows when keep_llm_usage=True."""
     sid_clean = (sid or "").strip()
-    cid = (client_id or "").strip()
     stats: dict[str, int | bool] = {
         "found": False,
         "bot_events_deleted": 0,
@@ -49,55 +109,38 @@ def purge_session_observability(
         "leads_deleted": 0,
         "sqlite_cleared": False,
     }
-    if not sid_clean or not cid or not (dsn or "").strip():
+    if not sid_clean or not (dsn or "").strip():
+        return stats
+
+    try:
+        tenant = validate_trusted_pg_tenant(client_id)
+    except InvalidPgTenantError:
         return stats
 
     import psycopg
 
-    with psycopg.connect(dsn.strip(), autocommit=True) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT 1 FROM bot_events WHERE sid=%s AND client_id=%s LIMIT 1",
-                (sid_clean, cid),
-            )
-            if not cur.fetchone():
-                cur.execute(
-                    "SELECT 1 FROM leads WHERE sid=%s AND client_id=%s LIMIT 1",
-                    (sid_clean, cid),
+    try:
+        with psycopg.connect(dsn.strip(), autocommit=True) as conn:
+            with tenant_transaction(conn, tenant):
+                row_stats = _purge_session_pg(
+                    conn,
+                    tenant=tenant,
+                    sid_clean=sid_clean,
+                    keep_llm_usage=keep_llm_usage,
                 )
-                if not cur.fetchone():
-                    return stats
-            stats["found"] = True
+    except Exception as e:
+        _log("warning", "observability_purge_pg_failed", err=str(e)[:200])
+        return stats
 
-            if keep_llm_usage:
-                cur.execute(
-                    """
-                    DELETE FROM bot_events
-                    WHERE sid=%s AND client_id=%s AND event_type <> 'llm_usage'
-                    """,
-                    (sid_clean, cid),
-                )
-            else:
-                cur.execute(
-                    "DELETE FROM bot_events WHERE sid=%s AND client_id=%s",
-                    (sid_clean, cid),
-                )
-            stats["bot_events_deleted"] = int(cur.rowcount or 0)
-            cur.execute(
-                "DELETE FROM v5_turn_traces WHERE sid=%s AND client_id=%s",
-                (sid_clean, cid),
-            )
-            stats["traces_deleted"] = int(cur.rowcount or 0)
-            cur.execute(
-                "DELETE FROM leads WHERE sid=%s AND client_id=%s",
-                (sid_clean, cid),
-            )
-            stats["leads_deleted"] = int(cur.rowcount or 0)
+    stats["found"] = bool(row_stats.get("found"))
+    stats["bot_events_deleted"] = int(row_stats.get("bot_events_deleted") or 0)
+    stats["traces_deleted"] = int(row_stats.get("traces_deleted") or 0)
+    stats["leads_deleted"] = int(row_stats.get("leads_deleted") or 0)
 
     from session import mem_reset
 
     try:
-        mem_reset(sid_clean, client_id=cid)
+        mem_reset(sid_clean, client_id=tenant)
         stats["sqlite_cleared"] = True
     except Exception as e:
         _log("warning", "observability_purge_sqlite_failed", sid=sid_clean, err=str(e)[:200])
@@ -121,35 +164,53 @@ def purge_expired_observability(dsn: str, *, retention_hours: int | None = None)
         "leads_deleted": 0,
     }
 
-    with psycopg.connect(dsn.strip(), autocommit=True) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT sid, client_id
-                FROM bot_events
-                WHERE sid IS NOT NULL
-                GROUP BY sid, client_id
-                HAVING max(occurred_at) < %s
-                """,
-                (cutoff,),
-            )
-            expired = [(str(sid), str(client_id or "")) for sid, client_id in cur.fetchall() if sid]
-        if not expired:
-            return stats
+    tenants = list_trusted_tenant_ids()
+    if not tenants:
+        return stats
 
-        sids = [row[0] for row in expired]
-        stats["sids_purged"] = len(sids)
+    try:
+        with psycopg.connect(dsn.strip(), autocommit=True) as conn:
+            for tenant in tenants:
+                expired_sids: list[str] = []
+                with tenant_transaction(conn, tenant):
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            SELECT sid
+                            FROM bot_events
+                            WHERE client_id = %s AND sid IS NOT NULL
+                            GROUP BY sid
+                            HAVING max(occurred_at) < %s
+                            """,
+                            (tenant, cutoff),
+                        )
+                        expired_sids = [str(row[0]) for row in cur.fetchall() if row and row[0]]
 
-        for sid, client_id in expired:
-            row_stats = purge_session_observability(
-                dsn,
-                sid=sid,
-                client_id=client_id or "",
-                keep_llm_usage=True,
-            )
-            stats["bot_events_deleted"] += int(row_stats.get("bot_events_deleted") or 0)
-            stats["traces_deleted"] += int(row_stats.get("traces_deleted") or 0)
-            stats["leads_deleted"] += int(row_stats.get("leads_deleted") or 0)
+                for sid_clean in expired_sids:
+                    with tenant_transaction(conn, tenant):
+                        row_stats = _purge_session_pg(
+                            conn,
+                            tenant=tenant,
+                            sid_clean=sid_clean,
+                            keep_llm_usage=True,
+                        )
+                    stats["sids_purged"] += 1
+                    stats["bot_events_deleted"] += int(row_stats.get("bot_events_deleted") or 0)
+                    stats["traces_deleted"] += int(row_stats.get("traces_deleted") or 0)
+                    stats["leads_deleted"] += int(row_stats.get("leads_deleted") or 0)
+                    try:
+                        from session import mem_reset
+
+                        mem_reset(sid_clean, client_id=tenant)
+                    except Exception as e:
+                        _log(
+                            "warning",
+                            "observability_purge_sqlite_failed",
+                            sid=sid_clean,
+                            err=str(e)[:200],
+                        )
+    except Exception as e:
+        _log("warning", "observability_retention_failed", err=str(e)[:300])
 
     return stats
 

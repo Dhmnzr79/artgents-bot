@@ -487,7 +487,7 @@ def dashboard_events_api():
     return jsonify(payload)
 
 
-def _orchestrate_ask_turn(data: dict):
+def _orchestrate_ask_turn(data: dict, *, resolved_client_id: str | None = None):
     request_id = str(data.get("request_id") or uuid.uuid4())
     try:
         from flask import request as flask_request
@@ -500,16 +500,32 @@ def _orchestrate_ask_turn(data: dict):
         sales_one_plus_on=True,
     ) as budget:
         try:
-            return _orchestrate_ask_turn_inner(data)
+            return _orchestrate_ask_turn_inner(
+                data,
+                resolved_client_id=resolved_client_id,
+            )
         finally:
             _snapshot_provider_budget(budget)
 
 
-def _orchestrate_ask_turn_inner(data: dict):
+def _orchestrate_ask_turn_inner(
+    data: dict,
+    *,
+    resolved_client_id: str | None = None,
+):
     # Stage 3A: unconditional One Call HTTP routing; legacy branch removed (Stage 3B: delete dormant modules).
+    trusted_cid = (resolved_client_id or "").strip() or None
+    if trusted_cid:
+
+        def _resolve_client_id(_raw, *, host):  # noqa: ARG001
+            return trusted_cid
+
+    else:
+        _resolve_client_id = resolve_request_client_id
+
     return orchestrate_sales_one_plus_ask_turn(
         data,
-        resolve_client_id=resolve_request_client_id,
+        resolve_client_id=_resolve_client_id,
         bind_chat_ctx=_bind_chat_ctx,
         resolve_ip=_resolve_request_ip,
         client_txt=_client_txt,
@@ -770,7 +786,7 @@ def _run_sse_worker_turn(
             text_emit=text_emit,
         ):
             try:
-                orch_r = _orchestrate_ask_turn(data)
+                orch_r = _orchestrate_ask_turn(data, resolved_client_id=client_id)
                 turn_timing.mark("orchestrate_done")
                 out, http_status = _build_sse_payload(orch_r)
                 route = str((out.get("meta") or {}).get("service_route") or _route_from_orch_result(orch_r))

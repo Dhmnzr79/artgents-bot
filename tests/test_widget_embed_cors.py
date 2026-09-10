@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import pytest
 
+import app as app_module
+import config
+import core.client_host as client_host
 from core import widget_cors
 from core.origin_guard import allowed_origins_for_client, matching_widget_origin
 
@@ -113,5 +116,53 @@ def test_widget_cors_preflight_denied(monkeypatch):
     monkeypatch.setattr("core.widget_cors.matching_widget_origin", lambda _cid: None)
     monkeypatch.setattr("core.widget_cors.resolve_widget_cors_client_id", lambda: "demo")
     resp = widget_cors.widget_cors_preflight_response()
+    assert resp is not None
+    assert resp.status_code == 403
+
+
+def test_resolve_widget_cors_prod_unknown_host_no_demo_fallback(monkeypatch):
+    monkeypatch.setattr(client_host, "APP_ENV", "prod")
+
+    class _Req:
+        method = "GET"
+        args = {}
+        host = "localhost:9001"
+
+        @staticmethod
+        def get_json(silent=True):
+            return None
+
+    monkeypatch.setattr("core.widget_cors.request", _Req())
+    assert widget_cors.resolve_widget_cors_client_id() is None
+
+
+def test_resolve_widget_cors_prod_host_mismatch_query_returns_none(monkeypatch):
+    import config
+
+    monkeypatch.setattr(client_host, "APP_ENV", "prod")
+    monkeypatch.setattr(config, "ALLOWED_CLIENTS", frozenset({"demo", "nikadent"}))
+
+    class _Req:
+        method = "GET"
+        args = {"client_id": "demo"}
+        host = "nikadent.bot.artgents.ru"
+
+        @staticmethod
+        def get_json(silent=True):
+            return None
+
+    monkeypatch.setattr("core.widget_cors.request", _Req())
+    assert widget_cors.resolve_widget_cors_client_id() is None
+
+
+def test_widget_cors_preflight_prod_bad_host_returns_403(monkeypatch):
+    monkeypatch.setattr(client_host, "APP_ENV", "prod")
+
+    with app_module.app.test_request_context(
+        "/api/widget-config",
+        method="OPTIONS",
+        base_url="http://evil.example",
+    ):
+        resp = widget_cors.widget_cors_preflight_response()
     assert resp is not None
     assert resp.status_code == 403

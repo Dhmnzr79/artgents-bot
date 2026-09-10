@@ -218,7 +218,7 @@ def test_flag_on_free_text_routes_sales_fast_without_legacy_llm(
 def test_production_orchestrate_wraps_http_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, object] = {}
 
-    def _inner(data):
+    def _inner(data, *, resolved_client_id=None):
         from core.provider_call_budget import current_provider_call_budget
 
         budget = current_provider_call_budget()

@@ -83,7 +83,10 @@ def purge_session_observability(
                     (sid_clean, cid),
                 )
             stats["bot_events_deleted"] = int(cur.rowcount or 0)
-            cur.execute("DELETE FROM v5_turn_traces WHERE sid=%s", (sid_clean,))
+            cur.execute(
+                "DELETE FROM v5_turn_traces WHERE sid=%s AND client_id=%s",
+                (sid_clean, cid),
+            )
             stats["traces_deleted"] = int(cur.rowcount or 0)
             cur.execute(
                 "DELETE FROM leads WHERE sid=%s AND client_id=%s",

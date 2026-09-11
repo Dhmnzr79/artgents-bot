@@ -104,9 +104,33 @@ def _mask_phone_in_text(value):
     return _PHONE_TEXT_RX.sub(lambda m: str(_mask_phone_like(m.group())), s)
 
 
+def _mask_user_contacts_in_text(value: str) -> str:
+    from core.user_text_privacy import observability_safe_user_text
+
+    return observability_safe_user_text(value or "")
+
+
+def _mask_bot_contacts_in_text(value: str, *, max_len: int = 8000) -> str:
+    from core.user_text_privacy import observability_safe_bot_text
+
+    return observability_safe_bot_text(value or "", max_len=max_len)
+
+
+_OBSERVABILITY_BOT_TEXT_KEYS = frozenset({"bot_text", "bot_text_redacted"})
+_OBSERVABILITY_USER_TEXT_KEYS = frozenset(
+    {
+        "user_text",
+        "user_text_redacted",
+        "user_preview_redacted",
+        "preview",
+        "question_preview",
+    }
+)
+
+
 def redact_text(value: str, *, max_len: int | None = None) -> str:
     """Явная редактирующая функция для payload до записи в любое хранилище."""
-    out = _mask_phone_in_text(value or "")
+    out = _mask_user_contacts_in_text(value or "")
     if max_len is not None and max_len > 0 and len(out) > max_len:
         return out[:max_len]
     return out
@@ -123,17 +147,22 @@ def _sanitize(d):
         elif isinstance(k, str) and ("phone" in kl or "tel" in kl):
             clean[k] = _mask_phone_like(v)
         elif isinstance(k, str) and "situation" in kl:
-            txt = _mask_phone_in_text(v)
+            txt = _mask_user_contacts_in_text(v)
             clean[k] = (txt[:80] + "…") if len(txt) > 80 else txt
         elif isinstance(v, dict):
             clean[k] = _sanitize(v)
         elif isinstance(v, list):
             clean[k] = [
-                _sanitize(x) if isinstance(x, dict) else (_mask_phone_in_text(x) if isinstance(x, str) else x)
+                _sanitize(x) if isinstance(x, dict) else (_mask_user_contacts_in_text(x) if isinstance(x, str) else x)
                 for x in v
             ]
         elif isinstance(v, str):
-            clean[k] = _mask_phone_in_text(v)
+            if isinstance(k, str) and kl in _OBSERVABILITY_BOT_TEXT_KEYS:
+                clean[k] = _mask_bot_contacts_in_text(v)
+            elif isinstance(k, str) and kl in _OBSERVABILITY_USER_TEXT_KEYS:
+                clean[k] = _mask_user_contacts_in_text(v)
+            else:
+                clean[k] = _mask_user_contacts_in_text(v)
         else:
             clean[k] = v
     return clean

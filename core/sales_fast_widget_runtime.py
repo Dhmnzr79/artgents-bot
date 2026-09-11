@@ -737,9 +737,9 @@ def run_sales_fast_widget_turn(
         **sales_context,
         AUTHORITY_CLIENT_ID_HINT_KEY: client_id,
     }
-    from session import recent_dialog_history
+    from session import recent_dialog_history_for_provider
 
-    dialog_history = recent_dialog_history(sid)
+    dialog_history = recent_dialog_history_for_provider(sid)
     static_handoff = static_sales_fast_admin_handoff(client_id=client_id)
     active_service_catalog = ActiveServiceCatalogSnapshot.from_bundle(context.bundle)
     service_reference_catalog = ServiceReferenceCatalogSnapshot.from_bundle(context.bundle)

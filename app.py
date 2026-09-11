@@ -41,8 +41,8 @@ from core.runtime_diagnostics import (
 )
 from core.video_catalog_loader import catalog_for_widget, get_external_video_src
 from lead_service import handle_lead
-from core.observability_pii import observability_turn_preview, observability_user_texts
-from logging_setup import LOG_FILE, emit_bot_event, get_logger, log_json, log_json_no_context, make_request_context, redact_text
+from core.observability_pii import error_turn_complete_details, observability_turn_preview
+from logging_setup import LOG_FILE, emit_bot_event, get_logger, log_json, log_json_no_context, make_request_context
 from session import (
     bind_client_id,
     clear_session_client_binding,
@@ -51,6 +51,7 @@ from session import (
     mem_add_user,
     mem_get,
     is_active_lead_flow,
+    is_lead_paused,
     record_last_bot_payload,
     sid_from_body,
 )
@@ -288,6 +289,21 @@ def _skip_lead_pii_in_session_hist(payload: dict) -> bool:
 def _skip_lead_pending_quote_in_session_hist(meta: dict | None) -> bool:
     step = str((meta or {}).get("lead_step") or "").strip().lower()
     return step in {"pending_name", "pending_phone"}
+
+
+def _error_observability_meta(sid: str | None) -> dict:
+    sid_clean = (sid or "").strip()
+    if not sid_clean:
+        return {}
+    try:
+        st = mem_get(sid_clean)
+    except Exception:
+        return {}
+    lead_flow = bool(is_active_lead_flow(st) or is_lead_paused(st))
+    situation_collect = bool(st.get("situation_pending"))
+    if not lead_flow and not situation_collect:
+        return {}
+    return {"lead_flow": lead_flow, "situation_collect": situation_collect}
 
 
 def _service_reply(
@@ -600,34 +616,30 @@ def ask():
                 route="error",
                 transport="json",
             )
-        logger.exception("ask_failed", extra={"q": q, "err": str(e)})
-        if request.ctx.get("sid") and (q or "").strip():
+        logger.exception("ask_failed", extra={"err": str(e)[:500]})
+        sid_err = str(request.ctx.get("sid") or "").strip()
+        if sid_err and (q or "").strip():
             emit_bot_event(
                 logger,
                 "turn_complete",
                 status="error",
-                details={
-                    "turn_number": None,
-                    "user_text_redacted": redact_text((q or ""), max_len=8000),
-                    "user_preview_redacted": redact_text((q or ""), max_len=200),
-                    "bot_text_redacted": "",
-                    "intent": None,
-                    "doc_id": None,
-                    "route": "error",
-                    "low_score": False,
-                    "lead_flow": False,
-                    "handoff_filter": False,
-                    "answer_chars": 0,
-                    "latency_ms": None,
-                    "fallback_reason": "ask_failed",
-                    "effective_intent": "",
-                },
+                details=error_turn_complete_details(
+                    q,
+                    fallback_reason="ask_failed",
+                    meta=_error_observability_meta(sid_err),
+                ),
             )
+        from core.user_text_privacy import observability_safe_user_text
+
         emit_bot_event(
             logger,
             "ask_failed",
             status="error",
-            details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
+            details={
+                "error": str(e)[:500],
+                "question_preview": observability_safe_user_text(q or "", max_len=200),
+                **_error_observability_meta(sid_err),
+            },
         )
         return safe_jsonify(internal_error_response(client_id=client_id)), 200
 
@@ -1129,34 +1141,30 @@ def ask_stream():
                 route="error",
                 transport="sse",
             )
-        logger.exception("ask_stream_failed", extra={"q": q, "err": str(e)})
-        if request.ctx.get("sid") and (q or "").strip():
+        logger.exception("ask_stream_failed", extra={"err": str(e)[:500]})
+        sid_err = str(request.ctx.get("sid") or "").strip()
+        if sid_err and (q or "").strip():
             emit_bot_event(
                 logger,
                 "turn_complete",
                 status="error",
-                details={
-                    "turn_number": None,
-                    "user_text_redacted": redact_text((q or ""), max_len=8000),
-                    "user_preview_redacted": redact_text((q or ""), max_len=200),
-                    "bot_text_redacted": "",
-                    "intent": None,
-                    "doc_id": None,
-                    "route": "error",
-                    "low_score": False,
-                    "lead_flow": False,
-                    "handoff_filter": False,
-                    "answer_chars": 0,
-                    "latency_ms": None,
-                    "fallback_reason": "ask_stream_failed",
-                    "effective_intent": "",
-                },
+                details=error_turn_complete_details(
+                    q,
+                    fallback_reason="ask_stream_failed",
+                    meta=_error_observability_meta(sid_err),
+                ),
             )
+        from core.user_text_privacy import observability_safe_user_text
+
         emit_bot_event(
             logger,
             "ask_stream_failed",
             status="error",
-            details={"error": str(e)[:500], "question_preview": (q or "")[:200]},
+            details={
+                "error": str(e)[:500],
+                "question_preview": observability_safe_user_text(q or "", max_len=200),
+                **_error_observability_meta(sid_err),
+            },
         )
         return safe_jsonify(internal_error_response(client_id=client_id)), 200
 

@@ -45,6 +45,7 @@ from session import (
     mem_reset,
     sid_from_body,
 )
+from core.user_text_privacy import provider_message_has_substance, provider_safe_user_text
 from ux_builder import empty_question_response
 
 logger = get_logger("bot")
@@ -122,12 +123,14 @@ def _contact_aspects_from_message(q: str) -> tuple[str, ...] | None:
     """Map existing CONTACTS_RE matches to planner contact aspects; None → pass to Flash."""
 
     from config import CONTACTS_RE
+    from core.user_text_privacy import EMAIL_PLACEHOLDER, PHONE_PLACEHOLDER
 
     if not q:
         return None
+    scan_q = (q or "").replace(PHONE_PLACEHOLDER, " ").replace(EMAIL_PLACEHOLDER, " ")
     aspects: list[str] = []
     seen: set[str] = set()
-    for match in CONTACTS_RE.finditer(q):
+    for match in CONTACTS_RE.finditer(scan_q):
         token = match.group(0).lower()
         aspect: str | None = None
         if "парков" in token:
@@ -443,6 +446,54 @@ def _resolve_governed_typed_ui_ref(
     return "продолжить"
 
 
+def _privacy_only_user_text_reply(
+    *,
+    sid: str,
+    client_id: str,
+    client_txt: Callable[[str | None], dict[str, str]],
+) -> AskOrchestrationResult:
+    from core.client_config_loader import ui_menu_to_payload
+
+    txt = client_txt(client_id)
+    answer = txt.get(
+        "user_text_privacy_only_contacts",
+        "Я не могу обработать только контактные данные в чате. "
+        "Нажмите «Хочу записаться» — администратор свяжется с вами.",
+    )
+    payload = ui_menu_to_payload(
+        {
+            "answer": answer,
+            "quick_replies": [{"label": "Хочу записаться", "ref": "lead:booking"}],
+        },
+        sid=sid,
+        client_id=client_id,
+        extra_meta={"service_route": "privacy_user_text_empty"},
+    )
+    return AskOrchestrationResult(
+        kind="service_reply",
+        q="",
+        sid=sid,
+        client_id=client_id,
+        service_payload=payload,
+        service_doc_id=None,
+        service_track_user=False,
+        service_route="privacy_user_text_empty",
+    )
+
+
+def _apply_provider_safe_question(q: str) -> tuple[str, bool]:
+    """Return (provider_safe_q, is_privacy_only)."""
+    raw = (q or "").strip()
+    if not raw:
+        return "", False
+    safe = provider_safe_user_text(raw)
+    if provider_message_has_substance(safe, raw_source=raw):
+        return safe, False
+    if len(raw) >= 3:
+        return "", True
+    return safe, False
+
+
 def _run_local_problem_gate(q: str) -> LocalProblemGateResult:
     turn_timing.stage_start("sales_fast_local_gate")
     gate = decide_local_problem_gate(q)
@@ -602,6 +653,12 @@ def orchestrate_sales_one_plus_ask_turn(
     provider_q = take_lead_provider_question()
     if provider_q:
         q = provider_q
+
+    if q:
+        q_safe, privacy_only = _apply_provider_safe_question(q)
+        if privacy_only:
+            return _privacy_only_user_text_reply(sid=sid, client_id=client_id, client_txt=client_txt)
+        q = q_safe
 
     if q:
         _maybe_clear_unrelated_pending_price_clarify_for_turn(

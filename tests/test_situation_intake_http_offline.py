@@ -9,7 +9,7 @@ from flask import Flask, request
 
 from core.observability_pii import is_pii_withheld_route, observability_user_texts
 from flow_handlers import handle_flows
-from session import mem_get, mem_reset
+from session import mem_get, mem_reset, session_client_scope
 
 
 @pytest.fixture
@@ -37,91 +37,95 @@ def _service_payload(answer, sid, client_id, **kwargs):
 
 def test_situation_start_sets_pending(flask_ctx) -> None:
     sid = f"s-sit-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    result = handle_flows(
-        data={"situation_action": "start", "client_id": "demo"},
-        st=mem_get(sid),
-        sid=sid,
-        q="",
-        client_id="demo",
-        txt=_txt(),
-        service_payload=_service_payload,
-        get_last_content_ui_payload=lambda _sid: None,
-        get_topic_state=lambda _sid, _doc: {},
-    )
-    assert result is not None
-    assert result["payload"]["situation"]["mode"] == "pending"
-    assert result["payload"]["meta"]["situation_collect"] is True
-    assert mem_get(sid).get("situation_pending") is True
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+        result = handle_flows(
+            data={"situation_action": "start", "client_id": "demo"},
+            st=mem_get(sid),
+            sid=sid,
+            q="",
+            client_id="demo",
+            txt=_txt(),
+            service_payload=_service_payload,
+            get_last_content_ui_payload=lambda _sid: None,
+            get_topic_state=lambda _sid, _doc: {},
+        )
+        assert result is not None
+        assert result["payload"]["situation"]["mode"] == "pending"
+        assert result["payload"]["meta"]["situation_collect"] is True
+        assert mem_get(sid).get("situation_pending") is True
 
 
 def test_situation_back_clears_pending(flask_ctx) -> None:
     sid = f"s-back-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    st = mem_get(sid)
-    st["situation_pending"] = True
-    result = handle_flows(
-        data={"situation_action": "back"},
-        st=st,
-        sid=sid,
-        q="",
-        client_id="demo",
-        txt=_txt(),
-        service_payload=_service_payload,
-        get_last_content_ui_payload=lambda _sid: {"answer": "prev", "quick_replies": []},
-        get_topic_state=lambda _sid, _doc: {},
-    )
-    assert result is not None
-    assert mem_get(sid).get("situation_pending") is False
-    assert result["payload"]["meta"].get("situation_back") is True
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+        st = mem_get(sid)
+        st["situation_pending"] = True
+        result = handle_flows(
+            data={"situation_action": "back"},
+            st=st,
+            sid=sid,
+            q="",
+            client_id="demo",
+            txt=_txt(),
+            service_payload=_service_payload,
+            get_last_content_ui_payload=lambda _sid: {"answer": "prev", "quick_replies": []},
+            get_topic_state=lambda _sid, _doc: {},
+        )
+        assert result is not None
+        assert mem_get(sid).get("situation_pending") is False
+        assert result["payload"]["meta"].get("situation_back") is True
 
 
 def test_situation_submit_moves_to_lead_name(flask_ctx) -> None:
     sid = f"s-sub-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
-    st = mem_get(sid)
-    st["situation_pending"] = True
-    result = handle_flows(
-        data={},
-        st=st,
-        sid=sid,
-        q="Нужна консультация по имплантации",
-        client_id="demo",
-        txt=_txt(),
-        service_payload=_service_payload,
-        get_last_content_ui_payload=lambda _sid: None,
-        get_topic_state=lambda _sid, _doc: {},
-    )
-    assert result is not None
-    assert mem_get(sid).get("situation_pending") is False
-    assert mem_get(sid).get("lead_intent") == "collecting_name"
-    assert result["payload"]["meta"]["lead_flow"] is True
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+        st = mem_get(sid)
+        st["situation_pending"] = True
+        result = handle_flows(
+            data={},
+            st=st,
+            sid=sid,
+            q="Нужна консультация по имплантации",
+            client_id="demo",
+            txt=_txt(),
+            service_payload=_service_payload,
+            get_last_content_ui_payload=lambda _sid: None,
+            get_topic_state=lambda _sid, _doc: {},
+        )
+        assert result is not None
+        assert mem_get(sid).get("situation_pending") is False
+        assert mem_get(sid).get("lead_intent") == "collecting_name"
+        assert result["payload"]["meta"]["lead_flow"] is True
 
 
 def test_situation_sid_isolation(flask_ctx) -> None:
     sid_a = f"s-a-{uuid.uuid4().hex[:8]}"
     sid_b = f"s-b-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid_a)
-    mem_reset(sid_b)
-    handle_flows(
-        data={"situation_action": "start"},
-        st=mem_get(sid_a),
-        sid=sid_a,
-        q="",
-        client_id="demo",
-        txt=_txt(),
-        service_payload=_service_payload,
-        get_last_content_ui_payload=lambda _sid: None,
-        get_topic_state=lambda _sid, _doc: {},
-    )
-    assert mem_get(sid_a).get("situation_pending") is True
-    assert mem_get(sid_b).get("situation_pending") is not True
+    with session_client_scope("demo"):
+        mem_reset(sid_a, client_id="demo")
+        mem_reset(sid_b, client_id="demo")
+        handle_flows(
+            data={"situation_action": "start"},
+            st=mem_get(sid_a),
+            sid=sid_a,
+            q="",
+            client_id="demo",
+            txt=_txt(),
+            service_payload=_service_payload,
+            get_last_content_ui_payload=lambda _sid: None,
+            get_topic_state=lambda _sid, _doc: {},
+        )
+        assert mem_get(sid_a).get("situation_pending") is True
+        assert mem_get(sid_b).get("situation_pending") is not True
 
 
 def test_situation_collect_pii_withheld() -> None:
     withheld = is_pii_withheld_route("situation_collect", {"situation_collect": True})
     assert withheld is True
-    user, _preview, flag = observability_user_texts(
+    _user, _preview, flag = observability_user_texts(
         "секретная ситуация",
         route="situation_collect",
         meta={"situation_collect": True},

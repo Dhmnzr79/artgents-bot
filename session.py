@@ -30,6 +30,8 @@ _lock = threading.RLock()
 _conns: dict[str, sqlite3.Connection] = {}
 _tls = threading.local()
 _UNSET = object()
+_SESSION_PURGE_INTERVAL_SEC = 300.0
+_last_session_purge_at: dict[str, float] = {}
 
 
 class SessionClientNotBoundError(RuntimeError):
@@ -190,6 +192,20 @@ def _now() -> float:
     return time.time()
 
 
+def _maybe_purge_idle_sessions() -> None:
+    """Tenant-scoped: drop SQLite rows idle longer than MAX_IDLE_SEC (bounded, throttled)."""
+    pack = _session_pack_id()
+    now = _now()
+    with _lock:
+        last = float(_last_session_purge_at.get(pack) or 0.0)
+        if now - last < _SESSION_PURGE_INTERVAL_SEC:
+            return
+        _last_session_purge_at[pack] = now
+        cutoff = now - float(MAX_IDLE_SEC)
+    conn = _connect()
+    conn.execute("DELETE FROM sessions WHERE updated_at < ?", (cutoff,))
+
+
 def bind_client_id(session_id: str, client_id: str | None) -> None:
     """Фиксируем client_id в SQLite-сессии (дашборд / мультиклиент)."""
     cid = (client_id or "").strip()
@@ -212,6 +228,10 @@ def sid_from_body(body: dict) -> str:
 
 def mem_get(session_id: str) -> dict:
     with _lock:
+        try:
+            _maybe_purge_idle_sessions()
+        except SessionClientNotBoundError:
+            pass
         conn = _connect()
         row = conn.execute(
             "SELECT payload, updated_at FROM sessions WHERE sid = ?",
@@ -230,6 +250,8 @@ def mem_get(session_id: str) -> dict:
 
 
 def mem_add_user(session_id: str, text: str) -> None:
+    from core.user_text_privacy import provider_safe_user_text
+
     with _lock:
         st = mem_get(session_id)
         st["turn_count"] = int(st.get("turn_count") or 0) + 1
@@ -237,18 +259,9 @@ def mem_add_user(session_id: str, text: str) -> None:
         if is_lead_context(st):
             _persist_unlocked(session_id, st)
             return
-        st["hist"].append({"role": "user", "content": text})
-        m = PHONE_RX.search(text)
-        if m:
-            st["profile"]["phone"] = m.group().replace(" ", "")
-        if "меня зовут" in text.lower():
-            parts = text.lower().split("меня зовут", 1)
-            if len(parts) > 1:
-                name_parts = parts[1].strip().split()
-                if name_parts:
-                    name = name_parts[0]
-                    if name:
-                        st["profile"]["name"] = name.capitalize()
+        safe = provider_safe_user_text(text or "")
+        if safe:
+            st["hist"].append({"role": "user", "content": safe})
         _persist_unlocked(session_id, st)
 
 
@@ -286,6 +299,23 @@ def recent_dialog_history(
         if isinstance(m, dict) and str(m.get("content") or "").strip()
     ]
     return "\n".join(lines)
+
+
+def recent_dialog_history_for_provider(
+    session_id: str,
+    *,
+    max_messages: int = RECENT_DIALOG_MAX_MESSAGES,
+) -> str:
+    """Provider-bound dialog tail with per-message user sanitization."""
+    from core.user_text_privacy import format_hist_messages_for_provider
+
+    if not (session_id or "").strip():
+        return ""
+    hist = list(mem_get(session_id).get("hist") or [])
+    if not hist:
+        return ""
+    tail = hist[-max(1, int(max_messages)) :]
+    return format_hist_messages_for_provider(tail)
 
 
 def format_dialog_context_for_understanding(dialog_history: str) -> str:

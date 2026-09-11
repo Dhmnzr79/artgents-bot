@@ -2,25 +2,20 @@
 
 from __future__ import annotations
 
-import re
-
-from logging_setup import redact_text
+from core.user_text_privacy import EMAIL_PLACEHOLDER, EMAIL_RX, observability_safe_user_text
 from session import RECENT_DIALOG_MAX_MESSAGES, recent_dialog_history, session_client_scope
 
 LEAD_DIALOG_EXCERPT_MAX_CHARS = 1200
 _ROLE_LABELS = {"user": "Пациент", "assistant": "Бот"}
-_EMAIL_RX = re.compile(
-    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9._%+-])"
-)
 
 
 def mask_email_in_text(value: str) -> str:
     """Technical PII mask for email addresses in free text (not semantic filtering)."""
-    return _EMAIL_RX.sub("[email скрыт]", str(value or ""))
+    return EMAIL_RX.sub(EMAIL_PLACEHOLDER, str(value or ""))
 
 
 def sanitize_dialog_line(value: str) -> str:
-    return mask_email_in_text(redact_text(value or ""))
+    return observability_safe_user_text(value or "")
 
 
 def _fit_excerpt_lines(lines: list[str], *, max_chars: int) -> str:

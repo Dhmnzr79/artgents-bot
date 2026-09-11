@@ -29,7 +29,13 @@ from core.runtime_diagnostics import (
     utf8_text_fingerprint,
 )
 from core.sales_fast_observability import record_sales_fast_observability
-from session import mem_reset
+from session import bind_session_client, mem_reset, session_client_scope
+
+
+def _mem_reset_demo(sid: str) -> None:
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+    bind_session_client("demo")
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -346,6 +352,9 @@ def test_sse_service_reply_emits_single_diagnostic(
             "client_id": "demo",
             "path": "/ask/stream",
         }
+        from session import bind_session_client
+
+        bind_session_client("demo")
         resp = app_module._sse_service_reply(
             payload,
             sid="sid-sse",
@@ -385,7 +394,7 @@ def test_orchestrate_emits_runtime_diagnostic_on_zero_call_contacts(
     )
 
     sid = f"s41-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     client = app_module.app.test_client()
     resp = client.post("/ask", json={"q": "телефон", "sid": sid, "client_id": "demo"})
     assert resp.status_code == 200
@@ -428,7 +437,13 @@ import config
 import app as app_module
 from types import SimpleNamespace
 from logging_setup import LOG_FILE, _shutdown_logging
-from session import mem_reset
+from session import bind_session_client, mem_reset, session_client_scope
+
+
+def _mem_reset_demo(sid: str) -> None:
+    with session_client_scope("demo"):
+        mem_reset(sid, client_id="demo")
+    bind_session_client("demo")
 
 
 def fake_orch(*args, **kwargs):
@@ -444,7 +459,7 @@ def fake_orch(*args, **kwargs):
     )
 
 app_module.orchestrate_sales_one_plus_ask_turn = fake_orch
-mem_reset(unique["sid"])
+_mem_reset_demo(unique["sid"])
 resp = app_module.app.test_client().post(
     "/ask",
     json={"q": unique["q"], "sid": unique["sid"], "client_id": "demo"},
@@ -510,7 +525,7 @@ def test_ask_runtime_diagnostic_has_final_timing_marks(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(app_module, "log_json_no_context", _capture)
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -538,7 +553,7 @@ def test_ask_runtime_diagnostic_error_after_orchestration_assembly(
         raise RuntimeError("assembly failed after orchestration")
 
     monkeypatch.setattr(app_module, "_service_reply", _boom)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -570,7 +585,7 @@ def test_worker_runtime_diagnostic_emits_after_build_sse_payload(
     monkeypatch.setattr(app_module, "_sse_worker_admission", MagicMock(acquire=MagicMock(return_value=False)))
 
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask/stream",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -604,6 +619,9 @@ def test_sse_service_reply_client_closed_on_early_iterator_close(
             "client_id": "demo",
             "path": "/ask/stream",
         }
+        from session import bind_session_client
+
+        bind_session_client("demo")
         resp = app_module._sse_service_reply(
             payload,
             sid="sid-close",
@@ -623,7 +641,7 @@ def test_stream_worker_client_closed_after_worker_submit(
 ) -> None:
     captured = _collect_sse_render_diagnostics(monkeypatch)
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
 
     submit_called = threading.Event()
     worker_entered = threading.Event()
@@ -719,7 +737,7 @@ def test_stream_overload_fallback_client_closed(
     monkeypatch.setattr(app_module, "_run_sse_worker_turn", slow_fallback)
     monkeypatch.setattr(app_module, "_sse_worker_admission", MagicMock(acquire=MagicMock(return_value=False)))
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask/stream",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -752,7 +770,7 @@ def test_stream_overload_fallback_client_closed(
 def test_stream_worker_completed_on_full_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     captured = _collect_sse_render_diagnostics(monkeypatch)
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask/stream",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -769,7 +787,7 @@ def test_stream_overload_fallback_completed_on_full_stream(
     captured = _collect_sse_render_diagnostics(monkeypatch)
     monkeypatch.setattr(app_module, "_sse_worker_admission", MagicMock(acquire=MagicMock(return_value=False)))
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask/stream",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -794,7 +812,7 @@ def test_no_duplicate_runtime_or_sse_diagnostics_on_full_ask(
 
     monkeypatch.setattr(app_module, "log_json_no_context", _capture)
     sid = _fake_service_orch(monkeypatch)
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask",
         json={"q": "телефон", "sid": sid, "client_id": "demo"},
@@ -824,7 +842,7 @@ def test_sse_worker_build_failure_emits_error_diagnostic_with_context(
 
     request_id = f"worker-req-{uuid.uuid4().hex[:8]}"
     client_id = "demo"
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     _out, http_status = app_module._run_sse_worker_turn(
         data={"q": secret, "sid": sid, "client_id": client_id},
         client_id=client_id,
@@ -867,7 +885,7 @@ def test_ask_stream_reset_dispatch_failure_emits_runtime_error_diagnostic(
     monkeypatch.setattr(app_module, "_dispatch_orchestration_sse", _dispatch_boom)
 
     sid = f"reset-{uuid.uuid4().hex[:8]}"
-    mem_reset(sid)
+    _mem_reset_demo(sid)
     resp = app_module.app.test_client().post(
         "/ask/stream",
         json={"q": "/reset", "sid": sid, "client_id": "demo"},

@@ -11,6 +11,8 @@ from typing import get_args
 
 import pytest
 
+from session import session_client_scope
+
 from contracts.answer_plan import AspectKind
 from contracts.decision_frame import RouteIntent
 from contracts.patient_situation import PatientSituationKind
@@ -43,6 +45,12 @@ _DEMO_TOPICS = frozenset(
     }
 )
 _NATIVE_FIXTURE = Path("tests/fixtures/patient_scope_native_contract_a9_v2.json")
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 def _native_spec() -> dict:

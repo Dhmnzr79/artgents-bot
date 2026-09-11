@@ -960,13 +960,13 @@ def test_pending_question_withheld_from_emit_bot_event_details(
 
 
 def test_render_bot_answer_html_escapes_markup() -> None:
-    script = Path("static/widget/answer_format.js")
-    raw = '<script>alert(1)</script>'
-    node_code = f"""
-import {{ renderBotAnswerHtml }} from {json.dumps(script.as_posix())};
-const html = renderBotAnswerHtml({json.dumps(raw)});
-console.log(html);
-"""
+    script_uri = Path("static/widget/answer_format.js").resolve().as_uri()
+    raw = "<script>alert(1)</script>"
+    node_code = (
+        f"import {{ renderBotAnswerHtml }} from {json.dumps(script_uri)};\n"
+        f"const html = renderBotAnswerHtml({json.dumps(raw)});\n"
+        "console.log(html);\n"
+    )
     result = subprocess.run(
         ["node", "--input-type=module", "-e", node_code],
         cwd=Path.cwd(),

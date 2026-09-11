@@ -2,8 +2,16 @@ from __future__ import annotations
 
 import pytest
 
+from session import session_client_scope
+
 from contracts.decision_frame import DecisionFrame, DecisionFrameConfidence
 from contracts.turn_plan import TurnPlan
+
+
+@pytest.fixture(autouse=True)
+def _explicit_demo_session_binding():
+    with session_client_scope("demo"):
+        yield
 
 
 def _decision(service_id: str | None = "all_on_4") -> DecisionFrame:

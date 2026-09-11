@@ -1,0 +1,3 @@
+# CI/test: production runtime (requirements.txt) plus pytest.
+-r requirements.txt
+pytest

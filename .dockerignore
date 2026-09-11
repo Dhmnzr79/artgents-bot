@@ -39,3 +39,6 @@ migration_ledger_local/
 *.tmp
 eval_*.txt
 DEPRECATED.md
+requirements.txt
+requirements-ci.in
+requirements-ci.lock

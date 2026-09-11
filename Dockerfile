@@ -15,7 +15,8 @@ COPY --chown=botapp:botapp . .
 
 RUN mkdir -p /app/data /app/logs \
     && chown -R botapp:botapp /app/data /app/logs \
-    && chmod +x /app/start.sh
+    && chmod +x /app/start.sh /app/deploy/production/start_admin.sh \
+    && chmod +x /app/deploy/production/admin_container_healthcheck.py
 
 USER 10001:10001
 

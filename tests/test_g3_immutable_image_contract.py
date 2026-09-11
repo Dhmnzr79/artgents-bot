@@ -314,6 +314,7 @@ def test_verify_job_preflight_and_ci_lock() -> None:
     pytest_block = verify.split("Offline unit, G2/G3 contracts", 1)[-1]
     assert "tests/test_g2_pr_ci_contract.py" in pytest_block
     assert "tests/test_g3_immutable_image_contract.py" in pytest_block
+    assert "tests/test_g4_manual_deploy_contract.py" in pytest_block
 
 
 def test_production_input_has_no_pytest() -> None:

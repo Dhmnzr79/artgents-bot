@@ -1,6 +1,23 @@
-# Production Compose (T6B Pass 3)
+# Production Compose (T6B Pass 3 + G4 manual deploy contract)
 
-Один экземпляр движка обслуживает несколько клиник по hostname (`{client_id}.bot.artgents.ru`). Этот каталог — **контейнерный пакет и документация**, не автоматический deploy. GitHub deploy/rollback — **Pass 4**. DNS, VPS и реальная квалификация PostgreSQL выполняются отдельно (в т.ч. браузерным GPT).
+Один экземпляр движка обслуживает несколько клиник по hostname (`{client_id}.bot.artgents.ru`). Этот каталог — **контейнерный пакет и документация**. Автоматический deploy на VPS **не** выполняется из репозитория на вашей машине.
+
+## G4 — manual production deploy (repository only)
+
+- Workflow **`Deploy production`** (`.github/workflows/deploy-production.yml`) появится в GitHub UI **только после merge в default branch `main`**.
+- Запуск **только** `workflow_dispatch` с полным `source_sha` (40 hex) и `confirm_production: true`.
+- Workflow проверяет ancestry на `main`, успешный G3 publish receipt и digest тега GHCR `<sha>` — **без** Docker build и **без** mutable tags (`latest`, `main`, `prod`).
+- SSH на VPS вызывает фиксированную команду; серверные шаблоны в `deploy/production/server/` (исключены из Docker image).
+- **GitHub Free:** без `environment: production`; будущие имена secrets/variables перечислены в `deploy/production/server/README.md` — **реальные значения в G4 не создаются**.
+- **Не запускать workflow**, пока не выполнены внешние gates:
+  - **G7** — утилита `/opt/artgents/bin/backup-postgres` (deploy fail-closed без неё);
+  - **G8** — квалификация PostgreSQL;
+  - **G10** — VPS, DNS, TLS, установка server assets.
+- Rollback (**G5**), настоящий backup (**G7**), disposable PG qualification (**G8**) и VPS setup (**G10**) **не** входят в G4.
+
+Подробности установки receiver/sudo/deploy script: `deploy/production/server/README.md`.
+
+---
 
 ## Контейнеры
 

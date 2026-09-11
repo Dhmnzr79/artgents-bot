@@ -1,0 +1,346 @@
+# G4 — manual fail-closed production deploy (immutable GHCR digest only).
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full 40-character commit SHA already published by G3
+        required: true
+        type: string
+      confirm_production:
+        description: Confirm production deployment
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  resolve-image:
+    name: Resolve and verify immutable image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    outputs:
+      source_sha: ${{ steps.export.outputs.source_sha }}
+      registry_digest: ${{ steps.export.outputs.registry_digest }}
+      immutable_reference: ${{ steps.export.outputs.immutable_reference }}
+    env:
+      IMAGE: ghcr.io/dhmnzr79/artgents-bot
+      EXPECTED_REPOSITORY: Dhmnzr79/artgents-bot
+    steps:
+      - name: Guard workflow context
+        env:
+          INPUT_SHA: ${{ github.event.inputs.source_sha }}
+          CONFIRM: ${{ github.event.inputs.confirm_production }}
+          WORKFLOW_REF: ${{ github.ref }}
+          WORKFLOW_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$WORKFLOW_REF" != "refs/heads/main" ]; then
+            echo "deploy-production may only run from refs/heads/main"
+            exit 1
+          fi
+          if [ "$WORKFLOW_REPOSITORY" != "Dhmnzr79/artgents-bot" ]; then
+            echo "unexpected repository for deploy-production workflow"
+            exit 1
+          fi
+          if [ "$CONFIRM" != "true" ]; then
+            echo "confirm_production must be true"
+            exit 1
+          fi
+          if ! printf '%s' "$INPUT_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "source_sha must be exactly 40 lowercase hex characters"
+            exit 1
+          fi
+          if [ "$INPUT_SHA" != "${INPUT_SHA,,}" ]; then
+            echo "source_sha must be lowercase"
+            exit 1
+          fi
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify commit on checked-out main
+        env:
+          INPUT_SHA: ${{ github.event.inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then
+            echo "checkout is not on main branch"
+            exit 1
+          fi
+          MAIN_HEAD="$(git rev-parse HEAD)"
+          if ! git cat-file -e "${INPUT_SHA}^{commit}" 2>/dev/null; then
+            echo "source_sha is not a commit object"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$INPUT_SHA" "$MAIN_HEAD"; then
+            echo "source_sha is not an ancestor of checked-out main HEAD"
+            exit 1
+          fi
+          echo "verified main HEAD=${MAIN_HEAD}"
+
+      - name: Locate successful G3 publish run
+        id: publish_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ github.event.inputs.source_sha }}
+          WORKFLOW_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$WORKFLOW_REPOSITORY" != "Dhmnzr79/artgents-bot" ]; then
+            echo "unexpected repository for publish run lookup"
+            exit 1
+          fi
+          RUNS_RAW=$(gh api --method GET \
+            "/repos/${WORKFLOW_REPOSITORY}/actions/workflows/publish-image.yml/runs" \
+            -f head_sha="$INPUT_SHA" \
+            -f status=completed \
+            -f per_page=20)
+          RUNS_JSON=$(printf '%s' "$RUNS_RAW" | jq --arg sha "$INPUT_SHA" \
+            '[.workflow_runs[] | select(.event=="push" and .conclusion=="success" and .head_sha==$sha)]')
+          COUNT=$(printf '%s' "$RUNS_JSON" | jq 'length')
+          if [ "$COUNT" != "1" ]; then
+            echo "expected exactly one successful G3 publish run for SHA, found ${COUNT}"
+            exit 1
+          fi
+          RUN_ID=$(printf '%s' "$RUNS_JSON" | jq -r '.[0].id')
+          printf 'run_id=%s\n' "$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Download and validate publish receipt
+        id: receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ github.event.inputs.source_sha }}
+          RUN_ID: ${{ steps.publish_run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_NAME="publish-receipt-${INPUT_SHA}"
+          rm -rf receipt-work
+          mkdir -p receipt-work
+          gh run download "$RUN_ID" --name "$ARTIFACT_NAME" --dir receipt-work
+          RECEIPT_PATH="receipt-work/publish-receipt.json"
+          if [ ! -f "$RECEIPT_PATH" ]; then
+            echo "missing publish-receipt.json in artifact"
+            exit 1
+          fi
+          python <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          raw = Path("receipt-work/publish-receipt.json").read_text(encoding="utf-8")
+          if re.search(r"[`$;|&<>]", raw):
+              sys.stderr.write("receipt contains forbidden shell fragments\n")
+              sys.exit(1)
+          data = json.loads(raw)
+          allowed = {
+              "repository",
+              "source_sha",
+              "tag",
+              "local_image_id",
+              "registry_digest",
+              "immutable_reference",
+          }
+          extra = set(data.keys()) - allowed
+          if extra:
+              sys.stderr.write(f"unexpected receipt fields: {sorted(extra)}\n")
+              sys.exit(1)
+          missing = allowed - set(data.keys())
+          if missing:
+              sys.stderr.write(f"missing receipt fields: {sorted(missing)}\n")
+              sys.exit(1)
+          inp = os.environ["INPUT_SHA"]
+          img = "ghcr.io/dhmnzr79/artgents-bot"
+          if data["repository"] != img:
+              sys.stderr.write("repository mismatch\n")
+              sys.exit(1)
+          if data["source_sha"] != inp or data["tag"] != inp:
+              sys.stderr.write("source_sha/tag mismatch\n")
+              sys.exit(1)
+          digest = data["registry_digest"]
+          if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+              sys.stderr.write("invalid registry_digest\n")
+              sys.exit(1)
+          imm = data["immutable_reference"]
+          if imm != f"{img}@{digest}":
+              sys.stderr.write("immutable_reference mismatch\n")
+              sys.exit(1)
+          for val in data.values():
+              if not isinstance(val, str):
+                  sys.stderr.write("receipt values must be strings\n")
+                  sys.exit(1)
+              if any(c in val for c in "\n\r\t`$;|&<>"):
+                  sys.stderr.write("unsafe characters in receipt value\n")
+                  sys.exit(1)
+          print(f"registry_digest={digest}")
+          print(f"immutable_reference={imm}")
+          PY
+          REGISTRY_DIGEST=$(python -c "import json; print(json.load(open('receipt-work/publish-receipt.json'))['registry_digest'])")
+          IMMUTABLE=$(python -c "import json; print(json.load(open('receipt-work/publish-receipt.json'))['immutable_reference'])")
+          {
+            echo "registry_digest=${REGISTRY_DIGEST}"
+            echo "immutable_reference=${IMMUTABLE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify GHCR SHA tag digest matches receipt
+        env:
+          INPUT_SHA: ${{ github.event.inputs.source_sha }}
+          RECEIPT_DIGEST: ${{ steps.receipt.outputs.registry_digest }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          set +x
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          TAG_REF="${IMAGE}:${INPUT_SHA}"
+          MANIFEST_DIGEST=$(docker buildx imagetools inspect "$TAG_REF" --format '{{.Manifest.Digest}}')
+          if [ "$MANIFEST_DIGEST" != "$RECEIPT_DIGEST" ]; then
+            echo "GHCR tag digest ${MANIFEST_DIGEST} != receipt ${RECEIPT_DIGEST}"
+            exit 1
+          fi
+
+      - name: Export validated deploy coordinates
+        id: export
+        env:
+          INPUT_SHA: ${{ github.event.inputs.source_sha }}
+          REGISTRY_DIGEST: ${{ steps.receipt.outputs.registry_digest }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$INPUT_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            exit 1
+          fi
+          if ! printf '%s' "$REGISTRY_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+            exit 1
+          fi
+          IMMUTABLE="${IMAGE}@${REGISTRY_DIGEST}"
+          {
+            echo "source_sha=${INPUT_SHA}"
+            echo "registry_digest=${REGISTRY_DIGEST}"
+            echo "immutable_reference=${IMMUTABLE}"
+          } >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy immutable image
+    needs: resolve-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions: {}
+    env:
+      IMAGE: ghcr.io/dhmnzr79/artgents-bot
+    steps:
+      - name: Re-validate deploy coordinates
+        id: coords
+        env:
+          SOURCE_SHA: ${{ needs.resolve-image.outputs.source_sha }}
+          REGISTRY_DIGEST: ${{ needs.resolve-image.outputs.registry_digest }}
+          IMMUTABLE_REFERENCE: ${{ needs.resolve-image.outputs.immutable_reference }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "invalid source_sha output"
+            exit 1
+          fi
+          if ! printf '%s' "$REGISTRY_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+            echo "invalid registry_digest output"
+            exit 1
+          fi
+          REBUILT="${IMAGE}@${REGISTRY_DIGEST}"
+          if [ "$IMMUTABLE_REFERENCE" != "$REBUILT" ]; then
+            echo "immutable_reference does not match fixed repository + digest"
+            exit 1
+          fi
+          {
+            echo "source_sha=${SOURCE_SHA}"
+            echo "registry_digest=${REGISTRY_DIGEST}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate SSH target contract
+        env:
+          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
+          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+          SSH_USER: ${{ vars.PRODUCTION_SSH_USER }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_PORT:-}" ] || [ -z "${SSH_USER:-}" ]; then
+            echo "PRODUCTION_SSH_HOST, PRODUCTION_SSH_PORT and PRODUCTION_SSH_USER must be configured"
+            exit 1
+          fi
+          if printf '%s' "$SSH_HOST" | grep -Eq '[[:space:]`$;|&<>@]'; then
+            echo "invalid SSH host"
+            exit 1
+          fi
+          if ! printf '%s' "$SSH_USER" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$'; then
+            echo "invalid SSH user"
+            exit 1
+          fi
+          if [ "$SSH_USER" = "root" ]; then
+            echo "SSH user must not be root"
+            exit 1
+          fi
+          if ! printf '%s' "$SSH_PORT" | grep -Eq '^[0-9]+$'; then
+            echo "invalid SSH port"
+            exit 1
+          fi
+          if [ "$SSH_PORT" -lt 1 ] || [ "$SSH_PORT" -gt 65535 ]; then
+            echo "SSH port out of range"
+            exit 1
+          fi
+
+      - name: Deploy via forced SSH command
+        env:
+          SOURCE_SHA: ${{ steps.coords.outputs.source_sha }}
+          REGISTRY_DIGEST: ${{ steps.coords.outputs.registry_digest }}
+          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
+          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+          SSH_USER: ${{ vars.PRODUCTION_SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+            echo "PRODUCTION_SSH_PRIVATE_KEY and PRODUCTION_SSH_KNOWN_HOSTS must be configured"
+            exit 1
+          fi
+          umask 077
+          KEY_FILE=$(mktemp)
+          KNOWN_HOSTS_FILE=$(mktemp)
+          cleanup() {
+            rm -f "$KEY_FILE" "$KNOWN_HOSTS_FILE"
+          }
+          trap cleanup EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KEY_FILE" "$KNOWN_HOSTS_FILE"
+          REMOTE_CMD="deploy-production ${SOURCE_SHA} ${REGISTRY_DIGEST}"
+          if ! printf '%s' "$REMOTE_CMD" | grep -Eq '^deploy-production [0-9a-f]{40} sha256:[0-9a-f]{64}$'; then
+            echo "internal remote command validation failed"
+            exit 1
+          fi
+          ssh -i "$KEY_FILE" \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ForwardAgent=no \
+            -o ForwardX11=no \
+            -o PermitLocalCommand=no \
+            -o ClearAllForwardings=yes \
+            -o ConnectTimeout=30 \
+            "${SSH_USER}@${SSH_HOST}" \
+            "$REMOTE_CMD"

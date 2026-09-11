@@ -42,3 +42,4 @@ DEPRECATED.md
 requirements.txt
 requirements-ci.in
 requirements-ci.lock
+deploy/production/server/

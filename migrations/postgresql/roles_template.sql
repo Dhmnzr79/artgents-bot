@@ -1,31 +1,42 @@
 -- Environment-specific role provisioning template (review before production use).
--- No passwords in repository. Run as superuser or existing table owner.
+-- No passwords in repository. Execute on VPS using bootstrap superuser + secret input only.
+-- Application env: BOT_PG_DSN (bot_runtime), BOT_MIGRATOR_PG_DSN (migrator job). Bootstrap DSN is not app env.
 
--- Migrator / owner role (DDL + migrations only):
--- CREATE ROLE bot_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+-- === Pre-migration (bot_migration schema may not exist yet) ===
+-- CREATE DATABASE ...;
+-- CREATE ROLE bot_migrator LOGIN PASSWORD :migrator_secret
+--   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+-- CREATE ROLE bot_runtime LOGIN PASSWORD :runtime_secret
+--   NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION;
+-- REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+-- GRANT USAGE, CREATE ON SCHEMA public TO bot_migrator;
+-- GRANT USAGE ON SCHEMA public TO bot_runtime;
+-- REVOKE CREATE ON SCHEMA public FROM bot_runtime;
+-- GRANT CONNECT ON DATABASE :dbname TO bot_migrator, bot_runtime;
+
+-- === Migrator DDL (deploy/postgres/migrate.py creates bot_migration ledger) ===
 -- ALTER TABLE public.bot_events OWNER TO bot_migrator;
 -- ALTER TABLE public.leads OWNER TO bot_migrator;
 -- ALTER TABLE public.v5_turn_traces OWNER TO bot_migrator;
--- (Optional) ALTER SEQUENCE public.bot_events_id_seq OWNER TO bot_migrator;
--- (Optional) ALTER SEQUENCE public.leads_id_seq OWNER TO bot_migrator;
+-- ALTER SCHEMA bot_migration OWNER TO bot_migrator;
+-- ALTER TABLE bot_migration.schema_migrations OWNER TO bot_migrator;
 
--- Runtime role (DML only; not owner; no DDL):
--- CREATE ROLE bot_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-
--- GRANT CONNECT ON DATABASE :dbname TO bot_runtime;
--- GRANT USAGE ON SCHEMA public TO bot_runtime;
--- REVOKE CREATE ON SCHEMA public FROM bot_runtime;
-
+-- === Post-migration (after first successful migrator run) ===
+-- REVOKE ALL ON SCHEMA bot_migration FROM PUBLIC, bot_runtime;
+-- REVOKE ALL ON TABLE bot_migration.schema_migrations FROM PUBLIC, bot_runtime;
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON public.bot_events TO bot_runtime;
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON public.leads TO bot_runtime;
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON public.v5_turn_traces TO bot_runtime;
-
--- Sequences used by BIGSERIAL inserts only:
 -- GRANT USAGE, SELECT ON SEQUENCE public.bot_events_id_seq TO bot_runtime;
 -- GRANT USAGE, SELECT ON SEQUENCE public.leads_id_seq TO bot_runtime;
+-- REVOKE UPDATE ON SEQUENCE public.bot_events_id_seq FROM bot_runtime;
+-- REVOKE UPDATE ON SEQUENCE public.leads_id_seq FROM bot_runtime;
 
--- Verification (read-only):
--- SELECT rolname, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
+-- Verification (read-only ACL / catalog):
+-- SELECT rolname, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole, rolreplication
 -- FROM pg_roles WHERE rolname IN ('bot_migrator', 'bot_runtime');
--- SELECT tablename, tableowner FROM pg_tables
--- WHERE schemaname='public' AND tablename IN ('bot_events','leads','v5_turn_traces');
+-- SELECT has_schema_privilege('bot_runtime', 'public', 'USAGE');
+-- SELECT has_schema_privilege('bot_runtime', 'public', 'CREATE');
+-- SELECT has_schema_privilege('bot_runtime', 'bot_migration', 'USAGE');
+-- SELECT has_table_privilege('bot_runtime', 'bot_migration.schema_migrations', 'INSERT');
+-- SELECT has_sequence_privilege('bot_runtime', 'public.bot_events_id_seq', 'UPDATE');

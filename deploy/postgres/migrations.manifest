@@ -1,0 +1,5 @@
+# Explicit mutation order for greenfield / migrator runs.
+# 001_tenant_preflight.sql is verification-only (psql); not listed here.
+002_tenant_schema_prepare.sql
+003_tenant_rls_enable.sql
+004_tenant_trace_pk_finalize.sql

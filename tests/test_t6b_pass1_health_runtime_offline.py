@@ -152,6 +152,38 @@ def test_readiness_prod_postgres_unavailable(monkeypatch: pytest.MonkeyPatch) ->
     assert "postgres_unavailable" in payload["checks"]["reasons"]
 
 
+def test_health_ready_prod_returns_503_on_runtime_role_failure(
+    monkeypatch: pytest.MonkeyPatch, app_client
+) -> None:
+    import config as config_module
+
+    monkeypatch.setattr(config_module, "APP_ENV", "prod")
+    monkeypatch.setattr(config_module, "ALLOWED_CLIENTS", frozenset({"demo"}))
+    monkeypatch.setattr(config_module, "DEFAULT_CLIENT_ID", "demo")
+    monkeypatch.setattr(config_module, "CHAT_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        config_module,
+        "CHAT_BASE_URL",
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    )
+    monkeypatch.setenv("BOT_PG_DSN", "postgresql://bot_runtime@127.0.0.1:5432/bot_events")
+    conn = MagicMock()
+    with patch("pg_sink.init_pg_sink"):
+        with patch("psycopg.connect", return_value=conn):
+            with patch(
+                "core.pg_schema_readiness.check_pg_schema_ready",
+                return_value=(False, "runtime_role_superuser"),
+            ):
+                resp = app_client.get("/health/ready")
+    assert resp.status_code == 503
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert any(
+        r.startswith("postgres_schema_not_ready:runtime_role_superuser")
+        for r in body["checks"]["reasons"]
+    )
+
+
 def test_readiness_prod_schema_not_ready_closes_connection(monkeypatch: pytest.MonkeyPatch) -> None:
     import config as config_module
 
@@ -194,7 +226,7 @@ def test_readiness_prod_schema_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BOT_PG_DSN", "postgresql://bot:bot@127.0.0.1:5432/bot_events")
     conn = MagicMock()
     with patch("psycopg.connect", return_value=conn):
-        with patch("core.pg_schema_readiness.check_pg_schema_ready", return_value=(True, "")):
+        with patch("core.pg_schema_readiness.check_pg_schema_ready", return_value=(True, "ok")):
             from core.prod_readiness import evaluate_readiness
 
             ok, _payload = evaluate_readiness(app_env="prod")

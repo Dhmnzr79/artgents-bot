@@ -5,15 +5,26 @@ import logging
 import os
 import sys
 
-from config import SALES_ONE_PLUS_MODEL
+from config import ALLOWED_CLIENTS, APP_ENV, SALES_ONE_PLUS_MODEL
 from core.client_runtime import client_md_dir, list_buildable_client_ids
+from core.prod_readiness import evaluate_allowed_client_registry
 from core.one_call_prompt_contract import ONE_CALL_PROMPT_CONTRACT_VERSION
 from core.target_client_data import load_target_client_data
 from logging_setup import log_json
 
 
 def run_startup_check(logger: logging.Logger) -> None:
-    client_ids = list_buildable_client_ids()
+    if APP_ENV == "prod":
+        registry_errors = evaluate_allowed_client_registry()
+        if registry_errors:
+            logger.error(
+                "startup_check_failed: allowed client registry invalid: %s",
+                ",".join(registry_errors),
+            )
+            sys.exit(1)
+        client_ids = sorted(ALLOWED_CLIENTS)
+    else:
+        client_ids = list_buildable_client_ids()
     if not client_ids:
         logger.error("startup_check_failed: no client packs with md/")
         sys.exit(1)

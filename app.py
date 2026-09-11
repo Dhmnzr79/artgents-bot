@@ -397,6 +397,27 @@ def _startup_check() -> None:
 
 _startup_check()
 
+_HEALTH_PROBE_PATHS = frozenset({"/health/live", "/health/ready"})
+
+
+def _is_health_probe_path() -> bool:
+    return (request.path or "") in _HEALTH_PROBE_PATHS
+
+
+@app.get("/health/live")
+def health_live():
+    """Process liveness (no DB, no tenant routing, no secrets)."""
+    return jsonify({"ok": True, "status": "live"}), 200
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Deployment readiness (prod fail-closed; local skips mandatory PG)."""
+    from core.prod_readiness import evaluate_readiness
+
+    ok, payload = evaluate_readiness()
+    return jsonify(payload), (200 if ok else 503)
+
 
 @app.before_request
 def _before():
@@ -408,6 +429,8 @@ def _before():
 
 @app.before_request
 def _widget_cors_preflight():
+    if _is_health_probe_path():
+        return None
     return widget_cors_preflight_response()
 
 
@@ -418,7 +441,7 @@ def _clear_session_client_binding_teardown(exc):
 
 @app.after_request
 def _after(resp):
-    if request.path.startswith("/dashboard"):
+    if request.path.startswith("/dashboard") or _is_health_probe_path():
         return resp
     latency = int((time.time() - request.ctx["t0"]) * 1000)
     log_json(

@@ -6,12 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- LLM provider ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-CHAT_API_KEY = (
-    (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip()
-    or OPENAI_API_KEY
-)
+APP_ENV = (os.getenv("APP_ENV") or "local").strip().lower()
+
+# --- LLM provider (Qwen/DashScope chat runtime; no OpenAI import-time requirement) ---
+CHAT_API_KEY = (os.getenv("CHAT_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or "").strip() or None
 CHAT_BASE_URL = (
     (os.getenv("CHAT_BASE_URL") or os.getenv("DASHSCOPE_BASE_URL") or "").strip()
     or None
@@ -300,15 +298,10 @@ def estimate_llm_usage_usd(
     )
 
 
-if not OPENAI_API_KEY:
-    # CI lint/unit import config without calling OpenAI; eval job checks the secret explicitly.
-    if os.getenv("GITHUB_ACTIONS") == "true":
-        OPENAI_API_KEY = "github-actions-placeholder"
-        CHAT_API_KEY = CHAT_API_KEY or OPENAI_API_KEY
-    else:
-        raise RuntimeError("OPENAI_API_KEY is not set in .env (required for chat LLM)")
-elif not CHAT_API_KEY:
-    CHAT_API_KEY = OPENAI_API_KEY
+if os.getenv("GITHUB_ACTIONS") == "true":
+    # CI import smoke only; production validation is readiness.
+    if not CHAT_API_KEY:
+        CHAT_API_KEY = "github-actions-placeholder"
 
 
 def resolve_client_id(raw: str | None) -> str | None:

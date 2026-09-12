@@ -95,11 +95,11 @@ def assert_trusted_directory(
         raise ValueError(f"{label} must be a directory")
     if enforce_root_metadata:
         st = path.stat()
-        if st.st_uid != 0 or st.st_gid != 0:
-            raise ValueError(f"{label} must be root-owned")
         mode = st.st_mode & 0o777
         if mode != 0o700:
             raise ValueError(f"{label} must be mode 0700")
+        if st.st_uid != 0 or st.st_gid != 0:
+            raise ValueError(f"{label} must be root-owned")
     return path.resolve(strict=True)
 
 
@@ -227,13 +227,13 @@ def assert_regular_file_metadata(
     if not enforce_root_metadata:
         return
     st = path.stat()
-    if st.st_uid != 0 or st.st_gid != 0:
-        raise ValueError(f"{label} must be root-owned")
     mode = st.st_mode & 0o777
-    if mode & 0o077:
-        raise ValueError(f"{label} must not be group/world accessible")
     if mode != 0o600:
         raise ValueError(f"{label} must be mode 0600")
+    if mode & 0o077:
+        raise ValueError(f"{label} must not be group/world accessible")
+    if st.st_uid != 0 or st.st_gid != 0:
+        raise ValueError(f"{label} must be root-owned")
 
 
 def sha256_file(path: Path) -> str:

@@ -488,7 +488,7 @@ def test_invalid_backup_id_rejected() -> None:
 def test_directory_mode_0755_rejected(tmp_path: Path) -> None:
     loose = tmp_path / "loose"
     loose.mkdir(mode=0o755)
-    with pytest.raises(ValueError, match="0700"):
+    with pytest.raises(ValueError, match="must be mode 0700"):
         g7.assert_trusted_directory(loose, label="dir", enforce_root_metadata=True)
 
 

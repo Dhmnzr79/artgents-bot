@@ -342,6 +342,38 @@ def test_ci_lock_includes_pytest_and_matches_production_runtime() -> None:
         assert ci_pins[name] == version, f"version drift for {name}"
 
 
+def _version_tuple(version: str) -> tuple[int, int, int]:
+    match = re.match(r"^(\d+)\.(\d+)\.(\d+)", version)
+    assert match, f"unparseable version: {version}"
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+
+def test_numpy_pins_compatible_with_python_311_runtime() -> None:
+    """NumPy 2.5+ needs newer Python; CI/Docker stay on 3.11 (G9)."""
+    prod_input = _PROD_INPUT.read_text(encoding="utf-8")
+    assert re.search(r"^numpy==2\.2\.6\s*$", prod_input, re.MULTILINE)
+
+    prod_pins = _parse_lock_pins(_PROD_LOCK)
+    ci_pins = _parse_lock_pins(_CI_LOCK)
+    numpy_prod = prod_pins["numpy"]
+    numpy_ci = ci_pins["numpy"]
+    assert numpy_prod == numpy_ci == "2.2.6"
+    assert _version_tuple(numpy_prod) < (2, 5, 0)
+
+    for lock_path in (_PROD_LOCK, _CI_LOCK):
+        lock_text = lock_path.read_text(encoding="utf-8")
+        assert ".g9-numpy-constraint" not in lock_text
+        assert "Cursor Projects" not in lock_text
+
+    ci = _ci_text()
+    assert ci.count('python-version: "3.11"') >= 2
+    assert 'python-version: "3.12"' not in ci
+
+    docker = _DOCKERFILE.read_text(encoding="utf-8")
+    assert re.search(r"^FROM python:3\.11-slim@", docker, re.MULTILINE)
+    assert "python:3.12" not in docker
+
+
 def test_ci_input_references_production_requirements() -> None:
     ci_input = _CI_INPUT.read_text(encoding="utf-8")
     assert "-r requirements.txt" in ci_input

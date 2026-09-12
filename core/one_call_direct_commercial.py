@@ -115,4 +115,5 @@ def append_direct_commercial_without_duplicates(
     if not missing:
         return patient_text
     separator = "\n\n" if body else ""
-    return f"{body}{separator}{'\n\n'.join(missing)}"
+    missing_text = "\n\n".join(missing)
+    return f"{body}{separator}{missing_text}"

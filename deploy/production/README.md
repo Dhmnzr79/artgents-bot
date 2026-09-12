@@ -13,9 +13,14 @@
   - **G7** — утилита `/opt/artgents/bin/backup-postgres` (deploy fail-closed без неё);
   - **G8** — квалификация PostgreSQL;
   - **G10** — VPS, DNS, TLS, установка server assets.
-- Rollback (**G5**), настоящий backup (**G7**), disposable PG qualification (**G8**) и VPS setup (**G10**) **не** входят в G4.
+- Rollback (**G5**), настоящий backup (**G7**), disposable PG qualification (**G8**) и VPS setup (**G10**) **не** входят в G4 как runtime на вашей машине; **G5 rollback workflow/script** добавлены в репозиторий как контракт (без запуска до gates).
 
-Подробности установки receiver/sudo/deploy script: `deploy/production/server/README.md`.
+## G5 — manual production rollback (repository only)
+
+- Workflow **`Rollback production`** — только `workflow_dispatch` с `expected_current_sha` + `confirm_rollback: true`; **без** выбора target SHA/digest пользователем.
+- Сервер читает **`previous.json`**, сверяет **`expected_current_sha`** с **`current.json`**, проверяет **migration bundle fingerprint** (manifest + содержимое SQL); при несовпадении — блок до остановки сервисов, текущая версия остаётся online.
+- Rollback **не** восстанавливает БД и **не** выполняет миграции/downgrade. Нужны **G7** (`backup-postgres --reason pre-rollback`), **G8**, **G10**. Workflow **не запускать** до готовности VPS.
+- Подробности: `deploy/production/server/README.md`.
 
 ---
 

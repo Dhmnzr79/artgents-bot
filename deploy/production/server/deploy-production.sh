@@ -8,6 +8,7 @@ readonly CURRENT_ROOT=/opt/artgents/current
 readonly COMPOSE_FILE="${CURRENT_ROOT}/deploy/production/compose.yml"
 readonly ENV_FILE=/etc/artgents/production.env
 readonly BACKUP_BIN=/opt/artgents/bin/backup-postgres
+readonly FINGERPRINT_HELPER=/opt/artgents/bin/migration-bundle-fingerprint.py
 readonly BACKUP_RECEIPT_ROOT=/var/lib/artgents/backups/receipts
 readonly DEPLOY_STATE_DIR=/var/lib/artgents/deploy
 readonly LOCK_FILE=/var/lock/artgents-production-deploy.lock
@@ -18,6 +19,8 @@ SOURCE_SHA="${1:-}"
 IMAGE_DIGEST="${2:-}"
 
 RECEIPT_TMP=""
+
+MIGRATION_BUNDLE_SHA256=""
 
 log_safe() {
   printf '%s\n' "$*" >&2
@@ -351,15 +354,21 @@ try:
     data = json.loads(path.read_text(encoding="utf-8"))
 except (OSError, json.JSONDecodeError, UnicodeError):
     sys.exit(1)
-if data.get("schema_version") != 1:
+if data.get("schema_version") != 2:
     sys.exit(1)
 if data.get("status") != "success":
+    sys.exit(1)
+operation = data.get("operation")
+if operation not in ("deploy", "rollback"):
     sys.exit(1)
 digest = data.get("image_digest")
 if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
     sys.exit(1)
 imm = data.get("immutable_reference")
 if not isinstance(imm, str) or imm != f"{repo}@{digest}":
+    sys.exit(1)
+fp = data.get("migration_bundle_sha256")
+if not isinstance(fp, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", fp):
     sys.exit(1)
 print(digest)
 PY
@@ -383,6 +392,36 @@ verify_pulled_image_digest() {
     fail "pulled image missing expected repo digest membership"
   fi
 }
+
+extract_migration_bundle_fingerprint_from_image() (
+  local image_ref="$1"
+  local tmpdir="" cid="" fingerprint=""
+  tmpdir=$(mktemp -d)
+  cleanup_extract() {
+    if [ -n "$cid" ]; then
+      docker rm -f "$cid" >/dev/null 2>&1
+    fi
+    rm -rf "$tmpdir"
+  }
+  trap cleanup_extract EXIT
+  require_file "$FINGERPRINT_HELPER" executable
+  if ! cid=$(docker create "$image_ref"); then
+    fail "docker create failed for migration bundle extraction"
+  fi
+  if ! docker cp "${cid}:/app/deploy/postgres/migrations.manifest" "${tmpdir}/migrations.manifest"; then
+    fail "failed to copy migrations manifest from image"
+  fi
+  if ! docker cp "${cid}:/app/migrations/postgresql" "${tmpdir}/postgresql"; then
+    fail "failed to copy migrations directory from image"
+  fi
+  if ! fingerprint=$(python3 "$FINGERPRINT_HELPER" --manifest "${tmpdir}/migrations.manifest" --migrations-dir "${tmpdir}/postgresql"); then
+    fail "failed to compute migration bundle fingerprint"
+  fi
+  if ! [[ "$fingerprint" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    fail "invalid migration bundle fingerprint format"
+  fi
+  printf '%s' "$fingerprint"
+)
 
 verify_caddy_running() {
   local cid status
@@ -414,6 +453,7 @@ write_deploy_receipt() {
   DEPLOY_STARTED_AT="$STARTED_AT" \
   DEPLOY_COMPLETED_AT="$COMPLETED_AT" \
   DEPLOY_PREVIOUS_DIGEST="$PREVIOUS_DIGEST" \
+  DEPLOY_MIGRATION_BUNDLE_SHA256="$MIGRATION_BUNDLE_SHA256" \
   python3 <<'PY' >"$RECEIPT_TMP"
 import json
 import os
@@ -439,6 +479,9 @@ if imm != f"{repo}@{digest}":
 backup = req("DEPLOY_BACKUP_RECEIPT")
 if not backup.startswith("/var/lib/artgents/backups/receipts/"):
     sys.exit(1)
+bundle = req("DEPLOY_MIGRATION_BUNDLE_SHA256")
+if not re.fullmatch(r"sha256:[0-9a-f]{64}", bundle):
+    sys.exit(1)
 prev = os.environ.get("DEPLOY_PREVIOUS_DIGEST", "")
 previous_digest = None
 if prev:
@@ -446,11 +489,13 @@ if prev:
         sys.exit(1)
     previous_digest = prev
 payload = {
-    "schema_version": 1,
+    "schema_version": 2,
+    "operation": "deploy",
     "status": "success",
     "source_sha": source_sha,
     "image_digest": digest,
     "immutable_reference": imm,
+    "migration_bundle_sha256": bundle,
     "backup_receipt": backup,
     "started_at": req("DEPLOY_STARTED_AT"),
     "completed_at": req("DEPLOY_COMPLETED_AT"),
@@ -475,6 +520,7 @@ require_file "$ENV_FILE" readable
 require_file "$COMPOSE_FILE" readable
 require_file "$CURRENT_ROOT" dir
 require_file "$BACKUP_BIN" executable
+require_file "$FINGERPRINT_HELPER" executable
 check_env_permissions
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -494,6 +540,7 @@ STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 docker pull "$IMMUTABLE_REF"
 verify_pulled_image_digest
+MIGRATION_BUNDLE_SHA256=$(extract_migration_bundle_fingerprint_from_image "$IMMUTABLE_REF")
 
 compose up -d postgres
 wait_service_healthy postgres 300

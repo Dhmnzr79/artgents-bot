@@ -8,4 +8,4 @@
 
 Defaults:DEPLOY_USER !requiretty
 
-DEPLOY_USER ALL=(root) NOPASSWD: /opt/artgents/bin/deploy-production
+DEPLOY_USER ALL=(root) NOPASSWD: /opt/artgents/bin/deploy-production, /opt/artgents/bin/rollback-production

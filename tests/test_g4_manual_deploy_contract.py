@@ -315,6 +315,9 @@ def test_receiver_forced_command_contract() -> None:
     assert "deploy-production" in text
     assert "DEPLOY_SCRIPT=/opt/artgents/bin/deploy-production" in text
     assert 'exec sudo -n "$DEPLOY_SCRIPT"' in text
+    assert "ROLLBACK_SCRIPT=/opt/artgents/bin/rollback-production" in text
+    assert 'exec sudo -n "$ROLLBACK_SCRIPT"' in text
+    assert "rollback-production" in text
     assert "id -u" in text
     assert "eval" not in text
     assert "bash -c" not in text
@@ -356,6 +359,15 @@ def test_root_deploy_script_staged_fail_closed() -> None:
     assert "/var/lib/artgents/backups/receipts" in text
     assert "|| echo \"null\"" not in text
     assert "'source_sha': '$SOURCE_SHA'" not in text
+    assert '"schema_version": 2' in text
+    assert "operation" in text and "deploy" in text
+    assert "migration_bundle_sha256" in text
+    assert "docker create" in text
+    assert "extract_migration_bundle_fingerprint_from_image" in text
+    assert "extract_migration_bundle_fingerprint_from_image() (" in text
+    assert "trap cleanup_extract EXIT" in text
+    assert "trap cleanup_extract RETURN" not in text
+    assert "MIGRATION_BUNDLE_SHA256" in text
     assert "DEPLOY_SOURCE_SHA" in text
     assert "read_previous_digest_or_empty" in text or "CURRENT_RECEIPT_PATH" in text
     assert "health/ready" in text
@@ -421,6 +433,7 @@ def test_current_receipt_metadata_contract() -> None:
 def test_sudoers_minimal_contract() -> None:
     text = _SUDOERS.read_text(encoding="utf-8")
     assert "NOPASSWD: /opt/artgents/bin/deploy-production" in text
+    assert "rollback-production" in text
     assert " ALL=(ALL) " not in text
     assert "/usr/bin/docker" not in text
     assert "/bin/sh" not in text

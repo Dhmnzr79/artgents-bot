@@ -3,6 +3,9 @@
 set -Eeuo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+readonly DEPLOY_SCRIPT=/opt/artgents/bin/deploy-production
+readonly ROLLBACK_SCRIPT=/opt/artgents/bin/rollback-production
+
 if [ "$(id -u)" -eq 0 ]; then
   echo "deploy-receiver must not run as root" >&2
   exit 1
@@ -29,13 +32,16 @@ if [[ "$ORIGINAL" =~ [[:space:]] ]]; then
   fi
 fi
 
-if [[ ! "$ORIGINAL" =~ ^deploy-production\ ([0-9a-f]{40})\ (sha256:[0-9a-f]{64})$ ]]; then
-  echo "invalid forced command grammar" >&2
-  exit 1
+if [[ "$ORIGINAL" =~ ^deploy-production\ ([0-9a-f]{40})\ (sha256:[0-9a-f]{64})$ ]]; then
+  SHA="${BASH_REMATCH[1]}"
+  DIGEST="${BASH_REMATCH[2]}"
+  exec sudo -n "$DEPLOY_SCRIPT" "$SHA" "$DIGEST"
 fi
 
-SHA="${BASH_REMATCH[1]}"
-DIGEST="${BASH_REMATCH[2]}"
+if [[ "$ORIGINAL" =~ ^rollback-production\ ([0-9a-f]{40})$ ]]; then
+  EXPECTED_SHA="${BASH_REMATCH[1]}"
+  exec sudo -n "$ROLLBACK_SCRIPT" "$EXPECTED_SHA"
+fi
 
-DEPLOY_SCRIPT=/opt/artgents/bin/deploy-production
-exec sudo -n "$DEPLOY_SCRIPT" "$SHA" "$DIGEST"
+echo "invalid forced command grammar" >&2
+exit 1

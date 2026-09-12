@@ -69,7 +69,21 @@ Deploy receipts are written under `/var/lib/artgents/deploy/`:
 - `current.json` — last **fully successful** deploy only
 - `previous.json` — prior successful receipt (atomic rotate)
 
-Failed deploys do **not** update `current.json`. G4 does **not** implement automatic rollback (G5).
+Failed deploys do **not** update `current.json`. Rollback is **G5** (separate workflow and script).
+
+## G5 — manual production rollback (repository only)
+
+- Workflow **`Rollback production`** (`.github/workflows/rollback-production.yml`) appears in GitHub UI only after merge to **`main`**. **Do not run** until G7 backup utility, G8 PostgreSQL qualification, and G10 VPS baseline are complete.
+- Operator supplies only **`expected_current_sha`** (from the last successful deploy receipt or deploy workflow run) and **`confirm_rollback: true`**. **No** workflow input for target SHA, digest, image, path, or DB restore.
+- Target image is chosen **only** from root-owned **`previous.json`** on the server (`current.json` → `previous.json` → immutable digest).
+- **Rollback is not DB restore** and **does not change PostgreSQL schema**. No `migrate`, no SQL downgrade, no automatic DB restore during rollback.
+- **Migration bundle fingerprint** (`migration_bundle_sha256` in schema **2** receipts) must match across current receipt, previous receipt, and a fresh extraction from the target image. Any mismatch → **`automatic rollback blocked: migration bundle differs`** **before** backup and **before** stopping Caddy/bot/admin — production keeps serving the current version.
+- Schema **1** receipts (if ever present on a VPS) block automatic rollback (fail-closed).
+- Requires at least **two** successful deployment receipts (`current.json` + `previous.json`).
+- Uses the same SSH hardening and **`production-deploy`** concurrency group as G4 deploy (deploy and rollback cannot overlap).
+- Remote grammar: `rollback-production <40-char-lowercase-sha>` via `deploy-receiver.sh` → `sudo -n /opt/artgents/bin/rollback-production`.
+- Install `rollback-production.sh` and `migration-bundle-fingerprint.py` to `/opt/artgents/bin/` (root-owned). Extend sudoers with rollback script only (see `artgents-deploy.sudoers.example`).
+- After a failed rollback **post-maintenance**, Caddy stays down, **`current.json` is unchanged**, and there is **no** automatic roll-forward — manual recovery is a separate procedure.
 
 ## Fail-closed staging (root script)
 

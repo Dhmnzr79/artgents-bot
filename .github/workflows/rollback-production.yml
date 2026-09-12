@@ -1,0 +1,132 @@
+# G5 — manual fail-closed production rollback (previous immutable image only).
+name: Rollback production
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_current_sha:
+        description: Full SHA currently expected in production
+        required: true
+        type: string
+      confirm_rollback:
+        description: Confirm production rollback
+        required: true
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Rollback to previous successful image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions: {}
+    steps:
+      - name: Guard workflow context
+        env:
+          EXPECTED_CURRENT_SHA: ${{ github.event.inputs.expected_current_sha }}
+          CONFIRM: ${{ github.event.inputs.confirm_rollback }}
+          WORKFLOW_REF: ${{ github.ref }}
+          WORKFLOW_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$WORKFLOW_REF" != "refs/heads/main" ]; then
+            echo "rollback-production may only run from refs/heads/main"
+            exit 1
+          fi
+          if [ "$WORKFLOW_REPOSITORY" != "Dhmnzr79/artgents-bot" ]; then
+            echo "unexpected repository for rollback-production workflow"
+            exit 1
+          fi
+          if [ "$CONFIRM" != "true" ]; then
+            echo "confirm_rollback must be true"
+            exit 1
+          fi
+          if ! printf '%s' "$EXPECTED_CURRENT_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "expected_current_sha must be exactly 40 lowercase hex characters"
+            exit 1
+          fi
+          if [ "$EXPECTED_CURRENT_SHA" != "${EXPECTED_CURRENT_SHA,,}" ]; then
+            echo "expected_current_sha must be lowercase"
+            exit 1
+          fi
+
+      - name: Validate SSH target contract
+        env:
+          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
+          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+          SSH_USER: ${{ vars.PRODUCTION_SSH_USER }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_PORT:-}" ] || [ -z "${SSH_USER:-}" ]; then
+            echo "PRODUCTION_SSH_HOST, PRODUCTION_SSH_PORT and PRODUCTION_SSH_USER must be configured"
+            exit 1
+          fi
+          if printf '%s' "$SSH_HOST" | grep -Eq '[[:space:]`$;|&<>@]'; then
+            echo "invalid SSH host"
+            exit 1
+          fi
+          if ! printf '%s' "$SSH_USER" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$'; then
+            echo "invalid SSH user"
+            exit 1
+          fi
+          if [ "$SSH_USER" = "root" ]; then
+            echo "SSH user must not be root"
+            exit 1
+          fi
+          if ! printf '%s' "$SSH_PORT" | grep -Eq '^[0-9]+$'; then
+            echo "invalid SSH port"
+            exit 1
+          fi
+          if [ "$SSH_PORT" -lt 1 ] || [ "$SSH_PORT" -gt 65535 ]; then
+            echo "SSH port out of range"
+            exit 1
+          fi
+
+      - name: Rollback via forced SSH command
+        env:
+          EXPECTED_CURRENT_SHA: ${{ github.event.inputs.expected_current_sha }}
+          SSH_HOST: ${{ vars.PRODUCTION_SSH_HOST }}
+          SSH_PORT: ${{ vars.PRODUCTION_SSH_PORT }}
+          SSH_USER: ${{ vars.PRODUCTION_SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "${SSH_PRIVATE_KEY:-}" ] || [ -z "${SSH_KNOWN_HOSTS:-}" ]; then
+            echo "PRODUCTION_SSH_PRIVATE_KEY and PRODUCTION_SSH_KNOWN_HOSTS must be configured"
+            exit 1
+          fi
+          umask 077
+          KEY_FILE=$(mktemp)
+          KNOWN_HOSTS_FILE=$(mktemp)
+          cleanup() {
+            rm -f "$KEY_FILE" "$KNOWN_HOSTS_FILE"
+          }
+          trap cleanup EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          chmod 600 "$KEY_FILE" "$KNOWN_HOSTS_FILE"
+          REMOTE_CMD="rollback-production ${EXPECTED_CURRENT_SHA}"
+          if ! printf '%s' "$REMOTE_CMD" | grep -Eq '^rollback-production [0-9a-f]{40}$'; then
+            echo "internal remote command validation failed"
+            exit 1
+          fi
+          ssh -i "$KEY_FILE" \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ForwardAgent=no \
+            -o ForwardX11=no \
+            -o PermitLocalCommand=no \
+            -o ClearAllForwardings=yes \
+            -o ConnectTimeout=30 \
+            "${SSH_USER}@${SSH_HOST}" \
+            "$REMOTE_CMD"

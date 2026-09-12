@@ -36,18 +36,18 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION pg_temp._strip_redundant_outer_parens(expr text) RETURNS text AS $$
 DECLARE
-  inner text := btrim(expr);
+  inner_expr text := btrim(expr);
   candidate text;
 BEGIN
-  WHILE length(inner) >= 2 AND left(inner, 1) = '(' AND right(inner, 1) = ')' LOOP
-    candidate := btrim(substring(inner from 2 for length(inner) - 2));
+  WHILE length(inner_expr) >= 2 AND left(inner_expr, 1) = '(' AND right(inner_expr, 1) = ')' LOOP
+    candidate := btrim(substring(inner_expr from 2 for length(inner_expr) - 2));
     IF (length(regexp_replace(candidate, '[^(]', '', 'g')) <>
         length(regexp_replace(candidate, '[^)]', '', 'g'))) THEN
       EXIT;
     END IF;
-    inner := candidate;
+    inner_expr := candidate;
   END LOOP;
-  RETURN inner;
+  RETURN inner_expr;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 

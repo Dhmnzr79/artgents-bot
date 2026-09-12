@@ -49,6 +49,15 @@ def test_002_turn_id_nonblank_greenfield_and_brownfield() -> None:
     assert "btrim(turn_id) = ''" in sql
 
 
+def test_002_strip_outer_parens_avoids_reserved_keyword_inner() -> None:
+    sql = _read("002_tenant_schema_prepare.sql")
+    fn = sql.split("CREATE OR REPLACE FUNCTION pg_temp._strip_redundant_outer_parens", 1)[1]
+    fn = fn.split("$$ LANGUAGE plpgsql IMMUTABLE;", 1)[0]
+    assert "inner text" not in fn
+    assert "inner_expr text := btrim(expr)" in fn
+    assert "RETURN inner_expr" in fn
+
+
 def test_migrations_use_public_schema_qualified_tables() -> None:
     sql2 = _read("002_tenant_schema_prepare.sql")
     sql3 = _read("003_tenant_rls_enable.sql")

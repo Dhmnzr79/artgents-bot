@@ -31,6 +31,7 @@ _DSN_SECRET_RE = re.compile(
     r"(postgresql(?:\+psycopg)?://)([^:@/]+)(?::([^@/]*))?@",
     flags=re.IGNORECASE,
 )
+_SQLSTATE_RE = re.compile(r"^[0-9A-Z]{5}$")
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,19 @@ class MigrationRunResult:
     dry_run: bool
     steps: list[MigrationStepResult]
     error_code: str | None = None
+    failed_filename: str | None = None
+    sqlstate: str | None = None
+
+
+def safe_sqlstate_from_exception(exc: BaseException) -> str | None:
+    """Return SQLSTATE only when it is exactly five [0-9A-Z] characters."""
+    raw = getattr(exc, "sqlstate", None)
+    if raw is None:
+        return None
+    text = str(raw).upper()
+    if _SQLSTATE_RE.fullmatch(text):
+        return text
+    return None
 
 
 def redact_dsn(dsn: str) -> str:
@@ -190,12 +204,13 @@ def run_migrations(
 
             connect = psycopg.connect
         conn = connect(dsn, autocommit=True, connect_timeout=10)
-    except Exception:
+    except Exception as exc:
         return MigrationRunResult(
             ok=False,
             dry_run=False,
             steps=steps,
             error_code="migration_connect_failed",
+            sqlstate=safe_sqlstate_from_exception(exc),
         )
 
     try:
@@ -236,21 +251,27 @@ def run_migrations(
                 )
             try:
                 _execute_migration_sql(conn, sql_text)
-            except Exception:
+            except Exception as exc:
                 return MigrationRunResult(
                     ok=False,
                     dry_run=False,
                     steps=steps,
                     error_code="migration_sql_failed",
+                    failed_filename=entry.filename,
+                    sqlstate=safe_sqlstate_from_exception(exc),
                 )
             try:
                 _record_applied(conn, entry)
             except MigrationManifestError as exc:
+                failed_filename = (
+                    entry.filename if exc.code == "ledger_write_failed" else None
+                )
                 return MigrationRunResult(
                     ok=False,
                     dry_run=False,
                     steps=steps,
                     error_code=exc.code,
+                    failed_filename=failed_filename,
                 )
             steps.append(
                 MigrationStepResult(

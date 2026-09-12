@@ -122,10 +122,18 @@ def test_g8_disposable_create_role_uses_psycopg_sql_composition() -> None:
 def test_g8_runner_failure_diagnostics_safe() -> None:
     runner = _RUNNER.read_text(encoding="utf-8")
     assert "g8_qualification=failed stage=" in runner
+    assert "detail=G8MigrationFailure code=" in runner
+    assert "migration=" in runner
     assert "sqlstate=" in runner
+    assert "code=none migration=none" in runner
     assert "str(exc)" not in runner
+    assert "repr(exc)" not in runner
+    assert "G8MigrationFailure" in runner
     assert "wait_postgres" in runner
     assert "grants_restore" in runner
+    migrate = (_REPO_ROOT / "deploy" / "postgres" / "migrate.py").read_text(encoding="utf-8")
+    assert "safe_sqlstate_from_exception" in migrate
+    assert "failed_filename" in migrate
 
 
 def test_g8_disposable_database_create_grants() -> None:

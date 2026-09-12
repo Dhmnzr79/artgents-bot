@@ -42,6 +42,7 @@ from deploy.postgres.g8_docker_pg import (
     validated_postgres_container_id,
 )
 from deploy.postgres.g8_junit import assert_junit_exact_passed
+from deploy.postgres.migrate import MigrationRunResult, safe_sqlstate_from_exception
 from deploy.postgres.migration_manifest import load_manifest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -70,15 +71,48 @@ _G8_STAGES = (
 )
 
 
-def _failure_sqlstate(exc: BaseException) -> str:
-    sqlstate = getattr(exc, "sqlstate", None)
-    return str(sqlstate) if sqlstate else "none"
+class G8MigrationFailure(Exception):
+    """Safe migration failure metadata for G8 CI diagnostics (no secrets)."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        migration: str | None,
+        sqlstate: str | None,
+    ) -> None:
+        self.code = code
+        self.migration = migration
+        self.sqlstate = sqlstate
+        super().__init__("g8_migration_failure")
+
+
+def _migration_failure_from_result(result: MigrationRunResult) -> G8MigrationFailure:
+    return G8MigrationFailure(
+        code=result.error_code or "migration_unknown",
+        migration=result.failed_filename,
+        sqlstate=result.sqlstate,
+    )
+
+
+def _format_sqlstate_label(exc: BaseException) -> str:
+    state = safe_sqlstate_from_exception(exc)
+    return state if state else "none"
 
 
 def _print_g8_failure(stage: str, exc: BaseException) -> None:
+    if isinstance(exc, G8MigrationFailure):
+        migration = exc.migration or "none"
+        sqlstate = exc.sqlstate or "none"
+        print(
+            f"g8_qualification=failed stage={stage} "
+            f"detail=G8MigrationFailure code={exc.code} migration={migration} sqlstate={sqlstate}"
+        )
+        return
     print(
         f"g8_qualification=failed stage={stage} "
-        f"detail={exc.__class__.__name__} sqlstate={_failure_sqlstate(exc)}"
+        f"detail={exc.__class__.__name__} code=none migration=none "
+        f"sqlstate={_format_sqlstate_label(exc)}"
     )
 
 
@@ -140,10 +174,10 @@ def _run_migrations_twice() -> None:
     os.environ["BOT_MIGRATOR_PG_DSN"] = migrator_dsn()
     first = migrate_mod.run_migrations(dsn=os.environ["BOT_MIGRATOR_PG_DSN"], dry_run=False)
     if not first.ok:
-        raise RuntimeError(f"migration_first_run_failed:{first.error_code}")
+        raise _migration_failure_from_result(first)
     second = migrate_mod.run_migrations(dsn=os.environ["BOT_MIGRATOR_PG_DSN"], dry_run=False)
     if not second.ok:
-        raise RuntimeError(f"migration_second_run_failed:{second.error_code}")
+        raise _migration_failure_from_result(second)
     if any(step.status != "skipped" for step in second.steps):
         raise RuntimeError("migration_idempotency_failed:not_all_skipped")
 

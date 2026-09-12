@@ -233,6 +233,31 @@ def test_runner_role_catalog_primary_and_restored() -> None:
     assert "assert_runtime_role_catalog" in runner
     assert "assert_migrator_role_catalog" in runner
     assert runner.count("_qualify_roles") >= 2
+    for stage in (
+        "grants_primary",
+        "verify_ledger_primary",
+        "qualify_roles_primary",
+        "grants_restore",
+        "verify_ledger_restore",
+        "qualify_roles_restore",
+    ):
+        assert f'stage = "{stage}"' in runner
+
+
+def test_runtime_ledger_privilege_check_uses_oid_not_text_name() -> None:
+    disposable = _DISPOSABLE.read_text(encoding="utf-8")
+    runtime = disposable.split("def assert_runtime_role_catalog", 1)[1].split(
+        "def assert_migrator_role_catalog", 1
+    )[0]
+    assert "bot_migration.schema_migrations" not in runtime
+    assert "_fetch_ledger_schema_migrations_oid(cur)" in runtime
+    assert "_has_table_privilege_on_oid" in runtime
+    helper = disposable.split("def _fetch_ledger_schema_migrations_oid", 1)[1].split(
+        "def _has_table_privilege_on_oid", 1
+    )[0]
+    assert "pg_class" in helper
+    assert "pg_namespace" in helper
+    assert "c.oid" in helper
 
 
 def test_runner_junit_zero_skipped_enforcement() -> None:

@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from deploy.postgres import migrate as migrate_mod
+from deploy.postgres.g8_disposable import _fetch_ledger_schema_migrations_oid
 from deploy.postgres.g8_qualification_runner import (
     G8MigrationFailure,
     _migration_failure_from_result,
@@ -130,6 +131,24 @@ def test_g8_migration_failure_from_result_preserves_codes() -> None:
     assert exc.code == "migration_sql_failed"
     assert exc.migration == "003_tenant_rls_enable.sql"
     assert exc.sqlstate == "42501"
+
+
+def test_fetch_ledger_schema_migrations_oid_requires_exactly_one_row() -> None:
+    class _Cur:
+        def __init__(self, rows: list[tuple[int]]) -> None:
+            self._rows = rows
+
+        def execute(self, sql, params=None):
+            self._sql = sql
+
+        def fetchall(self):
+            return self._rows
+
+    with pytest.raises(RuntimeError, match="ledger_relation_oid_invalid"):
+        _fetch_ledger_schema_migrations_oid(_Cur([]))
+    with pytest.raises(RuntimeError, match="ledger_relation_oid_invalid"):
+        _fetch_ledger_schema_migrations_oid(_Cur([(1,), (2,)]))
+    assert _fetch_ledger_schema_migrations_oid(_Cur([(4242,)])) == 4242
 
 
 def test_g8_failure_stdout_never_leaks_dsn_or_password() -> None:

@@ -193,6 +193,31 @@ def drop_restore_database_if_exists(conn: Any) -> None:
         conn.autocommit = old_autocommit
 
 
+def _fetch_ledger_schema_migrations_oid(cur: Any) -> int:
+    cur.execute(
+        """
+        SELECT c.oid
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'bot_migration'
+          AND c.relname = 'schema_migrations'
+          AND c.relkind = 'r'
+        """
+    )
+    rows = cur.fetchall()
+    if len(rows) != 1:
+        raise RuntimeError("ledger_relation_oid_invalid")
+    return int(rows[0][0])
+
+
+def _has_table_privilege_on_oid(cur: Any, oid: int, privilege: str) -> bool:
+    cur.execute(
+        "SELECT has_table_privilege(current_user, %s::oid, %s)",
+        (oid, privilege),
+    )
+    return bool(cur.fetchone()[0])
+
+
 def assert_runtime_role_catalog(conn: Any) -> None:
     with conn.cursor() as cur:
         cur.execute(
@@ -224,10 +249,8 @@ def assert_runtime_role_catalog(conn: Any) -> None:
         )
         if cur.fetchone()[0]:
             raise RuntimeError("runtime_bot_migration_usage_forbidden")
-        cur.execute(
-            "SELECT has_table_privilege(current_user, 'bot_migration.schema_migrations', 'SELECT')"
-        )
-        if cur.fetchone()[0]:
+        ledger_oid = _fetch_ledger_schema_migrations_oid(cur)
+        if _has_table_privilege_on_oid(cur, ledger_oid, "SELECT"):
             raise RuntimeError("runtime_ledger_select_forbidden")
         cur.execute(
             "SELECT has_database_privilege(current_user, current_database(), 'CREATE')"
@@ -257,10 +280,8 @@ def assert_migrator_role_catalog(conn: Any) -> None:
         )
         if int(cur.fetchone()[0]) != 3:
             raise RuntimeError("migrator_must_own_tenant_tables")
-        cur.execute(
-            "SELECT has_table_privilege(current_user, 'bot_migration.schema_migrations', 'INSERT')"
-        )
-        if not cur.fetchone()[0]:
+        ledger_oid = _fetch_ledger_schema_migrations_oid(cur)
+        if not _has_table_privilege_on_oid(cur, ledger_oid, "INSERT"):
             raise RuntimeError("migrator_ledger_insert_required")
         cur.execute(
             "SELECT has_database_privilege(current_user, current_database(), 'CREATE')"

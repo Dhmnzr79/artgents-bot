@@ -61,11 +61,15 @@ _G8_STAGES = (
     "bootstrap_primary",
     "migrate_primary",
     "grants_primary",
+    "verify_ledger_primary",
+    "qualify_roles_primary",
     "test_primary",
     "backup",
     "prepare_restore",
     "restore",
     "grants_restore",
+    "verify_ledger_restore",
+    "qualify_roles_restore",
     "test_restore",
     "cleanup",
 )
@@ -349,7 +353,10 @@ def main() -> int:
         with psycopg.connect(bootstrap_superuser_dsn(G8_PRIMARY_DATABASE), autocommit=True) as conn:
             apply_post_migrate_grants(conn)
 
+        stage = "verify_ledger_primary"
         _verify_ledger(G8_PRIMARY_DATABASE)
+
+        stage = "qualify_roles_primary"
         _qualify_roles(G8_PRIMARY_DATABASE)
 
         stage = "test_primary"
@@ -370,7 +377,10 @@ def main() -> int:
         stage = "grants_restore"
         _grants_restore_database()
 
+        stage = "verify_ledger_restore"
         _verify_ledger(G8_RESTORE_DATABASE)
+
+        stage = "qualify_roles_restore"
         _qualify_roles(G8_RESTORE_DATABASE)
 
         stage = "test_restore"

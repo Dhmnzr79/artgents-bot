@@ -46,6 +46,7 @@ _MANDATORY_OFFLINE_MODULES = (
     "tests/test_g2_pr_ci_contract.py",
     "tests/test_g4_manual_deploy_contract.py",
     "tests/test_g5_manual_rollback_contract.py",
+    "tests/test_g7_postgres_backup_contract.py",
     "tests/test_turn_planner_llm.py",
     "tests/test_turn_planner_wiring.py",
     "tests/test_tenant_resource_isolation_offline.py",

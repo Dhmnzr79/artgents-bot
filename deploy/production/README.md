@@ -66,7 +66,16 @@ Redis в пилоте **не** используется.
 
 Client packs и KB поставляются из **Git/image**, не правятся вручную в контейнере.
 
-**Backup contract (Pass 3):** SQLite sessions и JSONL logs **не** входят в обязательный backup. Backup PostgreSQL — отдельный pass.
+**Backup contract (Pass 3):** SQLite sessions и JSONL logs **не** входят в обязательный backup. Backup PostgreSQL — **G7** (отдельные каталоги на VPS):
+
+- Архивы: `/var/lib/artgents/backups/postgres/` (`0700`, файлы `0600`)
+- Квитанции: `/var/lib/artgents/backups/receipts/` — путь последней строки stdout `backup-postgres` (нужен G4/G5)
+- Ежедневно: `artgents-postgres-backup.timer` → `--reason scheduled`
+- Проверка без restore: `/opt/artgents/bin/verify-postgres-backup <receipt.json>`
+- Локальный backup на VPS **не** защищает от потери всего VPS — нужен off-host copy / snapshot (**G10**)
+- Полная operational готовность — только после реального backup и **G8** disposable restore drill (не только `pg_restore --list`)
+
+Подробности: `deploy/production/server/README.md` (G7).
 
 ## Секреты и env
 

@@ -244,6 +244,21 @@ def test_runner_role_catalog_primary_and_restored() -> None:
         assert f'stage = "{stage}"' in runner
 
 
+def test_pg_schema_readiness_ledger_privilege_check_uses_oid_not_text_name() -> None:
+    readiness = (_REPO_ROOT / "core" / "pg_schema_readiness.py").read_text(encoding="utf-8")
+    security = readiness.split("def _check_runtime_role_security", 1)[1]
+    assert "bot_migration.schema_migrations" not in security
+    assert "_fetch_ledger_schema_migrations_oid" in readiness
+    helper = readiness.split("def _fetch_ledger_schema_migrations_oid", 1)[1].split(
+        "def _check_runtime_role_security", 1
+    )[0]
+    assert "pg_class" in helper
+    assert "pg_namespace" in helper
+    assert "c.oid" in helper
+    assert "runtime_ledger_table_missing" in readiness
+    assert "%s::oid" in security
+
+
 def test_runtime_ledger_privilege_check_uses_oid_not_text_name() -> None:
     disposable = _DISPOSABLE.read_text(encoding="utf-8")
     runtime = disposable.split("def assert_runtime_role_catalog", 1)[1].split(

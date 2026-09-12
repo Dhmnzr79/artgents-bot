@@ -342,6 +342,7 @@ def test_verify_job_preflight_and_ci_lock() -> None:
     assert "tests/test_g4_manual_deploy_contract.py" in pytest_block
     assert "tests/test_g5_manual_rollback_contract.py" in pytest_block
     assert "tests/test_g7_postgres_backup_contract.py" in pytest_block
+    assert "tests/test_g8_postgres_qualification_contract.py" in pytest_block
 
 
 def test_production_input_has_no_pytest() -> None:
@@ -445,7 +446,7 @@ def test_no_g4_deploy_wiring_started() -> None:
 
 def test_ci_workflow_pip_cache_uses_ci_lock() -> None:
     ci = _ci_text()
-    assert ci.count("cache-dependency-path: requirements-ci.lock") == 2
+    assert ci.count("cache-dependency-path: requirements-ci.lock") == 3
 
 
 def test_publish_verify_pip_cache_uses_ci_lock() -> None:

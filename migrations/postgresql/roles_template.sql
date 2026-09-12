@@ -13,6 +13,8 @@
 -- GRANT USAGE ON SCHEMA public TO bot_runtime;
 -- REVOKE CREATE ON SCHEMA public FROM bot_runtime;
 -- GRANT CONNECT ON DATABASE :dbname TO bot_migrator, bot_runtime;
+-- REVOKE CREATE ON DATABASE :dbname FROM PUBLIC, bot_runtime;
+-- GRANT CREATE ON DATABASE :dbname TO bot_migrator;
 
 -- === Migrator DDL (deploy/postgres/migrate.py creates bot_migration ledger) ===
 -- ALTER TABLE public.bot_events OWNER TO bot_migrator;

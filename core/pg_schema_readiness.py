@@ -41,7 +41,7 @@ _RUNTIME_DML_PRIVS = ("SELECT", "INSERT", "UPDATE", "DELETE")
 _RUNTIME_FORBIDDEN_TABLE_PRIVS = ("TRUNCATE", "REFERENCES", "TRIGGER")
 _RUNTIME_SEQUENCES = ("bot_events_id_seq", "leads_id_seq")
 _LEDGER_SCHEMA = "bot_migration"
-_LEDGER_TABLE = "bot_migration.schema_migrations"
+_LEDGER_RELATION = "schema_migrations"
 _LEDGER_FORBIDDEN_SCHEMA_PRIVS = ("USAGE", "CREATE")
 _LEDGER_FORBIDDEN_TABLE_PRIVS = (
     "SELECT",
@@ -188,6 +188,24 @@ def check_pg_schema_ready(conn: Any) -> tuple[bool, str]:
             return False, reason
 
     return True, "ok"
+
+
+def _fetch_ledger_schema_migrations_oid(cur: Any) -> int | None:
+    cur.execute(
+        """
+        SELECT c.oid
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = %s
+          AND c.relname = %s
+          AND c.relkind = 'r'
+        """,
+        (_LEDGER_SCHEMA, _LEDGER_RELATION),
+    )
+    rows = cur.fetchall()
+    if len(rows) != 1:
+        return None
+    return int(rows[0][0])
 
 
 def _check_runtime_role_security(cur: Any) -> tuple[bool, str]:
@@ -396,10 +414,14 @@ def _check_runtime_role_security(cur: Any) -> tuple[bool, str]:
         if row and bool(row[0]):
             return False, f"runtime_ledger_schema_forbidden:{priv.lower()}"
 
+    ledger_oid = _fetch_ledger_schema_migrations_oid(cur)
+    if ledger_oid is None:
+        return False, "runtime_ledger_table_missing"
+
     for priv in _LEDGER_FORBIDDEN_TABLE_PRIVS:
         cur.execute(
-            "SELECT has_table_privilege(current_user, %s, %s)",
-            (_LEDGER_TABLE, priv),
+            "SELECT has_table_privilege(current_user, %s::oid, %s)",
+            (ledger_oid, priv),
         )
         row = cur.fetchone()
         if row and bool(row[0]):

@@ -1,9 +1,12 @@
 """Offline tests for pg_schema_readiness (negative catalog shapes)."""
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from core.pg_schema_readiness import _normalize_policy_expr, check_pg_schema_ready
+
+_LEDGER_OID = 4242
 
 _TENANT_QUAL = (
     "(client_id = NULLIF(current_setting('app.current_tenant'::text, true), ''::text))"
@@ -67,6 +70,8 @@ class _HappyHandler:
             if schema == "bot_migration" or "'bot_migration'" in sql:
                 return (False,)
         if "has_table_privilege" in sql:
+            if params and len(params) >= 2 and params[0] == _LEDGER_OID:
+                return (False,)
             if params and len(params) >= 2:
                 priv = str(params[1]).upper()
             elif "'SELECT'" in sql:
@@ -85,8 +90,6 @@ class _HappyHandler:
                 priv = "TRIGGER"
             else:
                 priv = ""
-            if params and "schema_migrations" in str(params[0]):
-                return (False,)
             if priv in {"TRUNCATE", "REFERENCES", "TRIGGER"}:
                 return (False,)
             if priv:
@@ -134,6 +137,14 @@ class _HappyHandler:
             return _policy_rows()
         if "pg_auth_members" in sql:
             return []
+        if (
+            "pg_class" in sql
+            and params
+            and len(params) == 2
+            and params[0] == "bot_migration"
+            and params[1] == "schema_migrations"
+        ):
+            return [(_LEDGER_OID,)]
         return []
 
 
@@ -352,11 +363,34 @@ def test_fails_when_runtime_has_truncate() -> None:
     assert "runtime_table_priv_forbidden" in reason
 
 
+def test_fails_when_runtime_ledger_table_missing() -> None:
+    class _H(_HappyHandler):
+        def fetchall(self, sql: str, params=None):
+            if (
+                "pg_class" in sql
+                and params
+                and len(params) == 2
+                and params[0] == "bot_migration"
+            ):
+                return []
+            return super().fetchall(sql, params)
+
+    conn = MagicMock()
+    conn.cursor.return_value = _CatalogCursor(_H())
+    ok, reason = check_pg_schema_ready(conn)
+    assert ok is False
+    assert reason == "runtime_ledger_table_missing"
+
+
 def test_fails_when_runtime_can_read_ledger() -> None:
     class _H(_HappyHandler):
         def fetchone(self, sql: str, params=None):
-            target = str(params[0]) if params else sql
-            if "has_table_privilege" in sql and "schema_migrations" in target:
+            if (
+                "has_table_privilege" in sql
+                and params
+                and params[0] == _LEDGER_OID
+                and str(params[1]).upper() == "SELECT"
+            ):
                 return (True,)
             return super().fetchone(sql, params)
 
@@ -392,12 +426,26 @@ def test_fails_when_policy_restrictive() -> None:
     assert reason == "policy_permissive_invalid:public.bot_events:RESTRICTIVE"
 
 
+def test_readiness_never_passes_textual_ledger_name_to_has_table_privilege() -> None:
+    text = (
+        Path(__file__).resolve().parents[1] / "core" / "pg_schema_readiness.py"
+    ).read_text(encoding="utf-8")
+    security = text.split("def _check_runtime_role_security", 1)[1]
+    assert "bot_migration.schema_migrations" not in security
+    assert "%s::oid" in security
+    assert "_fetch_ledger_schema_migrations_oid" in text
+
+
 def test_fails_when_runtime_ledger_insert_granted() -> None:
     class _H(_HappyHandler):
         def fetchone(self, sql: str, params=None):
-            if "has_table_privilege" in sql and params and params[1] == "INSERT":
-                if params and "schema_migrations" in str(params[0]):
-                    return (True,)
+            if (
+                "has_table_privilege" in sql
+                and params
+                and params[0] == _LEDGER_OID
+                and str(params[1]).upper() == "INSERT"
+            ):
+                return (True,)
             return super().fetchone(sql, params)
 
     conn = MagicMock()

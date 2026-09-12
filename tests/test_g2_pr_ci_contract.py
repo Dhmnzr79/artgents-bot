@@ -47,6 +47,7 @@ _MANDATORY_OFFLINE_MODULES = (
     "tests/test_g4_manual_deploy_contract.py",
     "tests/test_g5_manual_rollback_contract.py",
     "tests/test_g7_postgres_backup_contract.py",
+    "tests/test_g8_postgres_qualification_contract.py",
     "tests/test_turn_planner_llm.py",
     "tests/test_turn_planner_wiring.py",
     "tests/test_tenant_resource_isolation_offline.py",
@@ -81,6 +82,7 @@ _EXCLUDED_INTEGRATION = "tests/test_pg_tenant_rls_integration.py"
 _REQUIRED_JOB_NAMES = (
     "Lint and validate",
     "Offline unit and contracts",
+    "PostgreSQL qualification",
     "Secret scan",
 )
 
@@ -97,7 +99,8 @@ def _workflow_text() -> str:
 
 
 def _offline_pytest_block(text: str) -> str:
-    return text.split("offline-unit-and-contracts:", 1)[-1]
+    block = text.split("offline-unit-and-contracts:", 1)[-1]
+    return block.split("postgres-qualification:", 1)[0]
 
 
 def test_contract_module_has_no_network_imports() -> None:
@@ -155,7 +158,7 @@ def test_stable_job_display_names_exactly_once() -> None:
 def test_all_uses_pins_are_full_sha() -> None:
     text = _workflow_text()
     uses_entries = _SHA_USES_RE.findall(text)
-    assert len(uses_entries) == 6, f"expected 6 pinned uses, got {uses_entries}"
+    assert len(uses_entries) == 8, f"expected 8 pinned uses, got {uses_entries}"
     for action, sha in uses_entries:
         assert len(sha) == 40, action
         assert not action.endswith("@v"), action
@@ -171,9 +174,9 @@ def test_expected_action_shas_present() -> None:
     assert "gitleaks/gitleaks-action@v" not in text
 
 
-def test_checkout_persist_credentials_false_on_all_three() -> None:
+def test_checkout_persist_credentials_false_on_all_jobs() -> None:
     text = _workflow_text()
-    assert text.count("persist-credentials: false") == 3
+    assert text.count("persist-credentials: false") == 4
 
 
 def test_secret_scan_full_history_and_gitleaks_safeguards() -> None:
@@ -231,7 +234,12 @@ def test_g2_contract_runs_in_offline_unit_and_contracts_job() -> None:
     text = _workflow_text()
     offline = _offline_pytest_block(text)
     assert "tests/test_g2_pr_ci_contract.py" in offline
-    assert offline.index("tests/test_g2_pr_ci_contract.py") < offline.index("secret-scan:")
+    assert "postgres-qualification:" not in offline
+
+
+def test_g8_integration_not_in_offline_pytest_list() -> None:
+    offline = _offline_pytest_block(_workflow_text())
+    assert "tests/test_g8_postgres_qualification_integration.py" not in offline
 
 
 def test_planner_modules_required_in_ci() -> None:

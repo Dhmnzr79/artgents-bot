@@ -131,7 +131,8 @@ jobs:
             tests/test_g3_immutable_image_contract.py \
             tests/test_g4_manual_deploy_contract.py \
             tests/test_g5_manual_rollback_contract.py \
-            tests/test_g7_postgres_backup_contract.py
+            tests/test_g7_postgres_backup_contract.py \
+            tests/test_g8_postgres_qualification_contract.py
 
   secret-scan:
     name: Secret scan

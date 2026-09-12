@@ -98,6 +98,8 @@ def test_roles_template_runtime_not_owner_and_explicit_flags() -> None:
     assert pre.count("noreplication") >= 2
     assert "revoke create on schema public from public" in pre
     assert "grant usage, create on schema public to bot_migrator" in pre
+    assert "revoke create on database :dbname from public, bot_runtime" in pre
+    assert "grant create on database :dbname to bot_migrator" in pre
     assert "revoke all on schema bot_migration" not in pre
     assert "revoke all on schema bot_migration from public, bot_runtime" in post
     assert "revoke all on table bot_migration.schema_migrations" in post
